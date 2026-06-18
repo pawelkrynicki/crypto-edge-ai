@@ -9,61 +9,84 @@ const CHAIN_LABELS: Record<string, string> = {
   base: "BASE",
 };
 
+function fmtUsd(n: number): string {
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
+  return `$${(n / 1_000).toFixed(0)}K`;
+}
+
 export const WatchlistTab: React.FC = () => {
   const watchlist = MOCK_CANDIDATES.filter((c) => c.final_label === "WATCHLIST");
 
   return (
     <div className="space-y-4 max-w-3xl">
-      <div className="bg-[#21262d] border border-[#30363d] rounded-lg px-4 py-3 flex items-start gap-3">
-        <span className="text-[#3fb950] text-lg mt-0.5">ℹ</span>
-        <p className="text-sm text-[#8b949e]">
-          <strong className="text-gray-300">Watchlist</strong> means the token is eligible for further research. It is{" "}
-          <strong className="text-yellow-400">not a recommendation</strong> and does not constitute a buy signal. The trader must conduct independent due diligence before any decision.
+      {/* Disclaimer banner */}
+      <div className="rounded-md px-4 py-2.5 flex items-start gap-2.5"
+        style={{ background: "rgba(59,130,246,0.07)", border: "1px solid rgba(59,130,246,0.2)" }}>
+        <span className="text-accent text-sm mt-0.5 shrink-0">ℹ</span>
+        <p className="text-xs text-secondary">
+          <strong className="text-primary">Watchlist</strong> means the token is eligible for further research only. It is{" "}
+          <strong className="text-[#f59e0b]">not a recommendation</strong> and does not constitute a buy signal. Independent due diligence is required before any decision.
         </p>
       </div>
 
-      <div className="space-y-3">
+      {/* Token cards */}
+      <div className="space-y-2.5">
         {watchlist.map((c) => (
-          <div key={c.id} className="bg-[#161b22] border border-[#30363d] rounded-lg p-4 space-y-3">
+          <div key={c.id} className="card p-4 space-y-3">
+            {/* Top row */}
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div className="flex items-center gap-3">
                 <div>
-                  <span className="font-bold text-gray-100">{c.symbol}</span>
-                  <span className="text-[#8b949e] text-xs ml-2">{c.name}</span>
+                  <span className="font-bold text-primary text-sm">{c.symbol}</span>
+                  <span className="text-secondary text-xs ml-2">{c.name}</span>
                 </div>
-                <span className="text-xs text-[#8b949e] bg-[#21262d] px-2 py-0.5 rounded">
+                <span className="text-[10px] text-secondary px-2 py-0.5 rounded"
+                  style={{ background: "var(--bg-raised)", border: "1px solid var(--border)" }}>
                   {CHAIN_LABELS[c.chain] ?? c.chain.toUpperCase()} · {c.dex}
                 </span>
               </div>
               <LabelBadge label={c.final_label} />
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-              <Stat label="Market Cap" value={`$${(c.market_cap_usd / 1_000_000).toFixed(2)}M`} />
-              <Stat label="Liquidity" value={`$${(c.liquidity_usd / 1_000).toFixed(0)}K`} />
-              <Stat label="24h Volume" value={`$${(c.volume_24h_usd / 1_000).toFixed(0)}K`} />
-              <Stat label="Pair Age" value={`${c.pair_age_days} days`} />
+            {/* Stats grid */}
+            <div className="grid grid-cols-4 gap-2">
+              {[
+                { label: "Market Cap", value: fmtUsd(c.market_cap_usd) },
+                { label: "Liquidity", value: fmtUsd(c.liquidity_usd) },
+                { label: "24h Volume", value: fmtUsd(c.volume_24h_usd) },
+                { label: "Pair Age", value: `${c.pair_age_days}d` },
+              ].map((s) => (
+                <div key={s.label} className="rounded px-2.5 py-2"
+                  style={{ background: "var(--bg-raised)", border: "1px solid var(--border)" }}>
+                  <div className="section-label mb-0.5">{s.label}</div>
+                  <div className="text-sm font-semibold text-primary">{s.value}</div>
+                </div>
+              ))}
             </div>
 
+            {/* Why watchlist */}
             <div>
-              <div className="text-xs text-[#8b949e] uppercase tracking-widest font-semibold mb-1">Why Watchlist</div>
-              <p className="text-xs text-gray-300">{c.final_reasons.join(" · ")}</p>
+              <div className="section-label mb-1">Why Watchlist</div>
+              <p className="text-xs text-secondary">{c.final_reasons.join(" · ")}</p>
             </div>
 
+            {/* Missing checks */}
             {c.security && c.security.missing_data.length > 0 && (
               <div>
-                <div className="text-xs text-[#8b949e] uppercase tracking-widest font-semibold mb-1">Missing Manual Checks</div>
+                <div className="section-label mb-1">Missing Manual Checks</div>
                 <div className="flex flex-wrap gap-1">
                   {c.security.missing_data.map((m) => (
-                    <span key={m} className="px-2 py-0.5 rounded text-xs bg-yellow-900/30 text-yellow-400 border border-yellow-700/30">{m}</span>
+                    <span key={m} className="badge badge-manual text-[10px]">{m}</span>
                   ))}
                 </div>
               </div>
             )}
 
-            <div className="flex items-center justify-between text-xs text-[#8b949e]">
+            {/* Footer */}
+            <div className="flex items-center justify-between text-[10px]"
+              style={{ color: "var(--text-muted)" }}>
               <span>Last checked: {new Date(c.last_checked).toLocaleString()}</span>
-              <span className="italic text-yellow-400/80">Further review only, not a buy signal.</span>
+              <span className="italic text-[#f59e0b]/70">Further review only, not a buy signal.</span>
             </div>
           </div>
         ))}
@@ -71,10 +94,3 @@ export const WatchlistTab: React.FC = () => {
     </div>
   );
 };
-
-const Stat: React.FC<{ label: string; value: string }> = ({ label, value }) => (
-  <div className="bg-[#21262d] rounded p-2">
-    <div className="text-[#8b949e] uppercase tracking-widest text-xs mb-0.5">{label}</div>
-    <div className="text-gray-200 font-semibold">{value}</div>
-  </div>
-);

@@ -11,59 +11,82 @@ const CHAIN_LABELS: Record<string, string> = {
 
 export const RiskAlerts: React.FC = () => {
   const critical = MOCK_CANDIDATES.filter((c) => c.final_label === "CRITICAL_RISK");
-  const manual = MOCK_CANDIDATES.filter((c) => c.final_label === "NEEDS_MANUAL_VERIFICATION");
+  const manual   = MOCK_CANDIDATES.filter((c) => c.final_label === "NEEDS_MANUAL_VERIFICATION");
 
   return (
     <div className="space-y-6 max-w-3xl">
       {/* Critical Risks */}
-      <div>
-        <div className="flex items-center gap-2 mb-3">
-          <span className="text-[#f85149] text-lg">⚠</span>
-          <h3 className="text-sm font-semibold text-[#f85149] uppercase tracking-wide">Critical Risks</h3>
-          <span className="text-xs text-[#8b949e]">({critical.length})</span>
-        </div>
-        <div className="space-y-3">
-          {critical.map((c) => (
-            <AlertCard key={c.id} candidate={c} variant="critical" />
-          ))}
-        </div>
-      </div>
+      <Section
+        icon="▲"
+        iconColor="text-[#ef4444]"
+        title="Critical Risks"
+        count={critical.length}
+        borderColor="rgba(239,68,68,0.2)"
+        bgColor="rgba(239,68,68,0.04)"
+      >
+        {critical.map((c) => (
+          <AlertCard key={c.id} candidate={c} />
+        ))}
+      </Section>
 
       {/* Manual Verification */}
-      <div>
-        <div className="flex items-center gap-2 mb-3">
-          <span className="text-[#e3b341] text-lg">?</span>
-          <h3 className="text-sm font-semibold text-[#e3b341] uppercase tracking-wide">Manual Verification Required</h3>
-          <span className="text-xs text-[#8b949e]">({manual.length})</span>
-        </div>
-        <div className="space-y-3">
-          {manual.map((c) => (
-            <AlertCard key={c.id} candidate={c} variant="manual" />
-          ))}
-        </div>
-      </div>
+      <Section
+        icon="?"
+        iconColor="text-[#f59e0b]"
+        title="Manual Verification Required"
+        count={manual.length}
+        borderColor="rgba(245,158,11,0.2)"
+        bgColor="rgba(245,158,11,0.04)"
+      >
+        {manual.map((c) => (
+          <AlertCard key={c.id} candidate={c} />
+        ))}
+      </Section>
     </div>
   );
 };
 
+const Section: React.FC<{
+  icon: string; iconColor: string; title: string; count: number;
+  borderColor: string; bgColor: string; children: React.ReactNode;
+}> = ({ icon, iconColor, title, count, borderColor, bgColor, children }) => (
+  <div>
+    <div className="flex items-center gap-2 mb-3">
+      <span className={`text-sm font-bold ${iconColor}`}>{icon}</span>
+      <span className="text-sm font-semibold text-primary">{title}</span>
+      <span className="text-xs text-secondary ml-1">({count})</span>
+    </div>
+    <div className="space-y-2.5">
+      {React.Children.map(children, (child) =>
+        React.isValidElement(child)
+          ? React.cloneElement(child as React.ReactElement<AlertCardProps>, { borderColor, bgColor })
+          : child
+      )}
+    </div>
+  </div>
+);
+
 interface AlertCardProps {
   candidate: (typeof MOCK_CANDIDATES)[0];
-  variant: "critical" | "manual";
+  borderColor?: string;
+  bgColor?: string;
 }
 
-const AlertCard: React.FC<AlertCardProps> = ({ candidate: c, variant }) => {
-  const borderClass = variant === "critical" ? "border-red-800/50" : "border-yellow-800/50";
-  const bgClass = variant === "critical" ? "bg-red-900/10" : "bg-yellow-900/10";
-
-  const flags = c.security?.risk_flags ?? [];
+const AlertCard: React.FC<AlertCardProps> = ({ candidate: c, borderColor, bgColor }) => {
+  const flags   = c.security?.risk_flags ?? [];
   const missing = c.security?.missing_data ?? [];
 
   return (
-    <div className={`bg-[#161b22] border ${borderClass} ${bgClass} rounded-lg p-4 space-y-3`}>
+    <div className="rounded-lg p-4 space-y-3"
+      style={{
+        background: bgColor ?? "var(--bg-card)",
+        border: `1px solid ${borderColor ?? "var(--border)"}`,
+      }}>
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-3">
-          <span className="font-bold text-gray-100">{c.symbol}</span>
-          <span className="text-xs text-[#8b949e] bg-[#21262d] px-2 py-0.5 rounded">
+        <div className="flex items-center gap-2">
+          <span className="font-bold text-primary text-sm">{c.symbol}</span>
+          <span className="text-[10px] text-secondary px-2 py-0.5 rounded"
+            style={{ background: "var(--bg-raised)", border: "1px solid var(--border)" }}>
             {CHAIN_LABELS[c.chain] ?? c.chain.toUpperCase()} · {c.dex}
           </span>
         </div>
@@ -71,37 +94,33 @@ const AlertCard: React.FC<AlertCardProps> = ({ candidate: c, variant }) => {
       </div>
 
       <div>
-        <div className="text-xs text-[#8b949e] uppercase tracking-widest font-semibold mb-1">Reasons</div>
-        <ul className="space-y-0.5">
-          {c.final_reasons.map((r) => (
-            <li key={r} className="text-xs text-gray-300">• {r}</li>
-          ))}
-        </ul>
+        <div className="section-label mb-1">Reasons</div>
+        {c.final_reasons.map((r) => (
+          <div key={r} className="text-xs text-secondary">• {r}</div>
+        ))}
       </div>
 
       {flags.length > 0 && (
         <div>
-          <div className="text-xs text-[#8b949e] uppercase tracking-widest font-semibold mb-1">Risk Flags</div>
+          <div className="section-label mb-1">Risk Flags</div>
           <div className="flex flex-wrap gap-1">
-            {flags.map((f) => (
-              <span key={f} className="px-2 py-0.5 rounded text-xs bg-red-900/40 text-red-400 border border-red-700/40">{f}</span>
-            ))}
+            {flags.map((f) => <span key={f} className="badge badge-critical text-[10px]">{f}</span>)}
           </div>
         </div>
       )}
 
       {missing.length > 0 && (
         <div>
-          <div className="text-xs text-[#8b949e] uppercase tracking-widest font-semibold mb-1">Missing Data</div>
+          <div className="section-label mb-1">Missing Data</div>
           <div className="flex flex-wrap gap-1">
-            {missing.map((m) => (
-              <span key={m} className="px-2 py-0.5 rounded text-xs bg-yellow-900/40 text-yellow-400 border border-yellow-700/40">{m}</span>
-            ))}
+            {missing.map((m) => <span key={m} className="badge badge-manual text-[10px]">{m}</span>)}
           </div>
         </div>
       )}
 
-      <div className="text-xs text-[#8b949e]">Last checked: {new Date(c.last_checked).toLocaleString()}</div>
+      <div className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+        Last checked: {new Date(c.last_checked).toLocaleString()}
+      </div>
     </div>
   );
 };

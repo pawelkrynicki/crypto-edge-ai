@@ -7,49 +7,51 @@ interface Props {
   onClose?: () => void;
 }
 
-function fmt(n: number | null, prefix = "", decimals = 0): string {
+function fmtUsd(n: number | null, decimals = 0): string {
   if (n === null) return "—";
-  if (n >= 1_000_000) return `${prefix}${(n / 1_000_000).toFixed(2)}M`;
-  if (n >= 1_000) return `${prefix}${(n / 1_000).toFixed(0)}K`;
-  return `${prefix}${n.toFixed(decimals)}`;
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
+  if (n >= 1_000) return `$${(n / 1_000).toFixed(0)}K`;
+  return `$${n.toFixed(decimals)}`;
 }
 
-function pct(n: number | null): string {
+function fmtPct(n: number | null): string {
   if (n === null) return "—";
   return `${(n * 100).toFixed(1)}%`;
 }
 
-function boolDisplay(v: boolean | null): React.ReactNode {
-  if (v === null) return <span className="text-yellow-400 text-xs">Missing / manual verification required</span>;
-  return v ? (
-    <span className="text-green-400 text-xs">Yes</span>
-  ) : (
-    <span className="text-red-400 text-xs">No</span>
-  );
-}
+const BoolVal: React.FC<{ v: boolean | null }> = ({ v }) => {
+  if (v === null) return <MissingTag />;
+  return v
+    ? <span className="text-[#22c55e] text-xs">Yes</span>
+    : <span className="text-[#ef4444] text-xs">No</span>;
+};
 
-function riskDisplay(v: boolean | null, riskIfTrue = true): React.ReactNode {
-  if (v === null) return <span className="text-yellow-400 text-xs">Missing / manual verification required</span>;
-  const isRisk = riskIfTrue ? v : !v;
-  return isRisk ? (
-    <span className="text-red-400 text-xs">Detected</span>
-  ) : (
-    <span className="text-green-400 text-xs">Not detected</span>
-  );
-}
+const RiskVal: React.FC<{ v: boolean | null }> = ({ v }) => {
+  if (v === null) return <MissingTag />;
+  return v
+    ? <span className="text-[#ef4444] text-xs font-semibold">Detected</span>
+    : <span className="text-[#22c55e] text-xs">None</span>;
+};
+
+const MissingTag: React.FC = () => (
+  <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded"
+    style={{ background: "rgba(245,158,11,0.1)", color: "#f59e0b", border: "1px solid rgba(245,158,11,0.25)" }}>
+    Missing
+  </span>
+);
 
 const DECISION_COPY: Record<string, { explanation: string; nextStep: string }> = {
   WATCHLIST: {
     explanation: "Passed basic filters and available security checks. Eligible for further review only.",
-    nextStep: "Add to personal watchlist. Conduct manual community, narrative, and chart review before any decision.",
+    nextStep: "Conduct manual community, narrative, and chart review before any decision.",
   },
   CRITICAL_RISK: {
-    explanation: "Critical security flag detected. Do not proceed to setup review without manual investigation.",
-    nextStep: "Investigate flagged risks manually. Do not proceed without resolving all critical flags.",
+    explanation: "Critical security flag detected. Do not proceed without manual investigation.",
+    nextStep: "Investigate all flagged risks manually before any further assessment.",
   },
   NEEDS_MANUAL_VERIFICATION: {
     explanation: "Important security data is missing or unclear. Manual verification required.",
-    nextStep: "Manually verify missing data points before making any further assessment.",
+    nextStep: "Manually verify all missing data points before making any assessment.",
   },
   REJECT: {
     explanation: "Failed basic market/liquidity filters. Not eligible for further review.",
@@ -72,8 +74,8 @@ const CHECKLIST_ITEMS = {
     { key: "volMc", label: "Volume/MC ratio reviewed" },
   ],
   Social: [
-    { key: "community", label: "Community quality — manual review still needed" },
-    { key: "narrative", label: "Narrative — manual review still needed" },
+    { key: "community", label: "Community quality — manual review needed" },
+    { key: "narrative", label: "Narrative — manual review needed" },
   ],
   "Personal Risk": [
     { key: "notSignal", label: "I understand this is not a buy signal" },
@@ -84,168 +86,190 @@ const CHECKLIST_ITEMS = {
 
 type CheckedState = Record<string, boolean>;
 
+const SectionTitle: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <div className="section-label border-b pb-1 mb-2" style={{ borderColor: "var(--border)" }}>
+    {children}
+  </div>
+);
+
+const DR: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value }) => (
+  <div className="detail-row">
+    <span className="detail-label">{label}</span>
+    <span className="detail-value">{value}</span>
+  </div>
+);
+
 export const CandidateDetail: React.FC<Props> = ({ candidate: c, onClose }) => {
   const [checked, setChecked] = useState<CheckedState>({});
   const sec = c.security;
   const decision = DECISION_COPY[c.final_label];
-
   const toggle = (key: string) => setChecked((prev) => ({ ...prev, [key]: !prev[key] }));
 
   return (
-    <div className="bg-[#161b22] border border-[#30363d] rounded-lg overflow-y-auto max-h-[calc(100vh-200px)] text-sm">
+    <div className="card flex flex-col overflow-hidden" style={{ maxHeight: "calc(100vh - 180px)" }}>
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-[#30363d] sticky top-0 bg-[#161b22] z-10">
-        <div>
-          <span className="font-bold text-gray-100 text-base">{c.symbol}</span>
-          <span className="text-[#8b949e] ml-2 text-xs">{c.name}</span>
+      <div className="flex items-center justify-between px-4 py-3 shrink-0"
+        style={{ borderBottom: "1px solid var(--border)", background: "var(--bg-raised)" }}>
+        <div className="flex items-center gap-2">
+          <span className="font-bold text-primary text-sm">{c.symbol}</span>
+          <span className="text-secondary text-xs">{c.name}</span>
         </div>
         <div className="flex items-center gap-2">
           <LabelBadge label={c.final_label} />
           {onClose && (
-            <button onClick={onClose} className="text-[#8b949e] hover:text-gray-200 text-lg leading-none">×</button>
+            <button onClick={onClose} className="text-muted hover:text-primary text-base leading-none ml-1">×</button>
           )}
         </div>
       </div>
 
-      <div className="px-4 py-3 space-y-5">
-        {/* Meta */}
-        <div className="space-y-1">
-          <div className="text-xs text-[#8b949e] uppercase tracking-widest font-semibold mb-1">Token Info</div>
-          <Row label="Chain" value={c.chain.toUpperCase()} />
-          <Row label="DEX" value={c.dex} />
-          <Row label="Contract" value={<code className="text-xs text-[#8b949e] break-all">{c.contract_address}</code>} />
-          <Row label="Pair" value={<code className="text-xs text-[#8b949e] break-all">{c.pair_address}</code>} />
-          <Row
-            label="Source"
-            value={
-              <a href={c.source_url} target="_blank" rel="noopener noreferrer" className="text-[#58a6ff] hover:underline text-xs truncate block max-w-[180px]">
-                DexScreener ↗
-              </a>
-            }
-          />
+      {/* Scrollable body */}
+      <div className="overflow-y-auto flex-1 px-4 py-3 space-y-4 text-xs">
+
+        {/* Token meta */}
+        <div>
+          <SectionTitle>Token Info</SectionTitle>
+          <DR label="Chain" value={c.chain.toUpperCase()} />
+          <DR label="DEX" value={c.dex} />
+          <DR label="Contract" value={
+            <code className="text-[10px] text-secondary break-all">{c.contract_address.slice(0, 18)}…</code>
+          } />
+          <DR label="Source" value={
+            <a href={c.source_url} target="_blank" rel="noopener noreferrer"
+              className="text-accent hover:underline text-xs">DexScreener ↗</a>
+          } />
         </div>
 
         {/* A. Market Snapshot */}
-        <Section title="A. Market Snapshot">
-          <Row label="Price" value={c.price_usd !== null ? `$${c.price_usd.toFixed(6)}` : "—"} />
-          <Row label="Market Cap" value={fmt(c.market_cap_usd, "$")} />
-          <Row label="FDV" value={fmt(c.fdv_usd, "$")} />
-          <Row label="Liquidity" value={fmt(c.liquidity_usd, "$")} />
-          <Row label="24h Volume" value={fmt(c.volume_24h_usd, "$")} />
-          <Row label="Volume/MC" value={pct(c.volume_market_cap_ratio)} />
-          <Row label="Pair Age" value={`${c.pair_age_days} days`} />
-        </Section>
+        <div>
+          <SectionTitle>A. Market Snapshot</SectionTitle>
+          <div className="grid grid-cols-2 gap-x-3">
+            <DR label="Price" value={c.price_usd !== null ? `$${c.price_usd.toFixed(6)}` : "—"} />
+            <DR label="Market Cap" value={fmtUsd(c.market_cap_usd)} />
+            <DR label="FDV" value={fmtUsd(c.fdv_usd)} />
+            <DR label="Liquidity" value={fmtUsd(c.liquidity_usd)} />
+            <DR label="24h Volume" value={fmtUsd(c.volume_24h_usd)} />
+            <DR label="Volume/MC" value={fmtPct(c.volume_market_cap_ratio)} />
+            <DR label="Pair Age" value={`${c.pair_age_days}d`} />
+          </div>
+        </div>
 
         {/* B. Security Check */}
-        <Section title="B. Security Check">
+        <div>
+          <SectionTitle>B. Security Check</SectionTitle>
           {sec ? (
             <>
-              <Row label="Honeypot" value={
-                sec.honeypot_status === "passed" ? <span className="text-green-400 text-xs">Passed</span>
-                  : sec.honeypot_status === "failed" ? <span className="text-red-400 text-xs">DETECTED</span>
-                  : <span className="text-yellow-400 text-xs">Unknown</span>
-              } />
-              <Row label="Buy Tax" value={sec.buy_tax !== null ? `${sec.buy_tax}%` : "—"} />
-              <Row label="Sell Tax" value={sec.sell_tax !== null ? `${sec.sell_tax}%` : "—"} />
-              <Row label="Contract Verified" value={boolDisplay(sec.contract_verified)} />
-              <Row label="Ownership" value={
-                sec.ownership_status === "renounced" ? <span className="text-green-400 text-xs">Renounced</span>
-                  : sec.ownership_status === "active" ? <span className="text-red-400 text-xs">Active</span>
-                  : <span className="text-yellow-400 text-xs">Unknown</span>
-              } />
-              <Row label="Liquidity Locked" value={boolDisplay(sec.liquidity_locked)} />
-              <Row label="Mint Risk" value={riskDisplay(sec.mint_risk)} />
-              <Row label="Blacklist Risk" value={riskDisplay(sec.blacklist_risk)} />
-              <Row label="Sell Restriction" value={riskDisplay(sec.sell_restriction_risk)} />
-              <Row label="Top Wallet %" value={sec.top_wallet_pct !== null ? `${sec.top_wallet_pct}%` : <span className="text-yellow-400 text-xs">Missing / manual verification required</span>} />
-              <Row label="Top 10 Wallets %" value={sec.top_10_wallets_pct !== null ? `${sec.top_10_wallets_pct}%` : <span className="text-yellow-400 text-xs">Missing / manual verification required</span>} />
+              <div className="grid grid-cols-2 gap-x-3">
+                <DR label="Honeypot" value={
+                  sec.honeypot_status === "passed" ? <span className="text-[#22c55e]">Passed</span>
+                    : sec.honeypot_status === "failed" ? <span className="text-[#ef4444] font-semibold">DETECTED</span>
+                    : <span className="text-[#f59e0b]">Unknown</span>
+                } />
+                <DR label="Buy Tax" value={sec.buy_tax !== null ? `${sec.buy_tax}%` : <MissingTag />} />
+                <DR label="Sell Tax" value={sec.sell_tax !== null ? `${sec.sell_tax}%` : <MissingTag />} />
+                <DR label="Contract" value={<BoolVal v={sec.contract_verified} />} />
+                <DR label="Ownership" value={
+                  sec.ownership_status === "renounced" ? <span className="text-[#22c55e]">Renounced</span>
+                    : sec.ownership_status === "active" ? <span className="text-[#ef4444]">Active</span>
+                    : <span className="text-[#f59e0b]">Unknown</span>
+                } />
+                <DR label="Liq. Locked" value={<BoolVal v={sec.liquidity_locked} />} />
+                <DR label="Mint Risk" value={<RiskVal v={sec.mint_risk} />} />
+                <DR label="Blacklist" value={<RiskVal v={sec.blacklist_risk} />} />
+                <DR label="Sell Restrict" value={<RiskVal v={sec.sell_restriction_risk} />} />
+                <DR label="Top Wallet" value={sec.top_wallet_pct !== null ? `${sec.top_wallet_pct}%` : <MissingTag />} />
+                <DR label="Top 10 Wallets" value={sec.top_10_wallets_pct !== null ? `${sec.top_10_wallets_pct}%` : <MissingTag />} />
+              </div>
               {sec.risk_flags.length > 0 && (
                 <div className="mt-2">
-                  <div className="text-xs text-[#8b949e] mb-1">Risk Flags</div>
+                  <div className="section-label mb-1">Risk Flags</div>
                   <div className="flex flex-wrap gap-1">
                     {sec.risk_flags.map((f) => (
-                      <span key={f} className="px-2 py-0.5 rounded text-xs bg-red-900/40 text-red-400 border border-red-700/40">{f}</span>
+                      <span key={f} className="badge badge-critical text-[10px]">{f}</span>
                     ))}
                   </div>
                 </div>
               )}
               {sec.missing_data.length > 0 && (
                 <div className="mt-2">
-                  <div className="text-xs text-[#8b949e] mb-1">Missing Data</div>
+                  <div className="section-label mb-1">Missing Data</div>
                   <div className="flex flex-wrap gap-1">
                     {sec.missing_data.map((f) => (
-                      <span key={f} className="px-2 py-0.5 rounded text-xs bg-yellow-900/40 text-yellow-400 border border-yellow-700/40">{f}</span>
+                      <span key={f} className="badge badge-manual text-[10px]">{f}</span>
                     ))}
                   </div>
                 </div>
               )}
             </>
           ) : (
-            <p className="text-[#8b949e] text-xs italic">Security check not performed — token rejected at basic filter stage.</p>
+            <p className="text-secondary text-xs italic">
+              Security check not performed — token rejected at basic filter stage.
+            </p>
           )}
-        </Section>
+        </div>
 
-        {/* C. Decision Box */}
-        <Section title="C. Decision Box">
-          <div className="mb-2">
-            <LabelBadge label={c.final_label} size="md" />
-          </div>
-          {c.final_label === "WATCHLIST" && (
-            <p className="text-xs text-green-400/70 italic mb-2">Further review only, not a buy signal.</p>
-          )}
-          <p className="text-gray-300 text-xs mb-2">{decision.explanation}</p>
-          <div className="text-xs text-[#8b949e] uppercase tracking-widest font-semibold mb-1">Trader Next Step</div>
-          <p className="text-gray-400 text-xs">{decision.nextStep}</p>
-          {c.final_reasons.length > 0 && (
-            <div className="mt-2">
-              <div className="text-xs text-[#8b949e] uppercase tracking-widest font-semibold mb-1">Reasons</div>
-              <ul className="space-y-0.5">
-                {c.final_reasons.map((r) => (
-                  <li key={r} className="text-xs text-gray-400">• {r}</li>
-                ))}
-              </ul>
+        {/* C. Decision */}
+        <div>
+          <SectionTitle>C. Decision</SectionTitle>
+          <div className="rounded-md p-3 space-y-2" style={{ background: "var(--bg-raised)", border: "1px solid var(--border-sub)" }}>
+            <div className="flex items-center gap-2">
+              <LabelBadge label={c.final_label} size="md" />
+              {c.final_label === "WATCHLIST" && (
+                <span className="text-[10px] italic" style={{ color: "var(--text-muted)" }}>
+                  Not a buy signal
+                </span>
+              )}
             </div>
-          )}
-        </Section>
-
-        {/* D. Final Checklist */}
-        <Section title="D. Final Checklist">
-          {Object.entries(CHECKLIST_ITEMS).map(([category, items]) => (
-            <div key={category} className="mb-3">
-              <div className="text-xs text-[#8b949e] uppercase tracking-widest font-semibold mb-1">{category}</div>
-              <div className="space-y-1">
-                {items.map((item) => (
-                  <label key={item.key} className="flex items-start gap-2 cursor-pointer group">
-                    <input
-                      type="checkbox"
-                      checked={!!checked[item.key]}
-                      onChange={() => toggle(item.key)}
-                      className="mt-0.5 accent-[#58a6ff]"
-                    />
-                    <span className={`text-xs ${checked[item.key] ? "text-green-400 line-through" : "text-gray-300 group-hover:text-gray-100"}`}>
-                      {item.label}
-                    </span>
-                  </label>
+            <p className="text-secondary text-xs">{decision.explanation}</p>
+            <div>
+              <div className="section-label mb-0.5">Next Step</div>
+              <p className="text-secondary text-xs">{decision.nextStep}</p>
+            </div>
+            {c.final_reasons.length > 0 && (
+              <div>
+                <div className="section-label mb-0.5">Reasons</div>
+                {c.final_reasons.map((r) => (
+                  <div key={r} className="text-xs text-secondary">• {r}</div>
                 ))}
               </div>
-            </div>
-          ))}
-        </Section>
+            )}
+          </div>
+        </div>
+
+        {/* D. Final Checklist */}
+        <div>
+          <SectionTitle>D. Final Checklist</SectionTitle>
+          <div className="space-y-3">
+            {Object.entries(CHECKLIST_ITEMS).map(([category, items]) => (
+              <div key={category}>
+                <div className="text-[10px] font-semibold uppercase tracking-widest mb-1.5"
+                  style={{ color: "var(--text-muted)" }}>
+                  {category}
+                </div>
+                <div className="space-y-1">
+                  {items.map((item) => (
+                    <label key={item.key} className="flex items-start gap-2 cursor-pointer group">
+                      <input
+                        type="checkbox"
+                        checked={!!checked[item.key]}
+                        onChange={() => toggle(item.key)}
+                        className="mt-0.5 accent-accent"
+                      />
+                      <span className={`text-xs transition-colors ${
+                        checked[item.key]
+                          ? "text-[#22c55e] line-through opacity-70"
+                          : "text-secondary group-hover:text-primary"
+                      }`}>
+                        {item.label}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
       </div>
     </div>
   );
 };
-
-const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
-  <div>
-    <div className="text-xs text-[#8b949e] uppercase tracking-widest font-semibold mb-2 border-b border-[#21262d] pb-1">{title}</div>
-    <div className="space-y-1">{children}</div>
-  </div>
-);
-
-const Row: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value }) => (
-  <div className="flex items-start justify-between gap-2">
-    <span className="text-[#8b949e] text-xs shrink-0">{label}</span>
-    <span className="text-gray-300 text-xs text-right">{value}</span>
-  </div>
-);

@@ -4,37 +4,42 @@ import type { FinalLabel } from "../mockData";
 interface LabelBadgeProps {
   label: FinalLabel | string;
   size?: "sm" | "md";
+  showDot?: boolean;
 }
 
-const LABEL_CONFIG: Record<string, { cls: string; text: string }> = {
+const LABEL_CONFIG: Record<string, { cls: string; text: string; dot: string }> = {
   WATCHLIST: {
-    cls: "bg-green-900/60 text-green-400 border border-green-700/50",
-    text: "WATCHLIST",
+    cls: "badge badge-watchlist",
+    text: "Further review only",
+    dot: "bg-[#22c55e]",
   },
   CRITICAL_RISK: {
-    cls: "bg-red-900/60 text-red-400 border border-red-700/50",
-    text: "CRITICAL RISK",
+    cls: "badge badge-critical",
+    text: "Critical risk",
+    dot: "bg-[#ef4444]",
   },
   NEEDS_MANUAL_VERIFICATION: {
-    cls: "bg-yellow-900/60 text-yellow-400 border border-yellow-700/50",
-    text: "NEEDS REVIEW",
+    cls: "badge badge-manual",
+    text: "Manual check",
+    dot: "bg-[#f59e0b]",
   },
   REJECT: {
-    cls: "bg-gray-800 text-gray-500 border border-gray-700/50",
-    text: "REJECT",
+    cls: "badge badge-reject",
+    text: "Rejected",
+    dot: "bg-[#64748b]",
   },
 };
 
-export const LabelBadge: React.FC<LabelBadgeProps> = ({ label, size = "sm" }) => {
+export const LabelBadge: React.FC<LabelBadgeProps> = ({ label, size = "sm", showDot = true }) => {
   const cfg = LABEL_CONFIG[label] ?? {
-    cls: "bg-gray-800 text-gray-400 border border-gray-700",
+    cls: "badge badge-reject",
     text: label,
+    dot: "bg-[#64748b]",
   };
-  const sizeClass = size === "md" ? "px-3 py-1 text-sm" : "px-2 py-0.5 text-xs";
+  const sizeClass = size === "md" ? "px-3 py-1 text-xs" : "";
   return (
-    <span
-      className={`inline-flex items-center rounded font-semibold uppercase tracking-wide ${sizeClass} ${cfg.cls}`}
-    >
+    <span className={`${cfg.cls} ${sizeClass}`}>
+      {showDot && <span className={`inline-block w-1.5 h-1.5 rounded-full ${cfg.dot}`} />}
       {cfg.text}
     </span>
   );
