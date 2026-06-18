@@ -10,6 +10,8 @@ It also includes a second POC: Security Enrichment. This checks whether a normal
 
 It also includes a third POC: Combined Scanner. This connects DexScreener discovery, basic filters, limited security enrichment, final scanner labels, and standardized JSON output for Camp BETA.
 
+It also includes a fourth POC: Persistable Scanner Output. This converts Combined Scanner JSON into a storage-ready model and writes local JSON/JSONL files for later database mapping.
+
 This is not the product. It does not include UI, database, migrations, auth, production cron scripts, AI calls, exchange integration, MT4, Telegram/Discord, payments, or auto-trading.
 
 ## Install
@@ -100,6 +102,40 @@ npm run scanner:live -- --query SOL --max-candidates 3
 ```
 
 The default and maximum safety limit is `maxCandidates = 3`. The runner does not perform mass scanning, does not retry aggressively, and does not make unbounded parallel requests.
+
+## Persistable Scanner Output
+
+Persistable mode prepares the Combined Scanner output for later storage, without connecting to any database:
+
+```bash
+npm run scanner:persist:fixture
+npm run scanner:persist:live -- --query SOL --max-candidates 3
+```
+
+It writes files under:
+
+```text
+tools/data-poc/output/<run_id>/
+```
+
+Generated files:
+
+- `scan_run.json`: one scan run record.
+- `candidates.jsonl`: candidate rows, one JSON object per line.
+- `security_checks.jsonl`: security check rows for candidates with security data.
+- `scorecards.jsonl`: partial scorecard rows, one per candidate.
+- `full_output.json`: full storage-ready object.
+
+This is a storage-ready POC, not a database implementation. It does not add MySQL, SQLite, Drizzle, migrations, auth, or production persistence.
+
+Future table mapping:
+
+- `scan_run.json` -> `crypto_token_scan_runs`.
+- `candidates.jsonl` -> `crypto_token_candidates`.
+- `security_checks.jsonl` -> `crypto_token_security_checks`.
+- `scorecards.jsonl` -> `crypto_token_scorecards`.
+
+Scorecards are intentionally partial at this stage. `security_score`, `onchain_score`, `social_score`, `narrative_score`, `total_score`, and `confidence` are `null`. `decision_label` mirrors the Combined Scanner `final_label`, and `risk_level` is mapped from that label.
 
 ## Tests
 
@@ -284,6 +320,7 @@ Important: `WATCHLIST` is not a buy signal. It only means `eligible for further 
 - No production cron scripts.
 - No AI calls.
 - No trading signals.
+- No database persistence.
 
 For the Security Enrichment POC, GoPlus and Honeypot.is are included only as fixture-first and live best-effort checks. There is still no database, UI, cron, AI, or production scanner.
 

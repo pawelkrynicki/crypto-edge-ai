@@ -83,6 +83,38 @@ npm run scanner:live -- --query SOL --max-candidates 3
 
 Known asset caution: this rule set is optimized for new tokens and microcaps. Large known assets, stablecoins, wrapped assets, or special-purpose contracts may need contextual interpretation. Do not implement a whitelist or known assets list at POC stage.
 
+## Fourth Code POC Boundary: Persistable Scanner Output
+
+The fourth code POC converts Combined Scanner output into a storage-ready shape and writes local JSON/JSONL files.
+
+It includes:
+
+- Scan run record.
+- Candidate rows.
+- Security check rows when security data exists.
+- Partial scorecard rows for every candidate.
+- Local file output under `tools/data-poc/output/<run_id>/`.
+
+It still does not include:
+
+- MySQL.
+- SQLite.
+- Drizzle.
+- Migrations.
+- Auth.
+- UI.
+- Production cron.
+- Production scanner persistence.
+
+The output maps later to:
+
+- `crypto_token_scan_runs`.
+- `crypto_token_candidates`.
+- `crypto_token_security_checks`.
+- `crypto_token_scorecards`.
+
+Scorecards remain partial/null until the scoring model is implemented beyond the POC.
+
 ## Discovery Radar
 
 Starting source:

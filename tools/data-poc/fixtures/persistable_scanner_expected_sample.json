@@ -1,0 +1,21 @@
+{
+  "scan_run": {
+    "run_id": "scan_20260618000000",
+    "source": "combined-scanner-poc",
+    "mode": "fixture",
+    "query": "fixture",
+    "total_raw": 2,
+    "passed_basic_filter": 1,
+    "rejected_basic_filter": 1,
+    "security_checked": 1,
+    "security_passed": 1,
+    "needs_manual_verification": 0,
+    "critical_risk": 0,
+    "watchlist_candidates": 1
+  },
+  "summary": {
+    "candidates": 2,
+    "security_checks": 1,
+    "scorecards": 2
+  }
+}

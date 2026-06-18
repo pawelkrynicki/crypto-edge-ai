@@ -457,3 +457,33 @@ Purpose: persisted setup-review outputs from Crypto Edge AI.
 Camp v1 priority: later as storage. For Camp v1, `setupReviewMock` can remain non-persistent.
 
 Future extension notes: add only after AI usage limits, cost controls, and user ownership rules are confirmed.
+
+## Fourth Code POC: Persistable Scanner Output Mapping
+
+The Persistable Scanner Output POC does not create tables, migrations, or database connections. It creates local JSON/JSONL files that mirror the intended database boundaries.
+
+Generated files:
+
+- `scan_run.json` maps to `crypto_token_scan_runs`.
+- `candidates.jsonl` maps to `crypto_token_candidates`.
+- `security_checks.jsonl` maps to `crypto_token_security_checks`.
+- `scorecards.jsonl` maps to `crypto_token_scorecards`.
+- `full_output.json` keeps the full nested storage-ready object for inspection.
+
+Local output path:
+
+```text
+tools/data-poc/output/<run_id>/
+```
+
+The output directory is ignored by git.
+
+POC field mapping notes:
+
+- `run_id` is generated as a stable string from the scan timestamp.
+- `candidate_id` is a deterministic SHA-256 hash of `chain`, `contract_address`, `pair_address`, and `source`.
+- Rejected candidates without security data do not produce `security_checks` rows.
+- Every candidate produces one partial `scorecards` row.
+- Score fields are intentionally `null` until the full scorecard model is implemented.
+- `decision_label` mirrors Combined Scanner `final_label`.
+- `risk_level` maps as `CRITICAL_RISK -> critical`, `NEEDS_MANUAL_VERIFICATION -> medium`, `WATCHLIST -> low`, and `REJECT -> high`.

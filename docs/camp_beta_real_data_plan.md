@@ -107,6 +107,38 @@ Live mode is best-effort and limited to `maxCandidates = 3` by default. It must 
 
 Known asset caution: the security rules are designed mainly for new tokens and microcaps. Large known assets, stablecoins, wrapped assets, or contracts with special structures may require contextual interpretation. This POC documents that limitation only; it does not add a whitelist or known assets list.
 
+## Fourth Code POC: Persistable Scanner Output
+
+The fourth code POC prepares Combined Scanner output for later database storage without connecting to a database.
+
+It creates a storage-ready structure for future tables:
+
+- `crypto_token_scan_runs`.
+- `crypto_token_candidates`.
+- `crypto_token_security_checks`.
+- `crypto_token_scorecards`.
+
+Commands:
+
+```bash
+npm run scanner:persist:fixture
+npm run scanner:persist:live -- --query SOL --max-candidates 3
+```
+
+Generated local files:
+
+- `scan_run.json`.
+- `candidates.jsonl`.
+- `security_checks.jsonl`.
+- `scorecards.jsonl`.
+- `full_output.json`.
+
+Files are written under `tools/data-poc/output/<run_id>/`, and that output directory is ignored by git.
+
+This remains a POC. It does not add MySQL, SQLite, Drizzle, migrations, auth, production cron, or production persistence.
+
+Scorecards are partial in this POC. The individual score fields remain `null`, while `decision_label` mirrors the Combined Scanner final label and `risk_level` is mapped from that label.
+
 ## Flow Details
 
 ## Step 1: DexScreener Discovery

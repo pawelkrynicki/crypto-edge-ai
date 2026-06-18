@@ -112,6 +112,16 @@ Third code POC:
 - `WATCHLIST` means eligible for further review only, not a buy signal.
 - Known large assets, stablecoins, wrapped assets, and special contracts may need contextual interpretation; no whitelist or known assets list is implemented at POC stage.
 
+Fourth code POC:
+
+- `tools/data-poc`.
+- Persistable Scanner Output flow.
+- Convert Combined Scanner output to storage-ready records.
+- Write local `scan_run.json`, `candidates.jsonl`, `security_checks.jsonl`, `scorecards.jsonl`, and `full_output.json`.
+- Map later to `crypto_token_scan_runs`, `crypto_token_candidates`, `crypto_token_security_checks`, and `crypto_token_scorecards`.
+- Scorecard fields remain partial/null at POC stage.
+- No database, migrations, auth, UI, or production cron.
+
 ## Stage 5: Mock/Seed Crypto Edge AI Module
 
 Prepare safe mock data for Camp v1:

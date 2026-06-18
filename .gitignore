@@ -39,3 +39,4 @@ Thumbs.db
 # Local outputs
 coverage/
 htmlcov/
+tools/data-poc/output/

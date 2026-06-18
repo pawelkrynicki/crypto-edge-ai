@@ -18,17 +18,23 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const FIXTURES_DIR = resolve(__dirname, "../../fixtures");
 const DEFAULT_MAX_CANDIDATES = 3;
 
-async function main(): Promise<void> {
-  const args = parseArgs(process.argv.slice(2));
-  const mode = (args.mode ?? "fixture") as DexScreenerPocMode;
-  const query = args.query ?? (mode === "live" ? "SOL" : "fixture");
-  const maxCandidates = Math.max(1, Math.min(Number(args["max-candidates"] ?? DEFAULT_MAX_CANDIDATES), DEFAULT_MAX_CANDIDATES));
-  const now = new Date();
+export type RunCombinedScannerPocOptions = {
+  mode: DexScreenerPocMode;
+  query?: string;
+  maxCandidates?: number;
+  now?: Date;
+};
+
+export async function runCombinedScannerPoc(options: RunCombinedScannerPocOptions) {
+  const mode = options.mode;
+  const query = options.query ?? (mode === "live" ? "SOL" : "fixture");
+  const maxCandidates = sanitizeMaxCandidates(options.maxCandidates);
+  const now = options.now ?? new Date();
   const pairs = mode === "live" ? await searchDexScreenerPairs(query) : (await readJson<DexScreenerSearchResponse>(resolve(FIXTURES_DIR, "dexscreener_pair_sample.json"))).pairs ?? [];
   const candidates = normalizeDexScreenerPairs(pairs, now);
   const fixtureSecurity = await loadFixtureSecurity();
 
-  const output = await buildCombinedScannerOutput({
+  return buildCombinedScannerOutput({
     mode,
     query,
     candidates,
@@ -41,6 +47,15 @@ async function main(): Promise<void> {
             goplusRaw: fixtureSecurity.goplusRaw,
             honeypotRaw: fixtureSecurity.honeypotRaw
           })
+  });
+}
+
+async function main(): Promise<void> {
+  const args = parseArgs(process.argv.slice(2));
+  const output = await runCombinedScannerPoc({
+    mode: (args.mode ?? "fixture") as DexScreenerPocMode,
+    query: args.query,
+    maxCandidates: Number(args["max-candidates"] ?? DEFAULT_MAX_CANDIDATES)
   });
 
   console.log(JSON.stringify(output, null, 2));
@@ -99,8 +114,14 @@ function parseArgs(args: string[]): Record<string, string> {
   return parsed;
 }
 
-main().catch((error: unknown) => {
-  const message = error instanceof Error ? error.message : String(error);
-  console.error(JSON.stringify({ source: "combined-scanner-poc", error: message }, null, 2));
-  process.exit(1);
-});
+function sanitizeMaxCandidates(value: number | undefined): number {
+  return Math.max(1, Math.min(Number(value ?? DEFAULT_MAX_CANDIDATES), DEFAULT_MAX_CANDIDATES));
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(JSON.stringify({ source: "combined-scanner-poc", error: message }, null, 2));
+    process.exit(1);
+  });
+}
