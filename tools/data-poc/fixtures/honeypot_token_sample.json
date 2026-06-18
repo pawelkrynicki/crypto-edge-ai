@@ -1,0 +1,13 @@
+{
+  "token": {
+    "name": "Pass Token",
+    "symbol": "PASS"
+  },
+  "honeypotResult": {
+    "isHoneypot": false
+  },
+  "simulationResult": {
+    "buyTax": 3,
+    "sellTax": 4
+  }
+}

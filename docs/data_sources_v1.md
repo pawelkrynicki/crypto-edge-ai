@@ -55,6 +55,26 @@ The first code POC uses only DexScreener:
 
 GoPlus, Honeypot.is, CoinGecko, Fear & Greed, and AIKINTEL Market News mapping are intentionally left for later POC stages.
 
+## Second Code POC: Security Enrichment
+
+The second code POC adds fixture-first and live best-effort security enrichment:
+
+- GoPlus Security.
+- Honeypot.is.
+
+Scope:
+
+- Normalize available security fields.
+- Evaluate critical risk rules.
+- Report missing fields explicitly.
+- Avoid inventing unavailable holder/liquidity/ownership data.
+
+Limitations:
+
+- Public endpoints may vary by chain.
+- Some fields may not exist for all tokens.
+- Missing data should produce `NEEDS_MANUAL_VERIFICATION`, not fake values.
+
 ## Rule
 
 Do not add real fetchers or API keys until source access, rate limits, and terms are confirmed.

@@ -61,3 +61,57 @@ export type PocOutput = {
   total_rejected: number;
   candidates: CryptoEdgeCandidate[];
 };
+
+export type SecurityPocMode = "live" | "fixture";
+
+export type SecurityCandidate = {
+  symbol: string;
+  chain: string;
+  contract_address: string | null;
+};
+
+export type HoneypotStatus = "passed" | "failed" | "unknown";
+export type OwnershipStatus = "renounced" | "active" | "unknown";
+export type SecurityLabel = "SECURITY_PASSED" | "NEEDS_MANUAL_VERIFICATION" | "CRITICAL_RISK";
+
+export type NormalizedSecurity = {
+  sources: ("goplus" | "honeypot")[];
+  honeypot_status: HoneypotStatus;
+  buy_tax: number | null;
+  sell_tax: number | null;
+  contract_verified: boolean | null;
+  ownership_status: OwnershipStatus;
+  liquidity_locked: boolean | null;
+  liquidity_lock_days: number | null;
+  mint_risk: boolean | null;
+  blacklist_risk: boolean | null;
+  whitelist_risk: boolean | null;
+  sell_restriction_risk: boolean | null;
+  proxy_risk: boolean | null;
+  top_wallet_pct: number | null;
+  top_10_wallets_pct: number | null;
+  risk_flags: string[];
+  missing_data: string[];
+  raw_sources_available: {
+    goplus: boolean;
+    honeypot: boolean;
+  };
+};
+
+export type SecurityDecision = {
+  security_label: SecurityLabel;
+  critical_reasons: string[];
+  warning_reasons: string[];
+};
+
+export type SecurityPocOutput = {
+  source: "security-poc";
+  mode: SecurityPocMode;
+  generated_at: string;
+  candidate: SecurityCandidate;
+  security: NormalizedSecurity;
+  decision: SecurityDecision;
+};
+
+export type GoPlusTokenSecurityResponse = Record<string, unknown>;
+export type HoneypotTokenResponse = Record<string, unknown>;

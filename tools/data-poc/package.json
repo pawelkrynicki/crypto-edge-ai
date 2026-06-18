@@ -7,6 +7,9 @@
     "build": "tsc",
     "poc:fixture": "tsc && node dist/src/runDexScreenerPoc.js --mode fixture",
     "poc:live": "tsc && node dist/src/runDexScreenerPoc.js --mode live",
+    "security:fixture": "tsc && node dist/src/runSecurityPoc.js --mode fixture",
+    "security:live": "tsc && node dist/src/runSecurityPoc.js --mode live",
+    "poc:fixture:security": "tsc && node dist/src/runSecurityPoc.js --mode fixture --candidate-from-dex-fixture true",
     "test": "tsc && node --test dist/tests/*.js",
     "typecheck": "tsc --noEmit"
   },

@@ -41,6 +41,40 @@ It does not include:
 - Production cron.
 - AI calls.
 
+## Second Code POC: Security Enrichment
+
+The second code POC extends `tools/data-poc` with controlled security enrichment.
+
+It checks:
+
+- GoPlus Security fixture/live best-effort.
+- Honeypot.is fixture/live best-effort.
+- Honeypot status.
+- Buy/sell tax.
+- Contract verification when available.
+- Ownership status when available.
+- Liquidity lock when available.
+- Mint, blacklist, whitelist, sell restriction, proxy risks when available.
+- Top wallet and top 10 wallet concentration only when data exists.
+
+It outputs:
+
+- `SECURITY_PASSED`.
+- `NEEDS_MANUAL_VERIFICATION`.
+- `CRITICAL_RISK`.
+
+Important rule: the POC must not invent missing security data. Missing holder, liquidity lock, ownership, or source data must be represented in `missing_data` and normally lead to `NEEDS_MANUAL_VERIFICATION`.
+
+Still excluded:
+
+- Database writes.
+- UI.
+- Production cron.
+- OpenAI calls.
+- CoinGecko.
+- Fear & Greed.
+- AIKINTEL Market News.
+
 ## Flow Details
 
 ## Step 1: DexScreener Discovery

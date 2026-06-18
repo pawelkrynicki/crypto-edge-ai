@@ -6,6 +6,8 @@ This is a small Data Integration POC for Crypto Edge AI Camp BETA.
 
 It checks whether we can fetch or load DexScreener pair data, normalize it into a Crypto Edge AI token candidate model, apply basic filters, and output standardized JSON.
 
+It also includes a second POC: Security Enrichment. This checks whether a normalized candidate can be enriched with GoPlus Security and Honeypot.is style data, then classified as `SECURITY_PASSED`, `NEEDS_MANUAL_VERIFICATION`, or `CRITICAL_RISK`.
+
 This is not the product. It does not include UI, database, migrations, auth, production cron scripts, AI calls, exchange integration, MT4, Telegram/Discord, payments, or auto-trading.
 
 ## Install
@@ -22,6 +24,20 @@ Fixture mode is stable and does not require internet:
 npm run poc:fixture
 ```
 
+## Security Fixture Mode
+
+Security fixture mode is stable and does not require internet:
+
+```bash
+npm run security:fixture
+```
+
+You can also run a small combined fixture flow. It loads the DexScreener fixture, selects the first candidate that passed the basic filter, and enriches it with fixture security data:
+
+```bash
+npm run poc:fixture:security
+```
+
 ## Live Mode
 
 Live mode uses the public DexScreener search endpoint:
@@ -35,6 +51,26 @@ The POC uses:
 ```text
 https://api.dexscreener.com/latest/dex/search?q=<query>
 ```
+
+## Security Live Mode
+
+Security live mode is best-effort. It tries public GoPlus and Honeypot.is endpoints without API keys:
+
+```bash
+npm run security:live -- --chain eth --address 0x...
+npm run security:live -- --chain bsc --address 0x...
+```
+
+Supported shorthand chains in this POC:
+
+- `eth`.
+- `bsc`.
+- `base`.
+- `arbitrum`.
+- `polygon`.
+- `avalanche`.
+
+If a live security source is unavailable or unsupported, the POC does not fake data. It marks that source as unavailable and returns missing fields with `NEEDS_MANUAL_VERIFICATION`.
 
 ## Tests
 
@@ -101,10 +137,80 @@ The runner prints:
 }
 ```
 
+## Security Output Shape
+
+The security runner prints:
+
+```json
+{
+  "source": "security-poc",
+  "mode": "fixture",
+  "generated_at": "2026-06-18T00:00:00.000Z",
+  "candidate": {
+    "symbol": "PASS",
+    "chain": "eth",
+    "contract_address": "0x..."
+  },
+  "security": {
+    "sources": ["goplus", "honeypot"],
+    "honeypot_status": "passed",
+    "buy_tax": 3,
+    "sell_tax": 4,
+    "contract_verified": true,
+    "ownership_status": "renounced",
+    "liquidity_locked": true,
+    "liquidity_lock_days": 120,
+    "mint_risk": false,
+    "blacklist_risk": false,
+    "whitelist_risk": false,
+    "sell_restriction_risk": false,
+    "proxy_risk": false,
+    "top_wallet_pct": 8.5,
+    "top_10_wallets_pct": 34.2,
+    "risk_flags": [],
+    "missing_data": [],
+    "raw_sources_available": {
+      "goplus": true,
+      "honeypot": true
+    }
+  },
+  "decision": {
+    "security_label": "SECURITY_PASSED",
+    "critical_reasons": [],
+    "warning_reasons": []
+  }
+}
+```
+
+## Security Rules
+
+`CRITICAL_RISK` if:
+
+- Honeypot failed.
+- Buy tax >10%.
+- Sell tax >10%.
+- Contract is not verified.
+- Liquidity is unlocked when data is available.
+- Top wallet >30%.
+- Top 10 wallets >60%.
+- Mint risk is true.
+- Blacklist risk is true.
+- Sell restriction risk is true.
+
+`NEEDS_MANUAL_VERIFICATION` if:
+
+- One source is missing.
+- Ownership is unknown.
+- Liquidity lock is missing.
+- Top wallet data is missing.
+- Proxy risk is true.
+- Whitelist risk is true.
+- Security data is inconsistent between sources.
+
 ## What This POC Does Not Do
 
-- No GoPlus.
-- No Honeypot.is.
+- No production GoPlus integration.
+- No production Honeypot.is integration.
 - No CoinGecko.
 - No Fear & Greed.
 - No database.
@@ -113,3 +219,5 @@ The runner prints:
 - No production cron scripts.
 - No AI calls.
 - No trading signals.
+
+For the Security Enrichment POC, GoPlus and Honeypot.is are included only as fixture-first and live best-effort checks. There is still no database, UI, cron, AI, or production scanner.

@@ -90,6 +90,15 @@ First code POC:
 - Normalization.
 - Basic filters.
 
+Second code POC:
+
+- `tools/data-poc`.
+- GoPlus Security fixture/live best-effort.
+- Honeypot.is fixture/live best-effort.
+- Security normalization.
+- `SECURITY_PASSED`, `NEEDS_MANUAL_VERIFICATION`, `CRITICAL_RISK`.
+- Explicit missing data reporting.
+
 ## Stage 5: Mock/Seed Crypto Edge AI Module
 
 Prepare safe mock data for Camp v1:

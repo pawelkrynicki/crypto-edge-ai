@@ -1,0 +1,22 @@
+{
+  "code": 1,
+  "message": "OK",
+  "result": {
+    "0x1111111111111111111111111111111111111111": {
+      "is_honeypot": "0",
+      "buy_tax": "0.03",
+      "sell_tax": "0.04",
+      "is_open_source": "1",
+      "owner_address": "0x0000000000000000000000000000000000000000",
+      "liquidity_locked": true,
+      "liquidity_lock_days": 120,
+      "is_mintable": "0",
+      "is_blacklisted": "0",
+      "is_whitelisted": "0",
+      "cannot_sell_all": "0",
+      "is_proxy": "0",
+      "top_wallet_pct": 8.5,
+      "top_10_wallets_pct": 34.2
+    }
+  }
+}

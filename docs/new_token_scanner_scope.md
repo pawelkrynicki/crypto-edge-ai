@@ -28,6 +28,27 @@ The first code POC covers only:
 
 It does not include security integrations, scorecard persistence, database writes, UI, cron, or AI calls.
 
+## Second Code POC Boundary
+
+The second code POC adds Security Enrichment only:
+
+- GoPlus fixture/live best-effort.
+- Honeypot.is fixture/live best-effort.
+- Security normalization.
+- Security labels.
+- Missing data handling.
+
+It still does not include:
+
+- Database writes.
+- UI.
+- Production scanner.
+- Cron.
+- OpenAI.
+- CoinGecko.
+- Fear & Greed.
+- AIKINTEL Market News.
+
 ## Discovery Radar
 
 Starting source:
