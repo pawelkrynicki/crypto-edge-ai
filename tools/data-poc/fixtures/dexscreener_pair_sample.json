@@ -1,0 +1,66 @@
+{
+  "pairs": [
+    {
+      "chainId": "solana",
+      "dexId": "raydium",
+      "url": "https://dexscreener.com/solana/passpair",
+      "pairAddress": "PASSPAIR111111111111111111111111111111111",
+      "baseToken": {
+        "address": "PASSTOKEN11111111111111111111111111111111",
+        "name": "Pass Token",
+        "symbol": "PASS"
+      },
+      "priceUsd": "0.0123",
+      "fdv": 1200000,
+      "marketCap": 1000000,
+      "pairCreatedAt": 1759276800000,
+      "liquidity": {
+        "usd": 120000
+      },
+      "volume": {
+        "h24": 100000
+      }
+    },
+    {
+      "chainId": "ethereum",
+      "dexId": "uniswap",
+      "url": "https://dexscreener.com/ethereum/lowliqpair",
+      "pairAddress": "LOWLIQPAIR111111111111111111111111111111",
+      "baseToken": {
+        "address": "LOWLIQTOKEN1111111111111111111111111111",
+        "name": "Low Liquidity Token",
+        "symbol": "LOWL"
+      },
+      "priceUsd": "0.034",
+      "fdv": 800000,
+      "marketCap": 800000,
+      "pairCreatedAt": 1759276800000,
+      "liquidity": {
+        "usd": 12000
+      },
+      "volume": {
+        "h24": 60000
+      }
+    },
+    {
+      "chainId": "bsc",
+      "dexId": "pancakeswap",
+      "url": "https://dexscreener.com/bsc/fdvfallbackpair",
+      "pairAddress": "FDVFALLBACKPAIR111111111111111111111111",
+      "baseToken": {
+        "address": "FDVFALLBACKTOKEN1111111111111111111111",
+        "name": "FDV Fallback Token",
+        "symbol": "FDV"
+      },
+      "priceUsd": "0.045",
+      "fdv": 1500000,
+      "pairCreatedAt": 1759276800000,
+      "liquidity": {
+        "usd": 90000
+      },
+      "volume": {
+        "h24": 75000
+      }
+    }
+  ]
+}

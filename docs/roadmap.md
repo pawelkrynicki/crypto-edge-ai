@@ -82,6 +82,14 @@ Current artifacts:
 - `docs/rug_pull_risk_engine.md`.
 - `docs/token_scorecard_model.md`.
 
+First code POC:
+
+- `tools/data-poc`.
+- DexScreener discovery only.
+- Fixture mode.
+- Normalization.
+- Basic filters.
+
 ## Stage 5: Mock/Seed Crypto Edge AI Module
 
 Prepare safe mock data for Camp v1:

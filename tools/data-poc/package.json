@@ -1,0 +1,17 @@
+{
+  "name": "@crypto-edge-ai/data-poc",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "poc:fixture": "tsc && node dist/src/runDexScreenerPoc.js --mode fixture",
+    "poc:live": "tsc && node dist/src/runDexScreenerPoc.js --mode live",
+    "test": "tsc && node --test dist/tests/*.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.2"
+  }
+}

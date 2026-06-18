@@ -43,6 +43,18 @@ Use first:
 - Fear & Greed Index.
 - AIKINTEL Market News / Crypto if accessible.
 
+## First Code POC
+
+The first code POC uses only DexScreener:
+
+- Public endpoint, no API key.
+- Query-based live mode.
+- Local fixture mode.
+- Pair normalization.
+- Basic candidate filters.
+
+GoPlus, Honeypot.is, CoinGecko, Fear & Greed, and AIKINTEL Market News mapping are intentionally left for later POC stages.
+
 ## Rule
 
 Do not add real fetchers or API keys until source access, rate limits, and terms are confirmed.

@@ -17,6 +17,30 @@ This is still a planning document. It does not implement real fetchers, producti
 7. Final checklist.
 8. AIKINTEL-style UI.
 
+## First Code POC Scope
+
+The first code POC is intentionally smaller than the full Camp BETA flow.
+
+It includes only:
+
+- DexScreener public search endpoint.
+- Fixture mode with local sample data.
+- Candidate normalization.
+- Basic filters.
+- Standardized JSON output.
+
+It does not include:
+
+- GoPlus.
+- Honeypot.is.
+- CoinGecko.
+- Fear & Greed.
+- AIKINTEL Market News mapping.
+- Database writes.
+- UI.
+- Production cron.
+- AI calls.
+
 ## Flow Details
 
 ## Step 1: DexScreener Discovery

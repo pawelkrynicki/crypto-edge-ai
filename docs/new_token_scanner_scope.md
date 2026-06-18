@@ -17,6 +17,17 @@ Primary goal:
 - Surface watchlist candidates.
 - Produce a scorecard and checklist.
 
+## First Code POC Boundary
+
+The first code POC covers only:
+
+- DexScreener discovery.
+- Normalization to Crypto Edge AI candidate JSON.
+- Basic filters for market cap, volume, liquidity, volume/MC, and pair age.
+- Fixture mode for stable tests.
+
+It does not include security integrations, scorecard persistence, database writes, UI, cron, or AI calls.
+
 ## Discovery Radar
 
 Starting source:
