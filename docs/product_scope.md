@@ -162,3 +162,12 @@ Future user-specific statuses may include:
 - `archived`.
 
 These should use existing AIKINTEL users/auth if the module is integrated.
+
+## First UI Mock: Crypto Edge AI Camp BETA
+
+The initial frontend preview is located in `tools/ui-mock/`.
+- **What it shows:** Scanner Radar, Research Review, Watchlist, Risk Alerts, and Methodology tabs.
+- **Mock Data:** Data is mocked but strictly aligned with the `CombinedScanner` and `PersistableScanner` outputs from `tools/data-poc`.
+- **UI Direction:** Aligned with AIKINTEL (dark, professional, command center style).
+- **Core Principle:** The UI explicitly reinforces that `WATCHLIST` is **not a buy signal**.
+- **Next Stage:** Connect this UI mock to the persistable JSON/API.
