@@ -1,10 +1,10 @@
 # Manus Prompt: AIKINTEL UI Alignment
 
-You are designing the UI for the AIKINTEL Crypto Market Module.
+You are designing the UI for the Crypto Edge AI module.
 
 ## Goal
 
-Create a `/crypto-market` experience that feels native to AIKINTEL and supports Crypto Edge AI decision-support views.
+Create a `Crypto Edge AI` experience that can later feel native inside AIKINTEL and supports trader-facing decision-support views.
 
 ## Required Sections
 

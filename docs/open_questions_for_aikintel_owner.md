@@ -1,36 +1,70 @@
 # Open Questions for AIKINTEL Owner
 
-## Product and Access
+## Answered Decisions
 
-1. Czy modul ma korzystac z istniejacych `users` i auth?
-2. Czy nazwa w menu ma brzmiec `Crypto Market`, `Crypto Edge AI`, czy inaczej?
-3. Czy Camp v1 ma byc tylko dla admin/test users, czy dla realnych uczestnikow?
-4. Czy mamy juz dostep do glownego repo AIKINTEL?
+1. Answered: Working repo remains separate for now.
+   - Decision: Continue conceptual and technical work in `pawelkrynicki/crypto-edge-ai`.
 
-## Existing Platform Data
+2. Answered: Later integration path.
+   - Decision: Crypto Edge AI may be connected/deployed into AIKINTEL after it works and is ready for integration.
 
-5. Czy `crypto_news` istnieje w produkcji i jaki ma dokladny schemat?
-6. Ktore zrodla danych sa zatwierdzone na v1?
-7. Czy OpenAI helper juz istnieje?
-8. Czy tabele maja byc tworzone przez migracje Drizzle, raw SQL, czy osobny deployment script?
+3. Answered: Auth/users model.
+   - Decision: Use existing AIKINTEL auth/users if integrated into the platform.
 
-## User-Specific Features
+4. Answered: Module/menu name.
+   - Decision: Use `Crypto Edge AI`.
 
-9. Czy uzytkownik ma miec prywatne watchlisty juz w v1?
-10. Jakie limity uzycia AI maja obowiazywac?
+5. Answered: Relationship to Market News.
+   - Decision: AIKINTEL already has Market News with Crypto category, sentiment filters, and AI Analysis. Crypto Edge AI should not duplicate it. It should reuse or map to it if data access is possible.
 
-## Data and Operations
+6. Answered: Camp v1 users.
+   - Decision: Camp v1 targets real users like AIKINTEL, starting as a controlled module version.
 
-11. Czy Camp v1 ma korzystac z mock data, recznie zatwierdzonych danych, czy ograniczonego live collection?
-12. Czy sa juz zatwierdzone klucze lub limity dla CoinGecko, GoPlusLabs, DexScreener, DefiLlama lub innych zrodel?
-13. Czy istnieje standard nazewnictwa PM2 dla nowych procesow crypto?
-14. Czy token costs maja byc rozliczane przez istniejacy mechanizm `insight_costs` i `token_pools`?
-15. Czy AI analysis ma byc generowany w cron scripts, w webapp backend, czy hybrydowo?
+7. Answered: Product direction.
+   - Decision: Do not change direction to a separate `Crypto Market` product. Crypto Edge AI remains the main module direction.
 
-## UI and Release
+## Still Open
 
-16. Ktore istniejace strony AIKINTEL sa najlepszym wzorcem UI: `MarketNews.tsx`, `COTReports.tsx`, czy inna?
-17. Czy sidebar ma miec osobna sekcje crypto, czy link w istniejacej sekcji market intelligence?
-18. Czy Camp v1 ma miec publiczny demo mode, czy tylko zalogowany dostep?
-19. Czy setup review mock moze byc dostepny dla uczestnikow, czy tylko dla admin/test users?
-20. Jakie disclaimery prawne maja byc zaakceptowane przez wlasciciela przed campem?
+1. Do we have access to the main AIKINTEL repo, and when should implementation move there?
+
+2. What is the exact schema for AIKINTEL Market News / Crypto?
+   - Does `crypto_news` exist in production?
+   - Which fields are available for sentiment, AI Analysis, categories, tags, related coins, and source URLs?
+
+3. What is the preferred migration mechanism?
+   - Drizzle migration.
+   - Raw SQL.
+   - Separate deployment script.
+   - Other AIKINTEL convention.
+
+4. What is the current status of the OpenAI helper?
+   - Does it already exist?
+   - Where is it located?
+   - What model/configuration patterns does AIKINTEL use?
+
+5. Which data sources are approved for v1?
+   - CoinGecko.
+   - CryptoCompare.
+   - DefiLlama.
+   - CoinMarketCap if useful and accessible.
+   - Dune / public dashboards.
+   - GDELT.
+   - Existing AIKINTEL Market News.
+   - Fear & Greed Index.
+   - Token Unlocks if legal API access exists.
+   - Public CEX/DEX data without violating terms.
+
+6. What AI usage limits and cost controls should apply?
+   - Per user.
+   - Per day.
+   - Per setup review.
+   - Whether `insight_costs` / `token_pools` apply.
+
+7. When do we move from this standalone working repo into the main AIKINTEL repo?
+
+## Deferred Until Integration
+
+- Whether private watchlists are included in v1.
+- Whether setup reviews are persisted in v1.
+- Whether real data fetchers are built before or after main repo access.
+- Whether production cron scripts are needed for Camp v1.

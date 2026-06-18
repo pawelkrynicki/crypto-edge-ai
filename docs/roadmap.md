@@ -1,126 +1,121 @@
 # Roadmap
 
-## Stage 1: Repository Documentation Aligned With AIKINTEL Guidelines
+## Stage 1: Documentation Alignment With Owner Decisions
 
-Update project documentation so Crypto Edge AI is clearly positioned as the trader-facing layer inside the AIKINTEL Crypto Market Module.
+Align documentation with the latest owner decisions:
 
-Deliverables:
+- Crypto Edge AI remains the main module name and direction.
+- Work continues in the standalone repo first.
+- Later AIKINTEL integration is possible after the module is working.
+- Existing AIKINTEL auth/users should be used when integrated.
+- Existing AIKINTEL Market News / Crypto should be reused or mapped, not duplicated.
 
-- Updated scope.
-- Updated architecture.
-- Updated MVP requirements.
-- Updated AI scoring model.
-- Updated security boundaries.
-- AIKINTEL integration plan.
+Current artifacts:
 
-## Stage 2: Database Schema Mapping for AIKINTEL Crypto Market Module
+- `docs/owner_decisions_2026_06_18.md`.
+- `docs/project_brief.md`.
+- `docs/product_scope.md`.
+- `docs/aikintel_integration_plan.md`.
 
-Define schema mapping for:
+## Stage 2: Source Selection and Data Model Refinement
 
-- `crypto_projects`.
-- `crypto_scam_alerts`.
-- `crypto_opportunities`.
-- `crypto_onchain_metrics`.
-- `crypto_market_summaries`.
-- Existing `crypto_news` if present.
+Select credible v1 data sources and refine the data model.
 
-Confirm table names, indexes, JSON fields, deduplication hashes, and score fields with the AIKINTEL owner.
+Candidate sources:
 
-Current design artifact:
+- CoinGecko.
+- CryptoCompare.
+- DefiLlama.
+- CoinMarketCap if useful and accessible.
+- Dune / public dashboards.
+- GDELT.
+- Existing AIKINTEL Market News / Crypto.
+- Fear & Greed Index.
+- Token Unlocks if legal API access exists.
+- Public CEX/DEX data without violating terms.
+
+Current artifacts:
 
 - `docs/database_schema_design.md`.
 - `docs/aikintel_table_mapping.md`.
 - `docs/open_questions_for_aikintel_owner.md`.
 
-## Stage 3: tRPC Router Design for `cryptoMarket`
+## Stage 3: Mock/Seed Crypto Edge AI Module
 
-Design the `cryptoMarket` router:
+Prepare safe mock data for Camp v1:
 
-- Projects query.
-- Scam alerts query.
-- Opportunities query.
-- Latest market summary query.
-- On-chain metrics query.
-- Optional personal insight/status procedures after user data model is confirmed.
-- Mock setup review contract for Camp v1.
+- Projects/tokens.
+- Scam alerts.
+- Opportunities/narratives.
+- Market summaries.
+- Setup review mock scenarios.
 
-Current design artifact:
+Current artifact:
+
+- `docs/camp_v1_mock_data_plan.md`.
+
+## Stage 4: Read-Only tRPC Router Design / Skeleton
+
+Design and later create a safe read-only router skeleton:
+
+- `projects`.
+- `projectBySymbol`.
+- `scamAlerts`.
+- `opportunities`.
+- `marketSummary`.
+- `dashboard`.
+- `search`.
+- `setupReviewMock`.
+
+Current artifacts:
 
 - `docs/trpc_router_design.md`.
 - `prompts/codex/03_schema_and_router_design.md`.
 
-## Stage 4: Frontend Page Design Aligned With AIKINTEL UI
+## Stage 5: AIKINTEL-Style UI Mock Aligned With Screenshots
 
-Design:
+Prepare an AIKINTEL-style UI mock for the `Crypto Edge AI` module.
 
-- `/crypto-market` page.
-- Overview dashboard.
-- Projects tab.
-- Opportunities tab.
-- Scam alerts tab.
-- On-chain tab.
-- Crypto Edge decision-support panel if compatible with the existing UI.
+The mock should align with existing AIKINTEL screenshots or pages and should not become a full UI implementation before integration questions are settled.
 
-## Stage 5: Cron Data Collection Scripts Pattern
+## Stage 6: Camp v1 Controlled User Flow
 
-Plan PM2-ready scripts:
+Prepare a controlled flow for real users:
 
-- `fetch-crypto-projects.ts`.
-- `fetch-crypto-scam-alerts.ts`.
-- `fetch-crypto-opportunities.ts`.
-- `fetch-crypto-onchain.ts`.
-- `generate-crypto-summary.ts`.
+- Limited access.
+- Clear disclaimer.
+- Mock or approved data only.
+- No trading execution.
+- No buy/sell signals.
+- Safe setup review.
 
-## Stage 6: AI Analysis Schema and Mock Data
+## Stage 7: Integration Decision With Main AIKINTEL Repo
 
-Implement or plan mock AI JSON compatible with:
+Decide when and how to move from this standalone working repo into the main AIKINTEL repo.
 
-- `model`.
-- `analyzed_at`.
-- `summary`.
-- `key_points`.
-- `sentiment`.
-- `confidence`.
-- `risk_factors`.
-- `recommendation`.
-- `raw_prompt_tokens`.
-- `raw_completion_tokens`.
+Needed confirmations:
 
-Current design artifact:
+- Main repo access.
+- Migration mechanism.
+- Market News / Crypto schema.
+- OpenAI helper status.
+- Approved data sources.
+- AI cost and usage limits.
 
-- `docs/camp_v1_mock_data_plan.md`.
+## Stage 8: Real Data Sources and AI Helper Integration
 
-## Stage 7: Camp v1 Controlled Release
+After integration decisions:
 
-Prepare a limited release for camp participants:
+- Add approved real data sources.
+- Add AIKINTEL-compatible helper integration.
+- Add cost controls.
+- Add production-grade scripts only if approved.
 
-- Stable UI.
-- Controlled data sources.
-- Disclaimers.
-- Mock or safe AI output.
-- No trading automation.
-- Backup/demo plan.
+Still forbidden:
 
-## Stage 8: Integration Into Main AIKINTEL Platform
-
-Integrate into the main AIKINTEL platform:
-
-- Migration.
-- Cron processes.
-- tRPC router.
-- Frontend route.
-- Sidebar navigation.
-- Production deployment via existing AIKINTEL process.
-
-## Stage 9: Future Crypto Edge AI Decision-Support Layer
-
-Add more trader-facing functionality only after the intelligence module is stable:
-
-- Personal insights.
-- Observation statuses.
-- Setup review.
-- Risk checklist.
-- Bias and confidence history.
-- User-specific research notes.
-
-This stage must still avoid buy/sell signals and automated trading.
+- Auto-trading.
+- MT4.
+- Exchange execution.
+- Telegram/Discord integrations.
+- Payments.
+- Financial advice.

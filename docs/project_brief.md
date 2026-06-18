@@ -1,74 +1,81 @@
-# Project Brief: AIKINTEL Crypto Market Module
+# Project Brief: Crypto Edge AI
 
 ## Overview
 
-Crypto Edge AI is now positioned as the working name for the trader-facing decision-support layer inside the AIKINTEL Crypto Market Module.
+Crypto Edge AI is a crypto trading intelligence module designed first in this standalone working repository, with a clear path for later integration into AIKINTEL.
 
-The target product is not a separate web application. It is a crypto intelligence module for the existing AIKINTEL Market Intelligence platform.
-
-## Strategic Change
-
-Previous direction:
-
-- Standalone web app.
-- React + Vite frontend.
-- FastAPI backend.
-- SQLite MVP database.
-
-New direction:
-
-- AIKINTEL-compatible module.
-- React 19 frontend inside `packages/webapp`.
-- Express + tRPC backend inside `packages/webapp`.
-- MySQL / MariaDB database.
-- Drizzle ORM for webapp access.
-- `mysql2/promise` for cron scripts.
-- PM2-managed data collection scripts.
-
-## AIKINTEL Crypto Market Module
-
-The module should aggregate and expose crypto market intelligence:
-
-- `crypto_projects`.
-- `crypto_scam_alerts`.
-- `crypto_opportunities`.
-- `crypto_onchain_metrics`.
-- `crypto_market_summaries`.
-- `crypto_news` if available in AIKINTEL.
-
-This is the data and market intelligence layer.
-
-## Crypto Edge AI Layer
-
-Crypto Edge AI is the user-facing trading research layer:
+It focuses on trader-facing decision support:
 
 - Bias.
-- Score.
 - Risk.
+- Opportunity.
 - Confidence.
-- Checklist.
+- Narratives.
+- Scam alerts.
 - Setup review.
-- Personal insights.
-- Observation status.
-- AI decision-support commentary.
+- Pre-trade checklist.
 
-This layer supports research and decision preparation. It must not produce buy/sell instructions.
+Market intelligence data is the backing layer for this module, not a separate product direction.
 
-## Core Goal
+## Owner Decisions
 
-Deliver a limited, useful camp v1 module that fits AIKINTEL technically, visually, and product-wise.
+Current owner-side decisions:
 
-## Non-Goals
+- The working repo remains `pawelkrynicki/crypto-edge-ai`.
+- Later AIKINTEL integration is possible after the module is refined and working.
+- Existing AIKINTEL auth/users should be used if integrated.
+- The module/menu name should be `Crypto Edge AI`.
+- Existing AIKINTEL Market News with Crypto category should be reused or mapped when possible, not duplicated.
+- Migration style remains open until access to the main AIKINTEL repo is confirmed.
+- OpenAI helper integration remains open until the existing AIKINTEL helper can be reviewed.
+- Camp v1 targets real users through a controlled module flow.
 
-The project must not:
+See `docs/owner_decisions_2026_06_18.md`.
 
-- Build a second platform beside AIKINTEL.
-- Build a trading bot.
-- Build an automated signal engine.
-- Execute trades.
-- Integrate exchanges.
-- Integrate MT4.
-- Integrate Telegram or Discord.
-- Add payments.
-- Commit external API keys.
-- Modify AIKINTEL `_core`.
+## What Crypto Edge AI Is
+
+- A decision-support module for crypto traders.
+- A research workflow around market context, risk, bias, and checklist discipline.
+- A module that can later integrate into AIKINTEL.
+- A project that uses AIKINTEL-style architecture and market intelligence concepts.
+
+## What Crypto Edge AI Is Not
+
+- It is not a standalone platform competing with AIKINTEL.
+- It is not a generic Crypto Market product.
+- It is not a trading bot.
+- It is not a buy/sell signal engine.
+- It does not execute trades.
+- It does not add MT4, exchange execution, Telegram, Discord, or payments.
+- It does not duplicate AIKINTEL Market News / Crypto.
+
+## Technical Direction
+
+For future AIKINTEL integration, align with:
+
+- React 19.
+- Tailwind CSS 4.
+- shadcn/ui.
+- wouter.
+- TanStack Query.
+- Express.
+- tRPC.
+- MySQL / MariaDB.
+- Drizzle ORM in webapp.
+- `mysql2/promise` for scripts.
+- Node.js 20.
+- TypeScript.
+
+## Camp v1 Goal
+
+Camp v1 should provide a controlled Crypto Edge AI flow for real users:
+
+- Research dashboard.
+- Token/project context.
+- Scam/risk alerts.
+- Opportunities/narratives.
+- Market summary.
+- Setup review mock.
+- Score, bias, confidence, risk, and checklist.
+
+It must remain research support only.

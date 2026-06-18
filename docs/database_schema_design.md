@@ -2,13 +2,23 @@
 
 ## Purpose
 
-This document defines the database design for the AIKINTEL Crypto Market Module and the future Crypto Edge AI decision-support layer.
+This document defines the database design for Crypto Edge AI.
+
+Crypto Edge AI is the main crypto trading intelligence module. The tables below provide its market intelligence backing layer and support later AIKINTEL integration.
 
 This is a design document only. It does not implement migrations or production code.
 
-## AIKINTEL Database Standards
+## Owner Decisions Reflected
 
-Use the platform conventions from the AIKINTEL integration guidelines:
+- Work continues in `pawelkrynicki/crypto-edge-ai` first.
+- Later AIKINTEL integration is possible after the module is working.
+- Existing AIKINTEL auth/users should be used if integrated.
+- AIKINTEL Market News / Crypto should be reused or mapped where possible.
+- Migration style remains open until main AIKINTEL repo access is confirmed.
+
+## AIKINTEL-Compatible Database Standards
+
+Use these conventions for later compatibility:
 
 - Table names: snake_case, plural.
 - Column names: snake_case.
@@ -20,8 +30,6 @@ Use the platform conventions from the AIKINTEL integration guidelines:
 - AI output: `ai_analysis JSON`.
 - Deduplication: `hash VARCHAR(64) UNIQUE` where content can be collected repeatedly.
 - Scores: `TINYINT` for 0-100 values.
-- Avoid frontend-owned schema decisions.
-- Confirm migration style with AIKINTEL owner before implementation.
 
 ## Camp v1 Table Priority
 
@@ -38,6 +46,8 @@ Optional / later:
 - `crypto_user_watchlist`.
 - `crypto_user_insights`.
 - `crypto_setup_reviews`.
+
+Do not create a duplicate general crypto news table until the existing AIKINTEL Market News / Crypto schema is confirmed.
 
 ## Shared AI Analysis JSON Pattern
 
@@ -64,13 +74,9 @@ The `recommendation` field is research guidance only. It must not contain buy/se
 
 ## `crypto_projects`
 
-### Purpose
+Purpose: core registry for crypto projects and tokens shown in Crypto Edge AI.
 
-Core registry for crypto projects and tokens shown in the Crypto Market page. This table powers project cards, token lists, risk/opportunity sorting, and setup review context.
-
-### Columns
-
-Recommended columns:
+Columns:
 
 ```sql
 id INT AUTO_INCREMENT PRIMARY KEY
@@ -97,9 +103,7 @@ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ```
 
-### Indexes
-
-Recommended indexes:
+Indexes:
 
 - `idx_symbol (symbol)`.
 - `idx_category (category)`.
@@ -109,45 +113,19 @@ Recommended indexes:
 - `idx_market_cap (market_cap_usd)`.
 - unique `hash`.
 
-### Deduplication
+Deduplication: use stable project identity fields, preferably symbol, name, chain, contract address, and source identifier.
 
-Use `hash` generated from stable identity fields, for example:
+AI fields: `ai_evaluation`, `ai_analysis`, `risk_score`, `opportunity_score`, `last_evaluated_at`.
 
-```text
-lower(symbol) + "|" + lower(name) + "|" + lower(chain) + "|" + lower(contract_address)
-```
+Camp v1 priority: must-have.
 
-If contract address is missing, dedup by symbol, name, and source-specific identifier when available.
-
-### AI Fields
-
-- `ai_evaluation`: project-specific assessment if AIKINTEL keeps this separate.
-- `ai_analysis`: general AIKINTEL JSON pattern.
-- `risk_score`: 0-100, higher means riskier.
-- `opportunity_score`: 0-100, higher means stronger research opportunity.
-- `last_evaluated_at`: last AI analysis timestamp.
-
-### Camp v1 Priority
-
-Must-have.
-
-Camp v1 should seed 8-15 projects/tokens covering major assets, narratives, risky assets, and scam-like examples.
-
-### Future Extension Notes
-
-- Add normalized relation to chains if AIKINTEL later has a shared chain registry.
-- Add links to latest news, scam alerts, opportunities, and on-chain metrics.
-- Add user-specific watchlist in `crypto_user_watchlist`, not directly in this table.
+Future extension notes: link to AIKINTEL news records when the Market News schema is confirmed.
 
 ## `crypto_scam_alerts`
 
-### Purpose
+Purpose: scam, exploit, honeypot, rug-pull, fake-team, pump-dump, contract-risk, and other warning alerts.
 
-Stores scam, exploit, honeypot, rug-pull, fake-team, pump-dump, contract-risk, and other warning alerts.
-
-### Columns
-
-Recommended columns:
+Columns:
 
 ```sql
 id INT AUTO_INCREMENT PRIMARY KEY
@@ -167,9 +145,7 @@ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ```
 
-### Indexes
-
-Recommended indexes:
+Indexes:
 
 - `idx_type (alert_type)`.
 - `idx_severity (severity)`.
@@ -177,41 +153,19 @@ Recommended indexes:
 - `idx_published (published_at)`.
 - unique `hash`.
 
-### Deduplication
+Deduplication: source, project symbol, alert type, normalized title, and published date.
 
-Use `hash` generated from:
+AI fields: `ai_analysis` with risk-first summary, key points, confidence, and research-only recommendation.
 
-```text
-source + "|" + project_symbol + "|" + alert_type + "|" + normalized_title + "|" + published_date
-```
+Camp v1 priority: must-have.
 
-If source provides an ID, use that ID in the hash.
-
-### AI Fields
-
-- `ai_analysis` stores summary, key points, sentiment, confidence, risk factors, and research recommendation.
-- Scam/risk alerts should usually map sentiment to `bearish` or `neutral`; never use sentiment as an instruction to trade.
-
-### Camp v1 Priority
-
-Must-have.
-
-Camp v1 should include at least one high-risk and one critical alert to demonstrate safe risk handling.
-
-### Future Extension Notes
-
-- Add link to `crypto_projects.id` after schema ownership is confirmed.
-- Add evidence verification state and reviewer metadata if AIKINTEL has an admin review workflow.
+Future extension notes: add relation to project IDs and Market News IDs only after the AIKINTEL schema is confirmed.
 
 ## `crypto_opportunities`
 
-### Purpose
+Purpose: opportunities, narratives, airdrops, IDOs, staking/yield ideas, technical catalysts, and research-worthy themes.
 
-Stores opportunities, narratives, airdrops, IDOs, staking/yield ideas, technical catalysts, and research-worthy themes.
-
-### Columns
-
-Recommended columns:
+Columns:
 
 ```sql
 id INT AUTO_INCREMENT PRIMARY KEY
@@ -233,9 +187,7 @@ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ```
 
-### Indexes
-
-Recommended indexes:
+Indexes:
 
 - `idx_type (opportunity_type)`.
 - `idx_status (status)`.
@@ -245,40 +197,19 @@ Recommended indexes:
 - `idx_published (published_at)`.
 - unique `hash`.
 
-### Deduplication
+Deduplication: source URL or source, project symbol, opportunity type, and normalized title.
 
-Use `hash` generated from:
+AI fields: `ai_analysis`, `confidence_score`, `risk_level`.
 
-```text
-source_url OR source + "|" + project_symbol + "|" + opportunity_type + "|" + normalized_title
-```
+Camp v1 priority: must-have.
 
-### AI Fields
-
-- `ai_analysis` uses the AIKINTEL JSON pattern.
-- `confidence_score` is 0-100 and describes analysis confidence, not profit probability.
-- `risk_level` is explicit so the UI can filter and warn users.
-
-### Camp v1 Priority
-
-Must-have.
-
-Camp v1 should include a mix of narrative, fundamental-event, and high-risk opportunity examples.
-
-### Future Extension Notes
-
-- Consider separating narratives from opportunities only if the data volume grows.
-- Add lifecycle events for opportunity status changes later.
+Future extension notes: connect opportunities to existing news/catalysts if AIKINTEL data access allows it.
 
 ## `crypto_market_summaries`
 
-### Purpose
+Purpose: market context backing the Crypto Edge AI dashboard and setup review.
 
-Stores daily or weekly crypto market summaries generated from collected data and AI analysis.
-
-### Columns
-
-Recommended columns:
+Columns:
 
 ```sql
 id INT AUTO_INCREMENT PRIMARY KEY
@@ -297,227 +228,54 @@ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ```
 
-### Indexes
-
-Recommended indexes:
+Indexes:
 
 - unique `idx_date_tf (summary_date, timeframe)`.
 - `idx_sentiment (market_sentiment)`.
 - `idx_created (created_at)`.
 
-### Deduplication
+Deduplication: unique date/timeframe pair.
 
-Use the unique date/timeframe pair. No separate `hash` is required unless multiple sources produce competing summaries for the same timeframe.
+AI fields: `ai_summary`, `ai_analysis`, `fear_greed_index`.
 
-### AI Fields
+Camp v1 priority: must-have.
 
-- `ai_summary` is display text.
-- `ai_analysis` stores the structured AIKINTEL JSON.
-- `fear_greed_index` is 0-100.
-
-### Camp v1 Priority
-
-Must-have.
-
-Camp v1 can start with a few seeded daily and weekly summaries.
-
-### Future Extension Notes
-
-- Add source coverage metadata.
-- Add market regime labels if AIKINTEL uses them elsewhere.
+Future extension notes: include AIKINTEL Market News aggregate signals if available.
 
 ## Optional / Later Tables
 
 ## `crypto_onchain_metrics`
 
-### Purpose
+Purpose: daily on-chain metric snapshots for symbols/tokens.
 
-Stores daily on-chain metric snapshots for symbols/tokens.
+Camp v1 priority: optional.
 
-### Columns
+Key columns: `symbol`, `metric_date`, `active_addresses`, `transaction_count`, `tvl_usd`, `volume_24h_usd`, `whale_transactions`, `exchange_inflow`, `exchange_outflow`, `net_flow`, `source`, `created_at`.
 
-Recommended columns:
+Indexes: unique `(symbol, metric_date)`, plus `symbol` and `metric_date`.
 
-```sql
-id INT AUTO_INCREMENT PRIMARY KEY
-symbol VARCHAR(20) NOT NULL
-metric_date DATE NOT NULL
-active_addresses INT
-transaction_count INT
-tvl_usd DECIMAL(20,2)
-volume_24h_usd DECIMAL(20,2)
-whale_transactions INT
-exchange_inflow DECIMAL(20,4)
-exchange_outflow DECIMAL(20,4)
-net_flow DECIMAL(20,4)
-source VARCHAR(100)
-created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-```
-
-### Indexes
-
-- unique `idx_symbol_date (symbol, metric_date)`.
-- `idx_date (metric_date)`.
-- `idx_symbol (symbol)`.
-
-### Deduplication
-
-Use unique symbol/date records.
-
-### AI Fields
-
-No `ai_analysis` required for raw metrics. AI can analyze metrics into summaries later.
-
-### Camp v1 Priority
-
-Optional.
-
-### Future Extension Notes
-
-Add only after data source approval and chart requirements are confirmed.
+Future extension notes: add after source approval and legal/API access review.
 
 ## `crypto_user_watchlist`
 
-### Purpose
+Purpose: private user watchlist entries if user-specific tracking is needed.
 
-Stores private user watchlist entries if Camp v1 requires per-user tracking.
+Camp v1 priority: later unless approved.
 
-### Columns
-
-Recommended columns:
-
-```sql
-id INT AUTO_INCREMENT PRIMARY KEY
-user_id INT NOT NULL
-symbol VARCHAR(20) NOT NULL
-project_id INT NULL
-status ENUM('new', 'to_review', 'watching', 'rejected', 'played', 'archived') DEFAULT 'new'
-notes TEXT
-created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-```
-
-### Indexes
-
-- `idx_user (user_id)`.
-- `idx_symbol (symbol)`.
-- `idx_status (status)`.
-- unique `idx_user_symbol (user_id, symbol)`.
-
-### Deduplication
-
-One watchlist entry per user and symbol.
-
-### AI Fields
-
-No `ai_analysis` required initially.
-
-### Camp v1 Priority
-
-Later unless AIKINTEL owner confirms private watchlists are needed for Camp v1.
-
-### Future Extension Notes
-
-Must use existing AIKINTEL users and auth. Do not create a separate login.
+Must use existing AIKINTEL users/auth when integrated.
 
 ## `crypto_user_insights`
 
-### Purpose
+Purpose: user-specific research notes, observations, and personal AI-assisted insights.
 
-Stores user-specific research notes, observations, and personal AI-assisted insights.
+Camp v1 priority: later.
 
-### Columns
-
-Recommended columns:
-
-```sql
-id INT AUTO_INCREMENT PRIMARY KEY
-user_id INT NOT NULL
-entity_type ENUM('project', 'opportunity', 'scam_alert', 'market_summary', 'manual') NOT NULL
-entity_id INT NULL
-symbol VARCHAR(20)
-title VARCHAR(500)
-body TEXT
-ai_analysis JSON
-created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-```
-
-### Indexes
-
-- `idx_user (user_id)`.
-- `idx_entity (entity_type, entity_id)`.
-- `idx_symbol (symbol)`.
-- `idx_created (created_at)`.
-
-### Deduplication
-
-No global deduplication. User notes may intentionally repeat topics.
-
-### AI Fields
-
-Optional `ai_analysis` for personal summary or checklist support.
-
-### Camp v1 Priority
-
-Later.
-
-### Future Extension Notes
-
-Requires privacy review and clear ownership rules.
+Requires privacy and ownership review.
 
 ## `crypto_setup_reviews`
 
-### Purpose
+Purpose: persisted setup-review outputs from Crypto Edge AI.
 
-Stores structured setup-review outputs from Crypto Edge AI.
+Camp v1 priority: later as storage. For Camp v1, `setupReviewMock` can remain non-persistent.
 
-### Columns
-
-Recommended columns:
-
-```sql
-id INT AUTO_INCREMENT PRIMARY KEY
-user_id INT NULL
-symbol VARCHAR(20) NOT NULL
-title VARCHAR(500) NOT NULL
-description TEXT
-source_url VARCHAR(1024)
-timeframe VARCHAR(50)
-bias ENUM('bullish', 'bearish', 'neutral') NOT NULL
-score TINYINT NOT NULL
-confidence TINYINT NOT NULL
-risk_level ENUM('low', 'medium', 'high', 'critical') NOT NULL
-summary TEXT
-key_points JSON
-risk_factors JSON
-checklist JSON
-disclaimer_note TEXT
-ai_analysis JSON
-created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-```
-
-### Indexes
-
-- `idx_user (user_id)`.
-- `idx_symbol (symbol)`.
-- `idx_bias (bias)`.
-- `idx_score (score)`.
-- `idx_created (created_at)`.
-
-### Deduplication
-
-No global deduplication in early versions. Setup reviews may be repeated over time because context changes.
-
-### AI Fields
-
-Use full AIKINTEL `ai_analysis` JSON pattern plus mapped fields for direct UI display.
-
-### Camp v1 Priority
-
-Later as persisted storage. For Camp v1, `setupReviewMock` can be a non-persisted endpoint design.
-
-### Future Extension Notes
-
-Add only after AI usage limits and user ownership rules are confirmed.
+Future extension notes: add only after AI usage limits, cost controls, and user ownership rules are confirmed.

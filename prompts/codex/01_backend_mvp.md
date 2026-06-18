@@ -1,6 +1,6 @@
 # Codex Prompt: AIKINTEL Backend Module Planning
 
-You are working on Crypto Edge AI, now positioned as the trader-facing layer of the AIKINTEL Crypto Market Module.
+You are working on Crypto Edge AI, a crypto trading intelligence module developed in its own working repo first, with a path for later AIKINTEL integration.
 
 Do not build a standalone FastAPI backend. Do not use SQLite as the primary database. Design for the existing AIKINTEL architecture.
 

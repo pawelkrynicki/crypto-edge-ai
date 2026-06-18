@@ -1,129 +1,104 @@
-# Crypto Edge AI / AIKINTEL Crypto Market Module
+# Crypto Edge AI
 
-Crypto Edge AI is the working name for the trader-facing decision-support layer inside the AIKINTEL Crypto Market Module.
+Crypto Edge AI is a crypto trading intelligence module designed as a standalone working repository first, with a clear path for later integration into the AIKINTEL platform.
 
-The strategic direction has changed: this project is no longer planned as a standalone FastAPI + SQLite web application. It should be designed as a crypto intelligence module that fits into the existing AIKINTEL Market Intelligence platform technically, visually, and product-wise.
+It uses AIKINTEL-style market intelligence concepts and should use existing AIKINTEL auth/users if integrated into the main platform. The module focuses on trader-facing decision support: bias, risk, opportunity, confidence, narratives, scam alerts, setup review, and pre-trade checklist.
 
-## Product Positioning
+Crypto Edge AI is the module name and the intended menu name. The project should not be renamed to Crypto Market.
 
-AIKINTEL Crypto Market Module is the platform-level market intelligence layer for crypto data:
+## Strategic Direction
 
-- Project evaluations.
-- Opportunities and narratives.
-- Scam and risk alerts.
-- Market sentiment.
-- On-chain analytics.
-- AI-generated market summaries.
-- Crypto news when available in AIKINTEL.
+Current direction:
 
-Crypto Edge AI remains the working name for the trader-facing layer:
+- Develop conceptually and technically in this working repo: `pawelkrynicki/crypto-edge-ai`.
+- Keep the architecture compatible with AIKINTEL.
+- Integrate into AIKINTEL later if the module works and the main repo integration is approved.
+- Use existing AIKINTEL auth/users when integrated.
+- Reuse or map to existing AIKINTEL Market News / Crypto data where possible.
 
-- Bias.
-- Score.
-- Risk.
-- Confidence.
-- Checklist.
-- Setup review.
-- Personal insights.
-- Observation status.
-- AI decision-support commentary.
+This repo is not a second platform beside AIKINTEL. It is a working space for the Crypto Edge AI module before integration.
 
-Crypto Edge AI must not provide buy or sell recommendations.
+## What Crypto Edge AI Is
 
-## What This Project Is
+- A trader-facing crypto intelligence module.
+- A research and decision-support workflow for crypto traders.
+- A module that combines market intelligence with setup review, risk, confidence, and checklist discipline.
+- A future AIKINTEL-compatible module, not a competing platform.
 
-- A crypto intelligence module for AIKINTEL.
-- A research and decision-support layer for traders.
-- A structured way to review crypto projects, alerts, narratives, and market summaries.
-- A future AI-assisted analysis layer accessed through AIKINTEL backend patterns.
+## What Crypto Edge AI Is Not
 
-## What This Project Is Not
-
-- It is not a separate platform beside AIKINTEL.
 - It is not a trading bot.
 - It is not a buy/sell signal system.
 - It does not execute trades.
 - It does not integrate MT4, exchanges, Telegram, Discord, or payments in this stage.
 - It does not promise profit.
 - It does not provide financial advice.
+- It does not duplicate AIKINTEL Market News / Crypto.
 
-## AIKINTEL-Compatible Stack
+## Data Backing
 
-Frontend:
+Crypto market intelligence is the data backing for Crypto Edge AI. It may include:
 
-- React 19.
-- Tailwind CSS 4.
-- shadcn/ui.
-- wouter.
-- TanStack Query.
-
-Backend:
-
-- Express.
-- tRPC.
-
-Database:
-
-- MySQL / MariaDB.
-- Drizzle ORM in `packages/webapp`.
-- `mysql2/promise` in `packages/cron`.
-
-Runtime and operations:
-
-- Node.js 20.
-- TypeScript.
-- PM2 for cron scripts.
-
-AI:
-
-- OpenAI API through AIKINTEL internal helper/pattern.
-- No committed API keys.
-- Mock or documented AI schema only at this stage.
-
-## Target AIKINTEL Structure
-
-The module should align with:
-
-```text
-packages/webapp/client/src/pages
-packages/webapp/client/src/components
-packages/webapp/server/routers
-packages/cron/scripts
-packages/cron/lib/db.ts
-docs
-vault
-```
-
-Do not modify `_core`.
-
-## Current Repository Stage
-
-This repository currently contains documentation and planning artifacts for aligning Crypto Edge AI with the AIKINTEL Crypto Market Module architecture.
-
-No full application implementation is included yet.
-
-## Camp v1 MVP Direction
-
-The camp version should be a controlled, limited AIKINTEL-compatible module, not a standalone product. MVP should include:
-
-- Crypto Market / Crypto Edge page aligned with AIKINTEL UI.
-- Crypto intelligence dashboard.
-- Project/token list.
-- Scam and risk alerts.
+- Project/token evaluations.
 - Opportunities and narratives.
-- Market summary.
-- AI analysis JSON following AIKINTEL pattern.
+- Scam and risk alerts.
+- Market summaries.
+- Sentiment and bias context.
+- On-chain analytics later if useful.
+- Existing AIKINTEL Market News / Crypto when accessible.
+
+## AIKINTEL-Compatible Stack Direction
+
+If integrated into AIKINTEL, the expected stack remains:
+
+- Frontend: React 19, Tailwind CSS 4, shadcn/ui, wouter, TanStack Query.
+- Backend: Express and tRPC.
+- Database: MySQL / MariaDB.
+- Webapp database layer: Drizzle ORM.
+- Cron/script database layer: `mysql2/promise`.
+- Runtime: Node.js 20 and TypeScript.
+- Process manager: PM2 for later collection scripts.
+- AI: existing AIKINTEL OpenAI helper if available, otherwise to be decided later.
+
+Do not use FastAPI or SQLite as the target architecture for this module.
+
+## Camp v1 Direction
+
+Camp v1 should be a controlled Crypto Edge AI module for real users, starting with limited and safe functionality.
+
+It should focus on:
+
+- Crypto Edge AI dashboard/page.
+- Project/token research list.
+- Scam and risk alerts.
+- Opportunities/narratives.
+- Market summary context.
 - Score 0-100.
-- Sentiment/bias: bullish, bearish, neutral.
+- Bias: bullish, bearish, neutral.
 - Confidence 0-100.
 - Risk factors.
 - Trader checklist.
-- User status or personal insights if compatible with existing AIKINTEL architecture.
-- tRPC router pattern.
-- Cron script pattern.
-- PM2-ready collection scripts.
-- MySQL table conventions.
+- Setup review mock.
+- Disclaimer and safety boundaries.
+
+## Data Source Direction
+
+Prefer credible open-source or public API sources where legally and technically suitable:
+
+- CoinGecko.
+- CryptoCompare.
+- DefiLlama.
+- CoinMarketCap only if access and value justify it.
+- Dune / public dashboards if useful.
+- GDELT or existing AIKINTEL Market News if accessible.
+- Fear & Greed Index.
+- Token Unlocks only if legal API access is available.
+- Public CEX/DEX data without violating terms.
+
+## Current Stage
+
+This repository currently contains planning and technical design documents. It does not implement the app, migrations, auth, production cron scripts, real API fetchers, or OpenAI calls yet.
 
 ## Next Step
 
-Define the AIKINTEL database schema mapping and tRPC router design for `cryptoMarket`, then prepare a narrow mock-data implementation plan for camp v1.
+Refine source selection and the data model around Crypto Edge AI, then prepare mock/seed module data for a safe Camp v1 flow.

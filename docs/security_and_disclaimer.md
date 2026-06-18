@@ -2,7 +2,7 @@
 
 ## Core Principle
 
-Crypto Edge AI and the AIKINTEL Crypto Market Module support research and decision preparation. They do not make trading decisions for users.
+Crypto Edge AI supports research and decision preparation for crypto traders. It can later integrate into AIKINTEL, but it must not make trading decisions for users.
 
 ## Platform Security
 
@@ -62,7 +62,7 @@ AI may return:
 
 ## Disclaimer
 
-Crypto Edge AI is a research and checklist-support layer inside the AIKINTEL Crypto Market Module. It does not provide investment advice, trading signals, or guaranteed outcomes. It does not execute trades and does not replace the user's judgment. Crypto trading involves significant risk, including possible loss of capital.
+Crypto Edge AI is a research and checklist-support module. It does not provide investment advice, trading signals, or guaranteed outcomes. It does not execute trades and does not replace the user's judgment. Crypto trading involves significant risk, including possible loss of capital.
 
 ## Analysis Disclaimer
 

@@ -2,9 +2,9 @@
 
 ## Architecture Direction
 
-Crypto Edge AI must be designed as part of AIKINTEL, not as a separate application.
+Crypto Edge AI is developed in this standalone working repository first, with a clear path for later AIKINTEL integration.
 
-The technical target is the AIKINTEL Crypto Market Module inside the existing monorepo.
+The technical design should remain compatible with the AIKINTEL monorepo, but implementation does not move into the main AIKINTEL repo until access and integration timing are confirmed.
 
 ## Target Monorepo Paths
 

@@ -2,30 +2,38 @@
 
 ## Goal
 
-Integrate Crypto Edge AI as the trader-facing layer of the AIKINTEL Crypto Market Module.
+Develop Crypto Edge AI in this standalone working repository first, while keeping a clear and practical path for later AIKINTEL integration.
 
-The module must fit the AIKINTEL platform instead of becoming a second product.
+Crypto Edge AI is the main module. Crypto market intelligence tables and data sources are its backing layer.
+
+## Owner Decisions Applied
+
+- Working repo remains `pawelkrynicki/crypto-edge-ai`.
+- The module name and menu name should be `Crypto Edge AI`.
+- Later integration into AIKINTEL is possible after the module is working.
+- Existing AIKINTEL auth/users are the preferred model when integrated.
+- AIKINTEL Market News / Crypto should be reused or mapped where possible, not duplicated.
+- Migration approach should be the easiest safe path compatible with AIKINTEL, pending main repo access.
+- OpenAI helper usage is deferred until the existing AIKINTEL helper can be reviewed.
 
 ## Integration Principles
 
-- Follow AIKINTEL monorepo structure.
-- Use existing webapp and cron patterns.
-- Use tRPC for frontend/backend communication.
-- Use MySQL / MariaDB.
-- Use Drizzle ORM in webapp.
-- Use `mysql2/promise` in cron scripts.
-- Use PM2 for scheduled collection scripts.
+- Do not build a second platform beside AIKINTEL.
+- Do not rename the module to Crypto Market.
+- Keep data model compatible with AIKINTEL conventions.
+- Use existing AIKINTEL auth/users when integrated.
+- Avoid duplicate general crypto news storage if AIKINTEL Market News already covers it.
 - Do not modify `_core`.
-- Do not add a standalone login system.
-- Do not add a standalone backend.
+- Do not commit secrets.
+- Do not implement trading execution.
 
-## Target Files in AIKINTEL
+## Target Paths if Integrated
 
 Frontend:
 
 ```text
-packages/webapp/client/src/pages/CryptoMarket.tsx
-packages/webapp/client/src/components/CryptoMarket/
+packages/webapp/client/src/pages/CryptoEdgeAI.tsx
+packages/webapp/client/src/components/CryptoEdgeAI/
 packages/webapp/client/src/App.tsx
 packages/webapp/client/src/components/Sidebar.tsx
 ```
@@ -37,16 +45,7 @@ packages/webapp/server/routers/cryptoMarket.ts
 packages/webapp/server/routers.ts
 ```
 
-Cron:
-
-```text
-packages/cron/scripts/fetch-crypto-projects.ts
-packages/cron/scripts/fetch-crypto-scam-alerts.ts
-packages/cron/scripts/fetch-crypto-opportunities.ts
-packages/cron/scripts/fetch-crypto-onchain.ts
-packages/cron/scripts/generate-crypto-summary.ts
-packages/cron/lib/db.ts
-```
+The router may still be named `cryptoMarket` technically because it serves market intelligence data, while the UI/module name is `Crypto Edge AI`.
 
 Docs:
 
@@ -57,35 +56,35 @@ vault
 
 ## Integration Order
 
-1. Confirm database schema with AIKINTEL owner.
-2. Use `docs/database_schema_design.md` as the schema design baseline.
-3. Use `docs/trpc_router_design.md` as the `cryptoMarket` router design baseline.
-4. Prepare migration for Camp v1 must-have crypto tables.
-5. Add `/crypto-market` frontend page.
-6. Add sidebar navigation.
-7. Add PM2-ready cron script skeletons.
-8. Add safe AI analysis JSON generation.
-9. Run controlled camp v1 release.
+1. Confirm access to the main AIKINTEL repo.
+2. Confirm exact Market News / Crypto schema and whether `crypto_news` exists.
+3. Confirm migration mechanism: Drizzle migration, raw SQL, or deployment script.
+4. Confirm OpenAI helper availability and usage pattern.
+5. Refine source selection and data model.
+6. Prepare mock/seed Crypto Edge AI module data.
+7. Prepare read-only `cryptoMarket` router skeleton.
+8. Prepare AIKINTEL-style UI mock using screenshots or existing pages.
+9. Decide when to move from this working repo into the main AIKINTEL repo.
 
-## Camp v1 Technical Design Documents
+## Technical Design Documents
 
-The next implementation task should start from:
+Use:
 
 - `docs/database_schema_design.md`.
 - `docs/trpc_router_design.md`.
 - `docs/camp_v1_mock_data_plan.md`.
 - `docs/open_questions_for_aikintel_owner.md`.
+- `docs/owner_decisions_2026_06_18.md`.
 
-These documents define the schema, router contract, mock data plan, and open product/platform questions. They intentionally stop before implementation.
+These documents intentionally stop before application implementation.
 
 ## Validation Checklist
 
-- Builds inside AIKINTEL webapp.
-- Uses tRPC, not direct frontend fetches.
-- Uses existing DB connection patterns.
+- Module remains named Crypto Edge AI.
+- Does not duplicate general Market News / Crypto.
+- Uses tRPC design and AIKINTEL-compatible data conventions.
+- Uses existing AIKINTEL users/auth when integrated.
 - Does not modify `_core`.
 - Does not commit secrets.
 - Does not implement trading execution.
 - Includes disclaimer near AI analysis.
-- Uses existing AIKINTEL auth/users unless owner approves otherwise.
-- Keeps `setupReviewMock` as mock/design for Camp v1 until AI usage limits are approved.

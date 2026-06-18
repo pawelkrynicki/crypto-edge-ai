@@ -1,8 +1,8 @@
-# Codex Prompt: AIKINTEL Crypto Market Module Planning
+# Codex Prompt: Crypto Edge AI Module Planning
 
-You are planning the AIKINTEL Crypto Market Module.
+You are planning Crypto Edge AI.
 
-Crypto Edge AI is the trader-facing layer, but the technical implementation must fit AIKINTEL.
+Crypto Edge AI is a crypto trading intelligence module developed in its own working repo first, with a path for later AIKINTEL integration.
 
 ## Task
 

@@ -1,6 +1,6 @@
 # Manus Prompt: AIKINTEL Frontend MVP
 
-You are working on Crypto Edge AI, now the trader-facing layer of the AIKINTEL Crypto Market Module.
+You are working on Crypto Edge AI, a crypto trading intelligence module developed in its own working repo first, with a path for later AIKINTEL integration.
 
 Do not design a standalone app. Build UI plans that match AIKINTEL patterns.
 

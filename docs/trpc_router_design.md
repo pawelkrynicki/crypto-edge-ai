@@ -2,9 +2,11 @@
 
 ## Purpose
 
-This document designs the `cryptoMarket` tRPC router for the AIKINTEL Crypto Market Module.
+This document designs the `cryptoMarket` tRPC router that can power the Crypto Edge AI module.
 
-Target file:
+The UI/module name is `Crypto Edge AI`. The router name may remain `cryptoMarket` because it serves the market intelligence backing layer.
+
+Target future file if integrated:
 
 ```text
 packages/webapp/server/routers/cryptoMarket.ts
@@ -12,9 +14,17 @@ packages/webapp/server/routers/cryptoMarket.ts
 
 This is a design document only. It does not implement the router.
 
+## Owner Decisions Reflected
+
+- Crypto Edge AI remains the module/menu name.
+- Work continues in this repo first.
+- Existing AIKINTEL auth/users should be used if integrated.
+- Existing Market News / Crypto should be reused or mapped where possible.
+- OpenAI helper status remains open.
+
 ## Router Principles
 
-- Use AIKINTEL tRPC router patterns.
+- Use AIKINTEL tRPC patterns if integrated.
 - Do not modify `_core`.
 - Use protected procedures by default.
 - Do not create a standalone backend.
@@ -26,44 +36,26 @@ This is a design document only. It does not implement the router.
 - Never expose credentials.
 - Keep `setupReviewMock` non-persistent for Camp v1 unless approved.
 
-## Shared Types
+## Procedures
 
-### Common Input Rules
+Minimum procedures:
 
-- `limit`: integer, min 1, max 100, default 30 or 50 depending on procedure.
-- `offset`: integer, min 0, default 0 where pagination is needed.
-- `symbol`: uppercase string, max 20.
-- `sortBy`: enum only, never raw SQL.
-- `sortDirection`: `asc` or `desc`, default `desc`.
-
-### AI Analysis Output Shape
-
-```ts
-type AiAnalysis = {
-  model: string;
-  analyzed_at: string;
-  summary: string;
-  key_points: string[];
-  sentiment: "bullish" | "bearish" | "neutral";
-  confidence: number;
-  risk_factors: string[];
-  recommendation: string;
-  raw_prompt_tokens: number;
-  raw_completion_tokens: number;
-};
-```
+- `projects`.
+- `projectBySymbol`.
+- `scamAlerts`.
+- `opportunities`.
+- `marketSummary`.
+- `dashboard`.
+- `search`.
+- `setupReviewMock`.
 
 ## Procedure: `projects`
 
-### Purpose
+Purpose: return filtered and sorted crypto projects/tokens for Crypto Edge AI.
 
-Return a filtered and sorted list of crypto projects/tokens.
+Status: protected.
 
-### Protected/Public Status
-
-Protected.
-
-### Input Schema With Zod
+Input:
 
 ```ts
 z.object({
@@ -79,54 +71,15 @@ z.object({
 })
 ```
 
-### Output Shape
+Output: list of projects with symbol, name, category, chain, risk score, opportunity score, market cap, and `ai_analysis`.
 
-```ts
-{
-  items: Array<{
-    id: number;
-    symbol: string;
-    name: string;
-    category: string | null;
-    chain: string | null;
-    market_cap_usd: string | null;
-    risk_score: number | null;
-    opportunity_score: number | null;
-    ai_analysis: AiAnalysis | null;
-    updated_at: string | null;
-  }>;
-  nextOffset: number | null;
-}
-```
+Sorting: allowlisted `sortBy` only.
 
-### Sorting
+Filters: category, chain, score ranges, search.
 
-Allowed fields only:
+Security notes: parameterized search, no raw sort field, no external fetches.
 
-- `opportunity_score`.
-- `risk_score`.
-- `market_cap_usd`.
-- `created_at`.
-
-### Filters
-
-- Category.
-- Chain.
-- Minimum opportunity score.
-- Maximum risk score.
-- Symbol/name search.
-
-### Limit Rules
-
-Maximum `limit` is 100.
-
-### Security Notes
-
-- Use enum allowlists for sorting.
-- Escape or parameterize search.
-- Do not expose raw DB errors to frontend.
-
-### Sample Response
+Sample response:
 
 ```json
 {
@@ -136,23 +89,8 @@ Maximum `limit` is 100.
       "symbol": "BTC",
       "name": "Bitcoin",
       "category": "L1",
-      "chain": "Bitcoin",
-      "market_cap_usd": "1250000000000.00",
       "risk_score": 25,
-      "opportunity_score": 76,
-      "ai_analysis": {
-        "model": "mock-camp-v1",
-        "analyzed_at": "2026-06-16T12:00:00Z",
-        "summary": "Bitcoin remains the main market benchmark.",
-        "key_points": ["High liquidity", "Macro-sensitive", "Dominance should be monitored"],
-        "sentiment": "neutral",
-        "confidence": 82,
-        "risk_factors": ["Macro volatility", "ETF flow changes"],
-        "recommendation": "Use as market context and verify current flows.",
-        "raw_prompt_tokens": 0,
-        "raw_completion_tokens": 0
-      },
-      "updated_at": "2026-06-16T12:00:00Z"
+      "opportunity_score": 76
     }
   ],
   "nextOffset": 50
@@ -161,15 +99,11 @@ Maximum `limit` is 100.
 
 ## Procedure: `projectBySymbol`
 
-### Purpose
+Purpose: return a single project plus related alerts/opportunities.
 
-Return one project by symbol with related alerts and opportunities.
+Status: protected.
 
-### Protected/Public Status
-
-Protected.
-
-### Input Schema With Zod
+Input:
 
 ```ts
 z.object({
@@ -177,68 +111,29 @@ z.object({
 })
 ```
 
-### Output Shape
+Output: project, latest alerts, latest opportunities, and optional mapped Market News references if available.
 
-```ts
-{
-  project: CryptoProject | null;
-  latestAlerts: CryptoScamAlert[];
-  latestOpportunities: CryptoOpportunity[];
-}
-```
+Sorting: alerts by `published_at DESC`; opportunities by `confidence_score DESC, published_at DESC`.
 
-### Sorting
+Security notes: normalize symbol to uppercase and use parameterized queries.
 
-- Alerts: `published_at DESC`.
-- Opportunities: `confidence_score DESC, published_at DESC`.
-
-### Filters
-
-Filter all related records by normalized uppercase symbol.
-
-### Limit Rules
-
-Return up to 10 alerts and 10 opportunities.
-
-### Security Notes
-
-- Normalize symbol to uppercase server-side.
-- Do not allow arbitrary joins or raw table names.
-
-### Sample Response
+Sample response:
 
 ```json
 {
-  "project": {
-    "id": 1,
-    "symbol": "SOL",
-    "name": "Solana",
-    "risk_score": 45,
-    "opportunity_score": 78
-  },
+  "project": { "symbol": "SOL", "name": "Solana", "risk_score": 45, "opportunity_score": 78 },
   "latestAlerts": [],
-  "latestOpportunities": [
-    {
-      "id": 12,
-      "title": "Solana ecosystem narrative watch",
-      "risk_level": "medium",
-      "confidence_score": 72
-    }
-  ]
+  "latestOpportunities": [{ "title": "Solana ecosystem narrative watch", "confidence_score": 72 }]
 }
 ```
 
 ## Procedure: `scamAlerts`
 
-### Purpose
+Purpose: return scam and risk alerts.
 
-Return scam and risk alerts.
+Status: protected.
 
-### Protected/Public Status
-
-Protected.
-
-### Input Schema With Zod
+Input:
 
 ```ts
 z.object({
@@ -251,36 +146,13 @@ z.object({
 })
 ```
 
-### Output Shape
+Output: paginated scam/risk alerts.
 
-```ts
-{
-  items: CryptoScamAlert[];
-  nextOffset: number | null;
-}
-```
+Sorting: `published_at DESC`, with high/critical surfaced in dashboard procedure.
 
-### Sorting
+Security notes: render evidence URLs safely and avoid raw filters.
 
-`published_at DESC`, then severity priority.
-
-### Filters
-
-- Severity.
-- Alert type.
-- Symbol.
-- Confirmed only.
-
-### Limit Rules
-
-Maximum `limit` is 100.
-
-### Security Notes
-
-- Severity must be allowlisted.
-- Evidence URLs should be rendered safely in frontend.
-
-### Sample Response
+Sample response:
 
 ```json
 {
@@ -290,9 +162,7 @@ Maximum `limit` is 100.
       "project_symbol": "FAKE",
       "severity": "critical",
       "alert_type": "honeypot",
-      "title": "Potential honeypot pattern detected",
-      "is_confirmed": false,
-      "published_at": "2026-06-16T08:00:00Z"
+      "title": "Potential honeypot pattern detected"
     }
   ],
   "nextOffset": null
@@ -301,15 +171,11 @@ Maximum `limit` is 100.
 
 ## Procedure: `opportunities`
 
-### Purpose
+Purpose: return opportunities and narratives for research review.
 
-Return opportunities and narratives for research review.
+Status: protected.
 
-### Protected/Public Status
-
-Protected.
-
-### Input Schema With Zod
+Input:
 
 ```ts
 z.object({
@@ -323,66 +189,35 @@ z.object({
 })
 ```
 
-### Output Shape
+Output: paginated opportunities with risk level, confidence, status, and AI analysis summary.
 
-```ts
-{
-  items: CryptoOpportunity[];
-  nextOffset: number | null;
-}
-```
+Sorting: `confidence_score DESC, published_at DESC`.
 
-### Sorting
+Security notes: `potential_return` is descriptive only and must not be rendered as a promise.
 
-`confidence_score DESC, published_at DESC`.
-
-### Filters
-
-- Type.
-- Status.
-- Risk level.
-- Minimum confidence.
-- Symbol.
-
-### Limit Rules
-
-Maximum `limit` is 100.
-
-### Security Notes
-
-- `potential_return` is descriptive only and must not be presented as a promise.
-- Show disclaimer near opportunity analysis.
-
-### Sample Response
+Sample response:
 
 ```json
 {
   "items": [
     {
-      "id": 8,
       "project_symbol": "ETH",
       "opportunity_type": "narrative",
       "title": "L2 activity narrative",
       "risk_level": "medium",
-      "confidence_score": 69,
-      "status": "active"
+      "confidence_score": 69
     }
-  ],
-  "nextOffset": 30
+  ]
 }
 ```
 
 ## Procedure: `marketSummary`
 
-### Purpose
+Purpose: return latest market summary context for Crypto Edge AI.
 
-Return latest market summary for a requested timeframe.
+Status: protected.
 
-### Protected/Public Status
-
-Protected.
-
-### Input Schema With Zod
+Input:
 
 ```ts
 z.object({
@@ -390,41 +225,19 @@ z.object({
 })
 ```
 
-### Output Shape
+Output: one summary or null.
 
-```ts
-{
-  summary: CryptoMarketSummary | null;
-}
-```
+Sorting: `summary_date DESC`.
 
-### Sorting
+Security notes: safely parse JSON fields; missing summary returns null.
 
-`summary_date DESC`.
-
-### Filters
-
-Timeframe only.
-
-### Limit Rules
-
-Always return one record or null.
-
-### Security Notes
-
-- JSON fields should be parsed safely.
-- Missing summary should return null, not throw.
-
-### Sample Response
+Sample response:
 
 ```json
 {
   "summary": {
-    "summary_date": "2026-06-16",
-    "timeframe": "daily",
     "market_sentiment": "neutral",
     "fear_greed_index": 52,
-    "trending_narratives": ["BTC ETF flows", "L2 activity"],
     "ai_summary": "The market is mixed with no clear broad-risk impulse."
   }
 }
@@ -432,15 +245,11 @@ Always return one record or null.
 
 ## Procedure: `dashboard`
 
-### Purpose
+Purpose: return one payload for the Crypto Edge AI dashboard.
 
-Return a single payload for the Crypto Market overview dashboard.
+Status: protected.
 
-### Protected/Public Status
-
-Protected.
-
-### Input Schema With Zod
+Input:
 
 ```ts
 z.object({
@@ -451,140 +260,59 @@ z.object({
 })
 ```
 
-### Output Shape
+Output: summary, top projects, critical alerts, active opportunities, and generated timestamp.
 
-```ts
-{
-  summary: CryptoMarketSummary | null;
-  topProjects: CryptoProject[];
-  criticalAlerts: CryptoScamAlert[];
-  activeOpportunities: CryptoOpportunity[];
-  generatedAt: string;
-}
-```
+Security notes: bounded queries only.
 
-### Sorting
-
-- Projects by `opportunity_score DESC`.
-- Alerts by `published_at DESC`.
-- Opportunities by `confidence_score DESC`.
-
-### Filters
-
-- Summary timeframe.
-- Alerts should prioritize `high` and `critical`.
-- Opportunities should default to `active`.
-
-### Limit Rules
-
-Each list maximum is 20.
-
-### Security Notes
-
-- Combine server-side only.
-- Avoid expensive unbounded queries.
-
-### Sample Response
+Sample response:
 
 ```json
 {
-  "summary": {
-    "market_sentiment": "neutral",
-    "fear_greed_index": 52
-  },
-  "topProjects": [{"symbol": "BTC", "opportunity_score": 76}],
-  "criticalAlerts": [{"title": "Potential honeypot pattern detected", "severity": "critical"}],
-  "activeOpportunities": [{"title": "L2 activity narrative", "confidence_score": 69}],
+  "summary": { "market_sentiment": "neutral", "fear_greed_index": 52 },
+  "topProjects": [{ "symbol": "BTC", "opportunity_score": 76 }],
+  "criticalAlerts": [{ "title": "Potential honeypot pattern detected", "severity": "critical" }],
+  "activeOpportunities": [{ "title": "L2 activity narrative", "confidence_score": 69 }],
   "generatedAt": "2026-06-16T12:00:00Z"
 }
 ```
 
 ## Procedure: `search`
 
-### Purpose
+Purpose: search across Crypto Edge AI backing data.
 
-Search across projects, opportunities, alerts, and summaries for quick research navigation.
+Status: protected.
 
-### Protected/Public Status
-
-Protected.
-
-### Input Schema With Zod
+Input:
 
 ```ts
 z.object({
   query: z.string().min(2).max(100),
-  scope: z.enum(["all", "projects", "alerts", "opportunities", "summaries"]).default("all"),
+  scope: z.enum(["all", "projects", "alerts", "opportunities", "summaries", "market_news"]).default("all"),
   limit: z.number().int().min(1).max(50).default(20)
 })
 ```
 
-### Output Shape
+Output: mixed typed search results.
 
-```ts
-{
-  items: Array<{
-    type: "project" | "alert" | "opportunity" | "summary";
-    id: number;
-    title: string;
-    symbol?: string;
-    subtitle?: string;
-    score?: number;
-  }>;
-}
-```
+Security notes: use parameterized LIKE or full-text search; minimum query length avoids broad scans. Only include `market_news` after schema is confirmed.
 
-### Sorting
-
-Relevance-like ordering:
-
-- Exact symbol matches first.
-- Newer alerts/opportunities next.
-- Higher opportunity/confidence scores next.
-
-### Filters
-
-Scope.
-
-### Limit Rules
-
-Maximum `limit` is 50.
-
-### Security Notes
-
-- Minimum query length avoids expensive broad searches.
-- Use parameterized LIKE queries or full-text search if available.
-
-### Sample Response
+Sample response:
 
 ```json
 {
   "items": [
-    {
-      "type": "project",
-      "id": 1,
-      "title": "Bitcoin",
-      "symbol": "BTC",
-      "subtitle": "L1",
-      "score": 76
-    }
+    { "type": "project", "id": 1, "title": "Bitcoin", "symbol": "BTC", "score": 76 }
   ]
 }
 ```
 
 ## Procedure: `setupReviewMock`
 
-### Purpose
+Purpose: safe Camp v1 mock endpoint for trader-facing setup review. This is not full AI integration.
 
-Design-only Camp v1 endpoint for a safe, non-trading setup review mock.
+Status: protected.
 
-It should help test the Crypto Edge AI decision-support layer without real AI provider integration and without persisting production AI analysis.
-
-### Protected/Public Status
-
-Protected.
-
-### Input Schema With Zod
+Input:
 
 ```ts
 z.object({
@@ -597,7 +325,7 @@ z.object({
 })
 ```
 
-### Output Shape
+Output:
 
 ```ts
 {
@@ -614,27 +342,15 @@ z.object({
 }
 ```
 
-### Sorting
+Security notes:
 
-Not applicable.
-
-### Filters
-
-Not applicable.
-
-### Limit Rules
-
-The implementation should apply daily/user-level usage limits if this becomes real. For mock design, document a future cap such as 10 reviews per user per day.
-
-### Security Notes
-
-- Must not call real AI in Camp v1 unless explicitly approved.
-- Must not persist user context unless approved.
-- Must include disclaimer in every response.
+- Must not call real AI until approved.
+- Must not persist user context until approved.
+- Must include disclaimer.
 - Must not return buy/sell/enter-now language.
-- Must sanitize and limit input lengths.
+- Must sanitize and limit inputs.
 
-### Sample Response
+Sample response:
 
 ```json
 {
@@ -643,31 +359,18 @@ The implementation should apply daily/user-level usage limits if this becomes re
   "confidence": 71,
   "risk_level": "medium",
   "summary": "The topic may be worth monitoring, but the available evidence is not enough for a trading decision.",
-  "key_points": [
-    "Narrative alignment is visible but needs confirmation.",
-    "Liquidity and recent news should be checked.",
-    "Risk is elevated if the move already happened."
-  ],
-  "risk_factors": [
-    "Post-news chasing risk",
-    "Unclear invalidation level",
-    "Possible social hype"
-  ],
-  "checklist": [
-    "Verify current liquidity and spreads.",
-    "Check whether the catalyst is already priced in.",
-    "Review token unlocks and recent alerts.",
-    "Define invalidation before any decision."
-  ],
+  "key_points": ["Narrative alignment is visible", "Liquidity should be checked"],
+  "risk_factors": ["Post-news chasing risk", "Possible social hype"],
+  "checklist": ["Verify liquidity", "Check whether the catalyst is already priced in"],
   "disclaimer_note": "This is research support only, not financial advice or a buy/sell signal.",
   "ai_analysis": {
     "model": "mock-camp-v1",
     "analyzed_at": "2026-06-16T12:00:00Z",
     "summary": "Research topic needs verification before action.",
-    "key_points": ["Narrative visible", "Evidence incomplete", "Risk requires review"],
+    "key_points": ["Narrative visible", "Evidence incomplete"],
     "sentiment": "neutral",
     "confidence": 71,
-    "risk_factors": ["Post-news chasing risk", "Possible hype"],
+    "risk_factors": ["Post-news chasing risk"],
     "recommendation": "Verify liquidity, catalyst freshness, and risk factors before considering the topic further.",
     "raw_prompt_tokens": 0,
     "raw_completion_tokens": 0

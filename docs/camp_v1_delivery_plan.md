@@ -2,31 +2,39 @@
 
 ## Objective
 
-Deliver a limited AIKINTEL-compatible Crypto Market Module for camp use.
+Deliver a controlled Crypto Edge AI module for real users, using AIKINTEL-compatible patterns and a clear later integration path.
 
 The goal is usefulness and safety, not full automation.
 
 ## Camp v1 Must Have
 
-- `/crypto-market` page.
-- Overview dashboard.
-- Projects/token list.
+- Crypto Edge AI page/module.
+- Controlled user flow.
+- Project/token research list.
 - Scam/risk alerts.
 - Opportunities/narratives.
-- Market summary.
+- Market summary context.
 - AI analysis JSON display or mapping.
+- Setup review mock.
 - Score 0-100.
-- Sentiment/bias.
+- Bias: bullish, bearish, neutral.
 - Confidence 0-100.
 - Risk factors.
 - Checklist.
 - Disclaimer.
 
+## Camp v1 Should Reuse or Map
+
+- Existing AIKINTEL Market News / Crypto if accessible.
+- Existing AIKINTEL users/auth when integrated.
+- AIKINTEL-style UI patterns.
+
 ## Camp v1 Should Avoid
 
 - Full AI automation before review.
 - Unverified paid data dependencies.
-- Complex personal workflows.
+- Duplicating the general Market News / Crypto section.
+- Complex personal workflows before auth/users integration is confirmed.
 - Trading execution.
 - Signals.
 - MT4.
@@ -36,52 +44,50 @@ The goal is usefulness and safety, not full automation.
 
 ## Suggested Delivery Phases
 
-### Phase 1: Schema and Router Design
+### Phase 1: Owner Decisions and Source Selection
+
+- Use `docs/owner_decisions_2026_06_18.md`.
+- Resolve open questions from `docs/open_questions_for_aikintel_owner.md`.
+- Select credible data sources for v1.
+
+### Phase 2: Data Model Refinement
 
 - Use `docs/database_schema_design.md`.
-- Use `docs/trpc_router_design.md`.
-- Confirm open questions from `docs/open_questions_for_aikintel_owner.md`.
+- Confirm which tables are needed for Camp v1.
+- Decide how existing Market News / Crypto maps into Crypto Edge AI.
 
-### Phase 2: Schema and Mock Data
+### Phase 3: Mock/Seed Crypto Edge AI Module
 
-- Confirm tables.
-- Prepare migration.
-- Add seed/mock records.
-- Validate AI JSON shape.
 - Use `docs/camp_v1_mock_data_plan.md`.
+- Add safe mock records in the future implementation step.
+- Validate AI JSON shape.
 
-### Phase 3: Read-Only tRPC Router
+### Phase 4: Read-Only tRPC Router Design / Skeleton
 
-- Add `cryptoMarket` router.
-- Add protected read procedures.
-- Keep writes deferred.
-- Include `setupReviewMock` only as a safe mock endpoint if approved.
+- Use `docs/trpc_router_design.md`.
+- Keep procedures read-only except `setupReviewMock`.
+- Keep `setupReviewMock` safe and non-trading.
 
-### Phase 4: Frontend Page
+### Phase 5: AIKINTEL-Style UI Mock
 
-- Add `/crypto-market`.
-- Add overview, projects, opportunities, alerts, on-chain tabs.
-- Match AIKINTEL visual patterns.
+- Align with screenshots or existing AIKINTEL pages.
+- Use the module name `Crypto Edge AI`.
+- Avoid building full UI before integration decisions are settled.
 
-### Phase 5: Cron Skeletons
+### Phase 6: Controlled User Flow
 
-- Add PM2-ready scripts.
-- Use dedup hashes.
-- Use safe logging.
-- Leave external API keys as env vars only.
-
-### Phase 6: Controlled Camp Release
-
-- Deploy limited module.
+- Test with real-user assumptions.
+- Keep access controlled.
 - Verify disclaimers.
 - Monitor errors.
 - Keep backup/demo data.
 
 ## Acceptance Criteria
 
-- Fits AIKINTEL UI.
-- Uses tRPC.
-- Uses MySQL/MariaDB schema.
+- Module remains Crypto Edge AI.
+- Fits AIKINTEL direction.
+- Does not duplicate general crypto news.
+- Uses AIKINTEL-compatible data model.
 - Shows useful crypto research context.
 - Does not provide buy/sell instructions.
 - Does not execute trades.

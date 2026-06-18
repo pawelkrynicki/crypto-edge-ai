@@ -1,6 +1,6 @@
-# Claude Prompt: Crypto Market Research Taxonomy
+# Claude Prompt: Crypto Edge AI Research Taxonomy
 
-You are defining the research taxonomy for the AIKINTEL Crypto Market Module.
+You are defining the research taxonomy for Crypto Edge AI.
 
 ## Objective
 

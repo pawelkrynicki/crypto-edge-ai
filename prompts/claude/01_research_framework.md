@@ -1,8 +1,8 @@
 # Claude Prompt: AIKINTEL Crypto Research Framework
 
-You are helping define the research framework for the AIKINTEL Crypto Market Module.
+You are helping define the research framework for Crypto Edge AI.
 
-Crypto Edge AI is the working name for the trader-facing decision-support layer. It must support market research, risk review, bias assessment, confidence, and checklist discipline. It must not give buy or sell instructions.
+Crypto Edge AI is the module name for trader-facing crypto decision support. It must support market research, risk review, bias assessment, confidence, and checklist discipline. It must not give buy or sell instructions.
 
 ## Research Areas
 

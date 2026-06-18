@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Define safe mock/seed data for Camp v1 demonstrations of the AIKINTEL Crypto Market Module and Crypto Edge AI decision-support layer.
+Define safe mock/seed data for Camp v1 demonstrations of the Crypto Edge AI module.
 
 This is not a production data collection plan and does not add live cron scripts.
 

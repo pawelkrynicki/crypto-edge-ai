@@ -1,93 +1,97 @@
 # Product Scope
 
-## Product Layers
+## Product Direction
 
-The project has two related layers.
+Crypto Edge AI is the main module direction.
 
-## 1. AIKINTEL Crypto Market Module
+It is a crypto trading intelligence module developed in a standalone working repo first, with a path for later integration into AIKINTEL.
 
-This is the platform-level crypto intelligence layer.
+The crypto market intelligence layer is the data backing for Crypto Edge AI. It is not a separate product named Crypto Market.
 
-It should cover:
+## Core User Value
 
-- Project evaluations.
-- Crypto opportunities.
+Crypto Edge AI helps traders review crypto topics before making their own decisions by showing:
+
+- Bias.
+- Score.
+- Confidence.
+- Risk.
+- Narratives.
 - Scam alerts.
-- Market sentiment.
-- On-chain analytics.
-- AI-generated market summaries.
-- Crypto news if it already exists in AIKINTEL.
+- Market context.
+- Setup review.
+- Pre-trade checklist.
 
-Primary tables:
+## Data Backing
+
+The module may use:
 
 - `crypto_projects`.
 - `crypto_scam_alerts`.
 - `crypto_opportunities`.
-- `crypto_onchain_metrics`.
 - `crypto_market_summaries`.
-- `crypto_news` if already available.
+- Existing AIKINTEL Market News / Crypto if accessible.
+- `crypto_onchain_metrics` later if useful.
 
-## 2. Crypto Edge AI
-
-This is the trader-facing decision-support layer.
-
-It should cover:
-
-- Bias.
-- Score.
-- Risk.
-- Confidence.
-- Checklist.
-- Setup review.
-- Personal insights.
-- Observation status.
-- Decision-support AI commentary.
-
-It must not recommend buying or selling.
+Crypto Edge AI should not duplicate the existing AIKINTEL Market News section. It should map to it, summarize it, or use it as context when access is available.
 
 ## Camp v1 Scope
 
 Camp v1 should include:
 
-- Crypto Market / Crypto Edge page in AIKINTEL style.
-- Crypto intelligence dashboard.
-- Project/token list.
+- Crypto Edge AI page/module.
+- Controlled user flow for real users.
+- Project/token research list.
 - Scam/risk alerts.
-- Opportunities and narratives.
-- Market summary.
-- AI analysis JSON aligned with AIKINTEL guidelines.
+- Opportunities/narratives.
+- Market summary context.
+- Setup review mock.
 - Score 0-100.
-- Sentiment/bias: bullish, bearish, neutral.
+- Bias: bullish, bearish, neutral.
 - Confidence 0-100.
 - Risk factors.
-- Trader checklist.
-- User status or personal insights if compatible with existing AIKINTEL architecture.
-- tRPC router pattern.
-- Cron script pattern.
-- PM2-ready collection scripts.
-- MySQL table conventions.
+- Checklist.
+- Disclaimer.
+
+## Data Sources to Consider
+
+Prefer credible open-source or public API sources:
+
+- CoinGecko.
+- CryptoCompare.
+- DefiLlama.
+- CoinMarketCap only if useful and accessible.
+- Dune / public dashboards if useful.
+- GDELT.
+- Existing AIKINTEL Market News / Crypto.
+- Fear & Greed Index.
+- Token Unlocks only with legal API access.
+- Public CEX/DEX data without violating terms.
 
 ## Out of Scope
 
 The following remain out of scope:
 
-- Standalone FastAPI backend as the main backend.
-- SQLite as the main database.
-- Separate login system outside AIKINTEL.
+- Rebranding to a standalone Crypto Market product.
+- Full UI implementation in this documentation stage.
+- Production cron scripts in this documentation stage.
+- Real API fetchers in this documentation stage.
+- New standalone auth/login.
+- FastAPI.
+- SQLite.
 - MT4 integration.
-- Exchange integration.
+- Exchange execution.
 - Telegram integration.
 - Discord integration.
 - Payments.
-- Automated trading.
 - Auto-buy or auto-sell.
 - Signal bot.
 - Copy trading.
 - Hardcoded or committed API keys.
 
-## Topic and Insight Statuses
+## User Statuses
 
-For the trader-facing layer, user-specific statuses may include:
+Future user-specific statuses may include:
 
 - `new`.
 - `to_review`.
@@ -96,4 +100,4 @@ For the trader-facing layer, user-specific statuses may include:
 - `played`.
 - `archived`.
 
-These should be introduced only if they fit the existing AIKINTEL user data architecture.
+These should use existing AIKINTEL users/auth if the module is integrated.
