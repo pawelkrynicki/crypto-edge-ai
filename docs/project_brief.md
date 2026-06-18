@@ -1,47 +1,74 @@
-# Project Brief: Crypto Edge AI
+# Project Brief: AIKINTEL Crypto Market Module
 
 ## Overview
 
-Crypto Edge AI is a real web-based research tool for crypto traders. It helps traders collect, structure, analyze, and review crypto-related ideas before making their own trading decisions.
+Crypto Edge AI is now positioned as the working name for the trader-facing decision-support layer inside the AIKINTEL Crypto Market Module.
 
-The product is designed for users participating in a trading camp. It should help them work with market news, tokens, narratives, risks, and observations in a disciplined way.
+The target product is not a separate web application. It is a crypto intelligence module for the existing AIKINTEL Market Intelligence platform.
 
-## Core Purpose
+## Strategic Change
 
-Crypto Edge AI supports the trader in four areas:
+Previous direction:
 
-- Research: capturing topics, token ideas, market events, and narratives.
-- Selection: identifying which ideas deserve more attention.
-- Risk review: surfacing uncertainty, red flags, hype, and weak evidence.
-- Checklist discipline: helping the user verify key points before acting.
+- Standalone web app.
+- React + Vite frontend.
+- FastAPI backend.
+- SQLite MVP database.
 
-## Product Positioning
+New direction:
 
-Crypto Edge AI is an assistant for research and decision preparation. It is not a substitute for trader judgment.
+- AIKINTEL-compatible module.
+- React 19 frontend inside `packages/webapp`.
+- Express + tRPC backend inside `packages/webapp`.
+- MySQL / MariaDB database.
+- Drizzle ORM for webapp access.
+- `mysql2/promise` for cron scripts.
+- PM2-managed data collection scripts.
 
-The system may eventually use AI to classify and score user-submitted topics, but the output must always remain analytical and educational. It must not become a signal engine.
+## AIKINTEL Crypto Market Module
+
+The module should aggregate and expose crypto market intelligence:
+
+- `crypto_projects`.
+- `crypto_scam_alerts`.
+- `crypto_opportunities`.
+- `crypto_onchain_metrics`.
+- `crypto_market_summaries`.
+- `crypto_news` if available in AIKINTEL.
+
+This is the data and market intelligence layer.
+
+## Crypto Edge AI Layer
+
+Crypto Edge AI is the user-facing trading research layer:
+
+- Bias.
+- Score.
+- Risk.
+- Confidence.
+- Checklist.
+- Setup review.
+- Personal insights.
+- Observation status.
+- AI decision-support commentary.
+
+This layer supports research and decision preparation. It must not produce buy/sell instructions.
+
+## Core Goal
+
+Deliver a limited, useful camp v1 module that fits AIKINTEL technically, visually, and product-wise.
 
 ## Non-Goals
 
-Crypto Edge AI is not:
+The project must not:
 
-- A trading bot.
-- A buy or sell signal service.
-- An automated execution system.
-- An investment advisor.
-- A guaranteed-profit product.
-- An MT4 integration.
-- An exchange integration.
-- A Telegram, Discord, or payments platform.
-
-## First Milestone
-
-The first milestone is repository and product foundation:
-
-- Clear folder structure.
-- Project documentation.
-- MVP scope.
-- Technical architecture.
-- AI scoring model description.
-- Security and disclaimer rules.
-- Implementation prompts for future backend, frontend, and research work.
+- Build a second platform beside AIKINTEL.
+- Build a trading bot.
+- Build an automated signal engine.
+- Execute trades.
+- Integrate exchanges.
+- Integrate MT4.
+- Integrate Telegram or Discord.
+- Add payments.
+- Commit external API keys.
+- Modify AIKINTEL `_core`.

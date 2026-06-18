@@ -1,53 +1,71 @@
 # Security and Disclaimer
 
-## Core Safety Rule
+## Core Principle
 
-Crypto Edge AI supports research and decision preparation. It must not make decisions for the user.
+Crypto Edge AI and the AIKINTEL Crypto Market Module support research and decision preparation. They do not make trading decisions for users.
+
+## Platform Security
+
+Follow AIKINTEL rules:
+
+- No hardcoded credentials.
+- All secrets through `process.env`.
+- No API keys committed to the repository.
+- No frontend calls to external data or AI providers.
+- Frontend calls tRPC procedures only.
+- Backend and cron scripts use existing AIKINTEL helpers and DB patterns.
+- Use `packages/cron/lib/db.ts` for cron database access.
+- Do not create independent DB connection patterns unless approved.
+- Validate JSON before inserts.
+- Use deduplication hashes.
+- Respect API rate limits.
+- Use UTC timestamps.
+- Do not modify `_core`.
 
 ## Trading Safety Boundaries
 
+The AI must not give commands such as:
+
+- `buy`.
+- `sell`.
+- `enter now`.
+- `guaranteed profit`.
+- `sure setup`.
+- `risk-free`.
+- `financial advice`.
+
 The system must not:
 
-- Tell users to buy.
-- Tell users to sell.
-- Tell users to enter now.
-- Promise guaranteed profit.
-- Claim that a setup is certain.
 - Execute trades.
-- Connect to exchanges for execution.
-- Present itself as financial advice.
+- Auto-buy.
+- Auto-sell.
+- Provide copy trading.
+- Act as a signal bot.
+- Integrate MT4.
+- Integrate exchanges for execution.
+- Integrate Telegram or Discord alerts in this stage.
+- Add payments in this stage.
 
-## User Decision Ownership
+## Allowed AI Outputs
 
-The user is responsible for:
+AI may return:
 
-- Verifying information.
-- Assessing risk.
-- Deciding whether to trade.
-- Managing position size.
-- Managing leverage.
-- Managing stop loss and invalidation.
-- Understanding that crypto markets are volatile.
+- Market context.
+- Bias.
+- Risk review.
+- Checklist.
+- Research summary.
+- Decision support.
+- Things to verify before trading.
+- Scam or risk warnings.
+- Data uncertainty notes.
 
-## Data Security Principles
+## Disclaimer
 
-- Do not commit API keys.
-- Do not expose provider keys in the frontend.
-- Store secrets in environment variables.
-- Keep AI provider calls on the backend.
-- Keep user data isolated.
-- Validate user input.
-- Apply usage limits.
-- Log operational errors without leaking secrets.
+Crypto Edge AI is a research and checklist-support layer inside the AIKINTEL Crypto Market Module. It does not provide investment advice, trading signals, or guaranteed outcomes. It does not execute trades and does not replace the user's judgment. Crypto trading involves significant risk, including possible loss of capital.
 
-## MVP Disclaimer
+## Analysis Disclaimer
 
-Suggested disclaimer:
+Every AI analysis should display or include a disclaimer note:
 
-Crypto Edge AI is a research and checklist-support tool for crypto traders. It does not provide investment advice, trading signals, or guaranteed outcomes. The system does not execute trades and does not replace the user's own judgment. Crypto trading involves significant risk, including possible loss of capital.
-
-## AI Output Disclaimer
-
-Every analysis should include:
-
-This analysis is for research support only. It is not a buy or sell signal, not investment advice, and not a guarantee of future results.
+This analysis is for research support only. It is not a buy or sell signal, not financial advice, and not a guarantee of future results. The final decision belongs to the user.

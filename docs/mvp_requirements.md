@@ -1,95 +1,118 @@
 # MVP Requirements
 
-## Goal
+## MVP Goal
 
-Build a usable MVP for a trading camp audience. The MVP should let users log in, add crypto topics, receive structured AI-style analysis through a mock or future backend provider, and manage topic status over time.
+Build a controlled camp v1 module that fits AIKINTEL, rather than a standalone app.
 
-## User Roles
+The MVP should show useful crypto market intelligence and a trader-facing decision-support view without providing trading signals.
 
-### User
+## Required Platform Alignment
 
-A user can:
+The MVP must align with:
 
-- Log in.
-- Add crypto topics.
-- View only their own topics.
-- Request mock analysis.
-- View analysis history.
-- Update topic status.
-- See usage limits and disclaimer.
+- React 19.
+- Tailwind CSS 4.
+- shadcn/ui.
+- wouter.
+- TanStack Query.
+- Express.
+- tRPC.
+- MySQL / MariaDB.
+- Drizzle ORM in webapp.
+- `mysql2/promise` in cron scripts.
+- Node.js 20.
+- TypeScript.
+- PM2 cron process pattern.
 
-### Admin
+## Required AIKINTEL Sections
 
-An admin can:
+The MVP should expose:
 
-- View basic user list.
-- View usage counts.
-- Review topics across users.
-- Manage user access in a basic way.
-- Monitor system usage.
+- Crypto dashboard overview.
+- Projects/token list.
+- Scam and risk alerts.
+- Opportunities/narratives.
+- Market summary.
+- On-chain metrics if data is available.
 
-## Topic Fields
+## Required Trader-Facing Fields
 
-A topic should include:
+Crypto Edge AI fields should include:
 
-- ID.
-- User ID.
-- Title.
-- Description or notes.
-- Source URL, optional.
-- Status.
-- Created timestamp.
-- Updated timestamp.
-
-## Analysis Fields
-
-An analysis should include:
-
-- ID.
-- Topic ID.
-- Category.
-- Score from 0 to 100.
-- Summary.
-- Reasoning.
-- Risks.
+- Score 0-100.
+- Bias or sentiment: `bullish`, `bearish`, `neutral`.
+- Confidence 0-100.
+- Risk factors.
 - Checklist.
-- Recommended status.
-- Disclaimer note.
-- Provider type, initially `mock`.
-- Created timestamp.
+- Research summary.
+- Things to verify before trading.
+- Optional observation status or personal insights if supported by AIKINTEL.
 
-## Required Statuses
+## AI Analysis JSON Pattern
 
-- `new`
-- `to_review`
-- `watching`
-- `rejected`
-- `played`
-- `archived`
+Every table with `ai_analysis` should follow the AIKINTEL pattern:
 
-## Required Categories
+```json
+{
+  "model": "gpt-4o",
+  "analyzed_at": "2026-06-16T12:00:00Z",
+  "summary": "Brief 1-2 sentence summary",
+  "key_points": ["point1", "point2", "point3"],
+  "sentiment": "bullish|bearish|neutral",
+  "confidence": 75,
+  "risk_factors": ["factor1", "factor2"],
+  "recommendation": "Short research-support recommendation",
+  "raw_prompt_tokens": 1500,
+  "raw_completion_tokens": 800
+}
+```
 
-- `narrative`
-- `risk`
-- `hype`
-- `setup_candidate`
-- `scam_suspicious`
-- `fundamental_event`
-- `low_value_noise`
+The `recommendation` field must not contain buy or sell instructions. It should be interpreted as research guidance, such as what to verify next.
 
-## Usage Limits
+## Data Tables
 
-The MVP should support simple usage limits, such as:
+The MVP planning should account for:
 
-- Maximum analyses per user per day.
-- Admin-visible usage count.
-- Clear error message when a limit is reached.
+- `crypto_projects`.
+- `crypto_scam_alerts`.
+- `crypto_opportunities`.
+- `crypto_onchain_metrics`.
+- `crypto_market_summaries`.
+- Existing `crypto_news` if present.
 
-## Disclaimer Requirement
+## Required tRPC Capabilities
 
-Every analysis view should clearly state that:
+The planned `cryptoMarket` router should provide read procedures for:
 
-- The result is research support only.
-- It is not investment advice.
-- The user makes the final decision.
-- The system does not guarantee outcomes.
+- Projects.
+- Scam alerts.
+- Opportunities.
+- Market summary.
+- On-chain metrics.
+
+Write procedures for personal insights/statuses should be deferred until the existing AIKINTEL user model is confirmed.
+
+## Required Cron Capabilities
+
+Cron scripts should follow AIKINTEL style:
+
+- Live in `packages/cron/scripts`.
+- Use `packages/cron/lib/db.ts`.
+- Use `mysql2/promise`.
+- Use hashes for deduplication.
+- Respect API rate limits.
+- Be PM2-ready.
+- Never hardcode credentials.
+
+## Non-Requirements for This Stage
+
+Do not implement:
+
+- Full AI provider integration.
+- External API keys.
+- Exchange execution.
+- MT4.
+- Telegram.
+- Discord.
+- Payments.
+- Trading automation.

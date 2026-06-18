@@ -1,47 +1,74 @@
-# Claude Prompt: Research Framework
+# Claude Prompt: AIKINTEL Crypto Research Framework
 
-You are helping define a crypto research framework for Crypto Edge AI.
+You are helping define the research framework for the AIKINTEL Crypto Market Module.
 
-Crypto Edge AI is a web-based research and checklist assistant for crypto traders. It is not a trading bot, not a signal system, and not investment advice.
+Crypto Edge AI is the working name for the trader-facing decision-support layer. It must support market research, risk review, bias assessment, confidence, and checklist discipline. It must not give buy or sell instructions.
 
-Create a structured research framework for analyzing crypto topics.
+## Research Areas
 
-The framework should help classify:
+Classify and analyze:
 
+- Crypto projects.
+- Scam alerts.
+- Opportunities.
 - Narratives.
-- Risks.
-- Hype cycles.
-- Setup candidates.
-- Scam-suspicious topics.
-- Fundamental events.
-- Low-value noise.
+- Market sentiment.
+- On-chain metrics.
+- Market summaries.
+- Crypto news when available.
 
-For each topic, produce:
+## AIKINTEL Analysis JSON
 
-- Category.
-- Research-priority score from 0 to 100.
-- Neutral summary.
-- Reasoning.
-- Risks.
+Return analysis compatible with:
+
+```json
+{
+  "model": "gpt-4o",
+  "analyzed_at": "2026-06-16T12:00:00Z",
+  "summary": "Brief 1-2 sentence summary",
+  "key_points": ["point1", "point2", "point3"],
+  "sentiment": "bullish|bearish|neutral",
+  "confidence": 75,
+  "risk_factors": ["factor1", "factor2"],
+  "recommendation": "Short research-support recommendation",
+  "raw_prompt_tokens": 1500,
+  "raw_completion_tokens": 800
+}
+```
+
+## Optional Trader-Facing Mapping
+
+Also provide where useful:
+
+- Score 0-100.
+- Bias.
+- Confidence.
 - Checklist.
-- Recommended status.
-- Disclaimer note.
+- Things to verify before trading.
+- Data uncertainty.
 
-Forbidden language:
+## Forbidden Language
 
-- Buy.
-- Sell.
-- Enter now.
-- Guaranteed profit.
-- Certain setup.
-- Risk-free.
+Do not say:
 
-Tone:
+- buy.
+- sell.
+- enter now.
+- guaranteed profit.
+- sure setup.
+- risk-free.
+- financial advice.
 
-- Neutral.
-- Analytical.
-- Risk-aware.
-- Useful for a human trader.
-- Clear that the final decision belongs to the user.
+## Allowed Output Style
 
-The output should support research discipline, not trading automation.
+You may provide:
+
+- Market context.
+- Bias.
+- Risk review.
+- Checklist.
+- Research summary.
+- Decision support.
+- Things to verify before trading.
+
+Keep the tone neutral, analytical, risk-aware, and useful for a human trader.

@@ -1,101 +1,162 @@
 # Technical Architecture
 
-## Recommended MVP Stack
+## Architecture Direction
+
+Crypto Edge AI must be designed as part of AIKINTEL, not as a separate application.
+
+The technical target is the AIKINTEL Crypto Market Module inside the existing monorepo.
+
+## Target Monorepo Paths
+
+```text
+packages/webapp/client/src/pages
+packages/webapp/client/src/components
+packages/webapp/server/routers
+packages/cron/scripts
+packages/cron/lib/db.ts
+docs
+vault
+```
+
+Do not modify:
+
+```text
+packages/webapp/server/_core
+```
+
+## Stack
 
 ### Frontend
 
-- React.
-- Vite.
-- TypeScript.
-
-The frontend should provide a simple authenticated web interface for users and admins.
+- React 19.
+- Tailwind CSS 4.
+- shadcn/ui.
+- wouter.
+- TanStack Query.
+- Lucide React icons.
+- Recharts or existing AIKINTEL charting patterns where needed.
 
 ### Backend
 
-- FastAPI.
-- Python.
-
-The backend should own authentication, authorization, user data isolation, topic management, analysis storage, usage limits, and future AI provider access.
+- Express.
+- tRPC.
+- Existing AIKINTEL router pattern.
 
 ### Database
 
-- SQLite for local MVP development and the first camp version.
-- PostgreSQL as the likely future production database.
+- MySQL / MariaDB.
+- Drizzle ORM in `packages/webapp`.
+- `mysql2/promise` in `packages/cron`.
 
-SQLite is acceptable for the MVP because it keeps setup simple and supports fast iteration.
+### Runtime
 
-### AI Layer
+- Node.js 20.
+- TypeScript.
+- `tsx` for cron scripts.
+- PM2 for scheduled processes.
 
-AI must be accessed through the backend only. The frontend should never call AI providers directly and should never store external AI keys.
+### AI
 
-Stage 1 includes only architecture documentation and future prompts. Stage 2 or later may include a mock AI service. A real provider can be added later through backend configuration.
+- OpenAI API through AIKINTEL internal helper or established project pattern.
+- No provider calls from frontend.
+- No committed provider keys.
+- Mock AI output may be used before real provider wiring.
 
-Future provider options:
+## Data Layer
 
-- OpenAI API.
-- Claude API.
+The module should follow AIKINTEL database conventions:
 
-No real external API keys should be committed to the repository.
+- Table names: snake_case, plural.
+- Column names: snake_case.
+- Primary key: `id INT AUTO_INCREMENT PRIMARY KEY`.
+- Timestamps: `created_at`, `updated_at`.
+- JSON AI output in `ai_analysis`.
+- `hash VARCHAR(64) UNIQUE` for deduplication.
+- Relevance or score fields as `TINYINT` 0-100.
+- Charset: `utf8mb4`.
 
-## High-Level Flow
+## Proposed Tables
 
-1. User logs in.
-2. User creates a crypto topic.
-3. Backend stores the topic.
-4. User requests analysis.
-5. Backend checks usage limits.
-6. Backend calls mock AI scoring service in MVP.
-7. Backend stores the analysis result.
-8. Frontend shows category, score, reasoning, risks, checklist, status, and disclaimer.
+- `crypto_projects`.
+- `crypto_scam_alerts`.
+- `crypto_opportunities`.
+- `crypto_onchain_metrics`.
+- `crypto_market_summaries`.
 
-## Suggested Backend Modules
+Use existing `crypto_news` if available in AIKINTEL.
 
-Future backend structure:
+## Backend API Pattern
 
-```text
-backend/
-  app/
-    main.py
-    api/
-    core/
-    db/
-    models/
-    schemas/
-    services/
-    tests/
-```
-
-## Suggested Frontend Modules
-
-Future frontend structure:
+Create a router:
 
 ```text
-frontend/
-  src/
-    app/
-    components/
-    pages/
-    services/
-    types/
+packages/webapp/server/routers/cryptoMarket.ts
 ```
 
-## Security Principles
+Register it in the main router as:
 
-- Keep secrets out of the repository.
-- Use environment variables for provider keys.
-- Keep AI calls on the backend.
-- Enforce per-user data access.
-- Validate inputs.
-- Rate-limit or usage-limit analysis requests.
-- Show disclaimer near analysis output.
+```text
+cryptoMarket: cryptoMarketRouter
+```
 
-## Integration Boundaries
+The router should expose protected read procedures for:
 
-The MVP must not include:
+- `projects`.
+- `scamAlerts`.
+- `opportunities`.
+- `marketSummary`.
+- `onchainMetrics`.
 
-- Exchange execution.
-- MT4.
-- Telegram.
-- Discord.
-- Payments.
-- Automated trading.
+## Frontend Pattern
+
+Create a page:
+
+```text
+packages/webapp/client/src/pages/CryptoMarket.tsx
+```
+
+Register route:
+
+```text
+/crypto-market
+```
+
+The page should follow existing AIKINTEL visual conventions:
+
+- Dark UI.
+- shadcn components.
+- Tabs.
+- Cards.
+- Badges.
+- Skeleton states.
+- Existing sidebar/navigation pattern.
+
+## Cron Pattern
+
+Scripts should live in:
+
+```text
+packages/cron/scripts/fetch-crypto-*.ts
+packages/cron/scripts/generate-crypto-summary.ts
+```
+
+Scripts should:
+
+- Import shared DB helper from `../lib/db.js`.
+- Use `query`.
+- Generate SHA-256 hashes for deduplication.
+- Use `ON DUPLICATE KEY UPDATE`.
+- Respect rate limits with sleeps.
+- Handle errors with try/catch.
+- Exit cleanly for PM2 cron restarts.
+
+## Security Rules
+
+- No hardcoded credentials.
+- All secrets through `process.env`.
+- No frontend external API calls.
+- Frontend calls tRPC only.
+- AI provider usage remains backend/cron only.
+- Validate JSON before insert.
+- Use UTC timestamps.
+- Avoid modifying AIKINTEL framework internals.

@@ -1,49 +1,75 @@
-# Manus Prompt: Frontend MVP
+# Manus Prompt: AIKINTEL Frontend MVP
 
-You are working on Crypto Edge AI, a real web-based research assistant for crypto traders.
+You are working on Crypto Edge AI, now the trader-facing layer of the AIKINTEL Crypto Market Module.
 
-Build the frontend MVP using React, Vite, and TypeScript.
+Do not design a standalone app. Build UI plans that match AIKINTEL patterns.
 
-Important boundaries:
+## Target Stack
 
-- Do not build a trading bot UI.
-- Do not show buy or sell signals.
-- Do not imply guaranteed profit.
-- Do not integrate exchanges.
-- Do not integrate MT4.
-- Do not integrate Telegram, Discord, or payments.
-- Do not put AI provider keys in the frontend.
+- React 19.
+- Tailwind CSS 4.
+- shadcn/ui.
+- wouter.
+- TanStack Query.
+- tRPC client.
+- Lucide React icons.
+- Existing AIKINTEL dark visual system.
 
-Frontend MVP screens:
+## Target Page
 
-- Login screen.
-- User topic list.
-- Create topic form.
-- Topic detail view.
-- Analysis result panel.
-- Topic status selector.
-- Analysis history.
-- Basic admin panel.
-- Usage limit notice.
-- Disclaimer visible near analysis output.
+Create or plan:
 
-Analysis output fields:
+```text
+packages/webapp/client/src/pages/CryptoMarket.tsx
+```
 
-- Category.
-- Score 0 to 100.
-- Summary.
-- Reasoning.
-- Risks.
+Route:
+
+```text
+/crypto-market
+```
+
+## Required UI Sections
+
+- Overview dashboard.
+- Market summary.
+- Projects/token list.
+- Scam/risk alerts.
+- Opportunities/narratives.
+- On-chain metrics tab if data is available.
+- Crypto Edge decision-support panel if compatible.
+
+## Required Fields
+
+Display:
+
+- Score 0-100.
+- Sentiment/bias: bullish, bearish, neutral.
+- Confidence 0-100.
+- Risk factors.
 - Checklist.
-- Recommended status.
-- Disclaimer note.
+- Research summary.
+- Things to verify before trading.
+- Disclaimer.
 
-Design priority:
+## Design Rules
 
-- Clear.
-- Fast to use.
-- Trustworthy.
-- Research-focused.
-- No hype language.
+- Use AIKINTEL dark theme.
+- Use shadcn cards, tabs, badges, skeletons, and tooltips.
+- Use existing sidebar/navigation conventions.
+- Use tRPC only.
+- Do not call external APIs from the frontend.
+- Do not show buy/sell signals.
+- Do not imply guaranteed profit.
 
-The frontend should call the backend API only. It should not call AI providers directly.
+## Forbidden Features
+
+- Trading execution.
+- Exchange integration.
+- MT4.
+- Telegram.
+- Discord.
+- Payments.
+- Auto-buy.
+- Auto-sell.
+- Copy trading.

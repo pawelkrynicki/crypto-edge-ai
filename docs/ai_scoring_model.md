@@ -1,99 +1,108 @@
-# AI Scoring Model
+# AI Analysis and Scoring Model
 
 ## Purpose
 
-The AI scoring model helps traders structure research. It does not make trading decisions and must not produce buy or sell instructions.
+The AI layer supports crypto market intelligence and trader decision preparation. It must provide research context, risk review, bias, confidence, and checklist items.
 
-The score is a research-priority score, not a profit probability and not a trading signal.
+It must not provide buy or sell signals.
 
-## Required Output
+## AIKINTEL JSON Pattern
 
-Each analysis should return:
+Every table with `ai_analysis` should follow this structure:
 
-- `category`
-- `score`
-- `summary`
-- `reasoning`
-- `risks`
-- `checklist`
-- `recommended_status`
-- `disclaimer_note`
+```json
+{
+  "model": "gpt-4o",
+  "analyzed_at": "2026-06-16T12:00:00Z",
+  "summary": "Brief 1-2 sentence summary",
+  "key_points": ["point1", "point2", "point3"],
+  "sentiment": "bullish|bearish|neutral",
+  "confidence": 75,
+  "risk_factors": ["factor1", "factor2"],
+  "recommendation": "Short research-support recommendation",
+  "raw_prompt_tokens": 1500,
+  "raw_completion_tokens": 800
+}
+```
 
-## Categories
+## Crypto Edge AI Extensions
 
-### `narrative`
+For trader-facing views, the AIKINTEL output may be mapped to:
 
-The topic relates to a broader market story, sector, ecosystem, macro theme, or recurring crypto narrative.
+- `score`: 0-100 research priority or opportunity/risk relevance.
+- `bias`: bullish, bearish, neutral.
+- `confidence`: 0-100.
+- `risk_factors`: risk review.
+- `checklist`: things to verify before trading.
+- `status`: optional personal observation status.
 
-### `risk`
+## Allowed AI Outputs
 
-The topic is mainly about downside, uncertainty, exploit risk, market structure risk, regulatory risk, liquidity risk, or operational risk.
+AI may return:
 
-### `hype`
+- Market context.
+- Bias.
+- Risk review.
+- Checklist.
+- Research summary.
+- Decision support.
+- Things to verify before trading.
+- Data quality warnings.
+- Scam or risk red flags.
 
-The topic appears driven mostly by attention, social momentum, influencer promotion, or short-lived excitement.
+## Forbidden AI Outputs
 
-### `setup_candidate`
+AI must not return direct commands or promises such as:
 
-The topic may deserve more structured review as a possible trading idea, but the system must not tell the user to enter a trade.
+- `buy`.
+- `sell`.
+- `enter now`.
+- `guaranteed profit`.
+- `sure setup`.
+- `risk-free`.
+- `financial advice`.
 
-### `scam_suspicious`
+## Sentiment and Bias
 
-The topic contains red flags such as unclear tokenomics, anonymous team, suspicious promises, fake urgency, contract risk, or misleading promotion.
+Allowed values:
 
-### `fundamental_event`
+- `bullish`.
+- `bearish`.
+- `neutral`.
 
-The topic is based on a concrete event, such as unlock, listing, protocol upgrade, governance decision, legal update, exploit, partnership, earnings-like report, or ecosystem milestone.
+Bias is not a trading instruction. It is a research label describing the current interpretation of available data.
 
-### `low_value_noise`
+## Confidence
 
-The topic lacks enough quality, relevance, evidence, or actionable research value.
+Confidence is a 0-100 estimate of how reliable the analysis is based on available data quality, source consistency, and signal clarity.
 
-## Score Meaning
+Confidence is not a probability of profit.
 
-The score ranges from 0 to 100:
+## Score
 
-- 0 to 20: Very low research value or high noise.
-- 21 to 40: Weak topic, likely low priority.
-- 41 to 60: Mixed topic, review only if relevant to the user's current plan.
-- 61 to 80: Worth deeper research.
-- 81 to 100: High research priority, still not a trading recommendation.
+Score is a 0-100 research-priority or opportunity/risk relevance value.
 
-## Recommended Status Logic
+Suggested interpretation:
 
-Suggested mapping:
+- 0-20: low value, noisy, or dangerous.
+- 21-40: weak research priority.
+- 41-60: mixed and requires verification.
+- 61-80: worth deeper research.
+- 81-100: high research priority, still not a trading signal.
 
-- Low value or unclear topics: `rejected`.
-- New but potentially relevant topics: `to_review`.
-- Ongoing narratives or events: `watching`.
-- Completed user-reviewed ideas: `played`.
-- Old or no longer relevant topics: `archived`.
+## Recommendation Field Rule
 
-## Forbidden Output
+The AIKINTEL `recommendation` field must be treated as research guidance only.
 
-The AI must not say:
+Acceptable examples:
 
-- Buy.
-- Sell.
-- Enter now.
-- Guaranteed profit.
-- Certain setup.
-- Risk-free.
-- This will pump.
-- You must trade this.
+- "Verify liquidity, token unlocks, and source quality before considering this topic further."
+- "Monitor the narrative for confirmation across independent sources."
+- "Treat as high risk until contract and team information are verified."
 
-## Required Tone
+Unacceptable examples:
 
-The AI should be:
-
-- Neutral.
-- Analytical.
-- Risk-aware.
-- Clear about uncertainty.
-- Focused on research and checklist discipline.
-
-## Disclaimer Note
-
-Each analysis should include a disclaimer note similar to:
-
-This output supports research and checklist review only. It is not investment advice, not a trading signal, and not a guarantee of future results. The final decision belongs to the user.
+- "Buy now."
+- "Sell immediately."
+- "Enter with leverage."
+- "This is a guaranteed setup."

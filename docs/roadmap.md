@@ -1,90 +1,110 @@
 # Roadmap
 
-## Stage 1: Repository, Documentation, Architecture
+## Stage 1: Repository Documentation Aligned With AIKINTEL Guidelines
 
-Create the initial repository foundation:
+Update project documentation so Crypto Edge AI is clearly positioned as the trader-facing layer inside the AIKINTEL Crypto Market Module.
 
-- Folder structure.
-- Product documentation.
-- MVP requirements.
-- Technical architecture.
-- AI scoring model description.
-- Security and disclaimer rules.
-- Prompt files for future implementation steps.
+Deliverables:
 
-## Stage 2: Backend MVP
+- Updated scope.
+- Updated architecture.
+- Updated MVP requirements.
+- Updated AI scoring model.
+- Updated security boundaries.
+- AIKINTEL integration plan.
 
-Build the FastAPI backend skeleton:
+## Stage 2: Database Schema Mapping for AIKINTEL Crypto Market Module
 
-- App structure.
-- Health endpoint.
-- User model.
-- Topic model.
-- Analysis model.
-- SQLite setup.
-- Authentication foundation.
-- Role handling.
+Define schema mapping for:
 
-## Stage 3: Frontend MVP
+- `crypto_projects`.
+- `crypto_scam_alerts`.
+- `crypto_opportunities`.
+- `crypto_onchain_metrics`.
+- `crypto_market_summaries`.
+- Existing `crypto_news` if present.
 
-Build the React, Vite, TypeScript frontend:
+Confirm table names, indexes, JSON fields, deduplication hashes, and score fields with the AIKINTEL owner.
 
-- Login screen.
-- Topic list.
-- Topic create form.
-- Analysis result view.
-- Status controls.
-- Basic admin view.
-- Disclaimer display.
+## Stage 3: tRPC Router Design for `cryptoMarket`
 
-## Stage 4: Mock AI Scoring
+Design the `cryptoMarket` router:
 
-Implement deterministic mock scoring through the backend:
+- Projects query.
+- Scam alerts query.
+- Opportunities query.
+- Latest market summary query.
+- On-chain metrics query.
+- Optional personal insight/status procedures after user data model is confirmed.
 
-- Category classification.
-- Score 0 to 100.
-- Summary.
-- Reasoning.
-- Risks.
-- Checklist.
-- Recommended status.
+## Stage 4: Frontend Page Design Aligned With AIKINTEL UI
 
-## Stage 5: Real AI Provider Through Backend
+Design:
 
-Add provider abstraction:
+- `/crypto-market` page.
+- Overview dashboard.
+- Projects tab.
+- Opportunities tab.
+- Scam alerts tab.
+- On-chain tab.
+- Crypto Edge decision-support panel if compatible with the existing UI.
 
-- Environment-based configuration.
-- OpenAI or Claude provider option.
-- No frontend provider calls.
-- No committed API keys.
-- Safe output rules.
+## Stage 5: Cron Data Collection Scripts Pattern
 
-## Stage 6: Login, Limits, History
+Plan PM2-ready scripts:
 
-Harden user workflows:
+- `fetch-crypto-projects.ts`.
+- `fetch-crypto-scam-alerts.ts`.
+- `fetch-crypto-opportunities.ts`.
+- `fetch-crypto-onchain.ts`.
+- `generate-crypto-summary.ts`.
 
-- Per-user data isolation.
-- Usage limits.
-- Analysis history.
-- Admin visibility.
-- Better error states.
+## Stage 6: AI Analysis Schema and Mock Data
 
-## Stage 7: Hosting and Camp Version
+Implement or plan mock AI JSON compatible with:
 
-Prepare camp deployment:
+- `model`.
+- `analyzed_at`.
+- `summary`.
+- `key_points`.
+- `sentiment`.
+- `confidence`.
+- `risk_factors`.
+- `recommendation`.
+- `raw_prompt_tokens`.
+- `raw_completion_tokens`.
 
-- Hosting plan.
-- Database persistence.
-- Environment variables.
-- Admin bootstrap flow.
-- Backup and restore procedure.
+## Stage 7: Camp v1 Controlled Release
 
-## Stage 8: Tests, Demo Backup, Stabilization
+Prepare a limited release for camp participants:
 
-Prepare for real use:
+- Stable UI.
+- Controlled data sources.
+- Disclaimers.
+- Mock or safe AI output.
+- No trading automation.
+- Backup/demo plan.
 
-- Backend tests.
-- Frontend smoke tests.
-- Seed/demo data.
-- Backup demo instance.
-- Production-readiness checklist.
+## Stage 8: Integration Into Main AIKINTEL Platform
+
+Integrate into the main AIKINTEL platform:
+
+- Migration.
+- Cron processes.
+- tRPC router.
+- Frontend route.
+- Sidebar navigation.
+- Production deployment via existing AIKINTEL process.
+
+## Stage 9: Future Crypto Edge AI Decision-Support Layer
+
+Add more trader-facing functionality only after the intelligence module is stable:
+
+- Personal insights.
+- Observation statuses.
+- Setup review.
+- Risk checklist.
+- Bias and confidence history.
+- User-specific research notes.
+
+This stage must still avoid buy/sell signals and automated trading.

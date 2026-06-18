@@ -1,91 +1,99 @@
 # Product Scope
 
-## What Crypto Edge AI Does
+## Product Layers
 
-Crypto Edge AI lets a crypto trader add a market topic, such as a token, news item, narrative, protocol event, market observation, or possible setup candidate. The system stores the topic and returns a structured analysis.
+The project has two related layers.
 
-The analysis should help the user understand:
+## 1. AIKINTEL Crypto Market Module
 
-- What the topic appears to be.
-- Which category it belongs to.
-- How relevant it may be for further research.
-- Which risks are visible.
-- Which checklist items should be reviewed.
-- Which non-trading status is appropriate for tracking.
+This is the platform-level crypto intelligence layer.
 
-## MVP v1 Features
+It should cover:
 
-MVP v1 should include:
+- Project evaluations.
+- Crypto opportunities.
+- Scam alerts.
+- Market sentiment.
+- On-chain analytics.
+- AI-generated market summaries.
+- Crypto news if it already exists in AIKINTEL.
 
-- User login.
-- Admin and user roles.
-- User-specific topics and analyses.
-- Topic creation.
-- AI analysis or mock AI analysis.
-- Topic category.
-- Score from 0 to 100.
-- Short summary.
-- Reasoning.
-- Risks.
+Primary tables:
+
+- `crypto_projects`.
+- `crypto_scam_alerts`.
+- `crypto_opportunities`.
+- `crypto_onchain_metrics`.
+- `crypto_market_summaries`.
+- `crypto_news` if already available.
+
+## 2. Crypto Edge AI
+
+This is the trader-facing decision-support layer.
+
+It should cover:
+
+- Bias.
+- Score.
+- Risk.
+- Confidence.
 - Checklist.
-- Recommended topic status.
-- Topic status management.
-- Analysis history.
-- Basic admin panel.
-- Usage limits.
-- Security disclaimer.
+- Setup review.
+- Personal insights.
+- Observation status.
+- Decision-support AI commentary.
 
-## Topic Statuses
+It must not recommend buying or selling.
 
-Supported topic statuses:
+## Camp v1 Scope
 
-- `new`
-- `to_review`
-- `watching`
-- `rejected`
-- `played`
-- `archived`
+Camp v1 should include:
 
-## AI Categories
+- Crypto Market / Crypto Edge page in AIKINTEL style.
+- Crypto intelligence dashboard.
+- Project/token list.
+- Scam/risk alerts.
+- Opportunities and narratives.
+- Market summary.
+- AI analysis JSON aligned with AIKINTEL guidelines.
+- Score 0-100.
+- Sentiment/bias: bullish, bearish, neutral.
+- Confidence 0-100.
+- Risk factors.
+- Trader checklist.
+- User status or personal insights if compatible with existing AIKINTEL architecture.
+- tRPC router pattern.
+- Cron script pattern.
+- PM2-ready collection scripts.
+- MySQL table conventions.
 
-Supported AI categories:
+## Out of Scope
 
-- `narrative`
-- `risk`
-- `hype`
-- `setup_candidate`
-- `scam_suspicious`
-- `fundamental_event`
-- `low_value_noise`
+The following remain out of scope:
 
-## Analysis Result Shape
-
-Every analysis should eventually return:
-
-```json
-{
-  "category": "narrative",
-  "score": 72,
-  "summary": "Short neutral summary of the topic.",
-  "reasoning": "Why the system classified and scored the topic this way.",
-  "risks": ["Risk item 1", "Risk item 2"],
-  "checklist": ["Checklist item 1", "Checklist item 2"],
-  "recommended_status": "to_review",
-  "disclaimer_note": "This is research support, not investment advice."
-}
-```
-
-## Out of Scope for MVP v1
-
-The following are intentionally out of scope:
-
-- Automated trading.
-- Buy or sell signals.
-- Exchange integrations.
+- Standalone FastAPI backend as the main backend.
+- SQLite as the main database.
+- Separate login system outside AIKINTEL.
 - MT4 integration.
-- Telegram or Discord integrations.
-- Payment systems.
-- Real external AI provider keys committed to the repository.
-- Profit promises.
-- Portfolio management.
+- Exchange integration.
+- Telegram integration.
+- Discord integration.
+- Payments.
+- Automated trading.
+- Auto-buy or auto-sell.
+- Signal bot.
 - Copy trading.
+- Hardcoded or committed API keys.
+
+## Topic and Insight Statuses
+
+For the trader-facing layer, user-specific statuses may include:
+
+- `new`.
+- `to_review`.
+- `watching`.
+- `rejected`.
+- `played`.
+- `archived`.
+
+These should be introduced only if they fit the existing AIKINTEL user data architecture.
