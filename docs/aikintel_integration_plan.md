@@ -58,14 +58,25 @@ vault
 ## Integration Order
 
 1. Confirm database schema with AIKINTEL owner.
-2. Prepare migration for crypto tables.
-3. Build mock data or seed data.
-4. Add `cryptoMarket` tRPC router.
+2. Use `docs/database_schema_design.md` as the schema design baseline.
+3. Use `docs/trpc_router_design.md` as the `cryptoMarket` router design baseline.
+4. Prepare migration for Camp v1 must-have crypto tables.
 5. Add `/crypto-market` frontend page.
 6. Add sidebar navigation.
 7. Add PM2-ready cron script skeletons.
 8. Add safe AI analysis JSON generation.
 9. Run controlled camp v1 release.
+
+## Camp v1 Technical Design Documents
+
+The next implementation task should start from:
+
+- `docs/database_schema_design.md`.
+- `docs/trpc_router_design.md`.
+- `docs/camp_v1_mock_data_plan.md`.
+- `docs/open_questions_for_aikintel_owner.md`.
+
+These documents define the schema, router contract, mock data plan, and open product/platform questions. They intentionally stop before implementation.
 
 ## Validation Checklist
 
@@ -76,3 +87,5 @@ vault
 - Does not commit secrets.
 - Does not implement trading execution.
 - Includes disclaimer near AI analysis.
+- Uses existing AIKINTEL auth/users unless owner approves otherwise.
+- Keeps `setupReviewMock` as mock/design for Camp v1 until AI usage limits are approved.

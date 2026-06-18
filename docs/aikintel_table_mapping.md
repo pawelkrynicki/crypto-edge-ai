@@ -21,9 +21,28 @@ AIKINTEL table conventions:
 | `crypto_projects` | Project registry and evaluation | Project cards, risk score, opportunity score, setup review context |
 | `crypto_scam_alerts` | Scam and risk warnings | Risk panel, alerts, checklist blockers |
 | `crypto_opportunities` | Opportunities and narratives | Opportunities tab, narrative review, confidence |
-| `crypto_onchain_metrics` | On-chain snapshots | On-chain tab, context for bias and risk |
 | `crypto_market_summaries` | Daily/weekly market view | Overview dashboard, sentiment, market summary |
+| `crypto_onchain_metrics` | On-chain snapshots | On-chain tab, context for bias and risk |
+| `crypto_user_watchlist` | User-specific watchlist | Later private observation/status tracking |
+| `crypto_user_insights` | User-specific research notes | Later personal AI insights and notes |
+| `crypto_setup_reviews` | Persisted setup review outputs | Later storage for Crypto Edge AI setup reviews |
 | `crypto_news` | Existing news source if available | News context and related-coins analysis |
+
+## Camp v1 Priority
+
+Must-have:
+
+- `crypto_projects`.
+- `crypto_scam_alerts`.
+- `crypto_opportunities`.
+- `crypto_market_summaries`.
+
+Optional / later:
+
+- `crypto_onchain_metrics`.
+- `crypto_user_watchlist`.
+- `crypto_user_insights`.
+- `crypto_setup_reviews`.
 
 ## AI Analysis JSON
 
@@ -67,3 +86,7 @@ If AIKINTEL supports user-specific records, a future extension may map user obse
 - Personal score override.
 
 Do not introduce this until the existing user data architecture is confirmed.
+
+## Detailed Design Reference
+
+Use `docs/database_schema_design.md` for columns, indexes, deduplication, AI fields, Camp v1 priority, and future extension notes.

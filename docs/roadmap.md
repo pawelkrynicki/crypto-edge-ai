@@ -26,6 +26,12 @@ Define schema mapping for:
 
 Confirm table names, indexes, JSON fields, deduplication hashes, and score fields with the AIKINTEL owner.
 
+Current design artifact:
+
+- `docs/database_schema_design.md`.
+- `docs/aikintel_table_mapping.md`.
+- `docs/open_questions_for_aikintel_owner.md`.
+
 ## Stage 3: tRPC Router Design for `cryptoMarket`
 
 Design the `cryptoMarket` router:
@@ -36,6 +42,12 @@ Design the `cryptoMarket` router:
 - Latest market summary query.
 - On-chain metrics query.
 - Optional personal insight/status procedures after user data model is confirmed.
+- Mock setup review contract for Camp v1.
+
+Current design artifact:
+
+- `docs/trpc_router_design.md`.
+- `prompts/codex/03_schema_and_router_design.md`.
 
 ## Stage 4: Frontend Page Design Aligned With AIKINTEL UI
 
@@ -73,6 +85,10 @@ Implement or plan mock AI JSON compatible with:
 - `recommendation`.
 - `raw_prompt_tokens`.
 - `raw_completion_tokens`.
+
+Current design artifact:
+
+- `docs/camp_v1_mock_data_plan.md`.
 
 ## Stage 7: Camp v1 Controlled Release
 

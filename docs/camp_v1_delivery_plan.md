@@ -36,33 +36,41 @@ The goal is usefulness and safety, not full automation.
 
 ## Suggested Delivery Phases
 
-### Phase 1: Schema and Mock Data
+### Phase 1: Schema and Router Design
+
+- Use `docs/database_schema_design.md`.
+- Use `docs/trpc_router_design.md`.
+- Confirm open questions from `docs/open_questions_for_aikintel_owner.md`.
+
+### Phase 2: Schema and Mock Data
 
 - Confirm tables.
 - Prepare migration.
 - Add seed/mock records.
 - Validate AI JSON shape.
+- Use `docs/camp_v1_mock_data_plan.md`.
 
-### Phase 2: Read-Only tRPC Router
+### Phase 3: Read-Only tRPC Router
 
 - Add `cryptoMarket` router.
 - Add protected read procedures.
 - Keep writes deferred.
+- Include `setupReviewMock` only as a safe mock endpoint if approved.
 
-### Phase 3: Frontend Page
+### Phase 4: Frontend Page
 
 - Add `/crypto-market`.
 - Add overview, projects, opportunities, alerts, on-chain tabs.
 - Match AIKINTEL visual patterns.
 
-### Phase 4: Cron Skeletons
+### Phase 5: Cron Skeletons
 
 - Add PM2-ready scripts.
 - Use dedup hashes.
 - Use safe logging.
 - Leave external API keys as env vars only.
 
-### Phase 5: Controlled Camp Release
+### Phase 6: Controlled Camp Release
 
 - Deploy limited module.
 - Verify disclaimers.
@@ -78,3 +86,4 @@ The goal is usefulness and safety, not full automation.
 - Does not provide buy/sell instructions.
 - Does not execute trades.
 - Working release can be demonstrated safely during camp.
+- Working tree and deployment artifacts do not contain secrets.
