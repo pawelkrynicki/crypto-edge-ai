@@ -115,6 +115,29 @@ The output maps later to:
 
 Scorecards remain partial/null until the scoring model is implemented beyond the POC.
 
+## Fifth Code POC Boundary: Storage Output Validation
+
+The fifth code POC validates storage-ready scanner files before they are ever imported into a database.
+
+It includes:
+
+- In-memory validation of `PersistableScannerOutput`.
+- Directory validation for generated output folders.
+- JSON/JSONL structural checks.
+- Required field checks.
+- Candidate, security check, and scorecard relationship checks.
+- Allowed label and risk-level checks.
+
+It still does not include:
+
+- Database import.
+- MySQL, SQLite, Drizzle, or migrations.
+- Production cron.
+- UI.
+- Auth.
+
+This stage protects future tables from inconsistent scanner output.
+
 ## Discovery Radar
 
 Starting source:

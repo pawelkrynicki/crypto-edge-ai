@@ -487,3 +487,20 @@ POC field mapping notes:
 - Score fields are intentionally `null` until the full scorecard model is implemented.
 - `decision_label` mirrors Combined Scanner `final_label`.
 - `risk_level` maps as `CRITICAL_RISK -> critical`, `NEEDS_MANUAL_VERIFICATION -> medium`, `WATCHLIST -> low`, and `REJECT -> high`.
+
+## Fifth Code POC: Storage Output Validation
+
+The Storage Output Validation POC checks storage-ready JSON/JSONL before it can later be imported into database tables.
+
+Validation covers:
+
+- Required `crypto_token_scan_runs`-style fields in `scan_run.json`.
+- Required `crypto_token_candidates`-style fields in `candidates.jsonl`.
+- `crypto_token_security_checks` candidate references.
+- `crypto_token_scorecards` candidate references.
+- Exactly one scorecard per candidate.
+- Allowed values for `basic_filter_status`, `final_label`, `decision_label`, `security_label`, and `risk_level`.
+- JSONL parse errors.
+- Consistency between candidate final labels and scorecard decision/risk fields.
+
+This POC does not create tables or import rows. It is a pre-import quality gate so future DB work does not start from malformed output files.

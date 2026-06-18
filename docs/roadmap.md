@@ -122,6 +122,15 @@ Fourth code POC:
 - Scorecard fields remain partial/null at POC stage.
 - No database, migrations, auth, UI, or production cron.
 
+Fifth code POC:
+
+- `tools/data-poc`.
+- Storage Output Validation flow.
+- Validate `scan_run.json`, `candidates.jsonl`, `security_checks.jsonl`, `scorecards.jsonl`, and optional `full_output.json`.
+- Check required fields, JSONL parsing, allowed labels, candidate/security/scorecard relationships, and scorecard risk-level alignment.
+- Provide `npm run scanner:validate:fixture` and `npm run scanner:validate -- --output-dir tools/data-poc/output/<run_id>`.
+- No database import, migrations, auth, UI, or production cron.
+
 ## Stage 5: Mock/Seed Crypto Edge AI Module
 
 Prepare safe mock data for Camp v1:

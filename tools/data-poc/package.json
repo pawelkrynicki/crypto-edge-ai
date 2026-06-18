@@ -14,6 +14,8 @@
     "scanner:live": "tsc && node dist/src/runCombinedScannerPoc.js --mode live",
     "scanner:persist:fixture": "tsc && node dist/src/runPersistableScannerPoc.js --mode fixture",
     "scanner:persist:live": "tsc && node dist/src/runPersistableScannerPoc.js --mode live",
+    "scanner:validate": "tsc && node dist/src/runStorageValidationPoc.js",
+    "scanner:validate:fixture": "tsc && node dist/src/runStorageValidationPoc.js --mode fixture",
     "test": "tsc && node --test dist/tests/*.js",
     "typecheck": "tsc --noEmit"
   },

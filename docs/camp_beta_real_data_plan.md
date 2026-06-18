@@ -139,6 +139,30 @@ This remains a POC. It does not add MySQL, SQLite, Drizzle, migrations, auth, pr
 
 Scorecards are partial in this POC. The individual score fields remain `null`, while `decision_label` mirrors the Combined Scanner final label and `risk_level` is mapped from that label.
 
+## Fifth Code POC: Storage Output Validation
+
+The fifth code POC validates Persistable Scanner Output before any future database import.
+
+It checks:
+
+- `scan_run.json` exists and has required scan run fields.
+- `candidates.jsonl` exists and every candidate has required identifiers and labels.
+- `security_checks.jsonl` rows reference existing candidates.
+- `scorecards.jsonl` rows reference existing candidates.
+- Every candidate has exactly one scorecard.
+- JSONL lines are parseable.
+- Labels and risk levels use allowed values.
+- Candidate final labels align with scorecard decision labels and risk levels.
+
+Commands:
+
+```bash
+npm run scanner:validate:fixture
+npm run scanner:validate -- --output-dir tools/data-poc/output/<run_id>
+```
+
+This remains a POC. It does not add MySQL, SQLite, Drizzle, migrations, production importers, auth, or UI. Its purpose is to prevent malformed storage-ready files from becoming bad future table rows.
+
 ## Flow Details
 
 ## Step 1: DexScreener Discovery

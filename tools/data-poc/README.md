@@ -137,6 +137,30 @@ Future table mapping:
 
 Scorecards are intentionally partial at this stage. `security_score`, `onchain_score`, `social_score`, `narrative_score`, `total_score`, and `confidence` are `null`. `decision_label` mirrors the Combined Scanner `final_label`, and `risk_level` is mapped from that label.
 
+## Storage Output Validation
+
+The fifth POC validates storage-ready output before any future database import:
+
+```bash
+npm run scanner:validate:fixture
+npm run scanner:validate -- --output-dir tools/data-poc/output/<run_id>
+```
+
+The validator checks:
+
+- Required `scan_run` fields.
+- Candidate required fields and unique `candidate_id` values.
+- Security checks referencing existing candidates.
+- Scorecards referencing existing candidates.
+- Exactly one scorecard per candidate.
+- Allowed values for filter status, labels, security labels, and risk levels.
+- Cross-checks between candidate final labels and scorecard decisions/risk levels.
+- JSONL parse errors and missing split files.
+
+`full_output.json` is useful for inspection, but missing `full_output.json` is only a warning when the split files are valid. Empty `security_checks.jsonl` is allowed with a warning because some runs may not produce security rows.
+
+This is still not database persistence. It is a guardrail before later mapping into `crypto_token_scan_runs`, `crypto_token_candidates`, `crypto_token_security_checks`, and `crypto_token_scorecards`.
+
 ## Tests
 
 ```bash
@@ -321,6 +345,7 @@ Important: `WATCHLIST` is not a buy signal. It only means `eligible for further 
 - No AI calls.
 - No trading signals.
 - No database persistence.
+- No production database importer.
 
 For the Security Enrichment POC, GoPlus and Honeypot.is are included only as fixture-first and live best-effort checks. There is still no database, UI, cron, AI, or production scanner.
 
