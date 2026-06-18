@@ -75,6 +75,38 @@ Still excluded:
 - Fear & Greed.
 - AIKINTEL Market News.
 
+## Third Code POC: Combined Scanner
+
+The third code POC connects the first two controlled POCs into one mini-flow:
+
+1. DexScreener discovery.
+2. Candidate normalization.
+3. Basic market/liquidity filters.
+4. Limited selection of candidates that passed the basic filter.
+5. GoPlus/Honeypot security enrichment.
+6. Final scanner label.
+7. JSON output for Camp BETA review.
+
+Commands:
+
+```bash
+npm run scanner:fixture
+npm run scanner:live -- --query SOL --max-candidates 3
+```
+
+Final labels:
+
+- `REJECT`: failed basic filters.
+- `WATCHLIST`: eligible for further review after basic and security checks.
+- `CRITICAL_RISK`: critical security risk detected.
+- `NEEDS_MANUAL_VERIFICATION`: missing, incomplete, inconsistent, or warning-level security data.
+
+`WATCHLIST` is not a buy signal and not a recommendation. It only means the token/topic may be worth further research by the trader.
+
+Live mode is best-effort and limited to `maxCandidates = 3` by default. It must not become mass scanning, production cron, retry storm, or unbounded parallel security checking.
+
+Known asset caution: the security rules are designed mainly for new tokens and microcaps. Large known assets, stablecoins, wrapped assets, or contracts with special structures may require contextual interpretation. This POC documents that limitation only; it does not add a whitelist or known assets list.
+
 ## Flow Details
 
 ## Step 1: DexScreener Discovery

@@ -99,6 +99,19 @@ Second code POC:
 - `SECURITY_PASSED`, `NEEDS_MANUAL_VERIFICATION`, `CRITICAL_RISK`.
 - Explicit missing data reporting.
 
+Third code POC:
+
+- `tools/data-poc`.
+- Combined Scanner flow.
+- DexScreener discovery.
+- Basic filters.
+- Limited GoPlus/Honeypot security enrichment.
+- Final labels: `REJECT`, `WATCHLIST`, `CRITICAL_RISK`, `NEEDS_MANUAL_VERIFICATION`.
+- Fixture command: `npm run scanner:fixture`.
+- Live command: `npm run scanner:live -- --query SOL --max-candidates 3`.
+- `WATCHLIST` means eligible for further review only, not a buy signal.
+- Known large assets, stablecoins, wrapped assets, and special contracts may need contextual interpretation; no whitelist or known assets list is implemented at POC stage.
+
 ## Stage 5: Mock/Seed Crypto Edge AI Module
 
 Prepare safe mock data for Camp v1:

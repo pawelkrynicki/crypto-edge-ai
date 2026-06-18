@@ -10,6 +10,8 @@
     "security:fixture": "tsc && node dist/src/runSecurityPoc.js --mode fixture",
     "security:live": "tsc && node dist/src/runSecurityPoc.js --mode live",
     "poc:fixture:security": "tsc && node dist/src/runSecurityPoc.js --mode fixture --candidate-from-dex-fixture true",
+    "scanner:fixture": "tsc && node dist/src/runCombinedScannerPoc.js --mode fixture",
+    "scanner:live": "tsc && node dist/src/runCombinedScannerPoc.js --mode live",
     "test": "tsc && node --test dist/tests/*.js",
     "typecheck": "tsc --noEmit"
   },

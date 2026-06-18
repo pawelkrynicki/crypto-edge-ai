@@ -115,3 +115,38 @@ export type SecurityPocOutput = {
 
 export type GoPlusTokenSecurityResponse = Record<string, unknown>;
 export type HoneypotTokenResponse = Record<string, unknown>;
+
+export type CombinedScannerFinalLabel = "REJECT" | "WATCHLIST" | "CRITICAL_RISK" | "NEEDS_MANUAL_VERIFICATION";
+export type CombinedScannerSecurityLabel = SecurityLabel | "NOT_CHECKED";
+
+export type CombinedScannerCandidate = {
+  candidate: CryptoEdgeCandidate;
+  security: NormalizedSecurity | null;
+  decision: {
+    basic_filter_status: "passed_basic_filter" | "rejected_basic_filter";
+    security_label: CombinedScannerSecurityLabel;
+    final_label: CombinedScannerFinalLabel;
+    final_reasons: string[];
+  };
+};
+
+export type CombinedScannerOutput = {
+  source: "combined-scanner-poc";
+  mode: DexScreenerPocMode;
+  query: string;
+  generated_at: string;
+  limits: {
+    max_candidates: number;
+  };
+  summary: {
+    total_raw: number;
+    passed_basic_filter: number;
+    rejected_basic_filter: number;
+    security_checked: number;
+    security_passed: number;
+    needs_manual_verification: number;
+    critical_risk: number;
+    watchlist_candidates: number;
+  };
+  candidates: CombinedScannerCandidate[];
+};

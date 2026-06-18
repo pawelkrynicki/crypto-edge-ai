@@ -8,6 +8,8 @@ It checks whether we can fetch or load DexScreener pair data, normalize it into 
 
 It also includes a second POC: Security Enrichment. This checks whether a normalized candidate can be enriched with GoPlus Security and Honeypot.is style data, then classified as `SECURITY_PASSED`, `NEEDS_MANUAL_VERIFICATION`, or `CRITICAL_RISK`.
 
+It also includes a third POC: Combined Scanner. This connects DexScreener discovery, basic filters, limited security enrichment, final scanner labels, and standardized JSON output for Camp BETA.
+
 This is not the product. It does not include UI, database, migrations, auth, production cron scripts, AI calls, exchange integration, MT4, Telegram/Discord, payments, or auto-trading.
 
 ## Install
@@ -37,6 +39,23 @@ You can also run a small combined fixture flow. It loads the DexScreener fixture
 ```bash
 npm run poc:fixture:security
 ```
+
+## Combined Scanner Fixture Mode
+
+Combined scanner fixture mode is stable and does not require internet:
+
+```bash
+npm run scanner:fixture
+```
+
+It runs:
+
+- DexScreener fixture loading.
+- Candidate normalization.
+- Basic filters.
+- Fixture GoPlus/Honeypot security enrichment for candidates that passed the basic filter.
+- Final scanner labels.
+- JSON output.
 
 ## Live Mode
 
@@ -71,6 +90,16 @@ Supported shorthand chains in this POC:
 - `avalanche`.
 
 If a live security source is unavailable or unsupported, the POC does not fake data. It marks that source as unavailable and returns missing fields with `NEEDS_MANUAL_VERIFICATION`.
+
+## Combined Scanner Live Mode
+
+Combined scanner live mode is best-effort and intentionally limited:
+
+```bash
+npm run scanner:live -- --query SOL --max-candidates 3
+```
+
+The default and maximum safety limit is `maxCandidates = 3`. The runner does not perform mass scanning, does not retry aggressively, and does not make unbounded parallel requests.
 
 ## Tests
 
@@ -182,6 +211,42 @@ The security runner prints:
 }
 ```
 
+## Combined Scanner Output Shape
+
+The combined scanner runner prints:
+
+```json
+{
+  "source": "combined-scanner-poc",
+  "mode": "fixture",
+  "query": "fixture",
+  "generated_at": "2026-06-18T00:00:00.000Z",
+  "limits": {
+    "max_candidates": 3
+  },
+  "summary": {
+    "total_raw": 3,
+    "passed_basic_filter": 2,
+    "rejected_basic_filter": 1,
+    "security_checked": 2,
+    "security_passed": 2,
+    "needs_manual_verification": 0,
+    "critical_risk": 0,
+    "watchlist_candidates": 2
+  },
+  "candidates": []
+}
+```
+
+Final labels:
+
+- `REJECT`: candidate failed the basic filters.
+- `WATCHLIST`: candidate passed basic filters and security checks, and is eligible for further review.
+- `CRITICAL_RISK`: candidate passed basic filters but security enrichment found a critical risk.
+- `NEEDS_MANUAL_VERIFICATION`: candidate needs human review because security data is missing, incomplete, inconsistent, or warning-level.
+
+Important: `WATCHLIST` is not a buy signal. It only means `eligible for further review`.
+
 ## Security Rules
 
 `CRITICAL_RISK` if:
@@ -221,3 +286,9 @@ The security runner prints:
 - No trading signals.
 
 For the Security Enrichment POC, GoPlus and Honeypot.is are included only as fixture-first and live best-effort checks. There is still no database, UI, cron, AI, or production scanner.
+
+## Known Asset Caution
+
+The security rules are designed mainly for new tokens and microcaps. Large known assets, stablecoins, wrapped assets, or contracts with special structures may require contextual interpretation if the POC returns `CRITICAL_RISK` or `NEEDS_MANUAL_VERIFICATION`.
+
+Do not treat this POC as a universal token safety oracle. A future production design may add contextual asset handling, but this POC does not implement a whitelist or known assets list.

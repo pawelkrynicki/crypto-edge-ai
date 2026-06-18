@@ -98,3 +98,19 @@ The second POC implements only a controlled subset:
 - Critical and warning decision rules.
 
 The POC must not invent unavailable data. Missing top wallet, top 10 wallet, liquidity lock, ownership, or source data should remain null and be listed in `missing_data`.
+
+## Third Code POC: Combined Scanner
+
+The combined scanner uses this risk layer after DexScreener discovery and basic filters.
+
+Final behavior:
+
+- Basic filter rejection returns `REJECT` without security enrichment.
+- `SECURITY_PASSED` returns `WATCHLIST`.
+- `CRITICAL_RISK` returns `CRITICAL_RISK`.
+- `NEEDS_MANUAL_VERIFICATION` returns `NEEDS_MANUAL_VERIFICATION`.
+- Missing security check returns `NEEDS_MANUAL_VERIFICATION` with `NOT_CHECKED`.
+
+`WATCHLIST` means eligible for further research only. It is not permission to buy, not a signal, and not financial advice.
+
+Known asset caution: the risk engine is primarily designed for new tokens and microcaps. Large known assets, stablecoins, wrapped tokens, or special contract structures can trigger warnings that require human context. This is documented as future work only; no whitelist or known assets list is implemented in the POC.

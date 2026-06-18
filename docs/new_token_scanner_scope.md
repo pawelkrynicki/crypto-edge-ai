@@ -49,6 +49,40 @@ It still does not include:
 - Fear & Greed.
 - AIKINTEL Market News.
 
+## Third Code POC Boundary: Combined Scanner
+
+The third code POC combines discovery, basic filters, and security enrichment into one controlled scanner output.
+
+It includes:
+
+- DexScreener fixture/live discovery.
+- Basic filter pass/reject status.
+- Security enrichment only for a limited number of passed candidates.
+- Final labels: `REJECT`, `WATCHLIST`, `CRITICAL_RISK`, `NEEDS_MANUAL_VERIFICATION`.
+- JSON output for Camp BETA review.
+
+It still does not include:
+
+- Database writes.
+- UI.
+- Production scanner or production cron.
+- OpenAI.
+- CoinGecko.
+- Fear & Greed.
+- AIKINTEL Market News.
+- Exchange, MT4, Telegram, Discord, payment, or auto-trading integrations.
+
+Commands:
+
+```bash
+npm run scanner:fixture
+npm run scanner:live -- --query SOL --max-candidates 3
+```
+
+`WATCHLIST` means only `eligible for further review`. It does not mean buy, enter now, guaranteed setup, or trading signal.
+
+Known asset caution: this rule set is optimized for new tokens and microcaps. Large known assets, stablecoins, wrapped assets, or special-purpose contracts may need contextual interpretation. Do not implement a whitelist or known assets list at POC stage.
+
 ## Discovery Radar
 
 Starting source:

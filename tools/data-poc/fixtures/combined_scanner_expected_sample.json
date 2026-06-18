@@ -1,0 +1,18 @@
+{
+  "source": "combined-scanner-poc",
+  "mode": "fixture",
+  "query": "fixture",
+  "limits": {
+    "max_candidates": 3
+  },
+  "summary": {
+    "total_raw": 3,
+    "passed_basic_filter": 2,
+    "rejected_basic_filter": 1,
+    "security_checked": 2,
+    "security_passed": 2,
+    "needs_manual_verification": 0,
+    "critical_risk": 0,
+    "watchlist_candidates": 2
+  }
+}

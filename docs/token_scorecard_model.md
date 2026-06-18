@@ -86,3 +86,22 @@ Allowed:
 - `REJECT`.
 - `CRITICAL_RISK`.
 - `NOT_ELIGIBLE_FOR_REVIEW`.
+
+## Third Code POC: Combined Scanner Labels
+
+The Combined Scanner POC does not implement the full 100-point scorecard yet. It produces a limited scanner label based on:
+
+1. DexScreener basic filters.
+2. GoPlus/Honeypot security enrichment.
+3. Missing data handling.
+
+POC labels:
+
+- `REJECT`: failed basic filters.
+- `WATCHLIST`: passed basic filters and received `SECURITY_PASSED`.
+- `CRITICAL_RISK`: security enrichment found a critical risk.
+- `NEEDS_MANUAL_VERIFICATION`: security data was missing, incomplete, inconsistent, or warning-level.
+
+`WATCHLIST` means only that the token is eligible for further review. It is not a buy signal, setup confirmation, profit prediction, or investment recommendation.
+
+Known asset caution: the POC security and label rules are designed for new tokens and microcaps. Large known assets, stablecoins, wrapped assets, or special contract structures may need contextual interpretation before any product-level conclusion.
