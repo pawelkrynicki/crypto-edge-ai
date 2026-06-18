@@ -1,0 +1,149 @@
+# New Token Scanner Scope
+
+## Purpose
+
+New Token Scanner is a key module of Crypto Edge AI. It helps find and filter new tokens using real data.
+
+It is not the entire product. Crypto Edge AI also includes Research Review, Risk Engine, Setup Review, and Final Checklist.
+
+## Camp BETA Goal
+
+For Camp BETA, the scanner should work on a limited but real-data pipeline.
+
+Primary goal:
+
+- Find token candidates.
+- Reject obvious scams and critical risks.
+- Surface watchlist candidates.
+- Produce a scorecard and checklist.
+
+## Discovery Radar
+
+Starting source:
+
+- DexScreener as primary source.
+
+Later or backup:
+
+- GeckoTerminal.
+- DexTools as manual reference.
+
+Starting filters:
+
+- Market cap: $300K - $10M.
+- Token/pair age: preferred 14-90 days.
+- Minimum pair age: >7 days if token age is unavailable.
+- 24h volume: minimum $30K.
+- Liquidity: minimum $30K.
+- Volume/MC: 3%-80%.
+- Sweet spot Volume/MC: 5%-30%.
+- Reject Volume/MC <1% as likely dead.
+- Reject Volume/MC >100% as possible wash trading or pump/dump.
+
+## Deal Breaker Engine
+
+Reject immediately when critical flags appear:
+
+- Honeypot positive.
+- Buy/sell tax >10%.
+- Unverified contract.
+- Liquidity unlocked.
+- Top wallet >30% supply.
+- Top 10 wallets >60% supply.
+- Token Sniffer score <50.
+- GoPlus high risk or critical issue.
+- Missing verified source code.
+- Anonymous team plus very young token.
+- Suspicious copy-paste whitepaper.
+- Fake partnership or unverifiable claims.
+
+## Security Check
+
+Priority Camp BETA integrations:
+
+- GoPlus Security.
+- Honeypot.is.
+
+Optional/manual/later:
+
+- Token Sniffer if legal and stable access is confirmed.
+- De.Fi Scanner if API/legal access is confirmed.
+- Etherscan/BscScan/Solscan as explorers.
+
+Three-stamp idea:
+
+- Token Sniffer >70 and no critical flags.
+- GoPlus: honeypot false, tax <10%, no critical risk.
+- De.Fi Scanner: no critical risks.
+
+For Camp BETA, treat GoPlus and Honeypot.is as priority real integrations.
+
+## Rug Pull Risk
+
+Dedicated rug pull risk checks should evaluate:
+
+- Unlocked liquidity.
+- Liquidity lock <30 days.
+- LP tokens controlled by one wallet.
+- Active contract ownership.
+- Mint function.
+- Blacklist/whitelist functions.
+- Sell restrictions.
+- Hidden owner / proxy risk.
+- Top wallet concentration.
+- Fresh wallets buying together.
+- Large transfers between linked wallets.
+- Developer wallet sells during pump.
+- Liquidity spike without organic volume.
+
+## On-Chain Distribution
+
+Target metrics:
+
+- Holders minimum 300, preferred 500-5000.
+- Top 10 wallets <40% target, >60% red flag.
+- Top 1 wallet <10% target, >20% red flag.
+- Dev wallet <5% locked, >10% unlocked red flag.
+- Liquidity/MC 10%-30% optimal, <3% red flag.
+
+Bubblemaps is important later or as a manual check. Do not force production API until access terms are confirmed.
+
+## Social and Narrative Check
+
+Social checks:
+
+- Twitter/X account age.
+- Follower quality.
+- Engagement 2%-5% healthy.
+- Telegram members 500+ preferred.
+- Telegram active users 10%-30% active.
+- Real comments, not only hype spam.
+- Admin responsiveness.
+- Voice chat active as green flag.
+- Fake engagement as red flag.
+
+For Camp BETA, social may be manual input or checklist if API sources are unstable.
+
+## Output
+
+Scanner output should include:
+
+- Candidate data.
+- Security result.
+- Rug pull risk.
+- Holder/distribution notes.
+- Social/narrative notes.
+- Scorecard.
+- Decision label.
+- Final checklist.
+- Disclaimer.
+
+## Safety
+
+Do not output `APE`. Use safer labels:
+
+- `WATCHLIST`.
+- `HIGH_CONVICTION_REVIEW`.
+- `REJECT`.
+- `CRITICAL_RISK`.
+- `NOT_ELIGIBLE_FOR_REVIEW`.

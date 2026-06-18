@@ -95,6 +95,14 @@ Best current description:
 
 Crypto Edge AI is a crypto trading intelligence module designed as a standalone working repository first, with a clear path for later integration into the AIKINTEL platform. It uses AIKINTEL-style market intelligence concepts, existing auth/users when integrated, and focuses on trader-facing decision support: bias, risk, opportunity, confidence, narratives, scam alerts, setup review, and pre-trade checklist.
 
+Additional product clarification:
+
+- Crypto Edge AI is a web tool for crypto traders.
+- It helps with research, market-topic selection, risk assessment, scam filtering, and decision process structure.
+- It has two primary modes: Research Review and New Token Scanner.
+- New Token Scanner is a key module, but it does not replace the entire product.
+- Camp BETA should aim for a working tool on real data in a limited stable pipeline.
+
 ## Explicit Non-Goals
 
 Do not implement:

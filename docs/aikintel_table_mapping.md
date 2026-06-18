@@ -28,6 +28,11 @@ Use AIKINTEL-compatible conventions:
 | `crypto_scam_alerts` | Scam and risk warnings | Risk panel, alerts, checklist blockers | Camp v1 must-have |
 | `crypto_opportunities` | Opportunities and narratives | Opportunities tab, narrative review, confidence | Camp v1 must-have |
 | `crypto_market_summaries` | Daily/weekly market view | Dashboard context, sentiment, market summary | Camp v1 must-have |
+| `crypto_research_reviews` | Manual Research Review records | User-submitted topics, AI classification, checklist, status | Camp BETA must-have |
+| `crypto_token_candidates` | New Token Scanner candidates | DexScreener token discovery and filtering | Camp BETA must-have |
+| `crypto_token_security_checks` | Security check results | GoPlus/Honeypot/optional scanner outputs | Camp BETA must-have |
+| `crypto_token_scorecards` | Token scorecard outputs | Security, on-chain, social, narrative scoring | Camp BETA must-have |
+| `crypto_token_scan_runs` | Scan execution tracking | Controlled discovery runs and errors | Camp BETA must-have |
 | AIKINTEL Market News / Crypto | Existing general news layer | Reuse/map as context; do not duplicate | Confirm schema |
 | `crypto_onchain_metrics` | On-chain snapshots | Later context for bias and risk | Optional/later |
 | `crypto_user_watchlist` | User-specific watchlist | Later private observation/status tracking | Optional/later |
@@ -42,6 +47,11 @@ Must-have:
 - `crypto_scam_alerts`.
 - `crypto_opportunities`.
 - `crypto_market_summaries`.
+- `crypto_research_reviews`.
+- `crypto_token_candidates`.
+- `crypto_token_security_checks`.
+- `crypto_token_scorecards`.
+- `crypto_token_scan_runs`.
 
 Optional / later:
 

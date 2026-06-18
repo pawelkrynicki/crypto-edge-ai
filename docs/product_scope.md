@@ -22,6 +22,62 @@ Crypto Edge AI helps traders review crypto topics before making their own decisi
 - Setup review.
 - Pre-trade checklist.
 
+The main question is not "Should I buy?". The main question is:
+
+- Is this topic/token/news worth further analysis?
+- Does this token look like a scam?
+- Is there rug pull risk?
+- Is liquidity sufficient?
+- Are holders reasonably distributed?
+- Does volume look natural?
+- Does social quality look credible?
+- Does the narrative make sense?
+- What still needs to be checked before a decision?
+
+## Product Modes
+
+### Research Review
+
+User manually submits:
+
+- News.
+- Link.
+- Token description.
+- Market event.
+- Personal observation.
+- Narrative.
+- Contract address.
+- Ticker.
+
+Output:
+
+- Category.
+- Score.
+- Bias.
+- Confidence.
+- Summary.
+- Reasoning.
+- Risk factors.
+- Checklist.
+- Decision label.
+- Disclaimer note.
+
+### New Token Scanner
+
+System helps find and filter new tokens using real data.
+
+Focus:
+
+- Scam elimination.
+- Rug pull risk.
+- Security check.
+- Liquidity.
+- Holder distribution.
+- Social quality.
+- Scorecard.
+
+New Token Scanner is a key module, not the full product.
+
 ## Data Backing
 
 The module may use:
@@ -41,6 +97,11 @@ Camp v1 should include:
 
 - Crypto Edge AI page/module.
 - Controlled user flow for real users.
+- Research Review.
+- New Token Scanner in a limited real-data pipeline.
+- Risk Engine.
+- Setup Review.
+- Final Checklist.
 - Project/token research list.
 - Scam/risk alerts.
 - Opportunities/narratives.

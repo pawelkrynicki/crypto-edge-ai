@@ -48,6 +48,218 @@ Minimum procedures:
 - `dashboard`.
 - `search`.
 - `setupReviewMock`.
+- `createResearchReview`.
+- `researchReviews`.
+- `researchReviewById`.
+- `updateResearchReviewStatus`.
+- `scanCandidates`.
+- `candidateById`.
+- `securityCheck`.
+- `scorecard`.
+- `scanRunHistory`.
+- `rejectCandidate`.
+- `watchlistCandidate`.
+
+For Camp BETA, scanner procedures may start as read-only/design or controlled manual-run procedures. Real scanning should remain controlled until source access and API limits are confirmed.
+
+## Research Review Procedures
+
+## Procedure: `createResearchReview`
+
+Purpose: create a manual Research Review from a user-submitted topic.
+
+Status: protected.
+
+Input:
+
+```ts
+z.object({
+  input_type: z.enum(["news", "link", "token_description", "market_event", "observation", "narrative", "contract_address", "ticker", "screenshot_text"]),
+  title: z.string().min(3).max(500),
+  description: z.string().min(10).max(5000),
+  source_url: z.string().url().max(1024).optional(),
+  symbol: z.string().max(20).optional(),
+  contract_address: z.string().max(100).optional()
+})
+```
+
+Output: created review with category, score, bias, confidence, risk factors, checklist, decision label, and disclaimer.
+
+Security notes: no buy/sell wording; real AI call only after helper approval.
+
+## Procedure: `researchReviews`
+
+Purpose: list user Research Reviews.
+
+Status: protected.
+
+Input:
+
+```ts
+z.object({
+  status: z.enum(["new", "to_review", "watching", "rejected", "played", "archived", "all"]).default("all"),
+  category: z.string().optional(),
+  limit: z.number().int().min(1).max(100).default(30),
+  offset: z.number().int().min(0).default(0)
+})
+```
+
+Output: paginated reviews owned by current user or admin-visible scope if AIKINTEL supports it.
+
+## Procedure: `researchReviewById`
+
+Purpose: return one Research Review.
+
+Status: protected.
+
+Input:
+
+```ts
+z.object({ id: z.number().int().positive() })
+```
+
+Output: full review detail.
+
+Security notes: enforce user ownership unless admin.
+
+## Procedure: `updateResearchReviewStatus`
+
+Purpose: update workflow status of a Research Review.
+
+Status: protected.
+
+Input:
+
+```ts
+z.object({
+  id: z.number().int().positive(),
+  status: z.enum(["new", "to_review", "watching", "rejected", "played", "archived"])
+})
+```
+
+Output: updated review summary.
+
+## New Token Scanner Procedures
+
+## Procedure: `scanCandidates`
+
+Purpose: list New Token Scanner candidates.
+
+Status: protected.
+
+Input:
+
+```ts
+z.object({
+  status: z.enum(["new", "rejected", "watchlist", "high_conviction_review", "critical_risk", "archived", "all"]).default("all"),
+  chain: z.string().max(100).optional(),
+  minLiquidityUsd: z.number().min(0).optional(),
+  minVolume24hUsd: z.number().min(0).optional(),
+  minMarketCapUsd: z.number().min(0).optional(),
+  maxMarketCapUsd: z.number().min(0).optional(),
+  limit: z.number().int().min(1).max(100).default(50),
+  offset: z.number().int().min(0).default(0)
+})
+```
+
+Output: paginated candidates with latest scorecard and security status.
+
+## Procedure: `candidateById`
+
+Purpose: show full candidate detail.
+
+Status: protected.
+
+Input:
+
+```ts
+z.object({ id: z.number().int().positive() })
+```
+
+Output: candidate, security checks, scorecard, checklist, and source links.
+
+## Procedure: `securityCheck`
+
+Purpose: return security check details for one candidate.
+
+Status: protected.
+
+Input:
+
+```ts
+z.object({ candidate_id: z.number().int().positive() })
+```
+
+Output: GoPlus/Honeypot/manual security results.
+
+## Procedure: `scorecard`
+
+Purpose: return token scorecard for one candidate.
+
+Status: protected.
+
+Input:
+
+```ts
+z.object({ candidate_id: z.number().int().positive() })
+```
+
+Output: security, on-chain, social, narrative, total score, risk level, confidence, decision label, checklist.
+
+## Procedure: `scanRunHistory`
+
+Purpose: list controlled scan runs.
+
+Status: protected/admin-preferred.
+
+Input:
+
+```ts
+z.object({
+  source: z.string().max(100).optional(),
+  limit: z.number().int().min(1).max(100).default(30)
+})
+```
+
+Output: scan run metadata and counts.
+
+## Procedure: `rejectCandidate`
+
+Purpose: mark a candidate rejected from review.
+
+Status: protected.
+
+Input:
+
+```ts
+z.object({
+  id: z.number().int().positive(),
+  reason: z.string().max(1000).optional()
+})
+```
+
+Output: updated candidate status.
+
+Security notes: use `REJECT` / `NOT_ELIGIBLE_FOR_REVIEW`, not trading instructions.
+
+## Procedure: `watchlistCandidate`
+
+Purpose: mark a candidate as watchlist candidate.
+
+Status: protected.
+
+Input:
+
+```ts
+z.object({
+  id: z.number().int().positive(),
+  note: z.string().max(1000).optional()
+})
+```
+
+Output: updated candidate status.
+
+Security notes: watchlist does not mean buy signal.
 
 ## Procedure: `projects`
 

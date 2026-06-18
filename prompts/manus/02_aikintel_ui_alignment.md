@@ -9,6 +9,11 @@ Create a `Crypto Edge AI` experience that can later feel native inside AIKINTEL 
 ## Required Sections
 
 - Overview.
+- Research Review.
+- New Token Scanner.
+- Risk Engine.
+- Setup Review.
+- Final Checklist.
 - Projects.
 - Opportunities.
 - Scam Alerts.

@@ -1,8 +1,18 @@
 # Crypto Edge AI
 
-Crypto Edge AI is a crypto trading intelligence module designed as a standalone working repository first, with a clear path for later integration into the AIKINTEL platform.
+Crypto Edge AI is a web tool for crypto traders. It helps with research, market-topic selection, risk review, scam filtering, and decision process structure.
 
 It uses AIKINTEL-style market intelligence concepts and should use existing AIKINTEL auth/users if integrated into the main platform. The module focuses on trader-facing decision support: bias, risk, opportunity, confidence, narratives, scam alerts, setup review, and pre-trade checklist.
+
+The product combines five major components:
+
+- Research Review.
+- New Token Scanner.
+- Risk Engine.
+- Setup Review.
+- Final Checklist.
+
+New Token Scanner is one key module, but it does not replace the whole product.
 
 Crypto Edge AI is the module name and the intended menu name. The project should not be renamed to Crypto Market.
 
@@ -24,6 +34,7 @@ This repo is not a second platform beside AIKINTEL. It is a working space for th
 - A research and decision-support workflow for crypto traders.
 - A module that combines market intelligence with setup review, risk, confidence, and checklist discipline.
 - A future AIKINTEL-compatible module, not a competing platform.
+- A tool for deciding whether a topic or token deserves further analysis.
 
 ## What Crypto Edge AI Is Not
 
@@ -64,11 +75,13 @@ Do not use FastAPI or SQLite as the target architecture for this module.
 
 ## Camp v1 Direction
 
-Camp v1 should be a controlled Crypto Edge AI module for real users, starting with limited and safe functionality.
+Camp BETA should be a controlled Crypto Edge AI module for real users, starting with limited and safe functionality on real data where stable access is confirmed.
 
 It should focus on:
 
 - Crypto Edge AI dashboard/page.
+- Research Review manual input.
+- New Token Scanner real-data pipeline.
 - Project/token research list.
 - Scam and risk alerts.
 - Opportunities/narratives.
@@ -80,6 +93,16 @@ It should focus on:
 - Trader checklist.
 - Setup review mock.
 - Disclaimer and safety boundaries.
+
+Minimum viable real-data pipeline:
+
+- DexScreener discovery.
+- GoPlus/Honeypot security check.
+- CoinGecko context.
+- Fear & Greed market sentiment.
+- AIKINTEL Market News / Crypto mapping if accessible.
+- Scorecard.
+- Final checklist.
 
 ## Data Source Direction
 

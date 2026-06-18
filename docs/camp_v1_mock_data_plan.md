@@ -2,7 +2,15 @@
 
 ## Purpose
 
-Define safe mock/seed data for Camp v1 demonstrations of the Crypto Edge AI module.
+Define safe mock/seed data for Camp BETA demonstrations of the Crypto Edge AI module.
+
+Camp BETA should combine:
+
+- Research Review mock/manual examples.
+- New Token Scanner real-data-like candidates.
+- Risk Engine examples.
+- Setup Review examples.
+- Final Checklist examples.
 
 This is not a production data collection plan and does not add live cron scripts.
 
@@ -40,6 +48,35 @@ Recommended field coverage:
 - `category`.
 - `chain`.
 
+## Example Research Review Inputs
+
+Seed or prepare 8-12 manual Research Review examples:
+
+1. News event after a price move.
+2. Token description with incomplete data.
+3. Market observation about a narrative.
+4. Risk alert from a user link.
+5. Contract address requiring security review.
+6. Low-value hype topic.
+7. Scam-suspicious project description.
+8. Setup review request with timeframe.
+
+Each example should include:
+
+- `input_type`.
+- `title`.
+- `description`.
+- `source_url` if available.
+- `symbol` if relevant.
+- `category`.
+- `score`.
+- `bias`.
+- `confidence`.
+- `risk_level`.
+- `risk_factors`.
+- `checklist`.
+- `decision_label`.
+
 ## Example Scam Alerts
 
 Seed 5-8 rows in `crypto_scam_alerts`.
@@ -63,6 +100,71 @@ Each alert should include:
 - `is_confirmed`.
 - `published_at`.
 - `hash`.
+
+## Example New Token Scanner Candidates
+
+Prepare 8-15 scanner candidate examples that resemble DexScreener data:
+
+1. Candidate that passes basic filters and lands in `WATCHLIST`.
+2. Candidate rejected because liquidity is below $30K.
+3. Candidate rejected because Volume/MC is <1%.
+4. Candidate rejected because Volume/MC is >100%.
+5. Candidate with honeypot positive.
+6. Candidate with tax >10%.
+7. Candidate with unlocked liquidity.
+8. Candidate with top wallet concentration >30%.
+9. Candidate with decent security but weak social quality.
+10. Candidate with strong narrative but manual verification required.
+
+Each candidate should include:
+
+- `symbol`.
+- `name`.
+- `chain`.
+- `contract_address`.
+- `pair_address`.
+- `dex`.
+- `source`.
+- `source_url`.
+- `price_usd`.
+- `market_cap_usd`.
+- `fdv_usd`.
+- `liquidity_usd`.
+- `volume_24h_usd`.
+- `volume_market_cap_ratio`.
+- `pair_created_at`.
+- `status`.
+
+## Example Security Checks
+
+For scanner candidates, prepare security check examples:
+
+- GoPlus passed.
+- Honeypot.is passed.
+- Honeypot positive.
+- Buy tax >10%.
+- Sell tax >10%.
+- Contract unverified.
+- Ownership active.
+- Liquidity unlocked.
+- Top wallet concentration red flag.
+
+## Example Scorecards
+
+Prepare scorecards using:
+
+- Security max 30.
+- On-Chain max 25.
+- Social max 25.
+- Narrative max 20.
+
+Decision labels:
+
+- `REJECT`.
+- `WATCHLIST`.
+- `HIGH_CONVICTION_REVIEW`.
+- `CRITICAL_RISK`.
+- `NOT_ELIGIBLE_FOR_REVIEW`.
 
 ## Example Opportunities
 

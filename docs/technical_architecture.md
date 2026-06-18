@@ -6,6 +6,13 @@ Crypto Edge AI is developed in this standalone working repository first, with a 
 
 The technical design should remain compatible with the AIKINTEL monorepo, but implementation does not move into the main AIKINTEL repo until access and integration timing are confirmed.
 
+The product architecture has two primary modes:
+
+- Research Review for manual topic analysis.
+- New Token Scanner for real-data token discovery and scam/risk filtering.
+
+Both modes use shared scoring, risk, confidence, checklist, decision labels, and disclaimer rules.
+
 ## Target Monorepo Paths
 
 ```text
@@ -82,6 +89,11 @@ The module should follow AIKINTEL database conventions:
 - `crypto_opportunities`.
 - `crypto_onchain_metrics`.
 - `crypto_market_summaries`.
+- `crypto_research_reviews`.
+- `crypto_token_candidates`.
+- `crypto_token_security_checks`.
+- `crypto_token_scorecards`.
+- `crypto_token_scan_runs`.
 
 Use existing `crypto_news` if available in AIKINTEL.
 

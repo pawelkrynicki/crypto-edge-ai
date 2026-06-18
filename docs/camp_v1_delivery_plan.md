@@ -2,14 +2,19 @@
 
 ## Objective
 
-Deliver a controlled Crypto Edge AI module for real users, using AIKINTEL-compatible patterns and a clear later integration path.
+Deliver a controlled Crypto Edge AI BETA module for real users, using AIKINTEL-compatible patterns and a clear later integration path.
 
 The goal is usefulness and safety, not full automation.
 
-## Camp v1 Must Have
+## Camp BETA Must Have
 
 - Crypto Edge AI page/module.
 - Controlled user flow.
+- Research Review.
+- New Token Scanner.
+- Risk Engine.
+- Setup Review.
+- Final Checklist.
 - Project/token research list.
 - Scam/risk alerts.
 - Opportunities/narratives.
@@ -22,6 +27,18 @@ The goal is usefulness and safety, not full automation.
 - Risk factors.
 - Checklist.
 - Disclaimer.
+
+## Real-Data Minimum
+
+Camp BETA should work on a limited real-data pipeline:
+
+- DexScreener discovery.
+- GoPlus/Honeypot security check.
+- CoinGecko context.
+- Fear & Greed market sentiment.
+- AIKINTEL Market News / Crypto mapping if accessible.
+- Scorecard.
+- Final checklist.
 
 ## Camp v1 Should Reuse or Map
 
@@ -44,21 +61,26 @@ The goal is usefulness and safety, not full automation.
 
 ## Suggested Delivery Phases
 
-### Phase 1: Owner Decisions and Source Selection
+### Phase 1: Product Modes and Owner Decisions
 
 - Use `docs/owner_decisions_2026_06_18.md`.
+- Use `docs/product_modes_research_and_scanner.md`.
+- Use `docs/research_review_scope.md`.
+- Use `docs/new_token_scanner_scope.md`.
 - Resolve open questions from `docs/open_questions_for_aikintel_owner.md`.
 - Select credible data sources for v1.
 
 ### Phase 2: Data Model Refinement
 
 - Use `docs/database_schema_design.md`.
+- Use `docs/data_sources_v1.md`.
 - Confirm which tables are needed for Camp v1.
 - Decide how existing Market News / Crypto maps into Crypto Edge AI.
 
 ### Phase 3: Mock/Seed Crypto Edge AI Module
 
 - Use `docs/camp_v1_mock_data_plan.md`.
+- Use `docs/camp_beta_real_data_plan.md`.
 - Add safe mock records in the future implementation step.
 - Validate AI JSON shape.
 

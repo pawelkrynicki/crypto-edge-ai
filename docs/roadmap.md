@@ -17,7 +17,30 @@ Current artifacts:
 - `docs/product_scope.md`.
 - `docs/aikintel_integration_plan.md`.
 
-## Stage 2: Source Selection and Data Model Refinement
+## Stage 2: Product Modes and Source Selection
+
+Define the two primary product modes:
+
+- Research Review.
+- New Token Scanner.
+
+Clarify the shared layer:
+
+- Score.
+- Risk.
+- Bias.
+- Confidence.
+- Checklist.
+- Decision labels.
+- Disclaimer.
+
+Current artifacts:
+
+- `docs/product_modes_research_and_scanner.md`.
+- `docs/research_review_scope.md`.
+- `docs/new_token_scanner_scope.md`.
+
+## Stage 3: Source Selection and Data Model Refinement
 
 Select credible v1 data sources and refine the data model.
 
@@ -36,11 +59,30 @@ Candidate sources:
 
 Current artifacts:
 
+- `docs/data_sources_v1.md`.
 - `docs/database_schema_design.md`.
 - `docs/aikintel_table_mapping.md`.
 - `docs/open_questions_for_aikintel_owner.md`.
 
-## Stage 3: Mock/Seed Crypto Edge AI Module
+## Stage 4: Camp BETA Real-Data Pipeline Design
+
+Design the limited real-data flow:
+
+- DexScreener discovery.
+- GoPlus/Honeypot security check.
+- CoinGecko context.
+- Fear & Greed sentiment.
+- AIKINTEL Market News / Crypto mapping if accessible.
+- Scorecard.
+- Final checklist.
+
+Current artifacts:
+
+- `docs/camp_beta_real_data_plan.md`.
+- `docs/rug_pull_risk_engine.md`.
+- `docs/token_scorecard_model.md`.
+
+## Stage 5: Mock/Seed Crypto Edge AI Module
 
 Prepare safe mock data for Camp v1:
 
@@ -54,7 +96,7 @@ Current artifact:
 
 - `docs/camp_v1_mock_data_plan.md`.
 
-## Stage 4: Read-Only tRPC Router Design / Skeleton
+## Stage 6: Read-Only tRPC Router Design / Skeleton
 
 Design and later create a safe read-only router skeleton:
 
@@ -71,14 +113,15 @@ Current artifacts:
 
 - `docs/trpc_router_design.md`.
 - `prompts/codex/03_schema_and_router_design.md`.
+- `prompts/codex/04_new_token_scanner_real_data_plan.md`.
 
-## Stage 5: AIKINTEL-Style UI Mock Aligned With Screenshots
+## Stage 7: AIKINTEL-Style UI Mock Aligned With Screenshots
 
 Prepare an AIKINTEL-style UI mock for the `Crypto Edge AI` module.
 
 The mock should align with existing AIKINTEL screenshots or pages and should not become a full UI implementation before integration questions are settled.
 
-## Stage 6: Camp v1 Controlled User Flow
+## Stage 8: Camp BETA Controlled User Flow
 
 Prepare a controlled flow for real users:
 
@@ -89,7 +132,7 @@ Prepare a controlled flow for real users:
 - No buy/sell signals.
 - Safe setup review.
 
-## Stage 7: Integration Decision With Main AIKINTEL Repo
+## Stage 9: Integration Decision With Main AIKINTEL Repo
 
 Decide when and how to move from this standalone working repo into the main AIKINTEL repo.
 
@@ -102,7 +145,7 @@ Needed confirmations:
 - Approved data sources.
 - AI cost and usage limits.
 
-## Stage 8: Real Data Sources and AI Helper Integration
+## Stage 10: Real Data Sources and AI Helper Integration
 
 After integration decisions:
 

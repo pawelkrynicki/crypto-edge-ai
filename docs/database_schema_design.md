@@ -39,6 +39,11 @@ Must-have for Camp v1:
 - `crypto_scam_alerts`.
 - `crypto_opportunities`.
 - `crypto_market_summaries`.
+- `crypto_research_reviews`.
+- `crypto_token_candidates`.
+- `crypto_token_security_checks`.
+- `crypto_token_scorecards`.
+- `crypto_token_scan_runs`.
 
 Optional / later:
 
@@ -71,6 +76,48 @@ Tables with `ai_analysis` should use this shape:
 The `recommendation` field is research guidance only. It must not contain buy/sell instructions, guaranteed profit language, or financial advice.
 
 ## Must-Have Tables
+
+## `crypto_research_reviews`
+
+Purpose: stores manual Research Review submissions and AI/risk/checklist outputs.
+
+Columns:
+
+```sql
+id INT AUTO_INCREMENT PRIMARY KEY
+user_id INT NULL
+input_type ENUM('news', 'link', 'token_description', 'market_event', 'observation', 'narrative', 'contract_address', 'ticker', 'screenshot_text') NOT NULL
+title VARCHAR(500) NOT NULL
+description TEXT
+source_url VARCHAR(1024)
+symbol VARCHAR(20)
+contract_address VARCHAR(100)
+category ENUM('news_event', 'token_review', 'narrative', 'risk_alert', 'market_observation', 'setup_review', 'low_value_noise', 'scam_suspicious')
+score TINYINT
+bias ENUM('bullish', 'bearish', 'neutral')
+confidence TINYINT
+risk_level ENUM('low', 'medium', 'high', 'critical')
+risk_factors JSON
+checklist JSON
+decision_label ENUM('REJECT', 'WATCHLIST', 'HIGH_CONVICTION_REVIEW', 'CRITICAL_RISK', 'NOT_ELIGIBLE_FOR_REVIEW')
+ai_analysis JSON
+status ENUM('new', 'to_review', 'watching', 'rejected', 'played', 'archived') DEFAULT 'new'
+created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+```
+
+Indexes:
+
+- `idx_user (user_id)`.
+- `idx_symbol (symbol)`.
+- `idx_category (category)`.
+- `idx_decision (decision_label)`.
+- `idx_status (status)`.
+- `idx_created (created_at)`.
+
+Camp BETA priority: must-have for Research Review.
+
+Future extension notes: map to AIKINTEL Market News / Crypto when source records are available.
 
 ## `crypto_projects`
 
@@ -120,6 +167,137 @@ AI fields: `ai_evaluation`, `ai_analysis`, `risk_score`, `opportunity_score`, `l
 Camp v1 priority: must-have.
 
 Future extension notes: link to AIKINTEL news records when the Market News schema is confirmed.
+
+## `crypto_token_candidates`
+
+Purpose: stores New Token Scanner discovery candidates from DexScreener and later sources.
+
+Columns:
+
+```sql
+id INT AUTO_INCREMENT PRIMARY KEY
+symbol VARCHAR(20)
+name VARCHAR(200)
+chain VARCHAR(100)
+contract_address VARCHAR(100)
+pair_address VARCHAR(100)
+dex VARCHAR(100)
+source VARCHAR(100)
+source_url VARCHAR(1024)
+price_usd DECIMAL(20,10)
+market_cap_usd DECIMAL(20,2)
+fdv_usd DECIMAL(20,2)
+liquidity_usd DECIMAL(20,2)
+volume_24h_usd DECIMAL(20,2)
+volume_market_cap_ratio DECIMAL(10,4)
+pair_created_at TIMESTAMP NULL
+token_age_days INT NULL
+status ENUM('new', 'rejected', 'watchlist', 'high_conviction_review', 'critical_risk', 'archived') DEFAULT 'new'
+hash VARCHAR(64) UNIQUE
+created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+```
+
+Indexes:
+
+- `idx_symbol (symbol)`.
+- `idx_chain (chain)`.
+- `idx_contract (contract_address)`.
+- `idx_status (status)`.
+- `idx_market_cap (market_cap_usd)`.
+- `idx_liquidity (liquidity_usd)`.
+- `idx_volume (volume_24h_usd)`.
+- unique `hash`.
+
+Camp BETA priority: must-have for New Token Scanner.
+
+## `crypto_token_security_checks`
+
+Purpose: stores security check results for token candidates.
+
+Columns:
+
+```sql
+id INT AUTO_INCREMENT PRIMARY KEY
+candidate_id INT NOT NULL
+source VARCHAR(100) NOT NULL
+honeypot_status ENUM('unknown', 'passed', 'failed')
+buy_tax DECIMAL(8,4)
+sell_tax DECIMAL(8,4)
+contract_verified BOOLEAN
+ownership_status VARCHAR(100)
+liquidity_locked BOOLEAN
+liquidity_lock_days INT
+top_wallet_pct DECIMAL(8,4)
+top_10_wallets_pct DECIMAL(8,4)
+risk_flags JSON
+raw_response JSON
+checked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+```
+
+Indexes:
+
+- `idx_candidate (candidate_id)`.
+- `idx_source (source)`.
+- `idx_checked (checked_at)`.
+
+Camp BETA priority: must-have for GoPlus/Honeypot checks.
+
+## `crypto_token_scorecards`
+
+Purpose: stores New Token Scanner scorecard outputs.
+
+Columns:
+
+```sql
+id INT AUTO_INCREMENT PRIMARY KEY
+candidate_id INT NOT NULL
+security_score TINYINT
+onchain_score TINYINT
+social_score TINYINT
+narrative_score TINYINT
+total_score TINYINT
+decision_label ENUM('REJECT', 'WATCHLIST', 'HIGH_CONVICTION_REVIEW', 'CRITICAL_RISK', 'NOT_ELIGIBLE_FOR_REVIEW') NOT NULL
+risk_level ENUM('low', 'medium', 'high', 'critical')
+confidence TINYINT
+checklist JSON
+ai_analysis JSON
+created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+```
+
+Indexes:
+
+- `idx_candidate (candidate_id)`.
+- `idx_total_score (total_score)`.
+- `idx_decision (decision_label)`.
+- `idx_risk (risk_level)`.
+
+Camp BETA priority: must-have.
+
+## `crypto_token_scan_runs`
+
+Purpose: tracks controlled scanner runs and their outcomes.
+
+Columns:
+
+```sql
+id INT AUTO_INCREMENT PRIMARY KEY
+source VARCHAR(100) NOT NULL
+filters JSON
+started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+finished_at TIMESTAMP NULL
+candidates_found INT DEFAULT 0
+candidates_rejected INT DEFAULT 0
+candidates_watchlist INT DEFAULT 0
+errors JSON
+```
+
+Indexes:
+
+- `idx_source (source)`.
+- `idx_started (started_at)`.
+
+Camp BETA priority: must-have for controlled scanner observability.
 
 ## `crypto_scam_alerts`
 

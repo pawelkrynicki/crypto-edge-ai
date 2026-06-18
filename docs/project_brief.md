@@ -17,6 +17,35 @@ It focuses on trader-facing decision support:
 
 Market intelligence data is the backing layer for this module, not a separate product direction.
 
+## Core Product Modes
+
+Crypto Edge AI includes two primary modes:
+
+- Research Review: manual user input for news, links, token descriptions, events, narratives, or observations.
+- New Token Scanner: real-data token discovery and filtering with scam/rug/security/liquidity/distribution/social checks.
+
+These modes share:
+
+- Score.
+- Risk.
+- Bias.
+- Confidence.
+- Checklist.
+- Decision labels.
+- Disclaimer.
+
+## Main V1/BETA Components
+
+- Research Review.
+- Discovery Radar / New Token Scanner.
+- Deal Breaker Engine.
+- Security Check.
+- Rug Pull Risk Engine.
+- On-Chain Distribution.
+- Social & Narrative Check.
+- Scorecard.
+- Final Checklist.
+
 ## Owner Decisions
 
 Current owner-side decisions:
@@ -71,6 +100,8 @@ For future AIKINTEL integration, align with:
 Camp v1 should provide a controlled Crypto Edge AI flow for real users:
 
 - Research dashboard.
+- Research Review.
+- New Token Scanner on limited real data.
 - Token/project context.
 - Scam/risk alerts.
 - Opportunities/narratives.

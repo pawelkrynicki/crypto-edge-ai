@@ -6,6 +6,11 @@ You are defining the research taxonomy for Crypto Edge AI.
 
 Create a taxonomy for:
 
+- Research Review.
+- New Token Scanner.
+- Risk Engine.
+- Setup Review.
+- Final Checklist.
 - Crypto projects.
 - Scam alerts.
 - Opportunities.
