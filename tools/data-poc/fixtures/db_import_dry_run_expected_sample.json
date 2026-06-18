@@ -1,0 +1,18 @@
+{
+  "source": "db-import-dry-run-poc",
+  "mode": "fixture",
+  "valid": true,
+  "import_ready": true,
+  "summary": {
+    "scan_runs": 1,
+    "candidates": 2,
+    "security_checks": 1,
+    "scorecards": 2
+  },
+  "target_tables": [
+    "crypto_token_scan_runs",
+    "crypto_token_candidates",
+    "crypto_token_security_checks",
+    "crypto_token_scorecards"
+  ]
+}

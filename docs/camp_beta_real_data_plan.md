@@ -163,6 +163,43 @@ npm run scanner:validate -- --output-dir tools/data-poc/output/<run_id>
 
 This remains a POC. It does not add MySQL, SQLite, Drizzle, migrations, production importers, auth, or UI. Its purpose is to prevent malformed storage-ready files from becoming bad future table rows.
 
+## Sixth Code POC: DB Import Dry Run
+
+The sixth code POC prepares a dry-run report for future database import, without connecting to a real database.
+
+It answers:
+
+- Which records would be imported.
+- Which future tables they would target.
+- How many records each table would receive.
+- Which logical keys would be used.
+- Whether the import is ready and idempotent.
+- Which warnings or blockers must be handled before real DB work.
+
+Future target tables:
+
+- `crypto_token_scan_runs`.
+- `crypto_token_candidates`.
+- `crypto_token_security_checks`.
+- `crypto_token_scorecards`.
+
+Logical keys:
+
+- `crypto_token_scan_runs`: `run_id`.
+- `crypto_token_candidates`: `candidate_id`.
+- `crypto_token_security_checks`: `run_id + candidate_id`.
+- `crypto_token_scorecards`: `run_id + candidate_id`.
+
+Commands:
+
+```bash
+npm run scanner:import:dry-run:fixture
+npm run scanner:import:dry-run -- --output-dir tools/data-poc/output/<run_id>
+npm run scanner:import:dry-run:live -- --query SOL --max-candidates 3
+```
+
+This is still not a database import. MySQL, Drizzle, migrations, and AIKINTEL integration remain separate future stages.
+
 ## Flow Details
 
 ## Step 1: DexScreener Discovery

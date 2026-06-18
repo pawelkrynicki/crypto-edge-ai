@@ -161,6 +161,32 @@ The validator checks:
 
 This is still not database persistence. It is a guardrail before later mapping into `crypto_token_scan_runs`, `crypto_token_candidates`, `crypto_token_security_checks`, and `crypto_token_scorecards`.
 
+## DB Import Dry Run
+
+The sixth POC builds a dry-run import report from validated storage-ready output:
+
+```bash
+npm run scanner:import:dry-run:fixture
+npm run scanner:import:dry-run -- --output-dir tools/data-poc/output/<run_id>
+npm run scanner:import:dry-run:live -- --query SOL --max-candidates 3
+```
+
+It does not connect to a database and does not write rows. It reports what would be imported later:
+
+- `crypto_token_scan_runs`: one scan run, logical key `run_id`.
+- `crypto_token_candidates`: candidate rows, logical key `candidate_id`.
+- `crypto_token_security_checks`: security rows, logical key `run_id + candidate_id`.
+- `crypto_token_scorecards`: scorecard rows, logical key `run_id + candidate_id`.
+
+Proposed idempotency strategy:
+
+- `scan_run skip_if_exists by run_id`.
+- `candidate upsert by candidate_id`.
+- `security_check skip duplicate run_id+candidate_id`.
+- `scorecard replace by run_id+candidate_id`.
+
+This is a dry-run proposal only. Real MySQL/Drizzle/AIKINTEL import work remains a separate future stage.
+
 ## Tests
 
 ```bash

@@ -16,6 +16,9 @@
     "scanner:persist:live": "tsc && node dist/src/runPersistableScannerPoc.js --mode live",
     "scanner:validate": "tsc && node dist/src/runStorageValidationPoc.js",
     "scanner:validate:fixture": "tsc && node dist/src/runStorageValidationPoc.js --mode fixture",
+    "scanner:import:dry-run": "tsc && node dist/src/runDbImportDryRunPoc.js",
+    "scanner:import:dry-run:fixture": "tsc && node dist/src/runDbImportDryRunPoc.js --mode fixture",
+    "scanner:import:dry-run:live": "tsc && node dist/src/runDbImportDryRunPoc.js --mode live",
     "test": "tsc && node --test dist/tests/*.js",
     "typecheck": "tsc --noEmit"
   },

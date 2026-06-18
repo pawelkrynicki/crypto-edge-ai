@@ -504,3 +504,32 @@ Validation covers:
 - Consistency between candidate final labels and scorecard decision/risk fields.
 
 This POC does not create tables or import rows. It is a pre-import quality gate so future DB work does not start from malformed output files.
+
+## Sixth Code POC: DB Import Dry Run
+
+The DB Import Dry Run POC proposes how validated scanner files would map to future database operations.
+
+Future table plan:
+
+- `crypto_token_scan_runs`: `upsert`, key `run_id`, conflict policy `skip_if_exists`.
+- `crypto_token_candidates`: `upsert`, key `candidate_id`, conflict policy `update_existing_for_same_candidate_id`.
+- `crypto_token_security_checks`: `insert`, key `run_id + candidate_id`, conflict policy `skip_duplicate_run_candidate`.
+- `crypto_token_scorecards`: `insert`, key `run_id + candidate_id`, conflict policy `replace_for_same_run_candidate`.
+
+Readiness checks:
+
+- Storage validation must pass.
+- A scan run must exist.
+- Candidate count must be greater than zero.
+- Scorecard count must equal candidate count.
+- Candidate IDs must be unique.
+- Security checks and scorecards must reference existing candidates.
+
+Idempotency strategy:
+
+- Re-running the same output should not duplicate the scan run.
+- Candidates can be upserted by stable `candidate_id`.
+- Security checks can skip duplicate `run_id + candidate_id`.
+- Scorecards can be replaced for the same `run_id + candidate_id`.
+
+This is still only a dry-run proposal. It does not create migrations, tables, DB clients, or production import code.

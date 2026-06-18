@@ -131,6 +131,15 @@ Fifth code POC:
 - Provide `npm run scanner:validate:fixture` and `npm run scanner:validate -- --output-dir tools/data-poc/output/<run_id>`.
 - No database import, migrations, auth, UI, or production cron.
 
+Sixth code POC:
+
+- `tools/data-poc`.
+- DB Import Dry Run flow.
+- Run storage validation first.
+- Report future target tables, record counts, logical keys, conflict policies, readiness, and idempotency.
+- Provide `npm run scanner:import:dry-run:fixture`, `npm run scanner:import:dry-run -- --output-dir tools/data-poc/output/<run_id>`, and optional live dry-run command.
+- No real database connection, MySQL, Drizzle, migrations, auth, UI, or production importer.
+
 ## Stage 5: Mock/Seed Crypto Edge AI Module
 
 Prepare safe mock data for Camp v1:

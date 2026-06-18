@@ -138,6 +138,28 @@ It still does not include:
 
 This stage protects future tables from inconsistent scanner output.
 
+## Sixth Code POC Boundary: DB Import Dry Run
+
+The sixth code POC creates a report showing how validated scanner output would map into future database tables.
+
+It includes:
+
+- Import readiness check.
+- Target table counts.
+- Logical key proposal.
+- Conflict policy proposal.
+- Idempotency report.
+- Blocking reasons and warnings.
+
+It still does not include:
+
+- Real database connection.
+- DB writes.
+- MySQL, SQLite, Drizzle, or migrations.
+- Production importer.
+
+Dry-run target tables are `crypto_token_scan_runs`, `crypto_token_candidates`, `crypto_token_security_checks`, and `crypto_token_scorecards`.
+
 ## Discovery Radar
 
 Starting source:
