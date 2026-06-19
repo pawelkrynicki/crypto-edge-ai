@@ -245,4 +245,15 @@ The `tools/ui-mock` frontend now includes a UI Data Adapter layer (`src/adapters
 - Local JSON / API bridge service (`scannerDataSource.ts`)
 - Static JSON fixture in `public/fixtures/` (drop-in for real `full_output.json`)
 - Data source selector in UI header
+
+## Thin Scanner API POC
+
+- Add a thin local scanner API bridge under `tools/ui-mock/server`.
+- `GET /api/health` returns local service health.
+- `GET /api/scanner/latest` returns `PersistableScannerOutput`.
+- Default port is `5177`; `SCANNER_API_PORT` can override it.
+- UI can target the API through `VITE_SCANNER_API_URL`.
+- Current source remains `tools/ui-mock/public/fixtures/persistableScannerSample.json`.
+- No DB, MySQL, Drizzle, auth, OpenAI, live token fetch, auto-trading, or buy/sell signal behavior.
+- Next step: read `tools/data-poc/output/<run_id>/full_output.json`.
 - Props-based data flow: App.tsx → StatCards, ScannerRadar, WatchlistTab, RiskAlerts

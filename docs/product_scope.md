@@ -179,3 +179,16 @@ The `tools/ui-mock` frontend now includes a UI Data Adapter layer (`src/adapters
 - **Adapter**: Maps persistable data into flat `UiTokenCandidate` objects.
 - **Fixture**: `persistableScannerSample.ts` provides mock data in the exact persistable shape.
 - **Status**: UI generates its state dynamically from the adapter. Ready to swap the fixture for a live `fetch()`.
+
+## Thin Scanner API POC
+
+The UI mock includes a thin local API bridge for `PersistableScannerOutput`.
+
+- Health endpoint: `GET /api/health`.
+- Latest scanner endpoint: `GET /api/scanner/latest`.
+- Default port: `5177`.
+- UI env var: `VITE_SCANNER_API_URL`.
+- Current data source: `tools/ui-mock/public/fixtures/persistableScannerSample.json`.
+- No DB, MySQL, Drizzle, auth, OpenAI, live token fetch, trading automation, or buy/sell signal wording.
+
+This exists only to close the local loop from scanner-shaped JSON to the dashboard. The next step is reading `tools/data-poc/output/<run_id>/full_output.json`.

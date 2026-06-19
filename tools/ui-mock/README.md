@@ -30,6 +30,28 @@ npm run dev     # Start local development server
 npm run build   # Build for production
 ```
 
+## Thin Scanner API POC
+
+The local API bridge closes the current loop from persisted scanner-shaped JSON into the UI mock without adding a production backend.
+
+- `GET /api/health` returns `{ "status": "ok", "service": "crypto-edge-ai-scanner-api" }`.
+- `GET /api/scanner/latest` returns `PersistableScannerOutput` JSON.
+- Default API port: `5177`.
+- Port override: `SCANNER_API_PORT`.
+- UI API base URL: `VITE_SCANNER_API_URL=http://localhost:5177`.
+- Current API data source: `public/fixtures/persistableScannerSample.json`.
+
+Commands:
+
+```bash
+pnpm run api
+pnpm run dev:with-api
+```
+
+This remains a thin local bridge only. It adds no database, MySQL, Drizzle, auth, OpenAI, live token fetching, trading automation, or buy/sell signal wording. `WATCHLIST` still means eligible for further review only.
+
+Next stage: read a real persisted scanner run from `tools/data-poc/output/<run_id>/full_output.json`.
+
 ## Next Steps
 - Connect this UI to the persistable JSON outputs from `tools/data-poc` or a real backend API.
 - Replace mock data with live combined scanner data.

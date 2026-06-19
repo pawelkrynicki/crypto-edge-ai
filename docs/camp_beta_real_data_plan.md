@@ -349,3 +349,18 @@ The `tools/ui-mock` frontend now includes a UI Data Adapter layer (`src/adapters
 - Header data source selector (Fixture / Static JSON / API / latest)
 - Fallback to fixture with yellow banner when source unavailable
 - All components now receive `candidates` via props (no global mock imports)
+
+## Thin Scanner API POC
+
+The UI mock now has a thin local API bridge for scanner output.
+
+- `GET /api/health` reports `crypto-edge-ai-scanner-api` health.
+- `GET /api/scanner/latest` returns `PersistableScannerOutput` JSON.
+- Default port: `5177`.
+- Port override: `SCANNER_API_PORT`.
+- UI env var: `VITE_SCANNER_API_URL=http://localhost:5177`.
+- Current data source remains fixture/static JSON: `tools/ui-mock/public/fixtures/persistableScannerSample.json`.
+
+This is not a production backend. It does not add DB, MySQL, Drizzle, auth, OpenAI, live token fetch, production cron, trading execution, or buy/sell signals.
+
+Next stage: connect the bridge to `tools/data-poc/output/<run_id>/full_output.json` when a real persisted run is available.

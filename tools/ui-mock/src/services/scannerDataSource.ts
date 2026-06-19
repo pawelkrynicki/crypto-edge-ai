@@ -88,10 +88,9 @@ export async function loadScannerDataSourceResult(
     }
 
     case "api": {
-      // Future placeholder: /api/scanner/latest will be provided by a backend.
-      // Until then, this always falls back to the fixture with a clear message.
       try {
-        const output = await fetchJson("/api/scanner/latest");
+        const apiBaseUrl = import.meta.env.VITE_SCANNER_API_URL?.replace(/\/$/, "") ?? "";
+        const output = await fetchJson(`${apiBaseUrl}/api/scanner/latest`);
         return { source: "api", usedFallback: false, output };
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
