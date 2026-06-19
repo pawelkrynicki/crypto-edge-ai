@@ -52,6 +52,16 @@ This remains a thin local bridge only. It adds no database, MySQL, Drizzle, auth
 
 Next stage: read a real persisted scanner run from `tools/data-poc/output/<run_id>/full_output.json`.
 
+## Real Scanner Output Bridge POC
+
+`GET /api/scanner/latest` now checks `tools/data-poc/output/<run_id>/full_output.json` before using the fixture. It selects the newest valid run by preferring `scan_run.finished_at`, then `scan_run.started_at`, then the `full_output.json` file mtime.
+
+If no valid real output is available, the endpoint falls back to `public/fixtures/persistableScannerSample.json`. The response includes `_source_meta` with the selected source, path, reason, selected run id, and load timestamp.
+
+Diagnostics are available at `GET /api/scanner/sources`. This endpoint reports whether the output directory exists, how many runs and `full_output.json` files were found, which file would be selected, fixture availability, and up to 10 recent runs with validation status.
+
+This remains read-only and local. It does not add a database, auth, OpenAI, live token fetching, scanner logic changes, UI redesign, or trading signal behavior. Next stage: automate writing a real `tools/data-poc` run and verify the UI against API mode.
+
 ## Next Steps
 - Connect this UI to the persistable JSON outputs from `tools/data-poc` or a real backend API.
 - Replace mock data with live combined scanner data.
