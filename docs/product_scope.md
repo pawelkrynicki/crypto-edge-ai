@@ -171,3 +171,11 @@ The initial frontend preview is located in `tools/ui-mock/`.
 - **UI Direction:** Aligned with AIKINTEL (dark, professional, command center style).
 - **Core Principle:** The UI explicitly reinforces that `WATCHLIST` is **not a buy signal**.
 - **Next Stage:** Connect this UI mock to the persistable JSON/API.
+
+## UI Data Adapter (Completed)
+
+The `tools/ui-mock` frontend now includes a UI Data Adapter layer (`src/adapters/scannerOutputAdapter.ts`).
+- **Types**: `PersistableScannerOutput` matches `full_output.json`.
+- **Adapter**: Maps persistable data into flat `UiTokenCandidate` objects.
+- **Fixture**: `persistableScannerSample.ts` provides mock data in the exact persistable shape.
+- **Status**: UI generates its state dynamically from the adapter. Ready to swap the fixture for a live `fetch()`.
