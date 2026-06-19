@@ -45,3 +45,60 @@ The UI currently operates without a backend or live API. However, it is structur
 - **Integration (`src/mockData.ts`)**: The UI uses the adapter to generate the `MockCandidate` array from the fixture. 
 
 **Next Step**: To connect real data, replace `PERSISTABLE_SCANNER_SAMPLE` in `mockData.ts` with a `fetch()` call to a local `full_output.json` file or a thin API endpoint.
+
+---
+
+## UI Data Bridge (Local JSON / API)
+
+### New files added
+
+| File | Purpose |
+|---|---|
+| `src/services/scannerDataSource.ts` | Bridge service — loads `PersistableScannerOutput` from one of three sources and returns `ScannerDataSourceResult` |
+| `src/fixtures/persistableScannerSample.json` | Static JSON version of the fixture — can be swapped for real `full_output.json` |
+| `public/fixtures/persistableScannerSample.json` | Same file served at `/fixtures/persistableScannerSample.json` for runtime `fetch` |
+
+### Data source selector
+
+The header now shows a **Fixture / Static JSON / API** segment control. Switching source:
+1. Calls `loadScannerDataSourceResult(source)` from `scannerDataSource.ts`
+2. Runs the result through the existing adapter (`mapPersistableScannerOutputToUiCandidates`)
+3. Updates `candidates` state in `App.tsx`
+4. All tabs (Scanner Radar, Watchlist, Risk Alerts) re-render with new data
+
+If a source is unavailable (e.g. API not yet implemented), the service falls back to the fixture and shows a yellow notice banner in the UI.
+
+### Connecting real data
+
+**Option A — Static JSON drop-in:**
+```bash
+cp path/to/real_full_output.json tools/ui-mock/public/fixtures/persistableScannerSample.json
+```
+Then select "Static JSON" in the UI. No code changes required.
+
+**Option B — API endpoint:**
+Implement `GET /api/scanner/latest` returning `PersistableScannerOutput` JSON.
+Select "API / latest" in the UI. The bridge will fetch it automatically.
+
+### Architecture
+
+```
+[Data Source Selector]
+        │
+        ▼
+scannerDataSource.ts
+  ├── "fixture"     → PERSISTABLE_SCANNER_SAMPLE (TS import, always available)
+  ├── "static-json" → fetch /fixtures/persistableScannerSample.json
+  └── "api"         → fetch /api/scanner/latest  (future)
+        │
+        ▼ PersistableScannerOutput
+scannerOutputAdapter.ts
+        │
+        ▼ UiTokenCandidate[]
+App.tsx (candidates state)
+        │
+        ├── StatCards (summary counts)
+        ├── ScannerRadar (table + detail panel)
+        ├── WatchlistTab (WATCHLIST filter)
+        └── RiskAlerts (CRITICAL_RISK + NEEDS_MANUAL_VERIFICATION filter)
+```

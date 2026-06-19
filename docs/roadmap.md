@@ -237,3 +237,12 @@ The `tools/ui-mock` frontend now includes a UI Data Adapter layer (`src/adapters
 - **Adapter**: Maps persistable data into flat `UiTokenCandidate` objects.
 - **Fixture**: `persistableScannerSample.ts` provides mock data in the exact persistable shape.
 - **Status**: UI generates its state dynamically from the adapter. Ready to swap the fixture for a live `fetch()`.
+
+---
+
+## UI Data Bridge — Completed (2026-06-19)
+
+- Local JSON / API bridge service (`scannerDataSource.ts`)
+- Static JSON fixture in `public/fixtures/` (drop-in for real `full_output.json`)
+- Data source selector in UI header
+- Props-based data flow: App.tsx → StatCards, ScannerRadar, WatchlistTab, RiskAlerts

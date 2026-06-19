@@ -1,5 +1,12 @@
 import React from "react";
-import { MOCK_SUMMARY } from "../mockData";
+
+export interface ScanSummary {
+  total_candidates:          number;
+  watchlist:                 number;
+  critical_risk:             number;
+  needs_manual_verification: number;
+  rejected:                  number;
+}
 
 interface StatCardProps {
   label: string;
@@ -20,39 +27,43 @@ const StatCard: React.FC<StatCardProps> = ({ label, value, valueColor, dotColor,
   </div>
 );
 
-export const StatCards: React.FC = () => {
+interface Props {
+  summary: ScanSummary;
+}
+
+export const StatCards: React.FC<Props> = ({ summary }) => {
   const stats: StatCardProps[] = [
     {
       label: "Total Candidates",
-      value: MOCK_SUMMARY.total_candidates,
+      value: summary.total_candidates,
       valueColor: "text-primary",
       dotColor: "bg-accent",
       sub: "in current scan",
     },
     {
       label: "Watchlist",
-      value: MOCK_SUMMARY.watchlist,
+      value: summary.watchlist,
       valueColor: "text-[#22c55e]",
       dotColor: "bg-[#22c55e]",
       sub: "eligible for further review",
     },
     {
       label: "Critical Risk",
-      value: MOCK_SUMMARY.critical_risk,
+      value: summary.critical_risk,
       valueColor: "text-[#ef4444]",
       dotColor: "bg-[#ef4444]",
       sub: "critical flag detected",
     },
     {
       label: "Needs Manual Check",
-      value: MOCK_SUMMARY.needs_manual_verification,
+      value: summary.needs_manual_verification,
       valueColor: "text-[#f59e0b]",
       dotColor: "bg-[#f59e0b]",
       sub: "missing or unclear data",
     },
     {
       label: "Rejected",
-      value: MOCK_SUMMARY.rejected,
+      value: summary.rejected,
       valueColor: "text-[#64748b]",
       dotColor: "bg-[#64748b]",
       sub: "failed basic filters",

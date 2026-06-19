@@ -1,6 +1,10 @@
 import React from "react";
-import { MOCK_CANDIDATES } from "../mockData";
+import type { MockCandidate } from "../mockData";
 import { LabelBadge } from "./LabelBadge";
+
+interface Props {
+  candidates: MockCandidate[];
+}
 
 const CHAIN_LABELS: Record<string, string> = {
   solana: "SOL",
@@ -9,9 +13,9 @@ const CHAIN_LABELS: Record<string, string> = {
   base: "BASE",
 };
 
-export const RiskAlerts: React.FC = () => {
-  const critical = MOCK_CANDIDATES.filter((c) => c.final_label === "CRITICAL_RISK");
-  const manual   = MOCK_CANDIDATES.filter((c) => c.final_label === "NEEDS_MANUAL_VERIFICATION");
+export const RiskAlerts: React.FC<Props> = ({ candidates }) => {
+  const critical = candidates.filter((c) => c.final_label === "CRITICAL_RISK");
+  const manual   = candidates.filter((c) => c.final_label === "NEEDS_MANUAL_VERIFICATION");
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -67,7 +71,7 @@ const Section: React.FC<{
 );
 
 interface AlertCardProps {
-  candidate: (typeof MOCK_CANDIDATES)[0];
+  candidate: MockCandidate;
   borderColor?: string;
   bgColor?: string;
 }

@@ -1,6 +1,10 @@
 import React from "react";
-import { MOCK_CANDIDATES } from "../mockData";
+import type { MockCandidate } from "../mockData";
 import { LabelBadge } from "./LabelBadge";
+
+interface Props {
+  candidates: MockCandidate[];
+}
 
 const CHAIN_LABELS: Record<string, string> = {
   solana: "SOL",
@@ -14,8 +18,8 @@ function fmtUsd(n: number): string {
   return `$${(n / 1_000).toFixed(0)}K`;
 }
 
-export const WatchlistTab: React.FC = () => {
-  const watchlist = MOCK_CANDIDATES.filter((c) => c.final_label === "WATCHLIST");
+export const WatchlistTab: React.FC<Props> = ({ candidates }) => {
+  const watchlist = candidates.filter((c) => c.final_label === "WATCHLIST");
 
   return (
     <div className="space-y-4 max-w-3xl">

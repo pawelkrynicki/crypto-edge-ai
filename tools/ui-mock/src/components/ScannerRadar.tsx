@@ -1,7 +1,11 @@
 import React, { useState } from "react";
-import { MOCK_CANDIDATES, type MockCandidate, type FinalLabel } from "../mockData";
+import type { MockCandidate, FinalLabel } from "../mockData";
 import { LabelBadge } from "./LabelBadge";
 import { CandidateDetail } from "./CandidateDetail";
+
+interface Props {
+  candidates: MockCandidate[];
+}
 
 const CHAIN_LABELS: Record<string, string> = {
   solana: "SOL",
@@ -65,13 +69,19 @@ const FilterCell: React.FC<{ status: string }> = ({ status }) => {
   );
 };
 
-export const ScannerRadar: React.FC = () => {
-  const [selected, setSelected] = useState<MockCandidate | null>(MOCK_CANDIDATES[0]);
+export const ScannerRadar: React.FC<Props> = ({ candidates }) => {
+  const [selected, setSelected] = useState<MockCandidate | null>(candidates[0] ?? null);
   const [filter, setFilter] = useState<FinalLabel | "ALL">("ALL");
 
+  // Keep selected in sync when candidates change (e.g. source switch)
+  React.useEffect(() => {
+    setSelected(candidates[0] ?? null);
+    setFilter("ALL");
+  }, [candidates]);
+
   const filtered = filter === "ALL"
-    ? MOCK_CANDIDATES
-    : MOCK_CANDIDATES.filter((c) => c.final_label === filter);
+    ? candidates
+    : candidates.filter((c) => c.final_label === filter);
 
   return (
     <div className="flex gap-4 h-full min-h-0">

@@ -1,10 +1,80 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { StatCards } from "./components/StatCards";
 import { ScannerRadar } from "./components/ScannerRadar";
 import { ResearchReview } from "./components/ResearchReview";
 import { WatchlistTab } from "./components/WatchlistTab";
 import { RiskAlerts } from "./components/RiskAlerts";
 import { Methodology } from "./components/Methodology";
+import {
+  loadScannerDataSourceResult,
+  type DataSourceKey,
+  type ScannerDataSourceResult,
+} from "./services/scannerDataSource";
+import { mapPersistableScannerOutputToUiCandidates } from "./adapters/scannerOutputAdapter";
+import type { MockCandidate } from "./mockData";
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function buildMockCandidates(result: ScannerDataSourceResult): MockCandidate[] {
+  const uiCandidates = mapPersistableScannerOutputToUiCandidates(result.output);
+  return uiCandidates.map((u): MockCandidate => ({
+    id:                      u.id,
+    symbol:                  u.symbol,
+    name:                    u.name,
+    chain:                   u.chain,
+    dex:                     u.dex,
+    contract_address:        u.contractAddress,
+    pair_address:             u.pairAddress,
+    source_url:              u.sourceUrl,
+    price_usd:               null,
+    market_cap_usd:          u.marketCap,
+    fdv_usd:                 null,
+    liquidity_usd:           u.liquidity,
+    volume_24h_usd:          u.volume24h,
+    volume_market_cap_ratio: u.volumeMarketCapRatio,
+    pair_age_days:           u.pairAgeDays,
+    basic_filter_status:     u.basicFilterStatus,
+    security_label:          u.securityLabel,
+    final_label:             u.finalLabel,
+    final_reasons: [
+      u.mainReason,
+      ...u.filterReasons,
+      ...u.criticalReasons,
+      ...u.warningReasons,
+    ].filter((r, i, arr) => r.length > 0 && arr.indexOf(r) === i),
+    security: u.security
+      ? {
+          honeypot_status:       u.security.honeypotStatus,
+          buy_tax:               u.security.buyTax,
+          sell_tax:              u.security.sellTax,
+          contract_verified:     u.security.contractVerified,
+          ownership_status:      u.security.ownershipStatus,
+          liquidity_locked:      u.security.liquidityLocked,
+          liquidity_lock_days:   u.security.liquidityLockDays,
+          mint_risk:             u.security.mintRisk,
+          blacklist_risk:        u.security.blacklistRisk,
+          sell_restriction_risk: u.security.sellRestrictionRisk,
+          top_wallet_pct:        u.security.topWalletPct,
+          top_10_wallets_pct:    u.security.top10WalletsPct,
+          risk_flags:            u.riskFlags,
+          missing_data:          u.missingData,
+        }
+      : null,
+    last_checked: u.lastCheckedAt,
+  }));
+}
+
+function buildSummary(candidates: MockCandidate[]) {
+  return {
+    total_candidates:          candidates.length,
+    watchlist:                 candidates.filter((c) => c.final_label === "WATCHLIST").length,
+    critical_risk:             candidates.filter((c) => c.final_label === "CRITICAL_RISK").length,
+    needs_manual_verification: candidates.filter((c) => c.final_label === "NEEDS_MANUAL_VERIFICATION").length,
+    rejected:                  candidates.filter((c) => c.final_label === "REJECT").length,
+  };
+}
+
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 type TabId = "scanner" | "research" | "watchlist" | "risks" | "methodology";
 
@@ -22,16 +92,69 @@ const TABS: Tab[] = [
   { id: "methodology", label: "Methodology",     icon: "≡" },
 ];
 
+const DATA_SOURCE_OPTIONS: { key: DataSourceKey; label: string }[] = [
+  { key: "fixture",     label: "Fixture" },
+  { key: "static-json", label: "Static JSON" },
+  { key: "api",         label: "API / latest" },
+];
+
+// ── App ───────────────────────────────────────────────────────────────────────
+
 export default function App() {
-  const [activeTab, setActiveTab] = useState<TabId>("scanner");
+  const [activeTab,   setActiveTab]   = useState<TabId>("scanner");
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
+  // Data source state
+  const [dataSource,   setDataSource]   = useState<DataSourceKey>("fixture");
+  const [candidates,   setCandidates]   = useState<MockCandidate[]>([]);
+  const [loading,      setLoading]      = useState(false);
+  const [fallbackMsg,  setFallbackMsg]  = useState<string | null>(null);
+
+  const summary = buildSummary(candidates);
+
+  // Load data whenever source changes
+  const loadData = useCallback(async (source: DataSourceKey) => {
+    setLoading(true);
+    setFallbackMsg(null);
+    try {
+      const result = await loadScannerDataSourceResult(source);
+      const built  = buildMockCandidates(result);
+      setCandidates(built);
+      if (result.usedFallback && result.fallbackReason) {
+        setFallbackMsg(result.fallbackReason);
+      }
+    } catch (err) {
+      // Should not happen — loadScannerDataSourceResult never rejects
+      const msg = err instanceof Error ? err.message : String(err);
+      setFallbackMsg(`Unexpected error: ${msg}`);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Initial load on mount
+  useEffect(() => {
+    loadData("fixture");
+  }, [loadData]);
+
+  const handleSourceChange = (source: DataSourceKey) => {
+    setDataSource(source);
+    loadData(source);
+  };
+
   const renderTab = () => {
+    if (loading) {
+      return (
+        <div className="flex items-center justify-center h-40">
+          <span className="text-secondary text-sm">Loading data…</span>
+        </div>
+      );
+    }
     switch (activeTab) {
-      case "scanner":     return <ScannerRadar />;
+      case "scanner":     return <ScannerRadar candidates={candidates} />;
       case "research":    return <ResearchReview />;
-      case "watchlist":   return <WatchlistTab />;
-      case "risks":       return <RiskAlerts />;
+      case "watchlist":   return <WatchlistTab candidates={candidates} />;
+      case "risks":       return <RiskAlerts candidates={candidates} />;
       case "methodology": return <Methodology />;
     }
   };
@@ -122,7 +245,34 @@ export default function App() {
               Research radar &amp; risk scanner for crypto traders
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3 flex-wrap justify-end">
+            {/* Data source selector */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] font-medium shrink-0" style={{ color: "var(--text-muted)" }}>
+                Data source:
+              </span>
+              <div className="flex items-center rounded overflow-hidden"
+                style={{ border: "1px solid var(--border)", background: "var(--bg-raised)" }}>
+                {DATA_SOURCE_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.key}
+                    onClick={() => handleSourceChange(opt.key)}
+                    className="text-[10px] px-2 py-1 transition-colors"
+                    style={{
+                      background: dataSource === opt.key ? "var(--accent-dim)" : "transparent",
+                      color: dataSource === opt.key ? "var(--accent)" : "var(--text-secondary)",
+                      borderRight: "1px solid var(--border)",
+                      fontWeight: dataSource === opt.key ? 600 : 400,
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              {loading && (
+                <span className="text-[10px] italic" style={{ color: "var(--text-muted)" }}>loading…</span>
+              )}
+            </div>
             <span className="badge badge-watchlist">Camp BETA</span>
             <span className="text-[10px] px-2 py-0.5 rounded"
               style={{
@@ -130,14 +280,25 @@ export default function App() {
                 border: "1px solid var(--border)",
                 color: "var(--text-muted)",
               }}>
-              UI Mock — mock data only
+              UI Mock
             </span>
           </div>
         </header>
 
+        {/* Fallback notice */}
+        {fallbackMsg && (
+          <div className="px-5 py-1.5 shrink-0 flex items-center gap-2"
+            style={{ background: "rgba(245,158,11,0.08)", borderBottom: "1px solid rgba(245,158,11,0.2)" }}>
+            <span className="text-[10px] font-semibold" style={{ color: "#f59e0b" }}>⚠</span>
+            <span className="text-[10px]" style={{ color: "#f59e0b" }}>
+              API not available, using fixture fallback. — {fallbackMsg}
+            </span>
+          </div>
+        )}
+
         {/* Stat cards strip */}
         <div className="px-5 pt-4 pb-3 shrink-0">
-          <StatCards />
+          <StatCards summary={summary} />
         </div>
 
         {/* Tab bar */}
