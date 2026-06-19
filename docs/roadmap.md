@@ -256,4 +256,14 @@ The `tools/ui-mock` frontend now includes a UI Data Adapter layer (`src/adapters
 - Current source remains `tools/ui-mock/public/fixtures/persistableScannerSample.json`.
 - No DB, MySQL, Drizzle, auth, OpenAI, live token fetch, auto-trading, or buy/sell signal behavior.
 - Next step: read `tools/data-poc/output/<run_id>/full_output.json`.
+
+## Real Scanner Output Bridge POC
+
+- Extend the thin scanner API to read the latest `tools/data-poc/output/<run_id>/full_output.json`.
+- Select latest output by `scan_run.finished_at`, then `scan_run.started_at`, then file mtime.
+- Fall back to `tools/ui-mock/public/fixtures/persistableScannerSample.json` when no valid real output exists.
+- Add `_source_meta` to show `real-output` versus `fixture-fallback`.
+- Add `GET /api/scanner/sources` diagnostics.
+- Keep the bridge read-only: no DB, auth, OpenAI, live token fetch, scanner logic changes, UI redesign, or trading signals.
+- Next step: automate creation of a real `tools/data-poc` output and validate UI API mode against it.
 - Props-based data flow: App.tsx → StatCards, ScannerRadar, WatchlistTab, RiskAlerts

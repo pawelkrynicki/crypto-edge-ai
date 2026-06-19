@@ -192,3 +192,15 @@ The UI mock includes a thin local API bridge for `PersistableScannerOutput`.
 - No DB, MySQL, Drizzle, auth, OpenAI, live token fetch, trading automation, or buy/sell signal wording.
 
 This exists only to close the local loop from scanner-shaped JSON to the dashboard. The next step is reading `tools/data-poc/output/<run_id>/full_output.json`.
+
+## Real Scanner Output Bridge POC
+
+The local API bridge can read the newest valid persisted scanner output from `tools/data-poc/output/<run_id>/full_output.json`.
+
+- `/api/scanner/latest` prefers real output and falls back to the fixture if none is valid.
+- Latest run selection uses `scan_run.finished_at`, then `scan_run.started_at`, then file mtime.
+- `_source_meta` documents the selected source and fallback reason.
+- `/api/scanner/sources` exposes lightweight source diagnostics without returning large scanner payloads.
+- The product boundary remains unchanged: no DB, auth, OpenAI, live token fetch, scanner logic changes, UI redesign, or buy/sell signals.
+
+Next stage: save a real scanner run from `tools/data-poc` and verify the dashboard through API mode.

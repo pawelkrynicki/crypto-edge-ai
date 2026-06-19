@@ -1,5 +1,10 @@
 import { createServer, type ServerResponse } from "node:http";
-import { INVALID_SCANNER_OUTPUT, readLatestScannerOutput, ScannerOutputError } from "./latestScannerOutput.js";
+import {
+  getScannerSourcesDiagnostics,
+  INVALID_SCANNER_OUTPUT,
+  readLatestScannerOutput,
+  ScannerOutputError,
+} from "./latestScannerOutput.js";
 
 const DEFAULT_PORT = 5177;
 const port = Number.parseInt(process.env.SCANNER_API_PORT ?? String(DEFAULT_PORT), 10);
@@ -42,6 +47,19 @@ const server = createServer(async (req, res) => {
       sendJson(res, 500, {
         error: "scanner_output_unavailable",
         message: "Scanner output file is unavailable",
+      });
+    }
+    return;
+  }
+
+  if (req.method === "GET" && req.url === "/api/scanner/sources") {
+    try {
+      const diagnostics = await getScannerSourcesDiagnostics();
+      sendJson(res, 200, diagnostics);
+    } catch {
+      sendJson(res, 500, {
+        error: "scanner_sources_unavailable",
+        message: "Scanner source diagnostics are unavailable",
       });
     }
     return;

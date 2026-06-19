@@ -364,3 +364,17 @@ The UI mock now has a thin local API bridge for scanner output.
 This is not a production backend. It does not add DB, MySQL, Drizzle, auth, OpenAI, live token fetch, production cron, trading execution, or buy/sell signals.
 
 Next stage: connect the bridge to `tools/data-poc/output/<run_id>/full_output.json` when a real persisted run is available.
+
+## Real Scanner Output Bridge POC
+
+The thin scanner API can now read the latest real persisted scanner output from `tools/data-poc/output/<run_id>/full_output.json`.
+
+- `/api/scanner/latest` selects the newest valid `full_output.json`.
+- Selection prefers `scan_run.finished_at`, then `scan_run.started_at`, then file mtime.
+- If no valid real output exists, it falls back to `tools/ui-mock/public/fixtures/persistableScannerSample.json`.
+- Responses include `_source_meta` describing whether data came from `real-output` or `fixture-fallback`.
+- `/api/scanner/sources` reports output directory status, run counts, detected full output files, selected latest file, fixture availability, and up to 10 recent run diagnostics.
+
+This remains a local read-only bridge. It does not add DB, MySQL, Drizzle, auth, OpenAI, live token fetch, scanner logic changes, production cron, or trading signals.
+
+Next stage: automate saving a real `tools/data-poc` run and validate the UI in API mode against that output.
