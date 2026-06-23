@@ -13,9 +13,14 @@ const CHAIN_LABELS: Record<string, string> = {
   base: "BASE",
 };
 
-function fmtUsd(n: number): string {
+function fmtUsd(n: number | null): string {
+  if (n === null) return "--";
   if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
   return `$${(n / 1_000).toFixed(0)}K`;
+}
+
+function fmtDays(n: number | null): string {
+  return n === null ? "--" : `${n}d`;
 }
 
 export const WatchlistTab: React.FC<Props> = ({ candidates }) => {
@@ -29,7 +34,7 @@ export const WatchlistTab: React.FC<Props> = ({ candidates }) => {
         <span className="text-accent text-sm mt-0.5 shrink-0">ℹ</span>
         <p className="text-xs text-secondary">
           <strong className="text-primary">Watchlist</strong> means the token is eligible for further research only. It is{" "}
-          <strong className="text-[#f59e0b]">not a recommendation</strong> and does not constitute a buy signal. Independent due diligence is required before any decision.
+          <strong className="text-[#f59e0b]">not a recommendation</strong> and does not constitute a trading signal. Independent due diligence is required before any decision.
         </p>
       </div>
 
@@ -58,7 +63,7 @@ export const WatchlistTab: React.FC<Props> = ({ candidates }) => {
                 { label: "Market Cap", value: fmtUsd(c.market_cap_usd) },
                 { label: "Liquidity", value: fmtUsd(c.liquidity_usd) },
                 { label: "24h Volume", value: fmtUsd(c.volume_24h_usd) },
-                { label: "Pair Age", value: `${c.pair_age_days}d` },
+                { label: "Pair Age", value: fmtDays(c.pair_age_days) },
               ].map((s) => (
                 <div key={s.label} className="rounded px-2.5 py-2"
                   style={{ background: "var(--bg-raised)", border: "1px solid var(--border)" }}>
@@ -90,7 +95,7 @@ export const WatchlistTab: React.FC<Props> = ({ candidates }) => {
             <div className="flex items-center justify-between text-[10px]"
               style={{ color: "var(--text-muted)" }}>
               <span>Last checked: {new Date(c.last_checked).toLocaleString()}</span>
-              <span className="italic text-[#f59e0b]/70">Further review only, not a buy signal.</span>
+              <span className="italic text-[#f59e0b]/70">Further review only, not a trading signal.</span>
             </div>
           </div>
         ))}

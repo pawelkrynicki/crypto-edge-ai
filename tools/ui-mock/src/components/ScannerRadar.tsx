@@ -132,7 +132,7 @@ export const ScannerRadar: React.FC<Props> = ({ candidates }) => {
                     <td className="text-primary">{fmtUsd(c.liquidity_usd)}</td>
                     <td className="text-primary">{fmtUsd(c.volume_24h_usd)}</td>
                     <td className="text-primary">{fmtPct(c.volume_market_cap_ratio)}</td>
-                    <td className="text-secondary">{c.pair_age_days}d</td>
+                    <td className="text-secondary">{c.pair_age_days === null ? "--" : `${c.pair_age_days}d`}</td>
                     <td><FilterCell status={c.basic_filter_status} /></td>
                     <td><SecurityCell label={c.security_label} /></td>
                     <td><LabelBadge label={c.final_label} /></td>

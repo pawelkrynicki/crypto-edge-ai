@@ -11,57 +11,13 @@ import {
   type ScannerDataSourceResult,
 } from "./services/scannerDataSource";
 import { mapPersistableScannerOutputToUiCandidates } from "./adapters/scannerOutputAdapter";
-import type { MockCandidate } from "./mockData";
+import { toMockCandidate, type MockCandidate } from "./mockData";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function buildMockCandidates(result: ScannerDataSourceResult): MockCandidate[] {
   const uiCandidates = mapPersistableScannerOutputToUiCandidates(result.output);
-  return uiCandidates.map((u): MockCandidate => ({
-    id:                      u.id,
-    symbol:                  u.symbol,
-    name:                    u.name,
-    chain:                   u.chain,
-    dex:                     u.dex,
-    contract_address:        u.contractAddress,
-    pair_address:             u.pairAddress,
-    source_url:              u.sourceUrl,
-    price_usd:               null,
-    market_cap_usd:          u.marketCap,
-    fdv_usd:                 null,
-    liquidity_usd:           u.liquidity,
-    volume_24h_usd:          u.volume24h,
-    volume_market_cap_ratio: u.volumeMarketCapRatio,
-    pair_age_days:           u.pairAgeDays,
-    basic_filter_status:     u.basicFilterStatus,
-    security_label:          u.securityLabel,
-    final_label:             u.finalLabel,
-    final_reasons: [
-      u.mainReason,
-      ...u.filterReasons,
-      ...u.criticalReasons,
-      ...u.warningReasons,
-    ].filter((r, i, arr) => r.length > 0 && arr.indexOf(r) === i),
-    security: u.security
-      ? {
-          honeypot_status:       u.security.honeypotStatus,
-          buy_tax:               u.security.buyTax,
-          sell_tax:              u.security.sellTax,
-          contract_verified:     u.security.contractVerified,
-          ownership_status:      u.security.ownershipStatus,
-          liquidity_locked:      u.security.liquidityLocked,
-          liquidity_lock_days:   u.security.liquidityLockDays,
-          mint_risk:             u.security.mintRisk,
-          blacklist_risk:        u.security.blacklistRisk,
-          sell_restriction_risk: u.security.sellRestrictionRisk,
-          top_wallet_pct:        u.security.topWalletPct,
-          top_10_wallets_pct:    u.security.top10WalletsPct,
-          risk_flags:            u.riskFlags,
-          missing_data:          u.missingData,
-        }
-      : null,
-    last_checked: u.lastCheckedAt,
-  }));
+  return uiCandidates.map(toMockCandidate);
 }
 
 function buildSummary(candidates: MockCandidate[]) {
@@ -330,7 +286,7 @@ export default function App() {
           <p className="text-[10px] italic" style={{ color: "var(--text-muted)" }}>
             Crypto Edge AI is a research and risk review tool. It does not provide financial advice, trading signals, or investment recommendations.
           </p>
-          <span className="badge badge-reject shrink-0">WATCHLIST ≠ buy signal</span>
+          <span className="badge badge-reject shrink-0">WATCHLIST is research only</span>
         </footer>
 
       </div>

@@ -1,67 +1,26 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// scannerOutputAdapter.ts
-// Maps PersistableScannerOutput → UiTokenCandidate[]
-//
-// Rules:
-//   - Each candidate produces one UiTokenCandidate.
-//   - security_check is matched by candidate_id.
-//   - scorecard is matched by candidate_id.
-//   - If no security_check exists, securityLabel = NOT_CHECKED, security = null.
-//   - finalLabel is taken directly from candidate.final_label.
-//   - mainReason: first 1–2 entries from final_reasons, or a label-based fallback.
-//   - lastCheckedAt priority: security_check.checked_at → scorecard.created_at → candidate.created_at.
-// ─────────────────────────────────────────────────────────────────────────────
-
 import type {
-  PersistableScannerOutput,
   PersistableCandidate,
-  PersistableSecurityCheck,
+  PersistableScannerOutput,
   PersistableScorecard,
+  PersistableSecurityCheck,
   UiTokenCandidate,
-  PersistableFinalLabel,
 } from "../types/scannerTypes";
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-const FINAL_LABEL_FALLBACK: Record<PersistableFinalLabel, string> = {
-  WATCHLIST:                 "Passed basic filters and available security checks.",
-  CRITICAL_RISK:             "Critical security flag detected.",
-  NEEDS_MANUAL_VERIFICATION: "Missing or unclear security data — manual verification required.",
-  REJECT:                    "Failed basic market or liquidity filters.",
+const FINAL_LABEL_FALLBACK: Record<string, string> = {
+  WATCHLIST: "Eligible for further review only.",
+  CRITICAL_RISK: "Critical security flag detected.",
+  NEEDS_MANUAL_VERIFICATION: "Missing or unclear security data; manual verification required.",
+  REJECT: "Failed basic market or liquidity filters.",
 };
 
 function buildMainReason(candidate: PersistableCandidate): string {
   const reasons = candidate.final_reasons ?? [];
-  if (reasons.length === 0) return FINAL_LABEL_FALLBACK[candidate.final_label];
-  return reasons.slice(0, 2).join(" · ");
+  if (reasons.length > 0) return reasons.slice(0, 2).join(" | ");
+  return FINAL_LABEL_FALLBACK[candidate.final_label] ?? candidate.final_label;
 }
 
-function splitReasons(candidate: PersistableCandidate, security: PersistableSecurityCheck | undefined) {
-  const all = candidate.final_reasons ?? [];
-  const riskFlags = security?.risk_flags ?? [];
-  const missing   = security?.missing_data ?? [];
-
-  // Heuristic split: reasons that mention "missing" / "unknown" → warning,
-  // reasons that mention critical keywords → critical, rest → filter.
-  const criticalKeywords = ["honeypot", "tax above", "mint risk", "blacklist", "sell restriction", "rug"];
-  const missingKeywords  = ["missing", "unknown", "not available", "partial"];
-
-  const filterReasons:   string[] = [];
-  const criticalReasons: string[] = [];
-  const warningReasons:  string[] = [];
-
-  for (const r of all) {
-    const lower = r.toLowerCase();
-    if (criticalKeywords.some((k) => lower.includes(k)) || riskFlags.length > 0) {
-      criticalReasons.push(r);
-    } else if (missingKeywords.some((k) => lower.includes(k)) || missing.length > 0) {
-      warningReasons.push(r);
-    } else {
-      filterReasons.push(r);
-    }
-  }
-
-  return { filterReasons, criticalReasons, warningReasons };
+function safeString(value: string | null, fallback = ""): string {
+  return value ?? fallback;
 }
 
 function resolveLastCheckedAt(
@@ -72,92 +31,96 @@ function resolveLastCheckedAt(
   return security?.checked_at ?? scorecard?.created_at ?? candidate.created_at;
 }
 
-// ── Main adapter function ────────────────────────────────────────────────────
+function mapSecurity(security: PersistableSecurityCheck): UiTokenCandidate["security"] {
+  return {
+    sources: security.sources,
+    honeypotStatus: security.honeypot_status,
+    buyTax: security.buy_tax,
+    sellTax: security.sell_tax,
+    contractVerified: security.contract_verified,
+    ownershipStatus: security.ownership_status,
+    liquidityLocked: security.liquidity_locked,
+    liquidityLockDays: security.liquidity_lock_days,
+    mintRisk: security.mint_risk,
+    blacklistRisk: security.blacklist_risk,
+    whitelistRisk: security.whitelist_risk,
+    sellRestrictionRisk: security.sell_restriction_risk,
+    proxyRisk: security.proxy_risk,
+    topWalletPct: security.top_wallet_pct,
+    top10WalletsPct: security.top_10_wallets_pct,
+    checkedAt: security.checked_at,
+  };
+}
+
+function mapScorecard(scorecard: PersistableScorecard): UiTokenCandidate["scorecard"] {
+  return {
+    securityScore: scorecard.security_score,
+    onchainScore: scorecard.onchain_score,
+    socialScore: scorecard.social_score,
+    narrativeScore: scorecard.narrative_score,
+    totalScore: scorecard.total_score,
+    decisionLabel: scorecard.decision_label,
+    riskLevel: scorecard.risk_level,
+    confidence: scorecard.confidence,
+    checklist: scorecard.checklist,
+    createdAt: scorecard.created_at,
+  };
+}
 
 export function mapPersistableScannerOutputToUiCandidates(
   output: PersistableScannerOutput,
 ): UiTokenCandidate[] {
-  // Build lookup maps for O(1) access
   const securityByCandidate = new Map<string, PersistableSecurityCheck>();
-  for (const sc of output.security_checks) {
-    securityByCandidate.set(sc.candidate_id, sc);
+  for (const security of output.security_checks) {
+    securityByCandidate.set(security.candidate_id, security);
   }
 
   const scorecardByCandidate = new Map<string, PersistableScorecard>();
-  for (const sc of output.scorecards) {
-    scorecardByCandidate.set(sc.candidate_id, sc);
+  for (const scorecard of output.scorecards) {
+    scorecardByCandidate.set(scorecard.candidate_id, scorecard);
   }
 
-  return output.candidates.map((c): UiTokenCandidate => {
-    const security  = securityByCandidate.get(c.id);
-    const scorecard = scorecardByCandidate.get(c.id);
-
-    const { filterReasons, criticalReasons, warningReasons } = splitReasons(c, security);
+  return output.candidates.map((candidate): UiTokenCandidate => {
+    const security = securityByCandidate.get(candidate.candidate_id);
+    const scorecard = scorecardByCandidate.get(candidate.candidate_id);
 
     return {
-      // Identity
-      id:              c.id,
-      symbol:          c.symbol,
-      name:            c.name,
-      chain:           c.chain,
-      dex:             c.dex,
-      contractAddress: c.contract_address,
-      pairAddress:     c.pair_address,
-      sourceUrl:       c.source_url,
+      id: candidate.candidate_id,
+      runId: candidate.run_id,
+      symbol: candidate.symbol,
+      name: safeString(candidate.name, candidate.symbol),
+      chain: candidate.chain,
+      dex: safeString(candidate.dex),
+      source: candidate.source,
+      contractAddress: safeString(candidate.contract_address),
+      pairAddress: safeString(candidate.pair_address),
+      sourceUrl: safeString(candidate.source_url),
 
-      // Market data
-      marketCap:              c.market_cap_usd,
-      liquidity:              c.liquidity_usd,
-      volume24h:              c.volume_24h_usd,
-      volumeMarketCapRatio:   c.volume_market_cap_ratio,
-      pairAgeDays:            c.pair_age_days,
+      priceUsd: candidate.price_usd,
+      marketCap: candidate.market_cap_usd,
+      fdvUsd: candidate.fdv_usd,
+      liquidity: candidate.liquidity_usd,
+      volume24h: candidate.volume_24h_usd,
+      volumeMarketCapRatio: candidate.volume_market_cap_ratio,
+      pairCreatedAt: candidate.pair_created_at,
+      pairAgeDays: candidate.pair_age_days,
 
-      // Labels
-      basicFilterStatus: c.basic_filter_status,
-      securityLabel:     security ? c.security_label : "NOT_CHECKED",
-      finalLabel:        c.final_label,
+      basicFilterStatus: candidate.basic_filter_status,
+      securityLabel: security ? security.security_label : "NOT_CHECKED",
+      finalLabel: candidate.final_label,
 
-      // Reasons
-      mainReason:     buildMainReason(c),
-      filterReasons,
-      criticalReasons,
-      warningReasons,
+      mainReason: buildMainReason(candidate),
+      filterReasons: candidate.filter_reasons ?? [],
+      criticalReasons: security?.critical_reasons ?? [],
+      warningReasons: security?.warning_reasons ?? [],
+      finalReasons: candidate.final_reasons ?? [],
 
-      // Security detail
       missingData: security?.missing_data ?? [],
-      riskFlags:   security?.risk_flags   ?? [],
-      security: security
-        ? {
-            honeypotStatus:       security.honeypot_status,
-            buyTax:               security.buy_tax,
-            sellTax:              security.sell_tax,
-            contractVerified:     security.contract_verified,
-            ownershipStatus:      security.ownership_status,
-            liquidityLocked:      security.liquidity_locked,
-            liquidityLockDays:    security.liquidity_lock_days,
-            mintRisk:             security.mint_risk,
-            blacklistRisk:        security.blacklist_risk,
-            sellRestrictionRisk:  security.sell_restriction_risk,
-            topWalletPct:         security.top_wallet_pct,
-            top10WalletsPct:      security.top_10_wallets_pct,
-          }
-        : null,
+      riskFlags: security?.risk_flags ?? [],
+      security: security ? mapSecurity(security) : null,
 
-      // Scorecard
-      scorecard: scorecard
-        ? {
-            totalScore:     scorecard.total_score,
-            filterScore:    scorecard.filter_score,
-            securityScore:  scorecard.security_score,
-            volumeScore:    scorecard.volume_score,
-            liquidityScore: scorecard.liquidity_score,
-            ageScore:       scorecard.age_score,
-            notes:          scorecard.notes,
-          }
-        : null,
-
-      // Timestamp
-      lastCheckedAt: resolveLastCheckedAt(c, security, scorecard),
+      scorecard: scorecard ? mapScorecard(scorecard) : null,
+      lastCheckedAt: resolveLastCheckedAt(candidate, security, scorecard),
     };
   });
 }
