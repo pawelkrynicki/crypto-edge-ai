@@ -5,13 +5,45 @@ import { searchDexScreenerPairs } from "../src/dexscreenerClient.js";
 import { getSourcePolicyDecision, getActiveSourceEnvironment, isSourcePolicyError } from "../src/sourcePolicy.js";
 import { loadSourceRegistry, resolveRepoFile, validateDefaultSourceRegistry } from "../src/sourceRegistryValidator.js";
 
+const EXPECTED_SOURCE_IDS = [
+  "dexscreener",
+  "goplus_security",
+  "honeypot_is",
+  "coingecko_api",
+  "geckoterminal_api",
+  "defillama_api",
+  "alternative_me_fng",
+  "etherscan_api",
+  "bscscan_api",
+  "solscan_api",
+  "bubblemaps_api",
+  "aikintel_market_news",
+  "cryptocompare_ccdata",
+  "dune_api",
+  "coinmarketcap_api",
+  "tokensniffer_api",
+  "defi_scanner",
+  "dextools_api",
+  "arkham_api",
+  "lunarcrush_api",
+  "token_unlocks_tokenomist"
+] as const;
+
+const STALE_PROVISIONAL_SOURCE_IDS = [
+  ["crypto", "compare_api"].join(""),
+  ["dune", "public", "dashboards"].join("_"),
+  ["gdelt", "api"].join("_"),
+  ["token", "unlocks"].join("_")
+];
+const SOURCE_ENVIRONMENTS = ["FIXTURE_ONLY", "LOCAL_POC", "INTERNAL_BETA", "PUBLIC_BETA", "COMMERCIAL"] as const;
+
 describe("source registry validation", () => {
   it("validates the registry JSON", () => {
     const result = validateDefaultSourceRegistry();
 
     assert.equal(result.valid, true);
     assert.deepEqual(result.errors, []);
-    assert.ok(result.source_count > 0);
+    assert.equal(result.source_count, 21);
   });
 
   it("keeps source_ids unique", () => {
@@ -19,6 +51,44 @@ describe("source registry validation", () => {
     const sourceIds = registry.sources.map((source) => source.source_id);
 
     assert.equal(new Set(sourceIds).size, sourceIds.length);
+  });
+
+  it("matches the authoritative source_id set", () => {
+    const registry = loadSourceRegistry();
+    const sourceIds = registry.sources.map((source) => source.source_id).sort();
+
+    assert.deepEqual(sourceIds, [...EXPECTED_SOURCE_IDS].sort());
+  });
+
+  it("keeps Priority A and Priority B counts from the authoritative registry", () => {
+    const registry = loadSourceRegistry();
+    const priorityCounts = registry.sources.reduce<Record<string, number>>((counts, source) => {
+      const priority = typeof source.priority === "string" ? source.priority : "missing";
+      counts[priority] = (counts[priority] ?? 0) + 1;
+      return counts;
+    }, {});
+
+    assert.equal(priorityCounts.A, 12);
+    assert.equal(priorityCounts.B, 9);
+  });
+
+  it("keeps the exact Camp BETA ready and blocked/pending reference lists", () => {
+    const registry = loadSourceRegistry();
+    const sourceIds = new Set(registry.sources.map((source) => source.source_id));
+    const references = [...registry.sources_ready_for_camp_beta, ...registry.sources_blocked_or_pending];
+
+    assert.deepEqual([...registry.sources_ready_for_camp_beta].sort(), ["alternative_me_fng", "defillama_api"]);
+    assert.equal(registry.sources_blocked_or_pending.length, 19);
+    assert.equal(references.every((sourceId) => sourceIds.has(sourceId)), true);
+  });
+
+  it("does not contain stale provisional source IDs", () => {
+    const registry = loadSourceRegistry();
+    const sourceIds = new Set(registry.sources.map((source) => source.source_id));
+
+    for (const staleSourceId of STALE_PROVISIONAL_SOURCE_IDS) {
+      assert.equal(sourceIds.has(staleSourceId), false, `${staleSourceId} must not remain in the registry`);
+    }
   });
 });
 
@@ -116,7 +186,7 @@ describe("source runtime policy", () => {
   });
 
   it("blocks bscscan_api in every environment", () => {
-    for (const environment of ["FIXTURE_ONLY", "LOCAL_POC", "INTERNAL_BETA", "PUBLIC_BETA", "COMMERCIAL"]) {
+    for (const environment of SOURCE_ENVIRONMENTS) {
       const decision = getSourcePolicyDecision({
         sourceId: "bscscan_api",
         environment,
@@ -141,7 +211,7 @@ describe("source runtime policy", () => {
     const sourceIds = ["alternative_me_fng", "defillama_api", "dexscreener", "goplus_security", "honeypot_is"];
 
     for (const sourceId of sourceIds) {
-      for (const environment of ["FIXTURE_ONLY", "LOCAL_POC", "INTERNAL_BETA", "PUBLIC_BETA", "COMMERCIAL"]) {
+      for (const environment of SOURCE_ENVIRONMENTS) {
         const decision = getSourcePolicyDecision({
           sourceId,
           environment,

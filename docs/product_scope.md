@@ -135,6 +135,10 @@ Crypto Edge AI is API-first. Every automated source must pass the registry and r
 
 - Registry: `docs/compliance/data_source_registry_v1.json`.
 - Runtime policy: `config/data_source_runtime_policy.json`.
+- Sources reviewed: 21.
+- Priority A: 12.
+- Priority B: 9.
+- Sources currently cleared for Camp BETA: 2.
 - Safe default: `FIXTURE_ONLY`.
 - Active environment variable: `CRYPTO_EDGE_DATA_ENV`.
 - Environments: `FIXTURE_ONLY`, `LOCAL_POC`, `INTERNAL_BETA`, `PUBLIC_BETA`, `COMMERCIAL`.
@@ -149,6 +153,7 @@ $env:CRYPTO_EDGE_DATA_ENV = "LOCAL_POC"
 Current source boundary:
 
 - Alternative.me Fear & Greed and DefiLlama are the only sources currently cleared by the registry for Camp BETA.
+- The runtime policy is intentionally stricter than the research registry; registry presence does not grant runtime permission.
 - DexScreener, GoPlus Security, and Honeypot.is are not approved for PUBLIC_BETA and must remain LOCAL_POC only.
 - Raw API response storage is disabled in v1.
 - No API failure may fall back to scraping.

@@ -29,6 +29,8 @@ Forbidden collection patterns:
 - Rate-limit bypasses.
 - Fallback from a failed API to scraping.
 
-The registry at `docs/compliance/data_source_registry_v1.json` is a research and compliance record. Runtime authorization must use the explicit operational policy at `config/data_source_runtime_policy.json`; narrative registry fields must not be the only authorization logic.
+The registry at `docs/compliance/data_source_registry_v1.json` is a research and compliance record. It currently records 21 reviewed sources: 12 Priority A sources and 9 Priority B sources. Only 2 sources are currently cleared for Camp BETA.
+
+Runtime authorization must use the explicit operational policy at `config/data_source_runtime_policy.json`; narrative registry fields must not be the only authorization logic. The runtime policy is intentionally stricter than the research registry. Unknown or unconfigured sources fail closed.
 
 `WATCHLIST` means eligible for further review. It is not a buy signal, sell signal, or investment advice.

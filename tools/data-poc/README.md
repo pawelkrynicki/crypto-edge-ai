@@ -30,6 +30,12 @@ Registry and policy files:
 - Product policy: `docs/compliance/data_source_policy.md`.
 - Runtime policy: `config/data_source_runtime_policy.json`.
 
+The authoritative registry reviewed 21 sources:
+
+- Priority A: 12.
+- Priority B: 9.
+- Camp BETA cleared sources: 2.
+
 Runtime environments:
 
 - `FIXTURE_ONLY`.
@@ -74,7 +80,8 @@ Current PUBLIC_BETA source boundary:
 
 - Alternative.me Fear & Greed and DefiLlama are the only registry-cleared sources for Camp BETA.
 - DexScreener, GoPlus Security, and Honeypot.is remain LOCAL_POC only and are not approved for PUBLIC_BETA.
-- AIKINTEL Market News, BscScan, Etherscan, and all unlisted sources are disabled until an explicit future policy update.
+- The runtime policy is intentionally stricter than the research registry.
+- AIKINTEL Market News, BscScan, Etherscan, and any source absent from the runtime policy are disabled until an explicit future policy update.
 - Unknown `source_id` values fail closed.
 - Raw API response storage is disabled for all v1 automated sources.
 - No API failure may fall back to scraping, HTML parsing, browser automation, undocumented endpoints, or invented data.

@@ -1,7 +1,719 @@
 {
-  "registry_version": "1.0.0",
+  "registry_version": "1.0",
   "reviewed_at": "2026-06-23",
-  "record_note": "The original registry.json attachment was not available in the workspace attachment cache. This v1 record mirrors the explicit source conclusions provided in the task text and is treated as the compliance registry for runtime enforcement.",
+  "sources": [
+    {
+      "source_id": "dexscreener",
+      "provider": "DEX Screener, Inc.",
+      "category": "DEX pair/token market data",
+      "priority": "A",
+      "access_status": "APPROVED_API",
+      "usage_scope": "COMMERCIAL_PENDING",
+      "confidence": "HIGH",
+      "official_docs_url": "https://docs.dexscreener.com/api/reference",
+      "official_terms_url": "https://docs.dexscreener.com/api/api-terms-and-conditions",
+      "official_pricing_url": "https://docs.dexscreener.com (checkout stage, tiers not separately published)",
+      "authentication": "None for current free endpoints (no API key in documented examples)",
+      "api_key_required": false,
+      "rate_limits": "60 requests/min per documented endpoint (token-profiles, metas); third-party sources report 300 req/min for /latest/dex/search, NOT CONFIRMED from primary source for that specific endpoint",
+      "commercial_use": "Permitted - ToS Section 4 states API may be used for non-commercial AND commercial purposes, subject to Agreement limits",
+      "public_beta_use": "Permitted under same commercial terms; no separate beta carve-out found",
+      "caching_rules": "NOT CONFIRMED - ToS does not address caching duration explicitly",
+      "storage_rules": "NOT CONFIRMED - no explicit storage-duration clause in ToS",
+      "redistribution_rules": "Prohibited - ToS Section 2 (Resell Restrictions): no selling, marketing, licensing, or making API Services/data available to third parties",
+      "derived_data_rules": "Not explicitly addressed; Section 1 (Scope of Use) prohibits building a product whose primary purpose competes with DexScreener or its API",
+      "attribution_requirements": "NOT CONFIRMED - no attribution clause found in ToS",
+      "approved_endpoints": ["/latest/dex/search", "/token-profiles/latest/v1", "/tokens/v1/{chainId}/{tokenAddresses}", "/token-pairs/v1/{chainId}/{tokenAddress}"],
+      "current_code_files": ["tools/data-poc/src/dexscreenerClient.ts"],
+      "current_endpoint": "https://api.dexscreener.com/latest/dex/search?q=<query>",
+      "implementation_changes_required": [
+        "Confirm exact rate limit for /latest/dex/search directly with DexScreener support before scaling request volume; documented limits cover other endpoints at 60/min",
+        "Do not expose raw API JSON responses directly to end users; pass only normalized/derived fields, since redistribution of 'any portion' of API Services to third parties is prohibited",
+        "Avoid building any feature whose primary purpose is a competing DEX-data product",
+        "Re-confirm terms before any paid tier signup, since checkout-stage terms may add conditions"
+      ],
+      "open_questions": [
+        "Does 'making API Services available to third parties' extend to showing derived scores to end users of a SaaS, or only to reselling raw access? NOT CONFIRMED",
+        "What exact rate limit applies to the currently used endpoint?"
+      ],
+      "notes": "ToS explicitly allows commercial use but the no-redistribution and no-competing-product clauses are broadly worded and apply to 'any portion' of the data; legal review recommended before COMMERCIAL_ALLOWED is assigned for a paid public product."
+    },
+    {
+      "source_id": "goplus_security",
+      "provider": "Tops Labs Ltd (GoPlus Security)",
+      "category": "Token/contract security risk detection",
+      "priority": "A",
+      "access_status": "PENDING_TERMS_REVIEW",
+      "usage_scope": "COMMERCIAL_PENDING",
+      "confidence": "MEDIUM",
+      "official_docs_url": "https://docs.gopluslabs.io/reference/api-overview",
+      "official_terms_url": "https://docs.gopluslabs.io/reference/api-license-agreement-new",
+      "official_pricing_url": "NOT CONFIRMED - no public self-serve pricing page found; Pro/Ultra/Enterprise tiers referenced but pricing not published",
+      "authentication": "API key/access token system exists for higher tiers; base Token Security API is described as free/open and permissionless",
+      "api_key_required": false,
+      "rate_limits": "NOT CONFIRMED exact numeric limit; default batch throughput up to 100 addresses per query (paid tiers only), full-corpus dumping not supported",
+      "commercial_use": "NOT CONFIRMED explicitly either way in the License Agreement excerpt obtained; Agreement requires display of GoPlus logo / 'Powered by GoPlus' attribution, implying commercial integration is anticipated but not unconditionally cleared",
+      "public_beta_use": "NOT CONFIRMED",
+      "caching_rules": "NOT CONFIRMED",
+      "storage_rules": "NOT CONFIRMED",
+      "redistribution_rules": "Automated bypass of rate limits via scripts/bots/crawlers/proxies is explicitly prohibited",
+      "derived_data_rules": "Agreement states GoPlus 'will only provide API results' and does not suggest modification to API results, and disclaims responsibility for front-end/back-end modifications made by the integrator - implies derived/modified display is the integrator's own responsibility, not a GoPlus-sanctioned activity",
+      "attribution_requirements": "Required - integrator 'shall display' the GoPlus logo with 'Powered by GoPlus' wording; failure can result in termination and potential legal action per the Agreement text",
+      "branding_requirements": "Mandatory GoPlus logo + 'Powered by GoPlus' display",
+      "approved_endpoints": ["/api/v1/token_security/{chain_id}"],
+      "current_code_files": ["tools/data-poc/src/goplusClient.ts"],
+      "current_endpoint": "https://api.gopluslabs.io/api/v1/token_security/{chain_id}?contract_addresses=<address>",
+      "implementation_changes_required": [
+        "Add mandatory 'Powered by GoPlus' logo/attribution wherever GoPlus-derived data is shown to end users",
+        "Obtain written confirmation from GoPlus on commercial-use terms and any tier requirements before public/commercial launch",
+        "Confirm whether current no-key usage is the free/permissionless tier or requires upgrade for the planned call volume",
+        "Do not bypass rate limits via scripted bulk requests"
+      ],
+      "open_questions": [
+        "Is the current no-key endpoint usage within GoPlus's intended free-tier scope, or does production/commercial use require a paid tier? NOT CONFIRMED",
+        "Does the Agreement's silence on 'commercial use' mean it is permitted by default, or does it require a separate enterprise agreement? NOT CONFIRMED - the License Agreement text obtained did not include an explicit commercial-use clause"
+      ],
+      "notes": "Full API License Agreement text could not be completely retrieved (dynamic page); analysis is based on a substantial verified excerpt including governing law, attribution mandate, and anti-bypass clause. Recommend retrieving the complete document directly before finalizing classification."
+    },
+    {
+      "source_id": "honeypot_is",
+      "provider": "honeypot.is",
+      "category": "Token honeypot/scam contract detection",
+      "priority": "A",
+      "access_status": "PENDING_TERMS_REVIEW",
+      "usage_scope": "POC_ONLY",
+      "confidence": "HIGH",
+      "official_docs_url": "https://docs.honeypot.is/ishoneypot",
+      "official_terms_url": "https://docs.honeypot.is/terms",
+      "official_pricing_url": "NOT CONFIRMED - no published pricing page found; API key system described as 'not yet implemented'",
+      "authentication": "None currently required - official docs state API key system not yet implemented",
+      "api_key_required": false,
+      "rate_limits": "NOT CONFIRMED - no documented rate limit found",
+      "commercial_use": "NOT CONFIRMED explicitly; ToS contains a broad 'Third-Party Restriction' prohibiting making any portion of the API or its functionalities available to third parties, which is in tension with any user-facing commercial product",
+      "public_beta_use": "NOT CONFIRMED - same tension as above applies to any user-facing exposure",
+      "caching_rules": "NOT CONFIRMED",
+      "storage_rules": "NOT CONFIRMED",
+      "redistribution_rules": "Resale, leasing, or sublicensing of the API or its components is expressly prohibited (Resale Prohibition clause)",
+      "derived_data_rules": "NOT CONFIRMED - ToS does not separately address derived/normalized scores distinct from raw API access",
+      "attribution_requirements": "NOT CONFIRMED",
+      "branding_requirements": "NOT CONFIRMED",
+      "approved_endpoints": ["/v2/IsHoneypot"],
+      "current_code_files": ["tools/data-poc/src/honeypotClient.ts"],
+      "current_endpoint": "https://api.honeypot.is/v2/IsHoneypot?address=<address>&chainID=<chainId>",
+      "implementation_changes_required": [
+        "Seek explicit written permission from honeypot.is for the intended automated, multi-user product use case before any public or commercial launch",
+        "Treat as fixture/manual-research only until the Third-Party Restriction clause is clarified by the provider",
+        "Monitor t.me/honeypotis_news as referenced in official docs for API key/terms changes"
+      ],
+      "open_questions": [
+        "Does showing a derived risk flag (e.g. 'high risk - possible honeypot') to end users of Crypto Edge AI constitute making the API's 'functionality' available to a third party under the Third-Party Restriction clause? NOT CONFIRMED - this is the single largest open compliance question for this source",
+        "Will an API key requirement be introduced, and will it change terms?"
+      ],
+      "notes": "This is the most legally ambiguous source in the registry. The literal text of the Third-Party Restriction clause is broad enough to be read as prohibiting any multi-user product (since every user of such a product would be receiving the API's functionality indirectly). A conservative compliance posture treats this as POC_ONLY / internal-research-only pending direct clarification from honeypot.is."
+    },
+    {
+      "source_id": "coingecko_api",
+      "provider": "Gecko Labs Pte. Ltd. (CoinGecko)",
+      "category": "Market data (price, market cap, exchange, onchain)",
+      "priority": "A",
+      "access_status": "APPROVED_API",
+      "usage_scope": "COMMERCIAL_ALLOWED",
+      "confidence": "HIGH",
+      "official_docs_url": "https://www.coingecko.com/api/documentation",
+      "official_terms_url": "https://www.coingecko.com/en/api_terms",
+      "official_pricing_url": "https://www.coingecko.com/en/api/pricing",
+      "authentication": "API key (header or query param) required for Demo and paid plans",
+      "api_key_required": true,
+      "rate_limits": "Demo plan: 100 calls/min, 10,000 calls/month (free); Pro plans add higher limits starting ~$35/mo",
+      "commercial_use": "Permitted on Analyst, Lite, and Pro plans, with mandatory attribution; Demo (free) plan is for prototyping and is NOT itself a commercial license per CoinGecko's own FAQ distinction between Demo and commercial plans",
+      "public_beta_use": "Permitted under a paid plan with attribution; NOT CONFIRMED whether the free Demo key alone is sufficient for a public-facing (even beta) product, since commercial-use language is tied to paid plans",
+      "caching_rules": "NOT CONFIRMED precise duration limits; general commercial terms permit incorporation into a product",
+      "storage_rules": "NOT CONFIRMED beyond general redistribution restriction",
+      "redistribution_rules": "Reselling, renting, leasing, sub-licensing, redistributing, or syndicating access to the API or any part is prohibited unless under a separate Executed Agreement",
+      "derived_data_rules": "Using/integrating the API into a paid product is allowed; advertising around the product is allowed",
+      "attribution_requirements": "Required on Analyst/Lite/Pro commercial plans: visible 'Data provided by CoinGecko' message with hyperlink to coingecko.com/en/api",
+      "branding_requirements": "Attribution text + hyperlink as specified above; no use of CoinGecko branding beyond that without consent",
+      "approved_endpoints": ["/coins/markets", "/simple/price", "/onchain/* (GeckoTerminal data)"],
+      "current_code_files": [],
+      "current_endpoint": "Not yet implemented in current codebase",
+      "implementation_changes_required": [
+        "Obtain a CoinGecko API key (Demo at minimum, paid plan for any public/commercial deployment)",
+        "Add the required 'Data provided by CoinGecko' attribution with hyperlink wherever CoinGecko-sourced data appears to end users, once on a commercial plan",
+        "Confirm with CoinGecko support whether Demo-tier data may be shown to real users in a Camp BETA before launch, since the FAQ distinguishes Demo from commercial licensing"
+      ],
+      "open_questions": [
+        "Is the free Demo plan sufficient for a public (non-paying) BETA audience, or does any real-user exposure require the paid commercial license? NOT FULLY CONFIRMED from the pricing FAQ alone"
+      ],
+      "notes": "GeckoTerminal onchain DEX data is provided through the same CoinGecko API account/terms per official documentation, so it is tracked under this same entry rather than as a separate source."
+    },
+    {
+      "source_id": "geckoterminal_api",
+      "provider": "Gecko Labs Pte. Ltd. (CoinGecko / GeckoTerminal)",
+      "category": "Onchain DEX pair/pool data",
+      "priority": "A",
+      "access_status": "APPROVED_API",
+      "usage_scope": "COMMERCIAL_ALLOWED",
+      "confidence": "MEDIUM",
+      "official_docs_url": "https://www.coingecko.com/api/documentation",
+      "official_terms_url": "https://www.coingecko.com/en/api_terms",
+      "official_pricing_url": "https://www.coingecko.com/en/api/pricing",
+      "authentication": "Same CoinGecko API key system; GeckoTerminal onchain endpoints are served under the CoinGecko API umbrella",
+      "api_key_required": true,
+      "rate_limits": "Same tiering as main CoinGecko API (Demo 100/min, 10k/month free)",
+      "commercial_use": "Same CoinGecko API Terms of Service apply since GeckoTerminal data is delivered via the same API product",
+      "public_beta_use": "Same conditions as CoinGecko API entry above",
+      "caching_rules": "NOT CONFIRMED beyond general CoinGecko terms",
+      "storage_rules": "NOT CONFIRMED beyond general CoinGecko terms",
+      "redistribution_rules": "Same as CoinGecko API - no resale/redistribution without Executed Agreement",
+      "derived_data_rules": "Same as CoinGecko API",
+      "attribution_requirements": "Same attribution clause as CoinGecko API applies; NOT CONFIRMED whether a distinct 'Powered by GeckoTerminal' mark is separately required",
+      "branding_requirements": "NOT CONFIRMED for a GeckoTerminal-specific mark distinct from CoinGecko's",
+      "approved_endpoints": ["/onchain/networks/{network}/pools/{address}", "/onchain/networks/{network}/tokens/{address}"],
+      "current_code_files": [],
+      "current_endpoint": "Not yet implemented in current codebase",
+      "implementation_changes_required": [
+        "Treat as part of the same CoinGecko API key/account and licensing decision rather than a separate procurement",
+        "Confirm whether a GeckoTerminal-specific attribution mark is required in addition to the general CoinGecko one"
+      ],
+      "open_questions": [
+        "Is there a GeckoTerminal-specific attribution requirement distinct from the general CoinGecko one? NOT CONFIRMED"
+      ],
+      "notes": "Functionally and contractually unified with the main CoinGecko API; classification mirrors that entry."
+    },
+    {
+      "source_id": "defillama_api",
+      "provider": "DefiLlama Limited",
+      "category": "DeFi TVL, protocol, stablecoin, and price data",
+      "priority": "A",
+      "access_status": "APPROVED_PUBLIC_FEED",
+      "usage_scope": "COMMERCIAL_ALLOWED",
+      "confidence": "HIGH",
+      "official_docs_url": "https://api-docs.defillama.com/",
+      "official_terms_url": "https://defillama.com/terms",
+      "official_pricing_url": "https://defillama.com/subscription",
+      "authentication": "None required for free/open endpoints; API key only required for Pro tier ($250-$300/mo) for higher rate limits and premium endpoints",
+      "api_key_required": false,
+      "rate_limits": "No documented rate limit for normal traffic on the free/open API per official FAQ; Pro tier adds 1,000 req/min, 1M calls/month",
+      "commercial_use": "Not explicitly restricted for the free/open API in the FAQ or Terms excerpt obtained; Terms of Use impose broad liability and breach provisions (including liquidated damages up to $100,000 per violation of Clause 8, content not fully retrieved) - full Clause 8 text should be reviewed before high-volume commercial use",
+      "public_beta_use": "Appears permitted based on free/open API description; NOT FULLY CONFIRMED against the complete Terms of Use text (only partial text retrieved)",
+      "caching_rules": "NOT CONFIRMED",
+      "storage_rules": "NOT CONFIRMED",
+      "redistribution_rules": "NOT CONFIRMED from the retrieved Terms excerpt; official FAQ only requests (does not require) attribution",
+      "derived_data_rules": "NOT CONFIRMED",
+      "attribution_requirements": "Requested but not mandatory - official FAQ states 'Citing DefiLlama as the source is much appreciated' (not phrased as a requirement)",
+      "approved_endpoints": ["/protocols", "/tvl/{protocol}", "/stablecoins", "/prices/current/{coins}"],
+      "current_code_files": [],
+      "current_endpoint": "Not yet implemented in current codebase",
+      "implementation_changes_required": [
+        "Add a DefiLlama attribution line as a best practice even though not strictly mandatory",
+        "Retrieve and review the full Clause 8 text of the Terms of Use (liquidated-damages clause) before scaling request volume, since only a partial excerpt was available",
+        "Monitor for rate-limit throttling and consider Pro tier if production call volume is high"
+      ],
+      "open_questions": [
+        "What exactly does Clause 8 of the Terms of Use prohibit, given it carries liquidated damages up to $100,000 per violation? NOT FULLY CONFIRMED - full clause text was not retrievable"
+      ],
+      "notes": "One of the most permissive sources researched; free, keyless, and not rate-limited for normal use per the provider's own FAQ. The unresolved Clause 8 text is the only reason this is not rated APPROVED_API with full COMMERCIAL_ALLOWED confidence at HIGH+ certainty."
+    },
+    {
+      "source_id": "alternative_me_fng",
+      "provider": "Alternative.me",
+      "category": "Crypto Fear & Greed sentiment index",
+      "priority": "A",
+      "access_status": "APPROVED_PUBLIC_FEED",
+      "usage_scope": "COMMERCIAL_ALLOWED",
+      "confidence": "HIGH",
+      "official_docs_url": "https://alternative.me/crypto/fear-and-greed-index/#api",
+      "official_terms_url": "https://alternative.me/crypto/api/",
+      "official_pricing_url": "Free - no pricing page; explicitly stated as free with no plans to change",
+      "authentication": "None required",
+      "api_key_required": false,
+      "rate_limits": "NOT CONFIRMED numerically; no documented rate limit found",
+      "commercial_use": "Explicitly permitted - official documentation states the API and its data may be used 'in any way you like, this includes commercial projects of any kind'",
+      "public_beta_use": "Explicitly permitted under the same blanket free-use statement",
+      "caching_rules": "Not restricted; no caching limitation found",
+      "storage_rules": "Not restricted; no storage limitation found",
+      "redistribution_rules": "None found - no redistribution restriction in official terms",
+      "derived_data_rules": "None found",
+      "attribution_requirements": "Appreciated, not required - official terms state attribution is 'by no means' obligatory",
+      "approved_endpoints": ["/fng/"],
+      "current_code_files": [],
+      "current_endpoint": "https://api.alternative.me/fng/",
+      "implementation_changes_required": [
+        "No changes required for compliance; optional courtesy attribution recommended"
+      ],
+      "open_questions": [],
+      "notes": "Cleanest and most permissive source in the entire registry. Official terms unambiguously permit commercial use with no API key, no rate limit documentation, and only voluntary attribution."
+    },
+    {
+      "source_id": "etherscan_api",
+      "provider": "Etherscan.io",
+      "category": "Ethereum (and unified EVM multichain) block explorer data",
+      "priority": "A",
+      "access_status": "PENDING_TERMS_REVIEW",
+      "usage_scope": "COMMERCIAL_PENDING",
+      "confidence": "HIGH",
+      "official_docs_url": "https://docs.etherscan.io/introduction",
+      "official_terms_url": "https://etherscan.io/apiterms",
+      "official_pricing_url": "https://etherscan.io/apis",
+      "authentication": "API key (single key now covers 60+ EVM chains via API V2, chainid parameter)",
+      "api_key_required": true,
+      "rate_limits": "Free tier: documented separately per plan on etherscan.io/apis (not itemized in excerpt obtained); Pro tiers offer up to 20 calls/sec and 500,000 calls/day per a third-party source - NOT CONFIRMED as the exact current free-tier figure",
+      "commercial_use": "Restricted - official API Terms of Service state API Content may be viewed/cached/copied strictly for PERSONAL use, NOT commercial use, and that Content may not be used as a basis for financial or commercial gain without Etherscan's express prior written consent",
+      "public_beta_use": "Not confirmed as permitted - same personal-use-only restriction applies regardless of beta/production framing",
+      "caching_rules": "Permitted to 'cache' content but only within the personal-use restriction; commercial caching is not separately cleared",
+      "storage_rules": "Permitted to 'download and make copies' within personal-use restriction only",
+      "redistribution_rules": "May not reproduce, transmit, broadcast, publish, modify, display, distribute, sell, license, rent, lease, or create derivative forms of API Content without Etherscan's prior consent",
+      "derived_data_rules": "Same prohibition applies to derivative forms of API Content, per the ToS text",
+      "attribution_requirements": "Source attribution via link-back or 'Powered by Etherscan.io APIs' is required EXCEPT for personal/private usage (implying attribution is the minimum bar even where commercial use might otherwise be contemplated)",
+      "branding_requirements": "'Powered by Etherscan.io APIs' mention or link-back",
+      "approved_endpoints": ["api.etherscan.io/v2/api (single multichain endpoint with chainid parameter)"],
+      "current_code_files": [],
+      "current_endpoint": "Not yet implemented in current codebase",
+      "implementation_changes_required": [
+        "Do NOT deploy any Etherscan-sourced data in a commercial or revenue-generating context (including a paid course/educational product, B2B service, or monetized app) without first obtaining Etherscan's express prior written consent",
+        "If proceeding, contact Etherscan via the documented contact channel to request explicit commercial permission before integration",
+        "If used at all pre-permission, restrict to internal/personal research only, with no end-user-facing display",
+        "If/when permission is granted, add 'Powered by Etherscan.io APIs' attribution"
+      ],
+      "open_questions": [
+        "Does ALLinTraders' planned use (educational content / trading analysis product) qualify for an exception, or does it require the same prior written consent as any other commercial use? NOT CONFIRMED - requires direct inquiry to Etherscan"
+      ],
+      "notes": "This is one of the strictest sources in the registry. The 'strictly for personal use only but not for commercial use' language is unambiguous on its face and represents the highest-priority legal blocker for any source in this audit if Crypto Edge AI is or becomes a commercial product."
+    },
+    {
+      "source_id": "bscscan_api",
+      "provider": "Etherscan.io (BscScan deprecated as standalone product)",
+      "category": "BNB Smart Chain block explorer data",
+      "priority": "A",
+      "access_status": "BLOCKED_NO_PERMISSION",
+      "usage_scope": "NOT_ALLOWED",
+      "confidence": "HIGH",
+      "official_docs_url": "https://docs.etherscan.io/introduction",
+      "official_terms_url": "https://etherscan.io/apiterms",
+      "official_pricing_url": "https://etherscan.io/apis",
+      "authentication": "BscScan's standalone API and API keys were deprecated; access is now exclusively through Etherscan API V2 with a chainid parameter for BNB Smart Chain",
+      "api_key_required": true,
+      "rate_limits": "Same as Etherscan API V2 entry",
+      "commercial_use": "Same personal-use-only restriction as Etherscan API applies, since BscScan is now the same legal entity/product",
+      "public_beta_use": "Same restriction as Etherscan API",
+      "caching_rules": "Same as Etherscan API",
+      "storage_rules": "Same as Etherscan API",
+      "redistribution_rules": "Same as Etherscan API",
+      "derived_data_rules": "Same as Etherscan API",
+      "attribution_requirements": "Same as Etherscan API",
+      "approved_endpoints": ["api.etherscan.io/v2/api?chainid=56 (BNB Smart Chain via Etherscan V2)"],
+      "current_code_files": [],
+      "current_endpoint": "Not in current codebase; legacy api.bscscan.com endpoints are deprecated",
+      "implementation_changes_required": [
+        "Do not implement or reference legacy api.bscscan.com endpoints; these are deprecated as of the V1 retirement deadline",
+        "Any BSC explorer data must be sourced via Etherscan API V2 with chainid=56, subject to the same commercial-use restriction described under the etherscan_api entry"
+      ],
+      "open_questions": [],
+      "notes": "BscScan is listed separately in the Priority A research list, but it is no longer a distinct API product. As of the official Etherscan API V2 migration, BscScan API keys and endpoints have been deprecated/unified into Etherscan's single multichain API and the same Terms of Service. This entry is intentionally classified BLOCKED_NO_PERMISSION as a standalone source to prevent the implementation from building against a deprecated endpoint; the live successor is tracked under etherscan_api."
+    },
+    {
+      "source_id": "solscan_api",
+      "provider": "Solscan",
+      "category": "Solana block explorer data",
+      "priority": "A",
+      "access_status": "PENDING_TERMS_REVIEW",
+      "usage_scope": "COMMERCIAL_PENDING",
+      "confidence": "MEDIUM",
+      "official_docs_url": "https://docs.solscan.io/",
+      "official_terms_url": "https://docs.solscan.io/solscan-api/solscan-api-terms-and-services",
+      "official_pricing_url": "https://solscan.io/apis",
+      "authentication": "Pro API key required; no documented free/keyless public tier was found for programmatic access",
+      "api_key_required": true,
+      "rate_limits": "Tiered by paid plan: Level 2 150M CU/month at 1,000 req/min ($199/mo) up to Level 4 1.5B CU/month at 3,000 req/min ($1,099/mo)",
+      "commercial_use": "Ambiguous - the Pro API Terms prohibit using API Content to create a competing service, manipulating content for third-party resale, and selling/renting/leasing access for commercial purposes, but do not categorically ban all commercial integration; a product that uses (rather than resells) the data for its own end users is not explicitly cleared or barred in the excerpt obtained",
+      "public_beta_use": "NOT CONFIRMED - same ambiguity as commercial_use",
+      "caching_rules": "NOT CONFIRMED",
+      "storage_rules": "Must destroy API Documentation/Content/Data upon termination of access per the Terms excerpt",
+      "redistribution_rules": "Prohibited - 'Manipulate any API Content...for resale to a third party' and 'sell, trade, rent, loan, lease, license or provide our API Content or access to our service for commercial purposes' are both explicit prohibitions",
+      "derived_data_rules": "Prohibited from copying, modifying, or recreating data/content/software obtained through the API ('API Content') per the Terms excerpt",
+      "attribution_requirements": "NOT CONFIRMED",
+      "approved_endpoints": ["Pro API v2.0 endpoints (Account, Token, NFT, Transaction, Block, Market categories)"],
+      "current_code_files": [],
+      "current_endpoint": "Not yet implemented in current codebase",
+      "implementation_changes_required": [
+        "A paid Pro API key is required before any integration is possible; there is no free/keyless tier",
+        "Obtain explicit written clarification from Solscan on whether using (not reselling) their data inside a commercial educational/trading product is permitted under the 'commercial purposes' prohibition, since the clause is ambiguous between resale-of-access and general commercial use",
+        "Do not copy/recreate/redistribute raw API Content; only use normalized, integrated outputs"
+      ],
+      "open_questions": [
+        "Does the prohibition on providing 'access to our service for commercial purposes' apply only to reselling Solscan access itself, or to any commercial product that consumes Solscan data? NOT CONFIRMED - this is the central open legal question for this source"
+      ],
+      "notes": "Functionally similar restriction pattern to Etherscan and Honeypot.is (no-resale, no-competing-product, no-redistribution clauses are common across blockchain explorer/security APIs). No free tier exists, so cost is a gating factor in addition to legal ambiguity."
+    },
+    {
+      "source_id": "bubblemaps_api",
+      "provider": "Bubblemaps",
+      "category": "Wallet cluster / holder distribution visualization data",
+      "priority": "A",
+      "access_status": "PENDING_TERMS_REVIEW",
+      "usage_scope": "COMMERCIAL_PENDING",
+      "confidence": "MEDIUM",
+      "official_docs_url": "https://docs.bubblemaps.io/data/api/authentication",
+      "official_terms_url": "NOT CONFIRMED - no standalone API Terms of Service page was located distinct from the general developer documentation",
+      "official_pricing_url": "https://bubblemaps.io/work-with-us/ (sign-up/credit-based; exact pricing not published)",
+      "authentication": "API key required, passed via X-ApiKey header; credit-based usage system",
+      "api_key_required": true,
+      "rate_limits": "10,000 calls/minute rate limit applied at the IP level, in addition to a per-call credit system",
+      "commercial_use": "NOT CONFIRMED - no explicit commercial-use clause was located; access is gated through a 'Work with Us' B2B request process, suggesting use cases are reviewed/negotiated rather than governed by a self-serve public ToS",
+      "public_beta_use": "NOT CONFIRMED",
+      "caching_rules": "NOT CONFIRMED",
+      "storage_rules": "NOT CONFIRMED",
+      "redistribution_rules": "NOT CONFIRMED",
+      "derived_data_rules": "NOT CONFIRMED",
+      "attribution_requirements": "NOT CONFIRMED",
+      "approved_endpoints": ["Holders, Transfers, Clusters, Decentralization Score, Wallet Labels endpoints (B2B API)"],
+      "current_code_files": [],
+      "current_endpoint": "Not yet implemented in current codebase",
+      "implementation_changes_required": [
+        "Initiate contact via Bubblemaps' official B2B/Work-with-Us channel to obtain an API key and request the actual governing terms of service in writing before any integration",
+        "Do not proceed on the assumption that sign-up alone constitutes unrestricted commercial permission until terms are confirmed"
+      ],
+      "open_questions": [
+        "What are the actual contractual terms governing commercial use, redistribution, and derived-data display? NOT CONFIRMED - the publicly accessible documentation describes authentication mechanics but not a complete legal ToS"
+      ],
+      "notes": "Distinct from the legacy free iframe/'map-availability' integration (api-legacy.bubblemaps.io), which is a different, more limited product for embedding the visual map only. The B2B REST API (docs.bubblemaps.io/data/api) is the relevant one for Crypto Edge AI's data-licensing needs and requires direct registration."
+    },
+    {
+      "source_id": "aikintel_market_news",
+      "provider": "Internal / private (AIKINTEL)",
+      "category": "Internal market news feed",
+      "priority": "A",
+      "access_status": "MANUAL_ONLY",
+      "usage_scope": "NOT_ALLOWED",
+      "confidence": "HIGH",
+      "official_docs_url": "NOT APPLICABLE - internal/private source, not a public API",
+      "official_terms_url": "NOT APPLICABLE",
+      "official_pricing_url": "NOT APPLICABLE",
+      "authentication": "NOT CONFIRMED - access mechanism unknown without internal documentation",
+      "api_key_required": true,
+      "rate_limits": "NOT CONFIRMED",
+      "commercial_use": "Requires explicit owner permission and schema access per the task brief; not an externally licensable public source",
+      "public_beta_use": "Not permitted without owner sign-off",
+      "caching_rules": "NOT CONFIRMED - to be defined by the data owner",
+      "storage_rules": "NOT CONFIRMED - to be defined by the data owner",
+      "redistribution_rules": "To be defined by the data owner; default assumption is no redistribution outside the owning organization without written approval",
+      "derived_data_rules": "To be defined by the data owner",
+      "attribution_requirements": "NOT CONFIRMED",
+      "approved_endpoints": [],
+      "current_code_files": [],
+      "current_endpoint": "Not applicable - no public endpoint exists to research",
+      "implementation_changes_required": [
+        "Do not integrate AIKINTEL Market News into any automated pipeline until the data owner has explicitly granted permission and provided a documented schema/access method",
+        "Treat any future access as an internal data-sharing agreement, not a third-party API integration, and document it separately from this public-API compliance matrix"
+      ],
+      "open_questions": [
+        "Who is the data owner and what is the formal process for requesting access and schema documentation? Outside the scope of public-source research"
+      ],
+      "notes": "This is explicitly flagged in the task brief as requiring owner permission and is not a public API; no external research can substitute for that internal authorization step. Included in the registry as a placeholder pending internal sign-off."
+    },
+    {
+      "source_id": "cryptocompare_ccdata",
+      "provider": "CCData (CryptoCompare, now part of CoinDesk Indices)",
+      "category": "Market and pricing data",
+      "priority": "B",
+      "access_status": "PENDING_TERMS_REVIEW",
+      "usage_scope": "COMMERCIAL_PENDING",
+      "confidence": "MEDIUM",
+      "official_docs_url": "https://developers.cryptocompare.com/",
+      "official_terms_url": "https://www.cryptocompare.com/api-licence-agreement",
+      "official_pricing_url": "https://min-api.cryptocompare.com/pricing",
+      "authentication": "API key required for all tiers including free",
+      "api_key_required": true,
+      "rate_limits": "Free key: personal/non-commercial use or commercial trial; numeric limits NOT CONFIRMED from primary source in this pass",
+      "commercial_use": "Restricted on free tier - official Licence Agreement states even internal-use data must NOT be used in connection with any commercial product/service or 'Index'/'Financial Product' without a paid commercial licence ($80-$200+/month per third-party reporting, NOT CONFIRMED as current pricing)",
+      "public_beta_use": "Not permitted on the free key per the same restriction; would require a commercial subscription",
+      "caching_rules": "Internal use only ('you must not share it with anyone else') unless a commercial plan states otherwise",
+      "storage_rules": "Internal use only under free tier; commercial tiers permit broader caching/storage per CCData's commercial product description",
+      "redistribution_rules": "Commercial redistribution rights are only included in paid commercial tiers, not the free key",
+      "derived_data_rules": "NOT CONFIRMED in detail; 'Special Terms' for certain data sets may impose additional restrictions per the Agreement",
+      "attribution_requirements": "Required on free-tier use - 'if you're using our API with a free account, you'll have to reference us in your application' per official guide",
+      "approved_endpoints": ["NOT CONFIRMED - full endpoint list requires developer portal review"],
+      "current_code_files": [],
+      "current_endpoint": "Not yet implemented in current codebase",
+      "implementation_changes_required": [
+        "Do not use the free CCData/CryptoCompare key for any commercial or public-facing deployment; a paid commercial licence is required",
+        "If adopted, add required attribution per the free-tier branding guide",
+        "Confirm current pricing directly with CCData/CoinDesk Indices, since the brand has migrated under CoinDesk and pricing pages may have changed"
+      ],
+      "open_questions": [
+        "What is current commercial pricing now that the product operates under the CoinDesk/CCData brand rather than the original CryptoCompare branding? NOT CONFIRMED"
+      ],
+      "notes": "Priority B - qualification only. The provider has undergone a corporate/brand transition (CryptoCompare -> CCData -> CoinDesk Indices); legacy URLs may redirect or change without notice."
+    },
+    {
+      "source_id": "dune_api",
+      "provider": "Dune Analytics AS",
+      "category": "Onchain SQL analytics / blockchain query platform",
+      "priority": "B",
+      "access_status": "APPROVED_API",
+      "usage_scope": "COMMERCIAL_PENDING",
+      "confidence": "MEDIUM",
+      "official_docs_url": "https://docs.dune.com/api-reference/overview/billing",
+      "official_terms_url": "https://dune.com/terms",
+      "official_pricing_url": "https://dune.com/pricing",
+      "authentication": "API key required, issued after subscribing to a plan (including the free plan)",
+      "api_key_required": true,
+      "rate_limits": "Free plan includes 2,500 credits and API access by default; credit consumption scales with query complexity and data exported",
+      "commercial_use": "NOT CONFIRMED as categorically restricted in the General Terms excerpt obtained; no explicit personal-use-only clause was found (unlike Etherscan/Solscan), but full Addenda text was not completely reviewed",
+      "public_beta_use": "NOT CONFIRMED in full; API Keys must be kept confidential and not sold/sublicensed to third parties",
+      "caching_rules": "NOT CONFIRMED",
+      "storage_rules": "NOT CONFIRMED",
+      "redistribution_rules": "User must not sell, transfer, sublicense, or disclose API Keys to third parties; broader data-redistribution terms NOT CONFIRMED",
+      "derived_data_rules": "User-created public content/queries may be used, forked, and copied by other Dune users per the platform's open/composable design - relevant only if Crypto Edge AI publishes dashboards on Dune itself, not for private API consumption",
+      "attribution_requirements": "NOT CONFIRMED",
+      "approved_endpoints": ["Query execution and results API; Sim API for wallet balances/transactions"],
+      "current_code_files": [],
+      "current_endpoint": "Not yet implemented in current codebase",
+      "implementation_changes_required": [
+        "Review the full SQL API Service Addendum and Sim API terms (only partially retrieved) before integrating",
+        "Keep API keys confidential and do not share across organizations per the explicit confidentiality clause"
+      ],
+      "open_questions": [
+        "Is there an explicit commercial-use restriction in the Addenda not captured in the General Terms excerpt? NOT CONFIRMED"
+      ],
+      "notes": "Priority B - qualification only. Credit-based billing model; free tier appears usable for prototyping but full legal review of all Addenda is recommended before production use."
+    },
+    {
+      "source_id": "coinmarketcap_api",
+      "provider": "CoinMarketCap (CMC)",
+      "category": "Market data (price, market cap, listings, DEX)",
+      "priority": "B",
+      "access_status": "APPROVED_API",
+      "usage_scope": "COMMERCIAL_PENDING",
+      "confidence": "HIGH",
+      "official_docs_url": "https://coinmarketcap.com/api/documentation/",
+      "official_terms_url": "https://pro.coinmarketcap.com/user-agreement-commercial/",
+      "official_pricing_url": "https://coinmarketcap.com/api/pricing/",
+      "authentication": "API key required for Basic (free) tier and all paid tiers; a separate rate-limited Keyless Public API exists for a curated endpoint subset",
+      "api_key_required": true,
+      "rate_limits": "Basic (free): 15,000 call credits/month, 50 requests/min, personal use only; commercial use begins at Startup tier ($79/mo) and above",
+      "commercial_use": "Restricted on Basic (free) tier to personal use only per the general Terms of Use ('strictly for your personal, non-commercial use unless you enter into a separate agreement... for your commercial use'); commercial use is explicitly approved starting at the Startup paid tier under the separate Commercial Terms of Use",
+      "public_beta_use": "Permitted once on a commercial-approved paid tier (Startup or above); not on the free Basic tier if end users beyond the developer will see the data",
+      "caching_rules": "Caching for performance/operation of the application is implied as acceptable; redistribution as a standalone data service is not",
+      "storage_rules": "Local caching to support the application is permitted; building a public data-redistribution mirror is not",
+      "redistribution_rules": "Not allowed to redistribute or resell data as a standalone service (e.g. via your own API) or as part of a data-distribution product; data must be an integrated component of a larger product for end users' personal use",
+      "derived_data_rules": "NOT CONFIRMED in full detail beyond the redistribution restriction above",
+      "attribution_requirements": "Required - visible credit such as 'Data provided by CoinMarketCap' (linked) wherever CMC data is displayed",
+      "branding_requirements": "Follow CMC branding guidelines if using logos; link-only attribution acceptable when in doubt",
+      "approved_endpoints": ["/cryptocurrency/quotes/latest", "/cryptocurrency/listings/latest", "/fear-and-greed/latest"],
+      "current_code_files": [],
+      "current_endpoint": "Not yet implemented in current codebase",
+      "implementation_changes_required": [
+        "Use at minimum the Startup paid tier ($79/mo) if data will be shown to end users of a commercial product, since the free Basic tier is restricted to personal use",
+        "Add mandatory 'Data provided by CoinMarketCap' attribution with hyperlink",
+        "Do not expose data via a separate public API or as a standalone redistribution product"
+      ],
+      "open_questions": [],
+      "notes": "Priority B - qualification only, but terms are unusually well-documented and unambiguous compared to several Priority A sources."
+    },
+    {
+      "source_id": "tokensniffer_api",
+      "provider": "Solidus Labs (TokenSniffer)",
+      "category": "Token scam/contract risk scoring",
+      "priority": "B",
+      "access_status": "PENDING_TERMS_REVIEW",
+      "usage_scope": "COMMERCIAL_PENDING",
+      "confidence": "MEDIUM",
+      "official_docs_url": "https://tokensniffer.readme.io/reference/introduction",
+      "official_terms_url": "https://tokensniffer.com/docs/terms",
+      "official_pricing_url": "NOT CONFIRMED current price from primary source - third-party documentation cites $99/month, 500 requests/day historically; official site references Pro/Enterprise plans without published self-serve pricing",
+      "authentication": "API key required (apikey parameter); Pro/Enterprise plan needed for full token endpoint",
+      "api_key_required": true,
+      "rate_limits": "NOT CONFIRMED current numeric limit from the official source in this pass",
+      "commercial_use": "NOT CONFIRMED explicitly from the general Website Terms of Use excerpt obtained; those terms govern the public website rather than the API product specifically; Enterprise Pack is explicitly marketed toward commercial/DeFi platform integration, suggesting commercial use is anticipated at that tier",
+      "public_beta_use": "NOT CONFIRMED",
+      "caching_rules": "NOT CONFIRMED",
+      "storage_rules": "NOT CONFIRMED",
+      "redistribution_rules": "General Website Terms prohibit automated scraping/data harvesting beyond what's provided and reproduction of content without consent; API-specific redistribution terms NOT CONFIRMED",
+      "derived_data_rules": "NOT CONFIRMED",
+      "attribution_requirements": "NOT CONFIRMED",
+      "approved_endpoints": ["/api/v2/tokens/{chain_id}/{address}"],
+      "current_code_files": [],
+      "current_endpoint": "Not yet implemented in current codebase",
+      "implementation_changes_required": [
+        "Contact Solidus Labs' Enterprise Pack team to obtain the actual API-specific terms of service (distinct from the general website ToS) before integration",
+        "Budget for a paid Pro/Enterprise subscription, since no free programmatic tier was found"
+      ],
+      "open_questions": [
+        "What are the API-specific (not just website) terms governing commercial use, redistribution, and derived-data display? NOT CONFIRMED"
+      ],
+      "notes": "Priority B - qualification only. Now operated by Solidus Labs (acquired/integrated TokenSniffer); review should target current Solidus Labs API terms specifically."
+    },
+    {
+      "source_id": "defi_scanner",
+      "provider": "De.Fi",
+      "category": "Smart contract security scanning",
+      "priority": "B",
+      "access_status": "PENDING_TERMS_REVIEW",
+      "usage_scope": "COMMERCIAL_PENDING",
+      "confidence": "MEDIUM",
+      "official_docs_url": "https://docs.de.fi/api/api",
+      "official_terms_url": "NOT CONFIRMED - no standalone API Terms of Service document was located distinct from general product documentation",
+      "official_pricing_url": "Free for early adopters per official knowledge base; credit-based per-query cost beyond that, exact current pricing NOT CONFIRMED",
+      "authentication": "API key required (X-Api-Key header); GraphQL interface; credits purchased to execute queries",
+      "api_key_required": true,
+      "rate_limits": "NOT CONFIRMED",
+      "commercial_use": "NOT CONFIRMED - no explicit commercial-use clause located in available documentation",
+      "public_beta_use": "NOT CONFIRMED",
+      "caching_rules": "NOT CONFIRMED",
+      "storage_rules": "NOT CONFIRMED",
+      "redistribution_rules": "NOT CONFIRMED",
+      "derived_data_rules": "NOT CONFIRMED",
+      "attribution_requirements": "NOT CONFIRMED",
+      "approved_endpoints": ["scannerProject", "scannerLiquidityAnalysis"],
+      "current_code_files": [],
+      "current_endpoint": "Not yet implemented in current codebase",
+      "implementation_changes_required": [
+        "Email the documented De.Fi contact to request both an API key and the specific legal terms governing commercial use before integration",
+        "Treat as free-tier/credit-limited until a clear commercial license is obtained in writing"
+      ],
+      "open_questions": [
+        "What governing terms of service apply specifically to API use, separate from the general De.Fi platform terms? NOT CONFIRMED"
+      ],
+      "notes": "Priority B - qualification only. Access is by request (email-based key issuance) rather than fully self-serve, which itself signals that terms may be individually negotiated."
+    },
+    {
+      "source_id": "dextools_api",
+      "provider": "DEXTools",
+      "category": "DEX pair/token data and rankings",
+      "priority": "B",
+      "access_status": "PENDING_TERMS_REVIEW",
+      "usage_scope": "COMMERCIAL_PENDING",
+      "confidence": "MEDIUM",
+      "official_docs_url": "https://developer.dextools.io/",
+      "official_terms_url": "NOT CONFIRMED exact URL - a 'Terms' link exists on the developer portal but full text was not retrieved in this pass",
+      "official_pricing_url": "https://developer.dextools.io/ (tiered paid plans; DEXT token holding plus subscription required per third-party reporting, NOT CONFIRMED from the official portal text obtained)",
+      "authentication": "API key required for all tiers; no documented free/keyless production tier was confirmed",
+      "api_key_required": true,
+      "rate_limits": "NOT CONFIRMED exact figures per tier from primary source in this pass",
+      "commercial_use": "NOT CONFIRMED - official Terms text was not fully retrieved; third-party sources describe DEXTools API as built for commercial/enterprise integration (market makers, trading platforms) which suggests commercial use is the intended model, but this is not a primary-source confirmation of permission terms",
+      "public_beta_use": "NOT CONFIRMED",
+      "caching_rules": "NOT CONFIRMED",
+      "storage_rules": "NOT CONFIRMED",
+      "redistribution_rules": "NOT CONFIRMED",
+      "derived_data_rules": "NOT CONFIRMED",
+      "attribution_requirements": "NOT CONFIRMED",
+      "approved_endpoints": ["NOT CONFIRMED - full endpoint list requires Swagger documentation review at api.dextools.io"],
+      "current_code_files": [],
+      "current_endpoint": "Not yet implemented in current codebase",
+      "implementation_changes_required": [
+        "Retrieve and review the full Terms page linked from developer.dextools.io before any integration decision",
+        "Contact developer@dextools.io to clarify commercial licensing and confirm whether DEXT token holding is a hard requirement"
+      ],
+      "open_questions": [
+        "What do the official Terms (linked but not fully retrieved) state about commercial use, redistribution, and derived-data display? NOT CONFIRMED"
+      ],
+      "notes": "Priority B - qualification only. Requires a follow-up direct fetch of the Terms page before any classification upgrade."
+    },
+    {
+      "source_id": "arkham_api",
+      "provider": "Arkham Intelligence",
+      "category": "Blockchain wallet/entity intelligence and labeling",
+      "priority": "B",
+      "access_status": "PENDING_TERMS_REVIEW",
+      "usage_scope": "COMMERCIAL_PENDING",
+      "confidence": "LOW",
+      "official_docs_url": "https://intel.arkm.com/api/docs",
+      "official_terms_url": "NOT CONFIRMED - no standalone API Terms of Service document was located in this pass",
+      "official_pricing_url": "NOT CONFIRMED - access is currently managed through an API Pilot Program / access-request form rather than published self-serve pricing",
+      "authentication": "API key issued after approval through an access-request form (described historically as a 'Pilot Program')",
+      "api_key_required": true,
+      "rate_limits": "Some endpoints documented as rate-limited to 1 request/second for heavy queries (e.g. /transfers) per third-party-hosted API documentation; NOT CONFIRMED as the current official limit for all endpoints",
+      "commercial_use": "NOT CONFIRMED - no terms document was located confirming or denying commercial use",
+      "public_beta_use": "NOT CONFIRMED",
+      "caching_rules": "NOT CONFIRMED",
+      "storage_rules": "NOT CONFIRMED",
+      "redistribution_rules": "NOT CONFIRMED",
+      "derived_data_rules": "NOT CONFIRMED",
+      "attribution_requirements": "NOT CONFIRMED",
+      "approved_endpoints": ["/intelligence/address/{address}", "/transfers"],
+      "current_code_files": [],
+      "current_endpoint": "Not yet implemented in current codebase",
+      "implementation_changes_required": [
+        "Submit the official API access-request form at intel.arkm.com and request the governing terms of service in writing as part of onboarding",
+        "Do not integrate until both an approved key and written terms are obtained, given the access-gated/pilot nature of the program"
+      ],
+      "open_questions": [
+        "Has the Pilot Program graduated to general availability, and what terms apply now? NOT CONFIRMED",
+        "What are the commercial-use, redistribution, and attribution requirements? NOT CONFIRMED"
+      ],
+      "notes": "Priority B - qualification only. Lowest confidence in the registry due to gated/invite-style access; most community-available documentation for this API is explicitly marked 'unofficial' and was excluded as evidence per the official-sources-only research standard."
+    },
+    {
+      "source_id": "lunarcrush_api",
+      "provider": "LunarCrush",
+      "category": "Social sentiment and social-market analytics",
+      "priority": "B",
+      "access_status": "PENDING_TERMS_REVIEW",
+      "usage_scope": "COMMERCIAL_PENDING",
+      "confidence": "HIGH",
+      "official_docs_url": "https://lunarcrush.com/developers/pricing",
+      "official_terms_url": "https://lunarcrush.com/terms",
+      "official_pricing_url": "https://lunarcrush.com/pricing",
+      "authentication": "API key required (Bearer token), generated after accepting terms in account settings",
+      "api_key_required": true,
+      "rate_limits": "Free account: extremely limited API calls per official support documentation; full access requires Individual plan or above",
+      "commercial_use": "Restricted on free tier - official support page states plainly that 'All commercial use requires a paid plan'",
+      "public_beta_use": "Not permitted on the free tier per the same statement; would require at least the Individual paid plan",
+      "caching_rules": "NOT CONFIRMED",
+      "storage_rules": "NOT CONFIRMED",
+      "redistribution_rules": "NOT CONFIRMED in detail beyond the paid-plan-for-commercial-use requirement",
+      "derived_data_rules": "NOT CONFIRMED",
+      "attribution_requirements": "NOT CONFIRMED",
+      "approved_endpoints": ["Topic/Coin social metrics endpoints (Galaxy Score, AltRank, social_dominance)"],
+      "current_code_files": [],
+      "current_endpoint": "Not yet implemented in current codebase",
+      "implementation_changes_required": [
+        "Upgrade to at least the Individual paid plan before any commercial or public-facing use of LunarCrush data",
+        "Review the full Terms of Service at lunarcrush.com/terms (not completely retrieved in this pass) for redistribution and attribution specifics before integration"
+      ],
+      "open_questions": [
+        "What specific redistribution/attribution/derived-data terms apply once on a paid Individual/Builder plan? NOT FULLY CONFIRMED - the Terms of Service page itself was not completely retrieved"
+      ],
+      "notes": "Priority B - qualification only. The commercial-use-requires-paid-plan rule is unusually clearly and directly stated by the provider compared to most other sources researched."
+    },
+    {
+      "source_id": "token_unlocks_tokenomist",
+      "provider": "Multiple - data is provided as an add-on feature by several platforms (Tokenomist.ai / formerly Token Unlocks, CoinGecko, CoinMarketCap, DefiLlama, Messari/Artemis)",
+      "category": "Token vesting schedule / unlock event data",
+      "priority": "B",
+      "access_status": "PENDING_TERMS_REVIEW",
+      "usage_scope": "COMMERCIAL_PENDING",
+      "confidence": "LOW",
+      "official_docs_url": "https://docs.unlocks.app/ (Tokenomist, successor brand to the original 'Token Unlocks' product)",
+      "official_terms_url": "NOT CONFIRMED - no standalone API Terms of Service document was located for Tokenomist/Token Unlocks in this pass",
+      "official_pricing_url": "NOT CONFIRMED - Tokenomist Pro tier exists but a published self-serve API price list was not located; 'Get Free Trial API Now' CTA suggests a request/trial-based onboarding flow",
+      "authentication": "NOT CONFIRMED - no public API authentication documentation was located distinct from the Pro web product",
+      "api_key_required": true,
+      "rate_limits": "NOT CONFIRMED",
+      "commercial_use": "NOT CONFIRMED",
+      "public_beta_use": "NOT CONFIRMED",
+      "caching_rules": "NOT CONFIRMED",
+      "storage_rules": "NOT CONFIRMED",
+      "redistribution_rules": "NOT CONFIRMED",
+      "derived_data_rules": "NOT CONFIRMED",
+      "attribution_requirements": "NOT CONFIRMED",
+      "approved_endpoints": ["NOT CONFIRMED for the standalone product"],
+      "current_code_files": [],
+      "current_endpoint": "Not yet implemented in current codebase",
+      "implementation_changes_required": [
+        "Determine which actual provider Crypto Edge AI intends to use for unlock-schedule data: a standalone Tokenomist/Token Unlocks API subscription, or unlock data already bundled into an existing licensed source (DefiLlama free, or CoinGecko/CoinMarketCap/Messari paid tiers already covered elsewhere in this registry)",
+        "If a dedicated Tokenomist API is desired, request official API documentation and terms directly via their site rather than relying on the public web dashboard's Pro-tier marketing pages"
+      ],
+      "open_questions": [
+        "Is 'Token Unlocks' as named in the task brief referring to the original tokenunlocks.app brand (now Tokenomist.ai), or is it intended generically to mean 'unlock-schedule data from any source'? This materially changes the compliance analysis and could not be resolved from public sources alone",
+        "What are this provider's actual API terms? NOT CONFIRMED"
+      ],
+      "notes": "Priority B - qualification only, and the lowest-confidence entry in the registry due to brand fragmentation. The originally-named product has rebranded, and equivalent data is also available as a feature inside DefiLlama (free, already in this registry), CoinGecko, CoinMarketCap, and Messari/Artemis (all already covered above). Recommend satisfying this data need through an already-vetted source (DefiLlama is the strongest free candidate) rather than pursuing a new vendor relationship, unless Tokenomist's specific dataset is a hard requirement."
+    }
+  ],
+  "web_scraping_recommended": false,
+  "undocumented_endpoints_recommended": false,
   "sources_ready_for_camp_beta": [
     "alternative_me_fng",
     "defillama_api"
@@ -10,265 +722,21 @@
     "dexscreener",
     "goplus_security",
     "honeypot_is",
-    "aikintel_market_news",
-    "bscscan_api",
-    "etherscan_api",
     "coingecko_api",
-    "cryptocompare_api",
+    "geckoterminal_api",
+    "etherscan_api",
+    "bscscan_api",
+    "solscan_api",
+    "bubblemaps_api",
+    "aikintel_market_news",
+    "cryptocompare_ccdata",
+    "dune_api",
     "coinmarketcap_api",
-    "dune_public_dashboards",
-    "gdelt_api",
-    "token_unlocks"
-  ],
-  "sources": [
-    {
-      "source_id": "alternative_me_fng",
-      "name": "Alternative.me Fear & Greed Index",
-      "access_status": "APPROVED_PUBLIC_FEED",
-      "usage_scope": "COMMERCIAL_ALLOWED",
-      "confidence": "HIGH",
-      "approved_endpoints": [
-        "https://api.alternative.me/fng/"
-      ],
-      "current_code_files": [],
-      "implementation_changes_required": [
-        "No client is added in Data Source Registry Enforcement v1.",
-        "Future clients must pass the runtime policy gate before live fetch."
-      ],
-      "open_questions": []
-    },
-    {
-      "source_id": "defillama_api",
-      "name": "DefiLlama API",
-      "access_status": "APPROVED_API",
-      "usage_scope": "COMMERCIAL_ALLOWED",
-      "confidence": "HIGH",
-      "approved_endpoints": [
-        "https://api.llama.fi/",
-        "https://yields.llama.fi/"
-      ],
-      "current_code_files": [],
-      "implementation_changes_required": [
-        "No client is added in Data Source Registry Enforcement v1.",
-        "Future clients must pass the runtime policy gate before live fetch.",
-        "Use attribution where the surface makes source attribution practical."
-      ],
-      "open_questions": []
-    },
-    {
-      "source_id": "dexscreener",
-      "name": "DexScreener API",
-      "access_status": "PENDING_TERMS_REVIEW",
-      "usage_scope": "POC_ONLY",
-      "confidence": "MEDIUM",
-      "approved_endpoints": [
-        "https://api.dexscreener.com/latest/dex/search"
-      ],
-      "current_code_files": [
-        "tools/data-poc/src/dexscreenerClient.ts",
-        "tools/data-poc/src/runDexScreenerPoc.ts",
-        "tools/data-poc/src/runCombinedScannerPoc.ts"
-      ],
-      "implementation_changes_required": [
-        "Live fetch must be gated and limited to LOCAL_POC.",
-        "PUBLIC_BETA and COMMERCIAL remain blocked until written clarification.",
-        "Fixture mode must continue without network access."
-      ],
-      "open_questions": [
-        "Written clarification for PUBLIC_BETA and COMMERCIAL usage."
-      ]
-    },
-    {
-      "source_id": "goplus_security",
-      "name": "GoPlus Security API",
-      "access_status": "PENDING_TERMS_REVIEW",
-      "usage_scope": "POC_ONLY",
-      "confidence": "MEDIUM",
-      "approved_endpoints": [
-        "https://api.gopluslabs.io/api/v1/token_security"
-      ],
-      "current_code_files": [
-        "tools/data-poc/src/goplusClient.ts",
-        "tools/data-poc/src/runSecurityPoc.ts",
-        "tools/data-poc/src/runCombinedScannerPoc.ts"
-      ],
-      "implementation_changes_required": [
-        "Live fetch must be gated and limited to LOCAL_POC.",
-        "User display remains disabled.",
-        "Future user display requires Powered by GoPlus attribution and approval."
-      ],
-      "open_questions": [
-        "Approval for user display.",
-        "Required attribution wording and placement."
-      ],
-      "branding_requirements": [
-        "Future user display requires Powered by GoPlus attribution and approval."
-      ]
-    },
-    {
-      "source_id": "honeypot_is",
-      "name": "Honeypot.is API",
-      "access_status": "PENDING_TERMS_REVIEW",
-      "usage_scope": "POC_ONLY",
-      "confidence": "MEDIUM",
-      "approved_endpoints": [
-        "https://api.honeypot.is/v2/IsHoneypot"
-      ],
-      "current_code_files": [
-        "tools/data-poc/src/honeypotClient.ts",
-        "tools/data-poc/src/runSecurityPoc.ts",
-        "tools/data-poc/src/runCombinedScannerPoc.ts"
-      ],
-      "implementation_changes_required": [
-        "Live fetch must be gated and limited to LOCAL_POC.",
-        "PUBLIC_BETA and COMMERCIAL remain blocked pending written permission.",
-        "User display remains disabled."
-      ],
-      "open_questions": [
-        "Written permission for PUBLIC_BETA and COMMERCIAL usage."
-      ]
-    },
-    {
-      "source_id": "aikintel_market_news",
-      "name": "AIKINTEL Market News / Crypto",
-      "access_status": "PENDING_TERMS_REVIEW",
-      "usage_scope": "COMMERCIAL_PENDING",
-      "confidence": "LOW",
-      "approved_endpoints": [],
-      "current_code_files": [],
-      "implementation_changes_required": [
-        "Automated actions remain disabled until owner permission and schema access are documented."
-      ],
-      "open_questions": [
-        "Owner permission.",
-        "Schema access.",
-        "Allowed automated usage boundaries."
-      ]
-    },
-    {
-      "source_id": "bscscan_api",
-      "name": "BscScan API",
-      "access_status": "BLOCKED_NO_PERMISSION",
-      "usage_scope": "NOT_ALLOWED",
-      "confidence": "HIGH",
-      "approved_endpoints": [],
-      "current_code_files": [],
-      "implementation_changes_required": [
-        "Legacy standalone BscScan integration must remain blocked."
-      ],
-      "open_questions": []
-    },
-    {
-      "source_id": "etherscan_api",
-      "name": "Etherscan API",
-      "access_status": "PENDING_TERMS_REVIEW",
-      "usage_scope": "COMMERCIAL_PENDING",
-      "confidence": "MEDIUM",
-      "approved_endpoints": [],
-      "current_code_files": [],
-      "implementation_changes_required": [
-        "PUBLIC_BETA and COMMERCIAL actions remain disabled.",
-        "LOCAL_POC remains disabled in v1 for maximum safety."
-      ],
-      "open_questions": [
-        "Terms review for any future automated usage."
-      ]
-    },
-    {
-      "source_id": "coingecko_api",
-      "name": "CoinGecko API",
-      "access_status": "PENDING_TERMS_REVIEW",
-      "usage_scope": "COMMERCIAL_PENDING",
-      "confidence": "LOW",
-      "approved_endpoints": [],
-      "current_code_files": [],
-      "implementation_changes_required": [
-        "No runtime permission in v1.",
-        "Requires explicit future operational-policy update."
-      ],
-      "open_questions": [
-        "Terms review and endpoint approval."
-      ]
-    },
-    {
-      "source_id": "cryptocompare_api",
-      "name": "CryptoCompare API",
-      "access_status": "PENDING_TERMS_REVIEW",
-      "usage_scope": "COMMERCIAL_PENDING",
-      "confidence": "LOW",
-      "approved_endpoints": [],
-      "current_code_files": [],
-      "implementation_changes_required": [
-        "No runtime permission in v1.",
-        "Requires explicit future operational-policy update."
-      ],
-      "open_questions": [
-        "Terms review and endpoint approval."
-      ]
-    },
-    {
-      "source_id": "coinmarketcap_api",
-      "name": "CoinMarketCap API",
-      "access_status": "PENDING_TERMS_REVIEW",
-      "usage_scope": "COMMERCIAL_PENDING",
-      "confidence": "LOW",
-      "approved_endpoints": [],
-      "current_code_files": [],
-      "implementation_changes_required": [
-        "No runtime permission in v1.",
-        "Requires explicit future operational-policy update."
-      ],
-      "open_questions": [
-        "API plan, terms review, and endpoint approval."
-      ]
-    },
-    {
-      "source_id": "dune_public_dashboards",
-      "name": "Dune Public Dashboards",
-      "access_status": "PENDING_TERMS_REVIEW",
-      "usage_scope": "COMMERCIAL_PENDING",
-      "confidence": "LOW",
-      "approved_endpoints": [],
-      "current_code_files": [],
-      "implementation_changes_required": [
-        "No runtime permission in v1.",
-        "Requires explicit future operational-policy update."
-      ],
-      "open_questions": [
-        "API access and automated usage terms."
-      ]
-    },
-    {
-      "source_id": "gdelt_api",
-      "name": "GDELT API",
-      "access_status": "PENDING_TERMS_REVIEW",
-      "usage_scope": "COMMERCIAL_PENDING",
-      "confidence": "LOW",
-      "approved_endpoints": [],
-      "current_code_files": [],
-      "implementation_changes_required": [
-        "No runtime permission in v1.",
-        "Requires explicit future operational-policy update."
-      ],
-      "open_questions": [
-        "Terms review and endpoint approval."
-      ]
-    },
-    {
-      "source_id": "token_unlocks",
-      "name": "Token Unlocks",
-      "access_status": "PENDING_TERMS_REVIEW",
-      "usage_scope": "COMMERCIAL_PENDING",
-      "confidence": "LOW",
-      "approved_endpoints": [],
-      "current_code_files": [],
-      "implementation_changes_required": [
-        "No runtime permission in v1.",
-        "Requires explicit future operational-policy update."
-      ],
-      "open_questions": [
-        "Legal API access confirmation."
-      ]
-    }
+    "tokensniffer_api",
+    "defi_scanner",
+    "dextools_api",
+    "arkham_api",
+    "lunarcrush_api",
+    "token_unlocks_tokenomist"
   ]
 }
