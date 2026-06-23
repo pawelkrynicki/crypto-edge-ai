@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { writePersistableScannerOutput } from "./fileStorage.js";
 import { buildPersistableScannerOutput } from "./persistableScannerModel.js";
 import { runCombinedScannerPoc } from "./runCombinedScannerPoc.js";
+import { isSourcePolicyError } from "./sourcePolicy.js";
 import type { DexScreenerPocMode } from "./types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -57,7 +58,9 @@ function parseArgs(args: string[]): Record<string, string> {
 }
 
 main().catch((error: unknown) => {
-  const message = error instanceof Error ? error.message : String(error);
-  console.error(JSON.stringify({ source: "persistable-scanner-poc", error: message }, null, 2));
+  const body = isSourcePolicyError(error)
+    ? { source: "persistable-scanner-poc", error: "source_policy_denied", decision: error.decision }
+    : { source: "persistable-scanner-poc", error: error instanceof Error ? error.message : String(error) };
+  console.error(JSON.stringify(body, null, 2));
   process.exit(1);
 });

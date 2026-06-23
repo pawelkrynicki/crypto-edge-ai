@@ -1,4 +1,5 @@
 import type { GoPlusTokenSecurityResponse } from "./types.js";
+import { assertSourceActionAllowed } from "./sourcePolicy.js";
 
 const GOPLUS_BASE_URL = "https://api.gopluslabs.io/api/v1/token_security";
 
@@ -12,7 +13,17 @@ const GOPLUS_CHAIN_IDS: Record<string, string> = {
   avalanche: "43114"
 };
 
-export async function fetchGoPlusTokenSecurity(chain: string, address: string): Promise<GoPlusTokenSecurityResponse | null> {
+export async function fetchGoPlusTokenSecurity(
+  chain: string,
+  address: string,
+  options: { environment?: string | null } = {}
+): Promise<GoPlusTokenSecurityResponse | null> {
+  assertSourceActionAllowed({
+    sourceId: "goplus_security",
+    environment: options.environment,
+    action: "live_fetch"
+  });
+
   const chainId = toGoPlusChainId(chain);
   if (!chainId) {
     return null;

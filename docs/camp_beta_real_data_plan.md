@@ -6,6 +6,40 @@ Camp BETA should be a working Crypto Edge AI tool on real data in a limited, sta
 
 This is still a planning document. It does not implement real fetchers, production cron scripts, migrations, auth, UI, or AI calls.
 
+## Data Source Registry Enforcement v1
+
+The current technical control is the Data Source Registry Enforcement v1 gate.
+
+- Registry location: `docs/compliance/data_source_registry_v1.json`.
+- Runtime policy location: `config/data_source_runtime_policy.json`.
+- Sources reviewed: 21.
+- Priority A: 12.
+- Priority B: 9.
+- Sources currently cleared for Camp BETA: 2.
+- Safe default environment: `FIXTURE_ONLY`.
+- Active environment variable: `CRYPTO_EDGE_DATA_ENV`.
+- Environments: `FIXTURE_ONLY`, `LOCAL_POC`, `INTERNAL_BETA`, `PUBLIC_BETA`, `COMMERCIAL`.
+- Source actions: `fixture_load`, `live_fetch`, `normalized_storage`, `raw_storage`, `user_display`, `derived_score_display`.
+
+If `CRYPTO_EDGE_DATA_ENV` is missing or invalid, runtime authorization falls back to `FIXTURE_ONLY`.
+
+For local testing only, live POC mode must be enabled explicitly:
+
+```powershell
+$env:CRYPTO_EDGE_DATA_ENV = "LOCAL_POC"
+pnpm run scanner:live -- --query SOL --max-candidates 3
+```
+
+Current Camp BETA clearance:
+
+- Alternative.me Fear & Greed and DefiLlama are the only sources currently cleared by the registry for Camp BETA.
+- The runtime policy is intentionally stricter than the research registry; registry presence does not grant runtime permission.
+- DexScreener, GoPlus Security, and Honeypot.is are not approved for PUBLIC_BETA; they remain LOCAL_POC-only POC sources pending written clarification or permission.
+- BscScan, AIKINTEL Market News automated access, Etherscan, and all unlisted sources remain blocked until an explicit future runtime-policy update.
+- Unknown sources fail closed.
+- Raw API response storage is disabled in v1.
+- No scraping fallback is allowed. API failure must not fall back to scraping, HTML parsing, browser automation, undocumented endpoints, or invented data.
+
 ## Minimum Viable Real-Data Flow
 
 1. DexScreener discovery.

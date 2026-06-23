@@ -20,6 +20,72 @@ This is not the product. It does not include UI, database, migrations, auth, pro
 npm install
 ```
 
+## Data Source Registry Enforcement
+
+Data source authorization is fail-closed in v1.
+
+Registry and policy files:
+
+- Registry record: `docs/compliance/data_source_registry_v1.json`.
+- Product policy: `docs/compliance/data_source_policy.md`.
+- Runtime policy: `config/data_source_runtime_policy.json`.
+
+The authoritative registry reviewed 21 sources:
+
+- Priority A: 12.
+- Priority B: 9.
+- Camp BETA cleared sources: 2.
+
+Runtime environments:
+
+- `FIXTURE_ONLY`.
+- `LOCAL_POC`.
+- `INTERNAL_BETA`.
+- `PUBLIC_BETA`.
+- `COMMERCIAL`.
+
+`CRYPTO_EDGE_DATA_ENV` selects the active environment. If it is missing or invalid, the scanner uses the safe default `FIXTURE_ONLY`.
+
+Runtime actions:
+
+- `fixture_load`.
+- `live_fetch`.
+- `normalized_storage`.
+- `raw_storage`.
+- `user_display`.
+- `derived_score_display`.
+
+Validate the registry:
+
+```bash
+pnpm run sources:validate
+```
+
+Check a policy decision:
+
+```bash
+pnpm run sources:check -- --source dexscreener --environment PUBLIC_BETA --action live_fetch
+```
+
+Enable LOCAL_POC live mode explicitly:
+
+```powershell
+$env:CRYPTO_EDGE_DATA_ENV = "LOCAL_POC"
+pnpm run scanner:live -- --query SOL --max-candidates 3
+```
+
+Without `LOCAL_POC`, live DexScreener discovery is denied before any network request.
+
+Current PUBLIC_BETA source boundary:
+
+- Alternative.me Fear & Greed and DefiLlama are the only registry-cleared sources for Camp BETA.
+- DexScreener, GoPlus Security, and Honeypot.is remain LOCAL_POC only and are not approved for PUBLIC_BETA.
+- The runtime policy is intentionally stricter than the research registry.
+- AIKINTEL Market News, BscScan, Etherscan, and any source absent from the runtime policy are disabled until an explicit future policy update.
+- Unknown `source_id` values fail closed.
+- Raw API response storage is disabled for all v1 automated sources.
+- No API failure may fall back to scraping, HTML parsing, browser automation, undocumented endpoints, or invented data.
+
 ## Fixture Mode
 
 Fixture mode is stable and does not require internet:
@@ -61,7 +127,7 @@ It runs:
 
 ## Live Mode
 
-Live mode uses the public DexScreener search endpoint:
+Live mode uses the DexScreener API endpoint only in `LOCAL_POC`:
 
 ```bash
 npm run poc:live -- --query SOL
@@ -73,9 +139,11 @@ The POC uses:
 https://api.dexscreener.com/latest/dex/search?q=<query>
 ```
 
+This source is blocked in `PUBLIC_BETA` and `COMMERCIAL` until written clarification is recorded in the registry and runtime policy.
+
 ## Security Live Mode
 
-Security live mode is best-effort. It tries public GoPlus and Honeypot.is endpoints without API keys:
+Security live mode is best-effort and `LOCAL_POC` only. It tries GoPlus and Honeypot.is API endpoints without API keys:
 
 ```bash
 npm run security:live -- --chain eth --address 0x...
@@ -92,6 +160,8 @@ Supported shorthand chains in this POC:
 - `avalanche`.
 
 If a live security source is unavailable or unsupported, the POC does not fake data. It marks that source as unavailable and returns missing fields with `NEEDS_MANUAL_VERIFICATION`.
+
+If a live security source is denied by policy, the POC does not call it, does not invent security values, and requires manual verification.
 
 ## Combined Scanner Live Mode
 
@@ -362,6 +432,8 @@ Important: `WATCHLIST` is not a buy signal. It only means `eligible for further 
 
 - No production GoPlus integration.
 - No production Honeypot.is integration.
+- No scraping fallback.
+- No raw API response storage in v1.
 - No CoinGecko.
 - No Fear & Greed.
 - No database.

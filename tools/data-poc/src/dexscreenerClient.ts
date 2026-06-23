@@ -1,8 +1,18 @@
 import type { DexScreenerPair, DexScreenerSearchResponse } from "./types.js";
+import { assertSourceActionAllowed } from "./sourcePolicy.js";
 
 const DEXSCREENER_SEARCH_URL = "https://api.dexscreener.com/latest/dex/search";
 
-export async function searchDexScreenerPairs(query: string): Promise<DexScreenerPair[]> {
+export async function searchDexScreenerPairs(
+  query: string,
+  options: { environment?: string | null } = {}
+): Promise<DexScreenerPair[]> {
+  assertSourceActionAllowed({
+    sourceId: "dexscreener",
+    environment: options.environment,
+    action: "live_fetch"
+  });
+
   const url = new URL(DEXSCREENER_SEARCH_URL);
   url.searchParams.set("q", query);
 
