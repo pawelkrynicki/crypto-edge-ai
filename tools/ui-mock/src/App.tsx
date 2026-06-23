@@ -8,60 +8,17 @@ import { Methodology } from "./components/Methodology";
 import {
   loadScannerDataSourceResult,
   type DataSourceKey,
+  type ResolvedScannerSource,
   type ScannerDataSourceResult,
 } from "./services/scannerDataSource";
 import { mapPersistableScannerOutputToUiCandidates } from "./adapters/scannerOutputAdapter";
-import type { MockCandidate } from "./mockData";
+import { toMockCandidate, type MockCandidate } from "./mockData";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function buildMockCandidates(result: ScannerDataSourceResult): MockCandidate[] {
   const uiCandidates = mapPersistableScannerOutputToUiCandidates(result.output);
-  return uiCandidates.map((u): MockCandidate => ({
-    id:                      u.id,
-    symbol:                  u.symbol,
-    name:                    u.name,
-    chain:                   u.chain,
-    dex:                     u.dex,
-    contract_address:        u.contractAddress,
-    pair_address:             u.pairAddress,
-    source_url:              u.sourceUrl,
-    price_usd:               null,
-    market_cap_usd:          u.marketCap,
-    fdv_usd:                 null,
-    liquidity_usd:           u.liquidity,
-    volume_24h_usd:          u.volume24h,
-    volume_market_cap_ratio: u.volumeMarketCapRatio,
-    pair_age_days:           u.pairAgeDays,
-    basic_filter_status:     u.basicFilterStatus,
-    security_label:          u.securityLabel,
-    final_label:             u.finalLabel,
-    final_reasons: [
-      u.mainReason,
-      ...u.filterReasons,
-      ...u.criticalReasons,
-      ...u.warningReasons,
-    ].filter((r, i, arr) => r.length > 0 && arr.indexOf(r) === i),
-    security: u.security
-      ? {
-          honeypot_status:       u.security.honeypotStatus,
-          buy_tax:               u.security.buyTax,
-          sell_tax:              u.security.sellTax,
-          contract_verified:     u.security.contractVerified,
-          ownership_status:      u.security.ownershipStatus,
-          liquidity_locked:      u.security.liquidityLocked,
-          liquidity_lock_days:   u.security.liquidityLockDays,
-          mint_risk:             u.security.mintRisk,
-          blacklist_risk:        u.security.blacklistRisk,
-          sell_restriction_risk: u.security.sellRestrictionRisk,
-          top_wallet_pct:        u.security.topWalletPct,
-          top_10_wallets_pct:    u.security.top10WalletsPct,
-          risk_flags:            u.riskFlags,
-          missing_data:          u.missingData,
-        }
-      : null,
-    last_checked: u.lastCheckedAt,
-  }));
+  return uiCandidates.map(toMockCandidate);
 }
 
 function buildSummary(candidates: MockCandidate[]) {
@@ -98,6 +55,13 @@ const DATA_SOURCE_OPTIONS: { key: DataSourceKey; label: string }[] = [
   { key: "api",         label: "API / latest" },
 ];
 
+const SOURCE_STATUS_TEXT: Record<ResolvedScannerSource, string> = {
+  "built-in-fixture": "Built-in fixture data",
+  "static-json": "Static JSON fixture",
+  "real-output": "Real scanner output",
+  "fixture-fallback": "API fallback to fixture",
+};
+
 // ── App ───────────────────────────────────────────────────────────────────────
 
 export default function App() {
@@ -106,11 +70,13 @@ export default function App() {
 
   // Data source state
   const [dataSource,   setDataSource]   = useState<DataSourceKey>("fixture");
+  const [resolvedSource, setResolvedSource] = useState<ResolvedScannerSource>("built-in-fixture");
   const [candidates,   setCandidates]   = useState<MockCandidate[]>([]);
   const [loading,      setLoading]      = useState(false);
   const [fallbackMsg,  setFallbackMsg]  = useState<string | null>(null);
 
   const summary = buildSummary(candidates);
+  const sourceStatusText = SOURCE_STATUS_TEXT[resolvedSource];
 
   // Load data whenever source changes
   const loadData = useCallback(async (source: DataSourceKey) => {
@@ -120,12 +86,14 @@ export default function App() {
       const result = await loadScannerDataSourceResult(source);
       const built  = buildMockCandidates(result);
       setCandidates(built);
+      setResolvedSource(result.resolvedSource);
       if (result.usedFallback && result.fallbackReason) {
         setFallbackMsg(result.fallbackReason);
       }
     } catch (err) {
       // Should not happen — loadScannerDataSourceResult never rejects
       const msg = err instanceof Error ? err.message : String(err);
+      setResolvedSource("built-in-fixture");
       setFallbackMsg(`Unexpected error: ${msg}`);
     } finally {
       setLoading(false);
@@ -216,7 +184,7 @@ export default function App() {
         {sidebarOpen && (
           <div className="px-3 py-2 shrink-0" style={{ borderTop: "1px solid var(--border)" }}>
             <div className="text-[10px] italic" style={{ color: "var(--text-muted)" }}>
-              Mock data only — no live API
+              {sourceStatusText}
             </div>
           </div>
         )}
@@ -280,7 +248,7 @@ export default function App() {
                 border: "1px solid var(--border)",
                 color: "var(--text-muted)",
               }}>
-              UI Mock
+              {sourceStatusText}
             </span>
           </div>
         </header>
@@ -291,7 +259,7 @@ export default function App() {
             style={{ background: "rgba(245,158,11,0.08)", borderBottom: "1px solid rgba(245,158,11,0.2)" }}>
             <span className="text-[10px] font-semibold" style={{ color: "#f59e0b" }}>⚠</span>
             <span className="text-[10px]" style={{ color: "#f59e0b" }}>
-              API not available, using fixture fallback. — {fallbackMsg}
+              Using fixture fallback. — {fallbackMsg}
             </span>
           </div>
         )}
@@ -330,7 +298,7 @@ export default function App() {
           <p className="text-[10px] italic" style={{ color: "var(--text-muted)" }}>
             Crypto Edge AI is a research and risk review tool. It does not provide financial advice, trading signals, or investment recommendations.
           </p>
-          <span className="badge badge-reject shrink-0">WATCHLIST ≠ buy signal</span>
+          <span className="badge badge-reject shrink-0">WATCHLIST is research only</span>
         </footer>
 
       </div>

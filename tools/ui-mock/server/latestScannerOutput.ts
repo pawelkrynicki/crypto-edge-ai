@@ -102,11 +102,24 @@ export function isPersistableScannerOutputShape(value: unknown): boolean {
   }
 
   const output = value as Record<string, unknown>;
+  const scanRun = output.scan_run;
 
-  return Boolean(output.scan_run)
+  return isRecord(scanRun)
+    && typeof scanRun.run_id === "string"
     && Array.isArray(output.candidates)
+    && output.candidates.every(hasCandidateId)
     && Array.isArray(output.security_checks)
-    && Array.isArray(output.scorecards);
+    && output.security_checks.every(hasCandidateId)
+    && Array.isArray(output.scorecards)
+    && output.scorecards.every(hasCandidateId);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function hasCandidateId(value: unknown): boolean {
+  return isRecord(value) && typeof value.candidate_id === "string" && value.candidate_id.length > 0;
 }
 
 async function readFixtureOutput(reason: string): Promise<ScannerOutputWithMeta> {

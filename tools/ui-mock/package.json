@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "api": "tsx server/scannerApiServer.ts",
+    "test:contract": "tsx tests/contract.test.ts",
     "dev:with-api": "concurrently \"vite --host 0.0.0.0\" \"tsx server/scannerApiServer.ts\"",
     "lint": "eslint .",
     "preview": "vite preview"
