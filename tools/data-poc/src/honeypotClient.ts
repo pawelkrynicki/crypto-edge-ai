@@ -1,4 +1,5 @@
 import type { HoneypotTokenResponse } from "./types.js";
+import { assertSourceActionAllowed } from "./sourcePolicy.js";
 
 const HONEYPOT_URL = "https://api.honeypot.is/v2/IsHoneypot";
 
@@ -12,7 +13,17 @@ const HONEYPOT_CHAIN_IDS: Record<string, string> = {
   avalanche: "43114"
 };
 
-export async function fetchHoneypotToken(chain: string, address: string): Promise<HoneypotTokenResponse | null> {
+export async function fetchHoneypotToken(
+  chain: string,
+  address: string,
+  options: { environment?: string | null } = {}
+): Promise<HoneypotTokenResponse | null> {
+  assertSourceActionAllowed({
+    sourceId: "honeypot_is",
+    environment: options.environment,
+    action: "live_fetch"
+  });
+
   const chainId = toHoneypotChainId(chain);
   if (!chainId) {
     return null;

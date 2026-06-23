@@ -3,6 +3,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { searchDexScreenerPairs } from "./dexscreenerClient.js";
 import { normalizeDexScreenerPairs } from "./normalizeDexScreener.js";
+import { isSourcePolicyError } from "./sourcePolicy.js";
 import type { DexScreenerPair, DexScreenerPocMode, DexScreenerSearchResponse, PocOutput } from "./types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -59,7 +60,9 @@ function parseArgs(args: string[]): Record<string, string> {
 }
 
 main().catch((error: unknown) => {
-  const message = error instanceof Error ? error.message : String(error);
-  console.error(JSON.stringify({ source: "dexscreener", error: message }, null, 2));
+  const body = isSourcePolicyError(error)
+    ? { source: "dexscreener", error: "source_policy_denied", decision: error.decision }
+    : { source: "dexscreener", error: error instanceof Error ? error.message : String(error) };
+  console.error(JSON.stringify(body, null, 2));
   process.exit(1);
 });

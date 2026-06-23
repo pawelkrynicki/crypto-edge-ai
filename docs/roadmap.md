@@ -82,6 +82,19 @@ Current artifacts:
 - `docs/rug_pull_risk_engine.md`.
 - `docs/token_scorecard_model.md`.
 
+Data Source Registry Enforcement v1:
+
+- Registry: `docs/compliance/data_source_registry_v1.json`.
+- Runtime policy: `config/data_source_runtime_policy.json`.
+- Safe default: `FIXTURE_ONLY` when `CRYPTO_EDGE_DATA_ENV` is missing or invalid.
+- Environments: `FIXTURE_ONLY`, `LOCAL_POC`, `INTERNAL_BETA`, `PUBLIC_BETA`, `COMMERCIAL`.
+- Actions: `fixture_load`, `live_fetch`, `normalized_storage`, `raw_storage`, `user_display`, `derived_score_display`.
+- LOCAL_POC live mode requires `CRYPTO_EDGE_DATA_ENV=LOCAL_POC`.
+- PUBLIC_BETA allows Alternative.me Fear & Greed and DefiLlama only.
+- PUBLIC_BETA blocks DexScreener, GoPlus Security, and Honeypot.is pending written clarification or permission.
+- Raw API response storage is disabled in v1.
+- No scraping fallback, undocumented endpoints, browser automation for data collection, or invented data.
+
 First code POC:
 
 - `tools/data-poc`.

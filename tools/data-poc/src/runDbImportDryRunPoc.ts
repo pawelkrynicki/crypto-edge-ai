@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { buildDbImportDryRunFromDir, buildDbImportDryRunFromOutput } from "./dbImportDryRun.js";
 import { buildPersistableScannerOutput } from "./persistableScannerModel.js";
 import { runCombinedScannerPoc } from "./runCombinedScannerPoc.js";
+import { isSourcePolicyError } from "./sourcePolicy.js";
 import type { DexScreenerPocMode } from "./types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -70,7 +71,9 @@ function normalizeOutputDir(outputDir: string): string {
 }
 
 main().catch((error: unknown) => {
-  const message = error instanceof Error ? error.message : String(error);
-  console.error(JSON.stringify({ source: "db-import-dry-run-poc", error: message }, null, 2));
+  const body = isSourcePolicyError(error)
+    ? { source: "db-import-dry-run-poc", error: "source_policy_denied", decision: error.decision }
+    : { source: "db-import-dry-run-poc", error: error instanceof Error ? error.message : String(error) };
+  console.error(JSON.stringify(body, null, 2));
   process.exit(1);
 });

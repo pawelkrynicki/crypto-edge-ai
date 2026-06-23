@@ -1,0 +1,203 @@
+{
+  "policy_version": "data_source_runtime_policy_v1",
+  "safe_default_environment": "FIXTURE_ONLY",
+  "environments": [
+    "FIXTURE_ONLY",
+    "LOCAL_POC",
+    "INTERNAL_BETA",
+    "PUBLIC_BETA",
+    "COMMERCIAL"
+  ],
+  "actions": [
+    "fixture_load",
+    "live_fetch",
+    "normalized_storage",
+    "raw_storage",
+    "user_display",
+    "derived_score_display"
+  ],
+  "sources": {
+    "alternative_me_fng": {
+      "action_allowlist": {
+        "fixture_load": [],
+        "live_fetch": [
+          "LOCAL_POC",
+          "INTERNAL_BETA",
+          "PUBLIC_BETA",
+          "COMMERCIAL"
+        ],
+        "normalized_storage": [
+          "LOCAL_POC",
+          "INTERNAL_BETA",
+          "PUBLIC_BETA",
+          "COMMERCIAL"
+        ],
+        "raw_storage": [],
+        "user_display": [
+          "LOCAL_POC",
+          "INTERNAL_BETA",
+          "PUBLIC_BETA",
+          "COMMERCIAL"
+        ],
+        "derived_score_display": [
+          "LOCAL_POC",
+          "INTERNAL_BETA",
+          "PUBLIC_BETA",
+          "COMMERCIAL"
+        ]
+      },
+      "notes": [
+        "Alternative.me Fear & Greed is cleared for Camp BETA and commercial environments.",
+        "Raw storage is disabled in v1."
+      ]
+    },
+    "defillama_api": {
+      "action_allowlist": {
+        "fixture_load": [],
+        "live_fetch": [
+          "LOCAL_POC",
+          "INTERNAL_BETA",
+          "PUBLIC_BETA",
+          "COMMERCIAL"
+        ],
+        "normalized_storage": [
+          "LOCAL_POC",
+          "INTERNAL_BETA",
+          "PUBLIC_BETA",
+          "COMMERCIAL"
+        ],
+        "raw_storage": [],
+        "user_display": [
+          "LOCAL_POC",
+          "INTERNAL_BETA",
+          "PUBLIC_BETA",
+          "COMMERCIAL"
+        ],
+        "derived_score_display": [
+          "LOCAL_POC",
+          "INTERNAL_BETA",
+          "PUBLIC_BETA",
+          "COMMERCIAL"
+        ]
+      },
+      "notes": [
+        "DefiLlama is cleared for Camp BETA and commercial environments.",
+        "Attribution is recommended.",
+        "Raw storage is disabled in v1."
+      ]
+    },
+    "dexscreener": {
+      "action_allowlist": {
+        "fixture_load": [
+          "FIXTURE_ONLY"
+        ],
+        "live_fetch": [
+          "LOCAL_POC"
+        ],
+        "normalized_storage": [
+          "LOCAL_POC"
+        ],
+        "raw_storage": [],
+        "user_display": [
+          "LOCAL_POC"
+        ],
+        "derived_score_display": [
+          "LOCAL_POC"
+        ]
+      },
+      "notes": [
+        "DexScreener live fetch is LOCAL_POC only.",
+        "PUBLIC_BETA and COMMERCIAL are blocked until written clarification.",
+        "Raw storage is disabled in v1."
+      ]
+    },
+    "goplus_security": {
+      "action_allowlist": {
+        "fixture_load": [
+          "FIXTURE_ONLY"
+        ],
+        "live_fetch": [
+          "LOCAL_POC"
+        ],
+        "normalized_storage": [
+          "LOCAL_POC"
+        ],
+        "raw_storage": [],
+        "user_display": [],
+        "derived_score_display": [
+          "LOCAL_POC"
+        ]
+      },
+      "notes": [
+        "GoPlus live fetch is LOCAL_POC only.",
+        "User display is disabled in v1.",
+        "Future user display requires Powered by GoPlus attribution and approval.",
+        "Raw storage is disabled in v1."
+      ]
+    },
+    "honeypot_is": {
+      "action_allowlist": {
+        "fixture_load": [
+          "FIXTURE_ONLY"
+        ],
+        "live_fetch": [
+          "LOCAL_POC"
+        ],
+        "normalized_storage": [
+          "LOCAL_POC"
+        ],
+        "raw_storage": [],
+        "user_display": [],
+        "derived_score_display": [
+          "LOCAL_POC"
+        ]
+      },
+      "notes": [
+        "Honeypot.is live fetch is LOCAL_POC only.",
+        "PUBLIC_BETA and COMMERCIAL are blocked pending written permission.",
+        "User display and raw storage are disabled in v1."
+      ]
+    },
+    "aikintel_market_news": {
+      "action_allowlist": {
+        "fixture_load": [],
+        "live_fetch": [],
+        "normalized_storage": [],
+        "raw_storage": [],
+        "user_display": [],
+        "derived_score_display": []
+      },
+      "notes": [
+        "All automated actions are disabled until owner permission and schema access are documented."
+      ]
+    },
+    "bscscan_api": {
+      "action_allowlist": {
+        "fixture_load": [],
+        "live_fetch": [],
+        "normalized_storage": [],
+        "raw_storage": [],
+        "user_display": [],
+        "derived_score_display": []
+      },
+      "notes": [
+        "BscScan is blocked in every environment.",
+        "Legacy standalone BscScan integration must remain blocked."
+      ]
+    },
+    "etherscan_api": {
+      "action_allowlist": {
+        "fixture_load": [],
+        "live_fetch": [],
+        "normalized_storage": [],
+        "raw_storage": [],
+        "user_display": [],
+        "derived_score_display": []
+      },
+      "notes": [
+        "PUBLIC_BETA and COMMERCIAL actions are disabled.",
+        "LOCAL_POC remains disabled in v1 for maximum safety."
+      ]
+    }
+  }
+}

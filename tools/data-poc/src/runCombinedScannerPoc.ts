@@ -6,6 +6,7 @@ import { searchDexScreenerPairs } from "./dexscreenerClient.js";
 import { fetchGoPlusTokenSecurity } from "./goplusClient.js";
 import { fetchHoneypotToken } from "./honeypotClient.js";
 import { normalizeDexScreenerPairs } from "./normalizeDexScreener.js";
+import { isSourcePolicyError } from "./sourcePolicy.js";
 import type {
   CryptoEdgeCandidate,
   DexScreenerPocMode,
@@ -120,8 +121,10 @@ function sanitizeMaxCandidates(value: number | undefined): number {
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   main().catch((error: unknown) => {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error(JSON.stringify({ source: "combined-scanner-poc", error: message }, null, 2));
+    const body = isSourcePolicyError(error)
+      ? { source: "combined-scanner-poc", error: "source_policy_denied", decision: error.decision }
+      : { source: "combined-scanner-poc", error: error instanceof Error ? error.message : String(error) };
+    console.error(JSON.stringify(body, null, 2));
     process.exit(1);
   });
 }

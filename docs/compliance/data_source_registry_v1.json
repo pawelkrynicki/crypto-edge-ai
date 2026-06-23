@@ -1,0 +1,274 @@
+{
+  "registry_version": "1.0.0",
+  "reviewed_at": "2026-06-23",
+  "record_note": "The original registry.json attachment was not available in the workspace attachment cache. This v1 record mirrors the explicit source conclusions provided in the task text and is treated as the compliance registry for runtime enforcement.",
+  "sources_ready_for_camp_beta": [
+    "alternative_me_fng",
+    "defillama_api"
+  ],
+  "sources_blocked_or_pending": [
+    "dexscreener",
+    "goplus_security",
+    "honeypot_is",
+    "aikintel_market_news",
+    "bscscan_api",
+    "etherscan_api",
+    "coingecko_api",
+    "cryptocompare_api",
+    "coinmarketcap_api",
+    "dune_public_dashboards",
+    "gdelt_api",
+    "token_unlocks"
+  ],
+  "sources": [
+    {
+      "source_id": "alternative_me_fng",
+      "name": "Alternative.me Fear & Greed Index",
+      "access_status": "APPROVED_PUBLIC_FEED",
+      "usage_scope": "COMMERCIAL_ALLOWED",
+      "confidence": "HIGH",
+      "approved_endpoints": [
+        "https://api.alternative.me/fng/"
+      ],
+      "current_code_files": [],
+      "implementation_changes_required": [
+        "No client is added in Data Source Registry Enforcement v1.",
+        "Future clients must pass the runtime policy gate before live fetch."
+      ],
+      "open_questions": []
+    },
+    {
+      "source_id": "defillama_api",
+      "name": "DefiLlama API",
+      "access_status": "APPROVED_API",
+      "usage_scope": "COMMERCIAL_ALLOWED",
+      "confidence": "HIGH",
+      "approved_endpoints": [
+        "https://api.llama.fi/",
+        "https://yields.llama.fi/"
+      ],
+      "current_code_files": [],
+      "implementation_changes_required": [
+        "No client is added in Data Source Registry Enforcement v1.",
+        "Future clients must pass the runtime policy gate before live fetch.",
+        "Use attribution where the surface makes source attribution practical."
+      ],
+      "open_questions": []
+    },
+    {
+      "source_id": "dexscreener",
+      "name": "DexScreener API",
+      "access_status": "PENDING_TERMS_REVIEW",
+      "usage_scope": "POC_ONLY",
+      "confidence": "MEDIUM",
+      "approved_endpoints": [
+        "https://api.dexscreener.com/latest/dex/search"
+      ],
+      "current_code_files": [
+        "tools/data-poc/src/dexscreenerClient.ts",
+        "tools/data-poc/src/runDexScreenerPoc.ts",
+        "tools/data-poc/src/runCombinedScannerPoc.ts"
+      ],
+      "implementation_changes_required": [
+        "Live fetch must be gated and limited to LOCAL_POC.",
+        "PUBLIC_BETA and COMMERCIAL remain blocked until written clarification.",
+        "Fixture mode must continue without network access."
+      ],
+      "open_questions": [
+        "Written clarification for PUBLIC_BETA and COMMERCIAL usage."
+      ]
+    },
+    {
+      "source_id": "goplus_security",
+      "name": "GoPlus Security API",
+      "access_status": "PENDING_TERMS_REVIEW",
+      "usage_scope": "POC_ONLY",
+      "confidence": "MEDIUM",
+      "approved_endpoints": [
+        "https://api.gopluslabs.io/api/v1/token_security"
+      ],
+      "current_code_files": [
+        "tools/data-poc/src/goplusClient.ts",
+        "tools/data-poc/src/runSecurityPoc.ts",
+        "tools/data-poc/src/runCombinedScannerPoc.ts"
+      ],
+      "implementation_changes_required": [
+        "Live fetch must be gated and limited to LOCAL_POC.",
+        "User display remains disabled.",
+        "Future user display requires Powered by GoPlus attribution and approval."
+      ],
+      "open_questions": [
+        "Approval for user display.",
+        "Required attribution wording and placement."
+      ],
+      "branding_requirements": [
+        "Future user display requires Powered by GoPlus attribution and approval."
+      ]
+    },
+    {
+      "source_id": "honeypot_is",
+      "name": "Honeypot.is API",
+      "access_status": "PENDING_TERMS_REVIEW",
+      "usage_scope": "POC_ONLY",
+      "confidence": "MEDIUM",
+      "approved_endpoints": [
+        "https://api.honeypot.is/v2/IsHoneypot"
+      ],
+      "current_code_files": [
+        "tools/data-poc/src/honeypotClient.ts",
+        "tools/data-poc/src/runSecurityPoc.ts",
+        "tools/data-poc/src/runCombinedScannerPoc.ts"
+      ],
+      "implementation_changes_required": [
+        "Live fetch must be gated and limited to LOCAL_POC.",
+        "PUBLIC_BETA and COMMERCIAL remain blocked pending written permission.",
+        "User display remains disabled."
+      ],
+      "open_questions": [
+        "Written permission for PUBLIC_BETA and COMMERCIAL usage."
+      ]
+    },
+    {
+      "source_id": "aikintel_market_news",
+      "name": "AIKINTEL Market News / Crypto",
+      "access_status": "PENDING_TERMS_REVIEW",
+      "usage_scope": "COMMERCIAL_PENDING",
+      "confidence": "LOW",
+      "approved_endpoints": [],
+      "current_code_files": [],
+      "implementation_changes_required": [
+        "Automated actions remain disabled until owner permission and schema access are documented."
+      ],
+      "open_questions": [
+        "Owner permission.",
+        "Schema access.",
+        "Allowed automated usage boundaries."
+      ]
+    },
+    {
+      "source_id": "bscscan_api",
+      "name": "BscScan API",
+      "access_status": "BLOCKED_NO_PERMISSION",
+      "usage_scope": "NOT_ALLOWED",
+      "confidence": "HIGH",
+      "approved_endpoints": [],
+      "current_code_files": [],
+      "implementation_changes_required": [
+        "Legacy standalone BscScan integration must remain blocked."
+      ],
+      "open_questions": []
+    },
+    {
+      "source_id": "etherscan_api",
+      "name": "Etherscan API",
+      "access_status": "PENDING_TERMS_REVIEW",
+      "usage_scope": "COMMERCIAL_PENDING",
+      "confidence": "MEDIUM",
+      "approved_endpoints": [],
+      "current_code_files": [],
+      "implementation_changes_required": [
+        "PUBLIC_BETA and COMMERCIAL actions remain disabled.",
+        "LOCAL_POC remains disabled in v1 for maximum safety."
+      ],
+      "open_questions": [
+        "Terms review for any future automated usage."
+      ]
+    },
+    {
+      "source_id": "coingecko_api",
+      "name": "CoinGecko API",
+      "access_status": "PENDING_TERMS_REVIEW",
+      "usage_scope": "COMMERCIAL_PENDING",
+      "confidence": "LOW",
+      "approved_endpoints": [],
+      "current_code_files": [],
+      "implementation_changes_required": [
+        "No runtime permission in v1.",
+        "Requires explicit future operational-policy update."
+      ],
+      "open_questions": [
+        "Terms review and endpoint approval."
+      ]
+    },
+    {
+      "source_id": "cryptocompare_api",
+      "name": "CryptoCompare API",
+      "access_status": "PENDING_TERMS_REVIEW",
+      "usage_scope": "COMMERCIAL_PENDING",
+      "confidence": "LOW",
+      "approved_endpoints": [],
+      "current_code_files": [],
+      "implementation_changes_required": [
+        "No runtime permission in v1.",
+        "Requires explicit future operational-policy update."
+      ],
+      "open_questions": [
+        "Terms review and endpoint approval."
+      ]
+    },
+    {
+      "source_id": "coinmarketcap_api",
+      "name": "CoinMarketCap API",
+      "access_status": "PENDING_TERMS_REVIEW",
+      "usage_scope": "COMMERCIAL_PENDING",
+      "confidence": "LOW",
+      "approved_endpoints": [],
+      "current_code_files": [],
+      "implementation_changes_required": [
+        "No runtime permission in v1.",
+        "Requires explicit future operational-policy update."
+      ],
+      "open_questions": [
+        "API plan, terms review, and endpoint approval."
+      ]
+    },
+    {
+      "source_id": "dune_public_dashboards",
+      "name": "Dune Public Dashboards",
+      "access_status": "PENDING_TERMS_REVIEW",
+      "usage_scope": "COMMERCIAL_PENDING",
+      "confidence": "LOW",
+      "approved_endpoints": [],
+      "current_code_files": [],
+      "implementation_changes_required": [
+        "No runtime permission in v1.",
+        "Requires explicit future operational-policy update."
+      ],
+      "open_questions": [
+        "API access and automated usage terms."
+      ]
+    },
+    {
+      "source_id": "gdelt_api",
+      "name": "GDELT API",
+      "access_status": "PENDING_TERMS_REVIEW",
+      "usage_scope": "COMMERCIAL_PENDING",
+      "confidence": "LOW",
+      "approved_endpoints": [],
+      "current_code_files": [],
+      "implementation_changes_required": [
+        "No runtime permission in v1.",
+        "Requires explicit future operational-policy update."
+      ],
+      "open_questions": [
+        "Terms review and endpoint approval."
+      ]
+    },
+    {
+      "source_id": "token_unlocks",
+      "name": "Token Unlocks",
+      "access_status": "PENDING_TERMS_REVIEW",
+      "usage_scope": "COMMERCIAL_PENDING",
+      "confidence": "LOW",
+      "approved_endpoints": [],
+      "current_code_files": [],
+      "implementation_changes_required": [
+        "No runtime permission in v1.",
+        "Requires explicit future operational-policy update."
+      ],
+      "open_questions": [
+        "Legal API access confirmation."
+      ]
+    }
+  ]
+}
