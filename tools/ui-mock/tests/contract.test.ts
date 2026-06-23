@@ -4,7 +4,8 @@ import { resolve } from "node:path";
 import { mapPersistableScannerOutputToUiCandidates } from "../src/adapters/scannerOutputAdapter";
 import { getMissingSecurityText } from "../src/components/CandidateDetail";
 import { PERSISTABLE_SCANNER_SAMPLE } from "../src/fixtures/persistableScannerSample";
-import type { PersistableScannerOutput } from "../src/types/scannerTypes";
+import { interpretScannerApiOutput } from "../src/services/scannerDataSource";
+import type { PersistableScannerOutput, ScannerApiOutput } from "../src/types/scannerTypes";
 import { isPersistableScannerOutputShape } from "../server/latestScannerOutput";
 
 const realFixture = PERSISTABLE_SCANNER_SAMPLE;
@@ -85,6 +86,45 @@ assert.equal(
   isPersistableScannerOutputShape(publicFixture),
   true,
   "public JSON fixture passes validation",
+);
+
+const apiRealOutput: ScannerApiOutput = {
+  ...realFixture,
+  _source_meta: {
+    source: "real-output",
+    path: "../data-poc/output/scan_20260623073520/full_output.json",
+    reason: "latest valid tools/data-poc output selected",
+    selected_run_id: "scan_20260623073520",
+    loaded_at: "2026-06-23T07:35:21.000Z",
+  },
+};
+const apiRealResult = interpretScannerApiOutput(apiRealOutput);
+
+assert.equal(apiRealResult.usedFallback, false, "API real-output metadata is not a fallback");
+assert.equal(apiRealResult.resolvedSource, "real-output", "API real-output metadata resolves correctly");
+
+const apiFixtureFallbackOutput: ScannerApiOutput = {
+  ...realFixture,
+  _source_meta: {
+    source: "fixture-fallback",
+    path: "public/fixtures/persistableScannerSample.json",
+    reason: "no valid real scanner output found",
+    selected_run_id: null,
+    loaded_at: "2026-06-23T07:35:21.000Z",
+  },
+};
+const apiFixtureFallbackResult = interpretScannerApiOutput(apiFixtureFallbackOutput);
+
+assert.equal(apiFixtureFallbackResult.usedFallback, true, "API fixture-fallback metadata is a fallback");
+assert.equal(
+  apiFixtureFallbackResult.fallbackReason,
+  "no valid real scanner output found",
+  "fallbackReason comes from API source metadata",
+);
+assert.equal(
+  apiFixtureFallbackResult.resolvedSource,
+  "fixture-fallback",
+  "API fixture-fallback metadata resolves correctly",
 );
 
 console.log("contract tests passed");

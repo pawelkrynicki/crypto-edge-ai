@@ -121,6 +121,18 @@ export type PersistableScannerOutput = {
   scorecards: PersistableScorecard[];
 };
 
+export type ScannerSourceMeta = {
+  source: "real-output" | "fixture-fallback";
+  path: string;
+  reason: string;
+  selected_run_id: string | null;
+  loaded_at: string;
+};
+
+export type ScannerApiOutput = PersistableScannerOutput & {
+  _source_meta?: ScannerSourceMeta;
+};
+
 export interface UiTokenCandidate {
   id: string;
   runId: string;
