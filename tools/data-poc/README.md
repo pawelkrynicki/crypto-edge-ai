@@ -12,6 +12,8 @@ It also includes a third POC: Combined Scanner. This connects DexScreener discov
 
 It also includes a fourth POC: Persistable Scanner Output. This converts Combined Scanner JSON into a storage-ready model and writes local JSON/JSONL files for later database mapping.
 
+It also includes an approved free source adapter framework. This normalizes Alternative.me Fear & Greed and DefiLlama API output into a small context JSON file for later API/UI exposure.
+
 This is not the product. It does not include UI, database, migrations, auth, production cron scripts, AI calls, exchange integration, MT4, Telegram/Discord, payments, or auto-trading.
 
 ## Install
@@ -85,6 +87,142 @@ Current PUBLIC_BETA source boundary:
 - Unknown `source_id` values fail closed.
 - Raw API response storage is disabled for all v1 automated sources.
 - No API failure may fall back to scraping, HTML parsing, browser automation, undocumented endpoints, or invented data.
+
+## Approved Free Source Adapter Framework
+
+The approved source framework lives in `src/sources/`.
+
+Current adapters:
+
+- `alternative_me_fng`: Alternative.me Fear & Greed Index.
+- `defillama_api`: DefiLlama `/protocols` API.
+
+These are the only Camp BETA approved free live adapters. Paid or pending sources are intentionally not implemented here.
+
+Planned paid or clarification-dependent candidates remain later work:
+
+- CoinGecko Analyst as the first paid market/onchain candidate.
+- TokenSniffer as the first paid security pilot candidate.
+- Tokenomist as the unlock/vesting candidate.
+- GoPlus only after written commercial-use clarification.
+- Bubblemaps/Arkham only after sales and pricing clarification.
+
+Adapter contract:
+
+```ts
+type SourceAdapter = {
+  sourceId: string;
+  displayName: string;
+  supportedActions: SourceAction[];
+  fetchFixture(): Promise<NormalizedSourceOutput>;
+  fetchLive(options: { environment?: string }): Promise<NormalizedSourceOutput>;
+}
+```
+
+Normalized output:
+
+```ts
+type NormalizedSourceOutput = {
+  source_id: string;
+  source_name: string;
+  mode: "fixture" | "live";
+  fetched_at: string;
+  policy: {
+    environment: string;
+    action: string;
+    allowed: boolean;
+    reason: string;
+  };
+  data_category: "sentiment" | "defi_context" | "market_context";
+  records: NormalizedSourceRecord[];
+  warnings: string[];
+  errors: string[];
+}
+```
+
+Fixture mode:
+
+```powershell
+pnpm run sources:approved:fixture
+```
+
+Fixture mode loads only local files from `fixtures/`. It does not need internet and does not require `live_fetch` permission.
+
+Live mode:
+
+```powershell
+$env:CRYPTO_EDGE_DATA_ENV = "PUBLIC_BETA"
+pnpm run sources:approved:live
+```
+
+Live mode calls the runtime policy gate before network access:
+
+```ts
+assertSourceActionAllowed({
+  sourceId,
+  environment,
+  action: "live_fetch"
+})
+```
+
+If the policy denies a source, the adapter must not call the network and must not fall back to scraping.
+
+Allowed live endpoints in this POC:
+
+- `https://api.alternative.me/fng/`
+- `https://api.llama.fi/protocols`
+
+The DefiLlama adapter caps live protocol context to 10 normalized records so the output stays lightweight.
+
+Approved source output is written to:
+
+```text
+tools/data-poc/output/<run_id>/approved_sources_output.json
+```
+
+The output directory is ignored by git. The file contains:
+
+```ts
+{
+  run_id,
+  generated_at,
+  environment,
+  sources,
+  summary: {
+    sources_requested,
+    sources_allowed,
+    sources_denied,
+    records_total,
+    warnings_total,
+    errors_total
+  }
+}
+```
+
+Raw provider responses are not stored in this output.
+
+Future API bridge target:
+
+```text
+GET /api/context/latest
+```
+
+That endpoint is not implemented yet. It can later read the latest `approved_sources_output.json` and expose only the normalized records.
+
+## How to Add a New Data Source Safely
+
+- Add or confirm the registry entry.
+- Add runtime policy permissions for the required actions and environments.
+- Record the official docs URL.
+- Record the terms URL.
+- Add a small stable fixture.
+- Add one adapter.
+- Add one normalizer.
+- Add tests for policy, fixture mode, live URL, and normalized shape.
+- Add the UI display rule before exposing it.
+- Add the attribution rule before exposing it.
+- Store only normalized output, not raw provider JSON.
+- Do not add scraping fallback, HTML parsing, browser automation, undocumented endpoints, or reverse-engineered endpoints.
 
 ## Fixture Mode
 

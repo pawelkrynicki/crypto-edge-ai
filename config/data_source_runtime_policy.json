@@ -19,7 +19,9 @@
   "sources": {
     "alternative_me_fng": {
       "action_allowlist": {
-        "fixture_load": [],
+        "fixture_load": [
+          "FIXTURE_ONLY"
+        ],
         "live_fetch": [
           "LOCAL_POC",
           "INTERNAL_BETA",
@@ -53,7 +55,9 @@
     },
     "defillama_api": {
       "action_allowlist": {
-        "fixture_load": [],
+        "fixture_load": [
+          "FIXTURE_ONLY"
+        ],
         "live_fetch": [
           "LOCAL_POC",
           "INTERNAL_BETA",

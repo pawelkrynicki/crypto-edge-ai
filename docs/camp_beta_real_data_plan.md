@@ -40,6 +40,90 @@ Current Camp BETA clearance:
 - Raw API response storage is disabled in v1.
 - No scraping fallback is allowed. API failure must not fall back to scraping, HTML parsing, browser automation, undocumented endpoints, or invented data.
 
+## Approved Free Source Adapter Framework
+
+Camp BETA now starts with the approved free source adapter framework in `tools/data-poc/src/sources/`.
+
+Current approved free adapters:
+
+- `alternative_me_fng`: Alternative.me Fear & Greed Index from `https://api.alternative.me/fng/`.
+- `defillama_api`: DefiLlama protocol context from `https://api.llama.fi/protocols`.
+
+The framework keeps future source integration repeatable:
+
+1. Add or confirm the registry entry.
+2. Add runtime policy permissions.
+3. Add one source adapter file.
+4. Add one fixture.
+5. Add one normalizer.
+6. Add tests.
+7. Optionally expose the normalized result in UI.
+
+Fixture command:
+
+```powershell
+cd tools/data-poc
+pnpm run sources:approved:fixture
+```
+
+Live command:
+
+```powershell
+cd tools/data-poc
+$env:CRYPTO_EDGE_DATA_ENV = "PUBLIC_BETA"
+pnpm run sources:approved:live
+```
+
+Both commands write normalized output to:
+
+```text
+tools/data-poc/output/<run_id>/approved_sources_output.json
+```
+
+The output contains `run_id`, `generated_at`, `environment`, normalized `sources`, and a summary with requested, allowed, denied, record, warning, and error counts.
+
+The normalized source contract includes:
+
+- Source ID and display name.
+- Mode: `fixture` or `live`.
+- Policy decision.
+- Data category: `sentiment`, `defi_context`, or `market_context`.
+- Normalized records.
+- Warnings and errors.
+
+Raw provider responses are not persisted. API failure must not fall back to scraping.
+
+Future API bridge readiness:
+
+```text
+GET /api/context/latest
+```
+
+This endpoint is intentionally not implemented yet. It can later expose only the normalized `approved_sources_output.json` records through the UI/API layer.
+
+Paid or clarification-dependent sources remain explicitly deferred:
+
+- CoinGecko Analyst as first paid market/onchain source candidate.
+- TokenSniffer as first paid security pilot candidate.
+- Tokenomist as unlock/vesting candidate.
+- GoPlus only after written commercial-use clarification.
+- Bubblemaps/Arkham only after sales and pricing clarification.
+
+### How to Add a New Data Source Safely
+
+- Add or confirm the registry entry.
+- Add runtime policy permissions.
+- Record the official docs URL.
+- Record the terms URL.
+- Add a stable fixture.
+- Add an adapter.
+- Add a normalizer.
+- Add tests.
+- Add the UI display rule.
+- Add the attribution rule.
+- Do not store raw provider output.
+- Do not add scraping fallback.
+
 ## Minimum Viable Real-Data Flow
 
 1. DexScreener discovery.
