@@ -235,6 +235,63 @@
     color: var(--text-primary);
   }
 
+  .research-context-panel {
+    @apply rounded-md p-3 space-y-3;
+    background: var(--bg-raised);
+    border: 1px solid var(--border-sub);
+  }
+  .research-context-grid {
+    @apply grid grid-cols-1 gap-2;
+  }
+  .research-context-coverage,
+  .research-context-block {
+    @apply rounded-md p-2 min-w-0;
+    background: rgba(11,15,25,0.32);
+    border: 1px solid var(--border);
+  }
+  .research-context-mini-grid {
+    @apply grid grid-cols-1 gap-2;
+  }
+  .research-context-missing-row {
+    @apply flex items-start justify-between gap-2 rounded-md p-2;
+    background: rgba(11,15,25,0.28);
+    border: 1px solid var(--border);
+  }
+  .research-context-note {
+    @apply rounded-md px-3 py-2 text-[11px] leading-relaxed space-y-1;
+    color: var(--text-secondary);
+    background: rgba(59,130,246,0.08);
+    border: 1px solid rgba(59,130,246,0.18);
+  }
+  .research-context-note.warning {
+    color: var(--amber);
+    background: rgba(245,158,11,0.08);
+    border-color: rgba(245,158,11,0.22);
+  }
+  .research-context-chip {
+    @apply inline-flex shrink-0 items-center rounded px-1.5 py-0.5 text-[10px] font-semibold;
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    background: var(--bg-card);
+  }
+  .research-context-chip.available {
+    color: var(--green);
+    background: var(--green-dim);
+    border-color: var(--green-border);
+  }
+  .research-context-chip.pending,
+  .research-context-chip.loading {
+    color: var(--amber);
+    background: var(--amber-dim);
+    border-color: var(--amber-border);
+  }
+  .research-context-chip.missing,
+  .research-context-chip.unavailable {
+    color: var(--slate);
+    background: var(--slate-dim);
+    border-color: var(--slate-border);
+  }
+
   /* ── Input ───────────────────────────────────────────────── */
   .ai-input {
     @apply w-full rounded-md text-[13px] px-3 py-2 resize-none outline-none transition-colors;

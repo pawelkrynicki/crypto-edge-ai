@@ -149,7 +149,7 @@ export default function App() {
       );
     }
     switch (activeTab) {
-      case "scanner":     return <ScannerRadar candidates={candidates} />;
+      case "scanner":     return <ScannerRadar candidates={candidates} marketContextState={marketContextState} />;
       case "research":    return <ResearchReview />;
       case "watchlist":   return <WatchlistTab candidates={candidates} />;
       case "risks":       return <RiskAlerts candidates={candidates} />;
