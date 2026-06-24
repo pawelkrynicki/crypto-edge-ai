@@ -110,7 +110,8 @@ Approved free source adapter framework:
 - UI/API bridge: `GET /api/context/latest` reads the latest valid approved-source output and falls back to a local fixture.
 - Raw provider responses are not stored; only normalized context records are written.
 - Future source additions require registry entry, runtime policy, official docs URL, terms URL, fixture, adapter, normalizer, tests, UI display rule, attribution rule, no raw storage, and no scraping fallback.
-- The context endpoint does not live-fetch, scrape, parse HTML, call undocumented endpoints, add auth, add a database, add OpenAI, or add a frontend panel yet.
+- The Market Context Panel consumes `GET /api/context/latest` from `tools/ui-mock`, showing Alternative.me Fear & Greed and DefiLlama context as research-only market context.
+- The frontend consumes only the local API bridge. It does not live-fetch approved providers directly, scrape, parse HTML, call undocumented endpoints, add auth, add a database, add OpenAI, add paid sources, or change scanner scoring.
 
 Paid and clarification-dependent sources remain deferred:
 

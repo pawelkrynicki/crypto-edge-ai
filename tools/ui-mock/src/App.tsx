@@ -5,12 +5,14 @@ import { ResearchReview } from "./components/ResearchReview";
 import { WatchlistTab } from "./components/WatchlistTab";
 import { RiskAlerts } from "./components/RiskAlerts";
 import { Methodology } from "./components/Methodology";
+import { MarketContextPanel, type MarketContextPanelState } from "./components/MarketContextPanel";
 import {
   loadScannerDataSourceResult,
   type DataSourceKey,
   type ResolvedScannerSource,
   type ScannerDataSourceResult,
 } from "./services/scannerDataSource";
+import { loadLatestMarketContext } from "./services/contextDataSource";
 import { mapPersistableScannerOutputToUiCandidates } from "./adapters/scannerOutputAdapter";
 import { toMockCandidate, type MockCandidate } from "./mockData";
 
@@ -74,6 +76,10 @@ export default function App() {
   const [candidates,   setCandidates]   = useState<MockCandidate[]>([]);
   const [loading,      setLoading]      = useState(false);
   const [fallbackMsg,  setFallbackMsg]  = useState<string | null>(null);
+  const [marketContextState, setMarketContextState] = useState<MarketContextPanelState>({
+    status: "loading",
+    context: null,
+  });
 
   const summary = buildSummary(candidates);
   const sourceStatusText = SOURCE_STATUS_TEXT[resolvedSource];
@@ -100,10 +106,34 @@ export default function App() {
     }
   }, []);
 
+  const loadMarketContext = useCallback(async () => {
+    setMarketContextState({ status: "loading", context: null });
+    const result = await loadLatestMarketContext();
+
+    if (result.status === "ready") {
+      setMarketContextState({
+        status: "ready",
+        context: result.output,
+        message: result.usedFallback ? result.fallbackReason : undefined,
+      });
+      return;
+    }
+
+    setMarketContextState({
+      status: "error",
+      context: null,
+      message: result.error,
+    });
+  }, []);
+
   // Initial load on mount
   useEffect(() => {
     loadData("fixture");
   }, [loadData]);
+
+  useEffect(() => {
+    loadMarketContext();
+  }, [loadMarketContext]);
 
   const handleSourceChange = (source: DataSourceKey) => {
     setDataSource(source);
@@ -264,8 +294,13 @@ export default function App() {
           </div>
         )}
 
-        {/* Stat cards strip */}
+        {/* Market context */}
         <div className="px-5 pt-4 pb-3 shrink-0">
+          <MarketContextPanel state={marketContextState} />
+        </div>
+
+        {/* Stat cards strip */}
+        <div className="px-5 pb-3 shrink-0">
           <StatCards summary={summary} />
         </div>
 
