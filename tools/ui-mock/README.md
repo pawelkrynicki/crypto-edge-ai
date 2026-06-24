@@ -32,6 +32,10 @@ npm run dev     # Start local development server
 npm run build   # Build for production
 ```
 
+### Windows Helper Scripts
+
+Windows CMD helpers for checking the UI mock, starting the API/frontend preview, and freeing local ports are documented in `../../scripts/win/README.md`. The UI mock check uses direct binaries instead of `pnpm` because of the known Windows `node_modules` / `pnpm` `EPERM` issue.
+
 ## Thin Scanner API POC
 
 The local API bridge closes the current loop from persisted scanner-shaped JSON into the UI mock without adding a production backend.
