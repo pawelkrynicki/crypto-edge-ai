@@ -35,6 +35,7 @@ npm run build   # Build for production
 The local API bridge closes the current loop from persisted scanner-shaped JSON into the UI mock without adding a production backend.
 
 - `GET /api/health` returns `{ "status": "ok", "service": "crypto-edge-ai-scanner-api" }`.
+- `GET /api/context/latest` returns normalized approved free source context.
 - `GET /api/scanner/latest` returns `PersistableScannerOutput` JSON.
 - Default API port: `5177`.
 - Port override: `SCANNER_API_PORT`.
@@ -51,6 +52,44 @@ pnpm run dev:with-api
 This remains a thin local bridge only. It adds no database, MySQL, Drizzle, auth, OpenAI, live token fetching, trading automation, or buy/sell signal wording. `WATCHLIST` still means eligible for further review only.
 
 Next stage: read a real persisted scanner run from `tools/data-poc/output/<run_id>/full_output.json`.
+
+## Approved Source Context API Bridge
+
+`GET /api/context/latest` exposes the latest normalized approved free source context from:
+
+```text
+tools/data-poc/output/<run_id>/approved_sources_output.json
+```
+
+The endpoint selects the newest valid directory whose name starts with `approved_sources_`, reads `approved_sources_output.json`, validates the lightweight shape, strips any unexpected raw-provider fields, and returns:
+
+```ts
+{
+  run_id: string;
+  generated_at: string;
+  environment: string;
+  sources: NormalizedSourceOutput[];
+  summary: {
+    sources_requested: number;
+    sources_allowed: number;
+    sources_denied: number;
+    records_total: number;
+    warnings_total: number;
+    errors_total: number;
+  };
+  _source_meta: {
+    source_kind: "approved-sources-output" | "fixture-fallback";
+    output_file: string | null;
+    loaded_at: string;
+  };
+}
+```
+
+If no valid approved-source output exists, it falls back to `public/fixtures/contextLatestFixture.json`.
+
+This endpoint is read-only. It does not call Alternative.me, DefiLlama, or any external API. It does not scrape, parse HTML, use browser automation, read undocumented endpoints, add auth, add a database, add OpenAI, or change scanner scoring. A future UI context panel can consume this endpoint later; no frontend panel is added in this stage.
+
+Paid sources remain deferred: CoinGecko Analyst, TokenSniffer, Tokenomist, GoPlus after written commercial-use clarification, and Bubblemaps/Arkham after sales and pricing clarification.
 
 ## Real Scanner Output Bridge POC
 

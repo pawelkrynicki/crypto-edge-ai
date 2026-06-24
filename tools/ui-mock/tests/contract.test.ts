@@ -1,11 +1,16 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { get } from "node:http";
+import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { resolve } from "node:path";
+import type { AddressInfo } from "node:net";
 import { mapPersistableScannerOutputToUiCandidates } from "../src/adapters/scannerOutputAdapter";
 import { getMissingSecurityText } from "../src/components/CandidateDetail";
 import { PERSISTABLE_SCANNER_SAMPLE } from "../src/fixtures/persistableScannerSample";
 import { interpretScannerApiOutput } from "../src/services/scannerDataSource";
 import type { PersistableScannerOutput, ScannerApiOutput } from "../src/types/scannerTypes";
+import { createScannerApiServer } from "../server/scannerApiServer";
+import { readLatestContextOutput, type ContextLatestOutput } from "../server/latestContextOutput";
 import { isPersistableScannerOutputShape } from "../server/latestScannerOutput";
 
 const realFixture = PERSISTABLE_SCANNER_SAMPLE;
@@ -127,4 +132,231 @@ assert.equal(
   "API fixture-fallback metadata resolves correctly",
 );
 
+const contextFixturePath = resolve("public", "fixtures", "contextLatestFixture.json");
+const contextFixture = JSON.parse(await readFile(contextFixturePath, "utf8"));
+
+assert.equal(
+  contextFixture._source_meta.source_kind,
+  "fixture-fallback",
+  "context fallback fixture declares fixture-fallback metadata",
+);
+
+const contextTempRoot = await mkdtemp(resolve(tmpdir(), "crypto-edge-context-api-"));
+try {
+  const outputDir = resolve(contextTempRoot, "output");
+  await mkdir(outputDir, { recursive: true });
+  await writeContextRun(outputDir, makeContextOutput("approved_sources_20260624010101", 3));
+  await writeContextRun(outputDir, makeContextOutput("approved_sources_20260624020202", 9));
+
+  const latestContext = await readLatestContextOutput({ outputDirPath: outputDir, fixturePath: contextFixturePath });
+  assert.equal(
+    latestContext.run_id,
+    "approved_sources_20260624020202",
+    "context API reader selects the newest approved_sources_* directory",
+  );
+  assert.equal(latestContext._source_meta.source_kind, "approved-sources-output", "latest output metadata is included");
+  assert.ok(latestContext._source_meta.output_file?.endsWith("approved_sources_output.json"));
+  assert.equal(latestContext.summary.records_total, 3, "summary counts are preserved from approved source output");
+  assert.deepEqual(
+    latestContext.sources.map((source) => source.source_id),
+    ["alternative_me_fng", "defillama_api"],
+    "approved context source IDs are preserved",
+  );
+
+  const server = createScannerApiServer({
+    context: {
+      outputDirPath: outputDir,
+      fixturePath: contextFixturePath,
+    },
+  });
+  await new Promise<void>((resolveListen) => server.listen(0, "127.0.0.1", resolveListen));
+
+  try {
+    const address = server.address() as AddressInfo;
+    const response = await getJson(`http://127.0.0.1:${address.port}/api/context/latest`) as ContextLatestOutput;
+
+    assert.equal(response.run_id, "approved_sources_20260624020202", "GET /api/context/latest returns latest approved output");
+    assert.equal(response._source_meta.source_kind, "approved-sources-output", "GET /api/context/latest includes source metadata");
+    assert.equal(response.summary.sources_requested, 2, "GET /api/context/latest preserves summary counts");
+  } finally {
+    await new Promise<void>((resolveClose, rejectClose) => {
+      server.close((error) => {
+        if (error) rejectClose(error);
+        else resolveClose();
+      });
+    });
+  }
+
+  const emptyOutputDir = resolve(contextTempRoot, "empty-output");
+  await mkdir(emptyOutputDir, { recursive: true });
+  const fallbackContext = await readLatestContextOutput({ outputDirPath: emptyOutputDir, fixturePath: contextFixturePath });
+  assert.equal(fallbackContext._source_meta.source_kind, "fixture-fallback", "context reader falls back when no output exists");
+  assert.equal(fallbackContext._source_meta.output_file, null, "fixture fallback does not claim an output file");
+
+  const invalidOutputDir = resolve(contextTempRoot, "invalid-output");
+  await mkdir(resolve(invalidOutputDir, "approved_sources_20260624030303"), { recursive: true });
+  await writeFile(
+    resolve(invalidOutputDir, "approved_sources_20260624030303", "approved_sources_output.json"),
+    "{ invalid json",
+    "utf8",
+  );
+  const invalidFallbackContext = await readLatestContextOutput({ outputDirPath: invalidOutputDir, fixturePath: contextFixturePath });
+  assert.equal(
+    invalidFallbackContext._source_meta.source_kind,
+    "fixture-fallback",
+    "context reader handles invalid JSON with fixture fallback",
+  );
+
+  const originalFetch = globalThis.fetch;
+  let fetchCalled = false;
+  globalThis.fetch = (async () => {
+    fetchCalled = true;
+    throw new Error("context reader must not call network");
+  }) as typeof fetch;
+
+  try {
+    await readLatestContextOutput({ outputDirPath: outputDir, fixturePath: contextFixturePath });
+    assert.equal(fetchCalled, false, "context reader does not call network");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  const rawLeakOutputDir = resolve(contextTempRoot, "raw-leak-output");
+  const rawLeakOutput = makeContextOutput("approved_sources_20260624040404", 5);
+  await writeContextRun(rawLeakOutputDir, {
+    ...rawLeakOutput,
+    metadata: { provider: "raw" },
+    sources: rawLeakOutput.sources.map((source) => ({
+      ...source,
+      raw: { unsafe: true },
+      provider_response: { unsafe: true },
+      records: source.records.map((record) => ({
+        ...record,
+        description: "raw provider field",
+        symbol: "RAW",
+        chains: ["Ethereum"],
+      })),
+    })),
+  });
+  const sanitizedContext = await readLatestContextOutput({ outputDirPath: rawLeakOutputDir, fixturePath: contextFixturePath });
+  const serializedContext = JSON.stringify(sanitizedContext);
+  for (const forbiddenField of ["metadata", "description", "symbol", "chains", "raw", "provider_response"]) {
+    assert.equal(
+      serializedContext.includes(`"${forbiddenField}"`),
+      false,
+      `context output must not expose raw provider field ${forbiddenField}`,
+    );
+  }
+} finally {
+  await rm(contextTempRoot, { recursive: true, force: true });
+}
+
 console.log("contract tests passed");
+
+async function writeContextRun(outputDir: string, output: Record<string, unknown>): Promise<void> {
+  const runDir = resolve(outputDir, output.run_id as string);
+  await mkdir(runDir, { recursive: true });
+  await writeFile(resolve(runDir, "approved_sources_output.json"), `${JSON.stringify(output, null, 2)}\n`, "utf8");
+}
+
+function makeContextOutput(runId: string, fearGreedValue: number): Omit<ContextLatestOutput, "_source_meta"> {
+  return {
+    run_id: runId,
+    generated_at: "2026-06-24T00:00:00.000Z",
+    environment: "PUBLIC_BETA",
+    sources: [
+      {
+        source_id: "alternative_me_fng",
+        source_name: "Alternative.me Fear & Greed Index",
+        mode: "live",
+        fetched_at: "2026-06-24T00:00:01.000Z",
+        policy: {
+          environment: "PUBLIC_BETA",
+          action: "live_fetch",
+          allowed: true,
+          reason: "Allowed in PUBLIC_BETA",
+        },
+        data_category: "sentiment",
+        records: [
+          {
+            record_type: "fear_greed_index",
+            value: fearGreedValue,
+            value_classification: "Fear",
+            timestamp: "2026-06-24T00:00:00.000Z",
+            time_until_update: "12345",
+          },
+        ],
+        warnings: [],
+        errors: [],
+      },
+      {
+        source_id: "defillama_api",
+        source_name: "DefiLlama API",
+        mode: "live",
+        fetched_at: "2026-06-24T00:00:02.000Z",
+        policy: {
+          environment: "PUBLIC_BETA",
+          action: "live_fetch",
+          allowed: true,
+          reason: "Allowed in PUBLIC_BETA",
+        },
+        data_category: "defi_context",
+        records: [
+          {
+            record_type: "defi_protocol_snapshot",
+            name: "Lido",
+            chain: "Ethereum",
+            tvl_usd: 35400000000,
+            change_1d: 0.75,
+            change_7d: -2.1,
+            url: "https://lido.fi",
+          },
+          {
+            record_type: "defi_protocol_snapshot",
+            name: "Uniswap V3",
+            chain: "Ethereum",
+            tvl_usd: 4200000000,
+            change_1d: 1.2,
+            change_7d: 3.4,
+            url: "https://app.uniswap.org",
+          },
+        ],
+        warnings: [],
+        errors: [],
+      },
+    ],
+    summary: {
+      sources_requested: 2,
+      sources_allowed: 2,
+      sources_denied: 0,
+      records_total: 3,
+      warnings_total: 0,
+      errors_total: 0,
+    },
+  };
+}
+
+function getJson(url: string): Promise<unknown> {
+  return new Promise((resolveRequest, rejectRequest) => {
+    const request = get(url, (response) => {
+      let body = "";
+      response.setEncoding("utf8");
+      response.on("data", (chunk) => {
+        body += chunk;
+      });
+      response.on("end", () => {
+        if (response.statusCode !== 200) {
+          rejectRequest(new Error(`GET ${url} failed with HTTP ${response.statusCode}: ${body}`));
+          return;
+        }
+
+        try {
+          resolveRequest(JSON.parse(body));
+        } catch (error) {
+          rejectRequest(error);
+        }
+      });
+    });
+    request.on("error", rejectRequest);
+  });
+}

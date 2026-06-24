@@ -1,0 +1,79 @@
+{
+  "run_id": "approved_sources_fixture",
+  "generated_at": "2026-06-24T00:00:00.000Z",
+  "environment": "FIXTURE_ONLY",
+  "sources": [
+    {
+      "source_id": "alternative_me_fng",
+      "source_name": "Alternative.me Fear & Greed Index",
+      "mode": "fixture",
+      "fetched_at": "2026-06-24T00:00:00.000Z",
+      "policy": {
+        "environment": "FIXTURE_ONLY",
+        "action": "fixture_load",
+        "allowed": true,
+        "reason": "Fixture fallback for context API"
+      },
+      "data_category": "sentiment",
+      "records": [
+        {
+          "record_type": "fear_greed_index",
+          "value": 42,
+          "value_classification": "Fear",
+          "timestamp": "2024-03-09T16:00:00.000Z",
+          "time_until_update": "12345"
+        }
+      ],
+      "warnings": [],
+      "errors": []
+    },
+    {
+      "source_id": "defillama_api",
+      "source_name": "DefiLlama API",
+      "mode": "fixture",
+      "fetched_at": "2026-06-24T00:00:00.000Z",
+      "policy": {
+        "environment": "FIXTURE_ONLY",
+        "action": "fixture_load",
+        "allowed": true,
+        "reason": "Fixture fallback for context API"
+      },
+      "data_category": "defi_context",
+      "records": [
+        {
+          "record_type": "defi_protocol_snapshot",
+          "name": "Lido",
+          "chain": "Ethereum",
+          "tvl_usd": 35400000000,
+          "change_1d": 0.75,
+          "change_7d": -2.1,
+          "url": "https://lido.fi"
+        },
+        {
+          "record_type": "defi_protocol_snapshot",
+          "name": "Uniswap V3",
+          "chain": "Ethereum",
+          "tvl_usd": 4200000000,
+          "change_1d": 1.2,
+          "change_7d": 3.4,
+          "url": "https://app.uniswap.org"
+        }
+      ],
+      "warnings": [],
+      "errors": []
+    }
+  ],
+  "summary": {
+    "sources_requested": 2,
+    "sources_allowed": 2,
+    "sources_denied": 0,
+    "records_total": 3,
+    "warnings_total": 0,
+    "errors_total": 0
+  },
+  "_source_meta": {
+    "source_kind": "fixture-fallback",
+    "output_file": null,
+    "loaded_at": "2026-06-24T00:00:00.000Z"
+  }
+}
