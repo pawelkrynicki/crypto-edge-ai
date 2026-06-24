@@ -8,7 +8,7 @@ It demonstrates the visual direction, product structure, and trader value propos
 - **Dark, professional UI**: Aligned with the AIKINTEL aesthetic.
 - **Scanner Radar**: Main table view showing token candidates with market data, basic filter status, security checks, and final labels.
 - **Market Context Panel**: Shows Alternative.me Fear & Greed plus DefiLlama context from the local API bridge.
-- **Candidate Detail Panel**: In-depth breakdown of a selected token, including a trader checklist and risk reasons.
+- **Candidate Detail Panel**: In-depth breakdown of a selected token, including research context/data coverage, a trader checklist, and risk reasons.
 - **Research Review (Mock)**: A text area to paste news/events and see a mock AI risk categorization.
 - **Watchlist & Risk Alerts**: Dedicated tabs for tracking eligible candidates and critical risks.
 - **Methodology**: Explanation of the staged review process.
@@ -17,6 +17,7 @@ It demonstrates the visual direction, product structure, and trader value propos
 - **No Buy Signals**: Crypto Edge AI is a research tool, not a trading bot.
 - **WATCHLIST ≠ Buy**: The `WATCHLIST` label strictly means "eligible for further review". It explicitly states "Further review only, not a buy signal."
 - **Local Bridges Only**: This preview uses fixtures or local API bridge endpoints. The frontend does not call Alternative.me, DefiLlama, paid data sources, a database, or OpenAI directly.
+- **Context Does Not Change Labels**: Market context appears in the token detail for research framing only. It does not change scanner labels, scoring, or WATCHLIST meaning.
 
 ## Development
 
@@ -94,6 +95,8 @@ The Market Context Panel consumes this endpoint from the frontend. It displays:
 - Up to 5 DefiLlama protocol or chain context rows with TVL and 1d/7d change.
 - Source status, environment, summary counts, and warning/error counts.
 - Research-only compliance copy.
+
+The token detail panel also receives the already-loaded context state from the app. Its **Data Coverage & Context** section shows available approved free context, scanner/security coverage, API unavailable or fixture fallback state, and missing future categories such as paid market/onchain data, dedicated scam/security sources, unlocks/vesting, wallet clusters, and social sentiment.
 
 This endpoint is read-only. It does not call Alternative.me, DefiLlama, or any external API from the frontend. It does not scrape, parse HTML, use browser automation, read undocumented endpoints, add auth, add a database, add OpenAI, add paid data sources, or change scanner scoring.
 

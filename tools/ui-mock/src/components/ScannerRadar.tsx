@@ -2,9 +2,11 @@ import React, { useState } from "react";
 import type { MockCandidate, FinalLabel } from "../mockData";
 import { LabelBadge } from "./LabelBadge";
 import { CandidateDetail } from "./CandidateDetail";
+import type { MarketContextPanelState } from "./MarketContextPanel";
 
 interface Props {
   candidates: MockCandidate[];
+  marketContextState?: MarketContextPanelState;
 }
 
 const CHAIN_LABELS: Record<string, string> = {
@@ -69,7 +71,7 @@ const FilterCell: React.FC<{ status: string }> = ({ status }) => {
   );
 };
 
-export const ScannerRadar: React.FC<Props> = ({ candidates }) => {
+export const ScannerRadar: React.FC<Props> = ({ candidates, marketContextState }) => {
   const [selected, setSelected] = useState<MockCandidate | null>(candidates[0] ?? null);
   const [filter, setFilter] = useState<FinalLabel | "ALL">("ALL");
 
@@ -158,7 +160,11 @@ export const ScannerRadar: React.FC<Props> = ({ candidates }) => {
       {/* ── Right: detail panel ─────────────────────────────── */}
       <div className="w-[320px] flex-shrink-0 hidden xl:block">
         {selected ? (
-          <CandidateDetail candidate={selected} onClose={() => setSelected(null)} />
+          <CandidateDetail
+            candidate={selected}
+            marketContextState={marketContextState}
+            onClose={() => setSelected(null)}
+          />
         ) : (
           <div className="card p-6 text-center text-secondary text-sm">
             Select a token to view details

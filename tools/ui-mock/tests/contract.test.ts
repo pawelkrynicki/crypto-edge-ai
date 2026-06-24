@@ -7,9 +7,10 @@ import type { AddressInfo } from "node:net";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { mapPersistableScannerOutputToUiCandidates } from "../src/adapters/scannerOutputAdapter";
-import { getMissingSecurityText } from "../src/components/CandidateDetail";
+import { CandidateDetail, getMissingSecurityText } from "../src/components/CandidateDetail";
 import { MarketContextPanel } from "../src/components/MarketContextPanel";
 import { PERSISTABLE_SCANNER_SAMPLE } from "../src/fixtures/persistableScannerSample";
+import { toMockCandidate } from "../src/mockData";
 import { interpretContextApiOutput, parseMarketContextApiOutput } from "../src/services/contextDataSource";
 import { interpretScannerApiOutput } from "../src/services/scannerDataSource";
 import type { PersistableScannerOutput, ScannerApiOutput } from "../src/types/scannerTypes";
@@ -184,6 +185,39 @@ const apiFailureMarkup = renderToStaticMarkup(React.createElement(MarketContextP
 
 assert.match(apiFailureMarkup, /API unavailable/, "panel shows API failure state");
 assert.match(apiFailureMarkup, /Context API unavailable: test failure/, "panel renders API failure detail");
+
+const passMockCandidate = toMockCandidate(passUi);
+const detailWithContextMarkup = renderToStaticMarkup(React.createElement(CandidateDetail, {
+  candidate: passMockCandidate,
+  marketContextState: {
+    status: "ready",
+    context: parsedContextFixture,
+    message: interpretedContextFixture.fallbackReason,
+  },
+}));
+
+assert.match(detailWithContextMarkup, /Data Coverage.*Context/, "candidate detail renders research context section");
+assert.match(detailWithContextMarkup, /42 - Fear/, "candidate detail renders Fear & Greed context");
+assert.match(detailWithContextMarkup, /CoinGecko pending/, "candidate detail shows paid market source as pending");
+assert.match(detailWithContextMarkup, /TokenSniffer \/ GoPlus clarification pending/, "candidate detail shows dedicated security sources as pending");
+assert.match(detailWithContextMarkup, /Tokenomist pending/, "candidate detail shows unlock source as pending");
+assert.match(detailWithContextMarkup, /This is not a buy\/sell signal\./, "candidate detail renders compliance note");
+assert.match(detailWithContextMarkup, /Context does not alter scanner label\./, "candidate detail explains context does not alter label");
+assert.match(detailWithContextMarkup, /Fixture context/, "candidate detail represents fixture context fallback");
+assert.match(detailWithContextMarkup, /Further review only/, "candidate detail keeps candidate final label visible");
+assert.equal(passMockCandidate.final_label, "WATCHLIST", "context rendering does not change candidate final label");
+
+const detailFailureMarkup = renderToStaticMarkup(React.createElement(CandidateDetail, {
+  candidate: passMockCandidate,
+  marketContextState: {
+    status: "error",
+    context: null,
+    message: "Context API unavailable: test failure",
+  },
+}));
+
+assert.match(detailFailureMarkup, /Context unavailable/, "candidate detail handles context API failure");
+assert.match(detailFailureMarkup, /Further review only/, "candidate detail still renders label when context is unavailable");
 
 const contextTempRoot = await mkdtemp(resolve(tmpdir(), "crypto-edge-context-api-"));
 try {

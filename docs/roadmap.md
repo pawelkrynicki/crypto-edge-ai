@@ -111,6 +111,8 @@ Approved free source adapter framework:
 - Raw provider responses are not stored; only normalized context records are written.
 - Future source additions require registry entry, runtime policy, official docs URL, terms URL, fixture, adapter, normalizer, tests, UI display rule, attribution rule, no raw storage, and no scraping fallback.
 - The Market Context Panel consumes `GET /api/context/latest` from `tools/ui-mock`, showing Alternative.me Fear & Greed and DefiLlama context as research-only market context.
+- Token detail now includes a Data Coverage & Context section showing available approved free context, scanner/security coverage, and missing future data categories.
+- Context does not change scanner scoring, final labels, or WATCHLIST meaning.
 - The frontend consumes only the local API bridge. It does not live-fetch approved providers directly, scrape, parse HTML, call undocumented endpoints, add auth, add a database, add OpenAI, add paid sources, or change scanner scoring.
 
 Paid and clarification-dependent sources remain deferred:

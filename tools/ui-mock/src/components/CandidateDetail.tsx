@@ -1,10 +1,13 @@
 import React, { useState } from "react";
 import type { MockCandidate } from "../mockData";
 import { LabelBadge } from "./LabelBadge";
+import { CandidateResearchContext } from "./CandidateResearchContext";
+import type { MarketContextPanelState } from "./MarketContextPanel";
 
 interface Props {
   candidate: MockCandidate;
   onClose?: () => void;
+  marketContextState?: MarketContextPanelState;
 }
 
 function fmtUsd(n: number | null, decimals = 0): string {
@@ -117,7 +120,7 @@ export function getMissingSecurityText(candidate: Pick<MockCandidate, "basic_fil
   return "Security data is unavailable. Manual verification is required.";
 }
 
-export const CandidateDetail: React.FC<Props> = ({ candidate: c, onClose }) => {
+export const CandidateDetail: React.FC<Props> = ({ candidate: c, onClose, marketContextState }) => {
   const [checked, setChecked] = useState<CheckedState>({});
   const sec = c.security;
   const decision = DECISION_COPY[c.final_label] ?? {
@@ -231,7 +234,12 @@ export const CandidateDetail: React.FC<Props> = ({ candidate: c, onClose }) => {
         </div>
 
         <div>
-          <SectionTitle>C. Decision</SectionTitle>
+          <SectionTitle>C. Data Coverage &amp; Context</SectionTitle>
+          <CandidateResearchContext candidate={c} marketContextState={marketContextState} />
+        </div>
+
+        <div>
+          <SectionTitle>D. Decision</SectionTitle>
           <div className="rounded-md p-3 space-y-2" style={{ background: "var(--bg-raised)", border: "1px solid var(--border-sub)" }}>
             <div className="flex items-center gap-2">
               <LabelBadge label={c.final_label} size="md" />
@@ -258,7 +266,7 @@ export const CandidateDetail: React.FC<Props> = ({ candidate: c, onClose }) => {
         </div>
 
         <div>
-          <SectionTitle>D. Final Checklist</SectionTitle>
+          <SectionTitle>E. Final Checklist</SectionTitle>
           <div className="space-y-3">
             {Object.entries(CHECKLIST_ITEMS).map(([category, items]) => (
               <div key={category}>
