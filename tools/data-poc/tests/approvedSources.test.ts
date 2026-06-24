@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { relative, resolve } from "node:path";
 import { describe, it } from "node:test";
 import {
   ALTERNATIVE_ME_FNG_SOURCE_ID,
@@ -153,22 +155,28 @@ describe("approved free source adapters", () => {
     assert.equal(serialized.includes('"chains"'), false);
   });
 
-  it("writes approved source output to the output folder", async () => {
-    const result = await runApprovedSourcesPoc({
-      mode: "fixture",
-      now: new Date("2026-06-24T12:34:56.000Z"),
-      baseOutputDir: resolveRepoFile("tools/data-poc/output")
-    });
-    const persisted = JSON.parse(await readFile(result.output_file, "utf8")) as unknown;
+  it("writes approved source output to a temporary output folder", async () => {
+    const tempRoot = await mkdtemp(resolve(tmpdir(), "crypto-edge-approved-sources-"));
 
-    assert.equal(result.output.run_id, "approved_sources_20260624123456");
-    assert.equal(result.output_file.endsWith(APPROVED_SOURCES_OUTPUT_FILENAME), true);
-    assert.equal(result.output_dir.includes("tools\\data-poc\\output") || result.output_dir.includes("tools/data-poc/output"), true);
-    assert.deepEqual(persisted, result.output);
-    assert.equal(result.output.summary.sources_requested, 2);
-    assert.equal(result.output.summary.sources_allowed, 2);
-    assert.equal(result.output.summary.sources_denied, 0);
-    assert.equal(result.output.summary.records_total, 3);
+    try {
+      const result = await runApprovedSourcesPoc({
+        mode: "fixture",
+        now: new Date("2026-06-24T12:34:56.000Z"),
+        baseOutputDir: tempRoot
+      });
+      const persisted = JSON.parse(await readFile(result.output_file, "utf8")) as unknown;
+
+      assert.equal(result.output.run_id, "approved_sources_20260624123456");
+      assert.equal(result.output_file.endsWith(APPROVED_SOURCES_OUTPUT_FILENAME), true);
+      assert.equal(relative(tempRoot, result.output_dir), result.output.run_id);
+      assert.deepEqual(persisted, result.output);
+      assert.equal(result.output.summary.sources_requested, 2);
+      assert.equal(result.output.summary.sources_allowed, 2);
+      assert.equal(result.output.summary.sources_denied, 0);
+      assert.equal(result.output.summary.records_total, 3);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
   });
 
   it("registers only the approved Camp BETA adapters", () => {
