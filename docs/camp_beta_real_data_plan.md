@@ -117,6 +117,43 @@ Paid or clarification-dependent sources remain explicitly deferred:
 - GoPlus only after written commercial-use clarification.
 - Bubblemaps/Arkham only after sales and pricing clarification.
 
+## Local Review Session UI Layer
+
+Stage 7B adds a local analyst workflow to the `tools/ui-mock` scanner without changing scanner output.
+
+The Candidate Detail panel includes a Local Review Session with:
+
+- Local review status.
+- Analyst note.
+- Last-updated timestamp.
+- Clear wording that the review layer is saved in the current browser only.
+
+The state is stored in browser `localStorage` under:
+
+```text
+crypto-edge-ai.review-session.v1
+```
+
+Allowed local review statuses:
+
+- Not reviewed
+- Needs more research
+- Saved for follow-up
+- Dismissed after review
+- Waiting for more data
+
+This remains a UI-only work organization layer. It does not add a backend, database, auth, API write path, production cron, OpenAI call, data source, scraping, HTML parsing, browser automation, or undocumented endpoint. It does not change scanner scoring, final labels, or WATCHLIST meaning.
+
+The Scanner Radar table shows a small Review badge separate from the scanner Label column. The radar also includes a Follow-up filter based only on the local `Saved for follow-up` review status.
+
+Review panel compliance copy:
+
+```text
+Local review is saved only in this browser.
+This does not change scanner label.
+This is not a buy/sell signal.
+```
+
 ### How to Add a New Data Source Safely
 
 - Add or confirm the registry entry.

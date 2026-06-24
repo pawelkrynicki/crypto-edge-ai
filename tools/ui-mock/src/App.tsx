@@ -13,8 +13,10 @@ import {
   type ScannerDataSourceResult,
 } from "./services/scannerDataSource";
 import { loadLatestMarketContext } from "./services/contextDataSource";
+import { clearReviewRecord, loadReviewSession, saveReviewRecord } from "./services/reviewSessionStore";
 import { mapPersistableScannerOutputToUiCandidates } from "./adapters/scannerOutputAdapter";
 import { toMockCandidate, type MockCandidate } from "./mockData";
+import type { CandidateReviewInput, ReviewSessionState } from "./types/reviewSessionTypes";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -76,6 +78,7 @@ export default function App() {
   const [candidates,   setCandidates]   = useState<MockCandidate[]>([]);
   const [loading,      setLoading]      = useState(false);
   const [fallbackMsg,  setFallbackMsg]  = useState<string | null>(null);
+  const [reviewSession, setReviewSession] = useState<ReviewSessionState>(() => loadReviewSession());
   const [marketContextState, setMarketContextState] = useState<MarketContextPanelState>({
     status: "loading",
     context: null,
@@ -140,6 +143,14 @@ export default function App() {
     loadData(source);
   };
 
+  const handleSaveReview = useCallback((input: CandidateReviewInput) => {
+    setReviewSession(saveReviewRecord(input));
+  }, []);
+
+  const handleClearReview = useCallback((candidateId: string) => {
+    setReviewSession(clearReviewRecord(candidateId));
+  }, []);
+
   const renderTab = () => {
     if (loading) {
       return (
@@ -149,7 +160,15 @@ export default function App() {
       );
     }
     switch (activeTab) {
-      case "scanner":     return <ScannerRadar candidates={candidates} marketContextState={marketContextState} />;
+      case "scanner":     return (
+        <ScannerRadar
+          candidates={candidates}
+          marketContextState={marketContextState}
+          reviewSession={reviewSession}
+          onSaveReview={handleSaveReview}
+          onClearReview={handleClearReview}
+        />
+      );
       case "research":    return <ResearchReview />;
       case "watchlist":   return <WatchlistTab candidates={candidates} />;
       case "risks":       return <RiskAlerts candidates={candidates} />;

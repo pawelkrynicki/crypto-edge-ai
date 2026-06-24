@@ -122,6 +122,17 @@ Windows helper scripts:
 - `scripts\win\generate-live-context.cmd` generates approved live context for the local preview.
 - `scripts\win\dev-ui.cmd` starts the local API and frontend preview.
 
+Local Review Session:
+
+- Stage 7B adds a browser-only analyst review workflow to `tools/ui-mock`.
+- The Candidate Detail panel stores local review status, analyst note, and last-updated timestamp in `localStorage`.
+- Storage key: `crypto-edge-ai.review-session.v1`.
+- Statuses are `Not reviewed`, `Needs more research`, `Saved for follow-up`, `Dismissed after review`, and `Waiting for more data`.
+- The Scanner Radar table shows a separate Review badge and a Follow-up filter for locally saved follow-up items.
+- This does not add a backend, database, auth, API write path, production cron, OpenAI call, data source, scraping, HTML parsing, browser automation, or undocumented endpoint.
+- Review status does not change scanner scoring, final labels, or WATCHLIST meaning.
+- Review panel compliance copy: `Local review is saved only in this browser. This does not change scanner label. This is not a buy/sell signal.`
+
 Paid and clarification-dependent sources remain deferred:
 
 - CoinGecko Analyst: first paid market/onchain candidate.
