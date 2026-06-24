@@ -7,6 +7,7 @@ It demonstrates the visual direction, product structure, and trader value propos
 ## Features
 - **Dark, professional UI**: Aligned with the AIKINTEL aesthetic.
 - **Scanner Radar**: Main table view showing token candidates with market data, basic filter status, security checks, and final labels.
+- **Market Context Panel**: Shows Alternative.me Fear & Greed plus DefiLlama context from the local API bridge.
 - **Candidate Detail Panel**: In-depth breakdown of a selected token, including a trader checklist and risk reasons.
 - **Research Review (Mock)**: A text area to paste news/events and see a mock AI risk categorization.
 - **Watchlist & Risk Alerts**: Dedicated tabs for tracking eligible candidates and critical risks.
@@ -15,7 +16,7 @@ It demonstrates the visual direction, product structure, and trader value propos
 ## Important Product Rules
 - **No Buy Signals**: Crypto Edge AI is a research tool, not a trading bot.
 - **WATCHLIST ≠ Buy**: The `WATCHLIST` label strictly means "eligible for further review". It explicitly states "Further review only, not a buy signal."
-- **Mock Data Only**: This preview uses hardcoded mock data aligned with the `CombinedScanner` output from `tools/data-poc`. It does not make real API calls, connect to a database, or use real OpenAI models yet.
+- **Local Bridges Only**: This preview uses fixtures or local API bridge endpoints. The frontend does not call Alternative.me, DefiLlama, paid data sources, a database, or OpenAI directly.
 
 ## Development
 
@@ -87,7 +88,14 @@ The endpoint selects the newest valid directory whose name starts with `approved
 
 If no valid approved-source output exists, it falls back to `public/fixtures/contextLatestFixture.json`.
 
-This endpoint is read-only. It does not call Alternative.me, DefiLlama, or any external API. It does not scrape, parse HTML, use browser automation, read undocumented endpoints, add auth, add a database, add OpenAI, or change scanner scoring. A future UI context panel can consume this endpoint later; no frontend panel is added in this stage.
+The Market Context Panel consumes this endpoint from the frontend. It displays:
+
+- Alternative.me Fear & Greed value, classification, and timestamp.
+- Up to 5 DefiLlama protocol or chain context rows with TVL and 1d/7d change.
+- Source status, environment, summary counts, and warning/error counts.
+- Research-only compliance copy.
+
+This endpoint is read-only. It does not call Alternative.me, DefiLlama, or any external API from the frontend. It does not scrape, parse HTML, use browser automation, read undocumented endpoints, add auth, add a database, add OpenAI, add paid data sources, or change scanner scoring.
 
 Paid sources remain deferred: CoinGecko Analyst, TokenSniffer, Tokenomist, GoPlus after written commercial-use clarification, and Bubblemaps/Arkham after sales and pricing clarification.
 

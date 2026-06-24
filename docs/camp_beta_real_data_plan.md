@@ -93,7 +93,7 @@ The normalized source contract includes:
 
 Raw provider responses are not persisted. API failure must not fall back to scraping.
 
-Future API bridge readiness:
+Approved context API bridge and panel:
 
 ```text
 GET /api/context/latest
@@ -101,7 +101,9 @@ GET /api/context/latest
 
 This endpoint is now implemented in the local UI mock API bridge. It reads the newest valid `tools/data-poc/output/<run_id>/approved_sources_output.json`, validates the normalized shape, strips unexpected raw-provider fields, and falls back to a local fixture when no valid output exists.
 
-The endpoint does not live-fetch from Alternative.me or DefiLlama. It does not scrape, parse HTML, use browser automation, use undocumented endpoints, add auth, add a database, add OpenAI, or change scanner scoring. A future UI context panel will consume this endpoint.
+The Market Context Panel in `tools/ui-mock` consumes this endpoint. It shows Alternative.me Fear & Greed sentiment context, up to 5 DefiLlama protocol or chain context rows, source status, environment, summary counts, and warning/error counts.
+
+The frontend consumes only the local API bridge endpoint. It does not live-fetch from Alternative.me or DefiLlama. It does not scrape, parse HTML, use browser automation, use undocumented endpoints, add auth, add a database, add OpenAI, add paid data sources, or change scanner scoring. Context is presented as research-only market context, not as a trading signal.
 
 Paid or clarification-dependent sources remain explicitly deferred:
 

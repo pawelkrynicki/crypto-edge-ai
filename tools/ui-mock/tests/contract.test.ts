@@ -4,9 +4,13 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import type { AddressInfo } from "node:net";
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { mapPersistableScannerOutputToUiCandidates } from "../src/adapters/scannerOutputAdapter";
 import { getMissingSecurityText } from "../src/components/CandidateDetail";
+import { MarketContextPanel } from "../src/components/MarketContextPanel";
 import { PERSISTABLE_SCANNER_SAMPLE } from "../src/fixtures/persistableScannerSample";
+import { interpretContextApiOutput, parseMarketContextApiOutput } from "../src/services/contextDataSource";
 import { interpretScannerApiOutput } from "../src/services/scannerDataSource";
 import type { PersistableScannerOutput, ScannerApiOutput } from "../src/types/scannerTypes";
 import { createScannerApiServer } from "../server/scannerApiServer";
@@ -134,12 +138,52 @@ assert.equal(
 
 const contextFixturePath = resolve("public", "fixtures", "contextLatestFixture.json");
 const contextFixture = JSON.parse(await readFile(contextFixturePath, "utf8"));
+const parsedContextFixture = parseMarketContextApiOutput(contextFixture);
+const interpretedContextFixture = interpretContextApiOutput(parsedContextFixture);
+
+if (interpretedContextFixture.status !== "ready") {
+  throw new Error("context fixture should parse as a ready API result");
+}
 
 assert.equal(
-  contextFixture._source_meta.source_kind,
+  parsedContextFixture._source_meta.source_kind,
   "fixture-fallback",
   "context fallback fixture declares fixture-fallback metadata",
 );
+assert.equal(
+  interpretedContextFixture.usedFallback,
+  true,
+  "context API client recognizes fixture-fallback metadata",
+);
+
+const fixturePanelMarkup = renderToStaticMarkup(React.createElement(MarketContextPanel, {
+  state: {
+    status: "ready",
+    context: parsedContextFixture,
+    message: interpretedContextFixture.fallbackReason,
+  },
+}));
+
+assert.match(fixturePanelMarkup, /42/, "panel renders Fear & Greed value");
+assert.match(fixturePanelMarkup, /Lido/, "panel renders DefiLlama protocol rows");
+assert.match(fixturePanelMarkup, /Uniswap V3/, "panel renders multiple DefiLlama rows");
+assert.match(fixturePanelMarkup, /Fixture fallback/, "panel renders fixture fallback badge");
+assert.match(
+  fixturePanelMarkup,
+  /Context data is for research only\. It is not a buy\/sell signal\./,
+  "panel renders compliance note",
+);
+
+const apiFailureMarkup = renderToStaticMarkup(React.createElement(MarketContextPanel, {
+  state: {
+    status: "error",
+    context: null,
+    message: "Context API unavailable: test failure",
+  },
+}));
+
+assert.match(apiFailureMarkup, /API unavailable/, "panel shows API failure state");
+assert.match(apiFailureMarkup, /Context API unavailable: test failure/, "panel renders API failure detail");
 
 const contextTempRoot = await mkdtemp(resolve(tmpdir(), "crypto-edge-context-api-"));
 try {
