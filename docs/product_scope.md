@@ -159,6 +159,39 @@ Current source boundary:
 - No API failure may fall back to scraping.
 - Unknown sources fail closed.
 
+Approved free source framework:
+
+- `tools/data-poc/src/sources` contains a small source adapter pattern.
+- Current approved adapters: `alternative_me_fng` and `defillama_api`.
+- Fixture command: `pnpm run sources:approved:fixture`.
+- Live command: `CRYPTO_EDGE_DATA_ENV=PUBLIC_BETA pnpm run sources:approved:live`.
+- Normalized output path: `tools/data-poc/output/<run_id>/approved_sources_output.json`.
+- Future API bridge target: `GET /api/context/latest`.
+- Raw provider responses are not stored in the approved source output.
+
+Paid and clarification-dependent source candidates remain later work:
+
+- CoinGecko Analyst for paid market/onchain context.
+- TokenSniffer for a paid security pilot.
+- Tokenomist for unlock/vesting data.
+- GoPlus only after written commercial-use clarification.
+- Bubblemaps/Arkham only after sales and pricing clarification.
+
+Safe new-source checklist:
+
+- Registry entry.
+- Runtime policy.
+- Official docs URL.
+- Terms URL.
+- Fixture.
+- Adapter.
+- Normalizer.
+- Tests.
+- UI display rule.
+- Attribution rule.
+- No raw storage.
+- No scraping fallback.
+
 ## Out of Scope
 
 The following remain out of scope:
@@ -166,7 +199,7 @@ The following remain out of scope:
 - Rebranding to a standalone Crypto Market product.
 - Full UI implementation in this documentation stage.
 - Production cron scripts in this documentation stage.
-- Real API fetchers in this documentation stage.
+- Unapproved live API fetchers.
 - New standalone auth/login.
 - FastAPI.
 - SQLite.

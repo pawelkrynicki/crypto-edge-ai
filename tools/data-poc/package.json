@@ -21,6 +21,8 @@
     "scanner:import:dry-run:live": "tsc && node dist/src/runDbImportDryRunPoc.js --mode live",
     "sources:validate": "tsc && node dist/src/runSourceRegistryValidation.js",
     "sources:check": "tsc && node dist/src/runSourcePolicyCheck.js",
+    "sources:approved:fixture": "tsc && node dist/src/sources/runApprovedSourcesPoc.js --mode fixture",
+    "sources:approved:live": "tsc && node dist/src/sources/runApprovedSourcesPoc.js --mode live",
     "test": "tsc && node --test dist/tests/*.js",
     "typecheck": "tsc --noEmit"
   },

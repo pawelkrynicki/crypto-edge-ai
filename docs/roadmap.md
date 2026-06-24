@@ -100,6 +100,25 @@ Data Source Registry Enforcement v1:
 - Raw API response storage is disabled in v1.
 - No scraping fallback, undocumented endpoints, browser automation for data collection, or invented data.
 
+Approved free source adapter framework:
+
+- `tools/data-poc/src/sources` contains the repeatable adapter pattern.
+- Current approved live adapters are `alternative_me_fng` and `defillama_api`.
+- Fixture command: `pnpm run sources:approved:fixture`.
+- Live command: `CRYPTO_EDGE_DATA_ENV=PUBLIC_BETA pnpm run sources:approved:live`.
+- Output file: `tools/data-poc/output/<run_id>/approved_sources_output.json`.
+- Future UI/API bridge target: `GET /api/context/latest`.
+- Raw provider responses are not stored; only normalized context records are written.
+- Future source additions require registry entry, runtime policy, official docs URL, terms URL, fixture, adapter, normalizer, tests, UI display rule, attribution rule, no raw storage, and no scraping fallback.
+
+Paid and clarification-dependent sources remain deferred:
+
+- CoinGecko Analyst: first paid market/onchain candidate.
+- TokenSniffer: first paid security pilot candidate.
+- Tokenomist: unlock/vesting candidate.
+- GoPlus: only after written commercial-use clarification.
+- Bubblemaps/Arkham: only after sales and pricing clarification.
+
 First code POC:
 
 - `tools/data-poc`.
