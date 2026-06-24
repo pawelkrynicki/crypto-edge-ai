@@ -122,6 +122,10 @@ Prefer credible open-source or public API sources where legally and technically 
 
 This repository currently contains planning and technical design documents. It does not implement the app, migrations, auth, production cron scripts, real API fetchers, or OpenAI calls yet.
 
+## Windows Helper Scripts
+
+Developer-only Windows CMD helpers live in `scripts/win/`. See `scripts/win/README.md` for the one-command post-merge check, live context generation, local preview startup, and local port cleanup.
+
 ## Next Step
 
 Refine source selection and the data model around Crypto Edge AI, then prepare mock/seed module data for a safe Camp v1 flow.

@@ -22,6 +22,10 @@ This is not the product. It does not include UI, database, migrations, auth, pro
 npm install
 ```
 
+## Windows Helper Scripts
+
+Windows CMD helpers for running the data POC checks and generating approved live context are documented in `../../scripts/win/README.md`.
+
 ## Data Source Registry Enforcement
 
 Data source authorization is fail-closed in v1.

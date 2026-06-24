@@ -115,6 +115,13 @@ Approved free source adapter framework:
 - Context does not change scanner scoring, final labels, or WATCHLIST meaning.
 - The frontend consumes only the local API bridge. It does not live-fetch approved providers directly, scrape, parse HTML, call undocumented endpoints, add auth, add a database, add OpenAI, add paid sources, or change scanner scoring.
 
+Windows helper scripts:
+
+- Developer-only Windows CMD helpers live in `scripts/win/README.md`.
+- `scripts\win\post-merge-check.cmd` syncs `main` and runs the data POC and UI mock verification flow after a merge.
+- `scripts\win\generate-live-context.cmd` generates approved live context for the local preview.
+- `scripts\win\dev-ui.cmd` starts the local API and frontend preview.
+
 Paid and clarification-dependent sources remain deferred:
 
 - CoinGecko Analyst: first paid market/onchain candidate.
