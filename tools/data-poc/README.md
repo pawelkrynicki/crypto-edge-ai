@@ -207,7 +207,9 @@ Future API bridge target:
 GET /api/context/latest
 ```
 
-That endpoint is not implemented yet. It can later read the latest `approved_sources_output.json` and expose only the normalized records.
+That endpoint is implemented in `tools/ui-mock/server` as a local read-only bridge. It reads the latest valid `tools/data-poc/output/<run_id>/approved_sources_output.json`, returns only normalized approved-source records, and falls back to `tools/ui-mock/public/fixtures/contextLatestFixture.json` when no valid output exists.
+
+The endpoint does not live-fetch, does not call Alternative.me or DefiLlama directly, does not scrape, and does not expose raw provider responses. A future UI context panel can consume this endpoint later.
 
 ## How to Add a New Data Source Safely
 

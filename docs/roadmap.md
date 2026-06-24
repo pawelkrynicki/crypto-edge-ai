@@ -107,9 +107,10 @@ Approved free source adapter framework:
 - Fixture command: `pnpm run sources:approved:fixture`.
 - Live command: `CRYPTO_EDGE_DATA_ENV=PUBLIC_BETA pnpm run sources:approved:live`.
 - Output file: `tools/data-poc/output/<run_id>/approved_sources_output.json`.
-- Future UI/API bridge target: `GET /api/context/latest`.
+- UI/API bridge: `GET /api/context/latest` reads the latest valid approved-source output and falls back to a local fixture.
 - Raw provider responses are not stored; only normalized context records are written.
 - Future source additions require registry entry, runtime policy, official docs URL, terms URL, fixture, adapter, normalizer, tests, UI display rule, attribution rule, no raw storage, and no scraping fallback.
+- The context endpoint does not live-fetch, scrape, parse HTML, call undocumented endpoints, add auth, add a database, add OpenAI, or add a frontend panel yet.
 
 Paid and clarification-dependent sources remain deferred:
 

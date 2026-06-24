@@ -99,7 +99,9 @@ Future API bridge readiness:
 GET /api/context/latest
 ```
 
-This endpoint is intentionally not implemented yet. It can later expose only the normalized `approved_sources_output.json` records through the UI/API layer.
+This endpoint is now implemented in the local UI mock API bridge. It reads the newest valid `tools/data-poc/output/<run_id>/approved_sources_output.json`, validates the normalized shape, strips unexpected raw-provider fields, and falls back to a local fixture when no valid output exists.
+
+The endpoint does not live-fetch from Alternative.me or DefiLlama. It does not scrape, parse HTML, use browser automation, use undocumented endpoints, add auth, add a database, add OpenAI, or change scanner scoring. A future UI context panel will consume this endpoint.
 
 Paid or clarification-dependent sources remain explicitly deferred:
 
