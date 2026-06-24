@@ -2,12 +2,17 @@ import React, { useState } from "react";
 import type { MockCandidate } from "../mockData";
 import { LabelBadge } from "./LabelBadge";
 import { CandidateResearchContext } from "./CandidateResearchContext";
+import { CandidateReviewControls } from "./CandidateReviewControls";
 import type { MarketContextPanelState } from "./MarketContextPanel";
+import type { CandidateReviewInput, CandidateReviewRecord } from "../types/reviewSessionTypes";
 
 interface Props {
   candidate: MockCandidate;
   onClose?: () => void;
   marketContextState?: MarketContextPanelState;
+  reviewRecord?: CandidateReviewRecord | null;
+  onSaveReview?: (input: CandidateReviewInput) => void;
+  onClearReview?: (candidateId: string) => void;
 }
 
 function fmtUsd(n: number | null, decimals = 0): string {
@@ -120,7 +125,14 @@ export function getMissingSecurityText(candidate: Pick<MockCandidate, "basic_fil
   return "Security data is unavailable. Manual verification is required.";
 }
 
-export const CandidateDetail: React.FC<Props> = ({ candidate: c, onClose, marketContextState }) => {
+export const CandidateDetail: React.FC<Props> = ({
+  candidate: c,
+  onClose,
+  marketContextState,
+  reviewRecord,
+  onSaveReview,
+  onClearReview,
+}) => {
   const [checked, setChecked] = useState<CheckedState>({});
   const sec = c.security;
   const decision = DECISION_COPY[c.final_label] ?? {
@@ -236,6 +248,16 @@ export const CandidateDetail: React.FC<Props> = ({ candidate: c, onClose, market
         <div>
           <SectionTitle>C. Data Coverage &amp; Context</SectionTitle>
           <CandidateResearchContext candidate={c} marketContextState={marketContextState} />
+        </div>
+
+        <div>
+          <SectionTitle>Local Review Session</SectionTitle>
+          <CandidateReviewControls
+            candidateId={c.id}
+            reviewRecord={reviewRecord ?? null}
+            onSaveReview={onSaveReview}
+            onClearReview={onClearReview}
+          />
         </div>
 
         <div>

@@ -9,6 +9,7 @@ It demonstrates the visual direction, product structure, and trader value propos
 - **Scanner Radar**: Main table view showing token candidates with market data, basic filter status, security checks, and final labels.
 - **Market Context Panel**: Shows Alternative.me Fear & Greed plus DefiLlama context from the local API bridge.
 - **Candidate Detail Panel**: In-depth breakdown of a selected token, including research context/data coverage, a trader checklist, and risk reasons.
+- **Local Review Session**: Browser-only analyst workspace for per-candidate review status, analyst note, and last-updated timestamp.
 - **Research Review (Mock)**: A text area to paste news/events and see a mock AI risk categorization.
 - **Watchlist & Risk Alerts**: Dedicated tabs for tracking eligible candidates and critical risks.
 - **Methodology**: Explanation of the staged review process.
@@ -18,6 +19,35 @@ It demonstrates the visual direction, product structure, and trader value propos
 - **WATCHLIST ≠ Buy**: The `WATCHLIST` label strictly means "eligible for further review". It explicitly states "Further review only, not a buy signal."
 - **Local Bridges Only**: This preview uses fixtures or local API bridge endpoints. The frontend does not call Alternative.me, DefiLlama, paid data sources, a database, or OpenAI directly.
 - **Context Does Not Change Labels**: Market context appears in the token detail for research framing only. It does not change scanner labels, scoring, or WATCHLIST meaning.
+- **Local Review Is Separate**: Analyst review status and notes are saved only in the current browser. They do not change scanner labels, scoring, or WATCHLIST meaning.
+
+## Local Review Session
+
+The scanner detail panel now includes a **Local Review Session** section. It lets the analyst save a local status, short note, and last-updated timestamp for each candidate.
+
+Storage is browser-only:
+
+```text
+crypto-edge-ai.review-session.v1
+```
+
+Review statuses:
+
+- Not reviewed
+- Needs more research
+- Saved for follow-up
+- Dismissed after review
+- Waiting for more data
+
+The review layer has no backend, database, auth, API write path, or scanner-output mutation. It is only for organizing local analyst work. The scanner table shows a small **Review** badge, and the Scanner Radar includes a **Follow-up** filter based on the local `Saved for follow-up` status.
+
+Compliance copy shown in the review panel:
+
+```text
+Local review is saved only in this browser.
+This does not change scanner label.
+This is not a buy/sell signal.
+```
 
 ## Development
 

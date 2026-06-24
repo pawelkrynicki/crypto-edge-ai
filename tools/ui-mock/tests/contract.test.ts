@@ -9,9 +9,18 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { mapPersistableScannerOutputToUiCandidates } from "../src/adapters/scannerOutputAdapter";
 import { CandidateDetail, getMissingSecurityText } from "../src/components/CandidateDetail";
 import { MarketContextPanel } from "../src/components/MarketContextPanel";
+import { ScannerRadar } from "../src/components/ScannerRadar";
 import { PERSISTABLE_SCANNER_SAMPLE } from "../src/fixtures/persistableScannerSample";
 import { toMockCandidate } from "../src/mockData";
 import { interpretContextApiOutput, parseMarketContextApiOutput } from "../src/services/contextDataSource";
+import {
+  createEmptyReviewSession,
+  getCandidateReview,
+  loadReviewSession,
+  REVIEW_SESSION_STORAGE_KEY,
+  saveReviewRecord,
+} from "../src/services/reviewSessionStore";
+import type { StorageLike } from "../src/services/reviewSessionStore";
 import { interpretScannerApiOutput } from "../src/services/scannerDataSource";
 import type { PersistableScannerOutput, ScannerApiOutput } from "../src/types/scannerTypes";
 import { createScannerApiServer } from "../server/scannerApiServer";
@@ -187,6 +196,36 @@ assert.match(apiFailureMarkup, /API unavailable/, "panel shows API failure state
 assert.match(apiFailureMarkup, /Context API unavailable: test failure/, "panel renders API failure detail");
 
 const passMockCandidate = toMockCandidate(passUi);
+const reviewStorage = createMemoryStorage();
+const savedReviewState = saveReviewRecord({
+  candidate_id: passMockCandidate.id,
+  status: "saved_for_follow_up",
+  note: "Track community and liquidity follow-up.",
+}, reviewStorage);
+const savedReviewRecord = getCandidateReview(passMockCandidate.id, savedReviewState);
+
+assert.ok(savedReviewRecord, "saved review record is available from review session state");
+assert.equal(savedReviewRecord.status, "saved_for_follow_up", "review status is persisted");
+assert.equal(savedReviewRecord.note, "Track community and liquidity follow-up.", "review note is persisted");
+assert.ok(reviewStorage.getItem(REVIEW_SESSION_STORAGE_KEY), "review session is written to local storage key");
+
+const reloadedReviewState = loadReviewSession(reviewStorage);
+assert.equal(
+  getCandidateReview(passMockCandidate.id, reloadedReviewState)?.status,
+  "saved_for_follow_up",
+  "review session reloads saved record",
+);
+
+const corruptReviewStorage = createMemoryStorage({
+  [REVIEW_SESSION_STORAGE_KEY]: "{ invalid json",
+});
+assert.deepEqual(
+  loadReviewSession(corruptReviewStorage),
+  createEmptyReviewSession(),
+  "corrupt review session JSON falls back safely",
+);
+assert.equal(passMockCandidate.final_label, "WATCHLIST", "saving review status does not change scanner label");
+
 const detailWithContextMarkup = renderToStaticMarkup(React.createElement(CandidateDetail, {
   candidate: passMockCandidate,
   marketContextState: {
@@ -204,8 +243,34 @@ assert.match(detailWithContextMarkup, /Tokenomist pending/, "candidate detail sh
 assert.match(detailWithContextMarkup, /This is not a buy\/sell signal\./, "candidate detail renders compliance note");
 assert.match(detailWithContextMarkup, /Context does not alter scanner label\./, "candidate detail explains context does not alter label");
 assert.match(detailWithContextMarkup, /Fixture context/, "candidate detail represents fixture context fallback");
+assert.match(detailWithContextMarkup, /Local Review Session/, "candidate detail renders local review session");
+assert.match(detailWithContextMarkup, /This does not change scanner label\./, "candidate detail explains review does not change label");
 assert.match(detailWithContextMarkup, /Further review only/, "candidate detail keeps candidate final label visible");
 assert.equal(passMockCandidate.final_label, "WATCHLIST", "context rendering does not change candidate final label");
+
+const detailWithReviewMarkup = renderToStaticMarkup(React.createElement(CandidateDetail, {
+  candidate: passMockCandidate,
+  reviewRecord: savedReviewRecord,
+  onSaveReview: () => undefined,
+  onClearReview: () => undefined,
+}));
+
+assert.match(detailWithReviewMarkup, /Local Review Session/, "candidate detail renders review controls");
+assert.match(detailWithReviewMarkup, /Saved for follow-up/, "candidate detail shows saved review status");
+assert.match(detailWithReviewMarkup, /Track community and liquidity follow-up\./, "candidate detail shows saved analyst note");
+assert.match(detailWithReviewMarkup, /This does not change scanner label\./, "candidate detail includes scanner-label compliance copy");
+assert.match(detailWithReviewMarkup, /Further review only/, "review rendering keeps scanner final label visible");
+assert.equal(passMockCandidate.final_label, "WATCHLIST", "saved review status does not mutate final_label");
+
+const radarWithReviewMarkup = renderToStaticMarkup(React.createElement(ScannerRadar, {
+  candidates: [passMockCandidate],
+  reviewSession: savedReviewState,
+  onSaveReview: () => undefined,
+  onClearReview: () => undefined,
+}));
+
+assert.match(radarWithReviewMarkup, /Review/, "scanner radar renders review column");
+assert.match(radarWithReviewMarkup, /Follow-up/, "scanner radar renders local review badge");
 
 const detailFailureMarkup = renderToStaticMarkup(React.createElement(CandidateDetail, {
   candidate: passMockCandidate,
@@ -437,4 +502,20 @@ function getJson(url: string): Promise<unknown> {
     });
     request.on("error", rejectRequest);
   });
+}
+
+function createMemoryStorage(initial: Record<string, string> = {}): StorageLike {
+  const values = new Map(Object.entries(initial));
+
+  return {
+    getItem(key: string) {
+      return values.get(key) ?? null;
+    },
+    setItem(key: string, value: string) {
+      values.set(key, value);
+    },
+    removeItem(key: string) {
+      values.delete(key);
+    },
+  };
 }

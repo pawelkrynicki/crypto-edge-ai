@@ -2,11 +2,17 @@ import React, { useState } from "react";
 import type { MockCandidate, FinalLabel } from "../mockData";
 import { LabelBadge } from "./LabelBadge";
 import { CandidateDetail } from "./CandidateDetail";
+import { ReviewStatusBadge } from "./CandidateReviewControls";
 import type { MarketContextPanelState } from "./MarketContextPanel";
+import type { CandidateReviewInput, ReviewSessionState } from "../types/reviewSessionTypes";
+import { getCandidateReview } from "../services/reviewSessionStore";
 
 interface Props {
   candidates: MockCandidate[];
   marketContextState?: MarketContextPanelState;
+  reviewSession: ReviewSessionState;
+  onSaveReview: (input: CandidateReviewInput) => void;
+  onClearReview: (candidateId: string) => void;
 }
 
 const CHAIN_LABELS: Record<string, string> = {
@@ -16,12 +22,15 @@ const CHAIN_LABELS: Record<string, string> = {
   base: "BASE",
 };
 
-const FILTER_OPTIONS: { label: string; value: FinalLabel | "ALL" }[] = [
+type ScannerFilter = FinalLabel | "ALL" | "FOLLOW_UP";
+
+const FILTER_OPTIONS: { label: string; value: ScannerFilter }[] = [
   { label: "All", value: "ALL" },
   { label: "Watchlist", value: "WATCHLIST" },
   { label: "Critical Risk", value: "CRITICAL_RISK" },
   { label: "Manual Check", value: "NEEDS_MANUAL_VERIFICATION" },
   { label: "Rejected", value: "REJECT" },
+  { label: "Follow-up", value: "FOLLOW_UP" },
 ];
 
 function fmtUsd(n: number | null): string {
@@ -71,9 +80,15 @@ const FilterCell: React.FC<{ status: string }> = ({ status }) => {
   );
 };
 
-export const ScannerRadar: React.FC<Props> = ({ candidates, marketContextState }) => {
+export const ScannerRadar: React.FC<Props> = ({
+  candidates,
+  marketContextState,
+  reviewSession,
+  onSaveReview,
+  onClearReview,
+}) => {
   const [selected, setSelected] = useState<MockCandidate | null>(candidates[0] ?? null);
-  const [filter, setFilter] = useState<FinalLabel | "ALL">("ALL");
+  const [filter, setFilter] = useState<ScannerFilter>("ALL");
 
   // Keep selected in sync when candidates change (e.g. source switch)
   React.useEffect(() => {
@@ -83,7 +98,9 @@ export const ScannerRadar: React.FC<Props> = ({ candidates, marketContextState }
 
   const filtered = filter === "ALL"
     ? candidates
-    : candidates.filter((c) => c.final_label === filter);
+    : filter === "FOLLOW_UP"
+      ? candidates.filter((c) => getCandidateReview(c.id, reviewSession)?.status === "saved_for_follow_up")
+      : candidates.filter((c) => c.final_label === filter);
 
   return (
     <div className="flex gap-4 h-full min-h-0">
@@ -110,7 +127,7 @@ export const ScannerRadar: React.FC<Props> = ({ candidates, marketContextState }
           <table className="data-table">
             <thead>
               <tr>
-                {["Token", "Chain", "DEX", "Mkt Cap", "Liquidity", "24h Vol", "Vol/MC", "Age", "Filter", "Security", "Label", "Reason", ""].map(
+                {["Token", "Chain", "DEX", "Mkt Cap", "Liquidity", "24h Vol", "Vol/MC", "Age", "Filter", "Security", "Review", "Label", "Reason", ""].map(
                   (h) => <th key={h}>{h}</th>
                 )}
               </tr>
@@ -118,6 +135,7 @@ export const ScannerRadar: React.FC<Props> = ({ candidates, marketContextState }
             <tbody>
               {filtered.map((c) => {
                 const isActive = selected?.id === c.id;
+                const reviewRecord = getCandidateReview(c.id, reviewSession);
                 return (
                   <tr
                     key={c.id}
@@ -137,6 +155,7 @@ export const ScannerRadar: React.FC<Props> = ({ candidates, marketContextState }
                     <td className="text-secondary">{c.pair_age_days === null ? "--" : `${c.pair_age_days}d`}</td>
                     <td><FilterCell status={c.basic_filter_status} /></td>
                     <td><SecurityCell label={c.security_label} /></td>
+                    <td><ReviewStatusBadge status={reviewRecord?.status ?? "not_reviewed"} short /></td>
                     <td><LabelBadge label={c.final_label} /></td>
                     <td className="text-secondary max-w-[160px] truncate text-xs">
                       {c.final_reasons[0]}
@@ -163,6 +182,9 @@ export const ScannerRadar: React.FC<Props> = ({ candidates, marketContextState }
           <CandidateDetail
             candidate={selected}
             marketContextState={marketContextState}
+            reviewRecord={getCandidateReview(selected.id, reviewSession)}
+            onSaveReview={onSaveReview}
+            onClearReview={onClearReview}
             onClose={() => setSelected(null)}
           />
         ) : (
