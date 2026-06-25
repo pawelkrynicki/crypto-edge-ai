@@ -154,6 +154,12 @@ This does not change scanner label.
 This is not a buy/sell signal.
 ```
 
+## UX1 Professional Dashboard Redesign
+
+UX1 is a UI-only redesign of `tools/ui-mock`. It improves layout hierarchy, spacing, scanner readability, Market Context visibility, and Candidate Detail readability. Local Review Session is placed higher in Candidate Detail so analyst status and notes are easier to find.
+
+UX1 does not add data sources, scraping, browser automation, undocumented endpoints, OpenAI calls, auth, a database, production cron, API changes, localStorage model changes, scanner scoring changes, final-label changes, or WATCHLIST meaning changes.
+
 ### How to Add a New Data Source Safely
 
 - Add or confirm the registry entry.

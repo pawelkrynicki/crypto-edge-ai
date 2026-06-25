@@ -289,6 +289,13 @@ The initial frontend preview is located in `tools/ui-mock/`.
 - **Core Principle:** The UI explicitly reinforces that `WATCHLIST` is **not a buy signal**.
 - **Next Stage:** Connect this UI mock to the persistable JSON/API.
 
+UX1 Professional Dashboard Redesign:
+
+- Improves layout, hierarchy, spacing, and readability in `tools/ui-mock`.
+- Keeps the work UI-only: no new data sources, no API changes, no backend, no scoring changes, and no final-label changes.
+- Keeps `WATCHLIST` meaning unchanged: eligible for further review only.
+- Makes Market Context and Local Review Session more visible, with Local Review Session moved higher in Candidate Detail.
+
 ## UI Data Adapter (Completed)
 
 The `tools/ui-mock` frontend now includes a UI Data Adapter layer (`src/adapters/scannerOutputAdapter.ts`).

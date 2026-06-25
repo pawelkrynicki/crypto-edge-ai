@@ -17,23 +17,23 @@ interface Props {
 const MISSING_CATEGORIES = [
   {
     label: "Paid market/onchain data",
-    status: "Planned source",
-    detail: "CoinGecko pending",
+    status: "Deferred",
+    detail: "Not connected in UX1",
   },
   {
     label: "Dedicated scam/security source",
-    status: "Planned source",
-    detail: "TokenSniffer / GoPlus clarification pending",
+    status: "Deferred",
+    detail: "Clarification pending; no new source connected",
   },
   {
     label: "Token unlocks / vesting",
-    status: "Planned source",
-    detail: "Tokenomist pending",
+    status: "Deferred",
+    detail: "Not connected in UX1",
   },
   {
     label: "Holder concentration / wallet clusters",
-    status: "Planned source",
-    detail: "Bubblemaps or Arkham pending",
+    status: "Deferred",
+    detail: "Not connected in UX1",
   },
   {
     label: "Social sentiment",

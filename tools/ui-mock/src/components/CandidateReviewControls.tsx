@@ -18,11 +18,11 @@ interface CandidateReviewControlsProps {
 }
 
 const REVIEW_STATUS_BADGE_STYLES: Record<AnalystReviewStatus, string> = {
-  not_reviewed: "text-[#64748b] bg-[#64748b]/10 border-[#64748b]/25",
-  needs_more_research: "text-[#f59e0b] bg-[#f59e0b]/10 border-[#f59e0b]/25",
-  saved_for_follow_up: "text-[#22c55e] bg-[#22c55e]/10 border-[#22c55e]/25",
-  dismissed_after_review: "text-[#94a3b8] bg-[#64748b]/10 border-[#64748b]/25",
-  waiting_for_more_data: "text-[#38bdf8] bg-[#38bdf8]/10 border-[#38bdf8]/25",
+  not_reviewed: "text-[#8fa0ad] bg-[#8fa0ad]/10 border-[#8fa0ad]/25",
+  needs_more_research: "text-[#f5b84b] bg-[#f5b84b]/10 border-[#f5b84b]/25",
+  saved_for_follow_up: "text-[#32d184] bg-[#32d184]/10 border-[#32d184]/25",
+  dismissed_after_review: "text-[#8fa0ad] bg-[#8fa0ad]/10 border-[#8fa0ad]/25",
+  waiting_for_more_data: "text-[#f5b84b] bg-[#f5b84b]/10 border-[#f5b84b]/25",
 };
 
 export const ReviewStatusBadge: React.FC<{
@@ -77,7 +77,7 @@ export const CandidateReviewControls: React.FC<CandidateReviewControlsProps> = (
   };
 
   return (
-    <div className="rounded-md p-3 space-y-3" style={{ background: "var(--bg-raised)", border: "1px solid var(--border-sub)" }}>
+    <div className="review-control-panel">
       <div className="flex items-start justify-between gap-2">
         <div>
           <div className="text-[12px] font-semibold" style={{ color: "var(--text-primary)" }}>Local Review Session</div>
@@ -136,7 +136,7 @@ export const CandidateReviewControls: React.FC<CandidateReviewControlsProps> = (
       </div>
 
       <div className="rounded-md px-3 py-2 text-[11px] leading-relaxed space-y-1"
-        style={{ background: "rgba(59,130,246,0.08)", border: "1px solid rgba(59,130,246,0.18)", color: "var(--text-secondary)" }}>
+        style={{ background: "var(--accent-dim)", border: "1px solid var(--accent-border)", color: "var(--text-secondary)" }}>
         <div>Local review is saved only in this browser.</div>
         <div>This does not change scanner label.</div>
         <div>This is not a buy/sell signal.</div>

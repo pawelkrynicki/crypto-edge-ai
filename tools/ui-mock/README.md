@@ -14,6 +14,12 @@ It demonstrates the visual direction, product structure, and trader value propos
 - **Watchlist & Risk Alerts**: Dedicated tabs for tracking eligible candidates and critical risks.
 - **Methodology**: Explanation of the staged review process.
 
+## UX1 Professional Dashboard Redesign
+
+UX1 improves the dashboard information architecture and visual hierarchy without changing data behavior. The preview now uses a top product header, a compact Market Context block, a short KPI strip, a clearer Scanner Radar table, and a wider Candidate Detail working panel.
+
+This stage adds no new data sources, API endpoints, backend services, storage model changes, scanner scoring changes, final-label changes, or WATCHLIST meaning changes. Market Context and Local Review Session are easier to find, and Local Review Session remains browser-only localStorage.
+
 ## Important Product Rules
 - **No Buy Signals**: Crypto Edge AI is a research tool, not a trading bot.
 - **WATCHLIST ≠ Buy**: The `WATCHLIST` label strictly means "eligible for further review". It explicitly states "Further review only, not a buy signal."
