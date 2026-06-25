@@ -133,6 +133,16 @@ Local Review Session:
 - Review status does not change scanner scoring, final labels, or WATCHLIST meaning.
 - Review panel compliance copy: `Local review is saved only in this browser. This does not change scanner label. This is not a buy/sell signal.`
 
+Review Queue / Follow-up Workspace:
+
+- Stage 7C extends the Watchlist tab into a local Review Queue workspace while keeping scanner `WATCHLIST` meaning unchanged.
+- The view separates `Scanner Watchlist` candidates from `Local Review Queue` items saved in browser localStorage.
+- The queue shows local review status, analyst note preview, last-updated timestamp, scanner label, scanner reason, and a quick path back to Scanner Radar details.
+- Filters cover all local review items, follow-up, needs research, waiting data, and dismissed items.
+- Stored local reviews whose candidate is absent from the current scanner output are shown separately and can be cleared.
+- This uses the existing `crypto-edge-ai.review-session.v1` model and adds no backend, database, auth, API write path, new data source, scanner scoring change, final-label change, or WATCHLIST meaning change.
+- Review Queue compliance copy: `Local review is saved only in this browser. Review status does not change scanner labels. This is not a buy/sell signal.`
+
 Paid and clarification-dependent sources remain deferred:
 
 - CoinGecko Analyst: first paid market/onchain candidate.

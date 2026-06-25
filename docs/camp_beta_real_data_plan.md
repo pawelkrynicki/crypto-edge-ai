@@ -154,6 +154,27 @@ This does not change scanner label.
 This is not a buy/sell signal.
 ```
 
+## Review Queue / Follow-up Workspace
+
+Stage 7C extends the `tools/ui-mock` Watchlist tab into a browser-local Review Queue / Follow-up Workspace for analysts.
+
+The workspace has two separate sections:
+
+- `Scanner Watchlist`: candidates whose scanner `final_label` remains `WATCHLIST`.
+- `Local Review Queue`: candidates with existing local review status other than `not_reviewed`.
+
+The local queue shows saved follow-up, needs-more-research, waiting-data, and dismissed-after-review statuses with note preview, last-updated timestamp, scanner label, reason, and quick access back to Scanner Radar details. Review status remains visually separate from scanner label.
+
+This uses the existing `crypto-edge-ai.review-session.v1` localStorage model. It does not add a backend, database, auth, API write path, new source, scraper, HTML parser, browser automation, undocumented endpoint, OpenAI call, production cron, scanner scoring change, final-label change, or WATCHLIST meaning change. Stored local reviews whose candidate is not present in the current scanner output are shown separately and can be cleared.
+
+Review Queue compliance copy:
+
+```text
+Local review is saved only in this browser.
+Review status does not change scanner labels.
+This is not a buy/sell signal.
+```
+
 ## UX1 Professional Dashboard Redesign
 
 UX1 is a UI-only redesign of `tools/ui-mock`. It improves layout hierarchy, spacing, scanner readability, Market Context visibility, and Candidate Detail readability. Local Review Session is placed higher in Candidate Detail so analyst status and notes are easier to find.

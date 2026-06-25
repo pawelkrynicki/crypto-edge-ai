@@ -44,7 +44,7 @@ interface Tab {
 const TABS: Tab[] = [
   { id: "scanner",     label: "Scanner Radar",   icon: "SR" },
   { id: "research",    label: "Research Review", icon: "RR" },
-  { id: "watchlist",   label: "Watchlist",       icon: "WL" },
+  { id: "watchlist",   label: "Review Queue",    icon: "RQ" },
   { id: "risks",       label: "Risk Alerts",     icon: "RA" },
   { id: "methodology", label: "Methodology",     icon: "M" },
 ];
@@ -70,6 +70,7 @@ export default function App() {
   const [candidates, setCandidates] = useState<MockCandidate[]>([]);
   const [loading, setLoading] = useState(false);
   const [fallbackMsg, setFallbackMsg] = useState<string | null>(null);
+  const [selectedCandidateId, setSelectedCandidateId] = useState<string | null | undefined>(undefined);
   const [reviewSession, setReviewSession] = useState<ReviewSessionState>(() => loadReviewSession());
   const [marketContextState, setMarketContextState] = useState<MarketContextPanelState>({
     status: "loading",
@@ -140,6 +141,11 @@ export default function App() {
     setReviewSession(clearReviewRecord(candidateId));
   }, []);
 
+  const handleOpenCandidate = useCallback((candidateId: string) => {
+    setSelectedCandidateId(candidateId);
+    setActiveTab("scanner");
+  }, []);
+
   const renderTab = () => {
     if (loading) {
       return (
@@ -155,6 +161,8 @@ export default function App() {
           <ScannerRadar
             candidates={candidates}
             marketContextState={marketContextState}
+            selectedCandidateId={selectedCandidateId}
+            onCandidateSelected={setSelectedCandidateId}
             reviewSession={reviewSession}
             onSaveReview={handleSaveReview}
             onClearReview={handleClearReview}
@@ -163,7 +171,14 @@ export default function App() {
       case "research":
         return <ResearchReview />;
       case "watchlist":
-        return <WatchlistTab candidates={candidates} />;
+        return (
+          <WatchlistTab
+            candidates={candidates}
+            reviewSession={reviewSession}
+            onClearReview={handleClearReview}
+            onOpenCandidate={handleOpenCandidate}
+          />
+        );
       case "risks":
         return <RiskAlerts candidates={candidates} />;
       case "methodology":

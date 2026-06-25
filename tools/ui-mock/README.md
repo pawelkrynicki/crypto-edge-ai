@@ -11,7 +11,7 @@ It demonstrates the visual direction, product structure, and trader value propos
 - **Candidate Detail Panel**: In-depth breakdown of a selected token, including research context/data coverage, a trader checklist, and risk reasons.
 - **Local Review Session**: Browser-only analyst workspace for per-candidate review status, analyst note, and last-updated timestamp.
 - **Research Review (Mock)**: A text area to paste news/events and see a mock AI risk categorization.
-- **Watchlist & Risk Alerts**: Dedicated tabs for tracking eligible candidates and critical risks.
+- **Review Queue & Risk Alerts**: Dedicated tabs for local analyst follow-up, scanner WATCHLIST candidates, and critical risks.
 - **Methodology**: Explanation of the staged review process.
 
 ## UX1 Professional Dashboard Redesign
@@ -46,6 +46,25 @@ Review statuses:
 - Waiting for more data
 
 The review layer has no backend, database, auth, API write path, or scanner-output mutation. It is only for organizing local analyst work. The scanner table shows a small **Review** badge, and the Scanner Radar includes a **Follow-up** filter based on the local `Saved for follow-up` status.
+
+## Review Queue / Follow-up Workspace
+
+The former Watchlist tab is now labeled **Review Queue**. It still keeps scanner `WATCHLIST` meaning unchanged and separates that scanner output from local analyst review state.
+
+The workspace has two sections:
+
+- **Scanner Watchlist**: candidates whose scanner `final_label` is `WATCHLIST`.
+- **Local Review Queue**: candidates with a local review status other than `Not reviewed`, including `Saved for follow-up`, `Needs more research`, `Waiting for more data`, and `Dismissed after review`.
+
+Local Review Queue uses the existing browser `localStorage` model at `crypto-edge-ai.review-session.v1`. It does not add a backend, database, auth, API write path, new data source, scanner scoring change, final-label change, or WATCHLIST meaning change. Stored local reviews that no longer match the current scanner output are shown in a small "Stored reviews not in current scan" section so the analyst can see and clear them.
+
+Compliance copy shown in the Review Queue:
+
+```text
+Local review is saved only in this browser.
+Review status does not change scanner labels.
+This is not a buy/sell signal.
+```
 
 Compliance copy shown in the review panel:
 
@@ -221,6 +240,6 @@ App.tsx (candidates state)
         │
         ├── StatCards (summary counts)
         ├── ScannerRadar (table + detail panel)
-        ├── WatchlistTab (WATCHLIST filter)
+        ├── WatchlistTab (Review Queue / WATCHLIST and local review queue)
         └── RiskAlerts (CRITICAL_RISK + NEEDS_MANUAL_VERIFICATION filter)
 ```
