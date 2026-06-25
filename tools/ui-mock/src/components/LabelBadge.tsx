@@ -11,22 +11,22 @@ const LABEL_CONFIG: Record<string, { cls: string; text: string; dot: string }> =
   WATCHLIST: {
     cls: "badge badge-watchlist",
     text: "Further review only",
-    dot: "bg-[#22c55e]",
+    dot: "bg-[#32d184]",
   },
   CRITICAL_RISK: {
     cls: "badge badge-critical",
     text: "Critical risk",
-    dot: "bg-[#ef4444]",
+    dot: "bg-[#ff6575]",
   },
   NEEDS_MANUAL_VERIFICATION: {
     cls: "badge badge-manual",
     text: "Manual check",
-    dot: "bg-[#f59e0b]",
+    dot: "bg-[#f5b84b]",
   },
   REJECT: {
     cls: "badge badge-reject",
     text: "Rejected",
-    dot: "bg-[#64748b]",
+    dot: "bg-[#8fa0ad]",
   },
 };
 
@@ -34,7 +34,7 @@ export const LabelBadge: React.FC<LabelBadgeProps> = ({ label, size = "sm", show
   const cfg = LABEL_CONFIG[label] ?? {
     cls: "badge badge-reject",
     text: label,
-    dot: "bg-[#64748b]",
+    dot: "bg-[#8fa0ad]",
   };
   const sizeClass = size === "md" ? "px-3 py-1 text-xs" : "";
   return (

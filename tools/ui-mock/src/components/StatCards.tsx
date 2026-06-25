@@ -17,12 +17,12 @@ interface StatCardProps {
 }
 
 const StatCard: React.FC<StatCardProps> = ({ label, value, valueColor, dotColor, sub }) => (
-  <div className="card px-4 py-3 flex flex-col gap-1.5 min-w-0">
+  <div className="stat-card flex flex-col gap-1">
     <div className="flex items-center gap-1.5">
       <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotColor}`} />
       <span className="section-label">{label}</span>
     </div>
-    <div className={`text-2xl font-bold tabular-nums leading-none ${valueColor}`}>{value}</div>
+    <div className={`text-xl font-bold tabular-nums leading-none ${valueColor}`}>{value}</div>
     <div className="text-[10px] text-muted leading-none">{sub}</div>
   </div>
 );
@@ -43,35 +43,35 @@ export const StatCards: React.FC<Props> = ({ summary }) => {
     {
       label: "Watchlist",
       value: summary.watchlist,
-      valueColor: "text-[#22c55e]",
-      dotColor: "bg-[#22c55e]",
+      valueColor: "text-[#32d184]",
+      dotColor: "bg-[#32d184]",
       sub: "eligible for further review",
     },
     {
       label: "Critical Risk",
       value: summary.critical_risk,
-      valueColor: "text-[#ef4444]",
-      dotColor: "bg-[#ef4444]",
+      valueColor: "text-[#ff6575]",
+      dotColor: "bg-[#ff6575]",
       sub: "critical flag detected",
     },
     {
       label: "Needs Manual Check",
       value: summary.needs_manual_verification,
-      valueColor: "text-[#f59e0b]",
-      dotColor: "bg-[#f59e0b]",
+      valueColor: "text-[#f5b84b]",
+      dotColor: "bg-[#f5b84b]",
       sub: "missing or unclear data",
     },
     {
       label: "Rejected",
       value: summary.rejected,
-      valueColor: "text-[#64748b]",
-      dotColor: "bg-[#64748b]",
+      valueColor: "text-[#8fa0ad]",
+      dotColor: "bg-[#8fa0ad]",
       sub: "failed basic filters",
     },
   ];
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
+    <div className="stat-strip">
       {stats.map((s) => (
         <StatCard key={s.label} {...s} />
       ))}

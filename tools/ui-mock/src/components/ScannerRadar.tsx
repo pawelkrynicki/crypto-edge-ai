@@ -6,6 +6,7 @@ import { ReviewStatusBadge } from "./CandidateReviewControls";
 import type { MarketContextPanelState } from "./MarketContextPanel";
 import type { CandidateReviewInput, ReviewSessionState } from "../types/reviewSessionTypes";
 import { getCandidateReview } from "../services/reviewSessionStore";
+import { formatReasonText } from "../utils/displayText";
 
 interface Props {
   candidates: MockCandidate[];
@@ -34,27 +35,27 @@ const FILTER_OPTIONS: { label: string; value: ScannerFilter }[] = [
 ];
 
 function fmtUsd(n: number | null): string {
-  if (n === null) return "—";
+  if (n === null) return "--";
   if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `$${(n / 1_000).toFixed(0)}K`;
   return `$${n.toFixed(0)}`;
 }
 
 function fmtPct(n: number | null): string {
-  if (n === null) return "—";
+  if (n === null) return "--";
   return `${(n * 100).toFixed(1)}%`;
 }
 
 const ChainBadge: React.FC<{ chain: string }> = ({ chain }) => {
   const colors: Record<string, string> = {
-    solana: "text-[#9945ff] bg-[#9945ff]/10 border-[#9945ff]/25",
-    ethereum: "text-[#627eea] bg-[#627eea]/10 border-[#627eea]/25",
-    bsc: "text-[#f3ba2f] bg-[#f3ba2f]/10 border-[#f3ba2f]/25",
-    base: "text-[#0052ff] bg-[#0052ff]/10 border-[#0052ff]/25",
+    solana: "text-[#32d184] bg-[#32d184]/10 border-[#32d184]/25",
+    ethereum: "text-[#5aa7ff] bg-[#5aa7ff]/10 border-[#5aa7ff]/25",
+    bsc: "text-[#f5b84b] bg-[#f5b84b]/10 border-[#f5b84b]/25",
+    base: "text-[#8fa0ad] bg-[#8fa0ad]/10 border-[#8fa0ad]/25",
   };
   const cls = colors[chain] ?? "text-secondary bg-raised border-border";
   return (
-    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold border ${cls}`}>
+    <span className={`chain-badge ${cls}`}>
       {CHAIN_LABELS[chain] ?? chain.toUpperCase()}
     </span>
   );
@@ -62,19 +63,19 @@ const ChainBadge: React.FC<{ chain: string }> = ({ chain }) => {
 
 const SecurityCell: React.FC<{ label: string }> = ({ label }) => {
   const map: Record<string, { text: string; cls: string }> = {
-    SECURITY_PASSED:          { text: "Passed",   cls: "text-[#22c55e]" },
-    CRITICAL_RISK:            { text: "Critical", cls: "text-[#ef4444]" },
-    NEEDS_MANUAL_VERIFICATION:{ text: "Partial",  cls: "text-[#f59e0b]" },
-    NOT_CHECKED:              { text: "—",        cls: "text-muted" },
+    SECURITY_PASSED:           { text: "Passed",   cls: "research-context-chip available" },
+    CRITICAL_RISK:             { text: "Critical", cls: "research-context-chip critical" },
+    NEEDS_MANUAL_VERIFICATION: { text: "Partial",  cls: "research-context-chip pending" },
+    NOT_CHECKED:               { text: "Not checked", cls: "research-context-chip unavailable" },
   };
-  const cfg = map[label] ?? { text: label, cls: "text-secondary" };
-  return <span className={`text-xs font-medium ${cfg.cls}`}>{cfg.text}</span>;
+  const cfg = map[label] ?? { text: label, cls: "research-context-chip unavailable" };
+  return <span className={cfg.cls}>{cfg.text}</span>;
 };
 
 const FilterCell: React.FC<{ status: string }> = ({ status }) => {
   const passed = status === "passed_basic_filter";
   return (
-    <span className={`text-xs font-medium ${passed ? "text-[#22c55e]" : "text-[#ef4444]"}`}>
+    <span className={`research-context-chip ${passed ? "available" : "critical"}`}>
       {passed ? "Pass" : "Fail"}
     </span>
   );
@@ -90,7 +91,6 @@ export const ScannerRadar: React.FC<Props> = ({
   const [selected, setSelected] = useState<MockCandidate | null>(candidates[0] ?? null);
   const [filter, setFilter] = useState<ScannerFilter>("ALL");
 
-  // Keep selected in sync when candidates change (e.g. source switch)
   React.useEffect(() => {
     setSelected(candidates[0] ?? null);
     setFilter("ALL");
@@ -103,11 +103,9 @@ export const ScannerRadar: React.FC<Props> = ({
       : candidates.filter((c) => c.final_label === filter);
 
   return (
-    <div className="flex gap-4 h-full min-h-0">
-      {/* ── Left: table ─────────────────────────────────────── */}
-      <div className="flex-1 min-w-0 flex flex-col gap-3">
-        {/* Filter pills */}
-        <div className="flex flex-wrap items-center gap-2">
+    <div className="scanner-workbench">
+      <section className="scanner-main">
+        <div className="scanner-toolbar">
           {FILTER_OPTIONS.map((opt) => (
             <button
               key={opt.value}
@@ -117,19 +115,23 @@ export const ScannerRadar: React.FC<Props> = ({
               {opt.label}
             </button>
           ))}
-          <span className="ml-auto text-[11px] text-muted">
+          <span className="scanner-result-count">
             {filtered.length} result{filtered.length !== 1 ? "s" : ""}
           </span>
         </div>
 
-        {/* Table */}
-        <div className="card overflow-x-auto">
+        <div className="card scanner-table-card">
           <table className="data-table">
             <thead>
               <tr>
-                {["Token", "Chain", "DEX", "Mkt Cap", "Liquidity", "24h Vol", "Vol/MC", "Age", "Filter", "Security", "Review", "Label", "Reason", ""].map(
-                  (h) => <th key={h}>{h}</th>
-                )}
+                <th>Token</th>
+                <th>Market</th>
+                <th>Activity</th>
+                <th>Checks</th>
+                <th>Review status</th>
+                <th>Scanner label</th>
+                <th>Reason</th>
+                <th aria-label="Open details" />
               </tr>
             </thead>
             <tbody>
@@ -143,29 +145,52 @@ export const ScannerRadar: React.FC<Props> = ({
                     className={`cursor-pointer ${isActive ? "row-active" : ""}`}
                   >
                     <td>
-                      <div className="font-semibold text-primary text-sm leading-tight">{c.symbol}</div>
-                      <div className="text-[10px] text-muted leading-tight">{c.name}</div>
+                      <div className="scanner-token">
+                        <strong>{c.symbol}</strong>
+                        <span>{c.name}</span>
+                        <div className="chain-line">
+                          <ChainBadge chain={c.chain} />
+                          <span>{c.dex || "--"}</span>
+                        </div>
+                      </div>
                     </td>
-                    <td><ChainBadge chain={c.chain} /></td>
-                    <td className="text-secondary text-xs">{c.dex}</td>
-                    <td className="text-primary">{fmtUsd(c.market_cap_usd)}</td>
-                    <td className="text-primary">{fmtUsd(c.liquidity_usd)}</td>
-                    <td className="text-primary">{fmtUsd(c.volume_24h_usd)}</td>
-                    <td className="text-primary">{fmtPct(c.volume_market_cap_ratio)}</td>
-                    <td className="text-secondary">{c.pair_age_days === null ? "--" : `${c.pair_age_days}d`}</td>
-                    <td><FilterCell status={c.basic_filter_status} /></td>
-                    <td><SecurityCell label={c.security_label} /></td>
-                    <td><ReviewStatusBadge status={reviewRecord?.status ?? "not_reviewed"} short /></td>
-                    <td><LabelBadge label={c.final_label} /></td>
-                    <td className="text-secondary max-w-[160px] truncate text-xs">
-                      {c.final_reasons[0]}
+                    <td>
+                      <div className="scanner-metric-stack">
+                        <div><span>Mkt cap</span><span>{fmtUsd(c.market_cap_usd)}</span></div>
+                        <div><span>Liquidity</span><span>{fmtUsd(c.liquidity_usd)}</span></div>
+                      </div>
+                    </td>
+                    <td>
+                      <div className="scanner-metric-stack">
+                        <div><span>24h vol</span><span>{fmtUsd(c.volume_24h_usd)}</span></div>
+                        <div><span>Vol/MC</span><span>{fmtPct(c.volume_market_cap_ratio)}</span></div>
+                        <div><span>Age</span><span>{c.pair_age_days === null ? "--" : `${c.pair_age_days}d`}</span></div>
+                      </div>
+                    </td>
+                    <td>
+                      <div className="scanner-check-stack">
+                        <FilterCell status={c.basic_filter_status} />
+                        <SecurityCell label={c.security_label} />
+                      </div>
+                    </td>
+                    <td>
+                      <ReviewStatusBadge status={reviewRecord?.status ?? "not_reviewed"} short />
+                    </td>
+                    <td>
+                      <LabelBadge label={c.final_label} />
+                    </td>
+                    <td>
+                      <p className="scanner-reason">{c.final_reasons[0] ? formatReasonText(c.final_reasons[0]) : "No reason available."}</p>
                     </td>
                     <td>
                       <button
-                        className="text-[11px] text-accent hover:underline whitespace-nowrap"
-                        onClick={(e) => { e.stopPropagation(); setSelected(c); }}
+                        className="details-button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setSelected(c);
+                        }}
                       >
-                        Details →
+                        Open
                       </button>
                     </td>
                   </tr>
@@ -174,10 +199,9 @@ export const ScannerRadar: React.FC<Props> = ({
             </tbody>
           </table>
         </div>
-      </div>
+      </section>
 
-      {/* ── Right: detail panel ─────────────────────────────── */}
-      <div className="w-[320px] flex-shrink-0 hidden xl:block">
+      <aside>
         {selected ? (
           <CandidateDetail
             candidate={selected}
@@ -189,10 +213,10 @@ export const ScannerRadar: React.FC<Props> = ({
           />
         ) : (
           <div className="card p-6 text-center text-secondary text-sm">
-            Select a token to view details
+            Select a token to view details.
           </div>
         )}
-      </div>
+      </aside>
     </div>
   );
 };

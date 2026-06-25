@@ -18,11 +18,11 @@ interface CandidateReviewControlsProps {
 }
 
 const REVIEW_STATUS_BADGE_STYLES: Record<AnalystReviewStatus, string> = {
-  not_reviewed: "text-[#64748b] bg-[#64748b]/10 border-[#64748b]/25",
-  needs_more_research: "text-[#f59e0b] bg-[#f59e0b]/10 border-[#f59e0b]/25",
-  saved_for_follow_up: "text-[#22c55e] bg-[#22c55e]/10 border-[#22c55e]/25",
-  dismissed_after_review: "text-[#94a3b8] bg-[#64748b]/10 border-[#64748b]/25",
-  waiting_for_more_data: "text-[#38bdf8] bg-[#38bdf8]/10 border-[#38bdf8]/25",
+  not_reviewed: "text-[#8fa0ad] bg-[#8fa0ad]/10 border-[#8fa0ad]/25",
+  needs_more_research: "text-[#f5b84b] bg-[#f5b84b]/10 border-[#f5b84b]/25",
+  saved_for_follow_up: "text-[#32d184] bg-[#32d184]/10 border-[#32d184]/25",
+  dismissed_after_review: "text-[#8fa0ad] bg-[#8fa0ad]/10 border-[#8fa0ad]/25",
+  waiting_for_more_data: "text-[#f5b84b] bg-[#f5b84b]/10 border-[#f5b84b]/25",
 };
 
 export const ReviewStatusBadge: React.FC<{
@@ -77,15 +77,25 @@ export const CandidateReviewControls: React.FC<CandidateReviewControlsProps> = (
   };
 
   return (
-    <div className="rounded-md p-3 space-y-3" style={{ background: "var(--bg-raised)", border: "1px solid var(--border-sub)" }}>
+    <div className="review-control-panel">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <div className="text-[12px] font-semibold" style={{ color: "var(--text-primary)" }}>Local Review Session</div>
+          <div className="text-[12px] font-semibold" style={{ color: "var(--text-primary)" }}>Status & note</div>
           <div className="text-[10px]" style={{ color: "var(--text-muted)" }}>
             {updatedAt ? `Last updated: ${updatedAt}` : "Saved locally after review."}
           </div>
         </div>
-        <ReviewStatusBadge status={reviewRecord?.status ?? "not_reviewed"} />
+        <div className="flex shrink-0 items-center gap-2">
+          <ReviewStatusBadge status={reviewRecord?.status ?? "not_reviewed"} />
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={handleSave}
+            disabled={!onSaveReview}
+          >
+            Save review
+          </button>
+        </div>
       </div>
 
       <label className="block space-y-1">
@@ -104,7 +114,7 @@ export const CandidateReviewControls: React.FC<CandidateReviewControlsProps> = (
       <label className="block space-y-1">
         <span className="section-label">Analyst note</span>
         <textarea
-          className="ai-input min-h-[72px]"
+          className="ai-input min-h-[54px]"
           value={note}
           onChange={(event) => setNote(event.target.value)}
           placeholder="Analyst note"
@@ -112,14 +122,6 @@ export const CandidateReviewControls: React.FC<CandidateReviewControlsProps> = (
       </label>
 
       <div className="flex items-center gap-2">
-        <button
-          type="button"
-          className="btn-primary"
-          onClick={handleSave}
-          disabled={!onSaveReview}
-        >
-          Save review
-        </button>
         <button
           type="button"
           className="px-3 py-2 rounded-md text-[12px] font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
@@ -135,11 +137,9 @@ export const CandidateReviewControls: React.FC<CandidateReviewControlsProps> = (
         </button>
       </div>
 
-      <div className="rounded-md px-3 py-2 text-[11px] leading-relaxed space-y-1"
-        style={{ background: "rgba(59,130,246,0.08)", border: "1px solid rgba(59,130,246,0.18)", color: "var(--text-secondary)" }}>
-        <div>Local review is saved only in this browser.</div>
-        <div>This does not change scanner label.</div>
-        <div>This is not a buy/sell signal.</div>
+      <div className="rounded-md px-2.5 py-1.5 text-[10px] leading-snug"
+        style={{ background: "var(--accent-dim)", border: "1px solid var(--accent-border)", color: "var(--text-secondary)" }}>
+        Local browser only. This does not change scanner label. This is not a buy/sell signal.
       </div>
     </div>
   );

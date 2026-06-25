@@ -237,9 +237,9 @@ const detailWithContextMarkup = renderToStaticMarkup(React.createElement(Candida
 
 assert.match(detailWithContextMarkup, /Data Coverage.*Context/, "candidate detail renders research context section");
 assert.match(detailWithContextMarkup, /42 - Fear/, "candidate detail renders Fear & Greed context");
-assert.match(detailWithContextMarkup, /CoinGecko pending/, "candidate detail shows paid market source as pending");
-assert.match(detailWithContextMarkup, /TokenSniffer \/ GoPlus clarification pending/, "candidate detail shows dedicated security sources as pending");
-assert.match(detailWithContextMarkup, /Tokenomist pending/, "candidate detail shows unlock source as pending");
+assert.match(detailWithContextMarkup, /Paid market\/onchain data/, "candidate detail shows paid market source category as deferred");
+assert.match(detailWithContextMarkup, /Clarification pending; no new source connected/, "candidate detail shows dedicated security source category as deferred");
+assert.match(detailWithContextMarkup, /Token unlocks \/ vesting/, "candidate detail shows unlock source category as deferred");
 assert.match(detailWithContextMarkup, /This is not a buy\/sell signal\./, "candidate detail renders compliance note");
 assert.match(detailWithContextMarkup, /Context does not alter scanner label\./, "candidate detail explains context does not alter label");
 assert.match(detailWithContextMarkup, /Fixture context/, "candidate detail represents fixture context fallback");

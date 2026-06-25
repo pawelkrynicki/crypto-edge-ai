@@ -2,9 +2,10 @@ import React, { useState } from "react";
 import type { MockCandidate } from "../mockData";
 import { LabelBadge } from "./LabelBadge";
 import { CandidateResearchContext } from "./CandidateResearchContext";
-import { CandidateReviewControls } from "./CandidateReviewControls";
+import { CandidateReviewControls, ReviewStatusBadge } from "./CandidateReviewControls";
 import type { MarketContextPanelState } from "./MarketContextPanel";
 import type { CandidateReviewInput, CandidateReviewRecord } from "../types/reviewSessionTypes";
+import { formatReasonText, formatSecurityFlag } from "../utils/displayText";
 
 interface Props {
   candidate: MockCandidate;
@@ -34,24 +35,24 @@ function fmtDays(n: number | null): string {
 const BoolVal: React.FC<{ v: boolean | null }> = ({ v }) => {
   if (v === null) return <MissingTag />;
   return v
-    ? <span className="text-[#22c55e] text-xs">Yes</span>
-    : <span className="text-[#ef4444] text-xs">No</span>;
+    ? <span className="text-[#32d184] text-xs">Yes</span>
+    : <span className="text-[#ff6575] text-xs">No</span>;
 };
 
 const RiskVal: React.FC<{ v: boolean | null }> = ({ v }) => {
   if (v === null) return <MissingTag />;
   return v
-    ? <span className="text-[#ef4444] text-xs font-semibold">Detected</span>
-    : <span className="text-[#22c55e] text-xs">None</span>;
+    ? <span className="text-[#ff6575] text-xs font-semibold">Detected</span>
+    : <span className="text-[#32d184] text-xs">None</span>;
 };
 
 const MissingTag: React.FC = () => (
   <span
-    className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded"
+    className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md"
     style={{
-      background: "rgba(245,158,11,0.1)",
-      color: "#f59e0b",
-      border: "1px solid rgba(245,158,11,0.25)",
+      background: "var(--amber-dim)",
+      color: "var(--amber)",
+      border: "1px solid var(--amber-border)",
     }}
   >
     Missing
@@ -61,19 +62,19 @@ const MissingTag: React.FC = () => (
 const DECISION_COPY: Record<string, { explanation: string; nextStep: string }> = {
   WATCHLIST: {
     explanation: "Passed basic filters and available security checks. Eligible for further review only.",
-    nextStep: "Conduct manual community, narrative, and chart review before any decision.",
+    nextStep: "Complete manual community, narrative, and chart review before any independent decision.",
   },
   CRITICAL_RISK: {
-    explanation: "Critical security flag detected. Do not proceed without manual investigation.",
-    nextStep: "Investigate all flagged risks manually before any further assessment.",
+    explanation: "Critical security flag detected. Manual investigation is required before any further assessment.",
+    nextStep: "Review every flagged risk manually and keep the candidate out of the follow-up path unless resolved.",
   },
   NEEDS_MANUAL_VERIFICATION: {
-    explanation: "Important security data is missing or unclear. Manual verification required.",
-    nextStep: "Manually verify all missing data points before making any assessment.",
+    explanation: "Important security data is missing or unclear. Manual verification is required.",
+    nextStep: "Verify every missing data point before making any assessment.",
   },
   REJECT: {
-    explanation: "Failed basic market/liquidity filters. Not eligible for further review.",
-    nextStep: "No further action recommended at this stage.",
+    explanation: "Failed basic market or liquidity filters. Not eligible for further review.",
+    nextStep: "No follow-up in this scanner review path.",
   },
 };
 
@@ -96,17 +97,18 @@ const CHECKLIST_ITEMS = {
     { key: "narrative", label: "Narrative - manual review needed" },
   ],
   "Personal Risk": [
-    { key: "notSignal", label: "I understand this is not a signal" },
+    { key: "notSignal", label: "I understand this is research only" },
     { key: "mayFail", label: "I accept that token may still fail after review" },
-    { key: "riskRules", label: "I have position risk rules before any decision" },
+    { key: "riskRules", label: "I have personal risk rules before any decision" },
   ],
 };
 
 type CheckedState = Record<string, boolean>;
 
-const SectionTitle: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div className="section-label border-b pb-1 mb-2" style={{ borderColor: "var(--border)" }}>
-    {children}
+const SectionTitle: React.FC<{ children: React.ReactNode; meta?: React.ReactNode }> = ({ children, meta }) => (
+  <div className="detail-section-title">
+    <div className="section-label">{children}</div>
+    {meta}
   </div>
 );
 
@@ -114,6 +116,20 @@ const DR: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value 
   <div className="detail-row">
     <span className="detail-label">{label}</span>
     <span className="detail-value">{value}</span>
+  </div>
+);
+
+const MetaPill: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value }) => (
+  <span className="research-context-chip">
+    <span style={{ color: "var(--text-muted)" }}>{label}</span>
+    <span>{value}</span>
+  </span>
+);
+
+const SnapshotMetric: React.FC<{ label: string; value: string }> = ({ label, value }) => (
+  <div className="detail-kpi">
+    <span>{label}</span>
+    <strong>{value}</strong>
   </div>
 );
 
@@ -142,73 +158,83 @@ export const CandidateDetail: React.FC<Props> = ({
   const toggle = (key: string) => setChecked((prev) => ({ ...prev, [key]: !prev[key] }));
 
   return (
-    <div className="card flex flex-col overflow-hidden" style={{ maxHeight: "calc(100vh - 180px)" }}>
-      <div
-        className="flex items-center justify-between px-4 py-3 shrink-0"
-        style={{ borderBottom: "1px solid var(--border)", background: "var(--bg-raised)" }}
-      >
-        <div className="flex items-center gap-2">
-          <span className="font-bold text-primary text-sm">{c.symbol}</span>
-          <span className="text-secondary text-xs">{c.name}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <LabelBadge label={c.final_label} />
-          {onClose && (
-            <button onClick={onClose} className="text-muted hover:text-primary text-base leading-none ml-1">x</button>
-          )}
-        </div>
-      </div>
-
-      <div className="overflow-y-auto flex-1 px-4 py-3 space-y-4 text-xs">
-        <div>
-          <SectionTitle>Token Info</SectionTitle>
-          <DR label="Chain" value={c.chain.toUpperCase()} />
-          <DR label="DEX" value={c.dex || "--"} />
-          <DR label="Contract" value={<code className="text-[10px] text-secondary break-all">{c.contract_address.slice(0, 18) || "--"}</code>} />
-          <DR
-            label="Source"
-            value={
-              c.source_url
-                ? (
-                    <a href={c.source_url} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline text-xs">
-                      DexScreener
-                    </a>
-                  )
-                : "--"
-            }
-          />
-        </div>
-
-        <div>
-          <SectionTitle>A. Market Snapshot</SectionTitle>
-          <div className="grid grid-cols-2 gap-x-3">
-            <DR label="Price" value={c.price_usd !== null ? `$${c.price_usd.toFixed(6)}` : "--"} />
-            <DR label="Market Cap" value={fmtUsd(c.market_cap_usd)} />
-            <DR label="FDV" value={fmtUsd(c.fdv_usd)} />
-            <DR label="Liquidity" value={fmtUsd(c.liquidity_usd)} />
-            <DR label="24h Volume" value={fmtUsd(c.volume_24h_usd)} />
-            <DR label="Volume/MC" value={fmtPct(c.volume_market_cap_ratio)} />
-            <DR label="Pair Age" value={fmtDays(c.pair_age_days)} />
+    <div className="detail-panel">
+      <header className="detail-header">
+        <div className="detail-header-top">
+          <div className="detail-title">
+            <strong>{c.symbol}</strong>
+            <span>{c.name}</span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <LabelBadge label={c.final_label} />
+            {onClose && (
+              <button onClick={onClose} className="detail-close" aria-label="Close candidate detail">
+                x
+              </button>
+            )}
           </div>
         </div>
 
-        <div>
-          <SectionTitle>B. Security Check</SectionTitle>
+        <div className="detail-header-meta">
+          <MetaPill label="Chain" value={c.chain.toUpperCase()} />
+          <MetaPill label="DEX" value={c.dex || "--"} />
+          <MetaPill label="Review" value={<ReviewStatusBadge status={reviewRecord?.status ?? "not_reviewed"} short />} />
+          {c.source_url && (
+            <a href={c.source_url} target="_blank" rel="noopener noreferrer" className="research-context-chip available">
+              DexScreener
+            </a>
+          )}
+        </div>
+      </header>
+
+      <div className="detail-body">
+        <section className="detail-section">
+          <SectionTitle
+            meta={<ReviewStatusBadge status={reviewRecord?.status ?? "not_reviewed"} />}
+          >
+            Local Review Session
+          </SectionTitle>
+          <CandidateReviewControls
+            candidateId={c.id}
+            reviewRecord={reviewRecord ?? null}
+            onSaveReview={onSaveReview}
+            onClearReview={onClearReview}
+          />
+        </section>
+
+        <section className="detail-section">
+          <SectionTitle>Quick Snapshot</SectionTitle>
+          <div className="detail-kpi-grid">
+            <SnapshotMetric label="Price" value={c.price_usd !== null ? `$${c.price_usd.toFixed(6)}` : "--"} />
+            <SnapshotMetric label="Liquidity" value={fmtUsd(c.liquidity_usd)} />
+            <SnapshotMetric label="24h Volume" value={fmtUsd(c.volume_24h_usd)} />
+            <SnapshotMetric label="Age" value={fmtDays(c.pair_age_days)} />
+          </div>
+          <div className="mt-3">
+            <DR label="Market Cap" value={fmtUsd(c.market_cap_usd)} />
+            <DR label="Volume/MC" value={fmtPct(c.volume_market_cap_ratio)} />
+            <DR label="FDV" value={fmtUsd(c.fdv_usd)} />
+            <DR label="Contract" value={<code className="text-[10px] text-secondary break-all">{c.contract_address.slice(0, 24) || "--"}</code>} />
+          </div>
+        </section>
+
+        <section className="detail-section">
+          <SectionTitle>Security</SectionTitle>
           {sec ? (
             <>
-              <div className="grid grid-cols-2 gap-x-3">
+              <div className="detail-two-col">
                 <DR label="Honeypot" value={
-                  sec.honeypot_status === "passed" ? <span className="text-[#22c55e]">Passed</span>
-                    : sec.honeypot_status === "failed" ? <span className="text-[#ef4444] font-semibold">DETECTED</span>
-                    : <span className="text-[#f59e0b]">Unknown</span>
+                  sec.honeypot_status === "passed" ? <span className="text-[#32d184]">Passed</span>
+                    : sec.honeypot_status === "failed" ? <span className="text-[#ff6575] font-semibold">Detected</span>
+                    : <span className="text-[#f5b84b]">Unknown</span>
                 } />
-                <DR label="Entry Tax" value={sec.buy_tax !== null ? `${sec.buy_tax}%` : <MissingTag />} />
-                <DR label="Exit Tax" value={sec.sell_tax !== null ? `${sec.sell_tax}%` : <MissingTag />} />
+                <DR label="In Tax" value={sec.buy_tax !== null ? `${sec.buy_tax}%` : <MissingTag />} />
+                <DR label="Out Tax" value={sec.sell_tax !== null ? `${sec.sell_tax}%` : <MissingTag />} />
                 <DR label="Contract" value={<BoolVal v={sec.contract_verified} />} />
                 <DR label="Ownership" value={
-                  sec.ownership_status === "renounced" ? <span className="text-[#22c55e]">Renounced</span>
-                    : sec.ownership_status === "active" ? <span className="text-[#ef4444]">Active</span>
-                    : <span className="text-[#f59e0b]">Unknown</span>
+                  sec.ownership_status === "renounced" ? <span className="text-[#32d184]">Renounced</span>
+                    : sec.ownership_status === "active" ? <span className="text-[#ff6575]">Active</span>
+                    : <span className="text-[#f5b84b]">Unknown</span>
                 } />
                 <DR label="Liq. Locked" value={<BoolVal v={sec.liquidity_locked} />} />
                 <DR label="Mint Risk" value={<RiskVal v={sec.mint_risk} />} />
@@ -219,22 +245,24 @@ export const CandidateDetail: React.FC<Props> = ({
                 <DR label="Top Wallet" value={sec.top_wallet_pct !== null ? `${sec.top_wallet_pct}%` : <MissingTag />} />
                 <DR label="Top 10 Wallets" value={sec.top_10_wallets_pct !== null ? `${sec.top_10_wallets_pct}%` : <MissingTag />} />
               </div>
+
               {sec.risk_flags.length > 0 && (
-                <div className="mt-2">
+                <div className="mt-3">
                   <div className="section-label mb-1">Risk Flags</div>
                   <div className="flex flex-wrap gap-1">
                     {sec.risk_flags.map((f) => (
-                      <span key={f} className="badge badge-critical text-[10px]">{f}</span>
+                      <span key={f} className="badge badge-critical">{formatSecurityFlag(f)}</span>
                     ))}
                   </div>
                 </div>
               )}
+
               {sec.missing_data.length > 0 && (
-                <div className="mt-2">
+                <div className="mt-3">
                   <div className="section-label mb-1">Missing Data</div>
                   <div className="flex flex-wrap gap-1">
                     {sec.missing_data.map((f) => (
-                      <span key={f} className="badge badge-manual text-[10px]">{f}</span>
+                      <span key={f} className="badge badge-manual">{formatSecurityFlag(f)}</span>
                     ))}
                   </div>
                 </div>
@@ -243,33 +271,19 @@ export const CandidateDetail: React.FC<Props> = ({
           ) : (
             <p className="text-secondary text-xs italic">{getMissingSecurityText(c)}</p>
           )}
-        </div>
+        </section>
 
-        <div>
-          <SectionTitle>C. Data Coverage &amp; Context</SectionTitle>
+        <section className="detail-section">
+          <SectionTitle>Data Coverage &amp; Context</SectionTitle>
           <CandidateResearchContext candidate={c} marketContextState={marketContextState} />
-        </div>
+        </section>
 
-        <div>
-          <SectionTitle>Local Review Session</SectionTitle>
-          <CandidateReviewControls
-            candidateId={c.id}
-            reviewRecord={reviewRecord ?? null}
-            onSaveReview={onSaveReview}
-            onClearReview={onClearReview}
-          />
-        </div>
-
-        <div>
-          <SectionTitle>D. Decision</SectionTitle>
-          <div className="rounded-md p-3 space-y-2" style={{ background: "var(--bg-raised)", border: "1px solid var(--border-sub)" }}>
-            <div className="flex items-center gap-2">
+        <section className="detail-section">
+          <SectionTitle>Decision</SectionTitle>
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 flex-wrap">
               <LabelBadge label={c.final_label} size="md" />
-              {c.final_label === "WATCHLIST" && (
-                <span className="text-[10px] italic" style={{ color: "var(--text-muted)" }}>
-                  Not a signal
-                </span>
-              )}
+              <span className="research-context-chip">This is not a buy/sell signal.</span>
             </div>
             <p className="text-secondary text-xs">{decision.explanation}</p>
             <div>
@@ -278,21 +292,23 @@ export const CandidateDetail: React.FC<Props> = ({
             </div>
             {c.final_reasons.length > 0 && (
               <div>
-                <div className="section-label mb-0.5">Reasons</div>
-                {c.final_reasons.map((r) => (
-                  <div key={r} className="text-xs text-secondary">- {r}</div>
-                ))}
+                <div className="section-label mb-1">Reasons</div>
+                <div className="space-y-1">
+                  {c.final_reasons.map((r) => (
+                    <div key={r} className="text-xs text-secondary">- {formatReasonText(r)}</div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
-        </div>
+        </section>
 
-        <div>
-          <SectionTitle>E. Final Checklist</SectionTitle>
+        <section className="detail-section">
+          <SectionTitle>Final Checklist</SectionTitle>
           <div className="space-y-3">
             {Object.entries(CHECKLIST_ITEMS).map(([category, items]) => (
               <div key={category}>
-                <div className="text-[10px] font-semibold uppercase tracking-widest mb-1.5" style={{ color: "var(--text-muted)" }}>
+                <div className="text-[10px] font-semibold uppercase mb-1.5" style={{ color: "var(--text-muted)" }}>
                   {category}
                 </div>
                 <div className="space-y-1">
@@ -306,7 +322,7 @@ export const CandidateDetail: React.FC<Props> = ({
                       />
                       <span className={`text-xs transition-colors ${
                         checked[item.key]
-                          ? "text-[#22c55e] line-through opacity-70"
+                          ? "text-[#32d184] line-through opacity-70"
                           : "text-secondary group-hover:text-primary"
                       }`}>
                         {item.label}
@@ -317,7 +333,7 @@ export const CandidateDetail: React.FC<Props> = ({
               </div>
             ))}
           </div>
-        </div>
+        </section>
       </div>
     </div>
   );

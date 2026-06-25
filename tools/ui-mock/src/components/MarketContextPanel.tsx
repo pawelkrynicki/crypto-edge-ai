@@ -33,7 +33,7 @@ export const MarketContextPanel: React.FC<Props> = ({ state }) => {
     return (
       <section className="card market-context-card">
         <PanelHeader titleMeta="Loading context..." />
-        <div className="px-4 py-5 text-sm" style={{ color: "var(--text-secondary)" }}>
+        <div className="px-5 py-6 text-sm" style={{ color: "var(--text-secondary)" }}>
           Loading market context...
         </div>
       </section>
@@ -44,9 +44,11 @@ export const MarketContextPanel: React.FC<Props> = ({ state }) => {
     return (
       <section className="card market-context-card">
         <PanelHeader titleMeta="API unavailable" />
-        <div className="market-context-warning">
-          <div className="font-semibold">API unavailable</div>
-          <div>{state.message}</div>
+        <div className="market-notes mt-4">
+          <div className="market-context-warning">
+            <div className="font-semibold">API unavailable</div>
+            <div>{state.message}</div>
+          </div>
         </div>
         <ComplianceNote />
       </section>
@@ -55,12 +57,13 @@ export const MarketContextPanel: React.FC<Props> = ({ state }) => {
 
   const context = state.context;
   const fearGreed = findFearGreedRecord(context);
-  const defiRows = findDefiRecords(context).slice(0, 5);
+  const defiRows = findDefiRecords(context).slice(0, 3);
   const sourceKind = context._source_meta.source_kind;
   const sourceLabel = sourceKind === "approved-sources-output" ? "Real output" : "Fixture fallback";
   const sourceBadgeClass = sourceKind === "approved-sources-output" ? "badge-watchlist" : "badge-manual";
   const warningNotes = collectSourceNotes(context, "warnings");
   const errorNotes = collectSourceNotes(context, "errors");
+  const notePreview = [...warningNotes, ...errorNotes].slice(0, 4);
   const hasNoRecords = !fearGreed && defiRows.length === 0;
 
   return (
@@ -70,53 +73,57 @@ export const MarketContextPanel: React.FC<Props> = ({ state }) => {
         sourceBadgeClass={sourceBadgeClass}
         environment={context.environment}
         titleMeta={`Loaded ${formatDate(context._source_meta.loaded_at || context.generated_at)}`}
+        summary={context.summary}
       />
 
-      {state.message && (
-        <div className="market-context-warning">
-          <div className="font-semibold">Fixture fallback</div>
-          <div>{state.message}</div>
-        </div>
-      )}
-
-      {(context.summary.warnings_total > 0 || context.summary.errors_total > 0) && (
-        <div className="market-context-warning">
-          <div className="font-semibold">
-            Context notes: {context.summary.warnings_total} warning{context.summary.warnings_total === 1 ? "" : "s"}, {context.summary.errors_total} error{context.summary.errors_total === 1 ? "" : "s"}
-          </div>
-          {[...warningNotes, ...errorNotes].slice(0, 3).map((note) => (
-            <div key={note}>{note}</div>
-          ))}
+      {(state.message || notePreview.length > 0) && (
+        <div className="market-notes">
+          {state.message && (
+            <div className="market-context-warning">
+              <span className="font-semibold">Fixture fallback:</span>{" "}
+              <span>{state.message}</span>
+            </div>
+          )}
+          {notePreview.length > 0 && (
+            <div className="market-context-warning">
+              <span className="font-semibold">
+                Context notes: {context.summary.warnings_total} warning{context.summary.warnings_total === 1 ? "" : "s"}, {context.summary.errors_total} error{context.summary.errors_total === 1 ? "" : "s"}
+              </span>
+              <span> - {notePreview.join(" / ")}</span>
+            </div>
+          )}
         </div>
       )}
 
       {hasNoRecords ? (
-        <div className="px-4 py-5 text-sm" style={{ color: "var(--text-secondary)" }}>
+        <div className="px-5 py-6 text-sm" style={{ color: "var(--text-secondary)" }}>
           No context records available.
         </div>
       ) : (
         <div className="market-context-layout">
-          <section className="market-context-section">
+          <section className="fear-greed-card">
             <div className="section-label">Fear & Greed</div>
             {fearGreed ? (
-              <div className="mt-2 flex items-start justify-between gap-4">
-                <div>
-                  <div className="text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--text-primary)" }}>
-                    {fearGreed.value}
-                  </div>
-                  <div className="text-sm font-semibold mt-1" style={{ color: "var(--text-secondary)" }}>
+              <div className="mt-2 flex items-center gap-3">
+                <div
+                  className="fear-greed-meter"
+                  style={{
+                    "--meter-value": `${clamp(fearGreed.value, 0, 100)}%`,
+                    "--meter-color": sentimentColor(fearGreed.value),
+                  } as React.CSSProperties}
+                  aria-label={`Fear and Greed value ${fearGreed.value}`}
+                >
+                  <span>{fearGreed.value}</span>
+                </div>
+                <div className="min-w-0">
+                  <div className="text-base font-bold leading-tight" style={{ color: "var(--text-primary)" }}>
                     {fearGreed.value_classification}
                   </div>
-                </div>
-                <div className="text-right min-w-0">
-                  <div className="text-[10px] uppercase font-semibold" style={{ color: "var(--text-muted)" }}>
-                    Timestamp
+                  <div className="mt-0.5 text-[11px]" style={{ color: "var(--text-secondary)" }}>
+                    Broad market sentiment context.
                   </div>
-                  <div className="text-xs break-words" style={{ color: "var(--text-secondary)" }}>
+                  <div className="mt-1.5 text-[10px]" style={{ color: "var(--text-muted)" }}>
                     {formatDate(fearGreed.timestamp)}
-                  </div>
-                  <div className="mt-2 text-[11px]" style={{ color: "var(--accent)" }}>
-                    Market sentiment context only
                   </div>
                 </div>
               </div>
@@ -125,45 +132,33 @@ export const MarketContextPanel: React.FC<Props> = ({ state }) => {
             )}
           </section>
 
-          <section className="market-context-section market-context-defi">
-            <div className="flex items-center justify-between gap-3 mb-2">
-              <div className="section-label">DefiLlama</div>
-              <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>
-                {defiRows.length} row{defiRows.length === 1 ? "" : "s"}
-              </span>
+          <section className="market-context-section">
+            <div className="mb-1.5 flex items-center gap-2">
+              <div className="section-label">DeFi Context</div>
+              <div className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+                Top {defiRows.length} record{defiRows.length === 1 ? "" : "s"}
+              </div>
             </div>
+
             {defiRows.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="data-table market-context-table">
-                  <thead>
-                    <tr>
-                      <th>Name</th>
-                      <th>Chain</th>
-                      <th>TVL</th>
-                      <th>1d</th>
-                      <th>7d</th>
-                      <th>URL</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {defiRows.map((row) => (
-                      <tr key={`${row.record_type}-${row.name}-${row.chain ?? "all"}`}>
-                        <td className="font-semibold">{row.name}</td>
-                        <td>{row.chain ?? "--"}</td>
-                        <td>{formatUsd(row.tvl_usd)}</td>
-                        <td className={changeClass(row.change_1d)}>{formatChange(row.change_1d)}</td>
-                        <td className={changeClass(row.change_7d)}>{formatChange(row.change_7d)}</td>
-                        <td>
-                          {row.url ? (
-                            <a href={row.url} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
-                              Open
-                            </a>
-                          ) : "--"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="defi-list">
+                {defiRows.map((row) => (
+                  <div key={`${row.record_type}-${row.name}-${row.chain ?? "all"}`} className="defi-item">
+                    <div className="defi-item-main">
+                      {row.url ? (
+                        <a href={row.url} target="_blank" rel="noopener noreferrer">
+                          {row.name}
+                        </a>
+                      ) : (
+                        <span>{row.name}</span>
+                      )}
+                      <span>{row.chain ?? "All chains"}</span>
+                    </div>
+                    <DefiMetric label="TVL" value={formatUsd(row.tvl_usd)} />
+                    <DefiMetric label="1d" value={formatChange(row.change_1d)} valueClass={changeClass(row.change_1d)} />
+                    <DefiMetric label="7d" value={formatChange(row.change_7d)} valueClass={changeClass(row.change_7d)} />
+                  </div>
+                ))}
               </div>
             ) : (
               <EmptyState label="No DeFi context records available." />
@@ -171,13 +166,6 @@ export const MarketContextPanel: React.FC<Props> = ({ state }) => {
           </section>
         </div>
       )}
-
-      <div className="market-context-summary">
-        <SummaryItem label="Sources allowed" value={context.summary.sources_allowed} />
-        <SummaryItem label="Records total" value={context.summary.records_total} />
-        <SummaryItem label="Warnings" value={context.summary.warnings_total} />
-        <SummaryItem label="Errors" value={context.summary.errors_total} />
-      </div>
 
       <ComplianceNote />
     </section>
@@ -189,34 +177,40 @@ function PanelHeader({
   sourceBadgeClass,
   environment,
   titleMeta,
+  summary,
 }: {
   sourceLabel?: string;
   sourceBadgeClass?: string;
   environment?: string;
   titleMeta: string;
+  summary?: MarketContextApiOutput["summary"];
 }) {
   return (
     <div className="market-context-header">
-      <div className="min-w-0">
+      <div className="market-header-copy min-w-0">
         <div className="flex flex-wrap items-center gap-2">
-          <h2 className="text-sm font-bold leading-tight" style={{ color: "var(--text-primary)" }}>
-            Market Context
-          </h2>
+          <h2>Market Context</h2>
           {sourceLabel && (
-            <span className={`badge ${sourceBadgeClass ?? "badge-reject"} text-[10px]`}>
+            <span className={`badge ${sourceBadgeClass ?? "badge-reject"}`}>
               {sourceLabel}
             </span>
           )}
           {environment && (
-            <span className="badge badge-reject text-[10px]">
+            <span className="badge badge-context">
               {environment}
             </span>
           )}
         </div>
-        <div className="text-[11px] mt-1" style={{ color: "var(--text-muted)" }}>
-          {titleMeta}
-        </div>
+        <p>{titleMeta}</p>
       </div>
+      {summary && (
+        <div className="market-context-summary">
+          <SummaryItem label="Sources" value={summary.sources_allowed} />
+          <SummaryItem label="Records" value={summary.records_total} />
+          <SummaryItem label="Warnings" value={summary.warnings_total} />
+          <SummaryItem label="Errors" value={summary.errors_total} />
+        </div>
+      )}
     </div>
   );
 }
@@ -225,9 +219,18 @@ function SummaryItem({ label, value }: { label: string; value: number }) {
   return (
     <div className="min-w-0">
       <div className="section-label">{label}</div>
-      <div className="text-lg font-bold tabular-nums leading-tight" style={{ color: "var(--text-primary)" }}>
+      <div className="text-sm font-bold tabular-nums leading-tight" style={{ color: "var(--text-primary)" }}>
         {value}
       </div>
+    </div>
+  );
+}
+
+function DefiMetric({ label, value, valueClass }: { label: string; value: string; valueClass?: string }) {
+  return (
+    <div className="defi-metric">
+      <span>{label}</span>
+      <span className={valueClass}>{value}</span>
     </div>
   );
 }
@@ -303,7 +306,17 @@ function formatChange(value: number | null): string {
 
 function changeClass(value: number | null): string {
   if (value === null) return "text-secondary";
-  if (value > 0) return "text-[#22c55e]";
-  if (value < 0) return "text-[#ef4444]";
+  if (value > 0) return "text-[#32d184]";
+  if (value < 0) return "text-[#ff6575]";
   return "text-secondary";
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
+
+function sentimentColor(value: number): string {
+  if (value >= 65) return "var(--green)";
+  if (value >= 35) return "var(--amber)";
+  return "var(--red)";
 }
