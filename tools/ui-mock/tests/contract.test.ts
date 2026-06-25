@@ -10,6 +10,7 @@ import { mapPersistableScannerOutputToUiCandidates } from "../src/adapters/scann
 import { CandidateDetail, getMissingSecurityText } from "../src/components/CandidateDetail";
 import { MarketContextPanel } from "../src/components/MarketContextPanel";
 import { ScannerRadar } from "../src/components/ScannerRadar";
+import { WatchlistTab } from "../src/components/WatchlistTab";
 import { PERSISTABLE_SCANNER_SAMPLE } from "../src/fixtures/persistableScannerSample";
 import { toMockCandidate } from "../src/mockData";
 import { interpretContextApiOutput, parseMarketContextApiOutput } from "../src/services/contextDataSource";
@@ -22,6 +23,7 @@ import {
 } from "../src/services/reviewSessionStore";
 import type { StorageLike } from "../src/services/reviewSessionStore";
 import { interpretScannerApiOutput } from "../src/services/scannerDataSource";
+import type { ReviewSessionState } from "../src/types/reviewSessionTypes";
 import type { PersistableScannerOutput, ScannerApiOutput } from "../src/types/scannerTypes";
 import { createScannerApiServer } from "../server/scannerApiServer";
 import { readLatestContextOutput, type ContextLatestOutput } from "../server/latestContextOutput";
@@ -196,6 +198,8 @@ assert.match(apiFailureMarkup, /API unavailable/, "panel shows API failure state
 assert.match(apiFailureMarkup, /Context API unavailable: test failure/, "panel renders API failure detail");
 
 const passMockCandidate = toMockCandidate(passUi);
+const lowlMockCandidate = toMockCandidate(lowlUi);
+const fdvMockCandidate = toMockCandidate(fdvUi);
 const reviewStorage = createMemoryStorage();
 const savedReviewState = saveReviewRecord({
   candidate_id: passMockCandidate.id,
@@ -271,6 +275,75 @@ const radarWithReviewMarkup = renderToStaticMarkup(React.createElement(ScannerRa
 
 assert.match(radarWithReviewMarkup, /Review/, "scanner radar renders review column");
 assert.match(radarWithReviewMarkup, /Follow-up/, "scanner radar renders local review badge");
+
+const reviewQueueState = {
+  version: 1 as const,
+  entries: {
+    [passMockCandidate.id]: savedReviewRecord,
+    [lowlMockCandidate.id]: {
+      candidate_id: lowlMockCandidate.id,
+      status: "needs_more_research",
+      note: "Check why liquidity failed before any follow-up.",
+      updated_at: "2026-06-24T12:15:00.000Z",
+    },
+    [fdvMockCandidate.id]: {
+      candidate_id: fdvMockCandidate.id,
+      status: "waiting_for_more_data",
+      note: "Wait for updated security coverage.",
+      updated_at: "2026-06-24T12:20:00.000Z",
+    },
+    "stored-review-not-in-scan": {
+      candidate_id: "stored-review-not-in-scan",
+      status: "dismissed_after_review",
+      note: "Removed from this local review pass.",
+      updated_at: "2026-06-24T12:25:00.000Z",
+    },
+  },
+} satisfies ReviewSessionState;
+
+const reviewQueueMarkup = renderToStaticMarkup(React.createElement(WatchlistTab, {
+  candidates: [passMockCandidate, lowlMockCandidate, fdvMockCandidate],
+  reviewSession: reviewQueueState,
+  onClearReview: () => undefined,
+  onOpenCandidate: () => undefined,
+}));
+
+assert.match(reviewQueueMarkup, /Review Queue/, "watchlist tab renders review queue workspace");
+assert.match(reviewQueueMarkup, /Saved for follow-up/, "review queue renders local saved follow-up status");
+assert.match(reviewQueueMarkup, /Track community and liquidity follow-up\./, "review queue renders analyst note preview");
+assert.match(reviewQueueMarkup, /Scanner label/, "review queue labels scanner output separately");
+assert.match(reviewQueueMarkup, /Review status/, "review queue labels local review status separately");
+assert.match(reviewQueueMarkup, /Further review only/, "review queue keeps scanner label visible");
+assert.match(reviewQueueMarkup, /Needs more research/, "review queue renders needs research status");
+assert.match(reviewQueueMarkup, /Waiting for more data/, "review queue renders waiting data status");
+assert.match(reviewQueueMarkup, /Dismissed after review/, "review queue renders dismissed status");
+assert.match(reviewQueueMarkup, /Stored reviews not in current scan/, "review queue renders missing-current-scan section");
+assert.match(reviewQueueMarkup, /stored-review-not-in-scan/, "review queue shows stored review candidate_id");
+assert.match(
+  reviewQueueMarkup,
+  /This review belongs to a candidate not present in the current scanner output\./,
+  "review queue explains stored reviews outside current scan",
+);
+assert.match(
+  reviewQueueMarkup,
+  /Review status does not change scanner labels\./,
+  "review queue includes scanner-label compliance copy",
+);
+assert.equal(passMockCandidate.final_label, "WATCHLIST", "review queue rendering does not mutate final_label");
+
+const emptyReviewQueueMarkup = renderToStaticMarkup(React.createElement(WatchlistTab, {
+  candidates: [passMockCandidate],
+  reviewSession: createEmptyReviewSession(),
+  onClearReview: () => undefined,
+  onOpenCandidate: () => undefined,
+}));
+
+assert.match(emptyReviewQueueMarkup, /No local review items yet\./, "review queue renders empty state");
+assert.match(
+  emptyReviewQueueMarkup,
+  /Mark a candidate as Saved for follow-up or Needs more research from the scanner detail panel\./,
+  "review queue empty state points back to scanner detail",
+);
 
 const detailFailureMarkup = renderToStaticMarkup(React.createElement(CandidateDetail, {
   candidate: passMockCandidate,

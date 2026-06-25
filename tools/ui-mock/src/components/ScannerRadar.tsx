@@ -11,6 +11,8 @@ import { formatReasonText } from "../utils/displayText";
 interface Props {
   candidates: MockCandidate[];
   marketContextState?: MarketContextPanelState;
+  selectedCandidateId?: string | null;
+  onCandidateSelected?: (candidateId: string | null) => void;
   reviewSession: ReviewSessionState;
   onSaveReview: (input: CandidateReviewInput) => void;
   onClearReview: (candidateId: string) => void;
@@ -84,17 +86,24 @@ const FilterCell: React.FC<{ status: string }> = ({ status }) => {
 export const ScannerRadar: React.FC<Props> = ({
   candidates,
   marketContextState,
+  selectedCandidateId,
+  onCandidateSelected,
   reviewSession,
   onSaveReview,
   onClearReview,
 }) => {
-  const [selected, setSelected] = useState<MockCandidate | null>(candidates[0] ?? null);
   const [filter, setFilter] = useState<ScannerFilter>("ALL");
 
   React.useEffect(() => {
-    setSelected(candidates[0] ?? null);
     setFilter("ALL");
   }, [candidates]);
+
+  const selected = React.useMemo(() => {
+    if (selectedCandidateId === null) return null;
+    if (!selectedCandidateId) return candidates[0] ?? null;
+
+    return candidates.find((candidate) => candidate.id === selectedCandidateId) ?? candidates[0] ?? null;
+  }, [candidates, selectedCandidateId]);
 
   const filtered = filter === "ALL"
     ? candidates
@@ -141,7 +150,7 @@ export const ScannerRadar: React.FC<Props> = ({
                 return (
                   <tr
                     key={c.id}
-                    onClick={() => setSelected(c)}
+                    onClick={() => onCandidateSelected?.(c.id)}
                     className={`cursor-pointer ${isActive ? "row-active" : ""}`}
                   >
                     <td>
@@ -187,7 +196,7 @@ export const ScannerRadar: React.FC<Props> = ({
                         className="details-button"
                         onClick={(event) => {
                           event.stopPropagation();
-                          setSelected(c);
+                          onCandidateSelected?.(c.id);
                         }}
                       >
                         Open
@@ -209,7 +218,7 @@ export const ScannerRadar: React.FC<Props> = ({
             reviewRecord={getCandidateReview(selected.id, reviewSession)}
             onSaveReview={onSaveReview}
             onClearReview={onClearReview}
-            onClose={() => setSelected(null)}
+            onClose={() => onCandidateSelected?.(null)}
           />
         ) : (
           <div className="card p-6 text-center text-secondary text-sm">
