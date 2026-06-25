@@ -17,12 +17,12 @@ interface StatCardProps {
 }
 
 const StatCard: React.FC<StatCardProps> = ({ label, value, valueColor, dotColor, sub }) => (
-  <div className="stat-card flex flex-col gap-1.5">
+  <div className="stat-card flex flex-col gap-1">
     <div className="flex items-center gap-1.5">
       <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotColor}`} />
       <span className="section-label">{label}</span>
     </div>
-    <div className={`text-2xl font-bold tabular-nums leading-none ${valueColor}`}>{value}</div>
+    <div className={`text-xl font-bold tabular-nums leading-none ${valueColor}`}>{value}</div>
     <div className="text-[10px] text-muted leading-none">{sub}</div>
   </div>
 );

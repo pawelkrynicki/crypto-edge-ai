@@ -57,7 +57,7 @@ export const MarketContextPanel: React.FC<Props> = ({ state }) => {
 
   const context = state.context;
   const fearGreed = findFearGreedRecord(context);
-  const defiRows = findDefiRecords(context).slice(0, 5);
+  const defiRows = findDefiRecords(context).slice(0, 3);
   const sourceKind = context._source_meta.source_kind;
   const sourceLabel = sourceKind === "approved-sources-output" ? "Real output" : "Fixture fallback";
   const sourceBadgeClass = sourceKind === "approved-sources-output" ? "badge-watchlist" : "badge-manual";
@@ -73,24 +73,23 @@ export const MarketContextPanel: React.FC<Props> = ({ state }) => {
         sourceBadgeClass={sourceBadgeClass}
         environment={context.environment}
         titleMeta={`Loaded ${formatDate(context._source_meta.loaded_at || context.generated_at)}`}
+        summary={context.summary}
       />
 
       {(state.message || notePreview.length > 0) && (
         <div className="market-notes">
           {state.message && (
             <div className="market-context-warning">
-              <div className="font-semibold">Fixture fallback</div>
-              <div>{state.message}</div>
+              <span className="font-semibold">Fixture fallback:</span>{" "}
+              <span>{state.message}</span>
             </div>
           )}
           {notePreview.length > 0 && (
             <div className="market-context-warning">
-              <div className="font-semibold">
+              <span className="font-semibold">
                 Context notes: {context.summary.warnings_total} warning{context.summary.warnings_total === 1 ? "" : "s"}, {context.summary.errors_total} error{context.summary.errors_total === 1 ? "" : "s"}
-              </div>
-              {notePreview.map((note) => (
-                <div key={note}>{note}</div>
-              ))}
+              </span>
+              <span> - {notePreview.join(" / ")}</span>
             </div>
           )}
         </div>
@@ -105,7 +104,7 @@ export const MarketContextPanel: React.FC<Props> = ({ state }) => {
           <section className="fear-greed-card">
             <div className="section-label">Fear & Greed</div>
             {fearGreed ? (
-              <div className="mt-3 flex items-center gap-4">
+              <div className="mt-2 flex items-center gap-3">
                 <div
                   className="fear-greed-meter"
                   style={{
@@ -117,13 +116,13 @@ export const MarketContextPanel: React.FC<Props> = ({ state }) => {
                   <span>{fearGreed.value}</span>
                 </div>
                 <div className="min-w-0">
-                  <div className="text-lg font-bold leading-tight" style={{ color: "var(--text-primary)" }}>
+                  <div className="text-base font-bold leading-tight" style={{ color: "var(--text-primary)" }}>
                     {fearGreed.value_classification}
                   </div>
-                  <div className="mt-1 text-[12px]" style={{ color: "var(--text-secondary)" }}>
+                  <div className="mt-0.5 text-[11px]" style={{ color: "var(--text-secondary)" }}>
                     Broad market sentiment context.
                   </div>
-                  <div className="mt-3 text-[11px]" style={{ color: "var(--text-muted)" }}>
+                  <div className="mt-1.5 text-[10px]" style={{ color: "var(--text-muted)" }}>
                     {formatDate(fearGreed.timestamp)}
                   </div>
                 </div>
@@ -134,12 +133,10 @@ export const MarketContextPanel: React.FC<Props> = ({ state }) => {
           </section>
 
           <section className="market-context-section">
-            <div className="flex items-center justify-between gap-3 mb-3">
-              <div>
-                <div className="section-label">DeFi Context</div>
-                <div className="text-[11px] mt-1" style={{ color: "var(--text-muted)" }}>
-                  Top {defiRows.length} normalized context record{defiRows.length === 1 ? "" : "s"}
-                </div>
+            <div className="mb-1.5 flex items-center gap-2">
+              <div className="section-label">DeFi Context</div>
+              <div className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+                Top {defiRows.length} record{defiRows.length === 1 ? "" : "s"}
               </div>
             </div>
 
@@ -170,13 +167,6 @@ export const MarketContextPanel: React.FC<Props> = ({ state }) => {
         </div>
       )}
 
-      <div className="market-context-summary">
-        <SummaryItem label="Sources allowed" value={context.summary.sources_allowed} />
-        <SummaryItem label="Records total" value={context.summary.records_total} />
-        <SummaryItem label="Warnings" value={context.summary.warnings_total} />
-        <SummaryItem label="Errors" value={context.summary.errors_total} />
-      </div>
-
       <ComplianceNote />
     </section>
   );
@@ -187,11 +177,13 @@ function PanelHeader({
   sourceBadgeClass,
   environment,
   titleMeta,
+  summary,
 }: {
   sourceLabel?: string;
   sourceBadgeClass?: string;
   environment?: string;
   titleMeta: string;
+  summary?: MarketContextApiOutput["summary"];
 }) {
   return (
     <div className="market-context-header">
@@ -211,6 +203,14 @@ function PanelHeader({
         </div>
         <p>{titleMeta}</p>
       </div>
+      {summary && (
+        <div className="market-context-summary">
+          <SummaryItem label="Sources" value={summary.sources_allowed} />
+          <SummaryItem label="Records" value={summary.records_total} />
+          <SummaryItem label="Warnings" value={summary.warnings_total} />
+          <SummaryItem label="Errors" value={summary.errors_total} />
+        </div>
+      )}
     </div>
   );
 }
@@ -219,7 +219,7 @@ function SummaryItem({ label, value }: { label: string; value: number }) {
   return (
     <div className="min-w-0">
       <div className="section-label">{label}</div>
-      <div className="text-lg font-bold tabular-nums leading-tight" style={{ color: "var(--text-primary)" }}>
+      <div className="text-sm font-bold tabular-nums leading-tight" style={{ color: "var(--text-primary)" }}>
         {value}
       </div>
     </div>

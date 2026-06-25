@@ -80,12 +80,22 @@ export const CandidateReviewControls: React.FC<CandidateReviewControlsProps> = (
     <div className="review-control-panel">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <div className="text-[12px] font-semibold" style={{ color: "var(--text-primary)" }}>Local Review Session</div>
+          <div className="text-[12px] font-semibold" style={{ color: "var(--text-primary)" }}>Status & note</div>
           <div className="text-[10px]" style={{ color: "var(--text-muted)" }}>
             {updatedAt ? `Last updated: ${updatedAt}` : "Saved locally after review."}
           </div>
         </div>
-        <ReviewStatusBadge status={reviewRecord?.status ?? "not_reviewed"} />
+        <div className="flex shrink-0 items-center gap-2">
+          <ReviewStatusBadge status={reviewRecord?.status ?? "not_reviewed"} />
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={handleSave}
+            disabled={!onSaveReview}
+          >
+            Save review
+          </button>
+        </div>
       </div>
 
       <label className="block space-y-1">
@@ -104,7 +114,7 @@ export const CandidateReviewControls: React.FC<CandidateReviewControlsProps> = (
       <label className="block space-y-1">
         <span className="section-label">Analyst note</span>
         <textarea
-          className="ai-input min-h-[72px]"
+          className="ai-input min-h-[54px]"
           value={note}
           onChange={(event) => setNote(event.target.value)}
           placeholder="Analyst note"
@@ -112,14 +122,6 @@ export const CandidateReviewControls: React.FC<CandidateReviewControlsProps> = (
       </label>
 
       <div className="flex items-center gap-2">
-        <button
-          type="button"
-          className="btn-primary"
-          onClick={handleSave}
-          disabled={!onSaveReview}
-        >
-          Save review
-        </button>
         <button
           type="button"
           className="px-3 py-2 rounded-md text-[12px] font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
@@ -135,11 +137,9 @@ export const CandidateReviewControls: React.FC<CandidateReviewControlsProps> = (
         </button>
       </div>
 
-      <div className="rounded-md px-3 py-2 text-[11px] leading-relaxed space-y-1"
+      <div className="rounded-md px-2.5 py-1.5 text-[10px] leading-snug"
         style={{ background: "var(--accent-dim)", border: "1px solid var(--accent-border)", color: "var(--text-secondary)" }}>
-        <div>Local review is saved only in this browser.</div>
-        <div>This does not change scanner label.</div>
-        <div>This is not a buy/sell signal.</div>
+        Local browser only. This does not change scanner label. This is not a buy/sell signal.
       </div>
     </div>
   );

@@ -189,22 +189,6 @@ export const CandidateDetail: React.FC<Props> = ({
 
       <div className="detail-body">
         <section className="detail-section">
-          <SectionTitle>Quick Snapshot</SectionTitle>
-          <div className="detail-kpi-grid">
-            <SnapshotMetric label="Price" value={c.price_usd !== null ? `$${c.price_usd.toFixed(6)}` : "--"} />
-            <SnapshotMetric label="Liquidity" value={fmtUsd(c.liquidity_usd)} />
-            <SnapshotMetric label="24h Volume" value={fmtUsd(c.volume_24h_usd)} />
-            <SnapshotMetric label="Age" value={fmtDays(c.pair_age_days)} />
-            <SnapshotMetric label="Market Cap" value={fmtUsd(c.market_cap_usd)} />
-            <SnapshotMetric label="Volume/MC" value={fmtPct(c.volume_market_cap_ratio)} />
-          </div>
-          <div className="mt-3">
-            <DR label="FDV" value={fmtUsd(c.fdv_usd)} />
-            <DR label="Contract" value={<code className="text-[10px] text-secondary break-all">{c.contract_address.slice(0, 24) || "--"}</code>} />
-          </div>
-        </section>
-
-        <section className="detail-section">
           <SectionTitle
             meta={<ReviewStatusBadge status={reviewRecord?.status ?? "not_reviewed"} />}
           >
@@ -216,6 +200,22 @@ export const CandidateDetail: React.FC<Props> = ({
             onSaveReview={onSaveReview}
             onClearReview={onClearReview}
           />
+        </section>
+
+        <section className="detail-section">
+          <SectionTitle>Quick Snapshot</SectionTitle>
+          <div className="detail-kpi-grid">
+            <SnapshotMetric label="Price" value={c.price_usd !== null ? `$${c.price_usd.toFixed(6)}` : "--"} />
+            <SnapshotMetric label="Liquidity" value={fmtUsd(c.liquidity_usd)} />
+            <SnapshotMetric label="24h Volume" value={fmtUsd(c.volume_24h_usd)} />
+            <SnapshotMetric label="Age" value={fmtDays(c.pair_age_days)} />
+          </div>
+          <div className="mt-3">
+            <DR label="Market Cap" value={fmtUsd(c.market_cap_usd)} />
+            <DR label="Volume/MC" value={fmtPct(c.volume_market_cap_ratio)} />
+            <DR label="FDV" value={fmtUsd(c.fdv_usd)} />
+            <DR label="Contract" value={<code className="text-[10px] text-secondary break-all">{c.contract_address.slice(0, 24) || "--"}</code>} />
+          </div>
         </section>
 
         <section className="detail-section">
