@@ -13,7 +13,12 @@ import {
   type ScannerDataSourceResult,
 } from "./services/scannerDataSource";
 import { loadLatestMarketContext } from "./services/contextDataSource";
-import { clearReviewRecord, loadReviewSession, saveReviewRecord } from "./services/reviewSessionStore";
+import {
+  clearReviewRecord,
+  loadReviewSession,
+  saveReviewRecord,
+  saveReviewSessionState,
+} from "./services/reviewSessionStore";
 import { mapPersistableScannerOutputToUiCandidates } from "./adapters/scannerOutputAdapter";
 import { toMockCandidate, type MockCandidate } from "./mockData";
 import type { CandidateReviewInput, ReviewSessionState } from "./types/reviewSessionTypes";
@@ -141,6 +146,10 @@ export default function App() {
     setReviewSession(clearReviewRecord(candidateId));
   }, []);
 
+  const handleImportReviewSession = useCallback((nextState: ReviewSessionState) => {
+    setReviewSession(saveReviewSessionState(nextState));
+  }, []);
+
   const handleOpenCandidate = useCallback((candidateId: string) => {
     setSelectedCandidateId(candidateId);
     setActiveTab("scanner");
@@ -177,6 +186,7 @@ export default function App() {
             reviewSession={reviewSession}
             onClearReview={handleClearReview}
             onOpenCandidate={handleOpenCandidate}
+            onImportReviewSession={handleImportReviewSession}
           />
         );
       case "risks":

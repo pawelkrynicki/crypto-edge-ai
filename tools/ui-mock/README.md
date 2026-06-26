@@ -10,6 +10,7 @@ It demonstrates the visual direction, product structure, and trader value propos
 - **Market Context Panel**: Shows Alternative.me Fear & Greed plus DefiLlama context from the local API bridge.
 - **Candidate Detail Panel**: In-depth breakdown of a selected token, including research context/data coverage, a trader checklist, and risk reasons.
 - **Local Review Session**: Browser-only analyst workspace for per-candidate review status, analyst note, and last-updated timestamp.
+- **Review Backup**: Export/import the browser-local review session as JSON for lightweight analyst backup.
 - **Research Review (Mock)**: A text area to paste news/events and see a mock AI risk categorization.
 - **Review Queue & Risk Alerts**: Dedicated tabs for local analyst follow-up, scanner WATCHLIST candidates, and critical risks.
 - **Methodology**: Explanation of the staged review process.
@@ -19,6 +20,8 @@ It demonstrates the visual direction, product structure, and trader value propos
 UX1 improves the dashboard information architecture and visual hierarchy without changing data behavior. The preview now uses a top product header, a compact Market Context block, a short KPI strip, a clearer Scanner Radar table, and a wider Candidate Detail working panel.
 
 This stage adds no new data sources, API endpoints, backend services, storage model changes, scanner scoring changes, final-label changes, or WATCHLIST meaning changes. Market Context and Local Review Session are easier to find, and Local Review Session remains browser-only localStorage.
+
+UX2 Product-grade Interface Redesign remains a future required stage before a final production interface. UX2 is not implemented in this prototype pass.
 
 ## Important Product Rules
 - **No Buy Signals**: Crypto Edge AI is a research tool, not a trading bot.
@@ -46,6 +49,25 @@ Review statuses:
 - Waiting for more data
 
 The review layer has no backend, database, auth, API write path, or scanner-output mutation. It is only for organizing local analyst work. The scanner table shows a small **Review** badge, and the Scanner Radar includes a **Follow-up** filter based on the local `Saved for follow-up` status.
+
+## Review Export / Import Backup
+
+The Review Queue includes a **Review Backup** section for exporting and importing the current browser-local review session as JSON.
+
+Backup scope:
+
+- Includes only local review status and analyst notes from `crypto-edge-ai.review-session.v1`.
+- Does not include scanner output.
+- Does not include market data.
+- Works only in the browser through `localStorage`.
+- Adds no backend, database, auth, API write path, or new data source.
+
+Import supports:
+
+- **Merge with current**: imported entries overwrite local entries with the same `candidate_id`; all other local entries remain.
+- **Replace current**: imported state replaces the current local review session.
+
+Invalid JSON, unsupported backup versions, and invalid review entries are rejected with a visible error while the existing local review session is kept.
 
 ## Review Queue / Follow-up Workspace
 

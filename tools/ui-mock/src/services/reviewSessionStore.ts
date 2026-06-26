@@ -8,6 +8,17 @@ import { REVIEW_STATUS_OPTIONS } from "../types/reviewSessionTypes";
 
 export const REVIEW_SESSION_STORAGE_KEY = "crypto-edge-ai.review-session.v1";
 
+export type ReviewSessionImportMode = "replace" | "merge";
+
+export type ReviewSessionImportResult = {
+  ok: true;
+  state: ReviewSessionState;
+  entries_count: number;
+} | {
+  ok: false;
+  error: string;
+};
+
 export interface StorageLike {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
@@ -37,6 +48,14 @@ export function loadReviewSession(storage = getDefaultStorage()): ReviewSessionS
   }
 }
 
+export function saveReviewSessionState(
+  state: ReviewSessionState,
+  storage = getDefaultStorage(),
+): ReviewSessionState {
+  persistReviewSession(state, storage);
+  return state;
+}
+
 export function saveReviewRecord(
   input: CandidateReviewInput,
   storage = getDefaultStorage(),
@@ -64,6 +83,57 @@ export function saveReviewRecord(
   return next;
 }
 
+export function createReviewSessionExport(state: ReviewSessionState): string {
+  const exportState = parseReviewSessionState(state);
+  return `${JSON.stringify(exportState, null, 2)}\n`;
+}
+
+export function parseReviewSessionImport(jsonText: string): ReviewSessionImportResult {
+  let parsed: unknown;
+
+  try {
+    parsed = JSON.parse(jsonText);
+  } catch {
+    return {
+      ok: false,
+      error: "Review backup JSON is invalid.",
+    };
+  }
+
+  return parseReviewSessionImportState(parsed);
+}
+
+export function importReviewSession(
+  importedState: ReviewSessionState,
+  mode: ReviewSessionImportMode,
+  storage = getDefaultStorage(),
+): ReviewSessionState {
+  const current = mode === "merge" ? loadReviewSession(storage) : createEmptyReviewSession();
+  const next = mergeReviewSessionState(current, importedState, mode);
+  return saveReviewSessionState(next, storage);
+}
+
+export function mergeReviewSessionState(
+  currentState: ReviewSessionState,
+  importedState: ReviewSessionState,
+  mode: ReviewSessionImportMode,
+): ReviewSessionState {
+  const cleanCurrent = parseReviewSessionState(currentState);
+  const cleanImported = parseReviewSessionState(importedState);
+
+  if (mode === "replace") {
+    return cleanImported;
+  }
+
+  return {
+    version: 1,
+    entries: {
+      ...cleanCurrent.entries,
+      ...cleanImported.entries,
+    },
+  };
+}
+
 export function clearReviewRecord(candidateId: string, storage = getDefaultStorage()): ReviewSessionState {
   const current = loadReviewSession(storage);
   const normalizedId = candidateId.trim();
@@ -88,6 +158,53 @@ export function getCandidateReview(
   state: ReviewSessionState,
 ): CandidateReviewRecord | null {
   return state.entries[candidateId] ?? null;
+}
+
+function parseReviewSessionImportState(value: unknown): ReviewSessionImportResult {
+  if (!isRecord(value)) {
+    return {
+      ok: false,
+      error: "Review backup must be a JSON object.",
+    };
+  }
+
+  if (value.version !== 1) {
+    return {
+      ok: false,
+      error: "Unsupported review backup version. Expected version 1.",
+    };
+  }
+
+  if (!isRecord(value.entries)) {
+    return {
+      ok: false,
+      error: "Review backup entries must be an object.",
+    };
+  }
+
+  const entries: Record<string, CandidateReviewRecord> = {};
+
+  for (const [candidateId, record] of Object.entries(value.entries)) {
+    const parsedRecord = parseReviewRecord(candidateId, record);
+
+    if (!parsedRecord) {
+      return {
+        ok: false,
+        error: `Review backup entry "${candidateId}" is invalid.`,
+      };
+    }
+
+    entries[parsedRecord.candidate_id] = parsedRecord;
+  }
+
+  return {
+    ok: true,
+    state: {
+      version: 1,
+      entries,
+    },
+    entries_count: Object.keys(entries).length,
+  };
 }
 
 function persistReviewSession(state: ReviewSessionState, storage: StorageLike | null): void {

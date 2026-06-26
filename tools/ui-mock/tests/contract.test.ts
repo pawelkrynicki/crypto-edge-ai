@@ -15,9 +15,13 @@ import { PERSISTABLE_SCANNER_SAMPLE } from "../src/fixtures/persistableScannerSa
 import { toMockCandidate } from "../src/mockData";
 import { interpretContextApiOutput, parseMarketContextApiOutput } from "../src/services/contextDataSource";
 import {
+  createReviewSessionExport,
   createEmptyReviewSession,
   getCandidateReview,
+  importReviewSession,
   loadReviewSession,
+  mergeReviewSessionState,
+  parseReviewSessionImport,
   REVIEW_SESSION_STORAGE_KEY,
   saveReviewRecord,
 } from "../src/services/reviewSessionStore";
@@ -230,6 +234,134 @@ assert.deepEqual(
 );
 assert.equal(passMockCandidate.final_label, "WATCHLIST", "saving review status does not change scanner label");
 
+const exportedReviewJson = createReviewSessionExport(savedReviewState);
+const exportedReviewState = JSON.parse(exportedReviewJson) as ReviewSessionState;
+assert.equal(exportedReviewState.version, 1, "review export includes version");
+assert.equal(
+  exportedReviewState.entries[passMockCandidate.id].status,
+  "saved_for_follow_up",
+  "review export includes stored entries",
+);
+
+const parsedReviewImport = parseReviewSessionImport(exportedReviewJson);
+assert.equal(parsedReviewImport.ok, true, "valid review backup JSON parses");
+if (!parsedReviewImport.ok) {
+  throw new Error(parsedReviewImport.error);
+}
+assert.equal(parsedReviewImport.entries_count, 1, "valid review backup reports entries count");
+assert.equal(
+  parsedReviewImport.state.entries[passMockCandidate.id].note,
+  "Track community and liquidity follow-up.",
+  "valid review backup preserves analyst note",
+);
+
+const corruptReviewImport = parseReviewSessionImport("{ invalid json");
+assert.equal(corruptReviewImport.ok, false, "corrupt review backup JSON returns an error");
+if (corruptReviewImport.ok) {
+  throw new Error("corrupt review backup unexpectedly parsed");
+}
+assert.match(corruptReviewImport.error, /invalid/i, "corrupt review backup error is readable");
+
+const unknownVersionImport = parseReviewSessionImport(JSON.stringify({ version: 2, entries: {} }));
+assert.equal(unknownVersionImport.ok, false, "unknown review backup version returns an error");
+if (unknownVersionImport.ok) {
+  throw new Error("unknown review backup version unexpectedly parsed");
+}
+assert.match(unknownVersionImport.error, /version 1/i, "unknown version error explains expected version");
+
+const invalidEntryImport = parseReviewSessionImport(JSON.stringify({
+  version: 1,
+  entries: {
+    [passMockCandidate.id]: {
+      candidate_id: passMockCandidate.id,
+      status: "unknown_status",
+      note: "Bad status should fail validation.",
+      updated_at: "2026-06-24T12:00:00.000Z",
+    },
+  },
+}));
+assert.equal(invalidEntryImport.ok, false, "review backup validates entry status values");
+
+const currentMergeState = {
+  version: 1 as const,
+  entries: {
+    [passMockCandidate.id]: savedReviewRecord,
+    [lowlMockCandidate.id]: {
+      candidate_id: lowlMockCandidate.id,
+      status: "needs_more_research",
+      note: "Keep local-only note.",
+      updated_at: "2026-06-24T12:15:00.000Z",
+    },
+  },
+} satisfies ReviewSessionState;
+
+const importedMergeState = {
+  version: 1 as const,
+  entries: {
+    [passMockCandidate.id]: {
+      candidate_id: passMockCandidate.id,
+      status: "waiting_for_more_data",
+      note: "Imported conflict wins.",
+      updated_at: "2026-06-25T12:00:00.000Z",
+    },
+    [fdvMockCandidate.id]: {
+      candidate_id: fdvMockCandidate.id,
+      status: "saved_for_follow_up",
+      note: "Imported new entry.",
+      updated_at: "2026-06-25T12:05:00.000Z",
+    },
+  },
+} satisfies ReviewSessionState;
+
+const mergedReviewState = mergeReviewSessionState(currentMergeState, importedMergeState, "merge");
+assert.equal(
+  mergedReviewState.entries[lowlMockCandidate.id].note,
+  "Keep local-only note.",
+  "review import merge keeps existing non-conflicting entries",
+);
+assert.equal(
+  mergedReviewState.entries[passMockCandidate.id].note,
+  "Imported conflict wins.",
+  "review import merge overwrites conflicts by candidate_id",
+);
+assert.equal(
+  mergedReviewState.entries[fdvMockCandidate.id].note,
+  "Imported new entry.",
+  "review import merge adds imported entries",
+);
+
+const mergeImportStorage = createMemoryStorage({
+  [REVIEW_SESSION_STORAGE_KEY]: JSON.stringify(currentMergeState),
+});
+const persistedMergeState = importReviewSession(importedMergeState, "merge", mergeImportStorage);
+assert.equal(
+  persistedMergeState.entries[passMockCandidate.id].note,
+  "Imported conflict wins.",
+  "review import helper persists merged state",
+);
+assert.equal(
+  loadReviewSession(mergeImportStorage).entries[fdvMockCandidate.id].note,
+  "Imported new entry.",
+  "review import helper writes merged state to local storage",
+);
+
+const replaceImportStorage = createMemoryStorage({
+  [REVIEW_SESSION_STORAGE_KEY]: JSON.stringify(currentMergeState),
+});
+const replacedReviewState = importReviewSession(importedMergeState, "replace", replaceImportStorage);
+assert.deepEqual(
+  Object.keys(replacedReviewState.entries).sort(),
+  [fdvMockCandidate.id, passMockCandidate.id].sort(),
+  "review import replace substitutes the current state",
+);
+assert.equal(
+  loadReviewSession(replaceImportStorage).entries[lowlMockCandidate.id],
+  undefined,
+  "review import replace removes previous local entries",
+);
+assert.equal(passMockCandidate.final_label, "WATCHLIST", "review export/import does not change scanner final_label");
+assert.equal(passUi.scorecard?.decisionLabel, "WATCHLIST", "review export/import does not change WATCHLIST meaning");
+
 const detailWithContextMarkup = renderToStaticMarkup(React.createElement(CandidateDetail, {
   candidate: passMockCandidate,
   marketContextState: {
@@ -306,9 +438,25 @@ const reviewQueueMarkup = renderToStaticMarkup(React.createElement(WatchlistTab,
   reviewSession: reviewQueueState,
   onClearReview: () => undefined,
   onOpenCandidate: () => undefined,
+  onImportReviewSession: () => undefined,
 }));
 
 assert.match(reviewQueueMarkup, /Review Queue/, "watchlist tab renders review queue workspace");
+assert.match(reviewQueueMarkup, /Review Backup/, "review queue renders backup controls");
+assert.match(reviewQueueMarkup, /Export review JSON/, "review queue renders export action");
+assert.match(reviewQueueMarkup, /Import review JSON/, "review queue renders import file control");
+assert.match(reviewQueueMarkup, /Merge with current/, "review queue renders merge import mode");
+assert.match(reviewQueueMarkup, /Replace current/, "review queue renders replace import mode");
+assert.match(
+  reviewQueueMarkup,
+  /Backup includes only local review status and analyst notes\./,
+  "review queue explains backup scope",
+);
+assert.match(
+  reviewQueueMarkup,
+  /It does not include scanner output or market data\./,
+  "review queue explains scanner and market data are excluded",
+);
 assert.match(reviewQueueMarkup, /Saved for follow-up/, "review queue renders local saved follow-up status");
 assert.match(reviewQueueMarkup, /Track community and liquidity follow-up\./, "review queue renders analyst note preview");
 assert.match(reviewQueueMarkup, /Scanner label/, "review queue labels scanner output separately");
@@ -336,6 +484,7 @@ const emptyReviewQueueMarkup = renderToStaticMarkup(React.createElement(Watchlis
   reviewSession: createEmptyReviewSession(),
   onClearReview: () => undefined,
   onOpenCandidate: () => undefined,
+  onImportReviewSession: () => undefined,
 }));
 
 assert.match(emptyReviewQueueMarkup, /No local review items yet\./, "review queue renders empty state");

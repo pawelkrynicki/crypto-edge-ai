@@ -2,6 +2,12 @@ import React, { useMemo, useState } from "react";
 import type { MockCandidate } from "../mockData";
 import { LabelBadge } from "./LabelBadge";
 import { ReviewStatusBadge } from "./CandidateReviewControls";
+import {
+  createReviewSessionExport,
+  mergeReviewSessionState,
+  parseReviewSessionImport,
+} from "../services/reviewSessionStore";
+import type { ReviewSessionImportMode } from "../services/reviewSessionStore";
 import type {
   AnalystReviewStatus,
   CandidateReviewRecord,
@@ -14,6 +20,7 @@ interface Props {
   reviewSession: ReviewSessionState;
   onClearReview: (candidateId: string) => void;
   onOpenCandidate: (candidateId: string) => void;
+  onImportReviewSession: (nextState: ReviewSessionState) => void;
 }
 
 const CHAIN_LABELS: Record<string, string> = {
@@ -33,6 +40,11 @@ const REVIEW_QUEUE_FILTERS: { label: string; value: ReviewQueueFilter }[] = [
   { label: "Waiting data", value: "waiting_for_more_data" },
   { label: "Dismissed", value: "dismissed_after_review" },
 ];
+
+const IMPORT_MODE_LABELS: Record<ReviewSessionImportMode, string> = {
+  merge: "Merge with current",
+  replace: "Replace current",
+};
 
 interface ReviewQueueItem {
   candidate: MockCandidate;
@@ -102,13 +114,23 @@ function getFilteredEmptyText(filter: ReviewQueueFilter): string {
   return "No local review items match this filter.";
 }
 
+function getReviewEntryCountText(count: number): string {
+  return `${count} review entr${count === 1 ? "y" : "ies"}`;
+}
+
 export const WatchlistTab: React.FC<Props> = ({
   candidates,
   reviewSession,
   onClearReview,
   onOpenCandidate,
+  onImportReviewSession,
 }) => {
   const [reviewFilter, setReviewFilter] = useState<ReviewQueueFilter>("ALL");
+  const [importMode, setImportMode] = useState<ReviewSessionImportMode>("merge");
+  const [backupStatus, setBackupStatus] = useState<{
+    tone: "success" | "error";
+    message: string;
+  } | null>(null);
   const watchlist = candidates.filter((c) => c.final_label === "WATCHLIST");
 
   const {
@@ -144,6 +166,83 @@ export const WatchlistTab: React.FC<Props> = ({
   const filteredStoredReviews = storedReviewsNotInScan.filter((record) => filterReviewRecord(record, reviewFilter));
   const hasLocalReviews = localReviewRecords.length > 0;
   const hasFilteredReviews = filteredQueueItems.length > 0 || filteredStoredReviews.length > 0;
+  const localReviewEntryCount = Object.keys(reviewSession.entries).length;
+
+  const handleExportReviewJson = () => {
+    try {
+      const jsonText = createReviewSessionExport(reviewSession);
+      const blob = new Blob([jsonText], { type: "application/json" });
+      const objectUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+
+      link.href = objectUrl;
+      link.download = `crypto-edge-review-session-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(objectUrl);
+
+      setBackupStatus({
+        tone: "success",
+        message: `Exported ${getReviewEntryCountText(localReviewEntryCount)} to JSON.`,
+      });
+    } catch {
+      setBackupStatus({
+        tone: "error",
+        message: "Review backup export failed in this browser.",
+      });
+    }
+  };
+
+  const handleImportFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+
+    if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith(".json")) {
+      setBackupStatus({
+        tone: "error",
+        message: "Choose a .json review backup file.",
+      });
+      input.value = "";
+      return;
+    }
+
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      const jsonText = typeof reader.result === "string" ? reader.result : "";
+      const parsed = parseReviewSessionImport(jsonText);
+
+      if (!parsed.ok) {
+        setBackupStatus({
+          tone: "error",
+          message: parsed.error,
+        });
+        input.value = "";
+        return;
+      }
+
+      const nextState = mergeReviewSessionState(reviewSession, parsed.state, importMode);
+      onImportReviewSession(nextState);
+      setBackupStatus({
+        tone: "success",
+        message: `Imported ${getReviewEntryCountText(parsed.entries_count)}. Mode: ${IMPORT_MODE_LABELS[importMode]}.`,
+      });
+      input.value = "";
+    };
+
+    reader.onerror = () => {
+      setBackupStatus({
+        tone: "error",
+        message: "Review backup file could not be read.",
+      });
+      input.value = "";
+    };
+
+    reader.readAsText(file);
+  };
 
   return (
     <div className="space-y-5 max-w-6xl">
@@ -165,6 +264,64 @@ export const WatchlistTab: React.FC<Props> = ({
           </div>
         </div>
       </header>
+
+      <section className="card p-4 space-y-3">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <h3 className="text-sm font-bold text-primary">Review Backup</h3>
+            <p className="text-xs text-secondary">
+              Backup includes only local review status and analyst notes.
+            </p>
+            <p className="text-xs text-secondary">
+              It does not include scanner output or market data.
+            </p>
+          </div>
+          <span className="scanner-result-count">
+            {localReviewEntryCount} stored item{localReviewEntryCount !== 1 ? "s" : ""}
+          </span>
+        </div>
+
+        <div className="flex items-end gap-3 flex-wrap">
+          <button type="button" className="details-button" onClick={handleExportReviewJson}>
+            Export review JSON
+          </button>
+
+          <label className="block space-y-1">
+            <span className="section-label">Import mode</span>
+            <select
+              className="ai-input min-w-[180px]"
+              value={importMode}
+              onChange={(event) => setImportMode(event.target.value as ReviewSessionImportMode)}
+            >
+              <option value="merge">Merge with current</option>
+              <option value="replace">Replace current</option>
+            </select>
+          </label>
+
+          <label className="block space-y-1">
+            <span className="section-label">Import review JSON</span>
+            <input
+              className="ai-input max-w-[260px] text-xs"
+              type="file"
+              accept=".json,application/json"
+              onChange={handleImportFile}
+            />
+          </label>
+        </div>
+
+        {backupStatus && (
+          <div
+            className="rounded-md px-3 py-2 text-xs"
+            style={{
+              background: backupStatus.tone === "success" ? "rgba(50, 209, 132, 0.1)" : "rgba(245, 184, 75, 0.1)",
+              border: backupStatus.tone === "success" ? "1px solid rgba(50, 209, 132, 0.25)" : "1px solid rgba(245, 184, 75, 0.3)",
+              color: backupStatus.tone === "success" ? "#32d184" : "#f5b84b",
+            }}
+          >
+            {backupStatus.message}
+          </div>
+        )}
+      </section>
 
       <section className="space-y-2.5">
         <div className="flex items-center justify-between gap-3 flex-wrap">
