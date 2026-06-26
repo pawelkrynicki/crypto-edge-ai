@@ -165,6 +165,18 @@ Persistent Review Storage API v1:
 - UI starts from browser `localStorage`, loads the API state after mount, mirrors valid API state back to `localStorage`, and keeps browser fallback when the API is unavailable.
 - SQLite remains a future replaceable storage implementation; UX2 Product-grade Interface Redesign remains a future required stage.
 
+Review Storage Diagnostics / Reset Tools v1:
+
+- Stage 8B adds `GET /api/review-session/diagnostics` for local Review Storage health checks.
+- Diagnostics report `source_kind`, `storage_file`, `checked_at`, `file_exists`, `file_size_bytes`, `entries_count`, `valid`, and optional `warning`.
+- Diagnostics do not expose full review entries or analyst notes.
+- Review Queue shows diagnostics availability and has a `Refresh diagnostics` action.
+- Review Queue adds `Reset local reviews`, guarded by typing `RESET`.
+- Reset applies an empty `ReviewSessionState`, updates browser review storage, and attempts to mirror through the existing `PUT /api/review-session`.
+- Reset clears only local review status and analyst notes; it does not delete scanner output or market data.
+- This adds no SQLite, database, auth, production backend, production cron, new source, scraper, HTML parser, browser automation, undocumented endpoint, OpenAI call, scanner scoring change, final-label change, or WATCHLIST meaning change.
+- UX2 Product-grade Interface Redesign remains a future required stage.
+
 Paid and clarification-dependent sources remain deferred:
 
 - CoinGecko Analyst: first paid market/onchain candidate.

@@ -11,6 +11,7 @@ It demonstrates the visual direction, product structure, and trader value propos
 - **Candidate Detail Panel**: In-depth breakdown of a selected token, including research context/data coverage, a trader checklist, and risk reasons.
 - **Local Review Session**: Local analyst workspace for per-candidate review status, analyst note, and last-updated timestamp.
 - **Review Backup**: Export/import the review session as JSON for lightweight analyst backup.
+- **Review Storage Diagnostics / Reset**: Shows local review storage health and provides a guarded reset for local review status and analyst notes.
 - **Research Review (Mock)**: A text area to paste news/events and see a mock AI risk categorization.
 - **Review Queue & Risk Alerts**: Dedicated tabs for local analyst follow-up, scanner WATCHLIST candidates, and critical risks.
 - **Methodology**: Explanation of the staged review process.
@@ -39,6 +40,7 @@ Persistent Review Storage API v1 uses the local API bridge when available:
 ```text
 GET /api/review-session
 PUT /api/review-session
+GET /api/review-session/diagnostics
 ```
 
 The file-backed JSON store lives at:
@@ -62,6 +64,35 @@ Review statuses:
 - Waiting for more data
 
 The review layer has no production backend, database, SQLite, auth, or scanner-output mutation. The only write path is the local development API bridge, and the browser keeps `localStorage` as a fallback/mirror. It is only for organizing local analyst work. The scanner table shows a small **Review** badge, and the Scanner Radar includes a **Follow-up** filter based on the local `Saved for follow-up` status.
+
+## Review Storage Diagnostics / Reset
+
+The Review Queue **Review Backup** section now includes local storage diagnostics and a guarded reset tool.
+
+Diagnostics endpoint:
+
+```text
+GET /api/review-session/diagnostics
+```
+
+The diagnostics response reports only storage metadata:
+
+- `source_kind`
+- `storage_file`
+- `checked_at`
+- `file_exists`
+- `file_size_bytes`
+- `entries_count`
+- `valid`
+- optional `warning`
+
+It does not return analyst notes or review entries.
+
+The **Refresh diagnostics** button reloads that endpoint when the local API bridge is available. If the API is unavailable, the UI remains usable through browser `localStorage` fallback.
+
+The **Reset local reviews** tool clears only local review status and analyst notes. It requires typing `RESET`, then applies an empty `ReviewSessionState` to browser storage and attempts to mirror it through the existing `PUT /api/review-session` endpoint. It does not delete scanner output, market data, source files, `tools/data-poc` output, or any approved context output.
+
+This remains a local/developer storage tool only. It adds no SQLite, database, auth, production backend, production cron, new data source, scraping, OpenAI call, scanner scoring change, final-label change, or WATCHLIST meaning change. UX2 Product-grade Interface Redesign remains a future required stage.
 
 ## Review Export / Import Backup
 
@@ -135,6 +166,7 @@ The local API bridge closes the current loop from persisted scanner-shaped JSON 
 - `GET /api/scanner/latest` returns `PersistableScannerOutput` JSON.
 - `GET /api/review-session` returns the current file-backed review session plus `_source_meta`.
 - `PUT /api/review-session` validates and writes `ReviewSessionState` to local file-backed JSON storage.
+- `GET /api/review-session/diagnostics` returns file-backed review storage diagnostics without notes or entries.
 - Default API port: `5177`.
 - Port override: `SCANNER_API_PORT`.
 - UI API base URL: `VITE_SCANNER_API_URL=http://localhost:5177`.
@@ -159,7 +191,9 @@ tools/ui-mock/.local/review-session.json
 
 The store writes `ReviewSessionState` as JSON, creates `.local` when needed, writes through a temporary file before rename, and returns an empty review session if the file is missing. If the file is corrupt or invalid, the server returns an empty session with `_source_meta.warning` instead of crashing.
 
-The UI starts immediately from `localStorage`, then tries `GET /api/review-session`. When the API returns a valid state, the app uses it and mirrors it back to `localStorage`. Save, clear, and import update React state and `localStorage` first, then attempt `PUT /api/review-session`; if the API is unavailable, the UI continues through browser fallback.
+The UI starts immediately from `localStorage`, then tries `GET /api/review-session`. When the API returns a valid state, the app uses it and mirrors it back to `localStorage`. Save, clear, import, and reset update React state and `localStorage` first, then attempt `PUT /api/review-session`; if the API is unavailable, the UI continues through browser fallback.
+
+Storage diagnostics are available at `GET /api/review-session/diagnostics`. The endpoint reports the storage file path, existence, file size, entry count, validity, and warning state without returning full review entries or analyst notes. The Review Queue can refresh this diagnostics view on demand.
 
 This stage intentionally does not add SQLite, a database, auth, a production backend, production cron, new data sources, scraping, OpenAI, scanner scoring changes, final-label changes, or WATCHLIST meaning changes. SQLite can replace this storage implementation in a later stage without changing the UI workflow. UX2 Product-grade Interface Redesign remains a future required stage.
 
