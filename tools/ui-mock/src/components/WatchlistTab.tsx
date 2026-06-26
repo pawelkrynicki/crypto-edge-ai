@@ -18,6 +18,7 @@ import { formatReasonText, formatSecurityFlag } from "../utils/displayText";
 interface Props {
   candidates: MockCandidate[];
   reviewSession: ReviewSessionState;
+  reviewStorageStatus: ReviewStorageStatus;
   onClearReview: (candidateId: string) => void;
   onOpenCandidate: (candidateId: string) => void;
   onImportReviewSession: (nextState: ReviewSessionState) => void;
@@ -32,6 +33,11 @@ const CHAIN_LABELS: Record<string, string> = {
 
 type ReviewQueueStatus = Exclude<AnalystReviewStatus, "not_reviewed">;
 type ReviewQueueFilter = "ALL" | ReviewQueueStatus;
+type ReviewStorageStatus = {
+  tone: "ready" | "fallback" | "warning" | "error";
+  text: string;
+  detail?: string;
+};
 
 const REVIEW_QUEUE_FILTERS: { label: string; value: ReviewQueueFilter }[] = [
   { label: "All review items", value: "ALL" },
@@ -121,6 +127,7 @@ function getReviewEntryCountText(count: number): string {
 export const WatchlistTab: React.FC<Props> = ({
   candidates,
   reviewSession,
+  reviewStorageStatus,
   onClearReview,
   onOpenCandidate,
   onImportReviewSession,
@@ -250,7 +257,7 @@ export const WatchlistTab: React.FC<Props> = ({
         <div>
           <h2 className="text-lg font-bold leading-tight text-primary">Review Queue</h2>
           <p className="text-xs text-secondary">
-            Browser-local workspace for scanner candidates marked for follow-up, more research, waiting data, or dismissal.
+            Local analyst workspace for scanner candidates marked for follow-up, more research, waiting data, or dismissal.
           </p>
         </div>
 
@@ -258,7 +265,7 @@ export const WatchlistTab: React.FC<Props> = ({
           style={{ background: "var(--accent-dim)", border: "1px solid var(--accent-border)" }}>
           <span className="text-accent text-sm mt-0.5 shrink-0">i</span>
           <div className="text-xs text-secondary space-y-0.5">
-            <p>Local review is saved only in this browser.</p>
+            <p>Review storage uses the local API when available, with browser localStorage fallback.</p>
             <p>Review status does not change scanner labels.</p>
             <p>This is not a buy/sell signal.</p>
           </div>
@@ -275,6 +282,19 @@ export const WatchlistTab: React.FC<Props> = ({
             <p className="text-xs text-secondary">
               It does not include scanner output or market data.
             </p>
+            <div
+              className="mt-2 rounded-md px-3 py-2 text-xs"
+              style={{
+                background: getReviewStorageStatusBackground(reviewStorageStatus.tone),
+                border: getReviewStorageStatusBorder(reviewStorageStatus.tone),
+                color: getReviewStorageStatusColor(reviewStorageStatus.tone),
+              }}
+            >
+              <p className="font-semibold">{reviewStorageStatus.text}</p>
+              {reviewStorageStatus.detail && (
+                <p className="mt-0.5 break-all opacity-85">{reviewStorageStatus.detail}</p>
+              )}
+            </div>
           </div>
           <span className="scanner-result-count">
             {localReviewEntryCount} stored item{localReviewEntryCount !== 1 ? "s" : ""}
@@ -547,3 +567,22 @@ export const WatchlistTab: React.FC<Props> = ({
     </div>
   );
 };
+
+function getReviewStorageStatusBackground(tone: ReviewStorageStatus["tone"]): string {
+  if (tone === "ready") return "rgba(50, 209, 132, 0.1)";
+  if (tone === "warning") return "rgba(245, 184, 75, 0.1)";
+  if (tone === "error") return "rgba(245, 184, 75, 0.12)";
+  return "var(--bg-raised)";
+}
+
+function getReviewStorageStatusBorder(tone: ReviewStorageStatus["tone"]): string {
+  if (tone === "ready") return "1px solid rgba(50, 209, 132, 0.25)";
+  if (tone === "warning" || tone === "error") return "1px solid rgba(245, 184, 75, 0.3)";
+  return "1px solid var(--border)";
+}
+
+function getReviewStorageStatusColor(tone: ReviewStorageStatus["tone"]): string {
+  if (tone === "ready") return "#32d184";
+  if (tone === "warning" || tone === "error") return "#f5b84b";
+  return "var(--text-secondary)";
+}

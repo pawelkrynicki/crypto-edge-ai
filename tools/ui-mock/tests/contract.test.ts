@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { get } from "node:http";
+import { get, request } from "node:http";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
@@ -26,12 +26,14 @@ import {
   saveReviewRecord,
 } from "../src/services/reviewSessionStore";
 import type { StorageLike } from "../src/services/reviewSessionStore";
+import { loadReviewSessionFromApi } from "../src/services/reviewSessionApi";
 import { interpretScannerApiOutput } from "../src/services/scannerDataSource";
 import type { ReviewSessionState } from "../src/types/reviewSessionTypes";
 import type { PersistableScannerOutput, ScannerApiOutput } from "../src/types/scannerTypes";
 import { createScannerApiServer } from "../server/scannerApiServer";
 import { readLatestContextOutput, type ContextLatestOutput } from "../server/latestContextOutput";
 import { isPersistableScannerOutputShape } from "../server/latestScannerOutput";
+import { readReviewSessionFile, writeReviewSessionFile } from "../server/reviewSessionFileStore";
 
 const realFixture = PERSISTABLE_SCANNER_SAMPLE;
 const uiCandidates = mapPersistableScannerOutputToUiCandidates(realFixture);
@@ -234,6 +236,63 @@ assert.deepEqual(
 );
 assert.equal(passMockCandidate.final_label, "WATCHLIST", "saving review status does not change scanner label");
 
+const reviewFileTempRoot = await mkdtemp(resolve(tmpdir(), "crypto-edge-review-file-"));
+try {
+  const storageFilePath = resolve(reviewFileTempRoot, "review-session.json");
+  const missingFileState = await readReviewSessionFile({ storageFilePath });
+
+  assert.deepEqual(
+    missingFileState.state,
+    createEmptyReviewSession(),
+    "file-backed review storage returns empty state when the file does not exist",
+  );
+  assert.equal(
+    missingFileState._source_meta.source_kind,
+    "file-backed-review-session",
+    "file-backed review storage includes source metadata",
+  );
+
+  await writeReviewSessionFile(savedReviewState, { storageFilePath });
+  const reloadedFileState = await readReviewSessionFile({ storageFilePath });
+
+  assert.deepEqual(
+    reloadedFileState.state,
+    savedReviewState,
+    "file-backed review storage writes and reloads ReviewSessionState",
+  );
+
+  await writeFile(storageFilePath, "{ invalid json", "utf8");
+  const corruptFileState = await readReviewSessionFile({ storageFilePath });
+
+  assert.deepEqual(
+    corruptFileState.state,
+    createEmptyReviewSession(),
+    "corrupt file-backed review storage returns an empty session",
+  );
+  assert.match(
+    corruptFileState._source_meta.warning ?? "",
+    /could not be read or parsed/i,
+    "corrupt file-backed review storage includes a warning",
+  );
+} finally {
+  await rm(reviewFileTempRoot, { recursive: true, force: true });
+}
+
+const originalReviewFetch = globalThis.fetch;
+let reviewFetchCalled = false;
+globalThis.fetch = (async () => {
+  reviewFetchCalled = true;
+  throw new TypeError("review API unavailable in test");
+}) as typeof fetch;
+
+try {
+  const unavailableReviewApi = await loadReviewSessionFromApi();
+  assert.equal(unavailableReviewApi.status, "unavailable", "review API client reports unavailable without crashing");
+  assert.equal(reviewFetchCalled, true, "review API client attempts the local API request");
+} finally {
+  globalThis.fetch = originalReviewFetch;
+}
+
 const exportedReviewJson = createReviewSessionExport(savedReviewState);
 const exportedReviewState = JSON.parse(exportedReviewJson) as ReviewSessionState;
 assert.equal(exportedReviewState.version, 1, "review export includes version");
@@ -433,9 +492,15 @@ const reviewQueueState = {
   },
 } satisfies ReviewSessionState;
 
+const readyReviewStorageStatus = {
+  tone: "ready" as const,
+  text: "Review storage: local API",
+};
+
 const reviewQueueMarkup = renderToStaticMarkup(React.createElement(WatchlistTab, {
   candidates: [passMockCandidate, lowlMockCandidate, fdvMockCandidate],
   reviewSession: reviewQueueState,
+  reviewStorageStatus: readyReviewStorageStatus,
   onClearReview: () => undefined,
   onOpenCandidate: () => undefined,
   onImportReviewSession: () => undefined,
@@ -474,6 +539,12 @@ assert.match(
 );
 assert.match(
   reviewQueueMarkup,
+  /Review storage uses the local API when available, with browser localStorage fallback\./,
+  "review queue explains local API storage with browser fallback",
+);
+assert.match(reviewQueueMarkup, /Review storage: local API/, "review queue renders storage status");
+assert.match(
+  reviewQueueMarkup,
   /Review status does not change scanner labels\./,
   "review queue includes scanner-label compliance copy",
 );
@@ -482,6 +553,7 @@ assert.equal(passMockCandidate.final_label, "WATCHLIST", "review queue rendering
 const emptyReviewQueueMarkup = renderToStaticMarkup(React.createElement(WatchlistTab, {
   candidates: [passMockCandidate],
   reviewSession: createEmptyReviewSession(),
+  reviewStorageStatus: readyReviewStorageStatus,
   onClearReview: () => undefined,
   onOpenCandidate: () => undefined,
   onImportReviewSession: () => undefined,
@@ -505,6 +577,85 @@ const detailFailureMarkup = renderToStaticMarkup(React.createElement(CandidateDe
 
 assert.match(detailFailureMarkup, /Context unavailable/, "candidate detail handles context API failure");
 assert.match(detailFailureMarkup, /Further review only/, "candidate detail still renders label when context is unavailable");
+
+const reviewApiTempRoot = await mkdtemp(resolve(tmpdir(), "crypto-edge-review-api-"));
+try {
+  const storageFilePath = resolve(reviewApiTempRoot, "review-session.json");
+  const server = createScannerApiServer({
+    reviewSession: {
+      storageFilePath,
+    },
+  });
+  await new Promise<void>((resolveListen) => server.listen(0, "127.0.0.1", resolveListen));
+
+  try {
+    const address = server.address() as AddressInfo;
+    const baseUrl = `http://127.0.0.1:${address.port}`;
+    const initialResponse = await getJson(`${baseUrl}/api/review-session`) as ReviewSessionState & {
+      _source_meta: { source_kind: string; storage_file: string };
+    };
+
+    assert.deepEqual(
+      { version: initialResponse.version, entries: initialResponse.entries },
+      createEmptyReviewSession(),
+      "GET /api/review-session returns empty state before storage exists",
+    );
+    assert.equal(
+      initialResponse._source_meta.source_kind,
+      "file-backed-review-session",
+      "GET /api/review-session includes file-backed source metadata",
+    );
+
+    const putResponse = await requestJson(`${baseUrl}/api/review-session`, {
+      method: "PUT",
+      body: savedReviewState,
+    });
+    const putBody = putResponse.body as ReviewSessionState & {
+      _source_meta: { source_kind: string; storage_file: string };
+    };
+
+    assert.equal(putResponse.statusCode, 200, "PUT /api/review-session accepts valid state");
+    assert.deepEqual(
+      { version: putBody.version, entries: putBody.entries },
+      savedReviewState,
+      "PUT /api/review-session returns saved state",
+    );
+    assert.equal(
+      putBody._source_meta.source_kind,
+      "file-backed-review-session",
+      "PUT /api/review-session returns file-backed source metadata",
+    );
+    assert.deepEqual(
+      (await readReviewSessionFile({ storageFilePath })).state,
+      savedReviewState,
+      "PUT /api/review-session writes file-backed storage",
+    );
+
+    const invalidPutResponse = await requestJson(`${baseUrl}/api/review-session`, {
+      method: "PUT",
+      body: {
+        version: 2,
+        entries: {},
+      },
+    });
+
+    assert.equal(invalidPutResponse.statusCode, 400, "PUT /api/review-session rejects invalid state");
+    assert.deepEqual(
+      (await readReviewSessionFile({ storageFilePath })).state,
+      savedReviewState,
+      "invalid PUT /api/review-session does not overwrite storage",
+    );
+  } finally {
+    await new Promise<void>((resolveClose, rejectClose) => {
+      server.close((error) => {
+        if (error) rejectClose(error);
+        else resolveClose();
+      });
+    });
+  }
+} finally {
+  await rm(reviewApiTempRoot, { recursive: true, force: true });
+}
 
 const contextTempRoot = await mkdtemp(resolve(tmpdir(), "crypto-edge-context-api-"));
 try {
@@ -723,6 +874,41 @@ function getJson(url: string): Promise<unknown> {
       });
     });
     request.on("error", rejectRequest);
+  });
+}
+
+function requestJson(
+  url: string,
+  options: { method: "PUT"; body: unknown },
+): Promise<{ statusCode: number; body: unknown; rawBody: string }> {
+  return new Promise((resolveRequest, rejectRequest) => {
+    const httpRequest = request(url, {
+      method: options.method,
+      headers: {
+        "content-type": "application/json",
+      },
+    }, (response) => {
+      let rawBody = "";
+      response.setEncoding("utf8");
+      response.on("data", (chunk) => {
+        rawBody += chunk;
+      });
+      response.on("end", () => {
+        try {
+          resolveRequest({
+            statusCode: response.statusCode ?? 0,
+            body: JSON.parse(rawBody) as unknown,
+            rawBody,
+          });
+        } catch (error) {
+          rejectRequest(error);
+        }
+      });
+    });
+
+    httpRequest.on("error", rejectRequest);
+    httpRequest.write(JSON.stringify(options.body));
+    httpRequest.end();
   });
 }
 

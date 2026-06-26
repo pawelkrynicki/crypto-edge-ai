@@ -124,33 +124,46 @@ Windows helper scripts:
 
 Local Review Session:
 
-- Stage 7B adds a browser-only analyst review workflow to `tools/ui-mock`.
-- The Candidate Detail panel stores local review status, analyst note, and last-updated timestamp in `localStorage`.
+- Stage 7B adds a local analyst review workflow to `tools/ui-mock`.
+- The Candidate Detail panel stores local review status, analyst note, and last-updated timestamp.
 - Storage key: `crypto-edge-ai.review-session.v1`.
 - Statuses are `Not reviewed`, `Needs more research`, `Saved for follow-up`, `Dismissed after review`, and `Waiting for more data`.
 - The Scanner Radar table shows a separate Review badge and a Follow-up filter for locally saved follow-up items.
-- This does not add a backend, database, auth, API write path, production cron, OpenAI call, data source, scraping, HTML parsing, browser automation, or undocumented endpoint.
+- Stage 8A adds a local development API write path only, backed by JSON at `tools/ui-mock/.local/review-session.json`.
+- This does not add a production backend, database, SQLite, auth, production cron, OpenAI call, data source, scraping, HTML parsing, browser automation, or undocumented endpoint.
 - Review status does not change scanner scoring, final labels, or WATCHLIST meaning.
-- Review panel compliance copy: `Local review is saved only in this browser. This does not change scanner label. This is not a buy/sell signal.`
+- Review panel compliance copy: `Local review workspace only. This does not change scanner label. This is not a buy/sell signal.`
 
 Review Queue / Follow-up Workspace:
 
 - Stage 7C extends the Watchlist tab into a local Review Queue workspace while keeping scanner `WATCHLIST` meaning unchanged.
-- The view separates `Scanner Watchlist` candidates from `Local Review Queue` items saved in browser localStorage.
+- The view separates `Scanner Watchlist` candidates from `Local Review Queue` items saved in local review storage.
 - The queue shows local review status, analyst note preview, last-updated timestamp, scanner label, scanner reason, and a quick path back to Scanner Radar details.
 - Filters cover all local review items, follow-up, needs research, waiting data, and dismissed items.
 - Stored local reviews whose candidate is absent from the current scanner output are shown separately and can be cleared.
-- This uses the existing `crypto-edge-ai.review-session.v1` model and adds no backend, database, auth, API write path, new data source, scanner scoring change, final-label change, or WATCHLIST meaning change.
-- Review Queue compliance copy: `Local review is saved only in this browser. Review status does not change scanner labels. This is not a buy/sell signal.`
+- This uses the local API file-backed store when available and the existing `crypto-edge-ai.review-session.v1` localStorage model as fallback. It adds no production backend, database, SQLite, auth, new data source, scanner scoring change, final-label change, or WATCHLIST meaning change.
+- Review Queue compliance copy: `Review storage uses the local API when available, with browser localStorage fallback. Review status does not change scanner labels. This is not a buy/sell signal.`
 
 Review Export / Import Backup:
 
-- Stage 7D adds JSON export/import for the browser-local review session.
+- Stage 7D adds JSON export/import for the local review session.
 - Backup includes only local review status and analyst notes from `crypto-edge-ai.review-session.v1`.
 - Backup does not include scanner output or market data.
 - Import supports merge, where imported entries overwrite conflicts by `candidate_id`, and replace, where the imported state substitutes the current local session.
 - Invalid JSON, unsupported backup versions, and invalid entries are rejected without clearing the current local review session.
-- This remains frontend-only/localStorage and adds no backend, database, auth, API write path, new data source, scraping, HTML parsing, browser automation, undocumented endpoint, OpenAI call, production cron, scanner scoring change, final-label change, or WATCHLIST meaning change.
+- Import updates `localStorage` and attempts to mirror to `PUT /api/review-session`.
+- This adds no production backend, database, SQLite, auth, new data source, scraping, HTML parsing, browser automation, undocumented endpoint, OpenAI call, production cron, scanner scoring change, final-label change, or WATCHLIST meaning change.
+
+Persistent Review Storage API v1:
+
+- Stage 8A adds file-backed JSON review storage through the local UI API bridge.
+- Endpoints: `GET /api/review-session` and `PUT /api/review-session`.
+- Storage file: `tools/ui-mock/.local/review-session.json`, ignored by git.
+- Missing file returns an empty review session.
+- Corrupt or invalid storage file returns an empty review session with `_source_meta.warning`.
+- Invalid PUT payloads return 400 and do not overwrite the current file.
+- UI starts from browser `localStorage`, loads the API state after mount, mirrors valid API state back to `localStorage`, and keeps browser fallback when the API is unavailable.
+- SQLite remains a future replaceable storage implementation; UX2 Product-grade Interface Redesign remains a future required stage.
 
 Paid and clarification-dependent sources remain deferred:
 
