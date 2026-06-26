@@ -12,7 +12,7 @@ It demonstrates the visual direction, product structure, and trader value propos
 - **Local Review Session**: Local analyst workspace for per-candidate review status, analyst note, and last-updated timestamp.
 - **Review Backup**: Export/import the review session as JSON for lightweight analyst backup.
 - **Review Storage Diagnostics / Reset**: Shows local review storage health and provides a guarded reset for local review status and analyst notes.
-- **Review Storage Provider**: Keeps the local API endpoints behind a storage-provider interface so file-backed JSON can be replaced later without changing the UI workflow.
+- **Review Storage Provider**: Keeps the local API endpoints behind a storage-provider interface. File-backed JSON remains the default provider, with optional SQLite available through env configuration.
 - **Research Review (Mock)**: A text area to paste news/events and see a mock AI risk categorization.
 - **Review Queue & Risk Alerts**: Dedicated tabs for local analyst follow-up, scanner WATCHLIST candidates, and critical risks.
 - **Methodology**: Explanation of the staged review process.
@@ -50,6 +50,26 @@ The file-backed JSON store lives at:
 tools/ui-mock/.local/review-session.json
 ```
 
+SQLite Review Storage Provider v1 is available as an optional local provider. It does not migrate JSON data automatically and does not change endpoint paths or the UI workflow.
+
+Enable SQLite with:
+
+```text
+CRYPTO_EDGE_REVIEW_STORAGE_PROVIDER=sqlite
+```
+
+Optional SQLite path override:
+
+```text
+CRYPTO_EDGE_REVIEW_SQLITE_PATH=...
+```
+
+Default SQLite file:
+
+```text
+tools/ui-mock/.local/review-session.sqlite
+```
+
 The browser fallback key remains:
 
 ```text
@@ -64,7 +84,7 @@ Review statuses:
 - Dismissed after review
 - Waiting for more data
 
-The review layer has no production backend, database, SQLite, auth, or scanner-output mutation. The only write path is the local development API bridge, and the browser keeps `localStorage` as a fallback/mirror. It is only for organizing local analyst work. The scanner table shows a small **Review** badge, and the Scanner Radar includes a **Follow-up** filter based on the local `Saved for follow-up` status.
+The review layer has no production backend, auth, production database, or scanner-output mutation. The only write path is the local development API bridge, and the browser keeps `localStorage` as a fallback/mirror. SQLite is an optional local storage provider behind the same API workflow. It is only for organizing local analyst work. The scanner table shows a small **Review** badge, and the Scanner Radar includes a **Follow-up** filter based on the local `Saved for follow-up` status.
 
 ## Review Storage Diagnostics / Reset
 
@@ -93,7 +113,7 @@ The **Refresh diagnostics** button reloads that endpoint when the local API brid
 
 The **Reset local reviews** tool clears only local review status and analyst notes. It requires typing `RESET`, then applies an empty `ReviewSessionState` to browser storage and attempts to mirror it through the existing `PUT /api/review-session` endpoint. It does not delete scanner output, market data, source files, `tools/data-poc` output, or any approved context output.
 
-This remains a local/developer storage tool only. It adds no SQLite, database, auth, production backend, production cron, new data source, scraping, OpenAI call, scanner scoring change, final-label change, or WATCHLIST meaning change. UX2 Product-grade Interface Redesign remains a future required stage.
+This remains a local/developer storage tool only. It adds no auth, production backend, production cron, new data source, scraping, OpenAI call, scanner scoring change, final-label change, or WATCHLIST meaning change. SQLite remains optional local storage behind the existing endpoints. UX2 Product-grade Interface Redesign remains a future required stage.
 
 ## Review Export / Import Backup
 
@@ -123,7 +143,7 @@ The workspace has two sections:
 - **Scanner Watchlist**: candidates whose scanner `final_label` is `WATCHLIST`.
 - **Local Review Queue**: candidates with a local review status other than `Not reviewed`, including `Saved for follow-up`, `Needs more research`, `Waiting for more data`, and `Dismissed after review`.
 
-Local Review Queue uses the local API file-backed store when available and keeps the existing browser `localStorage` model at `crypto-edge-ai.review-session.v1` as fallback. It does not add a production backend, database, SQLite, auth, new data source, scanner scoring change, final-label change, or WATCHLIST meaning change. Stored local reviews that no longer match the current scanner output are shown in a small "Stored reviews not in current scan" section so the analyst can see and clear them.
+Local Review Queue uses the local API review storage provider when available and keeps the existing browser `localStorage` model at `crypto-edge-ai.review-session.v1` as fallback. File-backed JSON remains the default provider; SQLite is optional through env configuration. It does not add a production backend, auth, new data source, scanner scoring change, final-label change, or WATCHLIST meaning change. Stored local reviews that no longer match the current scanner output are shown in a small "Stored reviews not in current scan" section so the analyst can see and clear them.
 
 Compliance copy shown in the Review Queue:
 
@@ -165,9 +185,9 @@ The local API bridge closes the current loop from persisted scanner-shaped JSON 
 - `GET /api/health` returns `{ "status": "ok", "service": "crypto-edge-ai-scanner-api" }`.
 - `GET /api/context/latest` returns normalized approved free source context.
 - `GET /api/scanner/latest` returns `PersistableScannerOutput` JSON.
-- `GET /api/review-session` returns the current file-backed review session plus `_source_meta`.
-- `PUT /api/review-session` validates and writes `ReviewSessionState` to local file-backed JSON storage.
-- `GET /api/review-session/diagnostics` returns file-backed review storage diagnostics without notes or entries.
+- `GET /api/review-session` returns the current review session plus `_source_meta` from the configured provider.
+- `PUT /api/review-session` validates and writes `ReviewSessionState` through the configured provider.
+- `GET /api/review-session/diagnostics` returns provider diagnostics without notes or entries.
 - Default API port: `5177`.
 - Port override: `SCANNER_API_PORT`.
 - UI API base URL: `VITE_SCANNER_API_URL=http://localhost:5177`.
@@ -180,11 +200,11 @@ pnpm run api
 pnpm run dev:with-api
 ```
 
-This remains a thin local bridge only. It adds no database, SQLite, MySQL, Drizzle, auth, OpenAI, live token fetching, trading automation, or buy/sell signal wording. `WATCHLIST` still means eligible for further review only.
+This remains a thin local bridge only. It adds no production database, MySQL, Drizzle, auth, OpenAI, live token fetching, trading automation, or buy/sell signal wording. Optional SQLite is local review storage only. `WATCHLIST` still means eligible for further review only.
 
 ## Persistent Review Storage API v1
 
-The local API bridge now provides a transitional file-backed review store:
+The local API bridge provides a transitional review store. File-backed JSON remains the default provider:
 
 ```text
 tools/ui-mock/.local/review-session.json
@@ -196,7 +216,7 @@ The UI starts immediately from `localStorage`, then tries `GET /api/review-sessi
 
 Storage diagnostics are available at `GET /api/review-session/diagnostics`. The endpoint reports the storage file path, existence, file size, entry count, validity, and warning state without returning full review entries or analyst notes. The Review Queue can refresh this diagnostics view on demand.
 
-This stage intentionally does not add SQLite, a database, auth, a production backend, production cron, new data sources, scraping, OpenAI, scanner scoring changes, final-label changes, or WATCHLIST meaning changes. SQLite can replace this storage implementation in a later stage without changing the UI workflow. UX2 Product-grade Interface Redesign remains a future required stage.
+This stage keeps file-backed JSON as the default and now supports optional SQLite through `CRYPTO_EDGE_REVIEW_STORAGE_PROVIDER=sqlite`. It does not add auth, a production backend, production cron, new data sources, scraping, OpenAI, scanner scoring changes, final-label changes, or WATCHLIST meaning changes. UX2 Product-grade Interface Redesign remains a future required stage.
 
 ## Review Storage Provider Abstraction
 
@@ -208,7 +228,41 @@ PUT /api/review-session
 GET /api/review-session/diagnostics
 ```
 
-This is a technical refactor only. It does not change Review Queue behavior, localStorage fallback, reset behavior, endpoint paths, scanner output, scoring, final labels, or WATCHLIST meaning. SQLite is not added in this stage; it remains a future replaceable provider implementation behind the same API workflow. No database, auth, production backend, production cron, new data source, scraping, or OpenAI call is added. UX2 Product-grade Interface Redesign remains a future required stage.
+This is a technical refactor only. It does not change Review Queue behavior, localStorage fallback, reset behavior, endpoint paths, scanner output, scoring, final labels, or WATCHLIST meaning. File-backed JSON remains the default provider. Optional SQLite is available behind the same API workflow through env configuration. No auth, production backend, production cron, new data source, scraping, or OpenAI call is added. UX2 Product-grade Interface Redesign remains a future required stage.
+
+## SQLite Review Storage Provider v1
+
+SQLite is now available as an optional second `ReviewSessionStorageProvider` implementation. It uses Node's built-in `node:sqlite` module and adds no npm dependency.
+
+Provider selection:
+
+```text
+CRYPTO_EDGE_REVIEW_STORAGE_PROVIDER=sqlite
+```
+
+Optional database path:
+
+```text
+CRYPTO_EDGE_REVIEW_SQLITE_PATH=...
+```
+
+Default database file:
+
+```text
+tools/ui-mock/.local/review-session.sqlite
+```
+
+File-backed JSON remains the default provider at `tools/ui-mock/.local/review-session.json`. There is no automatic migration from JSON to SQLite. The same endpoints are used:
+
+```text
+GET /api/review-session
+PUT /api/review-session
+GET /api/review-session/diagnostics
+```
+
+Diagnostics return provider metadata, file status, file size, entry count, validity, and optional warning only. They do not return full entries or analyst notes. The UI still starts from `localStorage`, tries the local API, mirrors valid API state back to `localStorage`, and keeps browser fallback behavior.
+
+This adds no auth, production backend, production cron, new data source, scraping, HTML parsing, browser automation, undocumented endpoint, OpenAI call, scanner scoring change, final-label change, or WATCHLIST meaning change. UX2 Product-grade Interface Redesign remains a future required stage.
 
 Next stage: read a real persisted scanner run from `tools/data-poc/output/<run_id>/full_output.json`.
 

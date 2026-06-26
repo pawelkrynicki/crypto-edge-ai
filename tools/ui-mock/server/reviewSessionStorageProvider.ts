@@ -1,7 +1,15 @@
 import type { ReviewSessionState } from "../src/types/reviewSessionTypes.js";
 
+export type ReviewSessionStorageSourceKind =
+  | "file-backed-review-session"
+  | "sqlite-review-session";
+
+export type ReviewSessionStorageDiagnosticsSourceKind =
+  | "file-backed-review-session-diagnostics"
+  | "sqlite-review-session-diagnostics";
+
 export type ReviewSessionStorageSourceMeta = {
-  source_kind: "file-backed-review-session";
+  source_kind: ReviewSessionStorageSourceKind;
   storage_file: string;
   loaded_at: string;
   warning?: string;
@@ -13,7 +21,7 @@ export type ReviewSessionStorageResult = {
 };
 
 export type ReviewSessionStorageDiagnostics = {
-  source_kind: "file-backed-review-session-diagnostics";
+  source_kind: ReviewSessionStorageDiagnosticsSourceKind;
   storage_file: string;
   checked_at: string;
   file_exists: boolean;

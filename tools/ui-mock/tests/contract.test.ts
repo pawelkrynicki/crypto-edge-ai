@@ -44,6 +44,12 @@ import {
   readReviewSessionFile,
   writeReviewSessionFile,
 } from "../server/reviewSessionFileStore";
+import {
+  createSqliteReviewSessionStorageProvider,
+  readReviewSessionSqlite,
+  readReviewSessionSqliteDiagnostics,
+  writeReviewSessionSqlite,
+} from "../server/reviewSessionSqliteStore";
 import type { ReviewSessionStorageProvider } from "../server/reviewSessionStorageProvider";
 import { validateReviewSessionState } from "../src/services/reviewSessionValidation";
 
@@ -366,6 +372,166 @@ try {
   );
 } finally {
   await rm(reviewFileTempRoot, { recursive: true, force: true });
+}
+
+const reviewSqliteTempRoot = await mkdtemp(resolve(tmpdir(), "crypto-edge-review-sqlite-"));
+try {
+  const databaseFilePath = resolve(reviewSqliteTempRoot, "review-session.sqlite");
+  const sqliteProvider = createSqliteReviewSessionStorageProvider({ databaseFilePath });
+  const missingSqliteProviderState = await sqliteProvider.read();
+
+  assert.deepEqual(
+    missingSqliteProviderState.state,
+    createEmptyReviewSession(),
+    "SQLite provider returns empty state when the database file does not exist",
+  );
+  assert.equal(
+    missingSqliteProviderState._source_meta.source_kind,
+    "sqlite-review-session",
+    "SQLite provider includes SQLite source metadata",
+  );
+
+  const missingSqliteProviderDiagnostics = await sqliteProvider.diagnostics();
+  const missingSqliteDiagnostics = await readReviewSessionSqliteDiagnostics({ databaseFilePath });
+
+  assert.equal(
+    missingSqliteProviderDiagnostics.source_kind,
+    "sqlite-review-session-diagnostics",
+    "SQLite provider diagnostics includes SQLite diagnostic metadata",
+  );
+  assert.equal(missingSqliteProviderDiagnostics.file_exists, false, "SQLite diagnostics reports missing file");
+  assert.equal(missingSqliteProviderDiagnostics.valid, true, "SQLite diagnostics treats missing file as valid empty state");
+  assert.equal(missingSqliteProviderDiagnostics.entries_count, 0, "SQLite diagnostics reports zero entries for missing file");
+  assert.equal(missingSqliteDiagnostics.file_exists, false, "direct SQLite diagnostics reports missing file");
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(missingSqliteDiagnostics, "entries"),
+    false,
+    "direct SQLite diagnostics does not expose review entries",
+  );
+
+  await writeReviewSessionSqlite(savedReviewState, { databaseFilePath });
+  const reloadedSqliteState = await readReviewSessionSqlite({ databaseFilePath });
+
+  assert.deepEqual(
+    reloadedSqliteState.state,
+    savedReviewState,
+    "SQLite review storage writes and reloads ReviewSessionState",
+  );
+
+  const validSqliteDiagnostics = await sqliteProvider.diagnostics();
+  const serializedValidSqliteDiagnostics = JSON.stringify(validSqliteDiagnostics);
+
+  assert.equal(validSqliteDiagnostics.file_exists, true, "SQLite diagnostics reports existing file");
+  assert.equal(validSqliteDiagnostics.valid, true, "SQLite diagnostics reports valid database");
+  assert.equal(validSqliteDiagnostics.entries_count, 1, "SQLite diagnostics counts entries");
+  assert.equal(
+    typeof validSqliteDiagnostics.file_size_bytes,
+    "number",
+    "SQLite diagnostics reports file size for existing database",
+  );
+  assert.equal(
+    serializedValidSqliteDiagnostics.includes('"entries"'),
+    false,
+    "SQLite diagnostics does not expose entries",
+  );
+  assert.equal(
+    serializedValidSqliteDiagnostics.includes("Track community and liquidity follow-up."),
+    false,
+    "SQLite diagnostics does not expose analyst notes",
+  );
+
+  await assert.rejects(
+    () => sqliteProvider.write({
+      version: 2,
+      entries: {},
+    }),
+    /Expected version 1/,
+    "SQLite provider rejects invalid state",
+  );
+  assert.deepEqual(
+    (await sqliteProvider.read()).state,
+    savedReviewState,
+    "SQLite provider does not overwrite previous state after invalid write",
+  );
+
+  await writeFile(databaseFilePath, "not a sqlite database", "utf8");
+  const corruptSqliteDiagnostics = await sqliteProvider.diagnostics();
+  const corruptSqliteState = await sqliteProvider.read();
+
+  assert.equal(corruptSqliteDiagnostics.file_exists, true, "corrupt SQLite diagnostics reports existing file");
+  assert.equal(corruptSqliteDiagnostics.valid, false, "corrupt SQLite diagnostics reports invalid database");
+  assert.equal(corruptSqliteDiagnostics.entries_count, 0, "corrupt SQLite diagnostics reports zero entries");
+  assert.match(
+    corruptSqliteDiagnostics.warning ?? "",
+    /SQLite storage could not be read or parsed/i,
+    "corrupt SQLite diagnostics includes warning",
+  );
+  assert.deepEqual(
+    corruptSqliteState.state,
+    createEmptyReviewSession(),
+    "corrupt SQLite storage returns an empty session instead of crashing",
+  );
+  assert.match(
+    corruptSqliteState._source_meta.warning ?? "",
+    /SQLite storage could not be read or parsed/i,
+    "corrupt SQLite storage read includes a warning",
+  );
+} finally {
+  await rm(reviewSqliteTempRoot, { recursive: true, force: true });
+}
+
+const originalReviewApiFetch = globalThis.fetch;
+globalThis.fetch = (async (input) => {
+  const url = String(input);
+  const body = url.endsWith("/api/review-session/diagnostics")
+    ? {
+      source_kind: "sqlite-review-session-diagnostics",
+      storage_file: "memory://sqlite-review-session",
+      checked_at: "2026-06-26T00:00:00.000Z",
+      file_exists: true,
+      file_size_bytes: 4096,
+      entries_count: 1,
+      valid: true,
+    }
+    : {
+      ...savedReviewState,
+      _source_meta: {
+        source_kind: "sqlite-review-session",
+        storage_file: "memory://sqlite-review-session",
+        loaded_at: "2026-06-26T00:00:00.000Z",
+      },
+    };
+
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: {
+      "content-type": "application/json",
+    },
+  });
+}) as typeof fetch;
+
+try {
+  const sqliteReviewApi = await loadReviewSessionFromApi();
+
+  assert.equal(sqliteReviewApi.status, "ready", "review API client accepts SQLite review source metadata");
+  if (sqliteReviewApi.status !== "ready") {
+    throw new Error(sqliteReviewApi.error);
+  }
+  assert.equal(sqliteReviewApi.sourceMeta?.source_kind, "sqlite-review-session", "SQLite source kind is preserved");
+
+  const sqliteReviewDiagnosticsApi = await loadReviewSessionDiagnosticsFromApi();
+
+  assert.equal(sqliteReviewDiagnosticsApi.status, "ready", "review diagnostics client accepts SQLite diagnostics");
+  if (sqliteReviewDiagnosticsApi.status !== "ready") {
+    throw new Error(sqliteReviewDiagnosticsApi.error);
+  }
+  assert.equal(
+    sqliteReviewDiagnosticsApi.diagnostics.source_kind,
+    "sqlite-review-session-diagnostics",
+    "SQLite diagnostics source kind is preserved",
+  );
+} finally {
+  globalThis.fetch = originalReviewApiFetch;
 }
 
 const originalReviewFetch = globalThis.fetch;
@@ -829,6 +995,155 @@ try {
   await rm(reviewApiTempRoot, { recursive: true, force: true });
 }
 
+const reviewSqliteApiTempRoot = await mkdtemp(resolve(tmpdir(), "crypto-edge-review-sqlite-api-"));
+try {
+  const databaseFilePath = resolve(reviewSqliteApiTempRoot, "review-session.sqlite");
+  const sqliteProvider = createSqliteReviewSessionStorageProvider({ databaseFilePath });
+  const sqliteServer = createScannerApiServer({
+    reviewSessionProvider: sqliteProvider,
+  });
+  await new Promise<void>((resolveListen) => sqliteServer.listen(0, "127.0.0.1", resolveListen));
+
+  try {
+    const address = sqliteServer.address() as AddressInfo;
+    const baseUrl = `http://127.0.0.1:${address.port}`;
+    const initialResponse = await getJson(`${baseUrl}/api/review-session`) as ReviewSessionState & {
+      _source_meta: { source_kind: string; storage_file: string };
+    };
+
+    assert.deepEqual(
+      { version: initialResponse.version, entries: initialResponse.entries },
+      createEmptyReviewSession(),
+      "GET /api/review-session returns empty state through SQLite provider",
+    );
+    assert.equal(
+      initialResponse._source_meta.source_kind,
+      "sqlite-review-session",
+      "GET /api/review-session includes SQLite source metadata",
+    );
+
+    const initialDiagnosticsResponse = await getJson(`${baseUrl}/api/review-session/diagnostics`) as Record<string, unknown>;
+
+    assert.equal(
+      initialDiagnosticsResponse.source_kind,
+      "sqlite-review-session-diagnostics",
+      "GET /api/review-session/diagnostics returns SQLite diagnostics metadata",
+    );
+    assert.equal(
+      initialDiagnosticsResponse.file_exists,
+      false,
+      "GET /api/review-session/diagnostics reports missing SQLite database",
+    );
+
+    const putResponse = await requestJson(`${baseUrl}/api/review-session`, {
+      method: "PUT",
+      body: savedReviewState,
+    });
+    const putBody = putResponse.body as ReviewSessionState & {
+      _source_meta: { source_kind: string; storage_file: string };
+    };
+
+    assert.equal(putResponse.statusCode, 200, "PUT /api/review-session accepts valid state through SQLite provider");
+    assert.deepEqual(
+      { version: putBody.version, entries: putBody.entries },
+      savedReviewState,
+      "PUT /api/review-session returns SQLite-saved state",
+    );
+    assert.equal(
+      putBody._source_meta.source_kind,
+      "sqlite-review-session",
+      "PUT /api/review-session returns SQLite source metadata",
+    );
+    assert.deepEqual(
+      (await readReviewSessionSqlite({ databaseFilePath })).state,
+      savedReviewState,
+      "PUT /api/review-session writes SQLite storage",
+    );
+
+    const savedDiagnosticsResponse = await getJson(`${baseUrl}/api/review-session/diagnostics`) as Record<string, unknown>;
+
+    assert.equal(savedDiagnosticsResponse.file_exists, true, "SQLite diagnostics endpoint reports existing database");
+    assert.equal(savedDiagnosticsResponse.valid, true, "SQLite diagnostics endpoint reports valid database");
+    assert.equal(savedDiagnosticsResponse.entries_count, 1, "SQLite diagnostics endpoint reports entry count");
+    assert.equal(
+      JSON.stringify(savedDiagnosticsResponse).includes('"entries"'),
+      false,
+      "SQLite diagnostics endpoint omits entries after save",
+    );
+    assert.equal(
+      JSON.stringify(savedDiagnosticsResponse).includes("Track community and liquidity follow-up."),
+      false,
+      "SQLite diagnostics endpoint omits analyst notes after save",
+    );
+
+    const invalidPutResponse = await requestJson(`${baseUrl}/api/review-session`, {
+      method: "PUT",
+      body: {
+        version: 2,
+        entries: {},
+      },
+    });
+
+    assert.equal(invalidPutResponse.statusCode, 400, "SQLite-backed PUT rejects invalid state");
+    assert.deepEqual(
+      (await readReviewSessionSqlite({ databaseFilePath })).state,
+      savedReviewState,
+      "invalid SQLite-backed PUT does not overwrite storage",
+    );
+  } finally {
+    await new Promise<void>((resolveClose, rejectClose) => {
+      sqliteServer.close((error) => {
+        if (error) rejectClose(error);
+        else resolveClose();
+      });
+    });
+  }
+} finally {
+  await rm(reviewSqliteApiTempRoot, { recursive: true, force: true });
+}
+
+const reviewSqliteEnvApiTempRoot = await mkdtemp(resolve(tmpdir(), "crypto-edge-review-sqlite-env-api-"));
+const originalReviewStorageProviderEnv = process.env.CRYPTO_EDGE_REVIEW_STORAGE_PROVIDER;
+const originalReviewSqlitePathEnv = process.env.CRYPTO_EDGE_REVIEW_SQLITE_PATH;
+try {
+  const databaseFilePath = resolve(reviewSqliteEnvApiTempRoot, "review-session.sqlite");
+  process.env.CRYPTO_EDGE_REVIEW_STORAGE_PROVIDER = "sqlite";
+  process.env.CRYPTO_EDGE_REVIEW_SQLITE_PATH = databaseFilePath;
+
+  const sqliteEnvServer = createScannerApiServer();
+  await new Promise<void>((resolveListen) => sqliteEnvServer.listen(0, "127.0.0.1", resolveListen));
+
+  try {
+    const address = sqliteEnvServer.address() as AddressInfo;
+    const baseUrl = `http://127.0.0.1:${address.port}`;
+    const response = await getJson(`${baseUrl}/api/review-session`) as ReviewSessionState & {
+      _source_meta: { source_kind: string; storage_file: string };
+    };
+
+    assert.equal(
+      response._source_meta.source_kind,
+      "sqlite-review-session",
+      "createScannerApiServer uses SQLite provider when env selects it",
+    );
+    assert.equal(
+      response._source_meta.storage_file,
+      databaseFilePath,
+      "SQLite env path is used as the storage file",
+    );
+  } finally {
+    await new Promise<void>((resolveClose, rejectClose) => {
+      sqliteEnvServer.close((error) => {
+        if (error) rejectClose(error);
+        else resolveClose();
+      });
+    });
+  }
+} finally {
+  restoreOptionalEnv("CRYPTO_EDGE_REVIEW_STORAGE_PROVIDER", originalReviewStorageProviderEnv);
+  restoreOptionalEnv("CRYPTO_EDGE_REVIEW_SQLITE_PATH", originalReviewSqlitePathEnv);
+  await rm(reviewSqliteEnvApiTempRoot, { recursive: true, force: true });
+}
+
 let fakeProviderState = createEmptyReviewSession();
 let fakeProviderWriteCount = 0;
 const fakeReviewSessionProvider: ReviewSessionStorageProvider = {
@@ -1196,6 +1511,15 @@ function createFakeProviderResult(state: ReviewSessionState) {
       loaded_at: "2026-06-26T00:00:00.000Z",
     },
   };
+}
+
+function restoreOptionalEnv(key: string, value: string | undefined): void {
+  if (value === undefined) {
+    delete process.env[key];
+    return;
+  }
+
+  process.env[key] = value;
 }
 
 function createMemoryStorage(initial: Record<string, string> = {}): StorageLike {

@@ -130,7 +130,7 @@ Local Review Session:
 - Statuses are `Not reviewed`, `Needs more research`, `Saved for follow-up`, `Dismissed after review`, and `Waiting for more data`.
 - The Scanner Radar table shows a separate Review badge and a Follow-up filter for locally saved follow-up items.
 - Stage 8A adds a local development API write path only, backed by JSON at `tools/ui-mock/.local/review-session.json`.
-- This does not add a production backend, database, SQLite, auth, production cron, OpenAI call, data source, scraping, HTML parsing, browser automation, or undocumented endpoint.
+- This does not add a production backend, auth, production cron, OpenAI call, data source, scraping, HTML parsing, browser automation, or undocumented endpoint. Optional SQLite review storage is added later in Stage 8D behind the local API provider interface.
 - Review status does not change scanner scoring, final labels, or WATCHLIST meaning.
 - Review panel compliance copy: `Local review workspace only. This does not change scanner label. This is not a buy/sell signal.`
 
@@ -141,7 +141,7 @@ Review Queue / Follow-up Workspace:
 - The queue shows local review status, analyst note preview, last-updated timestamp, scanner label, scanner reason, and a quick path back to Scanner Radar details.
 - Filters cover all local review items, follow-up, needs research, waiting data, and dismissed items.
 - Stored local reviews whose candidate is absent from the current scanner output are shown separately and can be cleared.
-- This uses the local API file-backed store when available and the existing `crypto-edge-ai.review-session.v1` localStorage model as fallback. It adds no production backend, database, SQLite, auth, new data source, scanner scoring change, final-label change, or WATCHLIST meaning change.
+- This uses the local API review storage provider when available and the existing `crypto-edge-ai.review-session.v1` localStorage model as fallback. File-backed JSON remains the default provider; SQLite is optional in Stage 8D. It adds no production backend, auth, new data source, scanner scoring change, final-label change, or WATCHLIST meaning change.
 - Review Queue compliance copy: `Review storage uses the local API when available, with browser localStorage fallback. Review status does not change scanner labels. This is not a buy/sell signal.`
 
 Review Export / Import Backup:
@@ -163,7 +163,7 @@ Persistent Review Storage API v1:
 - Corrupt or invalid storage file returns an empty review session with `_source_meta.warning`.
 - Invalid PUT payloads return 400 and do not overwrite the current file.
 - UI starts from browser `localStorage`, loads the API state after mount, mirrors valid API state back to `localStorage`, and keeps browser fallback when the API is unavailable.
-- SQLite remains a future replaceable storage implementation; UX2 Product-grade Interface Redesign remains a future required stage.
+- File-backed JSON remains the default provider. SQLite is available in Stage 8D as an optional provider through env configuration. UX2 Product-grade Interface Redesign remains a future required stage.
 
 Review Storage Diagnostics / Reset Tools v1:
 
@@ -174,7 +174,7 @@ Review Storage Diagnostics / Reset Tools v1:
 - Review Queue adds `Reset local reviews`, guarded by typing `RESET`.
 - Reset applies an empty `ReviewSessionState`, updates browser review storage, and attempts to mirror through the existing `PUT /api/review-session`.
 - Reset clears only local review status and analyst notes; it does not delete scanner output or market data.
-- This adds no SQLite, database, auth, production backend, production cron, new source, scraper, HTML parser, browser automation, undocumented endpoint, OpenAI call, scanner scoring change, final-label change, or WATCHLIST meaning change.
+- This adds no auth, production backend, production cron, new source, scraper, HTML parser, browser automation, undocumented endpoint, OpenAI call, scanner scoring change, final-label change, or WATCHLIST meaning change. SQLite diagnostics are added later in Stage 8D behind the same diagnostics endpoint.
 - UX2 Product-grade Interface Redesign remains a future required stage.
 
 Storage Provider Abstraction / SQLite-ready Layer v1:
@@ -184,8 +184,22 @@ Storage Provider Abstraction / SQLite-ready Layer v1:
 - `GET /api/review-session`, `PUT /api/review-session`, and `GET /api/review-session/diagnostics` use the provider.
 - The existing `reviewSession: { storageFilePath }` server option remains compatible.
 - A fake provider is used only in lightweight tests to confirm endpoint behavior is provider-backed.
-- SQLite can be a future provider implementation, but SQLite is not added in this stage.
-- This adds no database, auth, production backend, production cron, new source, scraper, HTML parser, browser automation, undocumented endpoint, OpenAI call, scanner scoring change, final-label change, or WATCHLIST meaning change.
+- SQLite is available in Stage 8D as an optional provider implementation behind the same endpoint workflow.
+- This adds no auth, production backend, production cron, new source, scraper, HTML parser, browser automation, undocumented endpoint, OpenAI call, scanner scoring change, final-label change, or WATCHLIST meaning change.
+- UX2 Product-grade Interface Redesign remains a future required stage.
+
+SQLite Review Storage Provider v1:
+
+- Stage 8D adds optional SQLite storage for `ReviewSessionStorageProvider`.
+- File-backed JSON remains the default review storage provider.
+- Enable SQLite with `CRYPTO_EDGE_REVIEW_STORAGE_PROVIDER=sqlite`.
+- Override the SQLite file path with `CRYPTO_EDGE_REVIEW_SQLITE_PATH`.
+- Default SQLite file: `tools/ui-mock/.local/review-session.sqlite`.
+- No automatic migration from JSON to SQLite is performed.
+- Existing review endpoints remain unchanged: `GET /api/review-session`, `PUT /api/review-session`, and `GET /api/review-session/diagnostics`.
+- UI workflow remains unchanged: browser `localStorage` starts the app, local API sync is attempted, and fallback remains.
+- SQLite diagnostics do not expose full entries or analyst notes.
+- This adds no new npm dependency, auth, production backend, production cron, new source, scraper, HTML parser, browser automation, undocumented endpoint, OpenAI call, scanner scoring change, final-label change, or WATCHLIST meaning change.
 - UX2 Product-grade Interface Redesign remains a future required stage.
 
 Paid and clarification-dependent sources remain deferred:
