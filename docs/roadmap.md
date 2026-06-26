@@ -143,6 +143,15 @@ Review Queue / Follow-up Workspace:
 - This uses the existing `crypto-edge-ai.review-session.v1` model and adds no backend, database, auth, API write path, new data source, scanner scoring change, final-label change, or WATCHLIST meaning change.
 - Review Queue compliance copy: `Local review is saved only in this browser. Review status does not change scanner labels. This is not a buy/sell signal.`
 
+Review Export / Import Backup:
+
+- Stage 7D adds JSON export/import for the browser-local review session.
+- Backup includes only local review status and analyst notes from `crypto-edge-ai.review-session.v1`.
+- Backup does not include scanner output or market data.
+- Import supports merge, where imported entries overwrite conflicts by `candidate_id`, and replace, where the imported state substitutes the current local session.
+- Invalid JSON, unsupported backup versions, and invalid entries are rejected without clearing the current local review session.
+- This remains frontend-only/localStorage and adds no backend, database, auth, API write path, new data source, scraping, HTML parsing, browser automation, undocumented endpoint, OpenAI call, production cron, scanner scoring change, final-label change, or WATCHLIST meaning change.
+
 Paid and clarification-dependent sources remain deferred:
 
 - CoinGecko Analyst: first paid market/onchain candidate.
@@ -305,6 +314,12 @@ UX1 Professional Dashboard Redesign:
 - Keeps the work UI-only: no new data sources, no API changes, no backend, no scoring changes, and no final-label changes.
 - Keeps `WATCHLIST` meaning unchanged: eligible for further review only.
 - Makes Market Context and Local Review Session more visible, with Local Review Session moved higher in Candidate Detail.
+
+UX2 Product-grade Interface Redesign:
+
+- Future required stage before a final production interface.
+- Scope: simplify, organize, and professionalize the full frontend after the functional prototype stages.
+- Not implemented in Stage 7D.
 
 ## UI Data Adapter (Completed)
 

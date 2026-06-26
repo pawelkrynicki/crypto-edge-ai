@@ -175,6 +175,19 @@ Review status does not change scanner labels.
 This is not a buy/sell signal.
 ```
 
+## Review Export / Import Backup
+
+Stage 7D adds a small browser-only backup flow for the local review session in `tools/ui-mock`.
+
+- Export writes the current `crypto-edge-ai.review-session.v1` local review status and analyst notes to a JSON file.
+- Import reads a JSON backup in the browser and validates version and entries before applying it.
+- Merge mode keeps existing local entries and lets imported entries overwrite conflicts by `candidate_id`.
+- Replace mode substitutes the current local review session with the imported state.
+- The backup does not include scanner output or market data.
+- The flow adds no backend, database, auth, API write path, new data source, scraper, HTML parser, browser automation, undocumented endpoint, OpenAI call, production cron, scanner scoring change, final-label change, or WATCHLIST meaning change.
+
+UX2 Product-grade Interface Redesign remains a future required stage before a final production interface. It should simplify, organize, and professionalize the UI after the current functional prototype stages.
+
 ## UX1 Professional Dashboard Redesign
 
 UX1 is a UI-only redesign of `tools/ui-mock`. It improves layout hierarchy, spacing, scanner readability, Market Context visibility, and Candidate Detail readability. Local Review Session is placed higher in Candidate Detail so analyst status and notes are easier to find.
