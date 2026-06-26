@@ -184,6 +184,7 @@ Review Storage mode checks:
 ..\..\scripts\win\check-review-storage-file.cmd
 ..\..\scripts\win\check-review-storage-sqlite.cmd
 ..\..\scripts\win\check-review-storage-modes.cmd
+..\..\scripts\win\check-local-workflow-smoke.cmd
 ```
 
 SQLite local preview:
@@ -193,6 +194,22 @@ SQLite local preview:
 ```
 
 File-backed JSON remains the default provider. SQLite is optional through `CRYPTO_EDGE_REVIEW_STORAGE_PROVIDER=sqlite`, with `CRYPTO_EDGE_REVIEW_SQLITE_PATH` available for a local `.sqlite` path. The smoke checks use only dedicated files under `.local`: `review-session-smoke.json` and `review-session-smoke.sqlite`. They do not touch the normal `review-session.json` or `review-session.sqlite` files. There is no automatic JSON-to-SQLite migration. Endpoint paths and UI workflow are unchanged.
+
+Local workflow smoke:
+
+```bash
+pnpm run workflow:smoke
+```
+
+or from the repo root on Windows:
+
+```cmd
+scripts\win\check-local-workflow-smoke.cmd
+```
+
+This starts the existing local API on a random `127.0.0.1` port and checks scanner latest output, scanner source diagnostics, market context latest output, review session `GET`/`PUT`/diagnostics, invalid review write rejection, review export/import helpers, and server-render smoke coverage for Market Context, Candidate Detail, and Review Queue paths.
+
+It uses only local real-output files or local fixture fallback files. It writes only a dedicated `.local\local-workflow-smoke-review-session.json` file with a cleanup guard. It does not call external networks, mutate scanner output, mutate market data, add data sources, change endpoint paths, change UI workflow, change scoring, change `final_label`, or change `WATCHLIST` meaning. UX2 Product-grade Interface Redesign remains a future stage.
 
 ## Thin Scanner API POC
 
@@ -292,6 +309,18 @@ Developer smoke scripts now cover both Review Storage providers without changing
 The smoke runner starts `createScannerApiServer` on a random local port, exercises the existing review endpoints, confirms invalid writes do not overwrite the saved state, and verifies diagnostics do not expose review entries or analyst notes.
 
 This is DX/tooling only. It adds no npm dependency, auth, production backend, production cron, new source, scraper, HTML parser, browser automation, undocumented endpoint, OpenAI call, endpoint change, UI workflow change, scanner scoring change, final-label change, or WATCHLIST meaning change. UX2 Product-grade Interface Redesign remains a future required stage.
+
+## Local End-to-End Workflow Smoke v1
+
+`scripts\win\check-local-workflow-smoke.cmd` runs `scripts\localWorkflowSmoke.ts` as a local technical checkpoint for the MVP workflow:
+
+```text
+scanner output -> UI candidates -> market context -> candidate review -> review session storage -> diagnostics -> export/import review session
+```
+
+The runner uses the existing local API and existing service/adapter logic. It accepts either real local output or fixture fallback for scanner and context data, starts no browser, calls no external network, and does not mutate scanner output or market data. It writes only a guarded local review smoke file under `.local`.
+
+This stage adds no npm dependency, auth, production backend, production cron, new source, scraper, HTML parser, browser automation, undocumented endpoint, OpenAI call, endpoint change, UI workflow change, scanner scoring change, final-label change, or WATCHLIST meaning change. UX2 Product-grade Interface Redesign remains a future required stage.
 
 Next stage: read a real persisted scanner run from `tools/data-poc/output/<run_id>/full_output.json`.
 

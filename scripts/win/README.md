@@ -54,6 +54,25 @@ These scripts run a lightweight local smoke test for the existing Review Storage
 
 The smoke runner uses only local loopback HTTP and dedicated smoke files under `tools\ui-mock\.local`: `review-session-smoke.json` and `review-session-smoke.sqlite`. It does not touch the normal `review-session.json` or `review-session.sqlite` files. It also does not touch scanner output, market data, external networks, data sources, endpoint paths, UI workflow, scoring, `final_label`, or `WATCHLIST` meaning. SQLite is optional and there is no automatic JSON-to-SQLite migration.
 
+## Local Workflow Smoke Check
+
+```cmd
+scripts\win\check-local-workflow-smoke.cmd
+```
+
+This runs `tools\ui-mock\scripts\localWorkflowSmoke.ts` through `node_modules\.bin\tsx.cmd`.
+
+The local workflow smoke starts the existing local API on a random `127.0.0.1` port and verifies the basic local MVP path:
+
+- scanner latest output through `GET /api/scanner/latest` and the existing UI adapter
+- scanner source diagnostics through `GET /api/scanner/sources`
+- market context through `GET /api/context/latest` and the existing context parser
+- review session `GET`, valid `PUT`, diagnostics, invalid `PUT` rejection, and non-overwrite behavior
+- review session export/import helpers
+- server-render smoke coverage for Market Context, Candidate Detail, and Review Queue UI paths
+
+The runner uses a dedicated file under `tools\ui-mock\.local\local-workflow-smoke-review-session.json` and has a cleanup guard so it cannot remove the normal `review-session.json` or `review-session.sqlite`. It uses only local API calls and local real-output or fixture fallback files. It does not call external networks, change scanner output, change market data, add data sources, change endpoint paths, change UI workflow, change scoring, change `final_label`, or change `WATCHLIST` meaning. UX2 Product-grade Interface Redesign remains a future stage.
+
 ## Free Local Preview Ports
 
 ```cmd

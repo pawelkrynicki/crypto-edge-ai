@@ -292,6 +292,26 @@ File-backed JSON remains the default provider. SQLite remains optional. There is
 
 UX2 Product-grade Interface Redesign remains a future required stage.
 
+## Local End-to-End Workflow Smoke v1
+
+Stage 9A adds a local workflow smoke checkpoint for the MVP path:
+
+```text
+scanner output -> UI candidates -> market context -> candidate review -> review session storage -> diagnostics -> export/import review session
+```
+
+The check is run with:
+
+```cmd
+scripts\win\check-local-workflow-smoke.cmd
+```
+
+It starts the existing local API on a random `127.0.0.1` port and checks only existing endpoints: `GET /api/health`, `GET /api/scanner/latest`, `GET /api/scanner/sources`, `GET /api/context/latest`, `GET /api/review-session`, `PUT /api/review-session`, and `GET /api/review-session/diagnostics`. It parses scanner output through the existing scanner service/adapter logic, parses market context through the existing context service logic, verifies review storage and diagnostics behavior, verifies export/import helpers, and renders existing UI paths server-side for smoke coverage.
+
+The runner accepts real local output or fixture fallback. It calls no external network, starts no browser, adds no source, and writes only a guarded temporary review smoke file under `tools\ui-mock\.local`. It does not mutate scanner output, market data, endpoint paths, UI workflow, scanner scoring, `final_label`, or `WATCHLIST` meaning. It adds no npm dependency, auth, production backend, production cron, scraping, HTML parsing, browser automation, undocumented endpoint, or OpenAI call.
+
+UX2 Product-grade Interface Redesign remains a future required stage.
+
 ## UX1 Professional Dashboard Redesign
 
 UX1 is a UI-only redesign of `tools/ui-mock`. It improves layout hierarchy, spacing, scanner readability, Market Context visibility, and Candidate Detail readability. Local Review Session is placed higher in Candidate Detail so analyst status and notes are easier to find.
