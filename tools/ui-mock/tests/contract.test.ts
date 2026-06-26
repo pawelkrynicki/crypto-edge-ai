@@ -24,16 +24,24 @@ import {
   parseReviewSessionImport,
   REVIEW_SESSION_STORAGE_KEY,
   saveReviewRecord,
+  saveReviewSessionState,
 } from "../src/services/reviewSessionStore";
 import type { StorageLike } from "../src/services/reviewSessionStore";
-import { loadReviewSessionFromApi } from "../src/services/reviewSessionApi";
+import {
+  loadReviewSessionDiagnosticsFromApi,
+  loadReviewSessionFromApi,
+} from "../src/services/reviewSessionApi";
 import { interpretScannerApiOutput } from "../src/services/scannerDataSource";
 import type { ReviewSessionState } from "../src/types/reviewSessionTypes";
 import type { PersistableScannerOutput, ScannerApiOutput } from "../src/types/scannerTypes";
 import { createScannerApiServer } from "../server/scannerApiServer";
 import { readLatestContextOutput, type ContextLatestOutput } from "../server/latestContextOutput";
 import { isPersistableScannerOutputShape } from "../server/latestScannerOutput";
-import { readReviewSessionFile, writeReviewSessionFile } from "../server/reviewSessionFileStore";
+import {
+  readReviewSessionDiagnostics,
+  readReviewSessionFile,
+  writeReviewSessionFile,
+} from "../server/reviewSessionFileStore";
 
 const realFixture = PERSISTABLE_SCANNER_SAMPLE;
 const uiCandidates = mapPersistableScannerOutputToUiCandidates(realFixture);
@@ -239,6 +247,21 @@ assert.equal(passMockCandidate.final_label, "WATCHLIST", "saving review status d
 const reviewFileTempRoot = await mkdtemp(resolve(tmpdir(), "crypto-edge-review-file-"));
 try {
   const storageFilePath = resolve(reviewFileTempRoot, "review-session.json");
+  const missingFileDiagnostics = await readReviewSessionDiagnostics({ storageFilePath });
+
+  assert.equal(
+    missingFileDiagnostics.file_exists,
+    false,
+    "review storage diagnostics reports missing file",
+  );
+  assert.equal(missingFileDiagnostics.valid, true, "missing review storage file is a valid empty state");
+  assert.equal(missingFileDiagnostics.entries_count, 0, "missing review storage file reports zero entries");
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(missingFileDiagnostics, "entries"),
+    false,
+    "review storage diagnostics does not expose review entries",
+  );
+
   const missingFileState = await readReviewSessionFile({ storageFilePath });
 
   assert.deepEqual(
@@ -253,6 +276,17 @@ try {
   );
 
   await writeReviewSessionFile(savedReviewState, { storageFilePath });
+  const validFileDiagnostics = await readReviewSessionDiagnostics({ storageFilePath });
+
+  assert.equal(validFileDiagnostics.file_exists, true, "review storage diagnostics reports existing file");
+  assert.equal(validFileDiagnostics.valid, true, "review storage diagnostics reports valid review file");
+  assert.equal(validFileDiagnostics.entries_count, 1, "review storage diagnostics counts entries");
+  assert.equal(
+    typeof validFileDiagnostics.file_size_bytes,
+    "number",
+    "review storage diagnostics reports file size for existing file",
+  );
+
   const reloadedFileState = await readReviewSessionFile({ storageFilePath });
 
   assert.deepEqual(
@@ -262,6 +296,17 @@ try {
   );
 
   await writeFile(storageFilePath, "{ invalid json", "utf8");
+  const corruptFileDiagnostics = await readReviewSessionDiagnostics({ storageFilePath });
+
+  assert.equal(corruptFileDiagnostics.file_exists, true, "corrupt review storage diagnostics reports existing file");
+  assert.equal(corruptFileDiagnostics.valid, false, "corrupt review storage diagnostics reports invalid file");
+  assert.equal(corruptFileDiagnostics.entries_count, 0, "corrupt review storage diagnostics reports zero entries");
+  assert.match(
+    corruptFileDiagnostics.warning ?? "",
+    /could not be read or parsed/i,
+    "corrupt review storage diagnostics includes warning",
+  );
+
   const corruptFileState = await readReviewSessionFile({ storageFilePath });
 
   assert.deepEqual(
@@ -288,6 +333,12 @@ globalThis.fetch = (async () => {
 try {
   const unavailableReviewApi = await loadReviewSessionFromApi();
   assert.equal(unavailableReviewApi.status, "unavailable", "review API client reports unavailable without crashing");
+  const unavailableReviewDiagnosticsApi = await loadReviewSessionDiagnosticsFromApi();
+  assert.equal(
+    unavailableReviewDiagnosticsApi.status,
+    "unavailable",
+    "review diagnostics API client reports unavailable without crashing",
+  );
   assert.equal(reviewFetchCalled, true, "review API client attempts the local API request");
 } finally {
   globalThis.fetch = originalReviewFetch;
@@ -421,6 +472,26 @@ assert.equal(
 assert.equal(passMockCandidate.final_label, "WATCHLIST", "review export/import does not change scanner final_label");
 assert.equal(passUi.scorecard?.decisionLabel, "WATCHLIST", "review export/import does not change WATCHLIST meaning");
 
+const resetReviewStorage = createMemoryStorage({
+  [REVIEW_SESSION_STORAGE_KEY]: JSON.stringify(savedReviewState),
+});
+const passScorecardBeforeReset = JSON.stringify(passUi.scorecard);
+const resetReviewState = saveReviewSessionState(createEmptyReviewSession(), resetReviewStorage);
+
+assert.deepEqual(
+  resetReviewState,
+  createEmptyReviewSession(),
+  "reset local reviews uses an empty ReviewSessionState",
+);
+assert.equal(
+  resetReviewStorage.getItem(REVIEW_SESSION_STORAGE_KEY),
+  null,
+  "reset local reviews clears only the local review storage key",
+);
+assert.equal(passMockCandidate.final_label, "WATCHLIST", "reset local reviews does not change final_label");
+assert.equal(passUi.scorecard?.decisionLabel, "WATCHLIST", "reset local reviews does not change scoring decision label");
+assert.equal(JSON.stringify(passUi.scorecard), passScorecardBeforeReset, "reset local reviews does not mutate score fields");
+
 const detailWithContextMarkup = renderToStaticMarkup(React.createElement(CandidateDetail, {
   candidate: passMockCandidate,
   marketContextState: {
@@ -504,6 +575,7 @@ const reviewQueueMarkup = renderToStaticMarkup(React.createElement(WatchlistTab,
   onClearReview: () => undefined,
   onOpenCandidate: () => undefined,
   onImportReviewSession: () => undefined,
+  onResetReviewSession: async () => ({ status: "ready" as const, message: "Reset completed in test." }),
 }));
 
 assert.match(reviewQueueMarkup, /Review Queue/, "watchlist tab renders review queue workspace");
@@ -512,6 +584,22 @@ assert.match(reviewQueueMarkup, /Export review JSON/, "review queue renders expo
 assert.match(reviewQueueMarkup, /Import review JSON/, "review queue renders import file control");
 assert.match(reviewQueueMarkup, /Merge with current/, "review queue renders merge import mode");
 assert.match(reviewQueueMarkup, /Replace current/, "review queue renders replace import mode");
+assert.match(reviewQueueMarkup, /Storage diagnostics/, "review queue renders storage diagnostics");
+assert.match(reviewQueueMarkup, /Refresh diagnostics/, "review queue renders refresh diagnostics action");
+assert.match(reviewQueueMarkup, /API diagnostics/, "review queue renders API diagnostics availability");
+assert.match(reviewQueueMarkup, /Storage file path/, "review queue renders storage file path field");
+assert.match(reviewQueueMarkup, /Reset local reviews/, "review queue renders reset local reviews");
+assert.match(reviewQueueMarkup, /Type RESET to confirm/, "review queue requires RESET confirmation");
+assert.match(
+  reviewQueueMarkup,
+  /Reset clears only local review status and analyst notes\./,
+  "review queue explains reset scope",
+);
+assert.match(
+  reviewQueueMarkup,
+  /It does not delete scanner output or market data\./,
+  "review queue explains reset preserves scanner output and market data",
+);
 assert.match(
   reviewQueueMarkup,
   /Backup includes only local review status and analyst notes\./,
@@ -557,6 +645,7 @@ const emptyReviewQueueMarkup = renderToStaticMarkup(React.createElement(Watchlis
   onClearReview: () => undefined,
   onOpenCandidate: () => undefined,
   onImportReviewSession: () => undefined,
+  onResetReviewSession: async () => ({ status: "ready" as const, message: "Reset completed in test." }),
 }));
 
 assert.match(emptyReviewQueueMarkup, /No local review items yet\./, "review queue renders empty state");
@@ -606,6 +695,29 @@ try {
       "GET /api/review-session includes file-backed source metadata",
     );
 
+    const initialDiagnosticsResponse = await getJson(`${baseUrl}/api/review-session/diagnostics`) as Record<string, unknown>;
+
+    assert.equal(
+      initialDiagnosticsResponse.source_kind,
+      "file-backed-review-session-diagnostics",
+      "GET /api/review-session/diagnostics returns diagnostic metadata",
+    );
+    assert.equal(
+      initialDiagnosticsResponse.file_exists,
+      false,
+      "GET /api/review-session/diagnostics reports missing storage file",
+    );
+    assert.equal(
+      initialDiagnosticsResponse.valid,
+      true,
+      "GET /api/review-session/diagnostics treats missing file as valid empty state",
+    );
+    assert.equal(
+      JSON.stringify(initialDiagnosticsResponse).includes('"entries"'),
+      false,
+      "GET /api/review-session/diagnostics does not return review entries",
+    );
+
     const putResponse = await requestJson(`${baseUrl}/api/review-session`, {
       method: "PUT",
       body: savedReviewState,
@@ -629,6 +741,21 @@ try {
       (await readReviewSessionFile({ storageFilePath })).state,
       savedReviewState,
       "PUT /api/review-session writes file-backed storage",
+    );
+
+    const savedDiagnosticsResponse = await getJson(`${baseUrl}/api/review-session/diagnostics`) as Record<string, unknown>;
+
+    assert.equal(
+      savedDiagnosticsResponse.file_exists,
+      true,
+      "GET /api/review-session/diagnostics reports existing storage file",
+    );
+    assert.equal(savedDiagnosticsResponse.valid, true, "GET /api/review-session/diagnostics reports valid storage");
+    assert.equal(savedDiagnosticsResponse.entries_count, 1, "GET /api/review-session/diagnostics reports entry count");
+    assert.equal(
+      JSON.stringify(savedDiagnosticsResponse).includes('"entries"'),
+      false,
+      "GET /api/review-session/diagnostics still omits entries after save",
     );
 
     const invalidPutResponse = await requestJson(`${baseUrl}/api/review-session`, {

@@ -15,6 +15,7 @@ import {
 import { loadLatestMarketContext } from "./services/contextDataSource";
 import {
   clearReviewRecord,
+  createEmptyReviewSession,
   loadReviewSession,
   saveReviewRecord,
   saveReviewSessionState,
@@ -22,6 +23,7 @@ import {
 import {
   loadReviewSessionFromApi,
   saveReviewSessionToApi,
+  type ReviewSessionApiStatus,
   type ReviewSessionApiResult,
   type ReviewSessionApiSourceMeta,
 } from "./services/reviewSessionApi";
@@ -77,6 +79,11 @@ type ReviewStorageStatus = {
   tone: "ready" | "fallback" | "warning" | "error";
   text: string;
   detail?: string;
+};
+
+type ReviewSessionResetResult = {
+  status: ReviewSessionApiStatus;
+  message: string;
 };
 
 const INITIAL_REVIEW_STORAGE_STATUS: ReviewStorageStatus = {
@@ -205,6 +212,29 @@ export default function App() {
     syncReviewSessionToApi(savedState);
   }, [syncReviewSessionToApi]);
 
+  const handleResetReviewSession = useCallback(async (): Promise<ReviewSessionResetResult> => {
+    const emptyState = saveReviewSessionState(createEmptyReviewSession());
+    setReviewSession(emptyState);
+
+    const result = await saveReviewSessionToApi(emptyState);
+
+    if (result.status === "ready") {
+      setReviewStorageStatus(getReadyReviewStorageStatus(result.sourceMeta));
+      return {
+        status: "ready",
+        message: "Reset completed in browser storage and local API storage.",
+      };
+    }
+
+    setReviewStorageStatus(getFallbackReviewStorageStatus(result));
+    return {
+      status: result.status,
+      message: result.status === "unavailable"
+        ? "Reset completed in browser storage. Local API storage was unavailable."
+        : "Reset completed in browser storage. Local API storage returned an error.",
+    };
+  }, []);
+
   const handleOpenCandidate = useCallback((candidateId: string) => {
     setSelectedCandidateId(candidateId);
     setActiveTab("scanner");
@@ -243,6 +273,7 @@ export default function App() {
             onClearReview={handleClearReview}
             onOpenCandidate={handleOpenCandidate}
             onImportReviewSession={handleImportReviewSession}
+            onResetReviewSession={handleResetReviewSession}
           />
         );
       case "risks":

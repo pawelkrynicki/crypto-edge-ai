@@ -9,6 +9,7 @@ import {
 } from "./latestScannerOutput.js";
 import {
   readReviewSessionFile,
+  readReviewSessionDiagnostics,
   ReviewSessionFileStoreError,
   writeReviewSessionFile,
   type ReviewSessionFileStoreOptions,
@@ -98,6 +99,19 @@ export function createScannerApiServer(options: ScannerApiServerOptions = {}) {
     if (req.method === "GET" && path === "/api/review-session") {
       const output = await readReviewSessionFile(options.reviewSession);
       sendReviewSessionJson(res, 200, output);
+      return;
+    }
+
+    if (req.method === "GET" && path === "/api/review-session/diagnostics") {
+      try {
+        const diagnostics = await readReviewSessionDiagnostics(options.reviewSession);
+        sendJson(res, 200, diagnostics);
+      } catch {
+        sendJson(res, 500, {
+          error: "review_session_diagnostics_unavailable",
+          message: "Review session storage diagnostics are unavailable",
+        });
+      }
       return;
     }
 

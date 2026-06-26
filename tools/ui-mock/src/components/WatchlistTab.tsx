@@ -1,7 +1,12 @@
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import type { MockCandidate } from "../mockData";
 import { LabelBadge } from "./LabelBadge";
 import { ReviewStatusBadge } from "./CandidateReviewControls";
+import {
+  loadReviewSessionDiagnosticsFromApi,
+  type ReviewSessionApiStatus,
+  type ReviewSessionDiagnosticsApiResult,
+} from "../services/reviewSessionApi";
 import {
   createReviewSessionExport,
   mergeReviewSessionState,
@@ -22,6 +27,10 @@ interface Props {
   onClearReview: (candidateId: string) => void;
   onOpenCandidate: (candidateId: string) => void;
   onImportReviewSession: (nextState: ReviewSessionState) => void;
+  onResetReviewSession: () => Promise<{
+    status: ReviewSessionApiStatus;
+    message: string;
+  }>;
 }
 
 const CHAIN_LABELS: Record<string, string> = {
@@ -37,6 +46,11 @@ type ReviewStorageStatus = {
   tone: "ready" | "fallback" | "warning" | "error";
   text: string;
   detail?: string;
+};
+type ReviewDiagnosticsState = { status: "idle" | "loading" } | ReviewSessionDiagnosticsApiResult;
+type ResetLocalReviewsStatus = {
+  tone: "success" | "warning" | "error";
+  message: string;
 };
 
 const REVIEW_QUEUE_FILTERS: { label: string; value: ReviewQueueFilter }[] = [
@@ -131,6 +145,7 @@ export const WatchlistTab: React.FC<Props> = ({
   onClearReview,
   onOpenCandidate,
   onImportReviewSession,
+  onResetReviewSession,
 }) => {
   const [reviewFilter, setReviewFilter] = useState<ReviewQueueFilter>("ALL");
   const [importMode, setImportMode] = useState<ReviewSessionImportMode>("merge");
@@ -138,6 +153,10 @@ export const WatchlistTab: React.FC<Props> = ({
     tone: "success" | "error";
     message: string;
   } | null>(null);
+  const [diagnosticsState, setDiagnosticsState] = useState<ReviewDiagnosticsState>({ status: "idle" });
+  const [resetConfirmation, setResetConfirmation] = useState("");
+  const [resetStatus, setResetStatus] = useState<ResetLocalReviewsStatus | null>(null);
+  const [resetInProgress, setResetInProgress] = useState(false);
   const watchlist = candidates.filter((c) => c.final_label === "WATCHLIST");
 
   const {
@@ -174,6 +193,16 @@ export const WatchlistTab: React.FC<Props> = ({
   const hasLocalReviews = localReviewRecords.length > 0;
   const hasFilteredReviews = filteredQueueItems.length > 0 || filteredStoredReviews.length > 0;
   const localReviewEntryCount = Object.keys(reviewSession.entries).length;
+
+  const refreshDiagnostics = useCallback(async () => {
+    setDiagnosticsState({ status: "loading" });
+    const result = await loadReviewSessionDiagnosticsFromApi();
+    setDiagnosticsState(result);
+  }, []);
+
+  useEffect(() => {
+    void refreshDiagnostics();
+  }, [refreshDiagnostics]);
 
   const handleExportReviewJson = () => {
     try {
@@ -250,6 +279,37 @@ export const WatchlistTab: React.FC<Props> = ({
 
     reader.readAsText(file);
   };
+
+  const handleResetLocalReviews = async () => {
+    if (resetConfirmation !== "RESET" || resetInProgress) return;
+
+    setResetInProgress(true);
+    setResetStatus(null);
+
+    try {
+      const result = await onResetReviewSession();
+
+      setResetStatus({
+        tone: result.status === "ready" ? "success" : "warning",
+        message: result.message,
+      });
+      setResetConfirmation("");
+      await refreshDiagnostics();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setResetStatus({
+        tone: "error",
+        message: `Reset failed: ${message}`,
+      });
+    } finally {
+      setResetInProgress(false);
+    }
+  };
+
+  const diagnostics = diagnosticsState.status === "ready" ? diagnosticsState.diagnostics : null;
+  const diagnosticsError = diagnosticsState.status === "unavailable" || diagnosticsState.status === "error"
+    ? diagnosticsState.error
+    : null;
 
   return (
     <div className="space-y-5 max-w-6xl">
@@ -341,6 +401,95 @@ export const WatchlistTab: React.FC<Props> = ({
             {backupStatus.message}
           </div>
         )}
+
+        <div className="grid gap-4 lg:grid-cols-2 pt-2">
+          <div
+            className="rounded-md p-3 space-y-3"
+            style={{ background: "var(--bg-raised)", border: "1px solid var(--border)" }}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h4 className="text-xs font-bold text-primary">Storage diagnostics</h4>
+                <p className="text-xs text-secondary">Local Review Storage status without review notes or entries.</p>
+              </div>
+              <button
+                type="button"
+                className="details-button"
+                onClick={refreshDiagnostics}
+                disabled={diagnosticsState.status === "loading"}
+              >
+                {diagnosticsState.status === "loading" ? "Refreshing..." : "Refresh diagnostics"}
+              </button>
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-2 text-xs">
+              <DiagnosticField label="App storage status" value={reviewStorageStatus.text} />
+              <DiagnosticField label="API diagnostics" value={getDiagnosticsAvailabilityText(diagnosticsState)} />
+              {reviewStorageStatus.detail && (
+                <DiagnosticField label="App storage detail" value={reviewStorageStatus.detail} />
+              )}
+              <DiagnosticField label="Storage file path" value={diagnostics?.storage_file ?? "--"} breakAll />
+              <DiagnosticField label="File exists" value={diagnostics ? formatBoolean(diagnostics.file_exists) : "--"} />
+              <DiagnosticField label="File size" value={diagnostics ? formatFileSize(diagnostics.file_size_bytes) : "--"} />
+              <DiagnosticField label="Entries count" value={diagnostics ? String(diagnostics.entries_count) : "--"} />
+              <DiagnosticField label="Valid" value={diagnostics ? formatBoolean(diagnostics.valid) : "--"} />
+              {diagnostics?.warning && (
+                <DiagnosticField label="Warning" value={diagnostics.warning} breakAll />
+              )}
+              {diagnosticsError && (
+                <DiagnosticField label="Diagnostics detail" value={diagnosticsError} breakAll />
+              )}
+            </div>
+          </div>
+
+          <div
+            className="rounded-md p-3 space-y-3"
+            style={{ background: "var(--bg-raised)", border: "1px solid var(--border)" }}
+          >
+            <div>
+              <h4 className="text-xs font-bold text-primary">Reset local reviews</h4>
+              <p className="text-xs text-secondary">
+                Reset clears only local review status and analyst notes.
+              </p>
+              <p className="text-xs text-secondary">
+                It does not delete scanner output or market data.
+              </p>
+            </div>
+
+            <label className="block space-y-1">
+              <span className="section-label">Type RESET to confirm</span>
+              <input
+                className="ai-input max-w-[220px]"
+                value={resetConfirmation}
+                onChange={(event) => setResetConfirmation(event.target.value)}
+                placeholder="RESET"
+                autoComplete="off"
+              />
+            </label>
+
+            <button
+              type="button"
+              className="details-button"
+              onClick={handleResetLocalReviews}
+              disabled={resetConfirmation !== "RESET" || resetInProgress}
+            >
+              {resetInProgress ? "Resetting..." : "Reset local reviews"}
+            </button>
+
+            {resetStatus && (
+              <div
+                className="rounded-md px-3 py-2 text-xs"
+                style={{
+                  background: getResetStatusBackground(resetStatus.tone),
+                  border: getResetStatusBorder(resetStatus.tone),
+                  color: getResetStatusColor(resetStatus.tone),
+                }}
+              >
+                {resetStatus.message}
+              </div>
+            )}
+          </div>
+        </div>
       </section>
 
       <section className="space-y-2.5">
@@ -585,4 +734,57 @@ function getReviewStorageStatusColor(tone: ReviewStorageStatus["tone"]): string 
   if (tone === "ready") return "#32d184";
   if (tone === "warning" || tone === "error") return "#f5b84b";
   return "var(--text-secondary)";
+}
+
+function DiagnosticField({
+  label,
+  value,
+  breakAll = false,
+}: {
+  label: string;
+  value: string;
+  breakAll?: boolean;
+}) {
+  return (
+    <div className={breakAll ? "min-w-0 sm:col-span-2" : "min-w-0"}>
+      <div className="section-label mb-0.5">{label}</div>
+      <div className={`text-primary ${breakAll ? "break-all" : ""}`}>{value}</div>
+    </div>
+  );
+}
+
+function getDiagnosticsAvailabilityText(state: ReviewDiagnosticsState): string {
+  if (state.status === "ready") return "Available";
+  if (state.status === "loading") return "Refreshing";
+  if (state.status === "unavailable") return "Unavailable";
+  if (state.status === "error") return "Error";
+  return "Not loaded";
+}
+
+function formatBoolean(value: boolean): string {
+  return value ? "Yes" : "No";
+}
+
+function formatFileSize(value: number | null): string {
+  if (value === null) return "--";
+  if (value < 1024) return `${value} B`;
+  return `${(value / 1024).toFixed(1)} KB`;
+}
+
+function getResetStatusBackground(tone: ResetLocalReviewsStatus["tone"]): string {
+  if (tone === "success") return "rgba(50, 209, 132, 0.1)";
+  if (tone === "warning") return "rgba(245, 184, 75, 0.1)";
+  return "rgba(255, 94, 94, 0.1)";
+}
+
+function getResetStatusBorder(tone: ResetLocalReviewsStatus["tone"]): string {
+  if (tone === "success") return "1px solid rgba(50, 209, 132, 0.25)";
+  if (tone === "warning") return "1px solid rgba(245, 184, 75, 0.3)";
+  return "1px solid rgba(255, 94, 94, 0.25)";
+}
+
+function getResetStatusColor(tone: ResetLocalReviewsStatus["tone"]): string {
+  if (tone === "success") return "#32d184";
+  if (tone === "warning") return "#f5b84b";
+  return "#ff7b7b";
 }

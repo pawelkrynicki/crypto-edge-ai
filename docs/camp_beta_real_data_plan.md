@@ -221,6 +221,21 @@ tools/ui-mock/.local/review-session.json
 
 This is not a production backend. It does not add auth, SQLite, a database, production cron, new data sources, OpenAI, scraping, HTML parsing, browser automation, undocumented endpoints, scanner scoring changes, final-label changes, or WATCHLIST meaning changes. SQLite can be a future replaceable implementation behind the same UI workflow. UX2 Product-grade Interface Redesign remains a future required stage.
 
+## Review Storage Diagnostics / Reset Tools v1
+
+Stage 8B adds local/developer diagnostics and reset controls for Review Storage without changing scanner output or data sources.
+
+- `GET /api/review-session/diagnostics` returns file-backed review storage metadata.
+- Diagnostics include `source_kind`, `storage_file`, `checked_at`, `file_exists`, `file_size_bytes`, `entries_count`, `valid`, and optional `warning`.
+- Diagnostics do not return full review entries or analyst notes.
+- The Review Queue shows current app storage status, API diagnostics availability, storage file path, file existence, file size, entry count, validity, and warning state.
+- `Refresh diagnostics` reloads the diagnostics endpoint when the local API bridge is available and keeps the UI usable when it is unavailable.
+- `Reset local reviews` requires typing `RESET`.
+- Reset clears only local review status and analyst notes by applying an empty `ReviewSessionState` locally and attempting to mirror it with the existing `PUT /api/review-session`.
+- Reset does not delete scanner output, market data, approved context output, source files, or `tools/data-poc` output.
+
+This stage does not add SQLite, a database, auth, a production backend, production cron, new data sources, scraping, HTML parsing, browser automation, undocumented endpoints, OpenAI, scanner scoring changes, final-label changes, or WATCHLIST meaning changes.
+
 UX2 Product-grade Interface Redesign remains a future required stage before a final production interface. It should simplify, organize, and professionalize the UI after the current functional prototype stages.
 
 ## UX1 Professional Dashboard Redesign
