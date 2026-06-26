@@ -192,7 +192,7 @@ SQLite local preview:
 ..\..\scripts\win\dev-ui-sqlite.cmd
 ```
 
-File-backed JSON remains the default provider. SQLite is optional through `CRYPTO_EDGE_REVIEW_STORAGE_PROVIDER=sqlite`, with `CRYPTO_EDGE_REVIEW_SQLITE_PATH` available for a local `.sqlite` path. There is no automatic JSON-to-SQLite migration. Endpoint paths and UI workflow are unchanged.
+File-backed JSON remains the default provider. SQLite is optional through `CRYPTO_EDGE_REVIEW_STORAGE_PROVIDER=sqlite`, with `CRYPTO_EDGE_REVIEW_SQLITE_PATH` available for a local `.sqlite` path. The smoke checks use only dedicated files under `.local`: `review-session-smoke.json` and `review-session-smoke.sqlite`. They do not touch the normal `review-session.json` or `review-session.sqlite` files. There is no automatic JSON-to-SQLite migration. Endpoint paths and UI workflow are unchanged.
 
 ## Thin Scanner API POC
 

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { mkdir, rm } from "node:fs/promises";
 import type { AddressInfo } from "node:net";
-import { dirname, resolve } from "node:path";
+import { basename, dirname, isAbsolute, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createScannerApiServer } from "../server/scannerApiServer.js";
 import type { ReviewSessionState } from "../src/types/reviewSessionTypes.js";
@@ -159,7 +159,7 @@ function resolveStorageFile(mode: ReviewStorageMode): string {
     return resolve(localDir, "review-session-smoke.json");
   }
 
-  return resolve(process.env.CRYPTO_EDGE_REVIEW_SQLITE_PATH ?? resolve(localDir, "review-session-smoke.sqlite"));
+  return resolve(localDir, "review-session-smoke.sqlite");
 }
 
 async function assertNodeSqliteAvailable(): Promise<void> {
@@ -237,9 +237,25 @@ function close(server: ReturnType<typeof createScannerApiServer>): Promise<void>
 }
 
 async function removeStorageFile(storageFile: string): Promise<void> {
+  assertSmokeStorageFile(storageFile);
+
   await rm(storageFile, { force: true });
   await rm(`${storageFile}-shm`, { force: true });
   await rm(`${storageFile}-wal`, { force: true });
+}
+
+function assertSmokeStorageFile(storageFile: string): void {
+  const resolvedStorageFile = resolve(storageFile);
+  const resolvedLocalDir = resolve(localDir);
+  const pathFromLocalDir = relative(resolvedLocalDir, resolvedStorageFile);
+  const isUnderLocalDir = pathFromLocalDir.length > 0
+    && !pathFromLocalDir.startsWith("..")
+    && !isAbsolute(pathFromLocalDir);
+  const isSmokeFile = basename(resolvedStorageFile).includes("review-session-smoke");
+
+  if (!isUnderLocalDir || !isSmokeFile) {
+    throw new Error(`Refusing to remove non-smoke review storage file: ${resolvedStorageFile}`);
+  }
 }
 
 function restoreOptionalEnv(key: string, value: string | undefined): void {
