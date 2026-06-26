@@ -155,7 +155,7 @@ Allowed local review statuses:
 - Dismissed after review
 - Waiting for more data
 
-This remains a local/developer work organization layer. It does not add a production backend, database, SQLite, auth, production cron, OpenAI call, data source, scraping, HTML parsing, browser automation, or undocumented endpoint. The only write path is the local development API bridge. It does not change scanner scoring, final labels, or WATCHLIST meaning.
+This remains a local/developer work organization layer. It does not add a production backend, auth, production cron, OpenAI call, data source, scraping, HTML parsing, browser automation, or undocumented endpoint. The only write path is the local development API bridge. Optional SQLite review storage is added later in Stage 8D behind the local API provider interface. It does not change scanner scoring, final labels, or WATCHLIST meaning.
 
 The Scanner Radar table shows a small Review badge separate from the scanner Label column. The radar also includes a Follow-up filter based only on the local `Saved for follow-up` review status.
 
@@ -178,7 +178,7 @@ The workspace has two separate sections:
 
 The local queue shows saved follow-up, needs-more-research, waiting-data, and dismissed-after-review statuses with note preview, last-updated timestamp, scanner label, reason, and quick access back to Scanner Radar details. Review status remains visually separate from scanner label.
 
-This uses the local API file-backed store when available and keeps the existing `crypto-edge-ai.review-session.v1` localStorage model as fallback. It does not add a production backend, database, SQLite, auth, new source, scraper, HTML parser, browser automation, undocumented endpoint, OpenAI call, production cron, scanner scoring change, final-label change, or WATCHLIST meaning change. Stored local reviews whose candidate is not present in the current scanner output are shown separately and can be cleared.
+This uses the local API review storage provider when available and keeps the existing `crypto-edge-ai.review-session.v1` localStorage model as fallback. File-backed JSON remains the default provider; SQLite is optional in Stage 8D. It does not add a production backend, auth, new source, scraper, HTML parser, browser automation, undocumented endpoint, OpenAI call, production cron, scanner scoring change, final-label change, or WATCHLIST meaning change. Stored local reviews whose candidate is not present in the current scanner output are shown separately and can be cleared.
 
 Review Queue compliance copy:
 
@@ -202,7 +202,7 @@ Stage 7D adds a small backup flow for the local review session in `tools/ui-mock
 
 ## Persistent Review Storage API v1
 
-Stage 8A moves the review session from browser-only storage toward durable local storage without adding SQLite or a database.
+Stage 8A moves the review session from browser-only storage toward durable local file-backed JSON storage. Stage 8D adds optional SQLite later behind the same provider workflow.
 
 - `GET /api/review-session` returns `ReviewSessionState` plus `_source_meta`.
 - `PUT /api/review-session` validates `version` and entries before writing.
@@ -219,7 +219,7 @@ The storage file is ignored by git:
 tools/ui-mock/.local/review-session.json
 ```
 
-This is not a production backend. It does not add auth, SQLite, a database, production cron, new data sources, OpenAI, scraping, HTML parsing, browser automation, undocumented endpoints, scanner scoring changes, final-label changes, or WATCHLIST meaning changes. SQLite can be a future replaceable implementation behind the same UI workflow. UX2 Product-grade Interface Redesign remains a future required stage.
+This is not a production backend. It does not add auth, production cron, new data sources, OpenAI, scraping, HTML parsing, browser automation, undocumented endpoints, scanner scoring changes, final-label changes, or WATCHLIST meaning changes. File-backed JSON remains the default provider; Stage 8D adds optional SQLite behind the same UI workflow. UX2 Product-grade Interface Redesign remains a future required stage.
 
 ## Review Storage Diagnostics / Reset Tools v1
 
@@ -246,9 +246,26 @@ Stage 8C moves Review Storage access behind a `ReviewSessionStorageProvider` int
 - The current file-backed JSON store remains the default provider implementation.
 - `GET /api/review-session`, `PUT /api/review-session`, and `GET /api/review-session/diagnostics` use the provider instead of calling file-backed storage functions directly.
 - The existing `reviewSession: { storageFilePath }` server option remains supported for local tests and development.
-- SQLite can become a future provider implementation without rebuilding the UI workflow or endpoint paths.
+- SQLite is available in Stage 8D as an optional provider implementation without rebuilding the UI workflow or endpoint paths.
 
-This is a technical refactor only. SQLite is not added in this stage. No database, auth, production backend, production cron, new data source, scraping, HTML parsing, browser automation, undocumented endpoint, OpenAI call, scanner scoring change, final-label change, or WATCHLIST meaning change is added.
+This is a technical refactor only. No auth, production backend, production cron, new data source, scraping, HTML parsing, browser automation, undocumented endpoint, OpenAI call, scanner scoring change, final-label change, or WATCHLIST meaning change is added.
+
+## SQLite Review Storage Provider v1
+
+Stage 8D adds SQLite as an optional second `ReviewSessionStorageProvider` implementation for the local UI mock API bridge.
+
+- File-backed JSON remains the default provider.
+- SQLite is enabled only by env configuration: `CRYPTO_EDGE_REVIEW_STORAGE_PROVIDER=sqlite`.
+- The optional SQLite path override is `CRYPTO_EDGE_REVIEW_SQLITE_PATH`.
+- The default SQLite file is `tools/ui-mock/.local/review-session.sqlite`.
+- There is no automatic migration from JSON review storage to SQLite review storage.
+- The existing endpoints remain unchanged: `GET /api/review-session`, `PUT /api/review-session`, and `GET /api/review-session/diagnostics`.
+- The UI workflow remains unchanged: `localStorage` starts the app, the local API is attempted, saves/import/reset mirror through the API when available, and browser fallback remains.
+- SQLite diagnostics report storage metadata, file existence, file size, entry count, validity, and optional warning only. They do not return full entries or analyst notes.
+- Corrupt SQLite files are reported as invalid diagnostics instead of crashing the server.
+- `reviewSessionProvider` passed to `createScannerApiServer` remains the highest-priority provider override.
+
+This stage adds no npm dependency, auth, production backend, production cron, new data source, scraping, HTML parsing, browser automation, undocumented endpoint, OpenAI call, scanner scoring change, final-label change, or WATCHLIST meaning change.
 
 UX2 Product-grade Interface Redesign remains a future required stage before a final production interface. It should simplify, organize, and professionalize the UI after the current functional prototype stages.
 

@@ -7,10 +7,8 @@ import {
   readLatestScannerOutput,
   ScannerOutputError,
 } from "./latestScannerOutput.js";
-import {
-  createFileReviewSessionStorageProvider,
-  type ReviewSessionFileStoreOptions,
-} from "./reviewSessionFileStore.js";
+import type { ReviewSessionFileStoreOptions } from "./reviewSessionFileStore.js";
+import { createConfiguredReviewSessionStorageProvider } from "./reviewSessionProviderConfig.js";
 import {
   ReviewSessionStorageProviderError,
   type ReviewSessionStorageProvider,
@@ -35,7 +33,9 @@ export type ScannerApiServerOptions = {
 
 export function createScannerApiServer(options: ScannerApiServerOptions = {}) {
   const reviewSessionProvider = options.reviewSessionProvider
-    ?? createFileReviewSessionStorageProvider(options.reviewSession);
+    ?? createConfiguredReviewSessionStorageProvider({
+      reviewSession: options.reviewSession,
+    });
 
   return createServer(async (req, res) => {
     const path = getRequestPath(req.url);

@@ -3,15 +3,23 @@ import { validateReviewSessionState } from "./reviewSessionValidation";
 
 export type ReviewSessionApiStatus = "ready" | "unavailable" | "error";
 
+export type ReviewSessionApiSourceKind =
+  | "file-backed-review-session"
+  | "sqlite-review-session";
+
+export type ReviewSessionDiagnosticsSourceKind =
+  | "file-backed-review-session-diagnostics"
+  | "sqlite-review-session-diagnostics";
+
 export type ReviewSessionApiSourceMeta = {
-  source_kind: "file-backed-review-session";
+  source_kind: ReviewSessionApiSourceKind;
   storage_file: string;
   loaded_at: string;
   warning?: string;
 };
 
 export type ReviewSessionDiagnostics = {
-  source_kind: "file-backed-review-session-diagnostics";
+  source_kind: ReviewSessionDiagnosticsSourceKind;
   storage_file: string;
   checked_at: string;
   file_exists: boolean;
@@ -113,9 +121,10 @@ function parseReviewSessionDiagnosticsApiResponse(value: unknown): ReviewSession
 
   const fileSize = value.file_size_bytes;
   const warning = value.warning;
+  const sourceKind = value.source_kind;
 
   if (
-    value.source_kind !== "file-backed-review-session-diagnostics"
+    !isDiagnosticsSourceKind(sourceKind)
     || typeof value.storage_file !== "string"
     || typeof value.checked_at !== "string"
     || typeof value.file_exists !== "boolean"
@@ -130,7 +139,7 @@ function parseReviewSessionDiagnosticsApiResponse(value: unknown): ReviewSession
   }
 
   return {
-    source_kind: "file-backed-review-session-diagnostics",
+    source_kind: sourceKind,
     storage_file: value.storage_file,
     checked_at: value.checked_at,
     file_exists: value.file_exists,
@@ -204,7 +213,7 @@ function getSourceMeta(value: unknown): ReviewSessionApiSourceMeta | null {
   const meta = value._source_meta;
 
   if (
-    meta.source_kind !== "file-backed-review-session"
+    !isApiSourceKind(meta.source_kind)
     || typeof meta.storage_file !== "string"
     || typeof meta.loaded_at !== "string"
   ) {
@@ -212,11 +221,20 @@ function getSourceMeta(value: unknown): ReviewSessionApiSourceMeta | null {
   }
 
   return {
-    source_kind: "file-backed-review-session",
+    source_kind: meta.source_kind,
     storage_file: meta.storage_file,
     loaded_at: meta.loaded_at,
     ...(typeof meta.warning === "string" ? { warning: meta.warning } : {}),
   };
+}
+
+function isApiSourceKind(value: unknown): value is ReviewSessionApiSourceKind {
+  return value === "file-backed-review-session" || value === "sqlite-review-session";
+}
+
+function isDiagnosticsSourceKind(value: unknown): value is ReviewSessionDiagnosticsSourceKind {
+  return value === "file-backed-review-session-diagnostics"
+    || value === "sqlite-review-session-diagnostics";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
