@@ -236,6 +236,20 @@ Stage 8B adds local/developer diagnostics and reset controls for Review Storage 
 
 This stage does not add SQLite, a database, auth, a production backend, production cron, new data sources, scraping, HTML parsing, browser automation, undocumented endpoints, OpenAI, scanner scoring changes, final-label changes, or WATCHLIST meaning changes.
 
+## Storage Provider Abstraction / SQLite-ready Layer v1
+
+Stage 8C moves Review Storage access behind a `ReviewSessionStorageProvider` interface.
+
+- The provider supports reading `ReviewSessionState`.
+- The provider supports writing validated review session state.
+- The provider supports diagnostics for the current review storage implementation.
+- The current file-backed JSON store remains the default provider implementation.
+- `GET /api/review-session`, `PUT /api/review-session`, and `GET /api/review-session/diagnostics` use the provider instead of calling file-backed storage functions directly.
+- The existing `reviewSession: { storageFilePath }` server option remains supported for local tests and development.
+- SQLite can become a future provider implementation without rebuilding the UI workflow or endpoint paths.
+
+This is a technical refactor only. SQLite is not added in this stage. No database, auth, production backend, production cron, new data source, scraping, HTML parsing, browser automation, undocumented endpoint, OpenAI call, scanner scoring change, final-label change, or WATCHLIST meaning change is added.
+
 UX2 Product-grade Interface Redesign remains a future required stage before a final production interface. It should simplify, organize, and professionalize the UI after the current functional prototype stages.
 
 ## UX1 Professional Dashboard Redesign

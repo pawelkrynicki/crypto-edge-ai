@@ -38,10 +38,14 @@ import { createScannerApiServer } from "../server/scannerApiServer";
 import { readLatestContextOutput, type ContextLatestOutput } from "../server/latestContextOutput";
 import { isPersistableScannerOutputShape } from "../server/latestScannerOutput";
 import {
+  createFileReviewSessionStorageProvider,
+  ReviewSessionFileStoreError,
   readReviewSessionDiagnostics,
   readReviewSessionFile,
   writeReviewSessionFile,
 } from "../server/reviewSessionFileStore";
+import type { ReviewSessionStorageProvider } from "../server/reviewSessionStorageProvider";
+import { validateReviewSessionState } from "../src/services/reviewSessionValidation";
 
 const realFixture = PERSISTABLE_SCANNER_SAMPLE;
 const uiCandidates = mapPersistableScannerOutputToUiCandidates(realFixture);
@@ -247,6 +251,25 @@ assert.equal(passMockCandidate.final_label, "WATCHLIST", "saving review status d
 const reviewFileTempRoot = await mkdtemp(resolve(tmpdir(), "crypto-edge-review-file-"));
 try {
   const storageFilePath = resolve(reviewFileTempRoot, "review-session.json");
+  const fileBackedProvider = createFileReviewSessionStorageProvider({ storageFilePath });
+  const missingProviderState = await fileBackedProvider.read();
+
+  assert.deepEqual(
+    missingProviderState.state,
+    createEmptyReviewSession(),
+    "file-backed provider returns empty state when the file does not exist",
+  );
+
+  const missingProviderDiagnostics = await fileBackedProvider.diagnostics();
+
+  assert.equal(
+    missingProviderDiagnostics.file_exists,
+    false,
+    "file-backed provider diagnostics reports missing file",
+  );
+  assert.equal(missingProviderDiagnostics.valid, true, "file-backed provider treats missing file as valid empty state");
+  assert.equal(missingProviderDiagnostics.entries_count, 0, "file-backed provider diagnostics reports zero entries");
+
   const missingFileDiagnostics = await readReviewSessionDiagnostics({ storageFilePath });
 
   assert.equal(
@@ -275,12 +298,25 @@ try {
     "file-backed review storage includes source metadata",
   );
 
+  await fileBackedProvider.write(savedReviewState);
+  const providerReloadedState = await fileBackedProvider.read();
+
+  assert.deepEqual(
+    providerReloadedState.state,
+    savedReviewState,
+    "file-backed provider writes and reloads ReviewSessionState",
+  );
+
   await writeReviewSessionFile(savedReviewState, { storageFilePath });
   const validFileDiagnostics = await readReviewSessionDiagnostics({ storageFilePath });
+  const validProviderDiagnostics = await fileBackedProvider.diagnostics();
 
   assert.equal(validFileDiagnostics.file_exists, true, "review storage diagnostics reports existing file");
   assert.equal(validFileDiagnostics.valid, true, "review storage diagnostics reports valid review file");
   assert.equal(validFileDiagnostics.entries_count, 1, "review storage diagnostics counts entries");
+  assert.equal(validProviderDiagnostics.file_exists, true, "file-backed provider diagnostics reports existing file");
+  assert.equal(validProviderDiagnostics.valid, true, "file-backed provider diagnostics reports valid review file");
+  assert.equal(validProviderDiagnostics.entries_count, 1, "file-backed provider diagnostics counts entries");
   assert.equal(
     typeof validFileDiagnostics.file_size_bytes,
     "number",
@@ -296,8 +332,17 @@ try {
   );
 
   await writeFile(storageFilePath, "{ invalid json", "utf8");
+  const corruptProviderDiagnostics = await fileBackedProvider.diagnostics();
   const corruptFileDiagnostics = await readReviewSessionDiagnostics({ storageFilePath });
 
+  assert.equal(corruptProviderDiagnostics.file_exists, true, "corrupt file-backed provider diagnostics reports existing file");
+  assert.equal(corruptProviderDiagnostics.valid, false, "corrupt file-backed provider diagnostics reports invalid file");
+  assert.equal(corruptProviderDiagnostics.entries_count, 0, "corrupt file-backed provider diagnostics reports zero entries");
+  assert.match(
+    corruptProviderDiagnostics.warning ?? "",
+    /could not be read or parsed|must be a JSON object/i,
+    "corrupt file-backed provider diagnostics includes warning",
+  );
   assert.equal(corruptFileDiagnostics.file_exists, true, "corrupt review storage diagnostics reports existing file");
   assert.equal(corruptFileDiagnostics.valid, false, "corrupt review storage diagnostics reports invalid file");
   assert.equal(corruptFileDiagnostics.entries_count, 0, "corrupt review storage diagnostics reports zero entries");
@@ -784,6 +829,109 @@ try {
   await rm(reviewApiTempRoot, { recursive: true, force: true });
 }
 
+let fakeProviderState = createEmptyReviewSession();
+let fakeProviderWriteCount = 0;
+const fakeReviewSessionProvider: ReviewSessionStorageProvider = {
+  async read() {
+    return createFakeProviderResult(fakeProviderState);
+  },
+  async write(nextState: unknown) {
+    const validation = validateReviewSessionState(nextState, "Review session");
+
+    if (!validation.ok) {
+      throw new ReviewSessionFileStoreError("invalid_review_session", validation.error);
+    }
+
+    fakeProviderState = validation.state;
+    fakeProviderWriteCount += 1;
+    return createFakeProviderResult(fakeProviderState);
+  },
+  async diagnostics() {
+    return {
+      source_kind: "file-backed-review-session-diagnostics",
+      storage_file: "memory://review-session",
+      checked_at: "2026-06-26T00:00:00.000Z",
+      file_exists: true,
+      file_size_bytes: null,
+      entries_count: Object.keys(fakeProviderState.entries).length,
+      valid: true,
+    };
+  },
+};
+const providerServer = createScannerApiServer({
+  reviewSessionProvider: fakeReviewSessionProvider,
+});
+await new Promise<void>((resolveListen) => providerServer.listen(0, "127.0.0.1", resolveListen));
+
+try {
+  const address = providerServer.address() as AddressInfo;
+  const baseUrl = `http://127.0.0.1:${address.port}`;
+  const providerInitialResponse = await getJson(`${baseUrl}/api/review-session`) as ReviewSessionState & {
+    _source_meta: { source_kind: string; storage_file: string };
+  };
+
+  assert.deepEqual(
+    { version: providerInitialResponse.version, entries: providerInitialResponse.entries },
+    createEmptyReviewSession(),
+    "GET /api/review-session reads through reviewSessionProvider",
+  );
+  assert.equal(
+    providerInitialResponse._source_meta.storage_file,
+    "memory://review-session",
+    "GET /api/review-session can use a non-file-backed provider",
+  );
+
+  const providerPutResponse = await requestJson(`${baseUrl}/api/review-session`, {
+    method: "PUT",
+    body: savedReviewState,
+  });
+  const providerPutBody = providerPutResponse.body as ReviewSessionState & {
+    _source_meta: { source_kind: string; storage_file: string };
+  };
+
+  assert.equal(providerPutResponse.statusCode, 200, "PUT /api/review-session writes through reviewSessionProvider");
+  assert.deepEqual(
+    { version: providerPutBody.version, entries: providerPutBody.entries },
+    savedReviewState,
+    "PUT /api/review-session returns provider-saved state",
+  );
+  assert.equal(fakeProviderWriteCount, 1, "PUT /api/review-session calls provider write once");
+  assert.deepEqual(fakeProviderState, savedReviewState, "provider state is updated after valid PUT");
+
+  const providerDiagnosticsResponse = await getJson(`${baseUrl}/api/review-session/diagnostics`) as Record<string, unknown>;
+
+  assert.equal(
+    providerDiagnosticsResponse.storage_file,
+    "memory://review-session",
+    "GET /api/review-session/diagnostics reads through reviewSessionProvider",
+  );
+  assert.equal(providerDiagnosticsResponse.entries_count, 1, "provider diagnostics returns current entry count");
+  assert.equal(
+    JSON.stringify(providerDiagnosticsResponse).includes('"entries"'),
+    false,
+    "provider diagnostics endpoint still omits review entries",
+  );
+
+  const invalidProviderPutResponse = await requestJson(`${baseUrl}/api/review-session`, {
+    method: "PUT",
+    body: {
+      version: 2,
+      entries: {},
+    },
+  });
+
+  assert.equal(invalidProviderPutResponse.statusCode, 400, "provider-backed PUT rejects invalid state");
+  assert.equal(fakeProviderWriteCount, 1, "invalid provider-backed PUT does not count as a write");
+  assert.deepEqual(fakeProviderState, savedReviewState, "invalid provider-backed PUT does not overwrite provider state");
+} finally {
+  await new Promise<void>((resolveClose, rejectClose) => {
+    providerServer.close((error) => {
+      if (error) rejectClose(error);
+      else resolveClose();
+    });
+  });
+}
+
 const contextTempRoot = await mkdtemp(resolve(tmpdir(), "crypto-edge-context-api-"));
 try {
   const outputDir = resolve(contextTempRoot, "output");
@@ -1037,6 +1185,17 @@ function requestJson(
     httpRequest.write(JSON.stringify(options.body));
     httpRequest.end();
   });
+}
+
+function createFakeProviderResult(state: ReviewSessionState) {
+  return {
+    state,
+    _source_meta: {
+      source_kind: "file-backed-review-session" as const,
+      storage_file: "memory://review-session",
+      loaded_at: "2026-06-26T00:00:00.000Z",
+    },
+  };
 }
 
 function createMemoryStorage(initial: Record<string, string> = {}): StorageLike {

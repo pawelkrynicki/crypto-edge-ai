@@ -177,6 +177,17 @@ Review Storage Diagnostics / Reset Tools v1:
 - This adds no SQLite, database, auth, production backend, production cron, new source, scraper, HTML parser, browser automation, undocumented endpoint, OpenAI call, scanner scoring change, final-label change, or WATCHLIST meaning change.
 - UX2 Product-grade Interface Redesign remains a future required stage.
 
+Storage Provider Abstraction / SQLite-ready Layer v1:
+
+- Stage 8C adds a `ReviewSessionStorageProvider` interface for review reads, writes, and diagnostics.
+- The current file-backed JSON storage remains the default provider implementation.
+- `GET /api/review-session`, `PUT /api/review-session`, and `GET /api/review-session/diagnostics` use the provider.
+- The existing `reviewSession: { storageFilePath }` server option remains compatible.
+- A fake provider is used only in lightweight tests to confirm endpoint behavior is provider-backed.
+- SQLite can be a future provider implementation, but SQLite is not added in this stage.
+- This adds no database, auth, production backend, production cron, new source, scraper, HTML parser, browser automation, undocumented endpoint, OpenAI call, scanner scoring change, final-label change, or WATCHLIST meaning change.
+- UX2 Product-grade Interface Redesign remains a future required stage.
+
 Paid and clarification-dependent sources remain deferred:
 
 - CoinGecko Analyst: first paid market/onchain candidate.
