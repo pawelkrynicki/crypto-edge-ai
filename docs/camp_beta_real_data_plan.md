@@ -126,12 +126,25 @@ The Candidate Detail panel includes a Local Review Session with:
 - Local review status.
 - Analyst note.
 - Last-updated timestamp.
-- Clear wording that the review layer is saved in the current browser only.
+- Clear wording that the review layer uses local storage only and does not change scanner labels.
 
-The state is stored in browser `localStorage` under:
+The browser fallback state is stored in `localStorage` under:
 
 ```text
 crypto-edge-ai.review-session.v1
+```
+
+Stage 8A adds Persistent Review Storage API v1 as a transitional local API bridge layer. It stores the same `ReviewSessionState` as file-backed JSON at:
+
+```text
+tools/ui-mock/.local/review-session.json
+```
+
+The local API endpoints are:
+
+```text
+GET /api/review-session
+PUT /api/review-session
 ```
 
 Allowed local review statuses:
@@ -142,21 +155,21 @@ Allowed local review statuses:
 - Dismissed after review
 - Waiting for more data
 
-This remains a UI-only work organization layer. It does not add a backend, database, auth, API write path, production cron, OpenAI call, data source, scraping, HTML parsing, browser automation, or undocumented endpoint. It does not change scanner scoring, final labels, or WATCHLIST meaning.
+This remains a local/developer work organization layer. It does not add a production backend, database, SQLite, auth, production cron, OpenAI call, data source, scraping, HTML parsing, browser automation, or undocumented endpoint. The only write path is the local development API bridge. It does not change scanner scoring, final labels, or WATCHLIST meaning.
 
 The Scanner Radar table shows a small Review badge separate from the scanner Label column. The radar also includes a Follow-up filter based only on the local `Saved for follow-up` review status.
 
 Review panel compliance copy:
 
 ```text
-Local review is saved only in this browser.
+Local review workspace only.
 This does not change scanner label.
 This is not a buy/sell signal.
 ```
 
 ## Review Queue / Follow-up Workspace
 
-Stage 7C extends the `tools/ui-mock` Watchlist tab into a browser-local Review Queue / Follow-up Workspace for analysts.
+Stage 7C extends the `tools/ui-mock` Watchlist tab into a local Review Queue / Follow-up Workspace for analysts.
 
 The workspace has two separate sections:
 
@@ -165,26 +178,48 @@ The workspace has two separate sections:
 
 The local queue shows saved follow-up, needs-more-research, waiting-data, and dismissed-after-review statuses with note preview, last-updated timestamp, scanner label, reason, and quick access back to Scanner Radar details. Review status remains visually separate from scanner label.
 
-This uses the existing `crypto-edge-ai.review-session.v1` localStorage model. It does not add a backend, database, auth, API write path, new source, scraper, HTML parser, browser automation, undocumented endpoint, OpenAI call, production cron, scanner scoring change, final-label change, or WATCHLIST meaning change. Stored local reviews whose candidate is not present in the current scanner output are shown separately and can be cleared.
+This uses the local API file-backed store when available and keeps the existing `crypto-edge-ai.review-session.v1` localStorage model as fallback. It does not add a production backend, database, SQLite, auth, new source, scraper, HTML parser, browser automation, undocumented endpoint, OpenAI call, production cron, scanner scoring change, final-label change, or WATCHLIST meaning change. Stored local reviews whose candidate is not present in the current scanner output are shown separately and can be cleared.
 
 Review Queue compliance copy:
 
 ```text
-Local review is saved only in this browser.
+Review storage uses the local API when available, with browser localStorage fallback.
 Review status does not change scanner labels.
 This is not a buy/sell signal.
 ```
 
 ## Review Export / Import Backup
 
-Stage 7D adds a small browser-only backup flow for the local review session in `tools/ui-mock`.
+Stage 7D adds a small backup flow for the local review session in `tools/ui-mock`.
 
 - Export writes the current `crypto-edge-ai.review-session.v1` local review status and analyst notes to a JSON file.
 - Import reads a JSON backup in the browser and validates version and entries before applying it.
+- Import updates `localStorage` and attempts to mirror the imported state to `PUT /api/review-session`.
 - Merge mode keeps existing local entries and lets imported entries overwrite conflicts by `candidate_id`.
 - Replace mode substitutes the current local review session with the imported state.
 - The backup does not include scanner output or market data.
-- The flow adds no backend, database, auth, API write path, new data source, scraper, HTML parser, browser automation, undocumented endpoint, OpenAI call, production cron, scanner scoring change, final-label change, or WATCHLIST meaning change.
+- The flow adds no production backend, database, SQLite, auth, new data source, scraper, HTML parser, browser automation, undocumented endpoint, OpenAI call, production cron, scanner scoring change, final-label change, or WATCHLIST meaning change.
+
+## Persistent Review Storage API v1
+
+Stage 8A moves the review session from browser-only storage toward durable local storage without adding SQLite or a database.
+
+- `GET /api/review-session` returns `ReviewSessionState` plus `_source_meta`.
+- `PUT /api/review-session` validates `version` and entries before writing.
+- Invalid PUT payloads return status 400 and do not overwrite the existing storage file.
+- Missing storage file returns an empty review session.
+- Corrupt or invalid storage file returns an empty review session plus `_source_meta.warning`.
+- Writes use a temporary file followed by rename.
+- The UI starts from `localStorage`, then loads the API state if available.
+- Save, clear, and import update `localStorage` first and then attempt to persist through the local API.
+
+The storage file is ignored by git:
+
+```text
+tools/ui-mock/.local/review-session.json
+```
+
+This is not a production backend. It does not add auth, SQLite, a database, production cron, new data sources, OpenAI, scraping, HTML parsing, browser automation, undocumented endpoints, scanner scoring changes, final-label changes, or WATCHLIST meaning changes. SQLite can be a future replaceable implementation behind the same UI workflow. UX2 Product-grade Interface Redesign remains a future required stage.
 
 UX2 Product-grade Interface Redesign remains a future required stage before a final production interface. It should simplify, organize, and professionalize the UI after the current functional prototype stages.
 

@@ -41,3 +41,4 @@ Thumbs.db
 coverage/
 htmlcov/
 tools/data-poc/output/
+tools/ui-mock/.local/

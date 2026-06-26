@@ -19,6 +19,12 @@ import {
   saveReviewRecord,
   saveReviewSessionState,
 } from "./services/reviewSessionStore";
+import {
+  loadReviewSessionFromApi,
+  saveReviewSessionToApi,
+  type ReviewSessionApiResult,
+  type ReviewSessionApiSourceMeta,
+} from "./services/reviewSessionApi";
 import { mapPersistableScannerOutputToUiCandidates } from "./adapters/scannerOutputAdapter";
 import { toMockCandidate, type MockCandidate } from "./mockData";
 import type { CandidateReviewInput, ReviewSessionState } from "./types/reviewSessionTypes";
@@ -67,6 +73,17 @@ const SOURCE_STATUS_TEXT: Record<ResolvedScannerSource, string> = {
   "fixture-fallback": "API fallback to fixture",
 };
 
+type ReviewStorageStatus = {
+  tone: "ready" | "fallback" | "warning" | "error";
+  text: string;
+  detail?: string;
+};
+
+const INITIAL_REVIEW_STORAGE_STATUS: ReviewStorageStatus = {
+  tone: "fallback",
+  text: "Review storage: browser fallback",
+};
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabId>("scanner");
 
@@ -77,6 +94,7 @@ export default function App() {
   const [fallbackMsg, setFallbackMsg] = useState<string | null>(null);
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null | undefined>(undefined);
   const [reviewSession, setReviewSession] = useState<ReviewSessionState>(() => loadReviewSession());
+  const [reviewStorageStatus, setReviewStorageStatus] = useState<ReviewStorageStatus>(INITIAL_REVIEW_STORAGE_STATUS);
   const [marketContextState, setMarketContextState] = useState<MarketContextPanelState>({
     status: "loading",
     context: null,
@@ -133,22 +151,59 @@ export default function App() {
     loadMarketContext();
   }, [loadMarketContext]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    loadReviewSessionFromApi().then((result) => {
+      if (cancelled) return;
+
+      if (result.status === "ready") {
+        setReviewSession(saveReviewSessionState(result.state));
+        setReviewStorageStatus(getReadyReviewStorageStatus(result.sourceMeta));
+        return;
+      }
+
+      setReviewStorageStatus(getFallbackReviewStorageStatus(result));
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const syncReviewSessionToApi = useCallback((state: ReviewSessionState) => {
+    void saveReviewSessionToApi(state).then((result) => {
+      if (result.status === "ready") {
+        setReviewStorageStatus(getReadyReviewStorageStatus(result.sourceMeta));
+        return;
+      }
+
+      setReviewStorageStatus(getFallbackReviewStorageStatus(result));
+    });
+  }, []);
+
   const handleSourceChange = (source: DataSourceKey) => {
     setDataSource(source);
     loadData(source);
   };
 
   const handleSaveReview = useCallback((input: CandidateReviewInput) => {
-    setReviewSession(saveReviewRecord(input));
-  }, []);
+    const nextState = saveReviewRecord(input);
+    setReviewSession(nextState);
+    syncReviewSessionToApi(nextState);
+  }, [syncReviewSessionToApi]);
 
   const handleClearReview = useCallback((candidateId: string) => {
-    setReviewSession(clearReviewRecord(candidateId));
-  }, []);
+    const nextState = clearReviewRecord(candidateId);
+    setReviewSession(nextState);
+    syncReviewSessionToApi(nextState);
+  }, [syncReviewSessionToApi]);
 
   const handleImportReviewSession = useCallback((nextState: ReviewSessionState) => {
-    setReviewSession(saveReviewSessionState(nextState));
-  }, []);
+    const savedState = saveReviewSessionState(nextState);
+    setReviewSession(savedState);
+    syncReviewSessionToApi(savedState);
+  }, [syncReviewSessionToApi]);
 
   const handleOpenCandidate = useCallback((candidateId: string) => {
     setSelectedCandidateId(candidateId);
@@ -184,6 +239,7 @@ export default function App() {
           <WatchlistTab
             candidates={candidates}
             reviewSession={reviewSession}
+            reviewStorageStatus={reviewStorageStatus}
             onClearReview={handleClearReview}
             onOpenCandidate={handleOpenCandidate}
             onImportReviewSession={handleImportReviewSession}
@@ -271,4 +327,35 @@ export default function App() {
       </footer>
     </div>
   );
+}
+
+function getReadyReviewStorageStatus(sourceMeta: ReviewSessionApiSourceMeta | null): ReviewStorageStatus {
+  if (sourceMeta?.warning) {
+    return {
+      tone: "warning",
+      text: "Review storage: local API warning",
+      detail: sourceMeta.warning,
+    };
+  }
+
+  return {
+    tone: "ready",
+    text: "Review storage: local API",
+  };
+}
+
+function getFallbackReviewStorageStatus(result: Exclude<ReviewSessionApiResult, { status: "ready" }>): ReviewStorageStatus {
+  if (result.status === "unavailable") {
+    return {
+      tone: "fallback",
+      text: "Review storage: API unavailable, using browser localStorage",
+      detail: result.error,
+    };
+  }
+
+  return {
+    tone: "error",
+    text: "Review storage: API error, using browser localStorage",
+    detail: result.error,
+  };
 }
