@@ -124,6 +124,7 @@ Windows helper scripts:
 - `scripts\win\check-review-storage-file.cmd` checks the default file-backed JSON Review Storage provider.
 - `scripts\win\check-review-storage-sqlite.cmd` checks the optional SQLite Review Storage provider.
 - `scripts\win\check-review-storage-modes.cmd` checks both Review Storage modes.
+- `scripts\win\check-local-workflow-smoke.cmd` checks the local MVP workflow from scanner latest output through UI candidates, context latest output, review storage, diagnostics, and review export/import.
 - `scripts\win\dev-ui-sqlite.cmd` starts the local API and frontend preview with SQLite Review Storage enabled.
 
 Local Review Session:
@@ -213,6 +214,17 @@ Review Storage Mode DX / Smoke Scripts v1:
 - The smoke runner starts `createScannerApiServer` on a random local port, uses temporary `.local` storage, checks existing review endpoints, rejects invalid writes, and verifies diagnostics omit entries and analyst notes.
 - File-backed JSON remains the default provider. SQLite remains optional through env configuration. No JSON-to-SQLite migration is performed.
 - This stage does not change endpoint paths, UI workflow, scanner scoring, final labels, or WATCHLIST meaning.
+- UX2 Product-grade Interface Redesign remains a future required stage.
+
+Local End-to-End Workflow Smoke v1:
+
+- Add `tools/ui-mock/scripts/localWorkflowSmoke.ts` and `scripts\win\check-local-workflow-smoke.cmd`.
+- Start the existing local API on a random `127.0.0.1` port.
+- Check `GET /api/health`, `GET /api/scanner/latest`, `GET /api/scanner/sources`, `GET /api/context/latest`, `GET /api/review-session`, `PUT /api/review-session`, and `GET /api/review-session/diagnostics`.
+- Parse scanner latest output through the existing service/adapter path into UI candidates without changing scoring or final labels.
+- Parse market context latest output through the existing context service path, accepting real local output or fixture fallback.
+- Verify review session storage, diagnostics safety, invalid PUT rejection, export/import helpers, and server-render smoke coverage for Market Context, Candidate Detail, and Review Queue paths.
+- Use only local API calls and local fixture/real-output files. Do not call external networks, mutate scanner output, mutate market data, add sources, change endpoint paths, change UI workflow, change scanner scoring, change final labels, or change WATCHLIST meaning.
 - UX2 Product-grade Interface Redesign remains a future required stage.
 
 Paid and clarification-dependent sources remain deferred:
