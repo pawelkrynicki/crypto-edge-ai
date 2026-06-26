@@ -121,6 +121,10 @@ Windows helper scripts:
 - `scripts\win\post-merge-check.cmd` syncs `main` and runs the data POC and UI mock verification flow after a merge.
 - `scripts\win\generate-live-context.cmd` generates approved live context for the local preview.
 - `scripts\win\dev-ui.cmd` starts the local API and frontend preview.
+- `scripts\win\check-review-storage-file.cmd` checks the default file-backed JSON Review Storage provider.
+- `scripts\win\check-review-storage-sqlite.cmd` checks the optional SQLite Review Storage provider.
+- `scripts\win\check-review-storage-modes.cmd` checks both Review Storage modes.
+- `scripts\win\dev-ui-sqlite.cmd` starts the local API and frontend preview with SQLite Review Storage enabled.
 
 Local Review Session:
 
@@ -200,6 +204,15 @@ SQLite Review Storage Provider v1:
 - UI workflow remains unchanged: browser `localStorage` starts the app, local API sync is attempted, and fallback remains.
 - SQLite diagnostics do not expose full entries or analyst notes.
 - This adds no new npm dependency, auth, production backend, production cron, new source, scraper, HTML parser, browser automation, undocumented endpoint, OpenAI call, scanner scoring change, final-label change, or WATCHLIST meaning change.
+- UX2 Product-grade Interface Redesign remains a future required stage.
+
+Review Storage Mode DX / Smoke Scripts v1:
+
+- Add a lightweight `tools/ui-mock/scripts/reviewStorageModeSmoke.ts` runner for file-backed JSON and SQLite Review Storage.
+- Add Windows helper scripts for file mode, SQLite mode, both modes, and SQLite local preview.
+- The smoke runner starts `createScannerApiServer` on a random local port, uses temporary `.local` storage, checks existing review endpoints, rejects invalid writes, and verifies diagnostics omit entries and analyst notes.
+- File-backed JSON remains the default provider. SQLite remains optional through env configuration. No JSON-to-SQLite migration is performed.
+- This stage does not change endpoint paths, UI workflow, scanner scoring, final labels, or WATCHLIST meaning.
 - UX2 Product-grade Interface Redesign remains a future required stage.
 
 Paid and clarification-dependent sources remain deferred:

@@ -178,6 +178,22 @@ npm run build   # Build for production
 
 Windows CMD helpers for checking the UI mock, starting the API/frontend preview, and freeing local ports are documented in `../../scripts/win/README.md`. The UI mock check uses direct binaries instead of `pnpm` because of the known Windows `node_modules` / `pnpm` `EPERM` issue.
 
+Review Storage mode checks:
+
+```cmd
+..\..\scripts\win\check-review-storage-file.cmd
+..\..\scripts\win\check-review-storage-sqlite.cmd
+..\..\scripts\win\check-review-storage-modes.cmd
+```
+
+SQLite local preview:
+
+```cmd
+..\..\scripts\win\dev-ui-sqlite.cmd
+```
+
+File-backed JSON remains the default provider. SQLite is optional through `CRYPTO_EDGE_REVIEW_STORAGE_PROVIDER=sqlite`, with `CRYPTO_EDGE_REVIEW_SQLITE_PATH` available for a local `.sqlite` path. There is no automatic JSON-to-SQLite migration. Endpoint paths and UI workflow are unchanged.
+
 ## Thin Scanner API POC
 
 The local API bridge closes the current loop from persisted scanner-shaped JSON into the UI mock without adding a production backend.
@@ -263,6 +279,19 @@ GET /api/review-session/diagnostics
 Diagnostics return provider metadata, file status, file size, entry count, validity, and optional warning only. They do not return full entries or analyst notes. The UI still starts from `localStorage`, tries the local API, mirrors valid API state back to `localStorage`, and keeps browser fallback behavior.
 
 This adds no auth, production backend, production cron, new data source, scraping, HTML parsing, browser automation, undocumented endpoint, OpenAI call, scanner scoring change, final-label change, or WATCHLIST meaning change. UX2 Product-grade Interface Redesign remains a future required stage.
+
+## Review Storage Mode DX / Smoke Scripts v1
+
+Developer smoke scripts now cover both Review Storage providers without changing product behavior:
+
+- `scripts\win\check-review-storage-file.cmd` verifies the default file-backed JSON provider.
+- `scripts\win\check-review-storage-sqlite.cmd` verifies the optional SQLite provider.
+- `scripts\win\check-review-storage-modes.cmd` runs both.
+- `scripts\win\dev-ui-sqlite.cmd` starts the local preview with SQLite Review Storage.
+
+The smoke runner starts `createScannerApiServer` on a random local port, exercises the existing review endpoints, confirms invalid writes do not overwrite the saved state, and verifies diagnostics do not expose review entries or analyst notes.
+
+This is DX/tooling only. It adds no npm dependency, auth, production backend, production cron, new source, scraper, HTML parser, browser automation, undocumented endpoint, OpenAI call, endpoint change, UI workflow change, scanner scoring change, final-label change, or WATCHLIST meaning change. UX2 Product-grade Interface Redesign remains a future required stage.
 
 Next stage: read a real persisted scanner run from `tools/data-poc/output/<run_id>/full_output.json`.
 

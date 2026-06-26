@@ -269,6 +269,29 @@ This stage adds no npm dependency, auth, production backend, production cron, ne
 
 UX2 Product-grade Interface Redesign remains a future required stage before a final production interface. It should simplify, organize, and professionalize the UI after the current functional prototype stages.
 
+## Review Storage Mode DX / Smoke Scripts v1
+
+Stage 8E adds Windows developer helper scripts and a lightweight smoke runner for both Review Storage modes:
+
+- `scripts\win\check-review-storage-file.cmd` checks the default file-backed JSON provider.
+- `scripts\win\check-review-storage-sqlite.cmd` checks the optional SQLite provider through `CRYPTO_EDGE_REVIEW_STORAGE_PROVIDER=sqlite`.
+- `scripts\win\check-review-storage-modes.cmd` runs both checks.
+- `scripts\win\dev-ui-sqlite.cmd` starts the local preview with SQLite Review Storage at `tools\ui-mock\.local\review-session.sqlite`.
+
+The smoke runner exercises only the existing local endpoints:
+
+```text
+GET /api/review-session
+PUT /api/review-session
+GET /api/review-session/diagnostics
+```
+
+It uses temporary `.local` review storage, confirms invalid PUT payloads do not overwrite the saved review state, and confirms diagnostics do not expose entries or analyst notes.
+
+File-backed JSON remains the default provider. SQLite remains optional. There is no automatic JSON-to-SQLite migration. This DX stage does not add endpoints, auth, production backend, production cron, new data sources, scraping, HTML parsing, browser automation, undocumented endpoints, OpenAI, scanner scoring changes, final-label changes, WATCHLIST meaning changes, or UI workflow changes.
+
+UX2 Product-grade Interface Redesign remains a future required stage.
+
 ## UX1 Professional Dashboard Redesign
 
 UX1 is a UI-only redesign of `tools/ui-mock`. It improves layout hierarchy, spacing, scanner readability, Market Context visibility, and Candidate Detail readability. Local Review Session is placed higher in Candidate Detail so analyst status and notes are easier to find.
