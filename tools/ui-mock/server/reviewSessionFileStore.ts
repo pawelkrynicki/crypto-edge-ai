@@ -2,45 +2,32 @@ import { mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { ReviewSessionState } from "../src/types/reviewSessionTypes.js";
 import {
   createEmptyReviewSession,
   validateReviewSessionState,
 } from "../src/services/reviewSessionValidation.js";
+import {
+  ReviewSessionStorageProviderError,
+  type ReviewSessionStorageDiagnostics,
+  type ReviewSessionStorageProvider,
+  type ReviewSessionStorageResult,
+  type ReviewSessionStorageSourceMeta,
+} from "./reviewSessionStorageProvider.js";
 
-export type ReviewSessionSourceMeta = {
-  source_kind: "file-backed-review-session";
-  storage_file: string;
-  loaded_at: string;
-  warning?: string;
-};
+export type ReviewSessionSourceMeta = ReviewSessionStorageSourceMeta;
 
-export type ReviewSessionFileStoreResult = {
-  state: ReviewSessionState;
-  _source_meta: ReviewSessionSourceMeta;
-};
+export type ReviewSessionFileStoreResult = ReviewSessionStorageResult;
 
 export type ReviewSessionFileStoreOptions = {
   storageFilePath?: string;
 };
 
-export type ReviewSessionDiagnostics = {
-  source_kind: "file-backed-review-session-diagnostics";
-  storage_file: string;
-  checked_at: string;
-  file_exists: boolean;
-  file_size_bytes: number | null;
-  entries_count: number;
-  valid: boolean;
-  warning?: string;
-};
+export type ReviewSessionDiagnostics = ReviewSessionStorageDiagnostics;
 
-export class ReviewSessionFileStoreError extends Error {
-  readonly code: "invalid_review_session" | "write_failed";
-
-  constructor(code: ReviewSessionFileStoreError["code"], message: string) {
-    super(message);
-    this.code = code;
+export class ReviewSessionFileStoreError extends ReviewSessionStorageProviderError {
+  constructor(code: ReviewSessionStorageProviderError["code"], message: string) {
+    super(code, message);
+    this.name = "ReviewSessionFileStoreError";
   }
 }
 
@@ -53,6 +40,16 @@ const defaultStorageFilePath = resolve(
 
 export function getDefaultReviewSessionStorageFilePath(): string {
   return defaultStorageFilePath;
+}
+
+export function createFileReviewSessionStorageProvider(
+  options: ReviewSessionFileStoreOptions = {},
+): ReviewSessionStorageProvider {
+  return {
+    read: () => readReviewSessionFile(options),
+    write: (state: unknown) => writeReviewSessionFile(state, options),
+    diagnostics: () => readReviewSessionDiagnostics(options),
+  };
 }
 
 export async function readReviewSessionDiagnostics(

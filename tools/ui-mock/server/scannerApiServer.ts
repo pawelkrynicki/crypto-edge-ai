@@ -8,13 +8,14 @@ import {
   ScannerOutputError,
 } from "./latestScannerOutput.js";
 import {
-  readReviewSessionFile,
-  readReviewSessionDiagnostics,
-  ReviewSessionFileStoreError,
-  writeReviewSessionFile,
+  createFileReviewSessionStorageProvider,
   type ReviewSessionFileStoreOptions,
-  type ReviewSessionFileStoreResult,
 } from "./reviewSessionFileStore.js";
+import {
+  ReviewSessionStorageProviderError,
+  type ReviewSessionStorageProvider,
+  type ReviewSessionStorageResult,
+} from "./reviewSessionStorageProvider.js";
 
 const DEFAULT_PORT = 5177;
 const port = Number.parseInt(process.env.SCANNER_API_PORT ?? String(DEFAULT_PORT), 10);
@@ -29,9 +30,13 @@ const headers = {
 export type ScannerApiServerOptions = {
   context?: LatestContextOutputOptions;
   reviewSession?: ReviewSessionFileStoreOptions;
+  reviewSessionProvider?: ReviewSessionStorageProvider;
 };
 
 export function createScannerApiServer(options: ScannerApiServerOptions = {}) {
+  const reviewSessionProvider = options.reviewSessionProvider
+    ?? createFileReviewSessionStorageProvider(options.reviewSession);
+
   return createServer(async (req, res) => {
     const path = getRequestPath(req.url);
 
@@ -97,14 +102,14 @@ export function createScannerApiServer(options: ScannerApiServerOptions = {}) {
     }
 
     if (req.method === "GET" && path === "/api/review-session") {
-      const output = await readReviewSessionFile(options.reviewSession);
+      const output = await reviewSessionProvider.read();
       sendReviewSessionJson(res, 200, output);
       return;
     }
 
     if (req.method === "GET" && path === "/api/review-session/diagnostics") {
       try {
-        const diagnostics = await readReviewSessionDiagnostics(options.reviewSession);
+        const diagnostics = await reviewSessionProvider.diagnostics();
         sendJson(res, 200, diagnostics);
       } catch {
         sendJson(res, 500, {
@@ -118,11 +123,11 @@ export function createScannerApiServer(options: ScannerApiServerOptions = {}) {
     if (req.method === "PUT" && path === "/api/review-session") {
       try {
         const body = await readJsonBody(req);
-        const output = await writeReviewSessionFile(body, options.reviewSession);
+        const output = await reviewSessionProvider.write(body);
         sendReviewSessionJson(res, 200, output);
       } catch (error) {
         if (error instanceof RequestBodyError || (
-          error instanceof ReviewSessionFileStoreError
+          error instanceof ReviewSessionStorageProviderError
           && error.code === "invalid_review_session"
         )) {
           sendJson(res, 400, {
@@ -162,7 +167,7 @@ function sendJson(res: ServerResponse, status: number, body: unknown) {
 function sendReviewSessionJson(
   res: ServerResponse,
   status: number,
-  result: ReviewSessionFileStoreResult,
+  result: ReviewSessionStorageResult,
 ) {
   sendJson(res, status, {
     ...result.state,

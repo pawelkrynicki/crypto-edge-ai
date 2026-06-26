@@ -12,6 +12,7 @@ It demonstrates the visual direction, product structure, and trader value propos
 - **Local Review Session**: Local analyst workspace for per-candidate review status, analyst note, and last-updated timestamp.
 - **Review Backup**: Export/import the review session as JSON for lightweight analyst backup.
 - **Review Storage Diagnostics / Reset**: Shows local review storage health and provides a guarded reset for local review status and analyst notes.
+- **Review Storage Provider**: Keeps the local API endpoints behind a storage-provider interface so file-backed JSON can be replaced later without changing the UI workflow.
 - **Research Review (Mock)**: A text area to paste news/events and see a mock AI risk categorization.
 - **Review Queue & Risk Alerts**: Dedicated tabs for local analyst follow-up, scanner WATCHLIST candidates, and critical risks.
 - **Methodology**: Explanation of the staged review process.
@@ -196,6 +197,18 @@ The UI starts immediately from `localStorage`, then tries `GET /api/review-sessi
 Storage diagnostics are available at `GET /api/review-session/diagnostics`. The endpoint reports the storage file path, existence, file size, entry count, validity, and warning state without returning full review entries or analyst notes. The Review Queue can refresh this diagnostics view on demand.
 
 This stage intentionally does not add SQLite, a database, auth, a production backend, production cron, new data sources, scraping, OpenAI, scanner scoring changes, final-label changes, or WATCHLIST meaning changes. SQLite can replace this storage implementation in a later stage without changing the UI workflow. UX2 Product-grade Interface Redesign remains a future required stage.
+
+## Review Storage Provider Abstraction
+
+The local API bridge now routes review reads, writes, and diagnostics through a `ReviewSessionStorageProvider` interface. The current file-backed JSON store is the default provider implementation and keeps the same endpoint response format for:
+
+```text
+GET /api/review-session
+PUT /api/review-session
+GET /api/review-session/diagnostics
+```
+
+This is a technical refactor only. It does not change Review Queue behavior, localStorage fallback, reset behavior, endpoint paths, scanner output, scoring, final labels, or WATCHLIST meaning. SQLite is not added in this stage; it remains a future replaceable provider implementation behind the same API workflow. No database, auth, production backend, production cron, new data source, scraping, or OpenAI call is added. UX2 Product-grade Interface Redesign remains a future required stage.
 
 Next stage: read a real persisted scanner run from `tools/data-poc/output/<run_id>/full_output.json`.
 
