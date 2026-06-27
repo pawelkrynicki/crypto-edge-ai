@@ -125,6 +125,8 @@ Windows helper scripts:
 - `scripts\win\check-review-storage-sqlite.cmd` checks the optional SQLite Review Storage provider.
 - `scripts\win\check-review-storage-modes.cmd` checks both Review Storage modes.
 - `scripts\win\check-local-workflow-smoke.cmd` checks the local MVP workflow from scanner latest output through UI candidates, context latest output, review storage, diagnostics, and review export/import.
+- `scripts\win\generate-analyst-report.cmd` generates a local Markdown plus JSON analyst report under `tools\ui-mock\.local\reports`.
+- `scripts\win\check-analyst-report.cmd` runs the analyst report generator in smoke mode with guarded temporary review storage and report files.
 - `scripts\win\dev-ui-sqlite.cmd` starts the local API and frontend preview with SQLite Review Storage enabled.
 
 Local Review Session:
@@ -226,6 +228,15 @@ Local End-to-End Workflow Smoke v1:
 - Verify review session storage, diagnostics safety, invalid PUT rejection, export/import helpers, and server-render smoke coverage for Market Context, Candidate Detail, and Review Queue paths.
 - Use only local API calls and local fixture/real-output files. Do not call external networks, mutate scanner output, mutate market data, add sources, change endpoint paths, change UI workflow, change scanner scoring, change final labels, or change WATCHLIST meaning.
 - UX2 Product-grade Interface Redesign remains a future required stage.
+
+Analyst Report / Review Export v1:
+
+- Add `tools/ui-mock/src/services/analystReport.ts` for pure report data building and Markdown rendering.
+- Add `tools/ui-mock/scripts/generateAnalystReport.ts` and Windows helpers for normal export and smoke verification.
+- Generate Markdown and JSON under `tools\ui-mock\.local\reports` for the normal analyst workflow.
+- Summarize scanner metadata, scanner labels, security labels, review statuses, analyst notes, stored reviews not in the current scan, approved market context, and a neutral candidate snapshot.
+- Keep the report as a local research workflow export only. It is not a recommendation and includes `This is not a buy/sell signal.`
+- Use only existing local endpoints and local real-output or fixture fallback files. Do not call external networks, add sources, mutate scanner output, mutate market data, change scanner scoring, change `final_label`, change `WATCHLIST` meaning, add npm dependencies, add auth, add a production backend, or implement UX2.
 
 Paid and clarification-dependent sources remain deferred:
 

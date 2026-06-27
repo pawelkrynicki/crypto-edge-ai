@@ -73,6 +73,23 @@ The local workflow smoke starts the existing local API on a random `127.0.0.1` p
 
 The runner uses a dedicated file under `tools\ui-mock\.local\local-workflow-smoke-review-session.json` and has a cleanup guard so it cannot remove the normal `review-session.json` or `review-session.sqlite`. It uses only local API calls and local real-output or fixture fallback files. It does not call external networks, change scanner output, change market data, add data sources, change endpoint paths, change UI workflow, change scoring, change `final_label`, or change `WATCHLIST` meaning. UX2 Product-grade Interface Redesign remains a future stage.
 
+## Analyst Report Export
+
+```cmd
+scripts\win\generate-analyst-report.cmd
+scripts\win\check-analyst-report.cmd
+```
+
+`generate-analyst-report.cmd` runs the local analyst report export and writes Markdown plus JSON under:
+
+```text
+tools\ui-mock\.local\reports
+```
+
+`check-analyst-report.cmd` runs the same generator in `--smoke` mode with dedicated temporary review storage and guarded smoke report files under `tools\ui-mock\.local\reports-smoke`.
+
+The report is a local research workflow export only. It reads the existing local API path from scanner latest output, UI candidates, approved market context, review session storage, and review diagnostics. It does not call external networks, add data sources, change scanner output, change market data, change scoring, change `final_label`, change `WATCHLIST` meaning, add auth, add a production backend, or implement UX2. The compliance copy remains clear that it is not a recommendation and `This is not a buy/sell signal.`
+
 ## Free Local Preview Ports
 
 ```cmd

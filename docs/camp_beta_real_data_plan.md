@@ -312,6 +312,31 @@ The runner accepts real local output or fixture fallback. It calls no external n
 
 UX2 Product-grade Interface Redesign remains a future required stage.
 
+## Analyst Report / Review Export v1
+
+Stage 9B adds a local analyst report export for the existing MVP workflow:
+
+```text
+scanner latest output -> UI candidates -> market context -> review session -> analyst report
+```
+
+Run it from the repo root on Windows:
+
+```cmd
+scripts\win\generate-analyst-report.cmd
+scripts\win\check-analyst-report.cmd
+```
+
+The normal generator writes Markdown and JSON to:
+
+```text
+tools\ui-mock\.local\reports
+```
+
+The report summarizes scanner source metadata, scanner label counts, security label counts, review status counts, analyst notes, stored reviews not in the current scanner output, approved market context, and a neutral candidate snapshot. The JSON includes `report_version = 1` and the same structured data used for the Markdown report.
+
+This is a local research workflow export only. It uses the existing local API endpoints, accepts real local scanner/context output or fixture fallback, and reads review session storage. It does not call external networks, add sources, change scanner output, change market data, change scoring, change `final_label`, change `WATCHLIST` meaning, add auth, add npm dependencies, add a production backend, or add a production cron. UX2 Product-grade Interface Redesign remains a future stage.
+
 ## UX1 Professional Dashboard Redesign
 
 UX1 is a UI-only redesign of `tools/ui-mock`. It improves layout hierarchy, spacing, scanner readability, Market Context visibility, and Candidate Detail readability. Local Review Session is placed higher in Candidate Detail so analyst status and notes are easier to find.
