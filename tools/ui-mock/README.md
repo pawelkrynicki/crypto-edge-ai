@@ -13,6 +13,7 @@ It demonstrates the visual direction, product structure, and trader value propos
 - **Review Backup**: Export/import the review session as JSON for lightweight analyst backup.
 - **Review Storage Diagnostics / Reset**: Shows local review storage health and provides a guarded reset for local review status and analyst notes.
 - **Review Storage Provider**: Keeps the local API endpoints behind a storage-provider interface. File-backed JSON remains the default provider, with optional SQLite available through env configuration.
+- **Analyst Report Export**: Generates a local Markdown plus JSON analyst report from scanner latest output, market context, review session, and review diagnostics.
 - **Research Review (Mock)**: A text area to paste news/events and see a mock AI risk categorization.
 - **Review Queue & Risk Alerts**: Dedicated tabs for local analyst follow-up, scanner WATCHLIST candidates, and critical risks.
 - **Methodology**: Explanation of the staged review process.
@@ -210,6 +211,30 @@ scripts\win\check-local-workflow-smoke.cmd
 This starts the existing local API on a random `127.0.0.1` port and checks scanner latest output, scanner source diagnostics, market context latest output, review session `GET`/`PUT`/diagnostics, invalid review write rejection, review export/import helpers, and server-render smoke coverage for Market Context, Candidate Detail, and Review Queue paths.
 
 It uses only local real-output files or local fixture fallback files. It writes only a dedicated `.local\local-workflow-smoke-review-session.json` file with a cleanup guard. It does not call external networks, mutate scanner output, mutate market data, add data sources, change endpoint paths, change UI workflow, change scoring, change `final_label`, or change `WATCHLIST` meaning. UX2 Product-grade Interface Redesign remains a future stage.
+
+Analyst report export:
+
+```bash
+pnpm run report:analyst
+pnpm run report:analyst:smoke
+```
+
+or from the repo root on Windows:
+
+```cmd
+scripts\win\generate-analyst-report.cmd
+scripts\win\check-analyst-report.cmd
+```
+
+The normal report writes Markdown and JSON files to:
+
+```text
+tools\ui-mock\.local\reports
+```
+
+The report is a local analyst research workflow export. It summarizes scanner metadata and labels, review statuses and notes, stored reviews not in the current scan, approved market context, and a neutral candidate snapshot. The JSON includes `report_version = 1`, summary counts, review entries, market context summary, and candidate snapshot data.
+
+The generator starts the existing local API on `127.0.0.1`, uses only existing endpoints, and guards report output paths. It does not call external networks, add data sources, mutate scanner output, mutate market data, change scoring, change `final_label`, change `WATCHLIST` meaning, add auth, add npm dependencies, or add a production backend. UX2 Product-grade Interface Redesign remains a future stage.
 
 ## Thin Scanner API POC
 
