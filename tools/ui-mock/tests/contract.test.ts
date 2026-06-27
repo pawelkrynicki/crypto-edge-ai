@@ -8,6 +8,7 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { mapPersistableScannerOutputToUiCandidates } from "../src/adapters/scannerOutputAdapter";
 import { CandidateDetail, getMissingSecurityText } from "../src/components/CandidateDetail";
+import { LocalMvpWorkflowPanel } from "../src/components/LocalMvpWorkflowPanel";
 import { MarketContextPanel } from "../src/components/MarketContextPanel";
 import { ScannerRadar } from "../src/components/ScannerRadar";
 import { WatchlistTab } from "../src/components/WatchlistTab";
@@ -220,6 +221,37 @@ const apiFailureMarkup = renderToStaticMarkup(React.createElement(MarketContextP
 
 assert.match(apiFailureMarkup, /API unavailable/, "panel shows API failure state");
 assert.match(apiFailureMarkup, /Context API unavailable: test failure/, "panel renders API failure detail");
+
+const localMvpWorkflowMarkup = renderToStaticMarkup(React.createElement(LocalMvpWorkflowPanel, {
+  scannerSourceText: "Scanner source: real-output",
+  contextSourceText: "Context source: approved-sources-output",
+  reviewStorageText: "Review storage: local API (file-backed JSON)",
+  reviewStorageDetail: "tools/ui-mock/.local/review-session.json",
+}));
+
+assert.match(localMvpWorkflowMarkup, /Local MVP workflow/, "local MVP workflow panel renders title");
+assert.match(localMvpWorkflowMarkup, /Scanner latest/, "local MVP workflow panel renders scanner step");
+assert.match(localMvpWorkflowMarkup, /Market context/, "local MVP workflow panel renders market context step");
+assert.match(localMvpWorkflowMarkup, /Candidate detail/, "local MVP workflow panel renders candidate detail step");
+assert.match(localMvpWorkflowMarkup, /Local review/, "local MVP workflow panel renders local review step");
+assert.match(localMvpWorkflowMarkup, /Review queue/, "local MVP workflow panel renders review queue step");
+assert.match(localMvpWorkflowMarkup, /Analyst report/, "local MVP workflow panel renders analyst report step");
+assert.match(localMvpWorkflowMarkup, /Local MVP health check/, "local MVP workflow panel renders health check step");
+assert.match(
+  localMvpWorkflowMarkup,
+  /scripts\\win\\check-local-mvp\.cmd/,
+  "local MVP workflow panel renders local health check command",
+);
+assert.match(
+  localMvpWorkflowMarkup,
+  /scripts\\win\\generate-analyst-report\.cmd/,
+  "local MVP workflow panel renders analyst report command",
+);
+assert.match(
+  localMvpWorkflowMarkup,
+  /This is not a buy\/sell signal\./,
+  "local MVP workflow panel renders compliance copy",
+);
 
 const passMockCandidate = toMockCandidate(passUi);
 const lowlMockCandidate = toMockCandidate(lowlUi);
@@ -722,6 +754,26 @@ assert.match(detailWithContextMarkup, /Context does not alter scanner label\./, 
 assert.match(detailWithContextMarkup, /Fixture context/, "candidate detail represents fixture context fallback");
 assert.match(detailWithContextMarkup, /Local Review Session/, "candidate detail renders local review session");
 assert.match(detailWithContextMarkup, /This does not change scanner label\./, "candidate detail explains review does not change label");
+assert.match(
+  detailWithContextMarkup,
+  /final_label.*comes from scanner latest output/,
+  "candidate detail explains scanner final_label source",
+);
+assert.match(
+  detailWithContextMarkup,
+  /Saving a review status records a local analyst note only/,
+  "candidate detail explains local review status scope",
+);
+assert.match(
+  detailWithContextMarkup,
+  /WATCHLIST means further manual analysis only/,
+  "candidate detail explains WATCHLIST as manual analysis only",
+);
+assert.match(
+  detailWithContextMarkup,
+  /Missing security or context data means manual verification is required, not a positive assessment/,
+  "candidate detail explains missing data is not a positive assessment",
+);
 assert.match(detailWithContextMarkup, /Further review only/, "candidate detail keeps candidate final label visible");
 assert.equal(passMockCandidate.final_label, "WATCHLIST", "context rendering does not change candidate final label");
 
@@ -790,6 +842,20 @@ const reviewQueueMarkup = renderToStaticMarkup(React.createElement(WatchlistTab,
 }));
 
 assert.match(reviewQueueMarkup, /Review Queue/, "watchlist tab renders review queue workspace");
+assert.match(reviewQueueMarkup, /What this queue is for/, "review queue renders purpose guidance");
+assert.match(reviewQueueMarkup, /What to do next/, "review queue renders next-step guidance");
+assert.match(reviewQueueMarkup, /Export analyst report/, "review queue renders analyst report guidance");
+assert.match(reviewQueueMarkup, /Generate report from CMD/, "review queue explains report command workflow");
+assert.match(
+  reviewQueueMarkup,
+  /scripts\\win\\check-local-mvp\.cmd/,
+  "review queue renders local MVP health command",
+);
+assert.match(
+  reviewQueueMarkup,
+  /scripts\\win\\generate-analyst-report\.cmd/,
+  "review queue renders analyst report command",
+);
 assert.match(reviewQueueMarkup, /Review Backup/, "review queue renders backup controls");
 assert.match(reviewQueueMarkup, /Export review JSON/, "review queue renders export action");
 assert.match(reviewQueueMarkup, /Import review JSON/, "review queue renders import file control");

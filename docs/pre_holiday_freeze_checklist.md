@@ -6,6 +6,7 @@
 - 9A Local End-to-End Workflow Smoke
 - 9B Analyst Report / Review Export
 - 9C Local MVP Runbook + Freeze Checklist
+- 10A Product Workflow Polish
 
 ## Freeze Scope
 
@@ -14,6 +15,7 @@
 - Source registry and compliance rules are closed.
 - Local review workflow is closed for the current MVP scope.
 - Analyst report export works locally.
+- The UI now shows the local workflow guide and clearer scanner/context/review/report/health status copy.
 - UX2 Product-grade Interface Redesign remains a future required stage.
 
 ## Allowed During Holiday
@@ -41,7 +43,6 @@ scripts\win\check-local-mvp.cmd
 
 ## Post-Holiday Next Stages
 
-- 10A - Product Workflow Polish
 - 10B - UX2 Product-grade Interface Redesign
 - 10C - Local MVP Release Candidate Stabilization
 
@@ -54,6 +55,7 @@ A safe local MVP state means:
 - Working tree is clean.
 - Analyst report generates locally.
 - Local workflow smoke passes on real-output or fixture fallback.
+- The 10A workflow panel keeps scanner label, local review status, analyst report, and local MVP health check visibly separate.
 
 ## Freeze Notes
 

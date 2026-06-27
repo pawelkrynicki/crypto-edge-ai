@@ -203,6 +203,22 @@ export const CandidateDetail: React.FC<Props> = ({
         </section>
 
         <section className="detail-section">
+          <SectionTitle>Scanner Label vs Local Review</SectionTitle>
+          <div className="space-y-2 text-xs" style={{ color: "var(--text-secondary)" }}>
+            <p>
+              <code>final_label</code> comes from scanner latest output and remains separate from the local review status.
+            </p>
+            <p>
+              Saving a review status records a local analyst note only; it does not change scanner scoring or label.
+            </p>
+            <p>
+              WATCHLIST means further manual analysis only. Missing security or context data means manual verification is required, not a positive assessment.
+            </p>
+            <p>This is not a buy/sell signal.</p>
+          </div>
+        </section>
+
+        <section className="detail-section">
           <SectionTitle>Quick Snapshot</SectionTitle>
           <div className="detail-kpi-grid">
             <SnapshotMetric label="Price" value={c.price_usd !== null ? `$${c.price_usd.toFixed(6)}` : "--"} />
@@ -279,7 +295,7 @@ export const CandidateDetail: React.FC<Props> = ({
         </section>
 
         <section className="detail-section">
-          <SectionTitle>Decision</SectionTitle>
+          <SectionTitle>Scanner Label</SectionTitle>
           <div className="space-y-3">
             <div className="flex items-center gap-2 flex-wrap">
               <LabelBadge label={c.final_label} size="md" />

@@ -26,6 +26,25 @@ UX1 itself added no new data sources, API endpoints, backend services, storage m
 
 UX2 Product-grade Interface Redesign remains a future required stage before a final production interface. UX2 is not implemented in this prototype pass.
 
+## 10A Product Workflow Polish
+
+10A adds a small Local MVP workflow guide to the dashboard without implementing UX2. The panel shows the local research path:
+
+```text
+Scanner latest -> Market context -> Candidate detail -> Local review -> Review queue -> Analyst report -> Local MVP health check
+```
+
+The UI now makes these layers more explicit:
+
+- Scanner label comes from scanner latest output.
+- Local review status is a local analyst note layer.
+- Analyst report export is generated locally from CMD with `scripts\win\generate-analyst-report.cmd`.
+- Local MVP health is checked with `scripts\win\check-local-mvp.cmd`.
+
+Scanner source status distinguishes `real-output` from `fixture-fallback`. Market context distinguishes `approved-sources-output` from `fixture-fallback`. Review storage distinguishes local API, file-backed JSON or SQLite metadata when available, and browser `localStorage` fallback.
+
+This polish adds no endpoints, npm dependencies, auth, production backend, production cron, new sources, scraping, OpenAI call, scanner scoring change, `final_label` change, or `WATCHLIST` meaning change. UX2 Product-grade Interface Redesign remains a future required stage.
+
 ## Important Product Rules
 - **No Buy Signals**: Crypto Edge AI is a research tool, not a trading bot.
 - **WATCHLIST ≠ Buy**: The `WATCHLIST` label strictly means "eligible for further review". It explicitly states "Further review only, not a buy signal."

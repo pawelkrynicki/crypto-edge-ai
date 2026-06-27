@@ -3,6 +3,7 @@
 ## Status
 
 - Local MVP after 9B is operational for: scanner latest output, approved market context, local review storage, diagnostics, review export/import, and analyst report export.
+- 10A Product Workflow Polish adds visible local workflow guidance in the UI without changing endpoints, labels, scoring, or storage behavior.
 - The current frontend is a functional working prototype, not the final product interface.
 - UX2 Product-grade Interface Redesign remains a required future stage before a final production-grade interface.
 
@@ -83,6 +84,21 @@ Normal local files:
 9. Analyst report exports the current local workflow snapshot.
 
 Review status does not change scanner labels, scoring, `final_label`, or `WATCHLIST` meaning.
+
+10A UI polish mirrors this path in the dashboard:
+
+```text
+Scanner latest -> Market context -> Candidate detail -> Local review -> Review queue -> Analyst report -> Local MVP health check
+```
+
+Keep these layers separate:
+
+- Scanner label: read-only scanner output, including `final_label`.
+- Local review status: local analyst organization and notes only.
+- Analyst report: generated from CMD with `scripts\win\generate-analyst-report.cmd`.
+- Local MVP health check: run with `scripts\win\check-local-mvp.cmd`.
+
+This is not a buy/sell signal. UX2 Product-grade Interface Redesign remains a future required stage.
 
 ## Analyst Report
 

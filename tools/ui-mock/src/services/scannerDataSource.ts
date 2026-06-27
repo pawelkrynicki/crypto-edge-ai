@@ -28,7 +28,7 @@ function fixtureResult(): ScannerDataSourceResult {
 function fallbackResult(reason: string): ScannerDataSourceResult {
   return {
     source: "fixture",
-    resolvedSource: "built-in-fixture",
+    resolvedSource: "fixture-fallback",
     usedFallback: true,
     fallbackReason: reason,
     output: PERSISTABLE_SCANNER_SAMPLE,

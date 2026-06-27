@@ -450,6 +450,88 @@
     background: rgba(8, 12, 16, 0.34);
   }
 
+  .local-mvp-workflow-card {
+    @apply overflow-hidden;
+  }
+
+  .local-mvp-workflow-header {
+    @apply flex items-start justify-between gap-3 px-3 py-2;
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .local-mvp-workflow-header h2 {
+    @apply text-sm font-bold leading-tight;
+    color: var(--text-primary);
+  }
+
+  .local-mvp-workflow-header p {
+    @apply mt-0.5 text-[10px] leading-snug;
+    color: var(--text-muted);
+  }
+
+  .local-mvp-workflow-steps {
+    @apply grid gap-1.5 px-3 py-2;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    border-bottom: 1px solid var(--border);
+  }
+
+  .local-mvp-workflow-step {
+    @apply flex min-w-0 items-center gap-1.5 rounded-md px-2 py-1;
+    background: rgba(8, 12, 16, 0.28);
+    border: 1px solid var(--border);
+  }
+
+  .local-mvp-workflow-step-index {
+    @apply flex h-4 w-4 shrink-0 items-center justify-center rounded text-[9px] font-bold;
+    color: var(--accent);
+    background: var(--accent-dim);
+    border: 1px solid var(--accent-border);
+  }
+
+  .local-mvp-workflow-step span:last-child {
+    @apply truncate text-[10px] font-semibold;
+    color: var(--text-secondary);
+  }
+
+  .local-mvp-status-grid {
+    @apply grid gap-1.5 px-3 py-2;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .local-mvp-status-item {
+    @apply min-w-0 rounded-md px-2 py-1.5;
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+  }
+
+  .local-mvp-status-value {
+    @apply mt-0.5 truncate text-[11px] font-semibold;
+    color: var(--text-primary);
+  }
+
+  .local-mvp-status-detail,
+  .local-mvp-status-command {
+    @apply mt-0.5 truncate text-[10px];
+    color: var(--text-muted);
+  }
+
+  .local-mvp-status-command {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    color: var(--accent);
+  }
+
+  .local-mvp-workflow-note {
+    @apply flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 text-[10px];
+    color: var(--text-muted);
+    background: rgba(8, 12, 16, 0.34);
+    border-top: 1px solid var(--border);
+  }
+
+  .local-mvp-workflow-note span:last-child {
+    color: var(--amber);
+  }
+
   .stat-strip {
     @apply grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-1.5;
   }
@@ -824,6 +906,11 @@
     .detail-panel {
       max-height: none;
     }
+
+    .local-mvp-workflow-steps,
+    .local-mvp-status-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
   }
 
   @media (max-width: 900px) {
@@ -844,7 +931,9 @@
   @media (max-width: 720px) {
     .market-context-summary,
     .stat-strip,
-    .detail-kpi-grid {
+    .detail-kpi-grid,
+    .local-mvp-workflow-steps,
+    .local-mvp-status-grid {
       grid-template-columns: 1fr;
     }
 

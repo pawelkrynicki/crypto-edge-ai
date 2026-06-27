@@ -6,6 +6,7 @@ import { WatchlistTab } from "./components/WatchlistTab";
 import { RiskAlerts } from "./components/RiskAlerts";
 import { Methodology } from "./components/Methodology";
 import { MarketContextPanel, type MarketContextPanelState } from "./components/MarketContextPanel";
+import { LocalMvpWorkflowPanel } from "./components/LocalMvpWorkflowPanel";
 import {
   loadScannerDataSourceResult,
   type DataSourceKey,
@@ -69,10 +70,10 @@ const DATA_SOURCE_OPTIONS: { key: DataSourceKey; label: string }[] = [
 ];
 
 const SOURCE_STATUS_TEXT: Record<ResolvedScannerSource, string> = {
-  "built-in-fixture": "Built-in fixture data",
-  "static-json": "Static JSON fixture",
-  "real-output": "Real scanner output",
-  "fixture-fallback": "API fallback to fixture",
+  "built-in-fixture": "Scanner source: built-in fixture",
+  "static-json": "Scanner source: static-json fixture",
+  "real-output": "Scanner source: real-output",
+  "fixture-fallback": "Scanner source: fixture-fallback",
 };
 
 type ReviewStorageStatus = {
@@ -109,6 +110,7 @@ export default function App() {
 
   const summary = buildSummary(candidates);
   const sourceStatusText = SOURCE_STATUS_TEXT[resolvedSource];
+  const contextSourceStatus = getContextSourceStatus(marketContextState);
 
   const loadData = useCallback(async (source: DataSourceKey) => {
     setLoading(true);
@@ -317,7 +319,7 @@ export default function App() {
 
       {fallbackMsg && (
         <div className="app-notice">
-          <span>Fixture fallback</span>
+          <span>Scanner fixture fallback</span>
           <p>{fallbackMsg}</p>
         </div>
       )}
@@ -325,6 +327,17 @@ export default function App() {
       <div className="dashboard-scroll">
         <section className="dashboard-band">
           <MarketContextPanel state={marketContextState} />
+        </section>
+
+        <section className="dashboard-band compact">
+          <LocalMvpWorkflowPanel
+            scannerSourceText={sourceStatusText}
+            scannerFallbackReason={fallbackMsg}
+            contextSourceText={contextSourceStatus.text}
+            contextSourceDetail={contextSourceStatus.detail}
+            reviewStorageText={reviewStorageStatus.text}
+            reviewStorageDetail={reviewStorageStatus.detail}
+          />
         </section>
 
         <section className="dashboard-band compact">
@@ -361,17 +374,24 @@ export default function App() {
 }
 
 function getReadyReviewStorageStatus(sourceMeta: ReviewSessionApiSourceMeta | null): ReviewStorageStatus {
+  const providerText = formatReviewStorageProvider(sourceMeta?.source_kind);
+  const detail = [
+    sourceMeta?.storage_file,
+    sourceMeta?.warning,
+  ].filter((value): value is string => Boolean(value));
+
   if (sourceMeta?.warning) {
     return {
       tone: "warning",
-      text: "Review storage: local API warning",
-      detail: sourceMeta.warning,
+      text: `Review storage: local API (${providerText}) warning`,
+      detail: detail.join(" / "),
     };
   }
 
   return {
     tone: "ready",
-    text: "Review storage: local API",
+    text: `Review storage: local API (${providerText})`,
+    detail: detail.join(" / ") || undefined,
   };
 }
 
@@ -379,14 +399,38 @@ function getFallbackReviewStorageStatus(result: Exclude<ReviewSessionApiResult, 
   if (result.status === "unavailable") {
     return {
       tone: "fallback",
-      text: "Review storage: API unavailable, using browser localStorage",
+      text: "Review storage: localStorage fallback",
       detail: result.error,
     };
   }
 
   return {
     tone: "error",
-    text: "Review storage: API error, using browser localStorage",
+    text: "Review storage: local API error, using browser localStorage fallback",
     detail: result.error,
   };
+}
+
+function getContextSourceStatus(state: MarketContextPanelState): { text: string; detail?: string } {
+  if (state.status === "loading") {
+    return { text: "Context source: loading local API" };
+  }
+
+  if (state.status === "error") {
+    return {
+      text: "Context source: unavailable",
+      detail: state.message,
+    };
+  }
+
+  return {
+    text: `Context source: ${state.context._source_meta.source_kind}`,
+    detail: state.message ?? state.context._source_meta.output_file ?? undefined,
+  };
+}
+
+function formatReviewStorageProvider(sourceKind?: ReviewSessionApiSourceMeta["source_kind"]): string {
+  if (sourceKind === "file-backed-review-session") return "file-backed JSON";
+  if (sourceKind === "sqlite-review-session") return "SQLite";
+  return "provider metadata unavailable";
 }

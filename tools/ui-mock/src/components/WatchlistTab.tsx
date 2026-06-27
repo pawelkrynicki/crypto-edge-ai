@@ -333,6 +333,44 @@ export const WatchlistTab: React.FC<Props> = ({
       </header>
 
       <section className="card p-4 space-y-3">
+        <div className="grid gap-3 lg:grid-cols-3">
+          <div className="space-y-1">
+            <h3 className="text-sm font-bold text-primary">What this queue is for</h3>
+            <p className="text-xs text-secondary">
+              Organize local analyst work across scanner candidates and saved review notes.
+            </p>
+            <p className="text-xs text-secondary">
+              Review status does not change scanner labels, scoring, or WATCHLIST meaning.
+            </p>
+          </div>
+
+          <div className="space-y-1">
+            <h3 className="text-sm font-bold text-primary">What to do next</h3>
+            <p className="text-xs text-secondary">
+              Open candidate detail, verify missing security or context manually, and keep scanner label separate from local review status.
+            </p>
+            <p className="text-xs text-secondary">
+              Full local health check: <code>scripts\win\check-local-mvp.cmd</code>
+            </p>
+          </div>
+
+          <div className="space-y-1">
+            <h3 className="text-sm font-bold text-primary">Export analyst report</h3>
+            <p className="text-xs text-secondary">
+              Generate report from CMD. The UI does not run report generation as a product action.
+            </p>
+            <p className="text-xs text-secondary">
+              Command: <code>scripts\win\generate-analyst-report.cmd</code>
+            </p>
+          </div>
+        </div>
+
+        <p className="text-xs" style={{ color: "var(--amber)" }}>
+          This is not a buy/sell signal.
+        </p>
+      </section>
+
+      <section className="card p-4 space-y-3">
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>
             <h3 className="text-sm font-bold text-primary">Review Backup</h3>
