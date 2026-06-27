@@ -136,7 +136,7 @@ Local Review Session:
 - The Candidate Detail panel stores local review status, analyst note, and last-updated timestamp.
 - Storage key: `crypto-edge-ai.review-session.v1`.
 - Statuses are `Not reviewed`, `Needs more research`, `Saved for follow-up`, `Dismissed after review`, and `Waiting for more data`.
-- The Scanner Radar table shows a separate Review badge and a Follow-up filter for locally saved follow-up items.
+- The Scanner Radar candidate list shows a separate Review badge and a Follow-up filter for locally saved follow-up items.
 - Stage 8A adds a local development API write path only, backed by JSON at `tools/ui-mock/.local/review-session.json`.
 - This does not add a production backend, auth, production cron, OpenAI call, data source, scraping, HTML parsing, browser automation, or undocumented endpoint. Optional SQLite review storage is added later in Stage 8D behind the local API provider interface.
 - Review status does not change scanner scoring, final labels, or WATCHLIST meaning.
@@ -266,7 +266,15 @@ UX2 Information Architecture Shell v1:
 - Scanner Radar remains the read-only scanner output and Candidate Detail workspace.
 - Review Queue remains the local analyst status, notes, backup, diagnostics, reset, and report command workspace.
 - 10B.1 adds no endpoints, new sources, npm dependencies, auth, production backend, production cron, OpenAI call, scraping, scanner scoring change, `final_label` change, or `WATCHLIST` meaning change.
-- Next UX2 steps are 10B.2 Scanner / Candidate Detail Redesign, 10B.3 Review Queue + Report Workspace, and 10B.4 Visual QA / Polish.
+
+UX2 Scanner / Candidate Detail Redesign v1:
+
+- Stage 10B.2 continues UX2 only inside Scanner Radar and Candidate Detail.
+- Scanner Radar now uses a product-grade candidate-card list with selected state, scanner `final_label`, local review status, security label, chain/DEX, market cap, liquidity, 24h volume, age, and the first scanner reason.
+- Candidate Detail now separates Local Review Session, Scanner Label vs Local Review, Quick Snapshot, Security & Manual Verification, Data Coverage & Context, Scanner Label / Reasons, and Reasoning Checklist.
+- Guidance copy states that scanner output is read-only, `WATCHLIST` means eligible for further manual review only, local review does not change scanner label, missing security/context data requires manual verification, and this is not a buy/sell signal.
+- 10B.2 adds no endpoints, new sources, npm dependencies, auth, production backend, production cron, OpenAI call, scraping, browser automation, scanner scoring change, `final_label` change, `WATCHLIST` meaning change, review logic change, or report logic change.
+- Next UX2 steps are 10B.3 Review Queue + Report Workspace and 10B.4 Visual QA / Polish.
 
 Paid and clarification-dependent sources remain deferred:
 
@@ -435,7 +443,8 @@ UX2 Product-grade Interface Redesign:
 
 - Started in 10B.1 with information architecture and layout skeleton only.
 - Scope: simplify, organize, and professionalize the full frontend after the functional prototype stages.
-- Full UX2 remains in progress through 10B.2 Scanner / Candidate Detail Redesign, 10B.3 Review Queue + Report Workspace, and 10B.4 Visual QA / Polish.
+- 10B.2 completes the Scanner Radar / Candidate Detail redesign slice only.
+- Full UX2 remains in progress through 10B.3 Review Queue + Report Workspace and 10B.4 Visual QA / Polish.
 
 ## UI Data Adapter (Completed)
 
