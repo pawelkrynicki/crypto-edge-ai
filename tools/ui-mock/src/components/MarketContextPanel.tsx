@@ -59,7 +59,9 @@ export const MarketContextPanel: React.FC<Props> = ({ state }) => {
   const fearGreed = findFearGreedRecord(context);
   const defiRows = findDefiRecords(context).slice(0, 3);
   const sourceKind = context._source_meta.source_kind;
-  const sourceLabel = sourceKind === "approved-sources-output" ? "Real output" : "Fixture fallback";
+  const sourceLabel = sourceKind === "approved-sources-output"
+    ? "Context source: approved-sources-output"
+    : "Fixture fallback: fixture-fallback";
   const sourceBadgeClass = sourceKind === "approved-sources-output" ? "badge-watchlist" : "badge-manual";
   const warningNotes = collectSourceNotes(context, "warnings");
   const errorNotes = collectSourceNotes(context, "errors");

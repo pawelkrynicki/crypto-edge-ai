@@ -247,6 +247,17 @@ Local MVP Runbook + Freeze Checklist v1:
 - Keep this stage documentation/DX only. It does not change endpoints, UI workflow, scanner scoring, `final_label`, `WATCHLIST` meaning, source registry/compliance rules, npm dependencies, auth, production backend, or data sources.
 - UX2 Product-grade Interface Redesign remains a future required stage.
 
+Product Workflow Polish v1:
+
+- Stage 10A adds a small Local MVP workflow guide in `tools/ui-mock` without implementing UX2.
+- The UI presents the path `Scanner latest -> Market context -> Candidate detail -> Local review -> Review queue -> Analyst report -> Local MVP health check`.
+- Candidate Detail clarifies that scanner `final_label` comes from scanner output, local review status is only local analyst organization, and missing security/context data requires manual verification.
+- Review Queue clarifies what the queue is for, what to do next, and how to generate the analyst report with `scripts\win\generate-analyst-report.cmd`.
+- Local MVP health remains the existing `scripts\win\check-local-mvp.cmd` command.
+- Scanner source, market context source, and review storage status copy is more explicit.
+- This stage adds no endpoints, new sources, npm dependencies, auth, production backend, production cron, scanner scoring change, `final_label` change, or `WATCHLIST` meaning change.
+- UX2 Product-grade Interface Redesign remains a future required stage.
+
 Paid and clarification-dependent sources remain deferred:
 
 - CoinGecko Analyst: first paid market/onchain candidate.

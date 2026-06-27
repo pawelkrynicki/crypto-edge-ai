@@ -354,6 +354,29 @@ New docs:
 
 This is a documentation/DX checkpoint only. It closes the local MVP freeze scope for storage, local review workflow, source registry/compliance, endpoint paths, and analyst report export. UX2 Product-grade Interface Redesign remains a future required stage.
 
+## Product Workflow Polish v1
+
+Stage 10A adds first product workflow polish for the local MVP UI without implementing UX2.
+
+The dashboard now shows the local research path:
+
+```text
+Scanner latest -> Market context -> Candidate detail -> Local review -> Review queue -> Analyst report -> Local MVP health check
+```
+
+The polish keeps the local layers distinct:
+
+- Scanner label: read-only scanner output, including `final_label`.
+- Local review status: analyst organization and notes only.
+- Analyst report: generated locally from CMD with `scripts\win\generate-analyst-report.cmd`.
+- Local MVP health check: existing command `scripts\win\check-local-mvp.cmd`.
+
+Candidate Detail now clarifies that saving a review status does not change scanner scoring or label, `WATCHLIST` means further manual analysis only, and missing security/context data means manual verification rather than a positive assessment.
+
+Review Queue now explains what the queue is for, what to do next, and how to export the analyst report from CMD. Scanner/context/review storage status copy is also more explicit, including `real-output`, `approved-sources-output`, `fixture-fallback`, local API, file-backed JSON, SQLite metadata when available, and browser `localStorage` fallback.
+
+This stage adds no endpoints, new sources, npm dependencies, auth, production backend, production cron, OpenAI call, scraping, scanner scoring change, `final_label` change, or `WATCHLIST` meaning change. UX2 Product-grade Interface Redesign remains a future required stage.
+
 ## UX1 Professional Dashboard Redesign
 
 UX1 is a UI-only redesign of `tools/ui-mock`. It improves layout hierarchy, spacing, scanner readability, Market Context visibility, and Candidate Detail readability. Local Review Session is placed higher in Candidate Detail so analyst status and notes are easier to find.
