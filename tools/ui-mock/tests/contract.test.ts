@@ -11,7 +11,10 @@ import { CandidateDetail, getMissingSecurityText } from "../src/components/Candi
 import { LocalMvpWorkflowPanel } from "../src/components/LocalMvpWorkflowPanel";
 import { MarketContextPanel } from "../src/components/MarketContextPanel";
 import { ScannerRadar } from "../src/components/ScannerRadar";
+import { StatCards } from "../src/components/StatCards";
 import { WatchlistTab } from "../src/components/WatchlistTab";
+import { WorkspaceOverview } from "../src/components/WorkspaceOverview";
+import { WorkspaceSection, WorkspaceShell, type WorkspaceNavItem } from "../src/components/WorkspaceShell";
 import { PERSISTABLE_SCANNER_SAMPLE } from "../src/fixtures/persistableScannerSample";
 import { toMockCandidate } from "../src/mockData";
 import { interpretContextApiOutput, parseMarketContextApiOutput } from "../src/services/contextDataSource";
@@ -251,6 +254,86 @@ assert.match(
   localMvpWorkflowMarkup,
   /This is not a buy\/sell signal\./,
   "local MVP workflow panel renders compliance copy",
+);
+
+const workspaceNavItems = [
+  { id: "overview",    label: "Overview",        icon: "OV", description: "Status and health" },
+  { id: "scanner",     label: "Scanner Radar",   icon: "SR", description: "Read-only scanner output" },
+  { id: "watchlist",   label: "Review Queue",    icon: "RQ", description: "Local analyst queue" },
+  { id: "research",    label: "Research Review", icon: "RR", description: "Mock categorization" },
+  { id: "risks",       label: "Risk Alerts",     icon: "RA", description: "Critical and manual checks" },
+  { id: "methodology", label: "Methodology",     icon: "M",  description: "Scanner and review layers" },
+] satisfies WorkspaceNavItem[];
+
+const workspaceShellMarkup = renderToStaticMarkup(React.createElement(WorkspaceShell, {
+  navItems: workspaceNavItems,
+  activeSection: "overview",
+  onSectionChange: () => undefined,
+  dataSource: "fixture",
+  dataSourceOptions: [
+    { key: "fixture", label: "Fixture" },
+    { key: "static-json", label: "Static JSON" },
+    { key: "api", label: "API / latest" },
+  ],
+  onDataSourceChange: () => undefined,
+  loading: false,
+  sourceStatusText: "Scanner source: built-in fixture",
+}, React.createElement(WorkspaceSection, {
+  title: "Local MVP Overview",
+  description: "Current local workflow status and health commands.",
+}, React.createElement("div", null, "Overview body"))));
+
+assert.match(workspaceShellMarkup, /Local MVP Overview/, "workspace shell renders overview section");
+assert.match(workspaceShellMarkup, /Scanner Radar/, "workspace shell renders scanner radar navigation");
+assert.match(workspaceShellMarkup, /Review Queue/, "workspace shell renders review queue navigation");
+assert.match(workspaceShellMarkup, /Research Review/, "workspace shell renders research review navigation");
+assert.match(workspaceShellMarkup, /Risk Alerts/, "workspace shell renders risk alerts navigation");
+assert.match(workspaceShellMarkup, /Methodology/, "workspace shell renders methodology navigation");
+assert.match(
+  workspaceShellMarkup,
+  /This is not a buy\/sell signal\./,
+  "workspace shell renders compliance footer",
+);
+
+const workspaceOverviewMarkup = renderToStaticMarkup(React.createElement(WorkspaceOverview, {
+  statCards: React.createElement(StatCards, {
+    summary: {
+      total_candidates: uiCandidates.length,
+      watchlist: uiCandidates.filter((candidate) => candidate.finalLabel === "WATCHLIST").length,
+      critical_risk: uiCandidates.filter((candidate) => candidate.finalLabel === "CRITICAL_RISK").length,
+      needs_manual_verification: uiCandidates.filter((candidate) => candidate.finalLabel === "NEEDS_MANUAL_VERIFICATION").length,
+      rejected: uiCandidates.filter((candidate) => candidate.finalLabel === "REJECT").length,
+    },
+  }),
+  marketContext: React.createElement(MarketContextPanel, {
+    state: {
+      status: "ready",
+      context: parsedContextFixture,
+      message: interpretedContextFixture.fallbackReason,
+    },
+  }),
+  workflowPanel: React.createElement(LocalMvpWorkflowPanel, {
+    scannerSourceText: "Scanner source: real-output",
+    contextSourceText: "Context source: approved-sources-output",
+    reviewStorageText: "Review storage: local API (file-backed JSON)",
+  }),
+}));
+
+assert.match(workspaceOverviewMarkup, /Local MVP workspace overview/, "overview renders workspace copy");
+assert.match(
+  workspaceOverviewMarkup,
+  /Scanner label and local review status are separate/,
+  "overview explains scanner and review layers are separate",
+);
+assert.match(
+  workspaceOverviewMarkup,
+  /scripts\\win\\check-local-mvp\.cmd/,
+  "overview renders local MVP health command",
+);
+assert.match(
+  workspaceOverviewMarkup,
+  /scripts\\win\\generate-analyst-report\.cmd/,
+  "overview renders analyst report command",
 );
 
 const passMockCandidate = toMockCandidate(passUi);
@@ -912,6 +995,11 @@ assert.match(
   reviewQueueMarkup,
   /Review status does not change scanner labels\./,
   "review queue includes scanner-label compliance copy",
+);
+assert.match(
+  reviewQueueMarkup,
+  /This is not a buy\/sell signal\./,
+  "review queue renders compliance copy",
 );
 assert.equal(passMockCandidate.final_label, "WATCHLIST", "review queue rendering does not mutate final_label");
 
