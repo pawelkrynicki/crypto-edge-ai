@@ -127,6 +127,7 @@ Windows helper scripts:
 - `scripts\win\check-local-workflow-smoke.cmd` checks the local MVP workflow from scanner latest output through UI candidates, context latest output, review storage, diagnostics, and review export/import.
 - `scripts\win\generate-analyst-report.cmd` generates a local Markdown plus JSON analyst report under `tools\ui-mock\.local\reports`.
 - `scripts\win\check-analyst-report.cmd` runs the analyst report generator in smoke mode with guarded temporary review storage and report files.
+- `scripts\win\check-local-mvp.cmd` runs the aggregate local MVP health check for the pre-holiday freeze checkpoint.
 - `scripts\win\dev-ui-sqlite.cmd` starts the local API and frontend preview with SQLite Review Storage enabled.
 
 Local Review Session:
@@ -237,6 +238,14 @@ Analyst Report / Review Export v1:
 - Summarize scanner metadata, scanner labels, security labels, review statuses, analyst notes, stored reviews not in the current scan, approved market context, and a neutral candidate snapshot.
 - Keep the report as a local research workflow export only. It is not a recommendation and includes `This is not a buy/sell signal.`
 - Use only existing local endpoints and local real-output or fixture fallback files. Do not call external networks, add sources, mutate scanner output, mutate market data, change scanner scoring, change `final_label`, change `WATCHLIST` meaning, add npm dependencies, add auth, add a production backend, or implement UX2.
+
+Local MVP Runbook + Freeze Checklist v1:
+
+- Add `scripts\win\check-local-mvp.cmd` as the aggregate local MVP health check.
+- Add `docs/local_mvp_runbook.md` for quick local operations, partial checks, preview commands, storage notes, analyst workflow, report generation, and troubleshooting.
+- Add `docs/pre_holiday_freeze_checklist.md` for DONE status, freeze scope, holiday-safe work, avoid list, post-holiday stages, and safe local MVP definition.
+- Keep this stage documentation/DX only. It does not change endpoints, UI workflow, scanner scoring, `final_label`, `WATCHLIST` meaning, source registry/compliance rules, npm dependencies, auth, production backend, or data sources.
+- UX2 Product-grade Interface Redesign remains a future required stage.
 
 Paid and clarification-dependent sources remain deferred:
 

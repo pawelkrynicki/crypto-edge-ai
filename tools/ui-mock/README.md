@@ -179,6 +179,21 @@ npm run build   # Build for production
 
 Windows CMD helpers for checking the UI mock, starting the API/frontend preview, and freeing local ports are documented in `../../scripts/win/README.md`. The UI mock check uses direct binaries instead of `pnpm` because of the known Windows `node_modules` / `pnpm` `EPERM` issue.
 
+Local MVP runbook and freeze checklist:
+
+```text
+../../docs/local_mvp_runbook.md
+../../docs/pre_holiday_freeze_checklist.md
+```
+
+Full local MVP health check:
+
+```cmd
+..\..\scripts\win\check-local-mvp.cmd
+```
+
+Stage 9C adds this documentation/DX checkpoint only. It does not change endpoint paths, UI workflow, scanner scoring, `final_label`, or `WATCHLIST` meaning. UX2 Product-grade Interface Redesign remains a future required stage.
+
 Review Storage mode checks:
 
 ```cmd
