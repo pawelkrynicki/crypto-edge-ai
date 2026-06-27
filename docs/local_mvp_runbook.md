@@ -5,6 +5,7 @@
 - Local MVP after 9B is operational for: scanner latest output, approved market context, local review storage, diagnostics, review export/import, and analyst report export.
 - 10A Product Workflow Polish adds visible local workflow guidance in the UI without changing endpoints, labels, scoring, or storage behavior.
 - 10B.1 starts UX2 with an information architecture and layout skeleton: Overview, Scanner Radar, Review Queue, Research Review, Risk Alerts, and Methodology.
+- 10B.2 continues UX2 in the Scanner Radar and Candidate Detail workspace only, replacing the scanner table with candidate cards and reorganizing Candidate Detail sections.
 - The current frontend is a functional working prototype, not the final product interface.
 - Full UX2 Product-grade Interface Redesign remains in progress before a final production-grade interface.
 
@@ -99,11 +100,10 @@ Keep these layers separate:
 - Analyst report: generated from CMD with `scripts\win\generate-analyst-report.cmd`.
 - Local MVP health check: run with `scripts\win\check-local-mvp.cmd`.
 
-10B.1 moves Market Context, Local MVP workflow status, and scanner stat cards into the new Overview workspace. It does not change endpoints, scanner scoring, `final_label`, `WATCHLIST` meaning, review storage behavior, or analyst report generation.
+10B.1 moves Market Context, Local MVP workflow status, and scanner stat cards into the new Overview workspace. 10B.2 makes Scanner Radar and Candidate Detail easier to scan while keeping scanner output read-only and local review separate from scanner labels. Neither stage changes endpoints, scanner scoring, `final_label`, `WATCHLIST` meaning, review storage behavior, review import/export/reset behavior, or analyst report generation.
 
 Next UX2 steps:
 
-- 10B.2 Scanner / Candidate Detail Redesign
 - 10B.3 Review Queue + Report Workspace
 - 10B.4 Visual QA / Polish
 

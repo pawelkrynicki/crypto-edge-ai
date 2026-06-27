@@ -157,7 +157,7 @@ Allowed local review statuses:
 
 This remains a local/developer work organization layer. It does not add a production backend, auth, production cron, OpenAI call, data source, scraping, HTML parsing, browser automation, or undocumented endpoint. The only write path is the local development API bridge. Optional SQLite review storage is added later in Stage 8D behind the local API provider interface. It does not change scanner scoring, final labels, or WATCHLIST meaning.
 
-The Scanner Radar table shows a small Review badge separate from the scanner Label column. The radar also includes a Follow-up filter based only on the local `Saved for follow-up` review status.
+The Scanner Radar candidate list shows a small Review badge separate from the scanner label. The radar also includes a Follow-up filter based only on the local `Saved for follow-up` review status.
 
 Review panel compliance copy:
 
@@ -371,7 +371,7 @@ The polish keeps the local layers distinct:
 - Analyst report: generated locally from CMD with `scripts\win\generate-analyst-report.cmd`.
 - Local MVP health check: existing command `scripts\win\check-local-mvp.cmd`.
 
-Candidate Detail now clarifies that saving a review status does not change scanner scoring or label, `WATCHLIST` means further manual analysis only, and missing security/context data means manual verification rather than a positive assessment.
+Candidate Detail now clarifies that saving a review status does not change scanner scoring or label, `WATCHLIST` means eligible for further manual review only, and missing security/context data means manual verification rather than a positive assessment.
 
 Review Queue now explains what the queue is for, what to do next, and how to export the analyst report from CMD. Scanner/context/review storage status copy is also more explicit, including `real-output`, `approved-sources-output`, `fixture-fallback`, local API, file-backed JSON, SQLite metadata when available, and browser `localStorage` fallback.
 
@@ -393,7 +393,21 @@ Overview contains Market Context, Local MVP workflow status, scanner stat cards,
 
 Next UX2 steps:
 
-- 10B.2 Scanner / Candidate Detail Redesign
+- 10B.3 Review Queue + Report Workspace
+- 10B.4 Visual QA / Polish
+
+## UX2 Scanner / Candidate Detail Redesign v1
+
+Stage 10B.2 continues UX2 only inside Scanner Radar and Candidate Detail.
+
+- Scanner Radar now uses a candidate-card list with selected state, scanner `final_label`, local review status, security label, chain/DEX, market cap, liquidity, 24h volume, age, and the first scanner reason.
+- Candidate Detail now separates Local Review Session, Scanner Label vs Local Review, Quick Snapshot, Security & Manual Verification, Data Coverage & Context, Scanner Label / Reasons, and Reasoning Checklist.
+- Guidance copy states that scanner output is read-only, `WATCHLIST` means eligible for further manual review only, local review status is an analyst note layer, missing security/context data requires manual verification, and this is not a buy/sell signal.
+
+10B.2 changes no endpoint paths, data-source policy, review save/clear/import/export behavior, analyst report generation, scanner scoring, `final_label`, or `WATCHLIST` meaning. It adds no npm dependencies, auth, production backend, production cron, new sources, scraping, HTML parsing, browser automation, undocumented endpoints, or OpenAI calls.
+
+UX2 remains in progress. Next UX2 steps are:
+
 - 10B.3 Review Queue + Report Workspace
 - 10B.4 Visual QA / Polish
 

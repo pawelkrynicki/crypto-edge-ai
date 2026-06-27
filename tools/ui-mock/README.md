@@ -6,7 +6,7 @@ It demonstrates the visual direction, product structure, and trader value propos
 
 ## Features
 - **Dark, professional UI**: Aligned with the AIKINTEL aesthetic.
-- **Scanner Radar**: Main table view showing token candidates with market data, basic filter status, security checks, and final labels.
+- **Scanner Radar**: Product-grade candidate list and detail workspace showing scanner labels, local review status, security labels, market metrics, and read-only scanner reasons.
 - **Market Context Panel**: Shows Alternative.me Fear & Greed plus DefiLlama context from the local API bridge.
 - **Candidate Detail Panel**: In-depth breakdown of a selected token, including research context/data coverage, a trader checklist, and risk reasons.
 - **Local Review Session**: Local analyst workspace for per-candidate review status, analyst note, and last-updated timestamp.
@@ -20,11 +20,11 @@ It demonstrates the visual direction, product structure, and trader value propos
 
 ## UX1 Professional Dashboard Redesign
 
-UX1 improves the dashboard information architecture and visual hierarchy without changing data behavior. The preview now uses a top product header, a compact Market Context block, a short KPI strip, a clearer Scanner Radar table, and a wider Candidate Detail working panel.
+UX1 improves the dashboard information architecture and visual hierarchy without changing data behavior. The preview uses a top product header, a compact Market Context block, a short KPI strip, a clearer Scanner Radar workspace, and a wider Candidate Detail working panel.
 
 UX1 itself added no new data sources, API endpoints, backend services, storage model changes, scanner scoring changes, final-label changes, or WATCHLIST meaning changes. Market Context and Local Review Session are easier to find.
 
-UX2 Product-grade Interface Redesign is now started with 10B.1, but the full UX2 redesign is not complete.
+UX2 Product-grade Interface Redesign is now continued through 10B.2, but the full UX2 redesign is not complete.
 
 ## 10A Product Workflow Polish
 
@@ -62,6 +62,19 @@ The full UX2 redesign remains in progress. Planned next steps are:
 - 10B.4 Visual QA / Polish
 
 10B.1 does not change endpoint paths, scanner scoring, `final_label`, `WATCHLIST` meaning, review storage behavior, report generation logic, npm dependencies, auth, production backend, production cron, new sources, scraping, browser automation, undocumented endpoints, or OpenAI calls.
+
+## 10B.2 UX2 Scanner / Candidate Detail Redesign
+
+10B.2 redesigns only the Scanner Radar and Candidate Detail work area. Scanner Radar now uses a clearer candidate-card list beside the selected Candidate Detail panel. Candidate cards keep scanner `final_label`, security label, local review status, market cap, liquidity, 24h volume, age, and the first scanner reason visible without adding investment CTAs.
+
+Candidate Detail now has stronger product-grade sections for Local Review Session, Scanner Label vs Local Review, Quick Snapshot, Security & Manual Verification, Data Coverage & Context, Scanner Label / Reasons, and Reasoning Checklist. Guidance copy clarifies that scanner output is read-only, `WATCHLIST` means eligible for further manual review only, local review is an analyst note layer, missing security/context data requires manual verification, and this is not a buy/sell signal.
+
+10B.2 changes no endpoint paths, data-source policy, review save/clear/import/export behavior, analyst report generation, scanner scoring, `final_label`, or `WATCHLIST` meaning. It adds no npm dependencies, auth, production backend, production cron, new sources, scraping, browser automation, undocumented endpoints, or OpenAI calls.
+
+UX2 remains in progress. Planned next steps are:
+
+- 10B.3 Review Queue + Report Workspace
+- 10B.4 Visual QA / Polish
 
 ## Important Product Rules
 - **No Buy Signals**: Crypto Edge AI is a research tool, not a trading bot.
@@ -122,7 +135,7 @@ Review statuses:
 - Dismissed after review
 - Waiting for more data
 
-The review layer has no production backend, auth, production database, or scanner-output mutation. The only write path is the local development API bridge, and the browser keeps `localStorage` as a fallback/mirror. SQLite is an optional local storage provider behind the same API workflow. It is only for organizing local analyst work. The scanner table shows a small **Review** badge, and the Scanner Radar includes a **Follow-up** filter based on the local `Saved for follow-up` status.
+The review layer has no production backend, auth, production database, or scanner-output mutation. The only write path is the local development API bridge, and the browser keeps `localStorage` as a fallback/mirror. SQLite is an optional local storage provider behind the same API workflow. It is only for organizing local analyst work. The Scanner Radar candidate cards show a small **Review** badge, and the Scanner Radar includes a **Follow-up** filter based on the local `Saved for follow-up` status.
 
 ## Review Storage Diagnostics / Reset
 

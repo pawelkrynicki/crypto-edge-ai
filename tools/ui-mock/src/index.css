@@ -677,15 +677,48 @@
 
   .scanner-workbench {
     @apply grid gap-3 min-h-[500px];
-    grid-template-columns: minmax(0, 1fr) minmax(460px, 500px);
+    grid-template-columns: minmax(320px, 430px) minmax(0, 1fr);
+    align-items: start;
   }
 
-  .scanner-main {
-    @apply min-w-0 flex flex-col gap-2.5;
+  .scanner-list-panel,
+  .scanner-detail-panel {
+    @apply min-w-0;
+  }
+
+  .scanner-list-panel {
+    @apply flex flex-col gap-2.5;
+  }
+
+  .scanner-radar-header {
+    @apply rounded-md px-3 py-2.5;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+  }
+
+  .scanner-radar-header h3 {
+    @apply text-sm font-bold leading-tight;
+    color: var(--text-primary);
+  }
+
+  .scanner-radar-header p {
+    @apply mt-0.5 text-[11px] leading-snug;
+    color: var(--text-secondary);
+  }
+
+  .scanner-guidance-list {
+    @apply mt-2 flex flex-wrap gap-1.5;
+  }
+
+  .scanner-guidance-list span {
+    @apply rounded-md px-2 py-1 text-[10px] font-medium leading-snug;
+    color: var(--text-muted);
+    background: rgba(8, 12, 16, 0.3);
+    border: 1px solid var(--border);
   }
 
   .scanner-toolbar {
-    @apply flex items-center gap-2.5 flex-wrap rounded-md px-3 py-2;
+    @apply flex items-center gap-2 flex-wrap rounded-md px-3 py-2;
     background: var(--bg-card);
     border: 1px solid var(--border);
   }
@@ -695,16 +728,137 @@
     color: var(--text-muted);
   }
 
+  .scanner-card-list {
+    @apply grid gap-2;
+  }
+
+  .scanner-candidate-card {
+    @apply flex w-full flex-col items-stretch gap-2.5 rounded-md p-3 text-left transition-colors;
+    color: var(--text-primary);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+  }
+
+  .scanner-candidate-card:hover {
+    background: var(--bg-raised);
+    border-color: var(--border-sub);
+  }
+
+  .scanner-candidate-card.selected {
+    background: rgba(90, 167, 255, 0.08);
+    border-color: var(--accent-border);
+    box-shadow: inset 3px 0 0 var(--accent);
+  }
+
+  .scanner-card-topline {
+    @apply flex items-start justify-between gap-3 min-w-0;
+  }
+
+  .scanner-card-token {
+    @apply min-w-0;
+  }
+
+  .scanner-card-token strong {
+    @apply block truncate text-base font-bold leading-tight;
+    color: var(--text-primary);
+  }
+
+  .scanner-card-token span {
+    @apply block truncate text-[11px] leading-tight;
+    color: var(--text-secondary);
+  }
+
+  .scanner-card-badges {
+    @apply flex shrink-0 flex-wrap justify-end gap-1;
+  }
+
+  .scanner-card-meta {
+    @apply flex flex-wrap items-center gap-1.5 text-[11px];
+    color: var(--text-muted);
+  }
+
+  .scanner-chain-badge {
+    @apply inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-bold border;
+  }
+
+  .scanner-chain-badge.solana {
+    color: var(--green);
+    background: var(--green-dim);
+    border-color: var(--green-border);
+  }
+
+  .scanner-chain-badge.ethereum {
+    color: var(--accent);
+    background: var(--accent-dim);
+    border-color: var(--accent-border);
+  }
+
+  .scanner-chain-badge.bsc {
+    color: var(--amber);
+    background: var(--amber-dim);
+    border-color: var(--amber-border);
+  }
+
+  .scanner-chain-badge.base,
+  .scanner-chain-badge.unknown {
+    color: var(--slate);
+    background: var(--slate-dim);
+    border-color: var(--slate-border);
+  }
+
+  .scanner-card-metrics {
+    @apply grid grid-cols-2 gap-1.5;
+  }
+
+  .scanner-card-metric {
+    @apply min-w-0 rounded-md px-2 py-1.5;
+    background: rgba(8, 12, 16, 0.28);
+    border: 1px solid var(--border);
+  }
+
+  .scanner-card-metric span {
+    @apply block text-[9px] font-bold uppercase leading-tight;
+    color: var(--text-muted);
+  }
+
+  .scanner-card-metric strong {
+    @apply mt-0.5 block truncate text-[12px] font-bold tabular-nums;
+    color: var(--text-primary);
+  }
+
+  .scanner-card-reason {
+    @apply text-[12px] leading-relaxed;
+    color: var(--text-secondary);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .scanner-card-action {
+    @apply self-end rounded-md px-2.5 py-1 text-[11px] font-semibold;
+    color: var(--accent);
+    background: var(--accent-dim);
+    border: 1px solid var(--accent-border);
+  }
+
+  .scanner-empty-state {
+    @apply rounded-md p-6 text-center text-sm;
+    color: var(--text-secondary);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+  }
+
   .scanner-table-card {
     @apply overflow-x-auto;
   }
 
   .scanner-table-card table {
-    min-width: 980px;
+    min-width: 860px;
   }
 
   .scanner-token {
-    @apply min-w-[170px];
+    @apply min-w-[150px];
   }
 
   .scanner-token strong {
@@ -715,36 +869,6 @@
   .scanner-token > span {
     @apply block text-[11px] truncate;
     color: var(--text-secondary);
-  }
-
-  .chain-line {
-    @apply mt-1 flex items-center gap-1.5;
-  }
-
-  .chain-badge {
-    @apply inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-bold border;
-  }
-
-  .scanner-metric-stack {
-    @apply space-y-1.5 min-w-[118px];
-  }
-
-  .scanner-metric-stack div {
-    @apply flex items-center justify-between gap-3;
-  }
-
-  .scanner-metric-stack span:first-child {
-    @apply text-[10px] font-semibold uppercase;
-    color: var(--text-muted);
-  }
-
-  .scanner-metric-stack span:last-child {
-    @apply text-[12px] font-semibold tabular-nums;
-    color: var(--text-primary);
-  }
-
-  .scanner-check-stack {
-    @apply space-y-1.5 min-w-[96px];
   }
 
   .scanner-reason {
@@ -804,6 +928,17 @@
     @apply mt-2.5 flex flex-wrap items-center gap-2;
   }
 
+  .detail-header-summary {
+    @apply mt-2 grid gap-1 text-[10px] leading-snug;
+    color: var(--text-secondary);
+  }
+
+  .detail-header-summary span {
+    @apply rounded-md px-2 py-1;
+    background: rgba(8, 12, 16, 0.28);
+    border: 1px solid var(--border);
+  }
+
   .detail-close {
     @apply rounded-md px-2 py-1 text-[12px] font-bold transition-colors;
     color: var(--text-muted);
@@ -831,6 +966,18 @@
 
   .detail-section-title .section-label {
     color: var(--text-secondary);
+  }
+
+  .detail-section-note {
+    @apply mb-2 text-[11px] leading-relaxed;
+    color: var(--text-secondary);
+  }
+
+  .detail-warning-note {
+    @apply mt-2 rounded-md px-2.5 py-1.5 text-[10px] leading-snug;
+    color: var(--amber);
+    background: var(--amber-dim);
+    border: 1px solid var(--amber-border);
   }
 
   .detail-kpi-grid {
@@ -987,35 +1134,13 @@
 
   @media (min-width: 1480px) {
     .scanner-workbench {
-      grid-template-columns: minmax(0, 1fr) minmax(500px, 520px);
+      grid-template-columns: minmax(360px, 460px) minmax(0, 1fr);
     }
   }
 
   @media (max-width: 1400px) {
     .scanner-workbench {
-      grid-template-columns: minmax(0, 1fr) minmax(420px, 460px);
-    }
-
-    .scanner-table-card table {
-      min-width: 860px;
-    }
-
-    .scanner-table-card .data-table th,
-    .scanner-table-card .data-table td {
-      padding-left: 0.375rem;
-      padding-right: 0.375rem;
-    }
-
-    .scanner-token {
-      min-width: 150px;
-    }
-
-    .scanner-metric-stack {
-      min-width: 102px;
-    }
-
-    .scanner-reason {
-      max-width: 170px;
+      grid-template-columns: minmax(300px, 380px) minmax(0, 1fr);
     }
 
     .dashboard-band,

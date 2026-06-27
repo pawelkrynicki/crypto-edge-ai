@@ -175,6 +175,12 @@ export const CandidateDetail: React.FC<Props> = ({
           </div>
         </div>
 
+        <div className="detail-header-summary">
+          <span>Scanner output is read-only.</span>
+          <span>Local review status is an analyst note layer and does not change scanner label.</span>
+          <span>This is not a buy/sell signal.</span>
+        </div>
+
         <div className="detail-header-meta">
           <MetaPill label="Chain" value={c.chain.toUpperCase()} />
           <MetaPill label="DEX" value={c.dex || "--"} />
@@ -194,6 +200,9 @@ export const CandidateDetail: React.FC<Props> = ({
           >
             Local Review Session
           </SectionTitle>
+          <p className="detail-section-note">
+            Local-only analyst notes help organize follow-up work. They do not change the scanner label, scoring, or report data.
+          </p>
           <CandidateReviewControls
             candidateId={c.id}
             reviewRecord={reviewRecord ?? null}
@@ -212,7 +221,7 @@ export const CandidateDetail: React.FC<Props> = ({
               Saving a review status records a local analyst note only; it does not change scanner scoring or label.
             </p>
             <p>
-              WATCHLIST means further manual analysis only. Missing security or context data means manual verification is required, not a positive assessment.
+              WATCHLIST means eligible for further manual review only. Missing security or context data means manual verification is required, not a positive assessment.
             </p>
             <p>This is not a buy/sell signal.</p>
           </div>
@@ -224,18 +233,21 @@ export const CandidateDetail: React.FC<Props> = ({
             <SnapshotMetric label="Price" value={c.price_usd !== null ? `$${c.price_usd.toFixed(6)}` : "--"} />
             <SnapshotMetric label="Liquidity" value={fmtUsd(c.liquidity_usd)} />
             <SnapshotMetric label="24h Volume" value={fmtUsd(c.volume_24h_usd)} />
+            <SnapshotMetric label="Market Cap" value={fmtUsd(c.market_cap_usd)} />
+            <SnapshotMetric label="FDV" value={fmtUsd(c.fdv_usd)} />
             <SnapshotMetric label="Age" value={fmtDays(c.pair_age_days)} />
           </div>
           <div className="mt-3">
-            <DR label="Market Cap" value={fmtUsd(c.market_cap_usd)} />
             <DR label="Volume/MC" value={fmtPct(c.volume_market_cap_ratio)} />
-            <DR label="FDV" value={fmtUsd(c.fdv_usd)} />
             <DR label="Contract" value={<code className="text-[10px] text-secondary break-all">{c.contract_address.slice(0, 24) || "--"}</code>} />
           </div>
         </section>
 
         <section className="detail-section">
-          <SectionTitle>Security</SectionTitle>
+          <SectionTitle>Security &amp; Manual Verification</SectionTitle>
+          <p className="detail-section-note">
+            Missing security or context data requires manual verification.
+          </p>
           {sec ? (
             <>
               <div className="detail-two-col">
@@ -281,6 +293,9 @@ export const CandidateDetail: React.FC<Props> = ({
                       <span key={f} className="badge badge-manual">{formatSecurityFlag(f)}</span>
                     ))}
                   </div>
+                  <div className="detail-warning-note">
+                    Missing security data requires manual verification before any follow-up assessment.
+                  </div>
                 </div>
               )}
             </>
@@ -291,11 +306,14 @@ export const CandidateDetail: React.FC<Props> = ({
 
         <section className="detail-section">
           <SectionTitle>Data Coverage &amp; Context</SectionTitle>
+          <p className="detail-section-note">
+            Market context can frame research, but it does not change scanner labels.
+          </p>
           <CandidateResearchContext candidate={c} marketContextState={marketContextState} />
         </section>
 
         <section className="detail-section">
-          <SectionTitle>Scanner Label</SectionTitle>
+          <SectionTitle>Scanner Label / Reasons</SectionTitle>
           <div className="space-y-3">
             <div className="flex items-center gap-2 flex-wrap">
               <LabelBadge label={c.final_label} size="md" />
@@ -320,7 +338,7 @@ export const CandidateDetail: React.FC<Props> = ({
         </section>
 
         <section className="detail-section">
-          <SectionTitle>Final Checklist</SectionTitle>
+          <SectionTitle>Reasoning Checklist</SectionTitle>
           <div className="space-y-3">
             {Object.entries(CHECKLIST_ITEMS).map(([category, items]) => (
               <div key={category}>

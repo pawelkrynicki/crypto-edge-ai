@@ -849,13 +849,22 @@ assert.match(
 );
 assert.match(
   detailWithContextMarkup,
-  /WATCHLIST means further manual analysis only/,
-  "candidate detail explains WATCHLIST as manual analysis only",
+  /WATCHLIST means eligible for further manual review only/,
+  "candidate detail explains WATCHLIST as manual follow-up only",
 );
 assert.match(
   detailWithContextMarkup,
   /Missing security or context data means manual verification is required, not a positive assessment/,
   "candidate detail explains missing data is not a positive assessment",
+);
+assert.match(detailWithContextMarkup, /Scanner Label vs Local Review/, "candidate detail renders scanner-vs-review section");
+assert.match(detailWithContextMarkup, /Quick Snapshot/, "candidate detail renders quick snapshot section");
+assert.match(detailWithContextMarkup, /Security.*Manual Verification/, "candidate detail renders security manual verification section");
+assert.match(detailWithContextMarkup, /Reasoning Checklist/, "candidate detail renders reasoning checklist section");
+assert.match(
+  detailWithContextMarkup,
+  /Missing security or context data requires manual verification/,
+  "candidate detail renders manual verification guidance",
 );
 assert.match(detailWithContextMarkup, /Further review only/, "candidate detail keeps candidate final label visible");
 assert.equal(passMockCandidate.final_label, "WATCHLIST", "context rendering does not change candidate final label");
@@ -881,8 +890,17 @@ const radarWithReviewMarkup = renderToStaticMarkup(React.createElement(ScannerRa
   onClearReview: () => undefined,
 }));
 
-assert.match(radarWithReviewMarkup, /Review/, "scanner radar renders review column");
+assert.match(radarWithReviewMarkup, /Scanner Radar/, "scanner radar renders workspace title");
+assert.match(radarWithReviewMarkup, /Scanner output is read-only/, "scanner radar renders read-only guidance");
+assert.match(
+  radarWithReviewMarkup,
+  /WATCHLIST means eligible for further manual review only/,
+  "scanner radar explains WATCHLIST scope",
+);
+assert.match(radarWithReviewMarkup, /Local Review Session/, "scanner radar renders selected candidate detail");
+assert.match(radarWithReviewMarkup, /This is not a buy\/sell signal\./, "scanner radar renders compliance copy");
 assert.match(radarWithReviewMarkup, /Follow-up/, "scanner radar renders local review badge");
+assert.equal(passMockCandidate.final_label, "WATCHLIST", "scanner radar review status does not mutate final_label");
 
 const reviewQueueState = {
   version: 1 as const,
