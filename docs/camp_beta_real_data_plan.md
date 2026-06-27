@@ -337,6 +337,23 @@ The report summarizes scanner source metadata, scanner label counts, security la
 
 This is a local research workflow export only. It uses the existing local API endpoints, accepts real local scanner/context output or fixture fallback, and reads review session storage. It does not call external networks, add sources, change scanner output, change market data, change scoring, change `final_label`, change `WATCHLIST` meaning, add auth, add npm dependencies, add a production backend, or add a production cron. UX2 Product-grade Interface Redesign remains a future stage.
 
+## Local MVP Runbook + Freeze Checklist v1
+
+Stage 9C adds the pre-holiday local MVP runbook, freeze checklist, and one aggregate Windows check:
+
+```cmd
+scripts\win\check-local-mvp.cmd
+```
+
+The aggregate check runs the existing data POC, Review Storage modes, local workflow smoke, analyst report smoke, and UI mock checks. It does not start the dev preview, open a browser, add endpoints, change UI workflow, change scanner scoring, change `final_label`, or change `WATCHLIST` meaning.
+
+New docs:
+
+- `docs/local_mvp_runbook.md`
+- `docs/pre_holiday_freeze_checklist.md`
+
+This is a documentation/DX checkpoint only. It closes the local MVP freeze scope for storage, local review workflow, source registry/compliance, endpoint paths, and analyst report export. UX2 Product-grade Interface Redesign remains a future required stage.
+
 ## UX1 Professional Dashboard Redesign
 
 UX1 is a UI-only redesign of `tools/ui-mock`. It improves layout hierarchy, spacing, scanner readability, Market Context visibility, and Candidate Detail readability. Local Review Session is placed higher in Candidate Detail so analyst status and notes are easier to find.

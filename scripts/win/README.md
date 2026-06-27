@@ -10,6 +10,29 @@ scripts\win\post-merge-check.cmd
 
 This syncs `main`, checks that the working tree is clean, runs the data POC checks, and runs the UI mock checks.
 
+## Local MVP Check
+
+```cmd
+scripts\win\check-local-mvp.cmd
+```
+
+This is the pre-holiday local MVP health check. It runs the existing checks in order:
+
+- `scripts\win\check-data-poc.cmd`
+- `scripts\win\check-review-storage-modes.cmd`
+- `scripts\win\check-local-workflow-smoke.cmd`
+- `scripts\win\check-analyst-report.cmd`
+- `scripts\win\check-ui-mock.cmd`
+
+It does not start the dev preview or open a browser. It stops on the first failing check and prints `LOCAL MVP CHECK OK` when the local MVP stack is healthy.
+
+Runbook and freeze notes:
+
+- `docs\local_mvp_runbook.md`
+- `docs\pre_holiday_freeze_checklist.md`
+
+UX2 Product-grade Interface Redesign remains a future required stage.
+
 ## Generate Live Context
 
 ```cmd
