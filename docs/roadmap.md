@@ -258,6 +258,16 @@ Product Workflow Polish v1:
 - This stage adds no endpoints, new sources, npm dependencies, auth, production backend, production cron, scanner scoring change, `final_label` change, or `WATCHLIST` meaning change.
 - UX2 Product-grade Interface Redesign remains a future required stage.
 
+UX2 Information Architecture Shell v1:
+
+- Stage 10B.1 starts UX2 with product-grade information architecture and a layout skeleton, not a full visual redesign.
+- The workspace structure is `Overview -> Scanner Radar -> Review Queue -> Research Review -> Risk Alerts -> Methodology`.
+- Overview holds Market Context, Local MVP workflow status, scanner stat cards, health command copy, and analyst report command copy.
+- Scanner Radar remains the read-only scanner output and Candidate Detail workspace.
+- Review Queue remains the local analyst status, notes, backup, diagnostics, reset, and report command workspace.
+- 10B.1 adds no endpoints, new sources, npm dependencies, auth, production backend, production cron, OpenAI call, scraping, scanner scoring change, `final_label` change, or `WATCHLIST` meaning change.
+- Next UX2 steps are 10B.2 Scanner / Candidate Detail Redesign, 10B.3 Review Queue + Report Workspace, and 10B.4 Visual QA / Polish.
+
 Paid and clarification-dependent sources remain deferred:
 
 - CoinGecko Analyst: first paid market/onchain candidate.
@@ -423,9 +433,9 @@ UX1 Professional Dashboard Redesign:
 
 UX2 Product-grade Interface Redesign:
 
-- Future required stage before a final production interface.
+- Started in 10B.1 with information architecture and layout skeleton only.
 - Scope: simplify, organize, and professionalize the full frontend after the functional prototype stages.
-- Not implemented in Stage 7D.
+- Full UX2 remains in progress through 10B.2 Scanner / Candidate Detail Redesign, 10B.3 Review Queue + Report Workspace, and 10B.4 Visual QA / Polish.
 
 ## UI Data Adapter (Completed)
 

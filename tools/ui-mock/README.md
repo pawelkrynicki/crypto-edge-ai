@@ -24,7 +24,7 @@ UX1 improves the dashboard information architecture and visual hierarchy without
 
 UX1 itself added no new data sources, API endpoints, backend services, storage model changes, scanner scoring changes, final-label changes, or WATCHLIST meaning changes. Market Context and Local Review Session are easier to find.
 
-UX2 Product-grade Interface Redesign remains a future required stage before a final production interface. UX2 is not implemented in this prototype pass.
+UX2 Product-grade Interface Redesign is now started with 10B.1, but the full UX2 redesign is not complete.
 
 ## 10A Product Workflow Polish
 
@@ -44,6 +44,24 @@ The UI now makes these layers more explicit:
 Scanner source status distinguishes `real-output` from `fixture-fallback`. Market context distinguishes `approved-sources-output` from `fixture-fallback`. Review storage distinguishes local API, file-backed JSON or SQLite metadata when available, and browser `localStorage` fallback.
 
 This polish adds no endpoints, npm dependencies, auth, production backend, production cron, new sources, scraping, OpenAI call, scanner scoring change, `final_label` change, or `WATCHLIST` meaning change. UX2 Product-grade Interface Redesign remains a future required stage.
+
+## 10B.1 UX2 Information Architecture Shell
+
+10B.1 starts UX2 with an information architecture and layout skeleton only. The app now opens into a product-grade workspace shell with this structure:
+
+```text
+Overview -> Scanner Radar -> Review Queue -> Research Review -> Risk Alerts -> Methodology
+```
+
+Overview contains Market Context, Local MVP workflow status, scanner stat cards, and local health/report command copy. Scanner Radar remains the read-only scanner output and Candidate Detail workspace. Review Queue remains the local analyst status, notes, backup, diagnostics, reset, and report command workspace.
+
+The full UX2 redesign remains in progress. Planned next steps are:
+
+- 10B.2 Scanner / Candidate Detail Redesign
+- 10B.3 Review Queue + Report Workspace
+- 10B.4 Visual QA / Polish
+
+10B.1 does not change endpoint paths, scanner scoring, `final_label`, `WATCHLIST` meaning, review storage behavior, report generation logic, npm dependencies, auth, production backend, production cron, new sources, scraping, browser automation, undocumented endpoints, or OpenAI calls.
 
 ## Important Product Rules
 - **No Buy Signals**: Crypto Edge AI is a research tool, not a trading bot.

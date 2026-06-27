@@ -88,6 +88,135 @@
     border-bottom: 1px solid var(--border);
   }
 
+  .workspace-header {
+    @apply z-30;
+  }
+
+  .workspace-shell-body {
+    @apply flex-1 min-h-0 grid overflow-hidden;
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
+
+  .workspace-sidebar {
+    @apply min-h-0 overflow-y-auto;
+    background: var(--bg-surface);
+    border-right: 1px solid var(--border);
+  }
+
+  .workspace-nav {
+    @apply flex flex-col gap-1.5 p-3;
+  }
+
+  .workspace-nav-item {
+    @apply flex w-full items-start gap-2.5 rounded-md px-2.5 py-2 text-left transition-colors;
+    color: var(--text-secondary);
+    border: 1px solid transparent;
+  }
+
+  .workspace-nav-item:hover {
+    color: var(--text-primary);
+    background: var(--bg-raised);
+    border-color: var(--border);
+  }
+
+  .workspace-nav-item.active {
+    color: var(--accent);
+    background: var(--accent-dim);
+    border-color: var(--accent-border);
+  }
+
+  .workspace-nav-icon {
+    @apply inline-flex h-6 min-w-6 items-center justify-center rounded text-[9px] font-bold;
+    color: var(--text-muted);
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+  }
+
+  .workspace-nav-item.active .workspace-nav-icon {
+    color: var(--accent);
+    background: rgba(90, 167, 255, 0.18);
+    border-color: var(--accent-border);
+  }
+
+  .workspace-nav-copy {
+    @apply min-w-0;
+  }
+
+  .workspace-nav-copy > span {
+    @apply block text-[12px] font-bold leading-tight;
+  }
+
+  .workspace-nav-copy small {
+    @apply mt-0.5 block truncate text-[10px] font-medium leading-tight;
+    color: var(--text-muted);
+  }
+
+  .workspace-main {
+    @apply min-w-0 min-h-0 overflow-y-auto;
+    background: var(--bg-base);
+  }
+
+  .workspace-notice {
+    @apply sticky top-0 z-20;
+  }
+
+  .workspace-content {
+    @apply px-5 py-4 min-h-full;
+  }
+
+  .workspace-section {
+    @apply min-w-0 space-y-3;
+  }
+
+  .workspace-section-header {
+    @apply flex items-start justify-between gap-3 pb-1;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .workspace-section-header h2 {
+    @apply text-lg font-bold leading-tight;
+    color: var(--text-primary);
+  }
+
+  .workspace-section-header p {
+    @apply mt-0.5 text-[12px] leading-snug;
+    color: var(--text-secondary);
+  }
+
+  .workspace-section-body {
+    @apply min-w-0;
+  }
+
+  .overview-layout {
+    @apply grid gap-3;
+  }
+
+  .overview-intro-panel {
+    @apply rounded-md px-4 py-3;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+  }
+
+  .overview-intro-panel h3 {
+    @apply mt-1 text-sm font-bold leading-tight;
+    color: var(--text-primary);
+  }
+
+  .overview-intro-panel p {
+    @apply mt-1 text-[12px] leading-relaxed;
+    color: var(--text-secondary);
+  }
+
+  .overview-intro-panel code {
+    @apply text-[11px];
+    color: var(--accent);
+  }
+
+  .overview-stat-section,
+  .overview-panel {
+    @apply min-w-0;
+  }
+
   .product-mark {
     @apply flex items-center gap-3 min-w-0;
   }
@@ -893,7 +1022,8 @@
     .dashboard-content,
     .app-header,
     .app-footer,
-    .top-tabs {
+    .top-tabs,
+    .workspace-content {
       @apply px-4;
     }
   }
@@ -914,6 +1044,28 @@
   }
 
   @media (max-width: 900px) {
+    .workspace-shell-body {
+      grid-template-columns: 1fr;
+    }
+
+    .workspace-sidebar {
+      @apply overflow-x-auto overflow-y-hidden;
+      border-right: 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .workspace-nav {
+      @apply flex-row gap-1.5 p-2;
+    }
+
+    .workspace-nav-item {
+      @apply min-w-[150px] shrink-0;
+    }
+
+    .workspace-nav-copy small {
+      display: none;
+    }
+
     .market-context-layout {
       grid-template-columns: 1fr;
     }

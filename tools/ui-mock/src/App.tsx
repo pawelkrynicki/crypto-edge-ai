@@ -7,6 +7,13 @@ import { RiskAlerts } from "./components/RiskAlerts";
 import { Methodology } from "./components/Methodology";
 import { MarketContextPanel, type MarketContextPanelState } from "./components/MarketContextPanel";
 import { LocalMvpWorkflowPanel } from "./components/LocalMvpWorkflowPanel";
+import { WorkspaceOverview } from "./components/WorkspaceOverview";
+import {
+  WorkspaceSection,
+  WorkspaceShell,
+  type WorkspaceNavItem,
+  type WorkspaceSectionId,
+} from "./components/WorkspaceShell";
 import {
   loadScannerDataSourceResult,
   type DataSourceKey,
@@ -47,21 +54,41 @@ function buildSummary(candidates: MockCandidate[]) {
   };
 }
 
-type TabId = "scanner" | "research" | "watchlist" | "risks" | "methodology";
-
-interface Tab {
-  id: TabId;
-  label: string;
-  icon: string;
-}
-
-const TABS: Tab[] = [
-  { id: "scanner",     label: "Scanner Radar",   icon: "SR" },
-  { id: "research",    label: "Research Review", icon: "RR" },
-  { id: "watchlist",   label: "Review Queue",    icon: "RQ" },
-  { id: "risks",       label: "Risk Alerts",     icon: "RA" },
-  { id: "methodology", label: "Methodology",     icon: "M" },
+const WORKSPACE_NAV_ITEMS: WorkspaceNavItem[] = [
+  { id: "overview",    label: "Overview",        icon: "OV", description: "Status and health" },
+  { id: "scanner",     label: "Scanner Radar",   icon: "SR", description: "Read-only scanner output" },
+  { id: "watchlist",   label: "Review Queue",    icon: "RQ", description: "Local analyst queue" },
+  { id: "research",    label: "Research Review", icon: "RR", description: "Mock categorization" },
+  { id: "risks",       label: "Risk Alerts",     icon: "RA", description: "Critical and manual checks" },
+  { id: "methodology", label: "Methodology",     icon: "M",  description: "Scanner and review layers" },
 ];
+
+const SECTION_COPY: Record<WorkspaceSectionId, { title: string; description: string }> = {
+  overview: {
+    title: "Local MVP Overview",
+    description: "Current local workflow status and health commands.",
+  },
+  scanner: {
+    title: "Scanner Radar",
+    description: "Scanner output is read-only. WATCHLIST means eligible for further manual review only.",
+  },
+  watchlist: {
+    title: "Review Queue",
+    description: "Local analyst status and notes. This does not change scanner labels.",
+  },
+  research: {
+    title: "Research Review",
+    description: "Mock research categorization workspace. It is not an external AI call.",
+  },
+  risks: {
+    title: "Risk Alerts",
+    description: "Critical and manual-verification candidates from current scanner output.",
+  },
+  methodology: {
+    title: "Methodology",
+    description: "How local scanner labels, context and review layers fit together.",
+  },
+};
 
 const DATA_SOURCE_OPTIONS: { key: DataSourceKey; label: string }[] = [
   { key: "fixture",     label: "Fixture" },
@@ -93,7 +120,7 @@ const INITIAL_REVIEW_STORAGE_STATUS: ReviewStorageStatus = {
 };
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<TabId>("scanner");
+  const [activeSection, setActiveSection] = useState<WorkspaceSectionId>("overview");
 
   const [dataSource, setDataSource] = useState<DataSourceKey>("fixture");
   const [resolvedSource, setResolvedSource] = useState<ResolvedScannerSource>("built-in-fixture");
@@ -239,137 +266,109 @@ export default function App() {
 
   const handleOpenCandidate = useCallback((candidateId: string) => {
     setSelectedCandidateId(candidateId);
-    setActiveTab("scanner");
+    setActiveSection("scanner");
   }, []);
 
-  const renderTab = () => {
-    if (loading) {
-      return (
+  const renderLoadingSection = (sectionId: WorkspaceSectionId) => {
+    const copy = SECTION_COPY[sectionId];
+
+    return (
+      <WorkspaceSection title={copy.title} description={copy.description}>
         <div className="flex items-center justify-center h-40">
           <span className="text-secondary text-sm">Loading data...</span>
         </div>
-      );
+      </WorkspaceSection>
+    );
+  };
+
+  const renderSection = () => {
+    if (loading && activeSection !== "overview") {
+      return renderLoadingSection(activeSection);
     }
 
-    switch (activeTab) {
+    switch (activeSection) {
+      case "overview":
+        return (
+          <WorkspaceSection {...SECTION_COPY.overview}>
+            <WorkspaceOverview
+              statCards={<StatCards summary={summary} />}
+              marketContext={<MarketContextPanel state={marketContextState} />}
+              workflowPanel={(
+                <LocalMvpWorkflowPanel
+                  scannerSourceText={sourceStatusText}
+                  scannerFallbackReason={fallbackMsg}
+                  contextSourceText={contextSourceStatus.text}
+                  contextSourceDetail={contextSourceStatus.detail}
+                  reviewStorageText={reviewStorageStatus.text}
+                  reviewStorageDetail={reviewStorageStatus.detail}
+                />
+              )}
+            />
+          </WorkspaceSection>
+        );
       case "scanner":
         return (
-          <ScannerRadar
-            candidates={candidates}
-            marketContextState={marketContextState}
-            selectedCandidateId={selectedCandidateId}
-            onCandidateSelected={setSelectedCandidateId}
-            reviewSession={reviewSession}
-            onSaveReview={handleSaveReview}
-            onClearReview={handleClearReview}
-          />
+          <WorkspaceSection {...SECTION_COPY.scanner}>
+            <ScannerRadar
+              candidates={candidates}
+              marketContextState={marketContextState}
+              selectedCandidateId={selectedCandidateId}
+              onCandidateSelected={setSelectedCandidateId}
+              reviewSession={reviewSession}
+              onSaveReview={handleSaveReview}
+              onClearReview={handleClearReview}
+            />
+          </WorkspaceSection>
         );
       case "research":
-        return <ResearchReview />;
+        return (
+          <WorkspaceSection {...SECTION_COPY.research}>
+            <ResearchReview />
+          </WorkspaceSection>
+        );
       case "watchlist":
         return (
-          <WatchlistTab
-            candidates={candidates}
-            reviewSession={reviewSession}
-            reviewStorageStatus={reviewStorageStatus}
-            onClearReview={handleClearReview}
-            onOpenCandidate={handleOpenCandidate}
-            onImportReviewSession={handleImportReviewSession}
-            onResetReviewSession={handleResetReviewSession}
-          />
+          <WorkspaceSection {...SECTION_COPY.watchlist}>
+            <WatchlistTab
+              candidates={candidates}
+              reviewSession={reviewSession}
+              reviewStorageStatus={reviewStorageStatus}
+              onClearReview={handleClearReview}
+              onOpenCandidate={handleOpenCandidate}
+              onImportReviewSession={handleImportReviewSession}
+              onResetReviewSession={handleResetReviewSession}
+            />
+          </WorkspaceSection>
         );
       case "risks":
-        return <RiskAlerts candidates={candidates} />;
+        return (
+          <WorkspaceSection {...SECTION_COPY.risks}>
+            <RiskAlerts candidates={candidates} />
+          </WorkspaceSection>
+        );
       case "methodology":
-        return <Methodology />;
+        return (
+          <WorkspaceSection {...SECTION_COPY.methodology}>
+            <Methodology />
+          </WorkspaceSection>
+        );
     }
   };
 
   return (
-    <div className="app-shell">
-      <header className="app-header">
-        <div className="product-mark">
-          <div className="product-logo">CE</div>
-          <div className="min-w-0">
-            <h1>Crypto Edge AI</h1>
-            <p>Professional research radar for scanner candidates and market context.</p>
-          </div>
-        </div>
-
-        <div className="header-actions">
-          <div className="source-control" aria-label="Data source">
-            <span>Data source</span>
-            <div className="source-segment">
-              {DATA_SOURCE_OPTIONS.map((opt) => (
-                <button
-                  key={opt.key}
-                  onClick={() => handleSourceChange(opt.key)}
-                  className={dataSource === opt.key ? "active" : ""}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-            {loading && <em>loading...</em>}
-          </div>
-          <span className="badge badge-context">Camp BETA</span>
-          <span className="source-status">{sourceStatusText}</span>
-        </div>
-      </header>
-
-      {fallbackMsg && (
-        <div className="app-notice">
-          <span>Scanner fixture fallback</span>
-          <p>{fallbackMsg}</p>
-        </div>
-      )}
-
-      <div className="dashboard-scroll">
-        <section className="dashboard-band">
-          <MarketContextPanel state={marketContextState} />
-        </section>
-
-        <section className="dashboard-band compact">
-          <LocalMvpWorkflowPanel
-            scannerSourceText={sourceStatusText}
-            scannerFallbackReason={fallbackMsg}
-            contextSourceText={contextSourceStatus.text}
-            contextSourceDetail={contextSourceStatus.detail}
-            reviewStorageText={reviewStorageStatus.text}
-            reviewStorageDetail={reviewStorageStatus.detail}
-          />
-        </section>
-
-        <section className="dashboard-band compact">
-          <StatCards summary={summary} />
-        </section>
-
-        <nav className="top-tabs" aria-label="Dashboard views">
-          {TABS.map((t) => {
-            const active = activeTab === t.id;
-            return (
-              <button
-                key={t.id}
-                onClick={() => setActiveTab(t.id)}
-                className={`tab-item ${active ? "active" : ""}`}
-              >
-                <span className="tab-icon">{t.icon}</span>
-                <span>{t.label}</span>
-              </button>
-            );
-          })}
-        </nav>
-
-        <main className="dashboard-content">
-          {renderTab()}
-        </main>
-      </div>
-
-      <footer className="app-footer">
-        <p>Research workspace only. Scanner context and local review do not change labels or scoring.</p>
-        <span>This is not a buy/sell signal.</span>
-      </footer>
-    </div>
+    <WorkspaceShell
+      navItems={WORKSPACE_NAV_ITEMS}
+      activeSection={activeSection}
+      onSectionChange={setActiveSection}
+      dataSource={dataSource}
+      dataSourceOptions={DATA_SOURCE_OPTIONS}
+      onDataSourceChange={handleSourceChange}
+      loading={loading}
+      sourceStatusText={sourceStatusText}
+      fallbackMsg={fallbackMsg}
+    >
+      {renderSection()}
+    </WorkspaceShell>
   );
 }
 

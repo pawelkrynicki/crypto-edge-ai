@@ -377,6 +377,26 @@ Review Queue now explains what the queue is for, what to do next, and how to exp
 
 This stage adds no endpoints, new sources, npm dependencies, auth, production backend, production cron, OpenAI call, scraping, scanner scoring change, `final_label` change, or `WATCHLIST` meaning change. UX2 Product-grade Interface Redesign remains a future required stage.
 
+## UX2 Information Architecture Shell v1
+
+Stage 10B.1 starts UX2 from information architecture and layout skeleton only. It does not complete the full product-grade visual redesign.
+
+The UI workspace is now organized as:
+
+```text
+Overview -> Scanner Radar -> Review Queue -> Research Review -> Risk Alerts -> Methodology
+```
+
+Overview contains Market Context, Local MVP workflow status, scanner stat cards, `scripts\win\check-local-mvp.cmd`, and `scripts\win\generate-analyst-report.cmd` copy. Scanner Radar remains the read-only scanner output and Candidate Detail workspace. Review Queue remains the local analyst review, backup, diagnostics, reset, and report command workspace.
+
+10B.1 changes no data-source policy and adds no endpoints, sources, npm dependencies, auth, production backend, production cron, OpenAI call, scraping, HTML parsing, browser automation, undocumented endpoint, scanner scoring change, `final_label` change, or `WATCHLIST` meaning change.
+
+Next UX2 steps:
+
+- 10B.2 Scanner / Candidate Detail Redesign
+- 10B.3 Review Queue + Report Workspace
+- 10B.4 Visual QA / Polish
+
 ## UX1 Professional Dashboard Redesign
 
 UX1 is a UI-only redesign of `tools/ui-mock`. It improves layout hierarchy, spacing, scanner readability, Market Context visibility, and Candidate Detail readability. Local Review Session is placed higher in Candidate Detail so analyst status and notes are easier to find.
