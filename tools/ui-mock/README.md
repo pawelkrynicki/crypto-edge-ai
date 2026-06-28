@@ -24,7 +24,7 @@ UX1 improves the dashboard information architecture and visual hierarchy without
 
 UX1 itself added no new data sources, API endpoints, backend services, storage model changes, scanner scoring changes, final-label changes, or WATCHLIST meaning changes. Market Context and Local Review Session are easier to find.
 
-UX2 Product-grade Interface Redesign is now continued through 10B.2, but the full UX2 redesign is not complete.
+UX2 Product-grade Interface Redesign is now continued through 10B.3, but the full UX2 redesign is not complete.
 
 ## 10A Product Workflow Polish
 
@@ -55,10 +55,13 @@ Overview -> Scanner Radar -> Review Queue -> Research Review -> Risk Alerts -> M
 
 Overview contains Market Context, Local MVP workflow status, scanner stat cards, and local health/report command copy. Scanner Radar remains the read-only scanner output and Candidate Detail workspace. Review Queue remains the local analyst status, notes, backup, diagnostics, reset, and report command workspace.
 
-The full UX2 redesign remains in progress. Planned next steps are:
+The full UX2 redesign remains in progress. Completed follow-up slices:
 
 - 10B.2 Scanner / Candidate Detail Redesign
 - 10B.3 Review Queue + Report Workspace
+
+Last planned UX2 step:
+
 - 10B.4 Visual QA / Polish
 
 10B.1 does not change endpoint paths, scanner scoring, `final_label`, `WATCHLIST` meaning, review storage behavior, report generation logic, npm dependencies, auth, production backend, production cron, new sources, scraping, browser automation, undocumented endpoints, or OpenAI calls.
@@ -73,7 +76,18 @@ Candidate Detail now has stronger product-grade sections for Local Review Sessio
 
 UX2 remains in progress. Planned next steps are:
 
-- 10B.3 Review Queue + Report Workspace
+- 10B.4 Visual QA / Polish
+
+## 10B.3 UX2 Review Queue + Report Workspace Redesign
+
+10B.3 redesigns only the Review Queue and Analyst Report Workspace area. The Review Queue now has a product-grade workspace structure with header compliance copy, summary cards, Local Review Queue item cards, Stored Reviews Not In Current Scan, Scanner Watchlist, Storage & Backup, and an Analyst Report Workspace command area.
+
+The redesign keeps local review status as an analyst organization layer only. Export/import still covers only local review status and analyst notes. Diagnostics still omit notes and entries. Reset local reviews still clears only local review state. The analyst report is still generated locally from CMD with `scripts\win\generate-analyst-report.cmd`, smoke-checked with `scripts\win\check-analyst-report.cmd`, and written to `tools\ui-mock\.local\reports` as Markdown plus JSON.
+
+10B.3 changes no endpoint paths, review save/clear/import/export/reset logic, diagnostics behavior, analyst report generation logic, scanner scoring, `final_label`, or `WATCHLIST` meaning. It adds no npm dependencies, auth, production backend, production cron, new sources, scraping, browser automation, undocumented endpoints, or OpenAI calls.
+
+UX2 remains in progress. Last planned UX2 step:
+
 - 10B.4 Visual QA / Polish
 
 ## Important Product Rules

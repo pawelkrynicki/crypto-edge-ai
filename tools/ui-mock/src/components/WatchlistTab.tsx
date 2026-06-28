@@ -310,78 +310,84 @@ export const WatchlistTab: React.FC<Props> = ({
   const diagnosticsError = diagnosticsState.status === "unavailable" || diagnosticsState.status === "error"
     ? diagnosticsState.error
     : null;
+  const reviewQueueResultCount = filteredQueueItems.length + filteredStoredReviews.length;
+  const summaryCards = [
+    {
+      label: "Scanner WATCHLIST",
+      value: watchlist.length,
+      detail: "Current scanner candidates eligible for further manual review only.",
+    },
+    {
+      label: "Local review entries",
+      value: localReviewEntryCount,
+      detail: "Stored local review status and analyst notes.",
+    },
+    {
+      label: "Saved for follow-up",
+      value: countReviewStatus(localReviewRecords, "saved_for_follow_up"),
+      detail: "Local status only, separate from scanner labels.",
+    },
+    {
+      label: "Needs more research",
+      value: countReviewStatus(localReviewRecords, "needs_more_research"),
+      detail: "Analyst marked for more manual context.",
+    },
+    {
+      label: "Waiting for more data",
+      value: countReviewStatus(localReviewRecords, "waiting_for_more_data"),
+      detail: "Local queue item waiting on future coverage.",
+    },
+    {
+      label: "Dismissed after review",
+      value: countReviewStatus(localReviewRecords, "dismissed_after_review"),
+      detail: "Local review cleanup state only.",
+    },
+    {
+      label: "Stored reviews not in current scan",
+      value: storedReviewsNotInScan.length,
+      detail: "Notes from earlier scanner outputs.",
+    },
+  ];
 
   return (
-    <div className="space-y-5 max-w-6xl">
-      <header className="space-y-2">
-        <div>
-          <h2 className="text-lg font-bold leading-tight text-primary">Review Queue</h2>
-          <p className="text-xs text-secondary">
-            Local analyst workspace for scanner candidates marked for follow-up, more research, waiting data, or dismissal.
-          </p>
+    <div className="review-workspace">
+      <header className="review-workspace-header">
+        <div className="review-workspace-title">
+          <span className="section-label">Local analyst layer</span>
+          <h2>Review Queue Workspace</h2>
+          <p>Local analyst status and notes only.</p>
         </div>
 
-        <div className="rounded-md px-4 py-2.5 flex items-start gap-2.5"
-          style={{ background: "var(--accent-dim)", border: "1px solid var(--accent-border)" }}>
-          <span className="text-accent text-sm mt-0.5 shrink-0">i</span>
-          <div className="text-xs text-secondary space-y-0.5">
-            <p>Review storage uses the local API when available, with browser localStorage fallback.</p>
-            <p>Review status does not change scanner labels.</p>
+        <div className="review-compliance-panel">
+          <span>Scope</span>
+          <div>
+            <p>Review status does not change scanner labels, scoring, final_label or WATCHLIST meaning.</p>
             <p>This is not a buy/sell signal.</p>
           </div>
         </div>
       </header>
 
-      <section className="card p-4 space-y-3">
-        <div className="grid gap-3 lg:grid-cols-3">
-          <div className="space-y-1">
-            <h3 className="text-sm font-bold text-primary">What this queue is for</h3>
-            <p className="text-xs text-secondary">
-              Organize local analyst work across scanner candidates and saved review notes.
-            </p>
-            <p className="text-xs text-secondary">
-              Review status does not change scanner labels, scoring, or WATCHLIST meaning.
-            </p>
-          </div>
-
-          <div className="space-y-1">
-            <h3 className="text-sm font-bold text-primary">What to do next</h3>
-            <p className="text-xs text-secondary">
-              Open candidate detail, verify missing security or context manually, and keep scanner label separate from local review status.
-            </p>
-            <p className="text-xs text-secondary">
-              Full local health check: <code>scripts\win\check-local-mvp.cmd</code>
-            </p>
-          </div>
-
-          <div className="space-y-1">
-            <h3 className="text-sm font-bold text-primary">Export analyst report</h3>
-            <p className="text-xs text-secondary">
-              Generate report from CMD. The UI does not run report generation as a product action.
-            </p>
-            <p className="text-xs text-secondary">
-              Command: <code>scripts\win\generate-analyst-report.cmd</code>
-            </p>
-          </div>
-        </div>
-
-        <p className="text-xs" style={{ color: "var(--amber)" }}>
-          This is not a buy/sell signal.
-        </p>
+      <section className="review-summary-grid" aria-label="Review queue summary">
+        {summaryCards.map((card) => (
+          <ReviewSummaryCard
+            key={card.label}
+            label={card.label}
+            value={card.value}
+            detail={card.detail}
+          />
+        ))}
       </section>
 
-      <section className="card p-4 space-y-3">
-        <div className="flex items-start justify-between gap-3 flex-wrap">
+      <section className="review-storage-section">
+        <div className="review-storage-header">
           <div>
-            <h3 className="text-sm font-bold text-primary">Review Backup</h3>
-            <p className="text-xs text-secondary">
-              Backup includes only local review status and analyst notes.
-            </p>
-            <p className="text-xs text-secondary">
-              It does not include scanner output or market data.
-            </p>
+            <span className="section-label">Local review session only</span>
+            <h3>Storage & Backup</h3>
+            <p>Review storage uses the local API when available, with browser localStorage fallback.</p>
+            <p>Export/import includes only local review status and analyst notes.</p>
+            <p>Diagnostics do not show notes or entries. Reset local reviews clears only local review state.</p>
             <div
-              className="mt-2 rounded-md px-3 py-2 text-xs"
+              className="review-storage-status"
               style={{
                 background: getReviewStorageStatusBackground(reviewStorageStatus.tone),
                 border: getReviewStorageStatusBorder(reviewStorageStatus.tone),
@@ -399,7 +405,12 @@ export const WatchlistTab: React.FC<Props> = ({
           </span>
         </div>
 
-        <div className="flex items-end gap-3 flex-wrap">
+        <div className="review-backup-copy">
+          <h4>Review Backup</h4>
+          <p>Backup includes only local review status and analyst notes. It does not include scanner output or market data.</p>
+        </div>
+
+        <div className="review-backup-actions">
           <button type="button" className="details-button" onClick={handleExportReviewJson}>
             Export review JSON
           </button>
@@ -440,11 +451,8 @@ export const WatchlistTab: React.FC<Props> = ({
           </div>
         )}
 
-        <div className="grid gap-4 lg:grid-cols-2 pt-2">
-          <div
-            className="rounded-md p-3 space-y-3"
-            style={{ background: "var(--bg-raised)", border: "1px solid var(--border)" }}
-          >
+        <div className="review-storage-grid">
+          <div className="review-storage-panel">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h4 className="text-xs font-bold text-primary">Storage diagnostics</h4>
@@ -480,10 +488,7 @@ export const WatchlistTab: React.FC<Props> = ({
             </div>
           </div>
 
-          <div
-            className="rounded-md p-3 space-y-3"
-            style={{ background: "var(--bg-raised)", border: "1px solid var(--border)" }}
-          >
+          <div className="review-storage-panel">
             <div>
               <h4 className="text-xs font-bold text-primary">Reset local reviews</h4>
               <p className="text-xs text-secondary">
@@ -530,55 +535,54 @@ export const WatchlistTab: React.FC<Props> = ({
         </div>
       </section>
 
-      <section className="space-y-2.5">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div>
-            <h3 className="text-sm font-bold text-primary">Scanner Watchlist</h3>
-            <p className="text-xs text-secondary">Candidates with scanner label WATCHLIST.</p>
-          </div>
-          <span className="scanner-result-count">{watchlist.length} item{watchlist.length !== 1 ? "s" : ""}</span>
-        </div>
+      <section className="review-workspace-section scanner-watchlist-section">
+        <ReviewSectionHeader
+          title="Scanner Watchlist"
+          description="Current scanner candidates with final_label = WATCHLIST."
+          meta={`${watchlist.length} item${watchlist.length !== 1 ? "s" : ""}`}
+        />
 
-        <div className="rounded-md px-4 py-2.5 flex items-start gap-2.5"
-          style={{ background: "var(--accent-dim)", border: "1px solid var(--accent-border)" }}>
-          <span className="text-accent text-sm mt-0.5 shrink-0">i</span>
-          <p className="text-xs text-secondary">
-            <strong className="text-primary">Watchlist</strong> means the token is eligible for further research only. It is{" "}
-            <strong className="text-[#f5b84b]">not a decision layer</strong>. This is not a buy/sell signal. Independent due diligence is required before any decision.
+        <div className="review-info-note">
+          <span>WATCHLIST</span>
+          <p>
+            WATCHLIST means eligible for further manual review only. Local review status is a separate analyst layer.
+            This is not a buy/sell signal.
           </p>
         </div>
 
         {watchlist.length === 0 ? (
-          <div className="card p-5 text-sm text-secondary">No scanner watchlist candidates in the current output.</div>
+          <div className="review-empty-state">No scanner watchlist candidates in the current output.</div>
         ) : (
-          <div className="space-y-2.5">
+          <div className="review-card-list">
             {watchlist.map((c) => (
-              <div key={c.id} className="card p-4 space-y-3">
-                <div className="flex items-center justify-between gap-3 flex-wrap">
-                  <div className="flex items-center gap-3">
-                    <div>
-                      <span className="font-bold text-primary text-sm">{c.symbol}</span>
-                      <span className="text-secondary text-xs ml-2">{c.name}</span>
-                    </div>
-                    <span className="text-[10px] text-secondary px-2 py-0.5 rounded-md"
-                      style={{ background: "var(--bg-raised)", border: "1px solid var(--border)" }}>
-                      {getChainLabel(c.chain)} - {c.dex}
-                    </span>
+              <div key={c.id} className="review-item-card scanner-watchlist-card">
+                <div className="review-item-topline">
+                  <div className="review-item-token">
+                    <strong>{c.symbol}</strong>
+                    <span>{c.name}</span>
                   </div>
-                  <LabelBadge label={c.final_label} />
+                  <div className="review-item-badges">
+                    <LabelBadge label={c.final_label} />
+                    <ReviewStatusBadge status={reviewSession.entries[c.id]?.status ?? "not_reviewed"} />
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <div className="review-item-meta">
+                  <span>{getChainLabel(c.chain)} - {c.dex}</span>
+                  <code>{c.id}</code>
+                  <span>final_label: {c.final_label}</span>
+                </div>
+
+                <div className="review-metric-grid">
                   {[
                     { label: "Market Cap", value: fmtUsd(c.market_cap_usd) },
                     { label: "Liquidity", value: fmtUsd(c.liquidity_usd) },
                     { label: "24h Volume", value: fmtUsd(c.volume_24h_usd) },
                     { label: "Pair Age", value: fmtDays(c.pair_age_days) },
                   ].map((s) => (
-                    <div key={s.label} className="rounded-md px-2.5 py-2"
-                      style={{ background: "var(--bg-raised)", border: "1px solid var(--border)" }}>
-                      <div className="section-label mb-0.5">{s.label}</div>
-                      <div className="text-sm font-semibold text-primary">{s.value}</div>
+                    <div key={s.label} className="review-metric">
+                      <span>{s.label}</span>
+                      <strong>{s.value}</strong>
                     </div>
                   ))}
                 </div>
@@ -599,8 +603,7 @@ export const WatchlistTab: React.FC<Props> = ({
                   </div>
                 )}
 
-                <div className="flex items-center justify-between gap-3 text-[10px] flex-wrap"
-                  style={{ color: "var(--text-muted)" }}>
+                <div className="review-item-actions">
                   <span>Last checked: {new Date(c.last_checked).toLocaleString()}</span>
                   <button type="button" className="details-button" onClick={() => onOpenCandidate(c.id)}>
                     Open details
@@ -612,16 +615,14 @@ export const WatchlistTab: React.FC<Props> = ({
         )}
       </section>
 
-      <section className="space-y-2.5">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div>
-            <h3 className="text-sm font-bold text-primary">Local Review Queue</h3>
-            <p className="text-xs text-secondary">Local review status is separate from scanner label.</p>
-          </div>
-          <span className="scanner-result-count">{localReviewRecords.length} local item{localReviewRecords.length !== 1 ? "s" : ""}</span>
-        </div>
+      <section className="review-workspace-section local-review-section">
+        <ReviewSectionHeader
+          title="Local Review Queue"
+          description="Local review status is separate from scanner final_label, scoring, and WATCHLIST meaning."
+          meta={`${localReviewRecords.length} local item${localReviewRecords.length !== 1 ? "s" : ""}`}
+        />
 
-        <div className="scanner-toolbar">
+        <div className="scanner-toolbar review-filter-toolbar">
           {REVIEW_QUEUE_FILTERS.map((opt) => (
             <button
               key={opt.value}
@@ -632,128 +633,207 @@ export const WatchlistTab: React.FC<Props> = ({
             </button>
           ))}
           <span className="scanner-result-count">
-            {filteredQueueItems.length + filteredStoredReviews.length} result{filteredQueueItems.length + filteredStoredReviews.length !== 1 ? "s" : ""}
+            {reviewQueueResultCount} result{reviewQueueResultCount !== 1 ? "s" : ""}
           </span>
         </div>
 
         {!hasLocalReviews ? (
-          <div className="card p-5 text-sm text-secondary space-y-1">
+          <div className="review-empty-state">
             <p>No local review items yet.</p>
             <p>Mark a candidate as Saved for follow-up or Needs more research from the scanner detail panel.</p>
           </div>
-        ) : !hasFilteredReviews ? (
-          <div className="card p-5 text-sm text-secondary">{getFilteredEmptyText(reviewFilter)}</div>
+        ) : filteredQueueItems.length === 0 ? (
+          <div className="review-empty-state">
+            <p>{hasFilteredReviews ? "No current-scan local review items match this filter." : getFilteredEmptyText(reviewFilter)}</p>
+          </div>
         ) : (
-          <div className="space-y-3">
-            {filteredQueueItems.length > 0 && (
-              <div className="card scanner-table-card">
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Token</th>
-                      <th>Chain</th>
-                      <th>Scanner label</th>
-                      <th>Review status</th>
-                      <th>Analyst note</th>
-                      <th>Last updated</th>
-                      <th>Reason</th>
-                      <th aria-label="Review actions" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredQueueItems.map(({ candidate, reviewRecord }) => (
-                      <tr key={reviewRecord.candidate_id}>
-                        <td>
-                          <div className="scanner-token">
-                            <strong>{candidate.symbol}</strong>
-                            <span>{candidate.name}</span>
-                          </div>
-                        </td>
-                        <td>
-                          <span className="research-context-chip">{getChainLabel(candidate.chain)}</span>
-                        </td>
-                        <td>
-                          <LabelBadge label={candidate.final_label} />
-                        </td>
-                        <td>
-                          <ReviewStatusBadge status={reviewRecord.status} />
-                        </td>
-                        <td>
-                          <p className="scanner-reason">{getNotePreview(reviewRecord.note)}</p>
-                        </td>
-                        <td>
-                          <span className="text-[11px] text-secondary">{formatReviewDate(reviewRecord.updated_at)}</span>
-                        </td>
-                        <td>
-                          <p className="scanner-reason">{getCandidateReason(candidate)}</p>
-                        </td>
-                        <td>
-                          <div className="flex items-center gap-2">
-                            <button type="button" className="details-button" onClick={() => onOpenCandidate(candidate.id)}>
-                              Open details
-                            </button>
-                            <button type="button" className="pill" onClick={() => onClearReview(reviewRecord.candidate_id)}>
-                              Clear review
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {filteredStoredReviews.length > 0 && (
-              <div className="space-y-2">
-                <div>
-                  <h4 className="text-xs font-bold text-primary">Stored reviews not in current scan</h4>
-                  <p className="text-xs text-secondary">This review belongs to a candidate not present in the current scanner output.</p>
-                </div>
-                <div className="card scanner-table-card">
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>Candidate ID</th>
-                        <th>Review status</th>
-                        <th>Analyst note</th>
-                        <th>Last updated</th>
-                        <th aria-label="Stored review actions" />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredStoredReviews.map((record) => (
-                        <tr key={record.candidate_id}>
-                          <td>
-                            <code className="text-[11px] text-secondary break-all">{record.candidate_id}</code>
-                          </td>
-                          <td>
-                            <ReviewStatusBadge status={record.status} />
-                          </td>
-                          <td>
-                            <p className="scanner-reason">{getNotePreview(record.note)}</p>
-                          </td>
-                          <td>
-                            <span className="text-[11px] text-secondary">{formatReviewDate(record.updated_at)}</span>
-                          </td>
-                          <td>
-                            <button type="button" className="pill" onClick={() => onClearReview(record.candidate_id)}>
-                              Clear review
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
+          <div className="review-card-list">
+            {filteredQueueItems.map(({ candidate, reviewRecord }) => (
+              <ReviewQueueItemCard
+                key={reviewRecord.candidate_id}
+                candidate={candidate}
+                reviewRecord={reviewRecord}
+                onOpenCandidate={onOpenCandidate}
+                onClearReview={onClearReview}
+              />
+            ))}
           </div>
         )}
+      </section>
+
+      <section className="review-workspace-section stored-review-section">
+        <ReviewSectionHeader
+          title="Stored Reviews Not In Current Scan"
+          description="Local notes from previous scans. These entries do not imply the candidate is active in the current scanner output."
+          meta={`${storedReviewsNotInScan.length} stored item${storedReviewsNotInScan.length !== 1 ? "s" : ""}`}
+        />
+
+        {storedReviewsNotInScan.length === 0 ? (
+          <div className="review-empty-state">
+            <p>No stored reviews outside the current scan.</p>
+          </div>
+        ) : filteredStoredReviews.length === 0 ? (
+          <div className="review-empty-state">
+            <p>No stored reviews outside the current scan match this filter.</p>
+          </div>
+        ) : (
+          <div className="review-card-list">
+            {filteredStoredReviews.map((record) => (
+              <ReviewQueueItemCard
+                key={record.candidate_id}
+                reviewRecord={record}
+                onClearReview={onClearReview}
+              />
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="report-workspace-card">
+        <div className="report-workspace-copy">
+          <span className="section-label">Local CMD export</span>
+          <h3>Analyst Report Workspace</h3>
+          <p>
+            Generate the analyst report locally from CMD. The UI does not run report generation, so no new endpoint is needed.
+          </p>
+          <p>
+            The report is Markdown plus JSON and contains scanner summary, market context, review notes, stored reviews not in current scan,
+            candidate snapshot, and compliance.
+          </p>
+          <p>It is a local research workflow export, not investment advice.</p>
+          <p className="report-compliance">This is not a buy/sell signal.</p>
+        </div>
+
+        <div className="report-command-grid">
+          <CommandBlock label="Generate report" value={"scripts\\win\\generate-analyst-report.cmd"} />
+          <CommandBlock label="Smoke check" value={"scripts\\win\\check-analyst-report.cmd"} />
+          <CommandBlock label="Output path" value={"tools\\ui-mock\\.local\\reports"} />
+        </div>
       </section>
     </div>
   );
 };
+
+function countReviewStatus(records: CandidateReviewRecord[], status: ReviewQueueStatus): number {
+  return records.filter((record) => record.status === status).length;
+}
+
+function ReviewSummaryCard({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: number;
+  detail: string;
+}) {
+  return (
+    <article className="review-summary-card">
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <p>{detail}</p>
+    </article>
+  );
+}
+
+function ReviewSectionHeader({
+  title,
+  description,
+  meta,
+}: {
+  title: string;
+  description: string;
+  meta: string;
+}) {
+  return (
+    <div className="review-section-header">
+      <div>
+        <h3>{title}</h3>
+        <p>{description}</p>
+      </div>
+      <span className="scanner-result-count">{meta}</span>
+    </div>
+  );
+}
+
+function ReviewQueueItemCard({
+  candidate,
+  reviewRecord,
+  onOpenCandidate,
+  onClearReview,
+}: {
+  candidate?: MockCandidate;
+  reviewRecord: CandidateReviewRecord;
+  onOpenCandidate?: (candidateId: string) => void;
+  onClearReview: (candidateId: string) => void;
+}) {
+  return (
+    <article className={`review-item-card ${candidate ? "" : "stored-review-card"}`}>
+      <div className="review-item-topline">
+        <div className="review-item-token">
+          <strong>{candidate?.symbol ?? "Stored review"}</strong>
+          <span>{candidate?.name ?? "Not present in current scanner output"}</span>
+        </div>
+        <div className="review-item-badges">
+          {candidate && <LabelBadge label={candidate.final_label} />}
+          <ReviewStatusBadge status={reviewRecord.status} />
+        </div>
+      </div>
+
+      <div className="review-item-meta">
+        <code>{reviewRecord.candidate_id}</code>
+        {candidate && <span>{getChainLabel(candidate.chain)} - {candidate.dex}</span>}
+        {candidate ? (
+          <span>final_label: {candidate.final_label}</span>
+        ) : (
+          <span>This review belongs to a candidate not present in the current scanner output.</span>
+        )}
+      </div>
+
+      <div className="review-item-body">
+        <div>
+          <span className="section-label">Review status</span>
+          <ReviewStatusBadge status={reviewRecord.status} />
+        </div>
+        <div>
+          <span className="section-label">Analyst note</span>
+          <p>{getNotePreview(reviewRecord.note)}</p>
+        </div>
+        <div>
+          <span className="section-label">Last updated</span>
+          <p>{formatReviewDate(reviewRecord.updated_at)}</p>
+        </div>
+        <div>
+          <span className="section-label">Scanner reason</span>
+          <p>{candidate ? getCandidateReason(candidate) : "Scanner reason unavailable in the current output."}</p>
+        </div>
+      </div>
+
+      <div className="review-item-actions">
+        <span>{candidate ? "Current scanner output" : "Local note from an earlier scan"}</span>
+        <div className="flex items-center gap-2">
+          {candidate && onOpenCandidate && (
+            <button type="button" className="details-button" onClick={() => onOpenCandidate(candidate.id)}>
+              Open details
+            </button>
+          )}
+          <button type="button" className="pill" onClick={() => onClearReview(reviewRecord.candidate_id)}>
+            Clear review
+          </button>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function CommandBlock({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="report-command-block">
+      <span>{label}</span>
+      <code>{value}</code>
+    </div>
+  );
+}
 
 function getReviewStorageStatusBackground(tone: ReviewStorageStatus["tone"]): string {
   if (tone === "ready") return "rgba(50, 209, 132, 0.1)";

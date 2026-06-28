@@ -274,7 +274,15 @@ UX2 Scanner / Candidate Detail Redesign v1:
 - Candidate Detail now separates Local Review Session, Scanner Label vs Local Review, Quick Snapshot, Security & Manual Verification, Data Coverage & Context, Scanner Label / Reasons, and Reasoning Checklist.
 - Guidance copy states that scanner output is read-only, `WATCHLIST` means eligible for further manual review only, local review does not change scanner label, missing security/context data requires manual verification, and this is not a buy/sell signal.
 - 10B.2 adds no endpoints, new sources, npm dependencies, auth, production backend, production cron, OpenAI call, scraping, browser automation, scanner scoring change, `final_label` change, `WATCHLIST` meaning change, review logic change, or report logic change.
-- Next UX2 steps are 10B.3 Review Queue + Report Workspace and 10B.4 Visual QA / Polish.
+
+UX2 Review Queue + Report Workspace Redesign v1:
+
+- Stage 10B.3 continues UX2 only inside Review Queue and Analyst Report Workspace.
+- Review Queue now has product-grade sections for Review Queue Workspace, summary cards, Local Review Queue item cards, Stored Reviews Not In Current Scan, Scanner Watchlist, Storage & Backup, and Analyst Report Workspace.
+- Storage and backup copy clarifies that export/import includes only local review status and analyst notes, diagnostics omit notes and entries, and reset clears only local review state.
+- Analyst Report Workspace keeps report generation local to CMD with `scripts\win\generate-analyst-report.cmd`, smoke check `scripts\win\check-analyst-report.cmd`, and output path `tools\ui-mock\.local\reports`.
+- 10B.3 adds no endpoints, new sources, npm dependencies, auth, production backend, production cron, OpenAI call, scraping, browser automation, scanner scoring change, `final_label` change, `WATCHLIST` meaning change, review import/export/reset/diagnostics logic change, or report logic change.
+- Last planned UX2 step is 10B.4 Visual QA / Polish.
 
 Paid and clarification-dependent sources remain deferred:
 
@@ -444,7 +452,8 @@ UX2 Product-grade Interface Redesign:
 - Started in 10B.1 with information architecture and layout skeleton only.
 - Scope: simplify, organize, and professionalize the full frontend after the functional prototype stages.
 - 10B.2 completes the Scanner Radar / Candidate Detail redesign slice only.
-- Full UX2 remains in progress through 10B.3 Review Queue + Report Workspace and 10B.4 Visual QA / Polish.
+- 10B.3 completes the Review Queue + Report Workspace redesign slice only.
+- Full UX2 remains in progress through the last planned step, 10B.4 Visual QA / Polish.
 
 ## UI Data Adapter (Completed)
 

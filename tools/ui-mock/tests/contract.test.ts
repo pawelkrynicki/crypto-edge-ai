@@ -942,20 +942,31 @@ const reviewQueueMarkup = renderToStaticMarkup(React.createElement(WatchlistTab,
   onResetReviewSession: async () => ({ status: "ready" as const, message: "Reset completed in test." }),
 }));
 
-assert.match(reviewQueueMarkup, /Review Queue/, "watchlist tab renders review queue workspace");
-assert.match(reviewQueueMarkup, /What this queue is for/, "review queue renders purpose guidance");
-assert.match(reviewQueueMarkup, /What to do next/, "review queue renders next-step guidance");
-assert.match(reviewQueueMarkup, /Export analyst report/, "review queue renders analyst report guidance");
-assert.match(reviewQueueMarkup, /Generate report from CMD/, "review queue explains report command workflow");
-assert.match(
-  reviewQueueMarkup,
-  /scripts\\win\\check-local-mvp\.cmd/,
-  "review queue renders local MVP health command",
-);
+assert.match(reviewQueueMarkup, /Review Queue Workspace/, "watchlist tab renders review queue workspace");
+assert.match(reviewQueueMarkup, /Local Review Queue/, "review queue renders local review queue section");
+assert.match(reviewQueueMarkup, /Scanner Watchlist/, "review queue renders scanner watchlist section");
+assert.match(reviewQueueMarkup, /Stored Reviews Not In Current Scan/, "review queue renders stored reviews section");
+assert.match(reviewQueueMarkup, /Storage &amp; Backup/, "review queue renders storage and backup section");
+assert.match(reviewQueueMarkup, /Analyst Report Workspace/, "review queue renders analyst report workspace");
 assert.match(
   reviewQueueMarkup,
   /scripts\\win\\generate-analyst-report\.cmd/,
   "review queue renders analyst report command",
+);
+assert.match(
+  reviewQueueMarkup,
+  /scripts\\win\\check-analyst-report\.cmd/,
+  "review queue renders analyst report smoke command",
+);
+assert.match(
+  reviewQueueMarkup,
+  /tools\\ui-mock\\\.local\\reports/,
+  "review queue renders analyst report output path",
+);
+assert.match(
+  reviewQueueMarkup,
+  /This is not a buy\/sell signal/,
+  "review queue renders compliance copy",
 );
 assert.match(reviewQueueMarkup, /Review Backup/, "review queue renders backup controls");
 assert.match(reviewQueueMarkup, /Export review JSON/, "review queue renders export action");
@@ -990,13 +1001,13 @@ assert.match(
 );
 assert.match(reviewQueueMarkup, /Saved for follow-up/, "review queue renders local saved follow-up status");
 assert.match(reviewQueueMarkup, /Track community and liquidity follow-up\./, "review queue renders analyst note preview");
-assert.match(reviewQueueMarkup, /Scanner label/, "review queue labels scanner output separately");
+assert.match(reviewQueueMarkup, /final_label: WATCHLIST/, "review queue labels scanner final_label separately");
 assert.match(reviewQueueMarkup, /Review status/, "review queue labels local review status separately");
 assert.match(reviewQueueMarkup, /Further review only/, "review queue keeps scanner label visible");
 assert.match(reviewQueueMarkup, /Needs more research/, "review queue renders needs research status");
 assert.match(reviewQueueMarkup, /Waiting for more data/, "review queue renders waiting data status");
 assert.match(reviewQueueMarkup, /Dismissed after review/, "review queue renders dismissed status");
-assert.match(reviewQueueMarkup, /Stored reviews not in current scan/, "review queue renders missing-current-scan section");
+assert.match(reviewQueueMarkup, /Stored reviews not in current scan/, "review queue summary renders missing-current-scan count");
 assert.match(reviewQueueMarkup, /stored-review-not-in-scan/, "review queue shows stored review candidate_id");
 assert.match(
   reviewQueueMarkup,
@@ -1011,13 +1022,8 @@ assert.match(
 assert.match(reviewQueueMarkup, /Review storage: local API/, "review queue renders storage status");
 assert.match(
   reviewQueueMarkup,
-  /Review status does not change scanner labels\./,
+  /Review status does not change scanner labels, scoring, final_label or WATCHLIST meaning\./,
   "review queue includes scanner-label compliance copy",
-);
-assert.match(
-  reviewQueueMarkup,
-  /This is not a buy\/sell signal\./,
-  "review queue renders compliance copy",
 );
 assert.equal(passMockCandidate.final_label, "WATCHLIST", "review queue rendering does not mutate final_label");
 

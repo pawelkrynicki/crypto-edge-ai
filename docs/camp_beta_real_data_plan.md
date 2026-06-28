@@ -391,9 +391,13 @@ Overview contains Market Context, Local MVP workflow status, scanner stat cards,
 
 10B.1 changes no data-source policy and adds no endpoints, sources, npm dependencies, auth, production backend, production cron, OpenAI call, scraping, HTML parsing, browser automation, undocumented endpoint, scanner scoring change, `final_label` change, or `WATCHLIST` meaning change.
 
-Next UX2 steps:
+Completed follow-up UX2 slices:
 
+- 10B.2 Scanner / Candidate Detail Redesign
 - 10B.3 Review Queue + Report Workspace
+
+Last planned UX2 step:
+
 - 10B.4 Visual QA / Polish
 
 ## UX2 Scanner / Candidate Detail Redesign v1
@@ -406,9 +410,19 @@ Stage 10B.2 continues UX2 only inside Scanner Radar and Candidate Detail.
 
 10B.2 changes no endpoint paths, data-source policy, review save/clear/import/export behavior, analyst report generation, scanner scoring, `final_label`, or `WATCHLIST` meaning. It adds no npm dependencies, auth, production backend, production cron, new sources, scraping, HTML parsing, browser automation, undocumented endpoints, or OpenAI calls.
 
-UX2 remains in progress. Next UX2 steps are:
+## UX2 Review Queue + Report Workspace Redesign v1
 
-- 10B.3 Review Queue + Report Workspace
+Stage 10B.3 continues UX2 only inside Review Queue and Analyst Report Workspace.
+
+- Review Queue now has product-grade sections for Review Queue Workspace, summary cards, Local Review Queue item cards, Stored Reviews Not In Current Scan, Scanner Watchlist, Storage & Backup, and Analyst Report Workspace.
+- Local review status remains an analyst organization layer only. It does not change scanner labels, scoring, `final_label`, or `WATCHLIST` meaning.
+- Export/import still covers only local review status and analyst notes. Diagnostics still omit notes and entries. Reset still clears only local review state.
+- Analyst report generation remains local to CMD with `scripts\win\generate-analyst-report.cmd`, smoke check `scripts\win\check-analyst-report.cmd`, and output path `tools\ui-mock\.local\reports`.
+
+10B.3 changes no endpoint paths, data-source policy, review save/clear/import/export/reset behavior, diagnostics behavior, analyst report generation, scanner scoring, `final_label`, or `WATCHLIST` meaning. It adds no npm dependencies, auth, production backend, production cron, new sources, scraping, HTML parsing, browser automation, undocumented endpoints, or OpenAI calls.
+
+UX2 remains in progress. Last planned UX2 step:
+
 - 10B.4 Visual QA / Polish
 
 ## UX1 Professional Dashboard Redesign
