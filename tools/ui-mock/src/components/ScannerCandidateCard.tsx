@@ -98,6 +98,7 @@ export const ScannerCandidateCard: React.FC<ScannerCandidateCardProps> = ({
           <span>{candidate.name}</span>
         </span>
         <span className="scanner-card-badges">
+          {selected && <span className="scanner-card-selected-indicator">Selected</span>}
           <LabelBadge label={candidate.final_label} />
           <ReviewStatusBadge status={reviewRecord?.status ?? "not_reviewed"} short />
         </span>

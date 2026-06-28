@@ -7,8 +7,8 @@
 - 10B.1 starts UX2 with an information architecture and layout skeleton: Overview, Scanner Radar, Review Queue, Research Review, Risk Alerts, and Methodology.
 - 10B.2 continues UX2 in the Scanner Radar and Candidate Detail workspace only, replacing the scanner table with candidate cards and reorganizing Candidate Detail sections.
 - 10B.3 continues UX2 in the Review Queue and Analyst Report Workspace only, adding summary cards, review item cards, stored reviews not in current scan, storage/backup panels, and report command workspace copy.
-- The current frontend is a functional working prototype, not the final product interface.
-- Full UX2 Product-grade Interface Redesign remains in progress before a final production-grade interface.
+- 10B.4 closes UX2 Visual QA / Polish for the local MVP UI pass, covering layout consistency, wrapping, readability, responsive fallback, and the manual checklist in `docs/ux2_visual_qa_checklist.md`.
+- UX2 Product-grade Interface Redesign is complete at local MVP level, but 10C stabilization is still required before the end of August 2026.
 
 ## Fast Health Check
 
@@ -101,15 +101,15 @@ Keep these layers separate:
 - Analyst report: generated from CMD with `scripts\win\generate-analyst-report.cmd`.
 - Local MVP health check: run with `scripts\win\check-local-mvp.cmd`.
 
-10B.1 moves Market Context, Local MVP workflow status, and scanner stat cards into the new Overview workspace. 10B.2 makes Scanner Radar and Candidate Detail easier to scan while keeping scanner output read-only and local review separate from scanner labels. 10B.3 makes Review Queue, stored reviews, storage/backup/diagnostics/reset, and Analyst Report Workspace easier to scan while keeping all review/import/export/reset/diagnostics/report behavior unchanged.
+10B.1 moves Market Context, Local MVP workflow status, and scanner stat cards into the new Overview workspace. 10B.2 makes Scanner Radar and Candidate Detail easier to scan while keeping scanner output read-only and local review separate from scanner labels. 10B.3 makes Review Queue, stored reviews, storage/backup/diagnostics/reset, and Analyst Report Workspace easier to scan while keeping all review/import/export/reset/diagnostics/report behavior unchanged. 10B.4 completes the visual QA / polish pass for spacing, wrapping, section separation, selected candidate state, command blocks, and responsive fallback.
 
-10B.1 through 10B.3 change no endpoints, scanner scoring, `final_label`, `WATCHLIST` meaning, review storage behavior, review import/export/reset behavior, diagnostics behavior, or analyst report generation.
+10B.1 through 10B.4 change no endpoints, scanner scoring, `final_label`, `WATCHLIST` meaning, review storage behavior, review import/export/reset behavior, diagnostics behavior, or analyst report generation.
 
-Last planned UX2 step:
+Visual QA checklist:
 
-- 10B.4 Visual QA / Polish
+- `docs/ux2_visual_qa_checklist.md`
 
-This is not a buy/sell signal. Full UX2 Product-grade Interface Redesign remains in progress.
+This is not a buy/sell signal. UX2 is complete for the local MVP UI pass; 10C Local MVP Release Candidate Stabilization remains next.
 
 ## Analyst Report
 

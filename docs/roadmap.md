@@ -282,7 +282,13 @@ UX2 Review Queue + Report Workspace Redesign v1:
 - Storage and backup copy clarifies that export/import includes only local review status and analyst notes, diagnostics omit notes and entries, and reset clears only local review state.
 - Analyst Report Workspace keeps report generation local to CMD with `scripts\win\generate-analyst-report.cmd`, smoke check `scripts\win\check-analyst-report.cmd`, and output path `tools\ui-mock\.local\reports`.
 - 10B.3 adds no endpoints, new sources, npm dependencies, auth, production backend, production cron, OpenAI call, scraping, browser automation, scanner scoring change, `final_label` change, `WATCHLIST` meaning change, review import/export/reset/diagnostics logic change, or report logic change.
-- Last planned UX2 step is 10B.4 Visual QA / Polish.
+
+UX2 Visual QA / Polish v1:
+
+- Stage 10B.4 closes UX2 at local MVP UI level with layout consistency, spacing, responsive fallback, command/path wrapping, selected candidate state, Review Queue section separation, and Analyst Report Workspace command containment.
+- Visual QA checklist: `docs/ux2_visual_qa_checklist.md`.
+- 10B.4 adds no endpoints, new sources, npm dependencies, auth, production backend, production cron, OpenAI call, scraping, browser automation, scanner scoring change, `final_label` change, `WATCHLIST` meaning change, review import/export/reset/diagnostics logic change, or report logic change.
+- UX2 Product-grade Interface Redesign is complete for the local MVP UI pass. 10C Local MVP Release Candidate Stabilization remains required before the end of August 2026.
 
 Paid and clarification-dependent sources remain deferred:
 
@@ -453,7 +459,8 @@ UX2 Product-grade Interface Redesign:
 - Scope: simplify, organize, and professionalize the full frontend after the functional prototype stages.
 - 10B.2 completes the Scanner Radar / Candidate Detail redesign slice only.
 - 10B.3 completes the Review Queue + Report Workspace redesign slice only.
-- Full UX2 remains in progress through the last planned step, 10B.4 Visual QA / Polish.
+- 10B.4 completes the Visual QA / Polish pass for the local MVP UI.
+- UX2 is complete at local MVP level; 10C stabilization remains before the end of August 2026.
 
 ## UI Data Adapter (Completed)
 
