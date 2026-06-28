@@ -15,8 +15,7 @@ export const WorkspaceOverview: React.FC<WorkspaceOverviewProps> = ({
     <section className="overview-intro-panel">
       <div className="section-label">Workspace status</div>
       <h3>Local MVP workspace overview</h3>
-      <p>Scanner label, local review status and analyst report are separate layers.</p>
-      <p>Scanner label and local review status are separate workflow layers.</p>
+      <p>Scanner label, local review status, market context and analyst report are separate local workflow layers.</p>
       <p>
         Use <code>scripts\win\check-local-mvp.cmd</code> before merge/freeze decisions.
       </p>

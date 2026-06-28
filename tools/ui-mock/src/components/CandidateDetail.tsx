@@ -339,20 +339,20 @@ export const CandidateDetail: React.FC<Props> = ({
 
         <section className="detail-section">
           <SectionTitle>Reasoning Checklist</SectionTitle>
-          <div className="space-y-3">
+          <div className="reasoning-checklist-grid">
             {Object.entries(CHECKLIST_ITEMS).map(([category, items]) => (
-              <div key={category}>
-                <div className="text-[10px] font-semibold uppercase mb-1.5" style={{ color: "var(--text-muted)" }}>
+              <div key={category} className="reasoning-checklist-category">
+                <div className="reasoning-checklist-title">
                   {category}
                 </div>
-                <div className="space-y-1">
+                <div className="reasoning-checklist-items">
                   {items.map((item) => (
-                    <label key={item.key} className="flex items-start gap-2 cursor-pointer group">
+                    <label key={item.key} className="reasoning-checklist-item group">
                       <input
                         type="checkbox"
                         checked={!!checked[item.key]}
                         onChange={() => toggle(item.key)}
-                        className="mt-0.5 accent-accent"
+                        className="reasoning-checklist-checkbox accent-accent"
                       />
                       <span className={`text-xs transition-colors ${
                         checked[item.key]

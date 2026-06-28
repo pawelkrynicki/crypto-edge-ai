@@ -24,7 +24,7 @@ UX1 improves the dashboard information architecture and visual hierarchy without
 
 UX1 itself added no new data sources, API endpoints, backend services, storage model changes, scanner scoring changes, final-label changes, or WATCHLIST meaning changes. Market Context and Local Review Session are easier to find.
 
-UX2 Product-grade Interface Redesign is now continued through 10B.3, but the full UX2 redesign is not complete.
+UX2 Product-grade Interface Redesign is now closed for the local MVP through 10B.4 Visual QA / Polish. The local MVP UI pass is complete, but 10C stabilization is still required before the end of August 2026.
 
 ## 10A Product Workflow Polish
 
@@ -55,14 +55,15 @@ Overview -> Scanner Radar -> Review Queue -> Research Review -> Risk Alerts -> M
 
 Overview contains Market Context, Local MVP workflow status, scanner stat cards, and local health/report command copy. Scanner Radar remains the read-only scanner output and Candidate Detail workspace. Review Queue remains the local analyst status, notes, backup, diagnostics, reset, and report command workspace.
 
-The full UX2 redesign remains in progress. Completed follow-up slices:
+The UX2 local MVP UI pass is complete through these follow-up slices:
 
 - 10B.2 Scanner / Candidate Detail Redesign
 - 10B.3 Review Queue + Report Workspace
-
-Last planned UX2 step:
-
 - 10B.4 Visual QA / Polish
+
+Visual QA checklist:
+
+- `../../docs/ux2_visual_qa_checklist.md`
 
 10B.1 does not change endpoint paths, scanner scoring, `final_label`, `WATCHLIST` meaning, review storage behavior, report generation logic, npm dependencies, auth, production backend, production cron, new sources, scraping, browser automation, undocumented endpoints, or OpenAI calls.
 
@@ -74,9 +75,7 @@ Candidate Detail now has stronger product-grade sections for Local Review Sessio
 
 10B.2 changes no endpoint paths, data-source policy, review save/clear/import/export behavior, analyst report generation, scanner scoring, `final_label`, or `WATCHLIST` meaning. It adds no npm dependencies, auth, production backend, production cron, new sources, scraping, browser automation, undocumented endpoints, or OpenAI calls.
 
-UX2 remains in progress. Planned next steps are:
-
-- 10B.4 Visual QA / Polish
+UX2 visual QA is complete for the local MVP in 10B.4. The remaining pre-August work is 10C stabilization, not new UX2 feature scope.
 
 ## 10B.3 UX2 Review Queue + Report Workspace Redesign
 
@@ -86,9 +85,15 @@ The redesign keeps local review status as an analyst organization layer only. Ex
 
 10B.3 changes no endpoint paths, review save/clear/import/export/reset logic, diagnostics behavior, analyst report generation logic, scanner scoring, `final_label`, or `WATCHLIST` meaning. It adds no npm dependencies, auth, production backend, production cron, new sources, scraping, browser automation, undocumented endpoints, or OpenAI calls.
 
-UX2 remains in progress. Last planned UX2 step:
+10B.4 Visual QA / Polish closes the UX2 local MVP UI pass. See `../../docs/ux2_visual_qa_checklist.md` for the short manual checklist. 10C stabilization remains required before the end of August 2026.
 
-- 10B.4 Visual QA / Polish
+## 10B.4 UX2 Visual QA / Polish
+
+10B.4 polishes the existing UX2 UI without changing product logic. It tightens Workspace Shell and Overview wrapping, clarifies Scanner selected state, improves Candidate Detail readability, separates Review Queue sections, and keeps Analyst Report Workspace commands contained inside their panels.
+
+The visual QA pass adds `../../docs/ux2_visual_qa_checklist.md` and updates lightweight static coverage. It changes no endpoint paths, data-source policy, review save/clear/import/export/reset behavior, diagnostics behavior, analyst report generation, scanner scoring, `final_label`, or `WATCHLIST` meaning. It adds no npm dependencies, auth, production backend, production cron, new sources, scraping, browser automation, undocumented endpoints, or OpenAI calls.
+
+UX2 Product-grade Interface Redesign is now complete at local MVP level. 10C Local MVP Release Candidate Stabilization is still needed before the end of August 2026.
 
 ## Important Product Rules
 - **No Buy Signals**: Crypto Edge AI is a research tool, not a trading bot.

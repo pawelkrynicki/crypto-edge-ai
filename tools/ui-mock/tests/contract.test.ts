@@ -284,6 +284,7 @@ const workspaceShellMarkup = renderToStaticMarkup(React.createElement(WorkspaceS
 }, React.createElement("div", null, "Overview body"))));
 
 assert.match(workspaceShellMarkup, /Local MVP Overview/, "workspace shell renders overview section");
+assert.match(workspaceShellMarkup, /Overview/, "workspace shell renders overview navigation");
 assert.match(workspaceShellMarkup, /Scanner Radar/, "workspace shell renders scanner radar navigation");
 assert.match(workspaceShellMarkup, /Review Queue/, "workspace shell renders review queue navigation");
 assert.match(workspaceShellMarkup, /Research Review/, "workspace shell renders research review navigation");
@@ -891,6 +892,9 @@ const radarWithReviewMarkup = renderToStaticMarkup(React.createElement(ScannerRa
 }));
 
 assert.match(radarWithReviewMarkup, /Scanner Radar/, "scanner radar renders workspace title");
+assert.match(radarWithReviewMarkup, /scanner-candidate-card/, "scanner radar renders candidate cards");
+assert.match(radarWithReviewMarkup, /Selected/, "scanner radar renders selected candidate state");
+assert.match(radarWithReviewMarkup, /View details/, "scanner radar renders neutral detail action copy");
 assert.match(radarWithReviewMarkup, /Scanner output is read-only/, "scanner radar renders read-only guidance");
 assert.match(
   radarWithReviewMarkup,
@@ -898,6 +902,7 @@ assert.match(
   "scanner radar explains WATCHLIST scope",
 );
 assert.match(radarWithReviewMarkup, /Local Review Session/, "scanner radar renders selected candidate detail");
+assert.match(radarWithReviewMarkup, /Quick Snapshot/, "scanner radar renders selected candidate detail sections");
 assert.match(radarWithReviewMarkup, /This is not a buy\/sell signal\./, "scanner radar renders compliance copy");
 assert.match(radarWithReviewMarkup, /Follow-up/, "scanner radar renders local review badge");
 assert.equal(passMockCandidate.final_label, "WATCHLIST", "scanner radar review status does not mutate final_label");

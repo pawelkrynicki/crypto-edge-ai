@@ -395,10 +395,11 @@ Completed follow-up UX2 slices:
 
 - 10B.2 Scanner / Candidate Detail Redesign
 - 10B.3 Review Queue + Report Workspace
-
-Last planned UX2 step:
-
 - 10B.4 Visual QA / Polish
+
+Visual QA checklist:
+
+- `docs/ux2_visual_qa_checklist.md`
 
 ## UX2 Scanner / Candidate Detail Redesign v1
 
@@ -421,9 +422,13 @@ Stage 10B.3 continues UX2 only inside Review Queue and Analyst Report Workspace.
 
 10B.3 changes no endpoint paths, data-source policy, review save/clear/import/export/reset behavior, diagnostics behavior, analyst report generation, scanner scoring, `final_label`, or `WATCHLIST` meaning. It adds no npm dependencies, auth, production backend, production cron, new sources, scraping, HTML parsing, browser automation, undocumented endpoints, or OpenAI calls.
 
-UX2 remains in progress. Last planned UX2 step:
+## UX2 Visual QA / Polish v1
 
-- 10B.4 Visual QA / Polish
+Stage 10B.4 closes UX2 at local MVP UI level with layout consistency, spacing, responsive fallback, command/path wrapping, selected candidate state, Review Queue section separation, and Analyst Report Workspace command containment.
+
+- Visual QA checklist: `docs/ux2_visual_qa_checklist.md`.
+- UX2 is complete for the local MVP UI pass, while 10C Local MVP Release Candidate Stabilization remains required before the end of August 2026.
+- 10B.4 changes no endpoint paths, data-source policy, review save/clear/import/export/reset behavior, diagnostics behavior, analyst report generation, scanner scoring, `final_label`, or `WATCHLIST` meaning. It adds no npm dependencies, auth, production backend, production cron, new sources, scraping, HTML parsing, browser automation, undocumented endpoints, or OpenAI calls.
 
 ## UX1 Professional Dashboard Redesign
 
