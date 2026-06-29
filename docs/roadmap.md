@@ -1,5 +1,25 @@
 # Roadmap
 
+## Stage 11A: AI KINTEL Production MVP Definition
+
+Define what production MVP means for the Crypto Market module inside AI KINTEL.
+
+Current direction:
+
+- Final product is an AI KINTEL module, not a standalone SaaS.
+- Access should be controlled by AI KINTEL auth/subscription.
+- Local RC remains the porting baseline, not the production implementation.
+- Production MVP should use AI KINTEL Express/tRPC, MySQL/MariaDB, cron scripts, PM2, and `/crypto-market`.
+- Paid sources remain deferred but environment-ready through env placeholders, disabled config slots, and source policy gates.
+- Production MVP remains research-only: no trading execution, no investment recommendation, and `WATCHLIST` remains further manual review only.
+
+Current artifacts:
+
+- `docs/ai_kintel_production_mvp_definition.md`.
+- `docs/ai_kintel_integration_decision_matrix.md`.
+- `docs/ai_kintel_paid_source_readiness_plan.md`.
+- `docs/ai_kintel_integration_blueprint.md`.
+
 ## Stage 1: Documentation Alignment With Owner Decisions
 
 Align documentation with the latest owner decisions:

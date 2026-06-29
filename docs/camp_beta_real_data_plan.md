@@ -6,6 +6,19 @@ Camp BETA should be a working Crypto Edge AI tool on real data in a limited, sta
 
 This is still a planning document. It does not implement real fetchers, production cron scripts, migrations, auth, UI, or AI calls.
 
+## 11A AI KINTEL Production MVP Planning
+
+Stage 11A defines the production direction as an AI KINTEL Crypto Market module, not a standalone SaaS. The local RC remains the baseline for porting, but production work should move into the AI KINTEL architecture: Express/tRPC, MySQL/MariaDB, `packages/cron/scripts`, PM2, and a `/crypto-market` route.
+
+11A planning documents:
+
+- `docs/ai_kintel_production_mvp_definition.md`
+- `docs/ai_kintel_integration_decision_matrix.md`
+- `docs/ai_kintel_paid_source_readiness_plan.md`
+- `docs/ai_kintel_integration_blueprint.md`
+
+Paid sources remain deferred but environment-ready: paid vendor slots can be represented in config as disabled, with env placeholders and policy gates, while the production MVP starts with free/approved sources only.
+
 ## Data Source Registry Enforcement v1
 
 The current technical control is the Data Source Registry Enforcement v1 gate.

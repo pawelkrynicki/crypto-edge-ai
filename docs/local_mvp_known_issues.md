@@ -4,6 +4,15 @@
 
 Known Issues / Accepted Limitations for Local MVP RC.
 
+Stage 11A documents the AI KINTEL production MVP direction. The production path is an AI KINTEL module, not a standalone SaaS. The local RC remains the porting baseline only and is not the production implementation.
+
+11A planning documents:
+
+- `docs/ai_kintel_production_mvp_definition.md`
+- `docs/ai_kintel_integration_decision_matrix.md`
+- `docs/ai_kintel_paid_source_readiness_plan.md`
+- `docs/ai_kintel_integration_blueprint.md`
+
 ## No Known RC Blockers
 
 No known RC blockers after automated checks.
@@ -49,12 +58,11 @@ SQLite is optional. File-backed JSON remains the default local review storage pr
 
 ## Future Production Decisions
 
-- Hosting.
-- Auth/users.
-- Production backend.
-- Production storage/database.
-- Monitoring/logging.
-- Paid data integrations.
+- AI KINTEL route, tRPC router, and sidebar integration.
+- AI KINTEL auth/subscription gate location.
+- Production MySQL/MariaDB storage and migration review.
+- Production cron and PM2 monitoring/logging.
+- Paid data integrations; deferred but environment-ready.
 - Release/deployment process.
 - Production security review.
 

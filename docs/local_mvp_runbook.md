@@ -12,12 +12,21 @@
 - 10C Local MVP Release Candidate Stabilization v1 adds the local RC document and RC check script without adding features or changing product behavior.
 - 10D Local MVP RC Manual Preview Notes / Known Issues v1 adds manual preview notes and known issues documentation only. It does not add features or change product behavior.
 - Local RC-ready does not mean production-ready or final product-ready; production decisions remain deferred.
+- 11A AI KINTEL Production MVP Definition documents the production direction as an AI KINTEL module, not a standalone SaaS. It does not change local RC behavior.
+- Paid sources remain deferred but the production environment should be ready for later env/config/policy activation.
 
 Release candidate notes:
 
 - `docs/local_mvp_release_candidate.md`
 - `docs/local_mvp_rc_manual_preview_notes.md`
 - `docs/local_mvp_known_issues.md`
+
+AI KINTEL 11A planning notes:
+
+- `docs/ai_kintel_production_mvp_definition.md`
+- `docs/ai_kintel_integration_decision_matrix.md`
+- `docs/ai_kintel_paid_source_readiness_plan.md`
+- `docs/ai_kintel_integration_blueprint.md`
 
 ## Fast Health Check
 
@@ -183,3 +192,9 @@ If Windows or `pnpm` hits an `EPERM` issue, prefer the existing `scripts\win\*.c
 - Do not add paid integrations, production deployment, or monitoring until those future product decisions are made.
 
 After 10D, prefer freeze/light mode unless a real blocker appears.
+
+## AI KINTEL Production MVP Planning
+
+Stage 11A keeps the local RC as the baseline for porting, but production implementation belongs in AI KINTEL: Express/tRPC webapp, MySQL/MariaDB, cron scripts under `packages/cron/scripts`, PM2, and a `/crypto-market` module route.
+
+11A is documentation/decision work only. It adds no endpoint, source adapter, dependency, auth implementation, production backend, production database, executable production migration, UI/CSS change, scanner scoring change, `final_label` change, or `WATCHLIST` meaning change.

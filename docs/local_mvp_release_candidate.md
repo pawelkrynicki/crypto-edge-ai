@@ -3,11 +3,21 @@
 ## Status
 
 - Local MVP Release Candidate Stabilization v1.
+- Stage 11A adds AI KINTEL production MVP definition documents; it does not change local RC behavior.
 - The local MVP is RC-ready after `scripts\win\check-local-rc.cmd` passes.
 - UX2 local MVP UI pass was completed in 10B.4.
 - 10C stabilizes the local RC and does not add new product features.
 - 10D adds manual preview notes and known issues documentation only; it does not add new product features.
 - Local RC-ready still does not mean production-ready or final product-ready.
+- Production direction is an AI KINTEL module, not a standalone SaaS.
+- The local RC remains the porting baseline, not the production implementation.
+
+11A production planning documents:
+
+- `docs/ai_kintel_production_mvp_definition.md`
+- `docs/ai_kintel_integration_decision_matrix.md`
+- `docs/ai_kintel_paid_source_readiness_plan.md`
+- `docs/ai_kintel_integration_blueprint.md`
 
 ## Included In Local MVP
 
@@ -35,6 +45,8 @@
 - Report generation from UI.
 - Auto-trading.
 - Investment recommendations or trading signals.
+- AI KINTEL production implementation.
+- Paid sources remain deferred but the production environment should be ready for later env/config/policy activation.
 
 ## RC Verification
 
