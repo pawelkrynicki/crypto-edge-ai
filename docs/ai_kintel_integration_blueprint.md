@@ -3,8 +3,16 @@
 ## Status
 
 - Stage: 11A - AI KINTEL integration blueprint.
+- Stage 11B adds reviewable database migration blueprint artifacts for future owner/DB review.
 - This is a planning artifact for moving from local RC to AI KINTEL production MVP.
 - It does not implement production backend, production database, migrations, auth, UI, source adapters, cron jobs, endpoints, dependencies, or paid integrations.
+- 11B does not execute a production migration; the real migration belongs to a future AI KINTEL repo integration stage.
+
+11B database blueprint artifacts:
+
+- `docs/ai_kintel_database_migration_blueprint.md`
+- `docs/ai_kintel_crypto_tables_blueprint.sql`
+- `docs/ai_kintel_database_mapping_matrix.md`
 
 ## Target Repo Structure
 
@@ -36,7 +44,7 @@ Primary integration target:
 
 ## Suggested Phases
 
-- 11B Database Migration Blueprint.
+- 11B Database Migration Blueprint: review-only artifacts in this repo; no executed migration.
 - 11C Source Config / Adapter Contract.
 - 11D Cron Fetcher Skeletons.
 - 11E tRPC Router Blueprint.

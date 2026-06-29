@@ -3,9 +3,17 @@
 ## Status
 
 - Stage: 11A - AI KINTEL Production MVP Definition and Integration Decision Matrix.
+- Stage 11B adds reviewable database migration blueprint artifacts.
 - Planning date: 2026-06-29.
 - This is a documentation and decision artifact only.
 - No source adapter, endpoint, auth layer, production backend, production database, migration, UI change, or paid API call is implemented here.
+- 11B does not execute a migration; the real migration belongs to a future AI KINTEL repo integration stage after owner and DB review.
+
+11B database blueprint artifacts:
+
+- `docs/ai_kintel_database_migration_blueprint.md`
+- `docs/ai_kintel_crypto_tables_blueprint.sql`
+- `docs/ai_kintel_database_mapping_matrix.md`
 
 ## Architecture Decisions
 
@@ -56,6 +64,7 @@
 | Security/manual verification | `crypto_scam_alerts` or risk fields on project/opportunity records | Use explicit missing-data fields and do not invent unavailable security data. |
 | Review notes | New production review table, AI KINTEL user layer, or internal-only workflow | OPEN DECISION: whether local analyst review notes should be stored in production DB, user-specific table, or remain internal-only. |
 | Analyst report | Backend-generated research summary or internal/admin export | Decide in post-MVP architecture if UI generation requires new backend surfaces. |
+| Source run observability | `crypto_source_runs` | Track cron/data collection health and disabled paid-vendor metadata without activating paid providers. |
 
 ## Compliance Decisions
 

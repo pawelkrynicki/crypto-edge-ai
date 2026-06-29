@@ -1,5 +1,24 @@
 # Roadmap
 
+## Stage 11B: AI KINTEL Database Migration Blueprint
+
+Prepare a reviewable database migration blueprint for the future AI KINTEL Crypto Market module.
+
+Current direction:
+
+- 11B is documentation/blueprint work only.
+- No production migration is executed in this repo.
+- The real migration belongs to a future AI KINTEL repo integration stage after owner and DB review.
+- Local RC behavior remains unchanged.
+- Paid sources remain disabled/deferred and are represented only as readiness/observability concepts.
+- No endpoint, source adapter, backend, UI/CSS, auth, dependency, scanner scoring, `final_label`, or `WATCHLIST` behavior is changed.
+
+Current artifacts:
+
+- `docs/ai_kintel_database_migration_blueprint.md`.
+- `docs/ai_kintel_crypto_tables_blueprint.sql`.
+- `docs/ai_kintel_database_mapping_matrix.md`.
+
 ## Stage 11A: AI KINTEL Production MVP Definition
 
 Define what production MVP means for the Crypto Market module inside AI KINTEL.

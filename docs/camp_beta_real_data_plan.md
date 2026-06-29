@@ -19,6 +19,16 @@ Stage 11A defines the production direction as an AI KINTEL Crypto Market module,
 
 Paid sources remain deferred but environment-ready: paid vendor slots can be represented in config as disabled, with env placeholders and policy gates, while the production MVP starts with free/approved sources only.
 
+## 11B AI KINTEL Database Migration Blueprint
+
+Stage 11B adds reviewable database blueprint artifacts for the future AI KINTEL Crypto Market module:
+
+- `docs/ai_kintel_database_migration_blueprint.md`
+- `docs/ai_kintel_crypto_tables_blueprint.sql`
+- `docs/ai_kintel_database_mapping_matrix.md`
+
+These artifacts do not execute a production migration, add a production database, add source adapters, add endpoint/backend/auth code, change UI/CSS, or change local RC behavior. The real migration belongs to a future AI KINTEL repo integration stage after owner and DB review. Paid sources remain disabled/deferred.
+
 ## Data Source Registry Enforcement v1
 
 The current technical control is the Data Source Registry Enforcement v1 gate.

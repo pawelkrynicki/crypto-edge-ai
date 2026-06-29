@@ -4,6 +4,7 @@
 
 - Local MVP Release Candidate Stabilization v1.
 - Stage 11A adds AI KINTEL production MVP definition documents; it does not change local RC behavior.
+- Stage 11B adds AI KINTEL database migration blueprint documents; it does not change local RC behavior.
 - The local MVP is RC-ready after `scripts\win\check-local-rc.cmd` passes.
 - UX2 local MVP UI pass was completed in 10B.4.
 - 10C stabilizes the local RC and does not add new product features.
@@ -18,6 +19,14 @@
 - `docs/ai_kintel_integration_decision_matrix.md`
 - `docs/ai_kintel_paid_source_readiness_plan.md`
 - `docs/ai_kintel_integration_blueprint.md`
+
+11B database blueprint documents:
+
+- `docs/ai_kintel_database_migration_blueprint.md`
+- `docs/ai_kintel_crypto_tables_blueprint.sql`
+- `docs/ai_kintel_database_mapping_matrix.md`
+
+11B is review-only documentation. It does not execute a migration, add a production database, add source adapters, add backend/auth/endpoints, change UI/CSS, change scanner scoring, change `final_label`, or change `WATCHLIST` meaning. Paid sources remain disabled/deferred, and the real migration belongs to a future AI KINTEL repo integration stage.
 
 ## Included In Local MVP
 
