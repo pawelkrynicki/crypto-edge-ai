@@ -10,10 +10,14 @@
 - 10B.4 closes UX2 Visual QA / Polish for the local MVP UI pass, covering layout consistency, wrapping, readability, responsive fallback, and the manual checklist in `docs/ux2_visual_qa_checklist.md`.
 - UX2 Product-grade Interface Redesign is complete at local MVP level.
 - 10C Local MVP Release Candidate Stabilization v1 adds the local RC document and RC check script without adding features or changing product behavior.
+- 10D Local MVP RC Manual Preview Notes / Known Issues v1 adds manual preview notes and known issues documentation only. It does not add features or change product behavior.
+- Local RC-ready does not mean production-ready or final product-ready; production decisions remain deferred.
 
 Release candidate notes:
 
 - `docs/local_mvp_release_candidate.md`
+- `docs/local_mvp_rc_manual_preview_notes.md`
+- `docs/local_mvp_known_issues.md`
 
 ## Fast Health Check
 
@@ -124,7 +128,7 @@ Visual QA checklist:
 
 - `docs/ux2_visual_qa_checklist.md`
 
-This is not a buy/sell signal. UX2 is complete for the local MVP UI pass; 10C Local MVP Release Candidate Stabilization keeps the current scope stable.
+This is not a buy/sell signal. UX2 is complete for the local MVP UI pass; 10C Local MVP Release Candidate Stabilization keeps the current scope stable, and 10D adds manual preview / known-issues documentation without changing product behavior.
 
 ## Analyst Report
 
@@ -167,7 +171,7 @@ gh api user --jq .login
 
 If Windows or `pnpm` hits an `EPERM` issue, prefer the existing `scripts\win\*.cmd` helpers. They call direct local binaries where the project already needs that workaround.
 
-## Do Not Do During 10C
+## Do Not Do During 10C / 10D
 
 - Do not rebuild the frontend or change the completed local MVP UI flow.
 - Do not add a production backend.
@@ -177,3 +181,5 @@ If Windows or `pnpm` hits an `EPERM` issue, prefer the existing `scripts\win\*.c
 - Do not change `final_label`.
 - Do not change `WATCHLIST` meaning.
 - Do not add paid integrations, production deployment, or monitoring until those future product decisions are made.
+
+After 10D, prefer freeze/light mode unless a real blocker appears.

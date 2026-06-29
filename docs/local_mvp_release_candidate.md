@@ -6,6 +6,8 @@
 - The local MVP is RC-ready after `scripts\win\check-local-rc.cmd` passes.
 - UX2 local MVP UI pass was completed in 10B.4.
 - 10C stabilizes the local RC and does not add new product features.
+- 10D adds manual preview notes and known issues documentation only; it does not add new product features.
+- Local RC-ready still does not mean production-ready or final product-ready.
 
 ## Included In Local MVP
 
@@ -55,6 +57,12 @@ scripts\win\generate-live-context.cmd
 scripts\win\dev-ui.cmd
 ```
 
+Manual preview notes:
+
+- `docs/local_mvp_rc_manual_preview_notes.md`
+
+Do not mark any manual preview area as `PASS` unless the local UI was actually opened and clicked through.
+
 ## Local Storage
 
 - File-backed JSON is the default local review storage provider.
@@ -82,3 +90,9 @@ scripts\win\dev-ui.cmd
 - Report is generated from CMD.
 - Review status is not a recommendation.
 - `WATCHLIST` remains further manual review only.
+
+Known issues and accepted limitations:
+
+- `docs/local_mvp_known_issues.md`
+
+After 10D, prefer freeze/light mode unless a real blocker appears.

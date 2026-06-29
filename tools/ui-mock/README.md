@@ -18,6 +18,7 @@ It demonstrates the visual direction, product structure, and trader value propos
 - **Review Queue & Risk Alerts**: Dedicated tabs for local analyst follow-up, scanner WATCHLIST candidates, and critical risks.
 - **Methodology**: Explanation of the staged review process.
 - **Local MVP RC Check**: 10C release-candidate checkpoint through `..\..\scripts\win\check-local-rc.cmd`.
+- **Manual Preview Notes / Known Issues**: 10D documentation for local RC click-through status, accepted limitations, and resume rules.
 
 ## 10C Local MVP Release Candidate Stabilization
 
@@ -36,13 +37,24 @@ Release candidate notes:
 - 10C is stabilization/DX only and does not add endpoints, data sources, UI flow changes, scoring changes, label changes, auth, production backend, or npm dependencies.
 - Final product readiness still requires future decisions for hosting, auth, production backend, data/paid integrations, deployment, and monitoring.
 
+## 10D Local MVP RC Manual Preview Notes / Known Issues
+
+10D adds documentation only:
+
+- `../../docs/local_mvp_rc_manual_preview_notes.md`
+- `../../docs/local_mvp_known_issues.md`
+
+It records the manual click-through checklist, known limitations, blocker definition, and resume rules. It does not add endpoints, data sources, UI changes, CSS changes, scoring changes, label changes, auth, production backend, npm dependencies, or report-generation changes.
+
+Local RC-ready still does not mean production-ready or final product-ready. After 10D, prefer freeze/light mode unless a real blocker appears.
+
 ## UX1 Professional Dashboard Redesign
 
 UX1 improves the dashboard information architecture and visual hierarchy without changing data behavior. The preview uses a top product header, a compact Market Context block, a short KPI strip, a clearer Scanner Radar workspace, and a wider Candidate Detail working panel.
 
 UX1 itself added no new data sources, API endpoints, backend services, storage model changes, scanner scoring changes, final-label changes, or WATCHLIST meaning changes. Market Context and Local Review Session are easier to find.
 
-UX2 Product-grade Interface Redesign is now closed for the local MVP through 10B.4 Visual QA / Polish. The local MVP UI pass is complete, and 10C stabilization is the current local release-candidate checkpoint.
+UX2 Product-grade Interface Redesign is now closed for the local MVP through 10B.4 Visual QA / Polish. The local MVP UI pass is complete. 10C stabilization is the local release-candidate checkpoint, and 10D adds manual preview / known-issues documentation without changing product behavior.
 
 ## 10A Product Workflow Polish
 
@@ -272,6 +284,8 @@ Local MVP runbook and freeze checklist:
 ../../docs/local_mvp_runbook.md
 ../../docs/pre_holiday_freeze_checklist.md
 ../../docs/local_mvp_release_candidate.md
+../../docs/local_mvp_rc_manual_preview_notes.md
+../../docs/local_mvp_known_issues.md
 ```
 
 Local MVP release-candidate check:
@@ -286,7 +300,7 @@ Full local MVP health check:
 ..\..\scripts\win\check-local-mvp.cmd
 ```
 
-Stage 9C added the original documentation/DX checkpoint only. 10C adds release-candidate stabilization documentation and `check-local-rc.cmd`. These stages do not change endpoint paths, UI workflow, scanner scoring, `final_label`, or `WATCHLIST` meaning. UX2 Product-grade Interface Redesign is complete for the local MVP UI pass.
+Stage 9C added the original documentation/DX checkpoint only. 10C adds release-candidate stabilization documentation and `check-local-rc.cmd`. 10D adds manual preview notes and known issues documentation. These stages do not change endpoint paths, UI workflow, scanner scoring, `final_label`, or `WATCHLIST` meaning. UX2 Product-grade Interface Redesign is complete for the local MVP UI pass.
 
 Review Storage mode checks:
 

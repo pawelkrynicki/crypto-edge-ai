@@ -130,6 +130,7 @@ Windows helper scripts:
 - `scripts\win\check-local-mvp.cmd` runs the aggregate local MVP health check for the pre-holiday freeze checkpoint.
 - `scripts\win\check-local-rc.cmd` runs the 10C release-candidate checkpoint by confirming required docs/scripts and then running the local MVP health check.
 - `scripts\win\dev-ui-sqlite.cmd` starts the local API and frontend preview with SQLite Review Storage enabled.
+- 10D manual preview and known-issues notes are documented in `docs/local_mvp_rc_manual_preview_notes.md` and `docs/local_mvp_known_issues.md`.
 
 Local Review Session:
 
@@ -298,6 +299,13 @@ Local MVP Release Candidate Stabilization v1:
 - Add `docs/local_mvp_release_candidate.md` with included scope, deferred scope, RC verification, manual preview, local storage, RC definition, and known limitations.
 - 10C adds no endpoints, new sources, npm dependencies, auth, production backend, production cron, OpenAI call, scraping, browser automation, UI flow change, scanner scoring change, `final_label` change, `WATCHLIST` meaning change, review/import/export/reset/diagnostics logic change, or report logic change.
 - Final product readiness still requires future decisions for hosting, auth, production backend, data/paid integrations, deployment, and monitoring.
+
+Local MVP RC Manual Preview Notes / Known Issues v1:
+
+- Stage 10D adds `docs/local_mvp_rc_manual_preview_notes.md` for manual click-through status, preview commands, result recording, and resume rules.
+- Stage 10D adds `docs/local_mvp_known_issues.md` for accepted local limitations, operational notes, blocker definitions, and future production decisions.
+- 10D is documentation/QA only. It adds no endpoints, new sources, npm dependencies, auth, production backend, production cron, OpenAI call, scraping, browser automation, UI/CSS change, scanner scoring change, `final_label` change, `WATCHLIST` meaning change, review/import/export/reset/diagnostics logic change, or report logic change.
+- RC-ready local MVP still does not mean production-ready or final product-ready. After 10D, prefer freeze/light mode unless a real blocker appears.
 
 Paid and clarification-dependent sources remain deferred:
 
@@ -469,7 +477,7 @@ UX2 Product-grade Interface Redesign:
 - 10B.2 completes the Scanner Radar / Candidate Detail redesign slice only.
 - 10B.3 completes the Review Queue + Report Workspace redesign slice only.
 - 10B.4 completes the Visual QA / Polish pass for the local MVP UI.
-- UX2 is complete at local MVP level; 10C stabilizes the local release-candidate checkpoint without adding feature scope.
+- UX2 is complete at local MVP level; 10C stabilizes the local release-candidate checkpoint and 10D documents manual preview / known issues without adding feature scope.
 
 ## UI Data Adapter (Completed)
 
