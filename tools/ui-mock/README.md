@@ -2,6 +2,19 @@
 
 This directory contains the first UI mock / frontend preview for the **Crypto Edge AI Camp BETA**. 
 
+## 11A AI KINTEL Production MVP Planning
+
+11A defines the production direction as an AI KINTEL Crypto Market module, not a standalone SaaS. This UI mock remains a local RC baseline for porting and is not the production implementation.
+
+Planning documents:
+
+- `../../docs/ai_kintel_production_mvp_definition.md`
+- `../../docs/ai_kintel_integration_decision_matrix.md`
+- `../../docs/ai_kintel_paid_source_readiness_plan.md`
+- `../../docs/ai_kintel_integration_blueprint.md`
+
+Paid sources remain deferred but environment-ready for later env/config/policy activation. 11A adds no UI/CSS change, endpoint, source adapter, dependency, auth implementation, production backend, production database, scanner scoring change, `final_label` change, or `WATCHLIST` meaning change.
+
 It demonstrates the visual direction, product structure, and trader value proposition (research, risk, scam filtering) before the full backend integration.
 
 ## Features
