@@ -3,10 +3,18 @@
 ## Status
 
 - Stage: 11A - paid-source readiness only.
+- Stage 11B adds database blueprint references for source-run observability.
 - Paid sources are deferred.
 - The production environment must be paid-source-ready.
 - No paid source is called until explicitly enabled.
 - This document does not add source adapters, dependencies, endpoints, cron jobs, auth, backend code, or production database changes.
+- 11B does not execute a migration; the real migration belongs to a future AI KINTEL repo integration stage.
+
+11B database blueprint artifacts:
+
+- `docs/ai_kintel_database_migration_blueprint.md`
+- `docs/ai_kintel_crypto_tables_blueprint.sql`
+- `docs/ai_kintel_database_mapping_matrix.md`
 
 ## Required Pattern For Every Paid Source
 
@@ -72,6 +80,7 @@ When a paid source is disabled:
 - Do not require the env key.
 - Do not fail module startup.
 - Return disabled source metadata.
+- In the future AI KINTEL implementation, record disabled/config metadata in `crypto_source_runs` or equivalent source config observability.
 - Show `not configured` or `deferred` in UI-facing status.
 - Keep schema/API/UI stable so the source can be enabled later through env/config/policy only.
 

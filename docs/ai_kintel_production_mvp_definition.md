@@ -3,11 +3,19 @@
 ## Status
 
 - Stage: 11A - AI KINTEL Production MVP Definition.
+- Stage 11B adds a reviewable database migration blueprint for future owner/DB review.
 - Planning date: 2026-06-29.
 - The Local MVP Release Candidate is ready as a local RC baseline.
 - Production MVP is not the final product.
 - Production MVP is the first safe version of the Crypto Market module running inside AI KINTEL.
 - This document is a definition and decision artifact only. It does not implement production code, new sources, paid API calls, auth, migrations, or endpoints.
+- 11B does not execute a production migration and does not change Local RC behavior.
+
+11B database blueprint artifacts:
+
+- `docs/ai_kintel_database_migration_blueprint.md`
+- `docs/ai_kintel_crypto_tables_blueprint.sql`
+- `docs/ai_kintel_database_mapping_matrix.md`
 
 ## Product Positioning
 
@@ -25,6 +33,7 @@
 - AI KINTEL route: `/crypto-market`.
 - tRPC router: `cryptoMarket`.
 - MySQL/MariaDB tables and reviewable migrations for `crypto_*` module data.
+- Future migration created in the AI KINTEL repo after owner and DB review of the 11B blueprint.
 - Cron collection scripts under the AI KINTEL cron package.
 - PM2 process definitions for scheduled collection.
 - Source registry and source runtime policy adapted to AI KINTEL deployment.
