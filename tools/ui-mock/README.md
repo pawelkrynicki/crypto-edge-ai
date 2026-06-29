@@ -39,6 +39,18 @@ These are documentation/blueprint artifacts only. They do not execute a migratio
 
 These artifacts do not implement source adapters, activate paid sources, add provider calls, add endpoints/backend/auth, add cron implementations, add npm dependencies, change UI/CSS, change scanner scoring, change `final_label`, or change `WATCHLIST` meaning. Paid sources remain disabled/deferred. Future adapters must run backend/cron only, disabled paid vendors must not call providers, and the frontend remains tRPC/backend-only.
 
+## 11D AI KINTEL Cron Fetcher Skeletons
+
+11D adds documentation-only cron fetcher skeleton artifacts for the future AI KINTEL Crypto Market module:
+
+- `../../docs/ai_kintel_cron_fetcher_skeletons.md`
+- `../../docs/ai_kintel_cron_fetcher_types_matrix.md`
+- `../../docs/ai_kintel_pm2_cron_blueprint.md`
+- `../../docs/ai_kintel_cron_operational_runbook.md`
+- `../../docs/ai_kintel_cron_fetcher_test_plan.md`
+
+These artifacts do not create `packages/cron`, runtime cron scripts, source adapters, provider calls, endpoints/backend/auth, migrations, npm dependencies, UI/CSS changes, scanner scoring changes, `final_label` changes, or `WATCHLIST` meaning changes. Future cron fetchers must follow the 11C source adapter contract, paid sources remain disabled/deferred, disabled paid vendors must not call providers, and the frontend remains tRPC/backend-only.
+
 ## Features
 - **Dark, professional UI**: Aligned with the AIKINTEL aesthetic.
 - **Scanner Radar**: Product-grade candidate list and detail workspace showing scanner labels, local review status, security labels, market metrics, and read-only scanner reasons.

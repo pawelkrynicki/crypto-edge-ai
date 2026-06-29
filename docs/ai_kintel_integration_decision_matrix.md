@@ -5,11 +5,13 @@
 - Stage: 11A - AI KINTEL Production MVP Definition and Integration Decision Matrix.
 - Stage 11B adds reviewable database migration blueprint artifacts.
 - Stage 11C adds documentation-only source config, adapter, status/error, registry blueprint, and test-plan contracts.
+- Stage 11D adds documentation-only cron fetcher skeletons, type matrix, PM2 blueprint, runbook, and cron test plan.
 - Planning date: 2026-06-29.
 - This is a documentation and decision artifact only.
-- No source adapter, endpoint, auth layer, production backend, production database, migration, UI change, or paid API call is implemented here.
+- No source adapter, endpoint, auth layer, production backend, production database, migration, runtime cron script, UI change, or paid API call is implemented here.
 - 11B does not execute a migration; the real migration belongs to a future AI KINTEL repo integration stage after owner and DB review.
 - 11C does not implement adapters, activate sources, add cron code, add endpoints, or change Local RC behavior.
+- 11D does not create `packages/cron`, runtime cron scripts, source adapters, provider calls, endpoints, or change Local RC behavior.
 
 11B database blueprint artifacts:
 
@@ -24,6 +26,14 @@
 - `docs/ai_kintel_source_status_error_model.md`
 - `docs/ai_kintel_source_registry_blueprint.json`
 - `docs/ai_kintel_source_adapter_test_plan.md`
+
+11D cron skeleton artifacts:
+
+- `docs/ai_kintel_cron_fetcher_skeletons.md`
+- `docs/ai_kintel_cron_fetcher_types_matrix.md`
+- `docs/ai_kintel_pm2_cron_blueprint.md`
+- `docs/ai_kintel_cron_operational_runbook.md`
+- `docs/ai_kintel_cron_fetcher_test_plan.md`
 
 ## Architecture Decisions
 
@@ -65,6 +75,7 @@
 - Enabling a paid source requires an env var, a config flag, a source policy update, and a documented operational check.
 - Activation must respect vendor terms, rate limits, attribution requirements, and commercial approval status.
 - Future adapters must follow the 11C contract: backend/cron only, no provider call while disabled, no direct frontend provider call, and source-run status mapped to `crypto_source_runs`.
+- Future cron fetchers documented in 11D must follow the same 11C contract before any provider work.
 
 ## Data Model Decisions
 

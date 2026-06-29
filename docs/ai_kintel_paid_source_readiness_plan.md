@@ -5,12 +5,14 @@
 - Stage: 11A - paid-source readiness only.
 - Stage 11B adds database blueprint references for source-run observability.
 - Stage 11C adds documentation-only source config, adapter, status/error, registry blueprint, and test-plan contracts.
+- Stage 11D adds documentation-only cron fetcher skeletons, type matrix, PM2 blueprint, runbook, and cron test plan.
 - Paid sources are deferred.
 - The production environment must be paid-source-ready.
 - No paid source is called until explicitly enabled.
-- This document does not add source adapters, dependencies, endpoints, cron jobs, auth, backend code, or production database changes.
+- This document does not add source adapters, dependencies, endpoints, runtime cron scripts, `packages/cron`, auth, backend code, or production database changes.
 - 11B does not execute a migration; the real migration belongs to a future AI KINTEL repo integration stage.
 - 11C does not implement adapters, activate paid vendors, add provider calls, add endpoints, or change Local RC behavior.
+- 11D does not create `packages/cron`, runtime cron scripts, source adapters, provider calls, endpoints, or change Local RC behavior.
 
 11B database blueprint artifacts:
 
@@ -25,6 +27,14 @@
 - `docs/ai_kintel_source_status_error_model.md`
 - `docs/ai_kintel_source_registry_blueprint.json`
 - `docs/ai_kintel_source_adapter_test_plan.md`
+
+11D cron skeleton artifacts:
+
+- `docs/ai_kintel_cron_fetcher_skeletons.md`
+- `docs/ai_kintel_cron_fetcher_types_matrix.md`
+- `docs/ai_kintel_pm2_cron_blueprint.md`
+- `docs/ai_kintel_cron_operational_runbook.md`
+- `docs/ai_kintel_cron_fetcher_test_plan.md`
 
 ## Required Pattern For Every Paid Source
 
@@ -42,6 +52,8 @@ Every paid or approval-gated source must have:
 - Rollback rule for disabling the source without DB/API/UI rebuild.
 - Source-run status mapping to `crypto_source_runs`.
 - Backend/cron-only adapter execution; frontend provider calls remain forbidden.
+- Future cron fetcher behavior that follows the 11C source adapter contract before any provider work.
+- No provider call while disabled or deferred.
 
 ## Documentation-Only Config Shape
 

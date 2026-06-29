@@ -41,6 +41,18 @@ Stage 11C adds documentation-only source configuration and source adapter contra
 
 11C does not implement source adapters, activate paid sources, add provider calls, add endpoint/backend/auth code, add cron implementations, change UI/CSS, or change local RC behavior. Paid sources remain disabled/deferred. Future adapters must run backend/cron only, disabled paid vendors must not call providers, and the frontend remains tRPC/backend-only.
 
+## 11D AI KINTEL Cron Fetcher Skeletons
+
+Stage 11D adds documentation-only cron fetcher skeleton artifacts for the future AI KINTEL Crypto Market module:
+
+- `docs/ai_kintel_cron_fetcher_skeletons.md`
+- `docs/ai_kintel_cron_fetcher_types_matrix.md`
+- `docs/ai_kintel_pm2_cron_blueprint.md`
+- `docs/ai_kintel_cron_operational_runbook.md`
+- `docs/ai_kintel_cron_fetcher_test_plan.md`
+
+11D does not create `packages/cron`, runtime cron scripts, source adapters, provider calls, endpoints/backend/auth code, migrations, dependencies, UI/CSS changes, or local RC behavior changes. Future cron fetchers must follow the 11C source adapter contract, paid sources remain disabled/deferred, disabled sources must not call providers, and frontend access remains tRPC/backend-only.
+
 ## Data Source Registry Enforcement v1
 
 The current technical control is the Data Source Registry Enforcement v1 gate.
