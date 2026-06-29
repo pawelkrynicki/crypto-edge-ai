@@ -1,5 +1,26 @@
 # Roadmap
 
+## Stage 11D: AI KINTEL Cron Fetcher Skeletons
+
+Prepare documentation-only cron fetcher skeletons for the future AI KINTEL Crypto Market production module.
+
+Current direction:
+
+- 11D is documentation/skeleton work only.
+- No `packages/cron` directory, runtime cron script, source adapter, provider call, endpoint, auth, production backend, production database, migration, dependency, UI/CSS change, scanner scoring change, `final_label` change, or `WATCHLIST` behavior change is added.
+- Future cron fetchers must follow the 11C source config and source adapter contract.
+- Paid sources remain disabled/deferred.
+- Disabled/deferred paid sources must not call providers and must return disabled metadata where future source-run observability is approved.
+- Frontend remains tRPC/backend-only and must not call external providers directly.
+
+Current artifacts:
+
+- `docs/ai_kintel_cron_fetcher_skeletons.md`.
+- `docs/ai_kintel_cron_fetcher_types_matrix.md`.
+- `docs/ai_kintel_pm2_cron_blueprint.md`.
+- `docs/ai_kintel_cron_operational_runbook.md`.
+- `docs/ai_kintel_cron_fetcher_test_plan.md`.
+
 ## Stage 11C: AI KINTEL Source Config / Adapter Contract
 
 Prepare a documentation-only source configuration and adapter contract for the future AI KINTEL Crypto Market production module.

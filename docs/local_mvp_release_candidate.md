@@ -6,6 +6,7 @@
 - Stage 11A adds AI KINTEL production MVP definition documents; it does not change local RC behavior.
 - Stage 11B adds AI KINTEL database migration blueprint documents; it does not change local RC behavior.
 - Stage 11C adds AI KINTEL source config/adapter contract documents; it does not change local RC behavior.
+- Stage 11D adds AI KINTEL cron fetcher skeleton documents; it does not change local RC behavior.
 - The local MVP is RC-ready after `scripts\win\check-local-rc.cmd` passes.
 - UX2 local MVP UI pass was completed in 10B.4.
 - 10C stabilizes the local RC and does not add new product features.
@@ -35,9 +36,19 @@
 - `docs/ai_kintel_source_registry_blueprint.json`
 - `docs/ai_kintel_source_adapter_test_plan.md`
 
+11D cron skeleton documents:
+
+- `docs/ai_kintel_cron_fetcher_skeletons.md`
+- `docs/ai_kintel_cron_fetcher_types_matrix.md`
+- `docs/ai_kintel_pm2_cron_blueprint.md`
+- `docs/ai_kintel_cron_operational_runbook.md`
+- `docs/ai_kintel_cron_fetcher_test_plan.md`
+
 11B is review-only documentation. It does not execute a migration, add a production database, add source adapters, add backend/auth/endpoints, change UI/CSS, change scanner scoring, change `final_label`, or change `WATCHLIST` meaning. Paid sources remain disabled/deferred, and the real migration belongs to a future AI KINTEL repo integration stage.
 
 11C is review-only source contract documentation. It does not implement adapters, activate sources, add provider calls, add endpoint/backend/auth code, add cron implementations, change UI/CSS, change scanner scoring, change `final_label`, or change `WATCHLIST` meaning. Paid sources remain disabled/deferred, future adapters must run backend/cron only, disabled paid vendors must not call providers, and frontend access remains tRPC/backend-only.
+
+11D is review-only cron fetcher skeleton documentation. It does not create `packages/cron`, runtime cron scripts, source adapters, provider calls, endpoint/backend/auth code, dependencies, migrations, UI/CSS changes, scanner scoring changes, `final_label` changes, or `WATCHLIST` meaning changes. Future cron fetchers must follow the 11C source adapter contract, paid sources remain disabled/deferred, and disabled paid vendors must not call providers.
 
 ## Included In Local MVP
 

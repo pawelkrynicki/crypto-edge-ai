@@ -3,8 +3,9 @@
 ## Status
 
 - Stage: 11C - Source Adapter Contract.
+- Stage 11D adds documentation-only cron fetcher skeletons that must follow this contract.
 - This is a contract for future adapters, not an implementation.
-- Source adapters should be created in later stages, for example 11D+.
+- Source adapters should be created in later stages after 11D; 11D adds only cron-fetcher documentation skeletons.
 - This document does not add any provider calls, backend routes, cron jobs, dependencies, or runtime configuration.
 
 ## Adapter Responsibility
@@ -102,6 +103,27 @@ Normalized records must use:
 - No invented missing data.
 - Missing data means manual verification.
 - No investment recommendation fields.
+
+## 11D Cron Fetcher Relationship
+
+11D cron skeleton artifacts:
+
+- `docs/ai_kintel_cron_fetcher_skeletons.md`
+- `docs/ai_kintel_cron_fetcher_types_matrix.md`
+- `docs/ai_kintel_pm2_cron_blueprint.md`
+- `docs/ai_kintel_cron_operational_runbook.md`
+- `docs/ai_kintel_cron_fetcher_test_plan.md`
+
+Future cron fetchers must:
+
+- Use this 11C source adapter contract before any provider work.
+- Respect source config, policy, env, and rate-limit gates.
+- Avoid provider calls while a source is disabled or deferred.
+- Keep paid sources disabled/deferred until explicit approval.
+- Report run status to `crypto_source_runs`.
+- Avoid frontend provider calls.
+
+11D does not create `packages/cron`, runtime cron scripts, source adapters, endpoints, provider calls, or Local RC behavior changes.
 
 ## Pseudocode Only
 

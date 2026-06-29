@@ -3,8 +3,18 @@
 ## Status
 
 - Stage: 11C - future source adapter test plan.
+- Stage 11D adds a documentation-only cron fetcher test plan that extends these source-adapter expectations.
 - This is a future test plan, not implementation.
 - It does not add source adapters, provider calls, cron jobs, backend endpoints, UI changes, dependencies, or paid source activation.
+- 11D does not create `packages/cron`, runtime cron scripts, source adapters, provider calls, endpoints, or Local RC behavior changes.
+
+11D cron skeleton artifacts:
+
+- `docs/ai_kintel_cron_fetcher_skeletons.md`
+- `docs/ai_kintel_cron_fetcher_types_matrix.md`
+- `docs/ai_kintel_pm2_cron_blueprint.md`
+- `docs/ai_kintel_cron_operational_runbook.md`
+- `docs/ai_kintel_cron_fetcher_test_plan.md`
 
 ## Test Categories
 
@@ -20,6 +30,7 @@ Future source adapter tests should cover:
 - Timestamps are UTC.
 - Secrets are not written to logs.
 - Frontend never calls external providers directly.
+- One source failure does not crash a future cron batch.
 
 ## Required Checks Before Enabling A Paid Source
 

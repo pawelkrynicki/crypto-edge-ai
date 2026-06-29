@@ -5,10 +5,12 @@
 - Stage: 11A - AI KINTEL integration blueprint.
 - Stage 11B adds reviewable database migration blueprint artifacts for future owner/DB review.
 - Stage 11C adds documentation-only source config, adapter, status/error, registry blueprint, and test-plan contracts.
+- Stage 11D adds documentation-only cron fetcher skeletons, type matrix, PM2 blueprint, runbook, and cron test plan.
 - This is a planning artifact for moving from local RC to AI KINTEL production MVP.
 - It does not implement production backend, production database, migrations, auth, UI, source adapters, cron jobs, endpoints, dependencies, or paid integrations.
 - 11B does not execute a production migration; the real migration belongs to a future AI KINTEL repo integration stage.
 - 11C does not implement adapters, activate sources, add provider calls, add cron implementations, add endpoints, or change Local RC behavior.
+- 11D does not create `packages/cron`, runtime cron scripts, source adapters, provider calls, endpoints, or change Local RC behavior.
 
 11B database blueprint artifacts:
 
@@ -23,6 +25,14 @@
 - `docs/ai_kintel_source_status_error_model.md`
 - `docs/ai_kintel_source_registry_blueprint.json`
 - `docs/ai_kintel_source_adapter_test_plan.md`
+
+11D cron skeleton artifacts:
+
+- `docs/ai_kintel_cron_fetcher_skeletons.md`
+- `docs/ai_kintel_cron_fetcher_types_matrix.md`
+- `docs/ai_kintel_pm2_cron_blueprint.md`
+- `docs/ai_kintel_cron_operational_runbook.md`
+- `docs/ai_kintel_cron_fetcher_test_plan.md`
 
 ## Target Repo Structure
 
@@ -56,7 +66,7 @@ Primary integration target:
 
 - 11B Database Migration Blueprint: review-only artifacts in this repo; no executed migration.
 - 11C Source Config / Adapter Contract: review-only contract artifacts in this repo; no adapter implementation.
-- 11D Cron Fetcher Skeletons.
+- 11D Cron Fetcher Skeletons: review-only cron blueprint artifacts in this repo; no `packages/cron` or runtime scripts.
 - 11E tRPC Router Blueprint.
 - 11F AI KINTEL Frontend Port Plan.
 - 11G Staging/Deployment Checklist.
@@ -89,6 +99,8 @@ Primary integration target:
 - Respect rate limits.
 - Keep paid sources disabled until explicitly enabled.
 - Future adapters must follow the 11C source adapter contract and run in backend/cron only.
+- Future cron fetchers must follow the 11C source adapter contract before any provider work.
+- No source should call a provider while disabled or deferred.
 - Disabled paid vendors must return disabled metadata and must not call providers.
 - Source run health/status should map to `crypto_source_runs`.
 
@@ -118,6 +130,7 @@ The production MVP should preserve the local RC boundary:
 
 - Real production migrations.
 - Source adapter implementations.
+- Runtime cron scripts under `packages/cron`.
 - tRPC procedures.
 - Frontend route implementation.
 - Subscription/auth gate implementation.
