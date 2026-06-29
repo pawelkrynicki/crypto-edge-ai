@@ -4,15 +4,25 @@
 
 - Stage: 11A - AI KINTEL integration blueprint.
 - Stage 11B adds reviewable database migration blueprint artifacts for future owner/DB review.
+- Stage 11C adds documentation-only source config, adapter, status/error, registry blueprint, and test-plan contracts.
 - This is a planning artifact for moving from local RC to AI KINTEL production MVP.
 - It does not implement production backend, production database, migrations, auth, UI, source adapters, cron jobs, endpoints, dependencies, or paid integrations.
 - 11B does not execute a production migration; the real migration belongs to a future AI KINTEL repo integration stage.
+- 11C does not implement adapters, activate sources, add provider calls, add cron implementations, add endpoints, or change Local RC behavior.
 
 11B database blueprint artifacts:
 
 - `docs/ai_kintel_database_migration_blueprint.md`
 - `docs/ai_kintel_crypto_tables_blueprint.sql`
 - `docs/ai_kintel_database_mapping_matrix.md`
+
+11C source contract artifacts:
+
+- `docs/ai_kintel_source_config_contract.md`
+- `docs/ai_kintel_source_adapter_contract.md`
+- `docs/ai_kintel_source_status_error_model.md`
+- `docs/ai_kintel_source_registry_blueprint.json`
+- `docs/ai_kintel_source_adapter_test_plan.md`
 
 ## Target Repo Structure
 
@@ -45,7 +55,7 @@ Primary integration target:
 ## Suggested Phases
 
 - 11B Database Migration Blueprint: review-only artifacts in this repo; no executed migration.
-- 11C Source Config / Adapter Contract.
+- 11C Source Config / Adapter Contract: review-only contract artifacts in this repo; no adapter implementation.
 - 11D Cron Fetcher Skeletons.
 - 11E tRPC Router Blueprint.
 - 11F AI KINTEL Frontend Port Plan.
@@ -78,6 +88,9 @@ Primary integration target:
 - Store timestamps in UTC.
 - Respect rate limits.
 - Keep paid sources disabled until explicitly enabled.
+- Future adapters must follow the 11C source adapter contract and run in backend/cron only.
+- Disabled paid vendors must return disabled metadata and must not call providers.
+- Source run health/status should map to `crypto_source_runs`.
 
 ## Route And Module Shape
 

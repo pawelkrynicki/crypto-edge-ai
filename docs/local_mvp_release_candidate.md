@@ -5,6 +5,7 @@
 - Local MVP Release Candidate Stabilization v1.
 - Stage 11A adds AI KINTEL production MVP definition documents; it does not change local RC behavior.
 - Stage 11B adds AI KINTEL database migration blueprint documents; it does not change local RC behavior.
+- Stage 11C adds AI KINTEL source config/adapter contract documents; it does not change local RC behavior.
 - The local MVP is RC-ready after `scripts\win\check-local-rc.cmd` passes.
 - UX2 local MVP UI pass was completed in 10B.4.
 - 10C stabilizes the local RC and does not add new product features.
@@ -26,7 +27,17 @@
 - `docs/ai_kintel_crypto_tables_blueprint.sql`
 - `docs/ai_kintel_database_mapping_matrix.md`
 
+11C source contract documents:
+
+- `docs/ai_kintel_source_config_contract.md`
+- `docs/ai_kintel_source_adapter_contract.md`
+- `docs/ai_kintel_source_status_error_model.md`
+- `docs/ai_kintel_source_registry_blueprint.json`
+- `docs/ai_kintel_source_adapter_test_plan.md`
+
 11B is review-only documentation. It does not execute a migration, add a production database, add source adapters, add backend/auth/endpoints, change UI/CSS, change scanner scoring, change `final_label`, or change `WATCHLIST` meaning. Paid sources remain disabled/deferred, and the real migration belongs to a future AI KINTEL repo integration stage.
+
+11C is review-only source contract documentation. It does not implement adapters, activate sources, add provider calls, add endpoint/backend/auth code, add cron implementations, change UI/CSS, change scanner scoring, change `final_label`, or change `WATCHLIST` meaning. Paid sources remain disabled/deferred, future adapters must run backend/cron only, disabled paid vendors must not call providers, and frontend access remains tRPC/backend-only.
 
 ## Included In Local MVP
 

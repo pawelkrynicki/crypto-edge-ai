@@ -27,6 +27,18 @@ It demonstrates the visual direction, product structure, and trader value propos
 
 These are documentation/blueprint artifacts only. They do not execute a migration, add a production database, add endpoints/backend/auth, add source adapters, add npm dependencies, change UI/CSS, change scanner scoring, change `final_label`, or change `WATCHLIST` meaning. Paid sources remain disabled/deferred, and the real migration belongs to a future AI KINTEL repo integration stage after owner and DB review.
 
+## 11C AI KINTEL Source Config / Adapter Contract
+
+11C adds documentation-only source configuration and source adapter contract artifacts for the future AI KINTEL Crypto Market module:
+
+- `../../docs/ai_kintel_source_config_contract.md`
+- `../../docs/ai_kintel_source_adapter_contract.md`
+- `../../docs/ai_kintel_source_status_error_model.md`
+- `../../docs/ai_kintel_source_registry_blueprint.json`
+- `../../docs/ai_kintel_source_adapter_test_plan.md`
+
+These artifacts do not implement source adapters, activate paid sources, add provider calls, add endpoints/backend/auth, add cron implementations, add npm dependencies, change UI/CSS, change scanner scoring, change `final_label`, or change `WATCHLIST` meaning. Paid sources remain disabled/deferred. Future adapters must run backend/cron only, disabled paid vendors must not call providers, and the frontend remains tRPC/backend-only.
+
 ## Features
 - **Dark, professional UI**: Aligned with the AIKINTEL aesthetic.
 - **Scanner Radar**: Product-grade candidate list and detail workspace showing scanner labels, local review status, security labels, market metrics, and read-only scanner reasons.

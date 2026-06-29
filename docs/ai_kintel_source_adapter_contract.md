@@ -1,0 +1,132 @@
+# AI KINTEL Source Adapter Contract
+
+## Status
+
+- Stage: 11C - Source Adapter Contract.
+- This is a contract for future adapters, not an implementation.
+- Source adapters should be created in later stages, for example 11D+.
+- This document does not add any provider calls, backend routes, cron jobs, dependencies, or runtime configuration.
+
+## Adapter Responsibility
+
+Future source adapters must:
+
+- Run only in backend/cron.
+- Check source config before any provider work.
+- Check env availability only when the source is enabled and requires an env key.
+- Check runtime policy before any provider call.
+- Respect rate limits.
+- Fetch provider data only after config, env, and policy gates pass.
+- Normalize provider data into stable module records.
+- Deduplicate records by hash or logical key.
+- Validate JSON before storage.
+- Write only through the backend/DB layer.
+- Report the run result to `crypto_source_runs`.
+
+## Adapter Input Contract
+
+Future adapter inputs should include:
+
+- Source config.
+- Run context.
+- Env availability.
+- Policy gate result.
+- `dry_run` flag.
+- Optional `since` and `until` timestamps.
+
+## Adapter Output Contract
+
+Future adapter outputs should include:
+
+| Field | Contract |
+|---|---|
+| `source_id` | Stable source identifier. |
+| `status` | One of `success`, `warning`, `error`, `disabled`, `policy_blocked`, `env_missing`, or `rate_limited`. |
+| `records_seen` | Count of records observed in the provider response or fixture. |
+| `records_inserted` | Count of normalized records inserted. |
+| `records_updated` | Count of normalized records updated. |
+| `warnings` | Non-fatal warnings safe to log without secrets. |
+| `error_message` | Sanitized error summary, never including secrets or raw credentials. |
+| `rate_limit_remaining` | Remaining provider quota when available, otherwise `null`. |
+| `metadata` | Safe run metadata suitable for `crypto_source_runs.metadata`. |
+| `normalized_records` | Validated normalized records for later DB-layer handling or dry-run inspection. |
+
+## Disabled Behavior
+
+If `enabled=false`:
+
+- The adapter must not call the provider.
+- The adapter returns status `disabled`.
+- The adapter records or logs disabled metadata.
+- The adapter does not require the env key.
+- The adapter does not crash.
+
+## Env Missing Behavior
+
+If a paid or freemium source requires env and is enabled, but env is missing:
+
+- Return status `env_missing`.
+- Do not call the provider.
+- Emit a warning/log without secrets.
+- Do not crash.
+
+Missing env for a disabled source is not an error.
+
+## Policy Blocked Behavior
+
+If runtime policy does not allow the action:
+
+- Return status `policy_blocked`.
+- Do not call the provider.
+- Emit a warning/log without secrets.
+- Do not crash.
+
+## Provider Failure Behavior
+
+For timeout, provider error, malformed response, or rate-limit failure:
+
+- Use guarded error handling.
+- Return status `error` or `rate_limited`.
+- Log sanitized error details without secrets.
+- Prevent one failing source from crashing the entire cron process.
+
+## Normalized Record Rules
+
+Normalized records must use:
+
+- Stable `source`.
+- Stable `source_id`.
+- Stable `hash` where repeated data can occur.
+- UTC timestamps.
+- Explicit missing-data fields.
+- No invented missing data.
+- Missing data means manual verification.
+- No investment recommendation fields.
+
+## Pseudocode Only
+
+```ts
+async function runSourceAdapter(config, context) {
+  if (!config.enabled) {
+    return disabledResult(config);
+  }
+
+  if (!policyAllows(config)) {
+    return policyBlockedResult(config);
+  }
+
+  if (config.env_key && !hasEnv(config.env_key)) {
+    return envMissingResult(config);
+  }
+
+  try {
+    const raw = await fetchProviderData(config);
+    const normalized = normalize(raw);
+    return successResult(config, normalized);
+  } catch (error) {
+    return errorResult(config, error);
+  }
+}
+```
+
+This pseudocode is illustrative only. It is not an adapter implementation and must not be wired into runtime.

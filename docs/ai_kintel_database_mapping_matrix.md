@@ -3,9 +3,12 @@
 ## Status
 
 - Stage: 11B - Database Mapping Matrix.
+- Stage 11C adds documentation-only source config, adapter, status/error, registry blueprint, and test-plan contracts for future source writers.
 - This is documentation only and does not execute a migration.
 - Local RC behavior remains unchanged.
 - Real production mapping should be implemented later in the AI KINTEL repo after owner and DB review.
+- 11C does not implement adapters, activate sources, add provider calls, add endpoints, or change Local RC behavior.
+- Future source adapters must run backend/cron only, disabled paid vendors must not call providers, paid sources remain disabled/deferred, and frontend access remains tRPC/backend-only.
 
 ## Local RC To Production DB Mapping
 
@@ -38,3 +41,8 @@
 - `docs/ai_kintel_crypto_tables_blueprint.sql`
 - `docs/ai_kintel_integration_decision_matrix.md`
 - `docs/ai_kintel_integration_blueprint.md`
+- `docs/ai_kintel_source_config_contract.md`
+- `docs/ai_kintel_source_adapter_contract.md`
+- `docs/ai_kintel_source_status_error_model.md`
+- `docs/ai_kintel_source_registry_blueprint.json`
+- `docs/ai_kintel_source_adapter_test_plan.md`

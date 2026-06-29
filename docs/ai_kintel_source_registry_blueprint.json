@@ -1,0 +1,265 @@
+{
+  "schema_version": 1,
+  "stage": "11C",
+  "review_only": true,
+  "description": "Documentation-only source registry blueprint for future AI KINTEL Crypto Market integration.",
+  "sources": [
+    {
+      "id": "alternative_me",
+      "display_name": "Alternative.me Fear & Greed",
+      "tier": "free",
+      "category": "market_context",
+      "secondary_categories": [
+        "sentiment"
+      ],
+      "mvp_status": "active_candidate",
+      "enabled": false,
+      "env_key": null,
+      "requires_commercial_approval": false,
+      "requires_attribution": true,
+      "rate_limit": null,
+      "runtime_policy_status": "candidate_policy_required",
+      "disabled_behavior": "return disabled metadata",
+      "call_provider_when_disabled": false,
+      "missing_env_is_error_when_disabled": false,
+      "runtime_behavior_when_disabled": "return disabled metadata; do not call provider",
+      "output_tables": [
+        "crypto_market_summaries",
+        "crypto_source_runs"
+      ],
+      "source_run_type": "market_sentiment",
+      "notes": "Free active candidate for market context/sentiment. Review-only blueprint; does not activate runtime."
+    },
+    {
+      "id": "defillama",
+      "display_name": "DefiLlama",
+      "tier": "free",
+      "category": "market_context",
+      "secondary_categories": [
+        "onchain"
+      ],
+      "mvp_status": "active_candidate",
+      "enabled": false,
+      "env_key": null,
+      "requires_commercial_approval": false,
+      "requires_attribution": true,
+      "rate_limit": null,
+      "runtime_policy_status": "candidate_policy_required",
+      "disabled_behavior": "return disabled metadata",
+      "call_provider_when_disabled": false,
+      "missing_env_is_error_when_disabled": false,
+      "runtime_behavior_when_disabled": "return disabled metadata; do not call provider",
+      "output_tables": [
+        "crypto_market_summaries",
+        "crypto_onchain_metrics",
+        "crypto_source_runs"
+      ],
+      "source_run_type": "market_onchain_context",
+      "notes": "Free active candidate for market context/onchain context. Review-only blueprint; does not activate runtime."
+    },
+    {
+      "id": "cryptocompare",
+      "display_name": "CryptoCompare",
+      "tier": "freemium",
+      "category": "market_context",
+      "secondary_categories": [
+        "project_data"
+      ],
+      "mvp_status": "deferred",
+      "enabled": false,
+      "env_key": "CRYPTOCOMPARE_API_KEY",
+      "requires_commercial_approval": true,
+      "requires_attribution": true,
+      "rate_limit": null,
+      "runtime_policy_status": "disabled_until_enabled",
+      "disabled_behavior": "return disabled metadata; do not call provider",
+      "call_provider_when_disabled": false,
+      "missing_env_is_error_when_disabled": false,
+      "runtime_behavior_when_disabled": "return disabled metadata; do not call provider",
+      "output_tables": [
+        "crypto_projects",
+        "crypto_market_summaries",
+        "crypto_source_runs"
+      ],
+      "source_run_type": "market_project_data",
+      "notes": "Freemium source deferred until policy, env, terms, and cost review are complete."
+    },
+    {
+      "id": "coingecko",
+      "display_name": "CoinGecko",
+      "tier": "freemium",
+      "tier_detail": "paid/freemium",
+      "category": "project_data",
+      "secondary_categories": [
+        "market_context",
+        "onchain"
+      ],
+      "mvp_status": "deferred",
+      "enabled": false,
+      "env_key": "COINGECKO_API_KEY",
+      "requires_commercial_approval": true,
+      "requires_attribution": true,
+      "rate_limit": null,
+      "runtime_policy_status": "disabled_until_enabled",
+      "disabled_behavior": "return disabled metadata; do not call provider",
+      "call_provider_when_disabled": false,
+      "missing_env_is_error_when_disabled": false,
+      "runtime_behavior_when_disabled": "return disabled metadata; do not call provider",
+      "output_tables": [
+        "crypto_projects",
+        "crypto_market_summaries",
+        "crypto_source_runs"
+      ],
+      "source_run_type": "project_market_data",
+      "notes": "Paid/commercial decision deferred."
+    },
+    {
+      "id": "tokensniffer",
+      "display_name": "TokenSniffer",
+      "tier": "paid",
+      "tier_detail": "paid/limited",
+      "category": "security",
+      "mvp_status": "deferred",
+      "enabled": false,
+      "env_key": "TOKENSNIFFER_API_KEY",
+      "requires_commercial_approval": true,
+      "requires_attribution": true,
+      "rate_limit": null,
+      "runtime_policy_status": "disabled_until_enabled",
+      "disabled_behavior": "return disabled metadata; do not call provider",
+      "call_provider_when_disabled": false,
+      "missing_env_is_error_when_disabled": false,
+      "runtime_behavior_when_disabled": "return disabled metadata; do not call provider",
+      "output_tables": [
+        "crypto_scam_alerts",
+        "crypto_projects",
+        "crypto_source_runs"
+      ],
+      "source_run_type": "security_review",
+      "notes": "Paid/limited security source deferred until terms, rate limits, and commercial approval are complete."
+    },
+    {
+      "id": "tokenomist",
+      "display_name": "Tokenomist",
+      "tier": "paid",
+      "category": "project_data",
+      "secondary_categories": [
+        "market_context"
+      ],
+      "mvp_status": "deferred",
+      "enabled": false,
+      "env_key": "TOKENOMIST_API_KEY",
+      "requires_commercial_approval": true,
+      "requires_attribution": true,
+      "rate_limit": null,
+      "runtime_policy_status": "disabled_until_enabled",
+      "disabled_behavior": "return disabled metadata; do not call provider",
+      "call_provider_when_disabled": false,
+      "missing_env_is_error_when_disabled": false,
+      "runtime_behavior_when_disabled": "return disabled metadata; do not call provider",
+      "output_tables": [
+        "crypto_projects",
+        "crypto_opportunities",
+        "crypto_source_runs"
+      ],
+      "source_run_type": "token_unlocks_vesting",
+      "notes": "Unlock/vesting source deferred until paid/vendor review is complete."
+    },
+    {
+      "id": "goplus",
+      "display_name": "GoPlus",
+      "tier": "paid",
+      "approval_status": "needs_approval",
+      "category": "security",
+      "mvp_status": "needs_approval",
+      "enabled": false,
+      "env_key": "GOPLUS_API_KEY",
+      "requires_commercial_approval": true,
+      "requires_attribution": true,
+      "rate_limit": null,
+      "runtime_policy_status": "needs_review",
+      "disabled_behavior": "return disabled metadata; do not call provider",
+      "call_provider_when_disabled": false,
+      "missing_env_is_error_when_disabled": false,
+      "runtime_behavior_when_disabled": "return disabled metadata; do not call provider",
+      "output_tables": [
+        "crypto_scam_alerts",
+        "crypto_projects",
+        "crypto_source_runs"
+      ],
+      "source_run_type": "security_review",
+      "notes": "Requires written commercial-use clarification and attribution review before activation."
+    },
+    {
+      "id": "bubblemaps",
+      "display_name": "Bubblemaps",
+      "tier": "paid",
+      "tier_detail": "paid/sales",
+      "category": "onchain",
+      "mvp_status": "deferred",
+      "enabled": false,
+      "env_key": "BUBBLEMAPS_API_KEY",
+      "requires_commercial_approval": true,
+      "requires_attribution": true,
+      "rate_limit": null,
+      "runtime_policy_status": "disabled_until_enabled",
+      "disabled_behavior": "return disabled metadata; do not call provider",
+      "call_provider_when_disabled": false,
+      "missing_env_is_error_when_disabled": false,
+      "runtime_behavior_when_disabled": "return disabled metadata; do not call provider",
+      "output_tables": [
+        "crypto_onchain_metrics",
+        "crypto_source_runs"
+      ],
+      "source_run_type": "wallet_cluster_context",
+      "notes": "Paid/sales source deferred until pricing, terms, and commercial approval are complete."
+    },
+    {
+      "id": "arkham",
+      "display_name": "Arkham",
+      "tier": "paid",
+      "tier_detail": "paid/sales",
+      "category": "onchain",
+      "mvp_status": "deferred",
+      "enabled": false,
+      "env_key": "ARKHAM_API_KEY",
+      "requires_commercial_approval": true,
+      "requires_attribution": true,
+      "rate_limit": null,
+      "runtime_policy_status": "disabled_until_enabled",
+      "disabled_behavior": "return disabled metadata; do not call provider",
+      "call_provider_when_disabled": false,
+      "missing_env_is_error_when_disabled": false,
+      "runtime_behavior_when_disabled": "return disabled metadata; do not call provider",
+      "output_tables": [
+        "crypto_onchain_metrics",
+        "crypto_source_runs"
+      ],
+      "source_run_type": "wallet_entity_context",
+      "notes": "Paid/sales source deferred until access, pricing, terms, and commercial approval are complete."
+    },
+    {
+      "id": "openai",
+      "display_name": "OpenAI",
+      "tier": "internal",
+      "category": "ai_layer",
+      "mvp_status": "deferred",
+      "enabled": false,
+      "env_key": "OPENAI_API_KEY",
+      "requires_commercial_approval": false,
+      "requires_attribution": false,
+      "rate_limit": null,
+      "runtime_policy_status": "disabled_until_enabled",
+      "disabled_behavior": "return disabled metadata; do not call provider",
+      "call_provider_when_disabled": false,
+      "missing_env_is_error_when_disabled": false,
+      "runtime_behavior_when_disabled": "return disabled metadata; do not call provider",
+      "output_tables": [
+        "crypto_market_summaries",
+        "crypto_source_runs"
+      ],
+      "source_run_type": "ai_narrative_research",
+      "notes": "Narrative/research layer only, not decision layer."
+    }
+  ]
+}

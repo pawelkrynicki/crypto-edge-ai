@@ -4,18 +4,35 @@
 
 - Stage: 11A - AI KINTEL Production MVP Definition.
 - Stage 11B adds a reviewable database migration blueprint for future owner/DB review.
+- Stage 11C adds documentation-only source config, adapter, status/error, registry blueprint, and test-plan contracts.
 - Planning date: 2026-06-29.
 - The Local MVP Release Candidate is ready as a local RC baseline.
 - Production MVP is not the final product.
 - Production MVP is the first safe version of the Crypto Market module running inside AI KINTEL.
 - This document is a definition and decision artifact only. It does not implement production code, new sources, paid API calls, auth, migrations, or endpoints.
 - 11B does not execute a production migration and does not change Local RC behavior.
+- 11C does not implement adapters, activate sources, add endpoints, add cron implementations, or change Local RC behavior.
 
 11B database blueprint artifacts:
 
 - `docs/ai_kintel_database_migration_blueprint.md`
 - `docs/ai_kintel_crypto_tables_blueprint.sql`
 - `docs/ai_kintel_database_mapping_matrix.md`
+
+11C source contract artifacts:
+
+- `docs/ai_kintel_source_config_contract.md`
+- `docs/ai_kintel_source_adapter_contract.md`
+- `docs/ai_kintel_source_status_error_model.md`
+- `docs/ai_kintel_source_registry_blueprint.json`
+- `docs/ai_kintel_source_adapter_test_plan.md`
+
+11C contract implications:
+
+- Future source adapters must run backend/cron only.
+- Disabled paid vendors must not call providers.
+- Paid sources remain disabled/deferred until explicit env/config/policy activation.
+- Frontend remains tRPC/backend-only.
 
 ## Product Positioning
 
