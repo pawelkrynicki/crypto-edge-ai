@@ -4,17 +4,27 @@
 
 - Stage: 11A - paid-source readiness only.
 - Stage 11B adds database blueprint references for source-run observability.
+- Stage 11C adds documentation-only source config, adapter, status/error, registry blueprint, and test-plan contracts.
 - Paid sources are deferred.
 - The production environment must be paid-source-ready.
 - No paid source is called until explicitly enabled.
 - This document does not add source adapters, dependencies, endpoints, cron jobs, auth, backend code, or production database changes.
 - 11B does not execute a migration; the real migration belongs to a future AI KINTEL repo integration stage.
+- 11C does not implement adapters, activate paid vendors, add provider calls, add endpoints, or change Local RC behavior.
 
 11B database blueprint artifacts:
 
 - `docs/ai_kintel_database_migration_blueprint.md`
 - `docs/ai_kintel_crypto_tables_blueprint.sql`
 - `docs/ai_kintel_database_mapping_matrix.md`
+
+11C source contract artifacts:
+
+- `docs/ai_kintel_source_config_contract.md`
+- `docs/ai_kintel_source_adapter_contract.md`
+- `docs/ai_kintel_source_status_error_model.md`
+- `docs/ai_kintel_source_registry_blueprint.json`
+- `docs/ai_kintel_source_adapter_test_plan.md`
 
 ## Required Pattern For Every Paid Source
 
@@ -30,6 +40,8 @@ Every paid or approval-gated source must have:
 - Test mode or dry run if possible.
 - Attribution requirement notes where applicable.
 - Rollback rule for disabling the source without DB/API/UI rebuild.
+- Source-run status mapping to `crypto_source_runs`.
+- Backend/cron-only adapter execution; frontend provider calls remain forbidden.
 
 ## Documentation-Only Config Shape
 

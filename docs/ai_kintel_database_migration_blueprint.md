@@ -3,10 +3,12 @@
 ## Status
 
 - Stage: 11B - Database Migration Blueprint.
+- Stage 11C adds documentation-only source config, adapter, status/error, registry blueprint, and test-plan contracts for the future writers of these tables.
 - This is a documentation blueprint only, not an executed migration.
 - The Local RC remains unchanged.
 - No endpoint, source adapter, backend, UI, CSS, auth, dependency, or production database implementation is added here.
 - The SQL blueprint is review-only: `docs/ai_kintel_crypto_tables_blueprint.sql`.
+- 11C does not implement adapters, activate sources, add provider calls, add endpoints, or change Local RC behavior.
 
 ## Scope
 
@@ -83,3 +85,8 @@ This blueprint is ready for owner and DB review before any future migration is c
 - `docs/ai_kintel_integration_decision_matrix.md`
 - `docs/ai_kintel_paid_source_readiness_plan.md`
 - `docs/ai_kintel_integration_blueprint.md`
+- `docs/ai_kintel_source_config_contract.md`
+- `docs/ai_kintel_source_adapter_contract.md`
+- `docs/ai_kintel_source_status_error_model.md`
+- `docs/ai_kintel_source_registry_blueprint.json`
+- `docs/ai_kintel_source_adapter_test_plan.md`

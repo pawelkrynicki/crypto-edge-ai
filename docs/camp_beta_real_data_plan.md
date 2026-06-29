@@ -29,6 +29,18 @@ Stage 11B adds reviewable database blueprint artifacts for the future AI KINTEL 
 
 These artifacts do not execute a production migration, add a production database, add source adapters, add endpoint/backend/auth code, change UI/CSS, or change local RC behavior. The real migration belongs to a future AI KINTEL repo integration stage after owner and DB review. Paid sources remain disabled/deferred.
 
+## 11C AI KINTEL Source Config / Adapter Contract
+
+Stage 11C adds documentation-only source configuration and source adapter contracts for the future AI KINTEL Crypto Market module:
+
+- `docs/ai_kintel_source_config_contract.md`
+- `docs/ai_kintel_source_adapter_contract.md`
+- `docs/ai_kintel_source_status_error_model.md`
+- `docs/ai_kintel_source_registry_blueprint.json`
+- `docs/ai_kintel_source_adapter_test_plan.md`
+
+11C does not implement source adapters, activate paid sources, add provider calls, add endpoint/backend/auth code, add cron implementations, change UI/CSS, or change local RC behavior. Paid sources remain disabled/deferred. Future adapters must run backend/cron only, disabled paid vendors must not call providers, and the frontend remains tRPC/backend-only.
+
 ## Data Source Registry Enforcement v1
 
 The current technical control is the Data Source Registry Enforcement v1 gate.

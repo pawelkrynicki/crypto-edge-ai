@@ -1,5 +1,26 @@
 # Roadmap
 
+## Stage 11C: AI KINTEL Source Config / Adapter Contract
+
+Prepare a documentation-only source configuration and adapter contract for the future AI KINTEL Crypto Market production module.
+
+Current direction:
+
+- 11C is documentation/contract work only.
+- No source adapter, provider call, endpoint, cron implementation, auth, production backend, production database, migration, dependency, UI/CSS change, scanner scoring change, `final_label` change, or `WATCHLIST` behavior change is added.
+- Paid sources remain disabled/deferred but environment-ready through documented env placeholders, config gates, policy gates, and source-run observability expectations.
+- Future adapters must run backend/cron only and report status to `crypto_source_runs`.
+- Disabled paid vendors must not call providers and must return disabled metadata.
+- Frontend remains tRPC/backend-only and must not call external providers directly.
+
+Current artifacts:
+
+- `docs/ai_kintel_source_config_contract.md`.
+- `docs/ai_kintel_source_adapter_contract.md`.
+- `docs/ai_kintel_source_status_error_model.md`.
+- `docs/ai_kintel_source_registry_blueprint.json`.
+- `docs/ai_kintel_source_adapter_test_plan.md`.
+
 ## Stage 11B: AI KINTEL Database Migration Blueprint
 
 Prepare a reviewable database migration blueprint for the future AI KINTEL Crypto Market module.
