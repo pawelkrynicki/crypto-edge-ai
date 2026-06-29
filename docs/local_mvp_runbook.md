@@ -8,9 +8,24 @@
 - 10B.2 continues UX2 in the Scanner Radar and Candidate Detail workspace only, replacing the scanner table with candidate cards and reorganizing Candidate Detail sections.
 - 10B.3 continues UX2 in the Review Queue and Analyst Report Workspace only, adding summary cards, review item cards, stored reviews not in current scan, storage/backup panels, and report command workspace copy.
 - 10B.4 closes UX2 Visual QA / Polish for the local MVP UI pass, covering layout consistency, wrapping, readability, responsive fallback, and the manual checklist in `docs/ux2_visual_qa_checklist.md`.
-- UX2 Product-grade Interface Redesign is complete at local MVP level, but 10C stabilization is still required before the end of August 2026.
+- UX2 Product-grade Interface Redesign is complete at local MVP level.
+- 10C Local MVP Release Candidate Stabilization v1 adds the local RC document and RC check script without adding features or changing product behavior.
+
+Release candidate notes:
+
+- `docs/local_mvp_release_candidate.md`
 
 ## Fast Health Check
+
+Release-candidate check:
+
+```cmd
+scripts\win\check-local-rc.cmd
+```
+
+This verifies required documents and scripts, then runs the local MVP verification stack. It does not check git cleanliness; before marking RC, confirm `git status` is clean separately.
+
+Full local MVP check:
 
 ```cmd
 scripts\win\check-local-mvp.cmd
@@ -28,7 +43,7 @@ scripts\win\check-local-workflow-smoke.cmd
 scripts\win\check-analyst-report.cmd
 ```
 
-Use partial checks when working on a narrow area. Use `check-local-mvp.cmd` before merge or freeze decisions.
+Use partial checks when working on a narrow area. Use `check-local-rc.cmd` and `check-local-mvp.cmd` before merge, freeze, or RC decisions.
 
 ## Local Preview
 
@@ -109,7 +124,7 @@ Visual QA checklist:
 
 - `docs/ux2_visual_qa_checklist.md`
 
-This is not a buy/sell signal. UX2 is complete for the local MVP UI pass; 10C Local MVP Release Candidate Stabilization remains next.
+This is not a buy/sell signal. UX2 is complete for the local MVP UI pass; 10C Local MVP Release Candidate Stabilization keeps the current scope stable.
 
 ## Analyst Report
 
@@ -152,12 +167,13 @@ gh api user --jq .login
 
 If Windows or `pnpm` hits an `EPERM` issue, prefer the existing `scripts\win\*.cmd` helpers. They call direct local binaries where the project already needs that workaround.
 
-## Do Not Do Before UX2
+## Do Not Do During 10C
 
-- Do not rebuild the frontend as a final interface.
+- Do not rebuild the frontend or change the completed local MVP UI flow.
 - Do not add a production backend.
 - Do not add auth.
 - Do not add new data sources.
 - Do not change scanner scoring.
 - Do not change `final_label`.
 - Do not change `WATCHLIST` meaning.
+- Do not add paid integrations, production deployment, or monitoring until those future product decisions are made.

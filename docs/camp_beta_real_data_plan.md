@@ -219,7 +219,7 @@ The storage file is ignored by git:
 tools/ui-mock/.local/review-session.json
 ```
 
-This is not a production backend. It does not add auth, production cron, new data sources, OpenAI, scraping, HTML parsing, browser automation, undocumented endpoints, scanner scoring changes, final-label changes, or WATCHLIST meaning changes. File-backed JSON remains the default provider; Stage 8D adds optional SQLite behind the same UI workflow. UX2 Product-grade Interface Redesign remains a future required stage.
+This is not a production backend. It does not add auth, production cron, new data sources, OpenAI, scraping, HTML parsing, browser automation, undocumented endpoints, scanner scoring changes, final-label changes, or WATCHLIST meaning changes. File-backed JSON remains the default provider; Stage 8D adds optional SQLite behind the same UI workflow. UX2 Product-grade Interface Redesign is now complete for the local MVP UI pass through 10B.4.
 
 ## Review Storage Diagnostics / Reset Tools v1
 
@@ -267,7 +267,7 @@ Stage 8D adds SQLite as an optional second `ReviewSessionStorageProvider` implem
 
 This stage adds no npm dependency, auth, production backend, production cron, new data source, scraping, HTML parsing, browser automation, undocumented endpoint, OpenAI call, scanner scoring change, final-label change, or WATCHLIST meaning change.
 
-UX2 Product-grade Interface Redesign remains a future required stage before a final production interface. It should simplify, organize, and professionalize the UI after the current functional prototype stages.
+UX2 Product-grade Interface Redesign is now complete for the local MVP UI pass through 10B.4. Final production interface readiness still depends on future production decisions.
 
 ## Review Storage Mode DX / Smoke Scripts v1
 
@@ -290,7 +290,7 @@ It uses temporary `.local` review storage, confirms invalid PUT payloads do not 
 
 File-backed JSON remains the default provider. SQLite remains optional. There is no automatic JSON-to-SQLite migration. This DX stage does not add endpoints, auth, production backend, production cron, new data sources, scraping, HTML parsing, browser automation, undocumented endpoints, OpenAI, scanner scoring changes, final-label changes, WATCHLIST meaning changes, or UI workflow changes.
 
-UX2 Product-grade Interface Redesign remains a future required stage.
+UX2 Product-grade Interface Redesign is now complete for the local MVP UI pass through 10B.4.
 
 ## Local End-to-End Workflow Smoke v1
 
@@ -310,7 +310,7 @@ It starts the existing local API on a random `127.0.0.1` port and checks only ex
 
 The runner accepts real local output or fixture fallback. It calls no external network, starts no browser, adds no source, and writes only a guarded temporary review smoke file under `tools\ui-mock\.local`. It does not mutate scanner output, market data, endpoint paths, UI workflow, scanner scoring, `final_label`, or `WATCHLIST` meaning. It adds no npm dependency, auth, production backend, production cron, scraping, HTML parsing, browser automation, undocumented endpoint, or OpenAI call.
 
-UX2 Product-grade Interface Redesign remains a future required stage.
+UX2 Product-grade Interface Redesign is now complete for the local MVP UI pass through 10B.4.
 
 ## Analyst Report / Review Export v1
 
@@ -335,7 +335,7 @@ tools\ui-mock\.local\reports
 
 The report summarizes scanner source metadata, scanner label counts, security label counts, review status counts, analyst notes, stored reviews not in the current scanner output, approved market context, and a neutral candidate snapshot. The JSON includes `report_version = 1` and the same structured data used for the Markdown report.
 
-This is a local research workflow export only. It uses the existing local API endpoints, accepts real local scanner/context output or fixture fallback, and reads review session storage. It does not call external networks, add sources, change scanner output, change market data, change scoring, change `final_label`, change `WATCHLIST` meaning, add auth, add npm dependencies, add a production backend, or add a production cron. UX2 Product-grade Interface Redesign remains a future stage.
+This is a local research workflow export only. It uses the existing local API endpoints, accepts real local scanner/context output or fixture fallback, and reads review session storage. It does not call external networks, add sources, change scanner output, change market data, change scoring, change `final_label`, change `WATCHLIST` meaning, add auth, add npm dependencies, add a production backend, or add a production cron. UX2 Product-grade Interface Redesign is now complete for the local MVP UI pass through 10B.4.
 
 ## Local MVP Runbook + Freeze Checklist v1
 
@@ -352,7 +352,7 @@ New docs:
 - `docs/local_mvp_runbook.md`
 - `docs/pre_holiday_freeze_checklist.md`
 
-This is a documentation/DX checkpoint only. It closes the local MVP freeze scope for storage, local review workflow, source registry/compliance, endpoint paths, and analyst report export. UX2 Product-grade Interface Redesign remains a future required stage.
+This is a documentation/DX checkpoint only. It closes the local MVP freeze scope for storage, local review workflow, source registry/compliance, endpoint paths, and analyst report export. UX2 Product-grade Interface Redesign is now complete for the local MVP UI pass through 10B.4.
 
 ## Product Workflow Polish v1
 
@@ -375,7 +375,7 @@ Candidate Detail now clarifies that saving a review status does not change scann
 
 Review Queue now explains what the queue is for, what to do next, and how to export the analyst report from CMD. Scanner/context/review storage status copy is also more explicit, including `real-output`, `approved-sources-output`, `fixture-fallback`, local API, file-backed JSON, SQLite metadata when available, and browser `localStorage` fallback.
 
-This stage adds no endpoints, new sources, npm dependencies, auth, production backend, production cron, OpenAI call, scraping, scanner scoring change, `final_label` change, or `WATCHLIST` meaning change. UX2 Product-grade Interface Redesign remains a future required stage.
+This stage adds no endpoints, new sources, npm dependencies, auth, production backend, production cron, OpenAI call, scraping, scanner scoring change, `final_label` change, or `WATCHLIST` meaning change. UX2 Product-grade Interface Redesign is now complete for the local MVP UI pass through 10B.4.
 
 ## UX2 Information Architecture Shell v1
 
@@ -427,8 +427,19 @@ Stage 10B.3 continues UX2 only inside Review Queue and Analyst Report Workspace.
 Stage 10B.4 closes UX2 at local MVP UI level with layout consistency, spacing, responsive fallback, command/path wrapping, selected candidate state, Review Queue section separation, and Analyst Report Workspace command containment.
 
 - Visual QA checklist: `docs/ux2_visual_qa_checklist.md`.
-- UX2 is complete for the local MVP UI pass, while 10C Local MVP Release Candidate Stabilization remains required before the end of August 2026.
+- UX2 is complete for the local MVP UI pass.
 - 10B.4 changes no endpoint paths, data-source policy, review save/clear/import/export/reset behavior, diagnostics behavior, analyst report generation, scanner scoring, `final_label`, or `WATCHLIST` meaning. It adds no npm dependencies, auth, production backend, production cron, new sources, scraping, HTML parsing, browser automation, undocumented endpoints, or OpenAI calls.
+
+## Local MVP Release Candidate Stabilization v1
+
+Stage 10C stabilizes the local MVP as a release-candidate-ready local build without adding new product features.
+
+- RC document: `docs/local_mvp_release_candidate.md`.
+- RC check script: `scripts\win\check-local-rc.cmd`.
+- The RC check verifies required runbook/checklist documents and core local MVP scripts, then runs `scripts\win\check-local-mvp.cmd`.
+- Clean `git status` is still a separate requirement before declaring RC.
+- 10C changes no endpoint paths, data-source policy, UI flow, review save/clear/import/export/reset behavior, diagnostics behavior, analyst report generation, scanner scoring, `final_label`, or `WATCHLIST` meaning. It adds no npm dependencies, auth, production backend, production cron, new sources, scraping, HTML parsing, browser automation, undocumented endpoints, or OpenAI calls.
+- Final product readiness still requires future decisions for hosting, auth, production backend, data/paid integrations, deployment, and monitoring.
 
 ## UX1 Professional Dashboard Redesign
 

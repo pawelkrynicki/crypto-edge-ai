@@ -128,6 +128,7 @@ Windows helper scripts:
 - `scripts\win\generate-analyst-report.cmd` generates a local Markdown plus JSON analyst report under `tools\ui-mock\.local\reports`.
 - `scripts\win\check-analyst-report.cmd` runs the analyst report generator in smoke mode with guarded temporary review storage and report files.
 - `scripts\win\check-local-mvp.cmd` runs the aggregate local MVP health check for the pre-holiday freeze checkpoint.
+- `scripts\win\check-local-rc.cmd` runs the 10C release-candidate checkpoint by confirming required docs/scripts and then running the local MVP health check.
 - `scripts\win\dev-ui-sqlite.cmd` starts the local API and frontend preview with SQLite Review Storage enabled.
 
 Local Review Session:
@@ -171,7 +172,7 @@ Persistent Review Storage API v1:
 - Corrupt or invalid storage file returns an empty review session with `_source_meta.warning`.
 - Invalid PUT payloads return 400 and do not overwrite the current file.
 - UI starts from browser `localStorage`, loads the API state after mount, mirrors valid API state back to `localStorage`, and keeps browser fallback when the API is unavailable.
-- File-backed JSON remains the default provider. SQLite is available in Stage 8D as an optional provider through env configuration. UX2 Product-grade Interface Redesign remains a future required stage.
+- File-backed JSON remains the default provider. SQLite is available in Stage 8D as an optional provider through env configuration. UX2 Product-grade Interface Redesign is now complete for the local MVP UI pass through 10B.4.
 
 Review Storage Diagnostics / Reset Tools v1:
 
@@ -183,7 +184,7 @@ Review Storage Diagnostics / Reset Tools v1:
 - Reset applies an empty `ReviewSessionState`, updates browser review storage, and attempts to mirror through the existing `PUT /api/review-session`.
 - Reset clears only local review status and analyst notes; it does not delete scanner output or market data.
 - This adds no auth, production backend, production cron, new source, scraper, HTML parser, browser automation, undocumented endpoint, OpenAI call, scanner scoring change, final-label change, or WATCHLIST meaning change. SQLite diagnostics are added later in Stage 8D behind the same diagnostics endpoint.
-- UX2 Product-grade Interface Redesign remains a future required stage.
+- UX2 Product-grade Interface Redesign is now complete for the local MVP UI pass through 10B.4.
 
 Storage Provider Abstraction / SQLite-ready Layer v1:
 
@@ -194,7 +195,7 @@ Storage Provider Abstraction / SQLite-ready Layer v1:
 - A fake provider is used only in lightweight tests to confirm endpoint behavior is provider-backed.
 - SQLite is available in Stage 8D as an optional provider implementation behind the same endpoint workflow.
 - This adds no auth, production backend, production cron, new source, scraper, HTML parser, browser automation, undocumented endpoint, OpenAI call, scanner scoring change, final-label change, or WATCHLIST meaning change.
-- UX2 Product-grade Interface Redesign remains a future required stage.
+- UX2 Product-grade Interface Redesign is now complete for the local MVP UI pass through 10B.4.
 
 SQLite Review Storage Provider v1:
 
@@ -208,7 +209,7 @@ SQLite Review Storage Provider v1:
 - UI workflow remains unchanged: browser `localStorage` starts the app, local API sync is attempted, and fallback remains.
 - SQLite diagnostics do not expose full entries or analyst notes.
 - This adds no new npm dependency, auth, production backend, production cron, new source, scraper, HTML parser, browser automation, undocumented endpoint, OpenAI call, scanner scoring change, final-label change, or WATCHLIST meaning change.
-- UX2 Product-grade Interface Redesign remains a future required stage.
+- UX2 Product-grade Interface Redesign is now complete for the local MVP UI pass through 10B.4.
 
 Review Storage Mode DX / Smoke Scripts v1:
 
@@ -217,7 +218,7 @@ Review Storage Mode DX / Smoke Scripts v1:
 - The smoke runner starts `createScannerApiServer` on a random local port, uses temporary `.local` storage, checks existing review endpoints, rejects invalid writes, and verifies diagnostics omit entries and analyst notes.
 - File-backed JSON remains the default provider. SQLite remains optional through env configuration. No JSON-to-SQLite migration is performed.
 - This stage does not change endpoint paths, UI workflow, scanner scoring, final labels, or WATCHLIST meaning.
-- UX2 Product-grade Interface Redesign remains a future required stage.
+- UX2 Product-grade Interface Redesign is now complete for the local MVP UI pass through 10B.4.
 
 Local End-to-End Workflow Smoke v1:
 
@@ -228,7 +229,7 @@ Local End-to-End Workflow Smoke v1:
 - Parse market context latest output through the existing context service path, accepting real local output or fixture fallback.
 - Verify review session storage, diagnostics safety, invalid PUT rejection, export/import helpers, and server-render smoke coverage for Market Context, Candidate Detail, and Review Queue paths.
 - Use only local API calls and local fixture/real-output files. Do not call external networks, mutate scanner output, mutate market data, add sources, change endpoint paths, change UI workflow, change scanner scoring, change final labels, or change WATCHLIST meaning.
-- UX2 Product-grade Interface Redesign remains a future required stage.
+- UX2 Product-grade Interface Redesign is now complete for the local MVP UI pass through 10B.4.
 
 Analyst Report / Review Export v1:
 
@@ -245,7 +246,7 @@ Local MVP Runbook + Freeze Checklist v1:
 - Add `docs/local_mvp_runbook.md` for quick local operations, partial checks, preview commands, storage notes, analyst workflow, report generation, and troubleshooting.
 - Add `docs/pre_holiday_freeze_checklist.md` for DONE status, freeze scope, holiday-safe work, avoid list, post-holiday stages, and safe local MVP definition.
 - Keep this stage documentation/DX only. It does not change endpoints, UI workflow, scanner scoring, `final_label`, `WATCHLIST` meaning, source registry/compliance rules, npm dependencies, auth, production backend, or data sources.
-- UX2 Product-grade Interface Redesign remains a future required stage.
+- UX2 Product-grade Interface Redesign is now complete for the local MVP UI pass through 10B.4.
 
 Product Workflow Polish v1:
 
@@ -256,7 +257,7 @@ Product Workflow Polish v1:
 - Local MVP health remains the existing `scripts\win\check-local-mvp.cmd` command.
 - Scanner source, market context source, and review storage status copy is more explicit.
 - This stage adds no endpoints, new sources, npm dependencies, auth, production backend, production cron, scanner scoring change, `final_label` change, or `WATCHLIST` meaning change.
-- UX2 Product-grade Interface Redesign remains a future required stage.
+- UX2 Product-grade Interface Redesign is now complete for the local MVP UI pass through 10B.4.
 
 UX2 Information Architecture Shell v1:
 
@@ -288,7 +289,15 @@ UX2 Visual QA / Polish v1:
 - Stage 10B.4 closes UX2 at local MVP UI level with layout consistency, spacing, responsive fallback, command/path wrapping, selected candidate state, Review Queue section separation, and Analyst Report Workspace command containment.
 - Visual QA checklist: `docs/ux2_visual_qa_checklist.md`.
 - 10B.4 adds no endpoints, new sources, npm dependencies, auth, production backend, production cron, OpenAI call, scraping, browser automation, scanner scoring change, `final_label` change, `WATCHLIST` meaning change, review import/export/reset/diagnostics logic change, or report logic change.
-- UX2 Product-grade Interface Redesign is complete for the local MVP UI pass. 10C Local MVP Release Candidate Stabilization remains required before the end of August 2026.
+- UX2 Product-grade Interface Redesign is complete for the local MVP UI pass.
+
+Local MVP Release Candidate Stabilization v1:
+
+- Stage 10C stabilizes the local MVP as a release-candidate-ready local build.
+- Add `scripts\win\check-local-rc.cmd` as the aggregate RC checkpoint.
+- Add `docs/local_mvp_release_candidate.md` with included scope, deferred scope, RC verification, manual preview, local storage, RC definition, and known limitations.
+- 10C adds no endpoints, new sources, npm dependencies, auth, production backend, production cron, OpenAI call, scraping, browser automation, UI flow change, scanner scoring change, `final_label` change, `WATCHLIST` meaning change, review/import/export/reset/diagnostics logic change, or report logic change.
+- Final product readiness still requires future decisions for hosting, auth, production backend, data/paid integrations, deployment, and monitoring.
 
 Paid and clarification-dependent sources remain deferred:
 
@@ -460,7 +469,7 @@ UX2 Product-grade Interface Redesign:
 - 10B.2 completes the Scanner Radar / Candidate Detail redesign slice only.
 - 10B.3 completes the Review Queue + Report Workspace redesign slice only.
 - 10B.4 completes the Visual QA / Polish pass for the local MVP UI.
-- UX2 is complete at local MVP level; 10C stabilization remains before the end of August 2026.
+- UX2 is complete at local MVP level; 10C stabilizes the local release-candidate checkpoint without adding feature scope.
 
 ## UI Data Adapter (Completed)
 

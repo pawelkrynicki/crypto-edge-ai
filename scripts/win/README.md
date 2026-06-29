@@ -30,8 +30,21 @@ Runbook and freeze notes:
 
 - `docs\local_mvp_runbook.md`
 - `docs\pre_holiday_freeze_checklist.md`
+- `docs\local_mvp_release_candidate.md`
 
-UX2 Product-grade Interface Redesign remains a future required stage.
+UX2 Product-grade Interface Redesign is complete for the local MVP UI pass through 10B.4. 10C Local MVP Release Candidate Stabilization is documentation/DX stabilization only and adds no new feature scope.
+
+Final product readiness still requires future decisions for hosting, auth, production backend, data/paid integrations, deployment, and monitoring.
+
+## Local MVP RC Check
+
+```cmd
+scripts\win\check-local-rc.cmd
+```
+
+This is the 10C local release-candidate checkpoint. It verifies the required runbook/checklist documents and core local MVP scripts are present, then runs `scripts\win\check-local-mvp.cmd`.
+
+It does not check `git status --porcelain`, because development branches are expected to have changes before commit. Before marking a release candidate, confirm a clean working tree separately with `git status`.
 
 ## Generate Live Context
 
@@ -94,7 +107,7 @@ The local workflow smoke starts the existing local API on a random `127.0.0.1` p
 - review session export/import helpers
 - server-render smoke coverage for Market Context, Candidate Detail, and Review Queue UI paths
 
-The runner uses a dedicated file under `tools\ui-mock\.local\local-workflow-smoke-review-session.json` and has a cleanup guard so it cannot remove the normal `review-session.json` or `review-session.sqlite`. It uses only local API calls and local real-output or fixture fallback files. It does not call external networks, change scanner output, change market data, add data sources, change endpoint paths, change UI workflow, change scoring, change `final_label`, or change `WATCHLIST` meaning. UX2 Product-grade Interface Redesign remains a future stage.
+The runner uses a dedicated file under `tools\ui-mock\.local\local-workflow-smoke-review-session.json` and has a cleanup guard so it cannot remove the normal `review-session.json` or `review-session.sqlite`. It uses only local API calls and local real-output or fixture fallback files. It does not call external networks, change scanner output, change market data, add data sources, change endpoint paths, change UI workflow, change scoring, change `final_label`, or change `WATCHLIST` meaning. UX2 Product-grade Interface Redesign is complete for the local MVP UI pass; 10C keeps this as stabilization scope.
 
 ## Analyst Report Export
 
@@ -111,7 +124,7 @@ tools\ui-mock\.local\reports
 
 `check-analyst-report.cmd` runs the same generator in `--smoke` mode with dedicated temporary review storage and guarded smoke report files under `tools\ui-mock\.local\reports-smoke`.
 
-The report is a local research workflow export only. It reads the existing local API path from scanner latest output, UI candidates, approved market context, review session storage, and review diagnostics. It does not call external networks, add data sources, change scanner output, change market data, change scoring, change `final_label`, change `WATCHLIST` meaning, add auth, add a production backend, or implement UX2. The compliance copy remains clear that it is not a recommendation and `This is not a buy/sell signal.`
+The report is a local research workflow export only. It reads the existing local API path from scanner latest output, UI candidates, approved market context, review session storage, and review diagnostics. It does not call external networks, add data sources, change scanner output, change market data, change scoring, change `final_label`, change `WATCHLIST` meaning, add auth, add a production backend, or change the completed UX2 local MVP UI pass. The compliance copy remains clear that it is not a recommendation and `This is not a buy/sell signal.`
 
 ## Free Local Preview Ports
 

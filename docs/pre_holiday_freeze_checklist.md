@@ -11,6 +11,7 @@
 - 10B.2 UX2 Scanner / Candidate Detail Redesign
 - 10B.3 UX2 Review Queue + Report Workspace Redesign
 - 10B.4 UX2 Visual QA / Polish
+- 10C Local MVP Release Candidate Stabilization v1
 
 ## Freeze Scope
 
@@ -21,8 +22,10 @@
 - Analyst report export works locally.
 - The UI now shows the local workflow guide and clearer scanner/context/review/report/health status copy.
 - UX2 has completed the local MVP UI pass through 10B.1 information architecture shell, 10B.2 Scanner Radar / Candidate Detail redesign, 10B.3 Review Queue + Report Workspace redesign, and 10B.4 Visual QA / Polish.
+- 10C stabilizes the local release-candidate checkpoint without adding new product features.
 - 10B.1 through 10B.4 do not change endpoints, scoring, `final_label`, `WATCHLIST` meaning, review/import/export/reset/diagnostics/report logic, source rules, npm dependencies, auth, or production backend scope.
 - The Visual QA checklist is `docs/ux2_visual_qa_checklist.md`.
+- The release candidate document is `docs/local_mvp_release_candidate.md`.
 
 ## Allowed During Holiday
 
@@ -32,8 +35,11 @@
 - Merge only after green:
 
 ```cmd
+scripts\win\check-local-rc.cmd
 scripts\win\check-local-mvp.cmd
 ```
+
+`check-local-rc.cmd` does not check git cleanliness. Confirm `git status` is clean separately before declaring RC.
 
 ## Avoid During Holiday
 
@@ -49,13 +55,14 @@ scripts\win\check-local-mvp.cmd
 
 ## Post-Holiday Next Stages
 
-- 10C - Local MVP Release Candidate Stabilization
+- Future production decisions: hosting, auth, production backend, data/paid integrations, deployment, and monitoring.
 
 ## Safe Local MVP State
 
 A safe local MVP state means:
 
 - `scripts\win\check-local-mvp.cmd` passes.
+- `scripts\win\check-local-rc.cmd` passes.
 - `scripts\win\post-merge-check.cmd` passes after merge.
 - Working tree is clean.
 - Analyst report generates locally.
