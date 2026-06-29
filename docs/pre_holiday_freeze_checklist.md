@@ -12,6 +12,7 @@
 - 10B.3 UX2 Review Queue + Report Workspace Redesign
 - 10B.4 UX2 Visual QA / Polish
 - 10C Local MVP Release Candidate Stabilization v1
+- 10D Local MVP RC Manual Preview Notes / Known Issues v1
 
 ## Freeze Scope
 
@@ -23,9 +24,13 @@
 - The UI now shows the local workflow guide and clearer scanner/context/review/report/health status copy.
 - UX2 has completed the local MVP UI pass through 10B.1 information architecture shell, 10B.2 Scanner Radar / Candidate Detail redesign, 10B.3 Review Queue + Report Workspace redesign, and 10B.4 Visual QA / Polish.
 - 10C stabilizes the local release-candidate checkpoint without adding new product features.
+- 10D documents the manual preview path, accepted limitations, known issues, and resume rules without adding new product features.
 - 10B.1 through 10B.4 do not change endpoints, scoring, `final_label`, `WATCHLIST` meaning, review/import/export/reset/diagnostics/report logic, source rules, npm dependencies, auth, or production backend scope.
 - The Visual QA checklist is `docs/ux2_visual_qa_checklist.md`.
 - The release candidate document is `docs/local_mvp_release_candidate.md`.
+- Manual preview notes are `docs/local_mvp_rc_manual_preview_notes.md`.
+- Known issues and accepted limitations are `docs/local_mvp_known_issues.md`.
+- RC-ready local MVP does not mean production-ready or final product-ready.
 
 ## Allowed During Holiday
 
@@ -40,6 +45,8 @@ scripts\win\check-local-mvp.cmd
 ```
 
 `check-local-rc.cmd` does not check git cleanliness. Confirm `git status` is clean separately before declaring RC.
+
+After 10D, prefer freeze/light mode unless a real blocker appears.
 
 ## Avoid During Holiday
 
@@ -71,6 +78,7 @@ A safe local MVP state means:
 - The 10B.2 Scanner Radar / Candidate Detail redesign keeps scanner labels, local review, security/manual verification, context, and reasoning checklist visibly separate without changing scanner or review logic.
 - The 10B.3 Review Queue + Report Workspace redesign keeps local review status, stored reviews, scanner WATCHLIST candidates, backup/import/export, diagnostics/reset, and CMD report generation visibly separate without changing review/report logic.
 - The 10B.4 Visual QA / Polish pass keeps command/path wrapping, selected candidate state, section spacing, report command blocks, storage diagnostics, reset panel, compliance copy, and responsive layout visually checked without changing product logic.
+- The 10D manual preview notes keep real click-through status separate from automated RC readiness and do not allow `PASS` unless preview was actually run.
 
 ## Freeze Notes
 

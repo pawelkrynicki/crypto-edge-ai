@@ -31,10 +31,14 @@ Runbook and freeze notes:
 - `docs\local_mvp_runbook.md`
 - `docs\pre_holiday_freeze_checklist.md`
 - `docs\local_mvp_release_candidate.md`
+- `docs\local_mvp_rc_manual_preview_notes.md`
+- `docs\local_mvp_known_issues.md`
 
-UX2 Product-grade Interface Redesign is complete for the local MVP UI pass through 10B.4. 10C Local MVP Release Candidate Stabilization is documentation/DX stabilization only and adds no new feature scope.
+UX2 Product-grade Interface Redesign is complete for the local MVP UI pass through 10B.4. 10C Local MVP Release Candidate Stabilization is documentation/DX stabilization only and adds no new feature scope. 10D adds manual preview notes and known issues documentation only; it does not add features or change product behavior.
 
 Final product readiness still requires future decisions for hosting, auth, production backend, data/paid integrations, deployment, and monitoring.
+
+After 10D, prefer freeze/light mode unless a real blocker appears.
 
 ## Local MVP RC Check
 
@@ -61,6 +65,8 @@ scripts\win\dev-ui.cmd
 ```
 
 This starts the local API on port `5177` and the frontend on port `5173` in separate CMD windows.
+
+Record real click-through results in `docs\local_mvp_rc_manual_preview_notes.md`. Do not mark any area as `PASS` unless the preview was actually opened and clicked through.
 
 SQLite Review Storage preview:
 

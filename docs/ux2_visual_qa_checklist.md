@@ -8,10 +8,14 @@
 - 10B.4 done: visual QA / polish for layout, readability, wrapping, contrast, and responsive fallback.
 - UX2 local MVP UI pass is complete.
 - 10C Local MVP Release Candidate Stabilization keeps the UI flow stable and adds RC documentation/DX only.
+- 10D Local MVP RC Manual Preview Notes / Known Issues adds documentation for manual click-through, limitations, and resume rules only.
+- Local RC-ready does not mean production-ready or final product-ready.
 
 Release candidate notes:
 
 - `docs/local_mvp_release_candidate.md`
+- `docs/local_mvp_rc_manual_preview_notes.md`
+- `docs/local_mvp_known_issues.md`
 
 ## Local Check
 
@@ -29,11 +33,15 @@ scripts\win\generate-live-context.cmd
 scripts\win\dev-ui.cmd
 ```
 
+Use `docs/local_mvp_rc_manual_preview_notes.md` to record results. Do not mark any area as `PASS` unless the UI was actually opened and clicked through.
+
 ## Click Through
 
 - Overview.
 - Scanner Radar.
+- Candidate Detail.
 - Review Queue.
+- Analyst Report Workspace.
 - Research Review.
 - Risk Alerts.
 - Methodology.
@@ -60,3 +68,5 @@ scripts\win\dev-ui.cmd
 - Report generation from UI.
 - Auth or production backend.
 - Hosting, paid data integrations, deployment, or monitoring decisions.
+
+After 10D, prefer freeze/light mode unless a real blocker appears.

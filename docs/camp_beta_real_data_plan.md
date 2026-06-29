@@ -441,6 +441,17 @@ Stage 10C stabilizes the local MVP as a release-candidate-ready local build with
 - 10C changes no endpoint paths, data-source policy, UI flow, review save/clear/import/export/reset behavior, diagnostics behavior, analyst report generation, scanner scoring, `final_label`, or `WATCHLIST` meaning. It adds no npm dependencies, auth, production backend, production cron, new sources, scraping, HTML parsing, browser automation, undocumented endpoints, or OpenAI calls.
 - Final product readiness still requires future decisions for hosting, auth, production backend, data/paid integrations, deployment, and monitoring.
 
+## Local MVP RC Manual Preview Notes / Known Issues v1
+
+Stage 10D documents the manual local RC preview path and known local limitations without adding new product features.
+
+- Manual preview notes: `docs/local_mvp_rc_manual_preview_notes.md`.
+- Known issues and accepted limitations: `docs/local_mvp_known_issues.md`.
+- Manual preview status must stay `NOT RUN` unless the local UI is actually opened and clicked through.
+- RC-ready local MVP does not mean production-ready or final product-ready.
+- After 10D, prefer freeze/light mode unless a real blocker appears.
+- 10D changes no endpoint paths, data-source policy, UI/CSS, review save/clear/import/export/reset behavior, diagnostics behavior, analyst report generation, scanner scoring, `final_label`, or `WATCHLIST` meaning. It adds no npm dependencies, auth, production backend, production cron, new sources, scraping, HTML parsing, browser automation, undocumented endpoints, or OpenAI calls.
+
 ## UX1 Professional Dashboard Redesign
 
 UX1 is a UI-only redesign of `tools/ui-mock`. It improves layout hierarchy, spacing, scanner readability, Market Context visibility, and Candidate Detail readability. Local Review Session is placed higher in Candidate Detail so analyst status and notes are easier to find.
