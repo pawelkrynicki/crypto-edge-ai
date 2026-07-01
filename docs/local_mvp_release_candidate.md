@@ -7,6 +7,7 @@
 - Stage 11B adds AI KINTEL database migration blueprint documents; it does not change local RC behavior.
 - Stage 11C adds AI KINTEL source config/adapter contract documents; it does not change local RC behavior.
 - Stage 11D adds AI KINTEL cron fetcher skeleton documents; it does not change local RC behavior.
+- Stage 11E adds AI KINTEL tRPC router blueprint documents; it does not change local RC behavior.
 - The local MVP is RC-ready after `scripts\win\check-local-rc.cmd` passes.
 - UX2 local MVP UI pass was completed in 10B.4.
 - 10C stabilizes the local RC and does not add new product features.
@@ -44,11 +45,22 @@
 - `docs/ai_kintel_cron_operational_runbook.md`
 - `docs/ai_kintel_cron_fetcher_test_plan.md`
 
+11E tRPC router blueprint documents:
+
+- `docs/ai_kintel_trpc_router_blueprint.md`
+- `docs/ai_kintel_trpc_procedure_contract.md`
+- `docs/ai_kintel_trpc_query_matrix.md`
+- `docs/ai_kintel_trpc_access_control_blueprint.md`
+- `docs/ai_kintel_trpc_error_status_model.md`
+- `docs/ai_kintel_trpc_router_pseudocode.md`
+
 11B is review-only documentation. It does not execute a migration, add a production database, add source adapters, add backend/auth/endpoints, change UI/CSS, change scanner scoring, change `final_label`, or change `WATCHLIST` meaning. Paid sources remain disabled/deferred, and the real migration belongs to a future AI KINTEL repo integration stage.
 
 11C is review-only source contract documentation. It does not implement adapters, activate sources, add provider calls, add endpoint/backend/auth code, add cron implementations, change UI/CSS, change scanner scoring, change `final_label`, or change `WATCHLIST` meaning. Paid sources remain disabled/deferred, future adapters must run backend/cron only, disabled paid vendors must not call providers, and frontend access remains tRPC/backend-only.
 
 11D is review-only cron fetcher skeleton documentation. It does not create `packages/cron`, runtime cron scripts, source adapters, provider calls, endpoint/backend/auth code, dependencies, migrations, UI/CSS changes, scanner scoring changes, `final_label` changes, or `WATCHLIST` meaning changes. Future cron fetchers must follow the 11C source adapter contract, paid sources remain disabled/deferred, and disabled paid vendors must not call providers.
+
+11E is review-only tRPC router blueprint documentation. It does not create `packages/webapp`, `packages/webapp/server/routers/cryptoMarket.ts`, runtime tRPC procedures, endpoint/backend/auth code, dependencies, migrations, source adapters, provider calls, OpenAI calls, UI/CSS changes, scanner scoring changes, `final_label` changes, or `WATCHLIST` meaning changes. Future frontend access remains tRPC-only through `trpc.cryptoMarket.*`, future queries read DB records populated by cron/source layer, and paid sources remain disabled/deferred.
 
 ## Included In Local MVP
 

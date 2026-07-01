@@ -6,12 +6,14 @@
 - Stage 11B adds reviewable database migration blueprint artifacts.
 - Stage 11C adds documentation-only source config, adapter, status/error, registry blueprint, and test-plan contracts.
 - Stage 11D adds documentation-only cron fetcher skeletons, type matrix, PM2 blueprint, runbook, and cron test plan.
+- Stage 11E adds documentation-only tRPC router blueprint, procedure contract, query matrix, access-control blueprint, error/status model, and router pseudocode.
 - Planning date: 2026-06-29.
 - This is a documentation and decision artifact only.
-- No source adapter, endpoint, auth layer, production backend, production database, migration, runtime cron script, UI change, or paid API call is implemented here.
+- No source adapter, endpoint, tRPC procedure, auth layer, production backend, production database, migration, runtime cron script, UI change, or paid API call is implemented here.
 - 11B does not execute a migration; the real migration belongs to a future AI KINTEL repo integration stage after owner and DB review.
 - 11C does not implement adapters, activate sources, add cron code, add endpoints, or change Local RC behavior.
 - 11D does not create `packages/cron`, runtime cron scripts, source adapters, provider calls, endpoints, or change Local RC behavior.
+- 11E does not create `packages/webapp`, `packages/webapp/server/routers/cryptoMarket.ts`, runtime tRPC procedures, backend code, endpoints, provider calls, or change Local RC behavior.
 
 11B database blueprint artifacts:
 
@@ -35,6 +37,15 @@
 - `docs/ai_kintel_cron_operational_runbook.md`
 - `docs/ai_kintel_cron_fetcher_test_plan.md`
 
+11E tRPC router blueprint artifacts:
+
+- `docs/ai_kintel_trpc_router_blueprint.md`
+- `docs/ai_kintel_trpc_procedure_contract.md`
+- `docs/ai_kintel_trpc_query_matrix.md`
+- `docs/ai_kintel_trpc_access_control_blueprint.md`
+- `docs/ai_kintel_trpc_error_status_model.md`
+- `docs/ai_kintel_trpc_router_pseudocode.md`
+
 ## Architecture Decisions
 
 | Decision Area | Selected Direction | Rejected / Deferred Direction | Reason |
@@ -43,6 +54,7 @@
 | Backend | Existing AI KINTEL Express/tRPC webapp backend | Separate FastAPI service | Keeps production integration inside the existing AI KINTEL architecture. |
 | Database | AI KINTEL MySQL/MariaDB | PostgreSQL or local-only storage | AI KINTEL production uses MySQL/MariaDB. |
 | Data collection | AI KINTEL cron scripts plus PM2 | Frontend fetches or local helper scripts | External calls must run in backend/cron only. |
+| tRPC read path | DB-backed `cryptoMarket` queries | Provider calls from frontend or query path | Future frontend should call `trpc.cryptoMarket.*`; query data should come from DB rows populated by cron. |
 | Frontend | AI KINTEL webapp route `/crypto-market` | Separate webapp | Keeps module navigation and access control inside AI KINTEL. |
 | Local JSON/SQLite | Dev/local only | Production persistence | Local storage remains a porting baseline, not production storage. |
 | Deployment | AI KINTEL VPS/PM2 flow | Separate deployment stack | Reduces operational split and matches current AI KINTEL deployment. |
@@ -76,6 +88,7 @@
 - Activation must respect vendor terms, rate limits, attribution requirements, and commercial approval status.
 - Future adapters must follow the 11C contract: backend/cron only, no provider call while disabled, no direct frontend provider call, and source-run status mapped to `crypto_source_runs`.
 - Future cron fetchers documented in 11D must follow the same 11C contract before any provider work.
+- Future tRPC queries documented in 11E must read DB records populated by cron and must not call providers from the read path unless separately approved.
 
 ## Data Model Decisions
 
@@ -97,6 +110,7 @@
 - Missing data means manual verification.
 - The module must remain research-only.
 - Frontend uses tRPC/backend only and must not call external data providers directly.
+- Future `/crypto-market` reads should use `trpc.cryptoMarket.*` and preserve the research-only compliance block.
 
 ## Open Decisions
 

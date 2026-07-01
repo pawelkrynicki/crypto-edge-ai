@@ -3,12 +3,23 @@
 ## Status
 
 - Stage: 11D - AI KINTEL Cron Fetcher Skeletons.
+- Stage 11E adds documentation-only tRPC router/query blueprints for future readers of cron-populated DB records.
 - This is a documentation-only skeleton for future cron fetchers, not an implementation.
 - It does not create `packages/cron`.
 - It does not call providers.
 - It does not activate sources.
 - It does not change the Local MVP Release Candidate.
-- It does not add runtime cron scripts, source adapters, endpoints, dependencies, backend code, auth, migrations, UI, or CSS.
+- It does not add runtime cron scripts, source adapters, tRPC procedures, endpoints, dependencies, backend code, auth, migrations, UI, or CSS.
+- 11E does not create `packages/webapp`, `packages/webapp/server/routers/cryptoMarket.ts`, runtime tRPC procedures, backend code, endpoints, provider calls, or change Local RC behavior.
+
+11E tRPC router blueprint artifacts:
+
+- `docs/ai_kintel_trpc_router_blueprint.md`
+- `docs/ai_kintel_trpc_procedure_contract.md`
+- `docs/ai_kintel_trpc_query_matrix.md`
+- `docs/ai_kintel_trpc_access_control_blueprint.md`
+- `docs/ai_kintel_trpc_error_status_model.md`
+- `docs/ai_kintel_trpc_router_pseudocode.md`
 
 ## Target AI KINTEL Location
 
@@ -47,6 +58,8 @@ Future cron fetchers should follow these rules:
 - Write source run status to `crypto_source_runs`.
 - Run provider access through backend/cron only.
 - Do not add frontend provider calls.
+- Future tRPC queries should read DB records populated by these cron/source flows.
+- Future tRPC read queries should not call providers unless separately approved.
 - Keep paid sources disabled/deferred until explicit env, config, policy, and owner approval are complete.
 - Follow the 11C source config, adapter, status/error, registry, and test-plan contracts.
 

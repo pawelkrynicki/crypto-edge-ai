@@ -1,5 +1,27 @@
 # Roadmap
 
+## Stage 11E: AI KINTEL tRPC Router Blueprint
+
+Prepare documentation-only tRPC router blueprints for the future AI KINTEL Crypto Market production module.
+
+Current direction:
+
+- 11E is documentation/contract work only.
+- No `packages/webapp` directory, `packages/webapp/server/routers/cryptoMarket.ts`, runtime tRPC procedure, endpoint, auth implementation, production backend, production database, migration, dependency, UI/CSS change, source adapter, provider call, OpenAI call, scanner scoring change, `final_label` change, or `WATCHLIST` behavior change is added.
+- Future frontend access remains tRPC-only through `trpc.cryptoMarket.*`.
+- Future queries read MySQL/MariaDB records populated by cron/source layer.
+- Paid sources remain disabled/deferred and must not be called from frontend or read query path.
+- Future procedure outputs preserve research-only compliance, including `WATCHLIST` as manual review only and missing data as manual verification required.
+
+Current artifacts:
+
+- `docs/ai_kintel_trpc_router_blueprint.md`.
+- `docs/ai_kintel_trpc_procedure_contract.md`.
+- `docs/ai_kintel_trpc_query_matrix.md`.
+- `docs/ai_kintel_trpc_access_control_blueprint.md`.
+- `docs/ai_kintel_trpc_error_status_model.md`.
+- `docs/ai_kintel_trpc_router_pseudocode.md`.
+
 ## Stage 11D: AI KINTEL Cron Fetcher Skeletons
 
 Prepare documentation-only cron fetcher skeletons for the future AI KINTEL Crypto Market production module.

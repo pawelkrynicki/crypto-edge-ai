@@ -4,11 +4,16 @@
 
 - Stage: 11B - Database Mapping Matrix.
 - Stage 11C adds documentation-only source config, adapter, status/error, registry blueprint, and test-plan contracts for future source writers.
+- Stage 11D adds documentation-only cron fetcher skeletons for future DB writers.
+- Stage 11E adds documentation-only tRPC router/query blueprints for future DB readers.
 - This is documentation only and does not execute a migration.
 - Local RC behavior remains unchanged.
 - Real production mapping should be implemented later in the AI KINTEL repo after owner and DB review.
 - 11C does not implement adapters, activate sources, add provider calls, add endpoints, or change Local RC behavior.
+- 11D does not create `packages/cron`, runtime cron scripts, source adapters, provider calls, endpoints, or change Local RC behavior.
+- 11E does not create `packages/webapp`, `packages/webapp/server/routers/cryptoMarket.ts`, runtime tRPC procedures, backend code, endpoints, provider calls, or change Local RC behavior.
 - Future source adapters must run backend/cron only, disabled paid vendors must not call providers, paid sources remain disabled/deferred, and frontend access remains tRPC/backend-only.
+- Future tRPC queries should read DB records populated by cron/source layer, and the future frontend should call `trpc.cryptoMarket.*` only.
 
 ## Local RC To Production DB Mapping
 
@@ -34,6 +39,7 @@
 - Final naming of `research_score` versus `opportunity_score`.
 - How the AI KINTEL subscription gate exposes the Crypto Market module.
 - Whether `crypto_analyst_reviews` belongs in the first production migration or remains deferred.
+- Exact future `cryptoMarket` tRPC procedure shapes and access gates.
 
 ## Related Artifacts
 
@@ -46,3 +52,11 @@
 - `docs/ai_kintel_source_status_error_model.md`
 - `docs/ai_kintel_source_registry_blueprint.json`
 - `docs/ai_kintel_source_adapter_test_plan.md`
+- `docs/ai_kintel_cron_fetcher_skeletons.md`
+- `docs/ai_kintel_cron_fetcher_types_matrix.md`
+- `docs/ai_kintel_trpc_router_blueprint.md`
+- `docs/ai_kintel_trpc_procedure_contract.md`
+- `docs/ai_kintel_trpc_query_matrix.md`
+- `docs/ai_kintel_trpc_access_control_blueprint.md`
+- `docs/ai_kintel_trpc_error_status_model.md`
+- `docs/ai_kintel_trpc_router_pseudocode.md`

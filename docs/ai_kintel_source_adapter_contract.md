@@ -4,9 +4,10 @@
 
 - Stage: 11C - Source Adapter Contract.
 - Stage 11D adds documentation-only cron fetcher skeletons that must follow this contract.
+- Stage 11E adds documentation-only tRPC router/query blueprints that read adapter/cron results from DB.
 - This is a contract for future adapters, not an implementation.
 - Source adapters should be created in later stages after 11D; 11D adds only cron-fetcher documentation skeletons.
-- This document does not add any provider calls, backend routes, cron jobs, dependencies, or runtime configuration.
+- This document does not add any provider calls, backend routes, tRPC procedures, cron jobs, dependencies, or runtime configuration.
 
 ## Adapter Responsibility
 
@@ -124,6 +125,27 @@ Future cron fetchers must:
 - Avoid frontend provider calls.
 
 11D does not create `packages/cron`, runtime cron scripts, source adapters, endpoints, provider calls, or Local RC behavior changes.
+
+## 11E tRPC Router Relationship
+
+11E tRPC blueprint artifacts:
+
+- `docs/ai_kintel_trpc_router_blueprint.md`
+- `docs/ai_kintel_trpc_procedure_contract.md`
+- `docs/ai_kintel_trpc_query_matrix.md`
+- `docs/ai_kintel_trpc_access_control_blueprint.md`
+- `docs/ai_kintel_trpc_error_status_model.md`
+- `docs/ai_kintel_trpc_router_pseudocode.md`
+
+Future tRPC queries should:
+
+- Read normalized DB records populated by cron/source layer.
+- Read source health and disabled/deferred metadata from `crypto_source_runs`.
+- Expose safe source status to `/crypto-market` through `trpc.cryptoMarket.*`.
+- Avoid external provider calls from the frontend or read query path unless separately approved.
+- Keep paid sources disabled/deferred until explicit activation approval.
+
+11E does not create `packages/webapp`, `packages/webapp/server/routers/cryptoMarket.ts`, runtime tRPC procedures, backend code, endpoints, provider calls, or Local RC behavior changes.
 
 ## Pseudocode Only
 

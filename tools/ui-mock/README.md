@@ -51,6 +51,19 @@ These artifacts do not implement source adapters, activate paid sources, add pro
 
 These artifacts do not create `packages/cron`, runtime cron scripts, source adapters, provider calls, endpoints/backend/auth, migrations, npm dependencies, UI/CSS changes, scanner scoring changes, `final_label` changes, or `WATCHLIST` meaning changes. Future cron fetchers must follow the 11C source adapter contract, paid sources remain disabled/deferred, disabled paid vendors must not call providers, and the frontend remains tRPC/backend-only.
 
+## 11E AI KINTEL tRPC Router Blueprint
+
+11E adds documentation-only tRPC router blueprint artifacts for the future AI KINTEL Crypto Market module:
+
+- `../../docs/ai_kintel_trpc_router_blueprint.md`
+- `../../docs/ai_kintel_trpc_procedure_contract.md`
+- `../../docs/ai_kintel_trpc_query_matrix.md`
+- `../../docs/ai_kintel_trpc_access_control_blueprint.md`
+- `../../docs/ai_kintel_trpc_error_status_model.md`
+- `../../docs/ai_kintel_trpc_router_pseudocode.md`
+
+These artifacts do not create `packages/webapp`, `packages/webapp/server/routers/cryptoMarket.ts`, runtime tRPC procedures, endpoints/backend/auth, migrations, npm dependencies, source adapters, provider calls, OpenAI calls, UI/CSS changes, scanner scoring changes, `final_label` changes, or `WATCHLIST` meaning changes. Future `/crypto-market` frontend access remains tRPC-only through `trpc.cryptoMarket.*`; future queries read DB records populated by cron/source layer; paid sources remain disabled/deferred; no provider call is allowed in the frontend or read query path unless separately approved.
+
 ## Features
 - **Dark, professional UI**: Aligned with the AIKINTEL aesthetic.
 - **Scanner Radar**: Product-grade candidate list and detail workspace showing scanner labels, local review status, security labels, market metrics, and read-only scanner reasons.
