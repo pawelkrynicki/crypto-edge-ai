@@ -1,5 +1,27 @@
 # Roadmap
 
+## Stage 11F: AI KINTEL Frontend Port Plan
+
+Prepare documentation-only frontend port planning for the future AI KINTEL Crypto Market module.
+
+Current direction:
+
+- 11F is documentation/port-planning work only.
+- No `packages/webapp` directory, `CryptoMarket.tsx`, route `/crypto-market`, sidebar navigation, React component, UI/CSS change, runtime tRPC procedure, endpoint, backend code, auth implementation, source adapter, provider call, OpenAI call, npm dependency, scanner scoring change, `final_label` change, or `WATCHLIST` behavior change is added.
+- Future frontend access remains tRPC-only through `trpc.cryptoMarket.*`.
+- Future frontend reads DB-backed tRPC responses populated by the cron/source layer.
+- Paid sources remain disabled/deferred and must not be called from the browser.
+- Future UI should preserve research-only compliance, including `WATCHLIST` as manual review only and missing data as manual verification required.
+
+Current artifacts:
+
+- `docs/ai_kintel_frontend_port_plan.md`.
+- `docs/ai_kintel_frontend_component_map.md`.
+- `docs/ai_kintel_frontend_data_contract.md`.
+- `docs/ai_kintel_frontend_state_model.md`.
+- `docs/ai_kintel_frontend_compliance_copy_guide.md`.
+- `docs/ai_kintel_frontend_port_checklist.md`.
+
 ## Stage 11E: AI KINTEL tRPC Router Blueprint
 
 Prepare documentation-only tRPC router blueprints for the future AI KINTEL Crypto Market production module.

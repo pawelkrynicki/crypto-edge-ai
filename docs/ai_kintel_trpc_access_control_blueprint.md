@@ -3,9 +3,19 @@
 ## Status
 
 - Stage: 11E - tRPC access control blueprint.
+- Stage 11F adds documentation-only frontend access-state guidance for future `/crypto-market` consumers.
 - This is documentation only.
 - It does not implement auth.
 - It does not add backend code, endpoints, tRPC procedures, migrations, UI, CSS, source adapters, provider calls, OpenAI calls, or dependencies.
+
+11F frontend planning references:
+
+- `docs/ai_kintel_frontend_port_plan.md`
+- `docs/ai_kintel_frontend_component_map.md`
+- `docs/ai_kintel_frontend_data_contract.md`
+- `docs/ai_kintel_frontend_state_model.md`
+- `docs/ai_kintel_frontend_compliance_copy_guide.md`
+- `docs/ai_kintel_frontend_port_checklist.md`
 
 ## Access Model
 
@@ -52,6 +62,7 @@ Production MVP should begin with read queries. Mutations should be deferred unle
 - Missing env for enabled source is a sanitized configuration issue.
 - Frontend must not call external providers directly.
 - Future read queries should read DB rows populated by cron.
+- 11F does not create frontend runtime code, route `/crypto-market`, sidebar navigation, `CryptoMarket.tsx`, endpoints, runtime tRPC procedures, source activation, or provider calls.
 
 ## Compliance Rules
 

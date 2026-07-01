@@ -3,6 +3,7 @@
 ## Status
 
 - Stage: 11E - AI KINTEL tRPC Router Blueprint.
+- Stage 11F adds documentation-only frontend port planning that consumes this future router contract.
 - This is a documentation-only blueprint, not an implementation.
 - It does not create a router.
 - It does not add endpoints.
@@ -17,6 +18,15 @@
 - `docs/ai_kintel_trpc_access_control_blueprint.md`
 - `docs/ai_kintel_trpc_error_status_model.md`
 - `docs/ai_kintel_trpc_router_pseudocode.md`
+
+11F frontend planning references:
+
+- `docs/ai_kintel_frontend_port_plan.md`
+- `docs/ai_kintel_frontend_component_map.md`
+- `docs/ai_kintel_frontend_data_contract.md`
+- `docs/ai_kintel_frontend_state_model.md`
+- `docs/ai_kintel_frontend_compliance_copy_guide.md`
+- `docs/ai_kintel_frontend_port_checklist.md`
 
 ## Target AI KINTEL Location
 
@@ -33,6 +43,8 @@ Future frontend access pattern:
 - `trpc.cryptoMarket.*`
 
 The future `/crypto-market` frontend must not call external providers directly. External data should be collected by backend/cron, normalized into MySQL/MariaDB tables, and read through tRPC.
+
+11F documents the future frontend route/page/component plan only. It does not create `packages/webapp`, `CryptoMarket.tsx`, route `/crypto-market`, sidebar navigation, runtime tRPC procedures, endpoints, backend code, provider calls, or UI/CSS changes.
 
 ## Router Goals
 

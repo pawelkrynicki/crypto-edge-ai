@@ -3,9 +3,18 @@
 ## Status
 
 - Stage: 11E - tRPC query matrix.
+- Stage 11F adds documentation-only frontend mapping for future DB-backed query consumers.
 - This is documentation only.
 - It does not create SQL runtime query code.
 - It does not create tRPC procedures, endpoints, backend code, migrations, auth, UI, CSS, source adapters, provider calls, OpenAI calls, or dependencies.
+
+11F frontend planning references:
+
+- `docs/ai_kintel_frontend_port_plan.md`
+- `docs/ai_kintel_frontend_component_map.md`
+- `docs/ai_kintel_frontend_data_contract.md`
+- `docs/ai_kintel_frontend_state_model.md`
+- `docs/ai_kintel_frontend_port_checklist.md`
 
 ## Query Matrix
 
@@ -32,6 +41,8 @@
 - Query results should come from MySQL/MariaDB records populated by cron/source layer.
 - Source health and data freshness should be derived from `crypto_source_runs`.
 - Disabled/deferred paid sources should surface safe metadata only.
+- Future frontend reads these DB-backed results through `trpc.cryptoMarket.*` only.
+- 11F does not create route `/crypto-market`, sidebar navigation, `CryptoMarket.tsx`, runtime tRPC procedures, endpoints, provider calls, or UI/CSS changes.
 - Missing data means manual verification, not positive context.
 - `WATCHLIST` remains manual review only.
 - Scanner label, scanner scoring, and `final_label` remain read-only from the scanner output.
