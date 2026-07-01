@@ -6,6 +6,23 @@ Camp BETA should be a working Crypto Edge AI tool on real data in a limited, sta
 
 This is still a planning document. It does not implement real fetchers, production cron scripts, migrations, auth, UI, or AI calls.
 
+## 12A Standalone Trusted Tester Strategy Correction
+
+After 11G, the near-term priority changes from immediate AI KINTEL implementation to a standalone trusted tester preview path.
+
+- AI KINTEL implementation is deferred to the final integration stage after standalone preview feedback.
+- The 11A-11G AI KINTEL documents remain a compatibility/planning package for later, not the next implementation target.
+- Local MVP RC remains the technical baseline, but it is not yet an external preview that Pawel Gradziuk can open without developer support.
+- 12A adds documentation/analysis only and changes no runtime, UI, CSS, backend, frontend, deployment, source adapter, provider call, source activation, scanner scoring, `final_label`, or `WATCHLIST` meaning.
+- The trusted tester preview must keep the current source-compliance boundaries: no paid source activation, no browser provider calls, no secrets, and no public/open URL.
+
+12A standalone documents:
+
+- `docs/standalone_product_gap_audit.md`
+- `docs/trusted_tester_preview_path.md`
+- `docs/standalone_product_definition_of_done.md`
+- `docs/standalone_roadmap_to_trusted_tester.md`
+
 ## 11A AI KINTEL Production MVP Planning
 
 Stage 11A defines the production direction as an AI KINTEL Crypto Market module, not a standalone SaaS. The local RC remains the baseline for porting, but production work should move into the AI KINTEL architecture: Express/tRPC, MySQL/MariaDB, `packages/cron/scripts`, PM2, and a `/crypto-market` route.
