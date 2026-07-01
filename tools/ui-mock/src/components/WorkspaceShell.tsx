@@ -3,6 +3,7 @@ import type { DataSourceKey } from "../services/scannerDataSource";
 
 export type WorkspaceSectionId =
   | "overview"
+  | "control-center"
   | "scanner"
   | "watchlist"
   | "research"

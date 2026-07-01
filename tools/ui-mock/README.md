@@ -19,6 +19,16 @@ After 11G, the near-term product priority is a standalone trusted tester preview
 - `../../docs/standalone_product_definition_of_done.md`
 - `../../docs/standalone_roadmap_to_trusted_tester.md`
 
+## 12B.1 Standalone Control Center Shell
+
+12B.1 adds the first UI step toward a No-CMD Workflow: a standalone **Control Center** tab inside the existing local UI mock.
+
+- Control Center shows preview readiness, P0 trusted tester readiness, data/source freshness, review/report status, and research-only safety boundaries.
+- It does not run data refresh, report generation, deployment, access setup, tunnels, browser commands, provider calls, or source activation.
+- Trusted tester preview is still not ready until later 12C-12E work closes access, feedback, and private deployment.
+- AI KINTEL remains deferred to a later integration stage after standalone trusted tester feedback.
+- 12B.1 adds no dependencies, secrets, `.env`, backend production code, source adapters, provider calls, scanner scoring changes, `final_label` changes, or `WATCHLIST` meaning changes.
+
 ## 11A AI KINTEL Production MVP Planning
 
 11A defines the production direction as an AI KINTEL Crypto Market module, not a standalone SaaS. This UI mock remains a local RC baseline for porting and is not the production implementation.
@@ -110,6 +120,7 @@ These artifacts close the AI KINTEL planning package without deploying staging, 
 ## Features
 - **Dark, professional UI**: Aligned with the AIKINTEL aesthetic.
 - **Scanner Radar**: Product-grade candidate list and detail workspace showing scanner labels, local review status, security labels, market metrics, and read-only scanner reasons.
+- **Control Center**: Standalone preview status hub for product readiness, source freshness, review flow, reports, research-only boundaries, and trusted tester preparation.
 - **Market Context Panel**: Shows Alternative.me Fear & Greed plus DefiLlama context from the local API bridge.
 - **Candidate Detail Panel**: In-depth breakdown of a selected token, including research context/data coverage, a trader checklist, and risk reasons.
 - **Local Review Session**: Local analyst workspace for per-candidate review status, analyst note, and last-updated timestamp.
@@ -633,9 +644,11 @@ Diagnostics are available at `GET /api/scanner/sources`. This endpoint reports w
 This remains read-only and local. It does not add a database, auth, OpenAI, live token fetching, scanner logic changes, UI redesign, or trading signal behavior. Next stage: automate writing a real `tools/data-poc` run and verify the UI against API mode.
 
 ## Next Steps
-- Connect this UI to the persistable JSON outputs from `tools/data-poc` or a real backend API.
-- Replace mock data with live combined scanner data.
-- Integrate real OpenAI calls for the Research Review tab.
+- 12B.2: add Control Center actions / operator workflow without exposing CMD to the tester.
+- 12C: shape Trusted Tester Preview Mode.
+- 12D: add Reports Library + Feedback Loop.
+- 12E: prepare Lightweight Private Preview Deployment.
+- Keep AI KINTEL and real AI/provider integrations deferred until after standalone preview feedback and owner review.
 
 ## UI Data Adapter
 

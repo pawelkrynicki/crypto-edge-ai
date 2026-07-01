@@ -8,6 +8,7 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { mapPersistableScannerOutputToUiCandidates } from "../src/adapters/scannerOutputAdapter";
 import { CandidateDetail, getMissingSecurityText } from "../src/components/CandidateDetail";
+import { ControlCenter } from "../src/components/ControlCenter";
 import { LocalMvpWorkflowPanel } from "../src/components/LocalMvpWorkflowPanel";
 import { MarketContextPanel } from "../src/components/MarketContextPanel";
 import { ScannerRadar } from "../src/components/ScannerRadar";
@@ -258,6 +259,7 @@ assert.match(
 
 const workspaceNavItems = [
   { id: "overview",    label: "Overview",        icon: "OV", description: "Status and health" },
+  { id: "control-center", label: "Control Center", icon: "CC", description: "Preview readiness" },
   { id: "scanner",     label: "Scanner Radar",   icon: "SR", description: "Read-only scanner output" },
   { id: "watchlist",   label: "Review Queue",    icon: "RQ", description: "Local analyst queue" },
   { id: "research",    label: "Research Review", icon: "RR", description: "Mock categorization" },
@@ -285,6 +287,7 @@ const workspaceShellMarkup = renderToStaticMarkup(React.createElement(WorkspaceS
 
 assert.match(workspaceShellMarkup, /Local MVP Overview/, "workspace shell renders overview section");
 assert.match(workspaceShellMarkup, /Overview/, "workspace shell renders overview navigation");
+assert.match(workspaceShellMarkup, /Control Center/, "workspace shell renders control center navigation");
 assert.match(workspaceShellMarkup, /Scanner Radar/, "workspace shell renders scanner radar navigation");
 assert.match(workspaceShellMarkup, /Review Queue/, "workspace shell renders review queue navigation");
 assert.match(workspaceShellMarkup, /Research Review/, "workspace shell renders research review navigation");
@@ -294,6 +297,65 @@ assert.match(
   workspaceShellMarkup,
   /This is not a buy\/sell signal\./,
   "workspace shell renders compliance footer",
+);
+
+const controlCenterMarkup = renderToStaticMarkup(React.createElement(ControlCenter, {
+  candidateCount: uiCandidates.length,
+  resolvedScannerSource: "fixture-fallback",
+  scannerSourceText: "Scanner source: fixture-fallback",
+  scannerFallbackReason: "no valid real scanner output found",
+  scannerGeneratedAt: realFixture.scan_run.finished_at,
+  scannerMode: realFixture.scan_run.mode,
+  contextSourceText: "Context source: fixture-fallback",
+  contextSourceDetail: "Context API returned the local fixture fallback.",
+  marketContextState: {
+    status: "ready",
+    context: parsedContextFixture,
+    message: interpretedContextFixture.fallbackReason,
+  },
+  reviewStorageStatus: {
+    tone: "fallback",
+    text: "Review storage: browser fallback",
+    detail: "Local API unavailable in test render.",
+  },
+}));
+
+assert.match(controlCenterMarkup, /Control Center/, "control center renders title");
+assert.match(
+  controlCenterMarkup,
+  /Research-only\. WATCHLIST means manual review only\./,
+  "control center renders research-only WATCHLIST boundary",
+);
+assert.match(controlCenterMarkup, /Trusted Tester Readiness/, "control center renders readiness section");
+assert.match(controlCenterMarkup, /Private access \/ simple launch/, "control center renders private access P0");
+assert.match(controlCenterMarkup, /No-CMD tester path/, "control center renders no-CMD tester P0");
+assert.match(controlCenterMarkup, /Candidate list\/detail/, "control center renders candidate list/detail P0");
+assert.match(controlCenterMarkup, /Data freshness visible/, "control center renders data freshness P0");
+assert.match(controlCenterMarkup, /Source status visible/, "control center renders source status P0");
+assert.match(controlCenterMarkup, /Review semantics clear/, "control center renders review semantics P0");
+assert.match(controlCenterMarkup, /Report preview accessible/, "control center renders report preview P0");
+assert.match(controlCenterMarkup, /Feedback path/, "control center renders feedback path P0");
+assert.match(controlCenterMarkup, /No paid source activation/, "control center renders paid source P0");
+assert.match(controlCenterMarkup, /Not ready/, "control center does not claim tester preview is ready");
+assert.match(controlCenterMarkup, /Data &amp; Source Freshness/, "control center renders data freshness status");
+assert.match(controlCenterMarkup, /fixture-fallback/, "control center renders fixture fallback state");
+assert.match(controlCenterMarkup, /Review &amp; Reports/, "control center renders review and reports section");
+assert.match(controlCenterMarkup, /Review is separate from scanner label/, "control center renders review separation");
+assert.match(controlCenterMarkup, /Safety &amp; Compliance/, "control center renders safety section");
+assert.match(controlCenterMarkup, /No investment advice\./, "control center renders investment advice boundary");
+assert.match(controlCenterMarkup, /Missing data = manual verification required\./, "control center renders missing data boundary");
+assert.match(controlCenterMarkup, /12B\.2 - Control Center actions \/ operator workflow/, "control center renders next 12B.2 step");
+assert.match(
+  controlCenterMarkup,
+  /AI KINTEL remains a later integration stage, not the next standalone implementation target\./,
+  "control center keeps AI KINTEL out of nearest implementation target",
+);
+
+const forbiddenActionPattern = /<(button|a)\b[^>]*>[\s\S]*?\b(?:buy|sell|entry|signal|recommendation)\b[\s\S]*?<\/\1>/i;
+assert.doesNotMatch(
+  controlCenterMarkup,
+  forbiddenActionPattern,
+  "control center does not render forbidden trading words as actions",
 );
 
 const workspaceOverviewMarkup = renderToStaticMarkup(React.createElement(WorkspaceOverview, {
