@@ -53,6 +53,19 @@ Stage 11D adds documentation-only cron fetcher skeleton artifacts for the future
 
 11D does not create `packages/cron`, runtime cron scripts, source adapters, provider calls, endpoints/backend/auth code, migrations, dependencies, UI/CSS changes, or local RC behavior changes. Future cron fetchers must follow the 11C source adapter contract, paid sources remain disabled/deferred, disabled sources must not call providers, and frontend access remains tRPC/backend-only.
 
+## 11E AI KINTEL tRPC Router Blueprint
+
+Stage 11E adds documentation-only tRPC router blueprint artifacts for the future AI KINTEL Crypto Market module:
+
+- `docs/ai_kintel_trpc_router_blueprint.md`
+- `docs/ai_kintel_trpc_procedure_contract.md`
+- `docs/ai_kintel_trpc_query_matrix.md`
+- `docs/ai_kintel_trpc_access_control_blueprint.md`
+- `docs/ai_kintel_trpc_error_status_model.md`
+- `docs/ai_kintel_trpc_router_pseudocode.md`
+
+11E does not create `packages/webapp`, `packages/webapp/server/routers/cryptoMarket.ts`, runtime tRPC procedures, endpoints/backend/auth code, migrations, dependencies, source adapters, provider calls, OpenAI calls, UI/CSS changes, or local RC behavior changes. Future `/crypto-market` frontend access remains tRPC-only through `trpc.cryptoMarket.*`; future queries read MySQL/MariaDB records populated by cron/source layer; paid sources remain disabled/deferred; no provider call is allowed in the frontend or read query path unless separately approved.
+
 ## Data Source Registry Enforcement v1
 
 The current technical control is the Data Source Registry Enforcement v1 gate.

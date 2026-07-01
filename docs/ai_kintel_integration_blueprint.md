@@ -6,11 +6,13 @@
 - Stage 11B adds reviewable database migration blueprint artifacts for future owner/DB review.
 - Stage 11C adds documentation-only source config, adapter, status/error, registry blueprint, and test-plan contracts.
 - Stage 11D adds documentation-only cron fetcher skeletons, type matrix, PM2 blueprint, runbook, and cron test plan.
+- Stage 11E adds documentation-only tRPC router blueprint, procedure contract, query matrix, access-control blueprint, error/status model, and router pseudocode.
 - This is a planning artifact for moving from local RC to AI KINTEL production MVP.
-- It does not implement production backend, production database, migrations, auth, UI, source adapters, cron jobs, endpoints, dependencies, or paid integrations.
+- It does not implement production backend, production database, migrations, auth, UI, source adapters, cron jobs, tRPC procedures, endpoints, dependencies, or paid integrations.
 - 11B does not execute a production migration; the real migration belongs to a future AI KINTEL repo integration stage.
 - 11C does not implement adapters, activate sources, add provider calls, add cron implementations, add endpoints, or change Local RC behavior.
 - 11D does not create `packages/cron`, runtime cron scripts, source adapters, provider calls, endpoints, or change Local RC behavior.
+- 11E does not create `packages/webapp`, `packages/webapp/server/routers/cryptoMarket.ts`, runtime tRPC procedures, backend code, endpoints, provider calls, or change Local RC behavior.
 
 11B database blueprint artifacts:
 
@@ -33,6 +35,15 @@
 - `docs/ai_kintel_pm2_cron_blueprint.md`
 - `docs/ai_kintel_cron_operational_runbook.md`
 - `docs/ai_kintel_cron_fetcher_test_plan.md`
+
+11E tRPC router blueprint artifacts:
+
+- `docs/ai_kintel_trpc_router_blueprint.md`
+- `docs/ai_kintel_trpc_procedure_contract.md`
+- `docs/ai_kintel_trpc_query_matrix.md`
+- `docs/ai_kintel_trpc_access_control_blueprint.md`
+- `docs/ai_kintel_trpc_error_status_model.md`
+- `docs/ai_kintel_trpc_router_pseudocode.md`
 
 ## Target Repo Structure
 
@@ -100,9 +111,12 @@ Primary integration target:
 - Keep paid sources disabled until explicitly enabled.
 - Future adapters must follow the 11C source adapter contract and run in backend/cron only.
 - Future cron fetchers must follow the 11C source adapter contract before any provider work.
+- Future tRPC queries must read DB records populated by cron/source layer.
+- Future frontend access remains tRPC-only through `trpc.cryptoMarket.*`.
 - No source should call a provider while disabled or deferred.
 - Disabled paid vendors must return disabled metadata and must not call providers.
 - Source run health/status should map to `crypto_source_runs`.
+- Read queries must not call external providers unless separately approved.
 
 ## Route And Module Shape
 

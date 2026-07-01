@@ -3,11 +3,22 @@
 ## Status
 
 - Stage: 11D - future AI KINTEL cron operational runbook.
+- Stage 11E adds documentation-only tRPC router/query blueprints for future readers of cron-populated DB records.
 - This is documentation only.
 - It does not create runtime cron scripts.
 - It does not create `packages/cron`.
 - It does not activate sources or call providers.
 - It does not change Local RC behavior.
+- It does not create `packages/webapp`, runtime tRPC procedures, backend code, endpoints, auth, UI, CSS, or dependencies.
+
+11E tRPC router blueprint artifacts:
+
+- `docs/ai_kintel_trpc_router_blueprint.md`
+- `docs/ai_kintel_trpc_procedure_contract.md`
+- `docs/ai_kintel_trpc_query_matrix.md`
+- `docs/ai_kintel_trpc_access_control_blueprint.md`
+- `docs/ai_kintel_trpc_error_status_model.md`
+- `docs/ai_kintel_trpc_router_pseudocode.md`
 
 ## Manual Run Checklist
 
@@ -23,6 +34,8 @@ Before a future owner-approved manual cron run:
 - Confirm UTC timestamps.
 - Confirm dedup uses hash or logical key.
 - Confirm frontend access remains backend/tRPC-only.
+- Confirm future tRPC queries read DB records populated by cron/source layer.
+- Confirm no provider calls are introduced in the frontend or read query path.
 
 ## Failure Handling
 
@@ -81,3 +94,5 @@ Future cron work is blocked if any of these occurs:
 - Compliance boundaries are missing.
 - Runtime policy is bypassed.
 - Source-run observability is unavailable for enabled source runs.
+- Future tRPC read path calls providers without separate approval.
+- Future tRPC output omits the research-only compliance block.

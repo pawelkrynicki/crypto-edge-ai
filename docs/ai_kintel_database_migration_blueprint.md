@@ -5,12 +5,14 @@
 - Stage: 11B - Database Migration Blueprint.
 - Stage 11C adds documentation-only source config, adapter, status/error, registry blueprint, and test-plan contracts for the future writers of these tables.
 - Stage 11D adds documentation-only cron fetcher skeletons for future writers of these tables.
+- Stage 11E adds documentation-only tRPC router/query blueprints for future readers of these tables.
 - This is a documentation blueprint only, not an executed migration.
 - The Local RC remains unchanged.
-- No endpoint, source adapter, backend, UI, CSS, auth, dependency, or production database implementation is added here.
+- No endpoint, tRPC procedure, source adapter, backend, UI, CSS, auth, dependency, or production database implementation is added here.
 - The SQL blueprint is review-only: `docs/ai_kintel_crypto_tables_blueprint.sql`.
 - 11C does not implement adapters, activate sources, add provider calls, add endpoints, or change Local RC behavior.
 - 11D does not create `packages/cron`, runtime cron scripts, source adapters, provider calls, endpoints, or change Local RC behavior.
+- 11E does not create `packages/webapp`, `packages/webapp/server/routers/cryptoMarket.ts`, runtime tRPC procedures, backend code, endpoints, provider calls, or change Local RC behavior.
 
 ## Scope
 
@@ -22,6 +24,7 @@ This document proposes a MySQL/MariaDB schema for the future AI KINTEL Crypto Ma
 - Data collection belongs in backend/cron jobs, not browser-side provider calls.
 - Paid vendors remain disabled/deferred until owner, policy, env, and vendor approvals are complete.
 - Future cron fetchers documented in 11D must follow the 11C source adapter contract, normalize records before insert, deduplicate by hash or logical key, and report to `crypto_source_runs`.
+- Future tRPC queries documented in 11E should read these DB records through `trpc.cryptoMarket.*`, with no direct frontend provider calls and no provider calls from the read query path unless separately approved.
 
 This blueprint is ready for owner and DB review before any future migration is created in the `aikintel-platform` repo.
 
@@ -99,3 +102,9 @@ This blueprint is ready for owner and DB review before any future migration is c
 - `docs/ai_kintel_pm2_cron_blueprint.md`
 - `docs/ai_kintel_cron_operational_runbook.md`
 - `docs/ai_kintel_cron_fetcher_test_plan.md`
+- `docs/ai_kintel_trpc_router_blueprint.md`
+- `docs/ai_kintel_trpc_procedure_contract.md`
+- `docs/ai_kintel_trpc_query_matrix.md`
+- `docs/ai_kintel_trpc_access_control_blueprint.md`
+- `docs/ai_kintel_trpc_error_status_model.md`
+- `docs/ai_kintel_trpc_router_pseudocode.md`
