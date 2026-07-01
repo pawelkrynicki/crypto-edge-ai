@@ -64,6 +64,19 @@ These artifacts do not create `packages/cron`, runtime cron scripts, source adap
 
 These artifacts do not create `packages/webapp`, `packages/webapp/server/routers/cryptoMarket.ts`, runtime tRPC procedures, endpoints/backend/auth, migrations, npm dependencies, source adapters, provider calls, OpenAI calls, UI/CSS changes, scanner scoring changes, `final_label` changes, or `WATCHLIST` meaning changes. Future `/crypto-market` frontend access remains tRPC-only through `trpc.cryptoMarket.*`; future queries read DB records populated by cron/source layer; paid sources remain disabled/deferred; no provider call is allowed in the frontend or read query path unless separately approved.
 
+## 11F AI KINTEL Frontend Port Plan
+
+11F adds documentation-only frontend port planning artifacts for the future AI KINTEL Crypto Market module:
+
+- `../../docs/ai_kintel_frontend_port_plan.md`
+- `../../docs/ai_kintel_frontend_component_map.md`
+- `../../docs/ai_kintel_frontend_data_contract.md`
+- `../../docs/ai_kintel_frontend_state_model.md`
+- `../../docs/ai_kintel_frontend_compliance_copy_guide.md`
+- `../../docs/ai_kintel_frontend_port_checklist.md`
+
+These artifacts do not create `packages/webapp`, `CryptoMarket.tsx`, route `/crypto-market`, sidebar navigation, React components, Tailwind/shadcn runtime code, endpoints/backend/auth, runtime tRPC procedures, migrations, npm dependencies, source adapters, provider calls, OpenAI calls, UI/CSS changes, scanner scoring changes, `final_label` changes, or `WATCHLIST` meaning changes. Future frontend access remains tRPC-only through `trpc.cryptoMarket.*`; future UI reads DB-backed tRPC responses populated by cron/source layer; paid sources remain disabled/deferred; no provider call is allowed in the browser.
+
 ## Features
 - **Dark, professional UI**: Aligned with the AIKINTEL aesthetic.
 - **Scanner Radar**: Product-grade candidate list and detail workspace showing scanner labels, local review status, security labels, market metrics, and read-only scanner reasons.

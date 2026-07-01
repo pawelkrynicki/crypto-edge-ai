@@ -7,12 +7,14 @@
 - Stage 11C adds documentation-only source config, adapter, status/error, registry blueprint, and test-plan contracts.
 - Stage 11D adds documentation-only cron fetcher skeletons, type matrix, PM2 blueprint, runbook, and cron test plan.
 - Stage 11E adds documentation-only tRPC router blueprint, procedure contract, query matrix, access-control blueprint, error/status model, and router pseudocode.
+- Stage 11F adds documentation-only frontend port plan, component map, data contract, state model, compliance copy guide, and port checklist.
 - This is a planning artifact for moving from local RC to AI KINTEL production MVP.
 - It does not implement production backend, production database, migrations, auth, UI, source adapters, cron jobs, tRPC procedures, endpoints, dependencies, or paid integrations.
 - 11B does not execute a production migration; the real migration belongs to a future AI KINTEL repo integration stage.
 - 11C does not implement adapters, activate sources, add provider calls, add cron implementations, add endpoints, or change Local RC behavior.
 - 11D does not create `packages/cron`, runtime cron scripts, source adapters, provider calls, endpoints, or change Local RC behavior.
 - 11E does not create `packages/webapp`, `packages/webapp/server/routers/cryptoMarket.ts`, runtime tRPC procedures, backend code, endpoints, provider calls, or change Local RC behavior.
+- 11F does not create `packages/webapp`, `CryptoMarket.tsx`, route `/crypto-market`, sidebar navigation, React components, Tailwind/shadcn runtime code, backend code, endpoints, runtime tRPC procedures, provider calls, or change Local RC behavior.
 
 11B database blueprint artifacts:
 
@@ -45,6 +47,15 @@
 - `docs/ai_kintel_trpc_error_status_model.md`
 - `docs/ai_kintel_trpc_router_pseudocode.md`
 
+11F frontend port planning artifacts:
+
+- `docs/ai_kintel_frontend_port_plan.md`
+- `docs/ai_kintel_frontend_component_map.md`
+- `docs/ai_kintel_frontend_data_contract.md`
+- `docs/ai_kintel_frontend_state_model.md`
+- `docs/ai_kintel_frontend_compliance_copy_guide.md`
+- `docs/ai_kintel_frontend_port_checklist.md`
+
 ## Target Repo Structure
 
 ```text
@@ -67,6 +78,7 @@ Primary integration target:
 
 - `packages/webapp/server/routers/cryptoMarket.ts`
 - `packages/webapp/client/src/pages/CryptoMarket.tsx`
+- `packages/webapp/client/src/pages/CryptoMarketComponents/` if the future AI KINTEL frontend convention supports page-local components.
 - `packages/cron/scripts/fetch-crypto-*.ts`
 - `packages/cron/ecosystem.crypto.config.cjs`
 - Migration file for `crypto_*` tables.
@@ -79,7 +91,7 @@ Primary integration target:
 - 11C Source Config / Adapter Contract: review-only contract artifacts in this repo; no adapter implementation.
 - 11D Cron Fetcher Skeletons: review-only cron blueprint artifacts in this repo; no `packages/cron` or runtime scripts.
 - 11E tRPC Router Blueprint.
-- 11F AI KINTEL Frontend Port Plan.
+- 11F AI KINTEL Frontend Port Plan: review-only frontend mapping artifacts in this repo; no `packages/webapp`, route, sidebar, React components, UI/CSS, or runtime code.
 - 11G Staging/Deployment Checklist.
 
 ## Mapping Local RC To AI KINTEL
@@ -113,6 +125,7 @@ Primary integration target:
 - Future cron fetchers must follow the 11C source adapter contract before any provider work.
 - Future tRPC queries must read DB records populated by cron/source layer.
 - Future frontend access remains tRPC-only through `trpc.cryptoMarket.*`.
+- Future frontend UI reads DB-backed tRPC responses and must not call providers in the browser.
 - No source should call a provider while disabled or deferred.
 - Disabled paid vendors must return disabled metadata and must not call providers.
 - Source run health/status should map to `crypto_source_runs`.
@@ -125,6 +138,7 @@ Primary integration target:
 - Frontend page: `packages/webapp/client/src/pages/CryptoMarket.tsx`.
 - Backend router: `packages/webapp/server/routers/cryptoMarket.ts`.
 - Sidebar navigation should add a Crypto Market entry during the frontend port phase.
+- 11F documents the future route/page/sidebar plan only; it does not implement the route, page, or sidebar.
 
 ## Production MVP Flow
 

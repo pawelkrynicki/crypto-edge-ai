@@ -66,6 +66,19 @@ Stage 11E adds documentation-only tRPC router blueprint artifacts for the future
 
 11E does not create `packages/webapp`, `packages/webapp/server/routers/cryptoMarket.ts`, runtime tRPC procedures, endpoints/backend/auth code, migrations, dependencies, source adapters, provider calls, OpenAI calls, UI/CSS changes, or local RC behavior changes. Future `/crypto-market` frontend access remains tRPC-only through `trpc.cryptoMarket.*`; future queries read MySQL/MariaDB records populated by cron/source layer; paid sources remain disabled/deferred; no provider call is allowed in the frontend or read query path unless separately approved.
 
+## 11F AI KINTEL Frontend Port Plan
+
+Stage 11F adds documentation-only frontend port planning artifacts for the future AI KINTEL Crypto Market module:
+
+- `docs/ai_kintel_frontend_port_plan.md`
+- `docs/ai_kintel_frontend_component_map.md`
+- `docs/ai_kintel_frontend_data_contract.md`
+- `docs/ai_kintel_frontend_state_model.md`
+- `docs/ai_kintel_frontend_compliance_copy_guide.md`
+- `docs/ai_kintel_frontend_port_checklist.md`
+
+11F does not create `packages/webapp`, `CryptoMarket.tsx`, route `/crypto-market`, sidebar navigation, React components, Tailwind/shadcn runtime code, endpoints/backend/auth code, runtime tRPC procedures, migrations, dependencies, source adapters, provider calls, OpenAI calls, UI/CSS changes, or local RC behavior changes. Future frontend access remains tRPC-only through `trpc.cryptoMarket.*`; future UI reads DB-backed tRPC responses populated by cron/source layer; paid sources remain disabled/deferred; no provider call is allowed in the browser.
+
 ## Data Source Registry Enforcement v1
 
 The current technical control is the Data Source Registry Enforcement v1 gate.

@@ -3,9 +3,17 @@
 ## Status
 
 - Stage: 11E - tRPC procedure contract.
+- Stage 11F adds documentation-only frontend data-contract and state-model references for future consumers of this procedure contract.
 - This is documentation only.
 - It does not create runtime tRPC procedures.
 - It does not add backend code, endpoints, SQL query code, auth, migrations, UI, CSS, source adapters, provider calls, OpenAI calls, or dependencies.
+
+11F frontend planning references:
+
+- `docs/ai_kintel_frontend_data_contract.md`
+- `docs/ai_kintel_frontend_state_model.md`
+- `docs/ai_kintel_frontend_compliance_copy_guide.md`
+- `docs/ai_kintel_frontend_port_checklist.md`
 
 ## Input Contract Examples
 
@@ -116,3 +124,4 @@ Any wording related to automated decisions, trading instructions, or investment 
 - Frontend must not call external providers directly.
 - Read queries must not call external providers unless a separate owner-approved architecture decision explicitly allows it.
 - Paid sources remain disabled/deferred until explicit activation approval.
+- 11F does not implement frontend code, runtime tRPC procedures, endpoints, provider calls, route `/crypto-market`, sidebar navigation, or `CryptoMarket.tsx`.

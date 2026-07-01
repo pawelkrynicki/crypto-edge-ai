@@ -7,6 +7,7 @@
 - Stage 11C adds documentation-only source config, adapter, status/error, registry blueprint, and test-plan contracts.
 - Stage 11D adds documentation-only cron fetcher skeletons, type matrix, PM2 blueprint, runbook, and cron test plan.
 - Stage 11E adds documentation-only tRPC router blueprint, procedure contract, query matrix, access-control blueprint, error/status model, and router pseudocode.
+- Stage 11F adds documentation-only frontend port plan, component map, data contract, state model, compliance copy guide, and port checklist.
 - Planning date: 2026-06-29.
 - This is a documentation and decision artifact only.
 - No source adapter, endpoint, tRPC procedure, auth layer, production backend, production database, migration, runtime cron script, UI change, or paid API call is implemented here.
@@ -14,6 +15,7 @@
 - 11C does not implement adapters, activate sources, add cron code, add endpoints, or change Local RC behavior.
 - 11D does not create `packages/cron`, runtime cron scripts, source adapters, provider calls, endpoints, or change Local RC behavior.
 - 11E does not create `packages/webapp`, `packages/webapp/server/routers/cryptoMarket.ts`, runtime tRPC procedures, backend code, endpoints, provider calls, or change Local RC behavior.
+- 11F does not create `packages/webapp`, `CryptoMarket.tsx`, route `/crypto-market`, sidebar navigation, React components, Tailwind/shadcn runtime code, backend code, endpoints, runtime tRPC procedures, provider calls, or change Local RC behavior.
 
 11B database blueprint artifacts:
 
@@ -46,6 +48,15 @@
 - `docs/ai_kintel_trpc_error_status_model.md`
 - `docs/ai_kintel_trpc_router_pseudocode.md`
 
+11F frontend port planning artifacts:
+
+- `docs/ai_kintel_frontend_port_plan.md`
+- `docs/ai_kintel_frontend_component_map.md`
+- `docs/ai_kintel_frontend_data_contract.md`
+- `docs/ai_kintel_frontend_state_model.md`
+- `docs/ai_kintel_frontend_compliance_copy_guide.md`
+- `docs/ai_kintel_frontend_port_checklist.md`
+
 ## Architecture Decisions
 
 | Decision Area | Selected Direction | Rejected / Deferred Direction | Reason |
@@ -55,7 +66,7 @@
 | Database | AI KINTEL MySQL/MariaDB | PostgreSQL or local-only storage | AI KINTEL production uses MySQL/MariaDB. |
 | Data collection | AI KINTEL cron scripts plus PM2 | Frontend fetches or local helper scripts | External calls must run in backend/cron only. |
 | tRPC read path | DB-backed `cryptoMarket` queries | Provider calls from frontend or query path | Future frontend should call `trpc.cryptoMarket.*`; query data should come from DB rows populated by cron. |
-| Frontend | AI KINTEL webapp route `/crypto-market` | Separate webapp | Keeps module navigation and access control inside AI KINTEL. |
+| Frontend | AI KINTEL webapp route `/crypto-market`, planned by 11F | Separate webapp or browser provider calls | Keeps module navigation and access control inside AI KINTEL; future frontend remains tRPC-only and DB-backed. |
 | Local JSON/SQLite | Dev/local only | Production persistence | Local storage remains a porting baseline, not production storage. |
 | Deployment | AI KINTEL VPS/PM2 flow | Separate deployment stack | Reduces operational split and matches current AI KINTEL deployment. |
 | Access | AI KINTEL auth/subscription gate | Separate account system | Final access must align with AI KINTEL subscriptions. |
@@ -111,6 +122,7 @@
 - The module must remain research-only.
 - Frontend uses tRPC/backend only and must not call external data providers directly.
 - Future `/crypto-market` reads should use `trpc.cryptoMarket.*` and preserve the research-only compliance block.
+- 11F defines future UI copy, component mapping, and state handling without creating route `/crypto-market`, sidebar navigation, `CryptoMarket.tsx`, or runtime frontend code.
 
 ## Open Decisions
 
