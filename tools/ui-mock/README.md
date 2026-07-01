@@ -2,6 +2,23 @@
 
 This directory contains the first UI mock / frontend preview for the **Crypto Edge AI Camp BETA**. 
 
+## 12A Standalone Trusted Tester Strategy Correction
+
+After 11G, the near-term product priority is a standalone trusted tester preview, not immediate AI KINTEL implementation.
+
+- AI KINTEL implementation is deferred to a later final integration stage after standalone preview feedback.
+- 11A-11G remain the AI KINTEL compatibility/planning package for later integration.
+- Local MVP RC remains the technical baseline, but it is not yet an external preview that Pawel Gradziuk can open without developer support.
+- The trusted tester path must work without repository access, Codex, GitHub, CMD, local scripts, `.env`, API keys, or AI KINTEL access.
+- 12A is documentation/analysis only. It changes no runtime, UI, CSS, backend, frontend, deployment, provider calls, source adapters, source activation, scanner scoring, `final_label`, or `WATCHLIST` meaning.
+
+12A documents:
+
+- `../../docs/standalone_product_gap_audit.md`
+- `../../docs/trusted_tester_preview_path.md`
+- `../../docs/standalone_product_definition_of_done.md`
+- `../../docs/standalone_roadmap_to_trusted_tester.md`
+
 ## 11A AI KINTEL Production MVP Planning
 
 11A defines the production direction as an AI KINTEL Crypto Market module, not a standalone SaaS. This UI mock remains a local RC baseline for porting and is not the production implementation.

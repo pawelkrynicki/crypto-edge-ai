@@ -1,5 +1,33 @@
 # Roadmap
 
+## Stage 12A: Standalone Product Gap Audit + Trusted Tester Path
+
+Strategic correction after 11G:
+
+- AI KINTEL implementation is deferred to a final integration stage after standalone trusted tester feedback.
+- 11A-11G remain the AI KINTEL compatibility/planning package for later, not the immediate implementation target.
+- The nearest priority is a standalone trusted tester preview that can be shown without repository access, Codex, GitHub, or CMD.
+- Target trusted tester for the private preview: Pawel Gradziuk.
+- Local MVP RC remains the technical baseline, but it is not yet an external standalone preview.
+- 12A is documentation/analysis only and changes no runtime, UI, CSS, backend, frontend, deployment, provider calls, source adapters, source activation, scanner scoring, `final_label`, or `WATCHLIST` meaning.
+
+12A artifacts:
+
+- `docs/standalone_product_gap_audit.md`.
+- `docs/trusted_tester_preview_path.md`.
+- `docs/standalone_product_definition_of_done.md`.
+- `docs/standalone_roadmap_to_trusted_tester.md`.
+
+Proposed standalone path:
+
+- 12B - Standalone Control Center / No-CMD Workflow.
+- 12C - Trusted Tester Preview Mode.
+- 12D - Reports Library + Feedback Loop.
+- 12E - Lightweight Private Preview Deployment.
+- 12F - Pawel Gradziuk Test Session / Feedback Fixes.
+- 13A - AI KINTEL Owner Review Packet.
+- 13B+ - AI KINTEL integration after standalone preview feedback.
+
 ## Stage 11G: AI KINTEL Staging / Deployment Checklist
 
 Close the documentation package for AI KINTEL production planning before real implementation starts in the AI KINTEL repo.
