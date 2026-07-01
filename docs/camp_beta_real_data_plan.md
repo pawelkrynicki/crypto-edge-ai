@@ -79,6 +79,19 @@ Stage 11F adds documentation-only frontend port planning artifacts for the futur
 
 11F does not create `packages/webapp`, `CryptoMarket.tsx`, route `/crypto-market`, sidebar navigation, React components, Tailwind/shadcn runtime code, endpoints/backend/auth code, runtime tRPC procedures, migrations, dependencies, source adapters, provider calls, OpenAI calls, UI/CSS changes, or local RC behavior changes. Future frontend access remains tRPC-only through `trpc.cryptoMarket.*`; future UI reads DB-backed tRPC responses populated by cron/source layer; paid sources remain disabled/deferred; no provider call is allowed in the browser.
 
+## 11G AI KINTEL Staging / Deployment Checklist
+
+Stage 11G adds documentation-only staging/deployment planning artifacts for the future AI KINTEL Crypto Market module:
+
+- `docs/ai_kintel_staging_deployment_checklist.md`
+- `docs/ai_kintel_env_placeholder_matrix.md`
+- `docs/ai_kintel_release_readiness_matrix.md`
+- `docs/ai_kintel_rollout_rollback_plan.md`
+- `docs/ai_kintel_monitoring_observability_plan.md`
+- `docs/ai_kintel_implementation_entry_checklist.md`
+
+11G closes the AI KINTEL planning package without deploying staging, creating runtime code, creating `packages/webapp`, creating `packages/cron`, adding migrations, adding endpoint/backend/auth/tRPC/frontend code, adding source adapters, adding provider calls, adding env values/secrets, changing UI/CSS, or changing local RC behavior. Next work after 11G should be real implementation in `aikintel-platform` only after owner/DB/source/compliance review. Paid sources remain disabled/deferred.
+
 ## Data Source Registry Enforcement v1
 
 The current technical control is the Data Source Registry Enforcement v1 gate.

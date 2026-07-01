@@ -1,5 +1,27 @@
 # Roadmap
 
+## Stage 11G: AI KINTEL Staging / Deployment Checklist
+
+Close the documentation package for AI KINTEL production planning before real implementation starts in the AI KINTEL repo.
+
+Current direction:
+
+- 11G is documentation/checklist work only.
+- No staging environment, deployment, `packages/webapp`, `packages/cron`, `CryptoMarket.tsx`, route `/crypto-market`, sidebar navigation, runtime tRPC router, endpoint, backend code, frontend code, runtime cron script, PM2 `.cjs` config, production migration, auth implementation, source adapter, provider call, OpenAI call, npm dependency, `.env` file, secret value, scanner scoring change, `final_label` change, or `WATCHLIST` behavior change is added.
+- 11G closes the AI KINTEL planning package across DB, cron, tRPC, frontend, env, monitoring, rollout, rollback, and entry criteria.
+- Next work after 11G should be real implementation in `aikintel-platform` only after owner/DB/source/compliance review.
+- Paid sources remain disabled/deferred.
+- Local RC behavior remains unchanged.
+
+Current artifacts:
+
+- `docs/ai_kintel_staging_deployment_checklist.md`.
+- `docs/ai_kintel_env_placeholder_matrix.md`.
+- `docs/ai_kintel_release_readiness_matrix.md`.
+- `docs/ai_kintel_rollout_rollback_plan.md`.
+- `docs/ai_kintel_monitoring_observability_plan.md`.
+- `docs/ai_kintel_implementation_entry_checklist.md`.
+
 ## Stage 11F: AI KINTEL Frontend Port Plan
 
 Prepare documentation-only frontend port planning for the future AI KINTEL Crypto Market module.

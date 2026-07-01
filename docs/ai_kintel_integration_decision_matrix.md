@@ -8,6 +8,7 @@
 - Stage 11D adds documentation-only cron fetcher skeletons, type matrix, PM2 blueprint, runbook, and cron test plan.
 - Stage 11E adds documentation-only tRPC router blueprint, procedure contract, query matrix, access-control blueprint, error/status model, and router pseudocode.
 - Stage 11F adds documentation-only frontend port plan, component map, data contract, state model, compliance copy guide, and port checklist.
+- Stage 11G adds documentation-only staging/deployment checklist, env placeholder matrix, release readiness matrix, rollout/rollback plan, monitoring plan, and implementation entry checklist.
 - Planning date: 2026-06-29.
 - This is a documentation and decision artifact only.
 - No source adapter, endpoint, tRPC procedure, auth layer, production backend, production database, migration, runtime cron script, UI change, or paid API call is implemented here.
@@ -16,6 +17,7 @@
 - 11D does not create `packages/cron`, runtime cron scripts, source adapters, provider calls, endpoints, or change Local RC behavior.
 - 11E does not create `packages/webapp`, `packages/webapp/server/routers/cryptoMarket.ts`, runtime tRPC procedures, backend code, endpoints, provider calls, or change Local RC behavior.
 - 11F does not create `packages/webapp`, `CryptoMarket.tsx`, route `/crypto-market`, sidebar navigation, React components, Tailwind/shadcn runtime code, backend code, endpoints, runtime tRPC procedures, provider calls, or change Local RC behavior.
+- 11G does not deploy staging, create `packages/webapp`, create `packages/cron`, create runtime code, add migrations, add endpoint/backend/tRPC/frontend code, add PM2 `.cjs` config, activate sources, add provider calls, add env values/secrets, or change Local RC behavior.
 
 11B database blueprint artifacts:
 
@@ -56,6 +58,15 @@
 - `docs/ai_kintel_frontend_state_model.md`
 - `docs/ai_kintel_frontend_compliance_copy_guide.md`
 - `docs/ai_kintel_frontend_port_checklist.md`
+
+11G staging/deployment planning artifacts:
+
+- `docs/ai_kintel_staging_deployment_checklist.md`
+- `docs/ai_kintel_env_placeholder_matrix.md`
+- `docs/ai_kintel_release_readiness_matrix.md`
+- `docs/ai_kintel_rollout_rollback_plan.md`
+- `docs/ai_kintel_monitoring_observability_plan.md`
+- `docs/ai_kintel_implementation_entry_checklist.md`
 
 ## Architecture Decisions
 
@@ -123,6 +134,7 @@
 - Frontend uses tRPC/backend only and must not call external data providers directly.
 - Future `/crypto-market` reads should use `trpc.cryptoMarket.*` and preserve the research-only compliance block.
 - 11F defines future UI copy, component mapping, and state handling without creating route `/crypto-market`, sidebar navigation, `CryptoMarket.tsx`, or runtime frontend code.
+- 11G defines staging/deployment readiness without deploying staging or adding runtime code. Real implementation should begin in `aikintel-platform` only after owner/DB/source/compliance review.
 
 ## Open Decisions
 
@@ -133,3 +145,4 @@
 - Retention policy for old scanner outputs.
 - Whether export/report is generated backend-side in MVP or post-MVP.
 - Final table names and ownership boundaries for review queue data.
+- Staging go/no-go owners and rollback ownership before real deployment.

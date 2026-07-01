@@ -8,6 +8,7 @@
 - Stage 11D adds documentation-only cron fetcher skeletons, type matrix, PM2 blueprint, runbook, and cron test plan.
 - Stage 11E adds documentation-only tRPC router blueprint, procedure contract, query matrix, access-control blueprint, error/status model, and router pseudocode.
 - Stage 11F adds documentation-only frontend port plan, component map, data contract, state model, compliance copy guide, and port checklist.
+- Stage 11G adds documentation-only staging/deployment checklist, env placeholder matrix, release readiness matrix, rollout/rollback plan, monitoring plan, and implementation entry checklist.
 - This is a planning artifact for moving from local RC to AI KINTEL production MVP.
 - It does not implement production backend, production database, migrations, auth, UI, source adapters, cron jobs, tRPC procedures, endpoints, dependencies, or paid integrations.
 - 11B does not execute a production migration; the real migration belongs to a future AI KINTEL repo integration stage.
@@ -15,6 +16,7 @@
 - 11D does not create `packages/cron`, runtime cron scripts, source adapters, provider calls, endpoints, or change Local RC behavior.
 - 11E does not create `packages/webapp`, `packages/webapp/server/routers/cryptoMarket.ts`, runtime tRPC procedures, backend code, endpoints, provider calls, or change Local RC behavior.
 - 11F does not create `packages/webapp`, `CryptoMarket.tsx`, route `/crypto-market`, sidebar navigation, React components, Tailwind/shadcn runtime code, backend code, endpoints, runtime tRPC procedures, provider calls, or change Local RC behavior.
+- 11G does not deploy staging, create `packages/webapp`, create `packages/cron`, create runtime code, add migrations, add endpoint/backend/tRPC/frontend code, add PM2 `.cjs` config, activate sources, add provider calls, add env values/secrets, or change Local RC behavior.
 
 11B database blueprint artifacts:
 
@@ -56,6 +58,15 @@
 - `docs/ai_kintel_frontend_compliance_copy_guide.md`
 - `docs/ai_kintel_frontend_port_checklist.md`
 
+11G staging/deployment planning artifacts:
+
+- `docs/ai_kintel_staging_deployment_checklist.md`
+- `docs/ai_kintel_env_placeholder_matrix.md`
+- `docs/ai_kintel_release_readiness_matrix.md`
+- `docs/ai_kintel_rollout_rollback_plan.md`
+- `docs/ai_kintel_monitoring_observability_plan.md`
+- `docs/ai_kintel_implementation_entry_checklist.md`
+
 ## Target Repo Structure
 
 ```text
@@ -92,7 +103,8 @@ Primary integration target:
 - 11D Cron Fetcher Skeletons: review-only cron blueprint artifacts in this repo; no `packages/cron` or runtime scripts.
 - 11E tRPC Router Blueprint.
 - 11F AI KINTEL Frontend Port Plan: review-only frontend mapping artifacts in this repo; no `packages/webapp`, route, sidebar, React components, UI/CSS, or runtime code.
-- 11G Staging/Deployment Checklist.
+- 11G Staging/Deployment Checklist: review-only staging, env, release, rollout, rollback, monitoring, and implementation-entry artifacts; no staging deploy or runtime code.
+- Future real implementation in `aikintel-platform` after owner/DB/source/compliance review.
 
 ## Mapping Local RC To AI KINTEL
 
@@ -165,3 +177,4 @@ The production MVP should preserve the local RC boundary:
 - PM2 deployment config.
 - Paid vendor activation.
 - AI narrative analysis.
+- Staging deployment and production rollout until 11G checklist items are accepted by owners.

@@ -6,6 +6,7 @@
 - Stage 11C adds documentation-only source config, adapter, status/error, registry blueprint, and test-plan contracts for the future writers of these tables.
 - Stage 11D adds documentation-only cron fetcher skeletons for future writers of these tables.
 - Stage 11E adds documentation-only tRPC router/query blueprints for future readers of these tables.
+- Stage 11G adds documentation-only staging/deployment, release readiness, rollout/rollback, monitoring, and implementation-entry checklists for future owner review.
 - This is a documentation blueprint only, not an executed migration.
 - The Local RC remains unchanged.
 - No endpoint, tRPC procedure, source adapter, backend, UI, CSS, auth, dependency, or production database implementation is added here.
@@ -13,6 +14,7 @@
 - 11C does not implement adapters, activate sources, add provider calls, add endpoints, or change Local RC behavior.
 - 11D does not create `packages/cron`, runtime cron scripts, source adapters, provider calls, endpoints, or change Local RC behavior.
 - 11E does not create `packages/webapp`, `packages/webapp/server/routers/cryptoMarket.ts`, runtime tRPC procedures, backend code, endpoints, provider calls, or change Local RC behavior.
+- 11G does not deploy staging, create runtime code, create `packages/webapp`, create `packages/cron`, add migrations, add env values/secrets, or change Local RC behavior.
 
 ## Scope
 
@@ -27,6 +29,8 @@ This document proposes a MySQL/MariaDB schema for the future AI KINTEL Crypto Ma
 - Future tRPC queries documented in 11E should read these DB records through `trpc.cryptoMarket.*`, with no direct frontend provider calls and no provider calls from the read query path unless separately approved.
 
 This blueprint is ready for owner and DB review before any future migration is created in the `aikintel-platform` repo.
+
+11G closes the documentation package for staging/deployment readiness. The real AI KINTEL migration should still be created only after owner/DB review in `aikintel-platform`.
 
 ## Proposed Tables
 
@@ -108,3 +112,9 @@ This blueprint is ready for owner and DB review before any future migration is c
 - `docs/ai_kintel_trpc_access_control_blueprint.md`
 - `docs/ai_kintel_trpc_error_status_model.md`
 - `docs/ai_kintel_trpc_router_pseudocode.md`
+- `docs/ai_kintel_staging_deployment_checklist.md`
+- `docs/ai_kintel_env_placeholder_matrix.md`
+- `docs/ai_kintel_release_readiness_matrix.md`
+- `docs/ai_kintel_rollout_rollback_plan.md`
+- `docs/ai_kintel_monitoring_observability_plan.md`
+- `docs/ai_kintel_implementation_entry_checklist.md`

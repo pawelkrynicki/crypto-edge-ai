@@ -6,6 +6,7 @@
 - Stage 11B adds database blueprint references for source-run observability.
 - Stage 11C adds documentation-only source config, adapter, status/error, registry blueprint, and test-plan contracts.
 - Stage 11D adds documentation-only cron fetcher skeletons, type matrix, PM2 blueprint, runbook, and cron test plan.
+- Stage 11G adds documentation-only env placeholder, staging/deployment, release readiness, rollout/rollback, monitoring, and implementation-entry checklists.
 - Paid sources are deferred.
 - The production environment must be paid-source-ready.
 - No paid source is called until explicitly enabled.
@@ -13,6 +14,7 @@
 - 11B does not execute a migration; the real migration belongs to a future AI KINTEL repo integration stage.
 - 11C does not implement adapters, activate paid vendors, add provider calls, add endpoints, or change Local RC behavior.
 - 11D does not create `packages/cron`, runtime cron scripts, source adapters, provider calls, endpoints, or change Local RC behavior.
+- 11G does not activate sources, add provider calls, add env values/secrets, create runtime code, deploy staging, or change Local RC behavior.
 
 11B database blueprint artifacts:
 
@@ -35,6 +37,15 @@
 - `docs/ai_kintel_pm2_cron_blueprint.md`
 - `docs/ai_kintel_cron_operational_runbook.md`
 - `docs/ai_kintel_cron_fetcher_test_plan.md`
+
+11G staging/deployment planning artifacts:
+
+- `docs/ai_kintel_staging_deployment_checklist.md`
+- `docs/ai_kintel_env_placeholder_matrix.md`
+- `docs/ai_kintel_release_readiness_matrix.md`
+- `docs/ai_kintel_rollout_rollback_plan.md`
+- `docs/ai_kintel_monitoring_observability_plan.md`
+- `docs/ai_kintel_implementation_entry_checklist.md`
 
 ## Required Pattern For Every Paid Source
 
@@ -129,3 +140,4 @@ When a paid source is enabled:
 - No silent paid API calls.
 - No frontend direct calls to paid providers.
 - No paid-source activation without explicit env, config, and policy changes.
+- No paid-source activation during 11G; paid sources remain disabled/deferred until future owner/source/compliance approval.

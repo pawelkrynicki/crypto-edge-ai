@@ -5,6 +5,10 @@
 - Stage: 11A - AI KINTEL Production MVP Definition.
 - Stage 11B adds a reviewable database migration blueprint for future owner/DB review.
 - Stage 11C adds documentation-only source config, adapter, status/error, registry blueprint, and test-plan contracts.
+- Stage 11D adds documentation-only cron fetcher skeletons, PM2 blueprint, runbook, and cron test plan.
+- Stage 11E adds documentation-only tRPC router/query/access-control blueprints.
+- Stage 11F adds documentation-only frontend port planning.
+- Stage 11G adds documentation-only staging/deployment checklist, env placeholder matrix, release readiness matrix, rollout/rollback plan, monitoring plan, and implementation entry checklist.
 - Planning date: 2026-06-29.
 - The Local MVP Release Candidate is ready as a local RC baseline.
 - Production MVP is not the final product.
@@ -12,6 +16,7 @@
 - This document is a definition and decision artifact only. It does not implement production code, new sources, paid API calls, auth, migrations, or endpoints.
 - 11B does not execute a production migration and does not change Local RC behavior.
 - 11C does not implement adapters, activate sources, add endpoints, add cron implementations, or change Local RC behavior.
+- 11G does not deploy staging, create runtime code, create `packages/webapp`, create `packages/cron`, create migrations, add endpoints/backend/tRPC/frontend code, activate sources, add provider calls, add env values/secrets, or change Local RC behavior.
 
 11B database blueprint artifacts:
 
@@ -27,12 +32,22 @@
 - `docs/ai_kintel_source_registry_blueprint.json`
 - `docs/ai_kintel_source_adapter_test_plan.md`
 
+11G staging/deployment planning artifacts:
+
+- `docs/ai_kintel_staging_deployment_checklist.md`
+- `docs/ai_kintel_env_placeholder_matrix.md`
+- `docs/ai_kintel_release_readiness_matrix.md`
+- `docs/ai_kintel_rollout_rollback_plan.md`
+- `docs/ai_kintel_monitoring_observability_plan.md`
+- `docs/ai_kintel_implementation_entry_checklist.md`
+
 11C contract implications:
 
 - Future source adapters must run backend/cron only.
 - Disabled paid vendors must not call providers.
 - Paid sources remain disabled/deferred until explicit env/config/policy activation.
 - Frontend remains tRPC/backend-only.
+- After 11G, real implementation should start in `aikintel-platform` only after owner/DB/source/compliance review.
 
 ## Product Positioning
 
