@@ -77,6 +77,19 @@ These artifacts do not create `packages/webapp`, `packages/webapp/server/routers
 
 These artifacts do not create `packages/webapp`, `CryptoMarket.tsx`, route `/crypto-market`, sidebar navigation, React components, Tailwind/shadcn runtime code, endpoints/backend/auth, runtime tRPC procedures, migrations, npm dependencies, source adapters, provider calls, OpenAI calls, UI/CSS changes, scanner scoring changes, `final_label` changes, or `WATCHLIST` meaning changes. Future frontend access remains tRPC-only through `trpc.cryptoMarket.*`; future UI reads DB-backed tRPC responses populated by cron/source layer; paid sources remain disabled/deferred; no provider call is allowed in the browser.
 
+## 11G AI KINTEL Staging / Deployment Checklist
+
+11G adds documentation-only staging/deployment planning artifacts for the future AI KINTEL Crypto Market module:
+
+- `../../docs/ai_kintel_staging_deployment_checklist.md`
+- `../../docs/ai_kintel_env_placeholder_matrix.md`
+- `../../docs/ai_kintel_release_readiness_matrix.md`
+- `../../docs/ai_kintel_rollout_rollback_plan.md`
+- `../../docs/ai_kintel_monitoring_observability_plan.md`
+- `../../docs/ai_kintel_implementation_entry_checklist.md`
+
+These artifacts close the AI KINTEL planning package without deploying staging, creating `packages/webapp`, creating `packages/cron`, creating runtime code, adding migrations, adding endpoint/backend/auth/tRPC/frontend code, adding PM2 `.cjs` config, adding source adapters, adding provider calls, adding env values/secrets, activating sources, changing UI/CSS, changing scanner scoring, changing `final_label`, or changing `WATCHLIST` meaning. Next work after 11G should be real implementation in `aikintel-platform` only after owner/DB/source/compliance review. Paid sources remain disabled/deferred and the local RC remains unchanged.
+
 ## Features
 - **Dark, professional UI**: Aligned with the AIKINTEL aesthetic.
 - **Scanner Radar**: Product-grade candidate list and detail workspace showing scanner labels, local review status, security labels, market metrics, and read-only scanner reasons.

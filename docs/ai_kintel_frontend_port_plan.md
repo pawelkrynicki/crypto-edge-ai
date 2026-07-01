@@ -3,12 +3,14 @@
 ## Status
 
 - Stage: 11F - AI KINTEL Frontend Port Plan.
+- Stage 11G adds documentation-only staging/deployment readiness, env, rollout/rollback, monitoring, and implementation-entry guidance.
 - This is a documentation-only porting plan, not a frontend implementation.
 - It does not create `CryptoMarket.tsx`.
 - It does not create `packages/webapp`.
 - It does not add route registration or sidebar navigation.
 - It does not add React components, Tailwind/shadcn runtime code, backend code, endpoints, runtime tRPC procedures, source adapters, provider calls, OpenAI calls, dependencies, or source activation.
 - It does not change the Local MVP Release Candidate.
+- It does not deploy staging, add env values/secrets, create runtime code, or activate sources.
 
 11F frontend planning artifacts:
 
@@ -18,6 +20,15 @@
 - `docs/ai_kintel_frontend_state_model.md`
 - `docs/ai_kintel_frontend_compliance_copy_guide.md`
 - `docs/ai_kintel_frontend_port_checklist.md`
+
+11G staging/deployment planning references:
+
+- `docs/ai_kintel_staging_deployment_checklist.md`
+- `docs/ai_kintel_env_placeholder_matrix.md`
+- `docs/ai_kintel_release_readiness_matrix.md`
+- `docs/ai_kintel_rollout_rollback_plan.md`
+- `docs/ai_kintel_monitoring_observability_plan.md`
+- `docs/ai_kintel_implementation_entry_checklist.md`
 
 ## Target AI KINTEL Frontend Location
 
@@ -38,6 +49,8 @@ Future API:
 - `trpc.cryptoMarket.*`
 
 The future frontend should only call the AI KINTEL backend/tRPC layer. It must not call external providers directly from the browser.
+
+After 11G, the future frontend implementation should begin in `aikintel-platform` only after owner review and staging/deployment readiness are accepted.
 
 ## Product UI Goals
 

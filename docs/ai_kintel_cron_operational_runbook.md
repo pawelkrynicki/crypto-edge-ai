@@ -4,12 +4,14 @@
 
 - Stage: 11D - future AI KINTEL cron operational runbook.
 - Stage 11E adds documentation-only tRPC router/query blueprints for future readers of cron-populated DB records.
+- Stage 11G adds documentation-only staging/deployment, rollout/rollback, monitoring, and implementation-entry checklists.
 - This is documentation only.
 - It does not create runtime cron scripts.
 - It does not create `packages/cron`.
 - It does not activate sources or call providers.
 - It does not change Local RC behavior.
 - It does not create `packages/webapp`, runtime tRPC procedures, backend code, endpoints, auth, UI, CSS, or dependencies.
+- It does not deploy staging, add env values/secrets, activate sources, or change Local RC behavior.
 
 11E tRPC router blueprint artifacts:
 
@@ -19,6 +21,15 @@
 - `docs/ai_kintel_trpc_access_control_blueprint.md`
 - `docs/ai_kintel_trpc_error_status_model.md`
 - `docs/ai_kintel_trpc_router_pseudocode.md`
+
+11G staging/deployment planning artifacts:
+
+- `docs/ai_kintel_staging_deployment_checklist.md`
+- `docs/ai_kintel_env_placeholder_matrix.md`
+- `docs/ai_kintel_release_readiness_matrix.md`
+- `docs/ai_kintel_rollout_rollback_plan.md`
+- `docs/ai_kintel_monitoring_observability_plan.md`
+- `docs/ai_kintel_implementation_entry_checklist.md`
 
 ## Manual Run Checklist
 
@@ -36,6 +47,7 @@ Before a future owner-approved manual cron run:
 - Confirm frontend access remains backend/tRPC-only.
 - Confirm future tRPC queries read DB records populated by cron/source layer.
 - Confirm no provider calls are introduced in the frontend or read query path.
+- Confirm 11G staging/deployment go/no-go and rollback ownership are accepted before real staging work.
 
 ## Failure Handling
 

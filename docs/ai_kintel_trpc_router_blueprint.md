@@ -4,11 +4,13 @@
 
 - Stage: 11E - AI KINTEL tRPC Router Blueprint.
 - Stage 11F adds documentation-only frontend port planning that consumes this future router contract.
+- Stage 11G adds documentation-only staging/deployment readiness, rollout/rollback, monitoring, and implementation-entry guidance.
 - This is a documentation-only blueprint, not an implementation.
 - It does not create a router.
 - It does not add endpoints.
 - It does not change the Local MVP Release Candidate.
 - It does not add backend code, auth, migrations, source adapters, provider calls, OpenAI calls, dependencies, UI, or CSS.
+- It does not deploy staging, add env values/secrets, activate sources, or create runtime code.
 
 11E tRPC blueprint artifacts:
 
@@ -28,6 +30,15 @@
 - `docs/ai_kintel_frontend_compliance_copy_guide.md`
 - `docs/ai_kintel_frontend_port_checklist.md`
 
+11G staging/deployment planning references:
+
+- `docs/ai_kintel_staging_deployment_checklist.md`
+- `docs/ai_kintel_env_placeholder_matrix.md`
+- `docs/ai_kintel_release_readiness_matrix.md`
+- `docs/ai_kintel_rollout_rollback_plan.md`
+- `docs/ai_kintel_monitoring_observability_plan.md`
+- `docs/ai_kintel_implementation_entry_checklist.md`
+
 ## Target AI KINTEL Location
 
 Future AI KINTEL target path:
@@ -45,6 +56,8 @@ Future frontend access pattern:
 The future `/crypto-market` frontend must not call external providers directly. External data should be collected by backend/cron, normalized into MySQL/MariaDB tables, and read through tRPC.
 
 11F documents the future frontend route/page/component plan only. It does not create `packages/webapp`, `CryptoMarket.tsx`, route `/crypto-market`, sidebar navigation, runtime tRPC procedures, endpoints, backend code, provider calls, or UI/CSS changes.
+
+11G documents staging/deployment readiness only. It does not deploy staging or create the router; real implementation should begin in `aikintel-platform` only after owner/DB/source/compliance review.
 
 ## Router Goals
 

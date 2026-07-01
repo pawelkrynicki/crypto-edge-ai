@@ -9,6 +9,7 @@
 - Stage 11D adds AI KINTEL cron fetcher skeleton documents; it does not change local RC behavior.
 - Stage 11E adds AI KINTEL tRPC router blueprint documents; it does not change local RC behavior.
 - Stage 11F adds AI KINTEL frontend port planning documents; it does not change local RC behavior.
+- Stage 11G adds AI KINTEL staging/deployment checklist documents; it does not change local RC behavior.
 - The local MVP is RC-ready after `scripts\win\check-local-rc.cmd` passes.
 - UX2 local MVP UI pass was completed in 10B.4.
 - 10C stabilizes the local RC and does not add new product features.
@@ -64,6 +65,15 @@
 - `docs/ai_kintel_frontend_compliance_copy_guide.md`
 - `docs/ai_kintel_frontend_port_checklist.md`
 
+11G staging/deployment checklist documents:
+
+- `docs/ai_kintel_staging_deployment_checklist.md`
+- `docs/ai_kintel_env_placeholder_matrix.md`
+- `docs/ai_kintel_release_readiness_matrix.md`
+- `docs/ai_kintel_rollout_rollback_plan.md`
+- `docs/ai_kintel_monitoring_observability_plan.md`
+- `docs/ai_kintel_implementation_entry_checklist.md`
+
 11B is review-only documentation. It does not execute a migration, add a production database, add source adapters, add backend/auth/endpoints, change UI/CSS, change scanner scoring, change `final_label`, or change `WATCHLIST` meaning. Paid sources remain disabled/deferred, and the real migration belongs to a future AI KINTEL repo integration stage.
 
 11C is review-only source contract documentation. It does not implement adapters, activate sources, add provider calls, add endpoint/backend/auth code, add cron implementations, change UI/CSS, change scanner scoring, change `final_label`, or change `WATCHLIST` meaning. Paid sources remain disabled/deferred, future adapters must run backend/cron only, disabled paid vendors must not call providers, and frontend access remains tRPC/backend-only.
@@ -73,6 +83,8 @@
 11E is review-only tRPC router blueprint documentation. It does not create `packages/webapp`, `packages/webapp/server/routers/cryptoMarket.ts`, runtime tRPC procedures, endpoint/backend/auth code, dependencies, migrations, source adapters, provider calls, OpenAI calls, UI/CSS changes, scanner scoring changes, `final_label` changes, or `WATCHLIST` meaning changes. Future frontend access remains tRPC-only through `trpc.cryptoMarket.*`, future queries read DB records populated by cron/source layer, and paid sources remain disabled/deferred.
 
 11F is review-only frontend port planning documentation. It does not create `packages/webapp`, `CryptoMarket.tsx`, route `/crypto-market`, sidebar navigation, React components, Tailwind/shadcn runtime code, endpoint/backend/auth code, runtime tRPC procedures, dependencies, migrations, source adapters, provider calls, OpenAI calls, UI/CSS changes, scanner scoring changes, `final_label` changes, or `WATCHLIST` meaning changes. Future frontend access remains tRPC-only through `trpc.cryptoMarket.*`, future UI reads DB-backed tRPC responses populated by cron/source layer, paid sources remain disabled/deferred, and no provider call is allowed in the browser.
+
+11G is review-only staging/deployment checklist documentation. It does not deploy staging, create `packages/webapp`, create `packages/cron`, create runtime code, add migrations, add endpoint/backend/auth/tRPC/frontend code, add PM2 `.cjs` config, add source adapters, add provider calls, activate sources, add env values/secrets, add dependencies, change UI/CSS, change scanner scoring, change `final_label`, or change `WATCHLIST` meaning. It closes the AI KINTEL planning package; next work should be real implementation in `aikintel-platform` only after owner/DB/source/compliance review. Paid sources remain disabled/deferred.
 
 ## Included In Local MVP
 
