@@ -2,7 +2,7 @@
 
 ## Status
 
-- Stage 12B.1.
+- Stage 12B.2.
 - Roadmap after strategic correction.
 - AI KINTEL is moved to the final integration stage after standalone preview feedback.
 
@@ -19,6 +19,7 @@
 | Stage | Dates | Focus |
 |---|---|---|
 | 12A | Before vacation | Standalone Product Gap Audit + Trusted Tester Path. |
+| 12B.2 | Before vacation | Webinar Teaser Screenshot Mode. |
 | 12B | 2026-07-26 to 2026-08-02 | Standalone Control Center / No-CMD Workflow. |
 | 12C | 2026-08-03 to 2026-08-09 | Trusted Tester Preview Mode. |
 | 12D | 2026-08-10 to 2026-08-16 | Reports Library + Feedback Loop. |
@@ -109,6 +110,32 @@ Acceptance criteria:
 - Trusted tester preview remains `Not ready` because access, feedback, and deployment are not complete.
 - AI KINTEL remains a later integration stage, not the next implementation target.
 - Scanner scoring, `final_label`, review semantics, and `WATCHLIST` meaning remain unchanged.
+
+### 12B.2 - Webinar Teaser Screenshot Mode
+
+Goal:
+
+- Add a demo-safe `Webinar Teaser` tab for controlled screenshots before the 2026-07-13 webinar.
+
+Deliverables:
+
+- `Webinar Teaser` tab in the existing standalone UI mock.
+- 4-6 screenshot-ready sections: Radar Overview, Project Research Snapshot, Source Confidence Layer, Research Report Preview, Review Flow, and Product Teaser / Closing Screen.
+- Controlled demo data and neutral copy that shows the research-radar concept without exposing full methodology, weights, thresholds, full source/vendor lists, or internal roadmap.
+- Screenshot guide in `docs/webinar_teaser_screenshot_plan.md`.
+
+Not in scope:
+
+- Trusted tester preview replacement.
+- Production readiness.
+- Backend, deployment, access gate, source activation, provider calls, OpenAI calls, secrets, dependencies, scoring changes, `final_label` changes, or `WATCHLIST` meaning changes.
+- AI KINTEL implementation.
+
+Acceptance criteria:
+
+- The tab is useful for webinar screenshots and stays demo-safe.
+- The webinar screen avoids AI KINTEL, Pawel Gradziuk, P0/P1/P2, not-ready wording, GitHub/Codex/CMD, technical roadmap details, full source/vendor names, and trading action language.
+- AI KINTEL remains a later integration stage.
 
 ## 12C - Trusted Tester Preview Mode
 

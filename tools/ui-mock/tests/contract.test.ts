@@ -14,6 +14,7 @@ import { MarketContextPanel } from "../src/components/MarketContextPanel";
 import { ScannerRadar } from "../src/components/ScannerRadar";
 import { StatCards } from "../src/components/StatCards";
 import { WatchlistTab } from "../src/components/WatchlistTab";
+import { WebinarTeaser } from "../src/components/WebinarTeaser";
 import { WorkspaceOverview } from "../src/components/WorkspaceOverview";
 import { WorkspaceSection, WorkspaceShell, type WorkspaceNavItem } from "../src/components/WorkspaceShell";
 import { PERSISTABLE_SCANNER_SAMPLE } from "../src/fixtures/persistableScannerSample";
@@ -260,6 +261,7 @@ assert.match(
 const workspaceNavItems = [
   { id: "overview",    label: "Overview",        icon: "OV", description: "Status and health" },
   { id: "control-center", label: "Control Center", icon: "CC", description: "Preview readiness" },
+  { id: "webinar-teaser", label: "Webinar Teaser", icon: "WT", description: "Demo-safe screenshots" },
   { id: "scanner",     label: "Scanner Radar",   icon: "SR", description: "Read-only scanner output" },
   { id: "watchlist",   label: "Review Queue",    icon: "RQ", description: "Local analyst queue" },
   { id: "research",    label: "Research Review", icon: "RR", description: "Mock categorization" },
@@ -288,6 +290,7 @@ const workspaceShellMarkup = renderToStaticMarkup(React.createElement(WorkspaceS
 assert.match(workspaceShellMarkup, /Local MVP Overview/, "workspace shell renders overview section");
 assert.match(workspaceShellMarkup, /Overview/, "workspace shell renders overview navigation");
 assert.match(workspaceShellMarkup, /Control Center/, "workspace shell renders control center navigation");
+assert.match(workspaceShellMarkup, /Webinar Teaser/, "workspace shell renders webinar teaser navigation");
 assert.match(workspaceShellMarkup, /Scanner Radar/, "workspace shell renders scanner radar navigation");
 assert.match(workspaceShellMarkup, /Review Queue/, "workspace shell renders review queue navigation");
 assert.match(workspaceShellMarkup, /Research Review/, "workspace shell renders research review navigation");
@@ -298,6 +301,62 @@ assert.match(
   /This is not a buy\/sell signal\./,
   "workspace shell renders compliance footer",
 );
+
+const webinarTeaserMarkup = renderToStaticMarkup(React.createElement(WorkspaceShell, {
+  navItems: workspaceNavItems,
+  activeSection: "webinar-teaser",
+  onSectionChange: () => undefined,
+  dataSource: "fixture",
+  dataSourceOptions: [
+    { key: "fixture", label: "Fixture" },
+    { key: "static-json", label: "Static JSON" },
+    { key: "api", label: "API / latest" },
+  ],
+  onDataSourceChange: () => undefined,
+  loading: false,
+  sourceStatusText: "Scanner source: built-in fixture",
+  presentationMode: true,
+}, React.createElement(WorkspaceSection, {
+  title: "Webinar Teaser",
+  description: "Demo-safe screenshot mode for showing the product concept without exposing methodology, thresholds, source vendors or internal roadmap.",
+}, React.createElement(WebinarTeaser))));
+
+assert.match(webinarTeaserMarkup, /Webinar Teaser/, "webinar teaser renders in navigation");
+assert.match(webinarTeaserMarkup, /Crypto Research Radar/, "webinar teaser renders radar overview");
+assert.match(webinarTeaserMarkup, /Research snapshot/, "webinar teaser renders project snapshot");
+assert.match(webinarTeaserMarkup, /Source Confidence Layer/, "webinar teaser renders source confidence layer");
+assert.match(webinarTeaserMarkup, /Analyst research brief/, "webinar teaser renders report preview");
+assert.match(
+  webinarTeaserMarkup,
+  /WATCHLIST means manual review only/,
+  "webinar teaser renders WATCHLIST manual review boundary",
+);
+assert.match(webinarTeaserMarkup, /Research-only preview/, "webinar teaser renders research-only preview copy");
+
+const forbiddenWebinarTerms = [
+  /\bAI KINTEL\b/i,
+  /Pawe[lł] Gr[aą]dziuk/i,
+  /\bP0\b/i,
+  /\bP1\b/i,
+  /\bP2\b/i,
+  /\bnot ready\b/i,
+  /\bnot-ready\b/i,
+  /\bbranch\b/i,
+  /\bcommit\b/i,
+  /\bscript\b/i,
+  /\bCMD\b/i,
+  /\bGitHub\b/i,
+  /\bCodex\b/i,
+  /\bbuy\b/i,
+  /\bsell\b/i,
+  /\bentry\b/i,
+  /\bsignal\b/i,
+  /\brecommendation\b/i,
+];
+
+for (const pattern of forbiddenWebinarTerms) {
+  assert.doesNotMatch(webinarTeaserMarkup, pattern, `webinar teaser does not render forbidden term ${pattern}`);
+}
 
 const controlCenterMarkup = renderToStaticMarkup(React.createElement(ControlCenter, {
   candidateCount: uiCandidates.length,
