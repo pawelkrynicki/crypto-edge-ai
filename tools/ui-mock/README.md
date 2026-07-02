@@ -29,6 +29,19 @@ After 11G, the near-term product priority is a standalone trusted tester preview
 - AI KINTEL remains deferred to a later integration stage after standalone trusted tester feedback.
 - 12B.1 adds no dependencies, secrets, `.env`, backend production code, source adapters, provider calls, scanner scoring changes, `final_label` changes, or `WATCHLIST` meaning changes.
 
+## 12B.2 Webinar Teaser Screenshot Mode
+
+12B.2 adds a standalone **Webinar Teaser** tab for controlled webinar screenshots before the 2026-07-13 presentation.
+
+- Webinar Teaser is demo-safe UI content only for screenshots. It shows a research radar overview, project snapshot, source confidence layer, report preview, review flow, and closing product teaser.
+- It does not replace trusted tester preview, does not mean production readiness, and does not add backend, deployment, source activation, provider calls, OpenAI calls, secrets, `.env`, npm dependencies, scanner scoring changes, `final_label` changes, or `WATCHLIST` meaning changes.
+- The tab uses controlled demo data and presentation-mode shell copy so screenshots avoid technical workflow details, internal roadmap details, P0/P1/P2, not-ready wording, GitHub/Codex/CMD, AI KINTEL, Pawel Gradziuk, source/vendor lists, and trading action language.
+- AI KINTEL remains deferred to a later integration stage after standalone trusted tester feedback.
+
+Screenshot guide:
+
+- `../../docs/webinar_teaser_screenshot_plan.md`
+
 ## 11A AI KINTEL Production MVP Planning
 
 11A defines the production direction as an AI KINTEL Crypto Market module, not a standalone SaaS. This UI mock remains a local RC baseline for porting and is not the production implementation.
@@ -121,6 +134,7 @@ These artifacts close the AI KINTEL planning package without deploying staging, 
 - **Dark, professional UI**: Aligned with the AIKINTEL aesthetic.
 - **Scanner Radar**: Product-grade candidate list and detail workspace showing scanner labels, local review status, security labels, market metrics, and read-only scanner reasons.
 - **Control Center**: Standalone preview status hub for product readiness, source freshness, review flow, reports, research-only boundaries, and trusted tester preparation.
+- **Webinar Teaser**: Demo-safe screenshot mode with controlled research-radar screens for webinar use.
 - **Market Context Panel**: Shows Alternative.me Fear & Greed plus DefiLlama context from the local API bridge.
 - **Candidate Detail Panel**: In-depth breakdown of a selected token, including research context/data coverage, a trader checklist, and risk reasons.
 - **Local Review Session**: Local analyst workspace for per-candidate review status, analyst note, and last-updated timestamp.
@@ -644,10 +658,10 @@ Diagnostics are available at `GET /api/scanner/sources`. This endpoint reports w
 This remains read-only and local. It does not add a database, auth, OpenAI, live token fetching, scanner logic changes, UI redesign, or trading signal behavior. Next stage: automate writing a real `tools/data-poc` run and verify the UI against API mode.
 
 ## Next Steps
-- 12B.2: add Control Center actions / operator workflow without exposing CMD to the tester.
 - 12C: shape Trusted Tester Preview Mode.
 - 12D: add Reports Library + Feedback Loop.
 - 12E: prepare Lightweight Private Preview Deployment.
+- Treat 12B.2 Webinar Teaser Screenshot Mode as screenshot-only UI, not as trusted tester preview readiness.
 - Keep AI KINTEL and real AI/provider integrations deferred until after standalone preview feedback and owner review.
 
 ## UI Data Adapter

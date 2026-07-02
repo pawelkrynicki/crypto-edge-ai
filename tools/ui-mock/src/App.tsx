@@ -9,6 +9,7 @@ import { MarketContextPanel, type MarketContextPanelState } from "./components/M
 import { LocalMvpWorkflowPanel } from "./components/LocalMvpWorkflowPanel";
 import { WorkspaceOverview } from "./components/WorkspaceOverview";
 import { ControlCenter } from "./components/ControlCenter";
+import { WebinarTeaser } from "./components/WebinarTeaser";
 import {
   WorkspaceSection,
   WorkspaceShell,
@@ -58,6 +59,7 @@ function buildSummary(candidates: MockCandidate[]) {
 const WORKSPACE_NAV_ITEMS: WorkspaceNavItem[] = [
   { id: "overview",    label: "Overview",        icon: "OV", description: "Status and health" },
   { id: "control-center", label: "Control Center", icon: "CC", description: "Preview readiness" },
+  { id: "webinar-teaser", label: "Webinar Teaser", icon: "WT", description: "Demo-safe screenshots" },
   { id: "scanner",     label: "Scanner Radar",   icon: "SR", description: "Read-only scanner output" },
   { id: "watchlist",   label: "Review Queue",    icon: "RQ", description: "Local analyst queue" },
   { id: "research",    label: "Research Review", icon: "RR", description: "Mock categorization" },
@@ -73,6 +75,10 @@ const SECTION_COPY: Record<WorkspaceSectionId, { title: string; description: str
   "control-center": {
     title: "Control Center",
     description: "Standalone preview readiness, source freshness, review flow, reports and tester preparation.",
+  },
+  "webinar-teaser": {
+    title: "Webinar Teaser",
+    description: "Demo-safe screenshot mode for showing the product concept without exposing methodology, thresholds, source vendors or internal roadmap.",
   },
   scanner: {
     title: "Scanner Radar",
@@ -335,6 +341,12 @@ export default function App() {
             />
           </WorkspaceSection>
         );
+      case "webinar-teaser":
+        return (
+          <WorkspaceSection {...SECTION_COPY["webinar-teaser"]}>
+            <WebinarTeaser />
+          </WorkspaceSection>
+        );
       case "scanner":
         return (
           <WorkspaceSection {...SECTION_COPY.scanner}>
@@ -395,6 +407,7 @@ export default function App() {
       loading={loading}
       sourceStatusText={sourceStatusText}
       fallbackMsg={fallbackMsg}
+      presentationMode={activeSection === "webinar-teaser"}
     >
       {renderSection()}
     </WorkspaceShell>
