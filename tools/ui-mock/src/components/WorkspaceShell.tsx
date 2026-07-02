@@ -5,6 +5,7 @@ export type WorkspaceSectionId =
   | "overview"
   | "control-center"
   | "trusted-preview"
+  | "feedback-notes"
   | "webinar-teaser"
   | "scanner"
   | "watchlist"

@@ -3,6 +3,7 @@
 ## Status
 
 - Local MVP Release Candidate Stabilization v1.
+- Stage 12C.2 adds a Feedback Prompt / Session Notes Shell for organizing post-session trusted tester feedback. It is UI shell only and does not save feedback.
 - Stage 12C.1 adds a Trusted Tester Preview Shell as the first non-technical click path for a trusted external reviewer. It is UI shell only and does not add access, deployment, or feedback persistence.
 - Stage 12B.3 adds a Webinar Screenshot Capture Kit for preparing 2026-07-13 webinar screenshots. It is a screenshot helper only, not a new product feature.
 - Stage 12B.2 adds a Webinar Teaser Screenshot Mode for controlled 2026-07-13 webinar screenshots. It is demo-safe UI only and does not replace trusted tester preview.
@@ -30,7 +31,8 @@
 - 12B.2 does not add backend, deployment, access gate, tunnel, provider calls, source adapters, source activation, secrets, `.env`, npm dependencies, scanner scoring changes, `final_label` changes, or `WATCHLIST` meaning changes.
 - 12B.3 does not add backend, deployment, access gate, tunnel, provider calls, source adapters, source activation, source check changes, fetch logic changes, secrets, `.env`, npm dependencies, scanner scoring changes, `final_label` changes, review semantics changes, or `WATCHLIST` meaning changes.
 - 12C.1 does not add backend, deployment, access gate, tunnel, feedback persistence, provider calls, source adapters, source activation, source check changes, fetch logic changes, secrets, `.env`, npm dependencies, scanner scoring changes, `final_label` changes, review semantics changes, or `WATCHLIST` meaning changes.
-- Trusted tester preview still needs private access, feedback capture, report library, and lightweight private deployment before a real external test.
+- 12C.2 does not add backend, deployment, access gate, tunnel, feedback persistence, feedback capture backend, provider calls, source adapters, source activation, source check changes, fetch logic changes, secrets, `.env`, npm dependencies, scanner scoring changes, `final_label` changes, review semantics changes, or `WATCHLIST` meaning changes.
+- Trusted tester preview still needs private access, persisted feedback capture, report library, and lightweight private deployment before a real external test.
 - AI KINTEL remains a later integration stage.
 
 12A standalone trusted tester documents:
@@ -112,6 +114,7 @@
 
 - Standalone Control Center shell for preview readiness/status visibility.
 - Trusted Tester Preview Shell for the first non-technical reviewer click path.
+- Feedback Notes shell for structuring trusted tester session notes without saving data.
 - Webinar Teaser Screenshot Mode for demo-safe webinar screenshots.
 - Webinar Screenshot Capture Kit for selecting webinar-safe screenshots.
 - Local scanner latest flow.
@@ -141,6 +144,7 @@
 - Webinar Teaser Screenshot Mode does not make the local RC production-ready.
 - Webinar Screenshot Capture Kit is not a product feature and does not change Local MVP RC behavior.
 - Trusted Tester Preview Shell does not replace access gate, deployment, report library, or feedback capture.
+- Feedback Notes shell does not replace persisted feedback capture, private access, deployment, or the real external tester session.
 - AI KINTEL production implementation.
 - Paid sources remain deferred but the production environment should be ready for later env/config/policy activation.
 - External trusted tester preview is still deferred until access, feedback, and private deployment are complete.

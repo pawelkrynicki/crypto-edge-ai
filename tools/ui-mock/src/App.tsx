@@ -10,6 +10,7 @@ import { LocalMvpWorkflowPanel } from "./components/LocalMvpWorkflowPanel";
 import { WorkspaceOverview } from "./components/WorkspaceOverview";
 import { ControlCenter } from "./components/ControlCenter";
 import { TrustedPreview } from "./components/TrustedPreview";
+import { FeedbackNotes } from "./components/FeedbackNotes";
 import { WebinarTeaser } from "./components/WebinarTeaser";
 import {
   WorkspaceSection,
@@ -61,6 +62,7 @@ const WORKSPACE_NAV_ITEMS: WorkspaceNavItem[] = [
   { id: "overview",    label: "Overview",        icon: "OV", description: "Status and health" },
   { id: "control-center", label: "Control Center", icon: "CC", description: "Preview readiness" },
   { id: "trusted-preview", label: "Trusted Preview", icon: "TP", description: "Guided reviewer path" },
+  { id: "feedback-notes", label: "Feedback Notes", icon: "FN", description: "Session notes worksheet" },
   { id: "webinar-teaser", label: "Webinar Teaser", icon: "WT", description: "Demo-safe screenshots" },
   { id: "scanner",     label: "Scanner Radar",   icon: "SR", description: "Read-only scanner output" },
   { id: "watchlist",   label: "Review Queue",    icon: "RQ", description: "Local analyst queue" },
@@ -81,6 +83,10 @@ const SECTION_COPY: Record<WorkspaceSectionId, { title: string; description: str
   "trusted-preview": {
     title: "Trusted Preview",
     description: "Guided standalone preview path for a trusted external reviewer.",
+  },
+  "feedback-notes": {
+    title: "Feedback Notes",
+    description: "Structured session notes for a trusted preview review.",
   },
   "webinar-teaser": {
     title: "Webinar Teaser",
@@ -353,6 +359,12 @@ export default function App() {
             <TrustedPreview />
           </WorkspaceSection>
         );
+      case "feedback-notes":
+        return (
+          <WorkspaceSection {...SECTION_COPY["feedback-notes"]}>
+            <FeedbackNotes />
+          </WorkspaceSection>
+        );
       case "webinar-teaser":
         return (
           <WorkspaceSection {...SECTION_COPY["webinar-teaser"]}>
@@ -420,7 +432,7 @@ export default function App() {
       sourceStatusText={sourceStatusText}
       fallbackMsg={fallbackMsg}
       presentationMode={activeSection === "webinar-teaser"}
-      trustedPreviewMode={activeSection === "trusted-preview"}
+      trustedPreviewMode={activeSection === "trusted-preview" || activeSection === "feedback-notes"}
     >
       {renderSection()}
     </WorkspaceShell>

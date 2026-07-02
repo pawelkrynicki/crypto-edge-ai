@@ -3,12 +3,15 @@
 ## Status
 
 - Stage 12C.1.
+- Stage 12C.2 adds a Feedback Notes shell for structured post-session notes.
 - Plan for a trusted tester preview path.
 - The UI now includes a `Trusted Preview` shell for the first non-technical click path.
+- The UI now includes a `Feedback Notes` shell for organizing feedback after the click path.
 - Target trusted tester: Pawel Gradziuk.
 - This is not a public beta.
 - This is not AI KINTEL implementation.
 - 12C.1 does not add deployment, access gate, or feedback persistence.
+- 12C.2 does not add deployment, access gate, backend capture, or feedback persistence.
 
 ## What Pawel Gradziuk Should Be Able To Do
 
@@ -95,6 +98,8 @@ Minimum viable feedback capture can be simple:
 
 The feedback path must not require the tester to understand repository structure, scripts, local storage, or implementation details.
 
+12C.2 adds only a product-facing `Feedback Notes` worksheet for owner-led session notes. It helps organize prompts, blockers, improvements, later ideas, and clarification needs, but it does not save data and does not replace a later feedback capture backend.
+
 ## 12C.1 Trusted Preview Shell
 
 - Adds a product-facing `Trusted Preview` tab in the existing UI mock.
@@ -107,3 +112,15 @@ The feedback path must not require the tester to understand repository structure
 Related document:
 
 - `docs/trusted_tester_preview_shell.md`
+
+## 12C.2 Feedback Prompt / Session Notes Shell
+
+- Adds a product-facing `Feedback Notes` tab after `Trusted Preview`.
+- Provides a static checklist, feedback prompts, triage buckets, and a notes template for the owner to use after a trusted preview review.
+- Does not save feedback, send data, add backend capture, add private access, add deployment, or replace later feedback capture work.
+- Keeps private access, report library, lightweight private preview deployment, persisted feedback capture, and the real external tester session as later steps.
+- Keeps AI KINTEL as a later integration stage after standalone preview feedback.
+
+Related document:
+
+- `docs/feedback_session_notes_shell.md`

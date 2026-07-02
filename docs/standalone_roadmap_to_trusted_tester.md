@@ -2,7 +2,7 @@
 
 ## Status
 
-- Stage 12C.1.
+- Stage 12C.2.
 - Roadmap after strategic correction.
 - AI KINTEL is moved to the final integration stage after standalone preview feedback.
 
@@ -22,6 +22,7 @@
 | 12B.2 | Before vacation | Webinar Teaser Screenshot Mode. |
 | 12B.3 | Before vacation | Webinar Screenshot Capture Kit. |
 | 12C.1 | Before vacation | Trusted Tester Preview Shell. |
+| 12C.2 | Before vacation | Feedback Prompt / Session Notes Shell. |
 | 12B | 2026-07-26 to 2026-08-02 | Standalone Control Center / No-CMD Workflow. |
 | 12C | 2026-08-03 to 2026-08-09 | Trusted Tester Preview Mode. |
 | 12D | 2026-08-10 to 2026-08-16 | Reports Library + Feedback Loop. |
@@ -221,6 +222,35 @@ Acceptance criteria:
 - The preview path does not require CMD, repository access, GitHub, Codex, local scripts, or developer explanation.
 - The UI does not present AI KINTEL as the next implementation target.
 - Private access, feedback capture, report library, and lightweight private preview deployment remain later steps.
+
+### 12C.2 - Feedback Prompt / Session Notes Shell
+
+Goal:
+
+- Add a lightweight, product-facing worksheet for organizing trusted tester feedback after the Trusted Preview path.
+
+Deliverables:
+
+- `Feedback Notes` tab in the existing standalone UI mock after `Trusted Preview`.
+- Static session checklist, feedback prompts, triage buckets, and notes template.
+- `docs/feedback_session_notes_shell.md`.
+
+Not in scope:
+
+- Backend.
+- Feedback persistence.
+- Data submission.
+- Deployment.
+- Access gate.
+- Source activation, provider calls, OpenAI calls, source adapters, secrets, dependencies, scoring changes, `final_label` changes, review semantics changes, or `WATCHLIST` meaning changes.
+- AI KINTEL implementation.
+
+Acceptance criteria:
+
+- Owner can organize feedback into blockers, improvements, later ideas, and clarification needs.
+- The UI makes clear that feedback is not saved and no data is sent from this view.
+- The worksheet does not replace later persisted feedback capture, private access, report library, lightweight private preview deployment, or the real external tester session.
+- AI KINTEL remains a later integration stage after standalone preview feedback.
 
 ## 12D - Reports Library + Feedback Loop
 

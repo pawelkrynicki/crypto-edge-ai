@@ -13,6 +13,7 @@ import { LocalMvpWorkflowPanel } from "../src/components/LocalMvpWorkflowPanel";
 import { MarketContextPanel } from "../src/components/MarketContextPanel";
 import { ScannerRadar } from "../src/components/ScannerRadar";
 import { StatCards } from "../src/components/StatCards";
+import { FeedbackNotes } from "../src/components/FeedbackNotes";
 import { TrustedPreview } from "../src/components/TrustedPreview";
 import { WatchlistTab } from "../src/components/WatchlistTab";
 import { WebinarTeaser } from "../src/components/WebinarTeaser";
@@ -263,6 +264,7 @@ const workspaceNavItems = [
   { id: "overview",    label: "Overview",        icon: "OV", description: "Status and health" },
   { id: "control-center", label: "Control Center", icon: "CC", description: "Preview readiness" },
   { id: "trusted-preview", label: "Trusted Preview", icon: "TP", description: "Guided reviewer path" },
+  { id: "feedback-notes", label: "Feedback Notes", icon: "FN", description: "Session notes worksheet" },
   { id: "webinar-teaser", label: "Webinar Teaser", icon: "WT", description: "Demo-safe screenshots" },
   { id: "scanner",     label: "Scanner Radar",   icon: "SR", description: "Read-only scanner output" },
   { id: "watchlist",   label: "Review Queue",    icon: "RQ", description: "Local analyst queue" },
@@ -293,6 +295,7 @@ assert.match(workspaceShellMarkup, /Local MVP Overview/, "workspace shell render
 assert.match(workspaceShellMarkup, /Overview/, "workspace shell renders overview navigation");
 assert.match(workspaceShellMarkup, /Control Center/, "workspace shell renders control center navigation");
 assert.match(workspaceShellMarkup, /Trusted Preview/, "workspace shell renders trusted preview navigation");
+assert.match(workspaceShellMarkup, /Feedback Notes/, "workspace shell renders feedback notes navigation");
 assert.match(workspaceShellMarkup, /Webinar Teaser/, "workspace shell renders webinar teaser navigation");
 assert.match(workspaceShellMarkup, /Scanner Radar/, "workspace shell renders scanner radar navigation");
 assert.match(workspaceShellMarkup, /Review Queue/, "workspace shell renders review queue navigation");
@@ -364,6 +367,73 @@ const forbiddenTrustedPreviewTerms = [
 
 for (const pattern of forbiddenTrustedPreviewTerms) {
   assert.doesNotMatch(trustedPreviewMarkup, pattern, `trusted preview does not render forbidden term ${pattern}`);
+}
+
+const feedbackNotesMarkup = renderToStaticMarkup(React.createElement(WorkspaceShell, {
+  navItems: workspaceNavItems,
+  activeSection: "feedback-notes",
+  onSectionChange: () => undefined,
+  dataSource: "fixture",
+  dataSourceOptions: [
+    { key: "fixture", label: "Fixture" },
+    { key: "static-json", label: "Static JSON" },
+    { key: "api", label: "API / latest" },
+  ],
+  onDataSourceChange: () => undefined,
+  loading: false,
+  sourceStatusText: "Scanner source: built-in fixture",
+  trustedPreviewMode: true,
+}, React.createElement(WorkspaceSection, {
+  title: "Feedback Notes",
+  description: "Structured session notes for a trusted preview review.",
+}, React.createElement(FeedbackNotes))));
+
+assert.match(feedbackNotesMarkup, /Feedback Notes/, "feedback notes renders title and navigation");
+assert.match(feedbackNotesMarkup, /Structured session notes/, "feedback notes renders structured session notes copy");
+assert.match(feedbackNotesMarkup, /Research-only/, "feedback notes renders research-only boundary");
+assert.match(feedbackNotesMarkup, /Session checklist/, "feedback notes renders session checklist");
+assert.match(feedbackNotesMarkup, /Feedback prompts/, "feedback notes renders feedback prompts");
+assert.match(feedbackNotesMarkup, /Triage buckets/, "feedback notes renders triage buckets");
+assert.match(feedbackNotesMarkup, /Blocker/, "feedback notes renders blocker bucket");
+assert.match(feedbackNotesMarkup, /Improvement/, "feedback notes renders improvement bucket");
+assert.match(feedbackNotesMarkup, /Later idea/, "feedback notes renders later idea bucket");
+assert.match(feedbackNotesMarkup, /Clarification needed/, "feedback notes renders clarification bucket");
+assert.match(feedbackNotesMarkup, /Session notes template/, "feedback notes renders notes template");
+assert.match(
+  feedbackNotesMarkup,
+  /This shell does not save feedback yet/,
+  "feedback notes renders no-save boundary",
+);
+assert.match(
+  feedbackNotesMarkup,
+  /No data is sent from this view/,
+  "feedback notes renders no-send boundary",
+);
+
+const forbiddenFeedbackNotesTerms = [
+  /\bAI KINTEL\b/i,
+  /Pawe(?:l|\u0142) Gr(?:a|\u0105)dziuk/i,
+  /\bP0\b/i,
+  /\bP1\b/i,
+  /\bP2\b/i,
+  /\bnot ready\b/i,
+  /\bnot-ready\b/i,
+  /\bGitHub\b/i,
+  /\bCodex\b/i,
+  /\bCMD\b/i,
+  /\bbranch\b/i,
+  /\bcommit\b/i,
+  /\bscripts?\b/i,
+  /\bendpoints?\b/i,
+  /\bbuy\b/i,
+  /\bsell\b/i,
+  /\bentry\b/i,
+  /\bsignal\b/i,
+  /\brecommendation\b/i,
+];
+
+for (const pattern of forbiddenFeedbackNotesTerms) {
+  assert.doesNotMatch(feedbackNotesMarkup, pattern, `feedback notes does not render forbidden term ${pattern}`);
 }
 
 const webinarTeaserMarkup = renderToStaticMarkup(React.createElement(WorkspaceShell, {
