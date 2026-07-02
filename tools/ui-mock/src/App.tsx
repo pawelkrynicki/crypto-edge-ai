@@ -8,6 +8,7 @@ import { Methodology } from "./components/Methodology";
 import { MarketContextPanel, type MarketContextPanelState } from "./components/MarketContextPanel";
 import { LocalMvpWorkflowPanel } from "./components/LocalMvpWorkflowPanel";
 import { WorkspaceOverview } from "./components/WorkspaceOverview";
+import { ControlCenter } from "./components/ControlCenter";
 import {
   WorkspaceSection,
   WorkspaceShell,
@@ -56,6 +57,7 @@ function buildSummary(candidates: MockCandidate[]) {
 
 const WORKSPACE_NAV_ITEMS: WorkspaceNavItem[] = [
   { id: "overview",    label: "Overview",        icon: "OV", description: "Status and health" },
+  { id: "control-center", label: "Control Center", icon: "CC", description: "Preview readiness" },
   { id: "scanner",     label: "Scanner Radar",   icon: "SR", description: "Read-only scanner output" },
   { id: "watchlist",   label: "Review Queue",    icon: "RQ", description: "Local analyst queue" },
   { id: "research",    label: "Research Review", icon: "RR", description: "Mock categorization" },
@@ -67,6 +69,10 @@ const SECTION_COPY: Record<WorkspaceSectionId, { title: string; description: str
   overview: {
     title: "Local MVP Overview",
     description: "Current local workflow status and health commands.",
+  },
+  "control-center": {
+    title: "Control Center",
+    description: "Standalone preview readiness, source freshness, review flow, reports and tester preparation.",
   },
   scanner: {
     title: "Scanner Radar",
@@ -124,6 +130,8 @@ export default function App() {
 
   const [dataSource, setDataSource] = useState<DataSourceKey>("fixture");
   const [resolvedSource, setResolvedSource] = useState<ResolvedScannerSource>("built-in-fixture");
+  const [scannerGeneratedAt, setScannerGeneratedAt] = useState<string | null>(null);
+  const [scannerMode, setScannerMode] = useState<string | null>(null);
   const [candidates, setCandidates] = useState<MockCandidate[]>([]);
   const [loading, setLoading] = useState(false);
   const [fallbackMsg, setFallbackMsg] = useState<string | null>(null);
@@ -147,12 +155,16 @@ export default function App() {
       const built = buildMockCandidates(result);
       setCandidates(built);
       setResolvedSource(result.resolvedSource);
+      setScannerGeneratedAt(result.output.scan_run.finished_at ?? result.output.scan_run.started_at ?? null);
+      setScannerMode(result.output.scan_run.mode ?? null);
       if (result.usedFallback && result.fallbackReason) {
         setFallbackMsg(result.fallbackReason);
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setResolvedSource("built-in-fixture");
+      setScannerGeneratedAt(null);
+      setScannerMode(null);
       setFallbackMsg(`Unexpected error: ${msg}`);
     } finally {
       setLoading(false);
@@ -303,6 +315,23 @@ export default function App() {
                   reviewStorageDetail={reviewStorageStatus.detail}
                 />
               )}
+            />
+          </WorkspaceSection>
+        );
+      case "control-center":
+        return (
+          <WorkspaceSection {...SECTION_COPY["control-center"]}>
+            <ControlCenter
+              candidateCount={candidates.length}
+              resolvedScannerSource={resolvedSource}
+              scannerSourceText={sourceStatusText}
+              scannerFallbackReason={fallbackMsg}
+              scannerGeneratedAt={scannerGeneratedAt}
+              scannerMode={scannerMode}
+              contextSourceText={contextSourceStatus.text}
+              contextSourceDetail={contextSourceStatus.detail}
+              marketContextState={marketContextState}
+              reviewStorageStatus={reviewStorageStatus}
             />
           </WorkspaceSection>
         );

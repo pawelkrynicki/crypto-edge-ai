@@ -3,6 +3,7 @@
 ## Status
 
 - Local MVP Release Candidate Stabilization v1.
+- Stage 12B.1 adds a standalone Control Center shell as the first UI step toward No-CMD Workflow. It shows preview readiness and status, but it does not run refresh actions or commands.
 - Stage 12A adds a standalone product gap audit and trusted tester preview path. It does not change local RC behavior.
 - Strategic correction after 11G: AI KINTEL implementation is deferred until after standalone trusted tester feedback.
 - The nearest product priority is a standalone private preview for Pawel Gradziuk, not AI KINTEL implementation.
@@ -22,6 +23,9 @@
 - Production direction can still end in AI KINTEL, but the immediate path is standalone trusted tester preview first.
 - The local RC remains the porting baseline, not the production implementation.
 - 12A changes no runtime, UI, CSS, backend, frontend, deployment, provider calls, source adapters, source activation, scanner scoring, `final_label`, or `WATCHLIST` meaning.
+- 12B.1 does not add deployment, access gate, tunnel, backend production code, provider calls, source adapters, source activation, secrets, `.env`, npm dependencies, scanner scoring changes, `final_label` changes, or `WATCHLIST` meaning changes.
+- Trusted tester preview is still not ready until 12C-12E close tester mode, feedback, access, and private deployment.
+- AI KINTEL remains a later integration stage.
 
 12A standalone trusted tester documents:
 
@@ -100,6 +104,7 @@
 
 ## Included In Local MVP
 
+- Standalone Control Center shell for preview readiness/status visibility.
 - Local scanner latest flow.
 - Approved market context.
 - Review Queue.
@@ -126,6 +131,7 @@
 - Investment recommendations or trading signals.
 - AI KINTEL production implementation.
 - Paid sources remain deferred but the production environment should be ready for later env/config/policy activation.
+- External trusted tester preview is still deferred until access, feedback, and private deployment are complete.
 
 ## RC Verification
 

@@ -2,7 +2,7 @@
 
 ## Status
 
-- Stage 12A.
+- Stage 12B.1.
 - Roadmap after strategic correction.
 - AI KINTEL is moved to the final integration stage after standalone preview feedback.
 
@@ -79,6 +79,36 @@ Acceptance criteria:
 - Owner can prepare or verify preview state without explaining scripts to the tester.
 - Tester path does not require CMD.
 - Status/freshness is visible and understandable.
+
+### 12B.1 - Standalone Control Center Shell
+
+Goal:
+
+- Add a safe UI shell/status hub that starts hiding developer workflow details behind product-readable status.
+
+Deliverables:
+
+- `Control Center` tab in the existing standalone UI mock.
+- Trusted tester P0 readiness checklist with conservative `Ready`, `Partial`, `Not ready`, and `Manual check required` states.
+- Data/source freshness, review/report, safety/compliance, and next-build-step sections.
+- Explicit note that `Research-only` and `WATCHLIST means manual review only`.
+
+Not in scope:
+
+- Refresh actions.
+- Command execution from the UI.
+- Deployment.
+- Access gate.
+- Feedback capture.
+- AI KINTEL implementation.
+- Provider calls, source adapters, source activation, or paid sources.
+
+Acceptance criteria:
+
+- Control Center makes preview readiness understandable without requiring a tester to inspect CMD, GitHub, Codex, or the repo.
+- Trusted tester preview remains `Not ready` because access, feedback, and deployment are not complete.
+- AI KINTEL remains a later integration stage, not the next implementation target.
+- Scanner scoring, `final_label`, review semantics, and `WATCHLIST` meaning remain unchanged.
 
 ## 12C - Trusted Tester Preview Mode
 
