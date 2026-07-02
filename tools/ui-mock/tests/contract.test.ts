@@ -42,6 +42,10 @@ import {
 import { interpretScannerApiOutput } from "../src/services/scannerDataSource";
 import type { ReviewSessionState } from "../src/types/reviewSessionTypes";
 import type { PersistableScannerOutput, ScannerApiOutput } from "../src/types/scannerTypes";
+import {
+  resolveInitialWorkspaceSection,
+  sectionToHash,
+} from "../src/workspaceNavigation";
 import { createScannerApiServer } from "../server/scannerApiServer";
 import { readLatestContextOutput, type ContextLatestOutput } from "../server/latestContextOutput";
 import { isPersistableScannerOutputShape } from "../server/latestScannerOutput";
@@ -273,6 +277,26 @@ const workspaceNavItems = [
   { id: "methodology", label: "Methodology",     icon: "M",  description: "Scanner and review layers" },
 ] satisfies WorkspaceNavItem[];
 
+for (const label of ["Trusted Preview", "Feedback Notes", "Webinar Teaser", "Control Center"]) {
+  assert.ok(
+    workspaceNavItems.some((item) => item.label === label),
+    `workspace navigation includes ${label}`,
+  );
+}
+
+assert.equal(resolveInitialWorkspaceSection("#trusted-preview"), "trusted-preview");
+assert.equal(resolveInitialWorkspaceSection("#feedback-notes"), "feedback-notes");
+assert.equal(resolveInitialWorkspaceSection("#webinar-teaser"), "webinar-teaser");
+assert.equal(resolveInitialWorkspaceSection("#control-center"), "control-center");
+assert.equal(resolveInitialWorkspaceSection("#unknown-preview"), "overview");
+assert.equal(resolveInitialWorkspaceSection(""), "overview");
+assert.equal(resolveInitialWorkspaceSection("#context"), "overview");
+assert.equal(resolveInitialWorkspaceSection("#workflow"), "overview");
+assert.equal(sectionToHash("trusted-preview"), "#trusted-preview");
+assert.equal(sectionToHash("feedback-notes"), "#feedback-notes");
+assert.equal(sectionToHash("webinar-teaser"), "#webinar-teaser");
+assert.equal(sectionToHash("control-center"), "#control-center");
+
 const workspaceShellMarkup = renderToStaticMarkup(React.createElement(WorkspaceShell, {
   navItems: workspaceNavItems,
   activeSection: "overview",
@@ -328,6 +352,11 @@ const trustedPreviewMarkup = renderToStaticMarkup(React.createElement(WorkspaceS
 }, React.createElement(TrustedPreview))));
 
 assert.match(trustedPreviewMarkup, /Trusted Preview/, "trusted preview renders title and navigation");
+assert.match(
+  trustedPreviewMarkup,
+  /This view can be opened directly with #trusted-preview\./,
+  "trusted preview renders direct hash link note",
+);
 assert.match(trustedPreviewMarkup, /Research-only/, "trusted preview renders research-only boundary");
 assert.match(
   trustedPreviewMarkup,
@@ -389,6 +418,11 @@ const feedbackNotesMarkup = renderToStaticMarkup(React.createElement(WorkspaceSh
 }, React.createElement(FeedbackNotes))));
 
 assert.match(feedbackNotesMarkup, /Feedback Notes/, "feedback notes renders title and navigation");
+assert.match(
+  feedbackNotesMarkup,
+  /This view can be opened directly with #feedback-notes\./,
+  "feedback notes renders direct hash link note",
+);
 assert.match(feedbackNotesMarkup, /Structured session notes/, "feedback notes renders structured session notes copy");
 assert.match(feedbackNotesMarkup, /Research-only/, "feedback notes renders research-only boundary");
 assert.match(feedbackNotesMarkup, /Session checklist/, "feedback notes renders session checklist");

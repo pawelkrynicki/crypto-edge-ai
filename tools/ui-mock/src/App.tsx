@@ -41,6 +41,11 @@ import {
 } from "./services/reviewSessionApi";
 import { mapPersistableScannerOutputToUiCandidates } from "./adapters/scannerOutputAdapter";
 import { toMockCandidate, type MockCandidate } from "./mockData";
+import {
+  DEFAULT_WORKSPACE_SECTION,
+  resolveInitialWorkspaceSection,
+  sectionToHash,
+} from "./workspaceNavigation";
 import type { CandidateReviewInput, ReviewSessionState } from "./types/reviewSessionTypes";
 
 function buildMockCandidates(result: ScannerDataSourceResult): MockCandidate[] {
@@ -144,7 +149,10 @@ const INITIAL_REVIEW_STORAGE_STATUS: ReviewStorageStatus = {
 };
 
 export default function App() {
-  const [activeSection, setActiveSection] = useState<WorkspaceSectionId>("overview");
+  const [activeSection, setActiveSection] = useState<WorkspaceSectionId>(() => {
+    if (typeof window === "undefined") return DEFAULT_WORKSPACE_SECTION;
+    return resolveInitialWorkspaceSection(window.location.hash);
+  });
 
   const [dataSource, setDataSource] = useState<DataSourceKey>("fixture");
   const [resolvedSource, setResolvedSource] = useState<ResolvedScannerSource>("built-in-fixture");
@@ -218,6 +226,20 @@ export default function App() {
   }, [loadMarketContext]);
 
   useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+
+    const handleHashChange = () => {
+      setActiveSection(resolveInitialWorkspaceSection(window.location.hash));
+    };
+
+    window.addEventListener("hashchange", handleHashChange);
+
+    return () => {
+      window.removeEventListener("hashchange", handleHashChange);
+    };
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
 
     loadReviewSessionFromApi().then((result) => {
@@ -246,6 +268,18 @@ export default function App() {
 
       setReviewStorageStatus(getFallbackReviewStorageStatus(result));
     });
+  }, []);
+
+  const handleWorkspaceSectionChange = useCallback((sectionId: WorkspaceSectionId) => {
+    setActiveSection(sectionId);
+
+    if (typeof window === "undefined") return;
+
+    const nextHash = sectionToHash(sectionId);
+
+    if (window.location.hash !== nextHash) {
+      window.location.hash = nextHash;
+    }
   }, []);
 
   const handleSourceChange = (source: DataSourceKey) => {
@@ -296,8 +330,8 @@ export default function App() {
 
   const handleOpenCandidate = useCallback((candidateId: string) => {
     setSelectedCandidateId(candidateId);
-    setActiveSection("scanner");
-  }, []);
+    handleWorkspaceSectionChange("scanner");
+  }, [handleWorkspaceSectionChange]);
 
   const renderLoadingSection = (sectionId: WorkspaceSectionId) => {
     const copy = SECTION_COPY[sectionId];
@@ -424,7 +458,7 @@ export default function App() {
     <WorkspaceShell
       navItems={WORKSPACE_NAV_ITEMS}
       activeSection={activeSection}
-      onSectionChange={setActiveSection}
+      onSectionChange={handleWorkspaceSectionChange}
       dataSource={dataSource}
       dataSourceOptions={DATA_SOURCE_OPTIONS}
       onDataSourceChange={handleSourceChange}

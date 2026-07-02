@@ -67,6 +67,7 @@ export const FeedbackNotes: React.FC = () => (
         <p>Structured session notes for a trusted preview review.</p>
         <p>Research-only. Feedback helps improve clarity, workflow and trust.</p>
         <p>This view helps organize feedback after the trusted preview path is completed.</p>
+        <p>This view can be opened directly with #feedback-notes.</p>
       </div>
       <div className="feedback-notes-boundary-card">
         No feedback is saved or sent from this shell.

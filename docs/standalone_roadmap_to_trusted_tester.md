@@ -23,6 +23,7 @@
 | 12B.3 | Before vacation | Webinar Screenshot Capture Kit. |
 | 12C.1 | Before vacation | Trusted Tester Preview Shell. |
 | 12C.2 | Before vacation | Feedback Prompt / Session Notes Shell. |
+| 12C.3 | Before vacation | Deep-Linkable Trusted Preview. |
 | 12B | 2026-07-26 to 2026-08-02 | Standalone Control Center / No-CMD Workflow. |
 | 12C | 2026-08-03 to 2026-08-09 | Trusted Tester Preview Mode. |
 | 12D | 2026-08-10 to 2026-08-16 | Reports Library + Feedback Loop. |
@@ -251,6 +252,32 @@ Acceptance criteria:
 - The UI makes clear that feedback is not saved and no data is sent from this view.
 - The worksheet does not replace later persisted feedback capture, private access, report library, lightweight private preview deployment, or the real external tester session.
 - AI KINTEL remains a later integration stage after standalone preview feedback.
+
+### 12C.3 - Deep-Linkable Trusted Preview
+
+Goal:
+
+- Let key standalone preview views be opened directly through stable hash links.
+
+Deliverables:
+
+- Hash navigation in the existing standalone UI mock.
+- Direct preview links for `#trusted-preview`, `#feedback-notes`, `#webinar-teaser`, and `#control-center`.
+- `docs/deep_linkable_preview_navigation.md`.
+
+Not in scope:
+
+- Deployment.
+- Access gate.
+- Backend or storage.
+- Source activation, provider calls, OpenAI calls, source adapters, secrets, dependencies, scoring changes, `final_label` changes, review semantics changes, or `WATCHLIST` meaning changes.
+- AI KINTEL implementation.
+
+Acceptance criteria:
+
+- Known preview hashes open the intended UI section.
+- Unknown hashes fall back to the safe default overview view.
+- Navigation does not change scanner output, review behavior, source behavior, labels, or scoring.
 
 ## 12D - Reports Library + Feedback Loop
 
