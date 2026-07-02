@@ -4,6 +4,7 @@ import type { DataSourceKey } from "../services/scannerDataSource";
 export type WorkspaceSectionId =
   | "overview"
   | "control-center"
+  | "trusted-preview"
   | "webinar-teaser"
   | "scanner"
   | "watchlist"
@@ -34,6 +35,7 @@ interface WorkspaceShellProps {
   sourceStatusText: string;
   fallbackMsg?: string | null;
   presentationMode?: boolean;
+  trustedPreviewMode?: boolean;
   children: React.ReactNode;
 }
 
@@ -54,15 +56,16 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
   sourceStatusText,
   fallbackMsg,
   presentationMode = false,
+  trustedPreviewMode = false,
   children,
 }) => (
-  <div className={`app-shell ${presentationMode ? "presentation-mode" : ""}`}>
+  <div className={`app-shell ${presentationMode ? "presentation-mode" : ""} ${trustedPreviewMode ? "trusted-preview-mode" : ""}`}>
     <header className="app-header workspace-header">
       <div className="product-mark">
         <div className="product-logo">CE</div>
         <div className="min-w-0">
           <h1>Crypto Edge AI</h1>
-          <p>{presentationMode ? "Research preview" : "Local MVP / Research only"}</p>
+          <p>{presentationMode ? "Research preview" : trustedPreviewMode ? "Trusted reviewer preview" : "Local MVP / Research only"}</p>
         </div>
       </div>
 
@@ -71,6 +74,12 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
           <>
             <span className="badge badge-context">Webinar Teaser</span>
             <span className="badge badge-context">Research only</span>
+          </>
+        ) : trustedPreviewMode ? (
+          <>
+            <span className="badge badge-context">Trusted Preview</span>
+            <span className="badge badge-context">Research only</span>
+            <span className="source-status">WATCHLIST means manual review only.</span>
           </>
         ) : (
           <>
@@ -141,6 +150,11 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
         <>
           <p>Research preview only. Context, risks and review steps stay analyst-controlled.</p>
           <span>Manual review boundary.</span>
+        </>
+      ) : trustedPreviewMode ? (
+        <>
+          <p>Research-only preview. Scanner context and local review do not change labels or scoring.</p>
+          <span>WATCHLIST means manual review only.</span>
         </>
       ) : (
         <>

@@ -2,11 +2,13 @@
 
 ## Status
 
-- Stage 12A.
+- Stage 12C.1.
 - Plan for a trusted tester preview path.
+- The UI now includes a `Trusted Preview` shell for the first non-technical click path.
 - Target trusted tester: Pawel Gradziuk.
 - This is not a public beta.
 - This is not AI KINTEL implementation.
+- 12C.1 does not add deployment, access gate, or feedback persistence.
 
 ## What Pawel Gradziuk Should Be Able To Do
 
@@ -57,12 +59,12 @@ Target duration: 10-15 minutes.
 Click path:
 
 1. Open preview.
-2. Read header and dashboard.
-3. Check source/data status.
-4. Open candidate/project.
-5. Inspect source status and freshness.
-6. Check report or report preview.
-7. Leave feedback.
+2. Start with radar overview.
+3. Open candidate/project.
+4. Check source freshness.
+5. Read research snapshot.
+6. Review report preview.
+7. Leave structured feedback.
 
 Questions to ask:
 
@@ -92,3 +94,16 @@ Minimum viable feedback capture can be simple:
 - A short owner summary with observed blockers, unclear labels, missing context, and requested changes.
 
 The feedback path must not require the tester to understand repository structure, scripts, local storage, or implementation details.
+
+## 12C.1 Trusted Preview Shell
+
+- Adds a product-facing `Trusted Preview` tab in the existing UI mock.
+- Gives the reviewer a 2-3 minute orientation path before deeper clicking.
+- Explains `WATCHLIST` as manual review only, missing data as manual verification required, and freshness as context recency rather than a quality guarantee.
+- Shows feedback prompts as guidance only; real feedback capture comes later.
+- Does not replace private access, lightweight preview deployment, report library, or feedback persistence.
+- Keeps AI KINTEL as a later integration stage after standalone preview feedback.
+
+Related document:
+
+- `docs/trusted_tester_preview_shell.md`

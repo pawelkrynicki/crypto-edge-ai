@@ -51,6 +51,20 @@ Screenshot guide:
 - It changes no Local MVP RC behavior, sources, source checks, scoring, review semantics, `final_label`, or `WATCHLIST` meaning.
 - It adds no backend, deployment, access gate, provider calls, source activation, secrets, `.env`, npm dependencies, or AI KINTEL implementation.
 
+## 12C.1 Trusted Tester Preview Shell
+
+12C.1 adds a standalone **Trusted Preview** tab as the first non-technical click path for a trusted external reviewer.
+
+- Trusted Preview guides the reviewer through radar overview, project detail, source freshness, research snapshot, report preview, and structured feedback prompts.
+- It explains that `WATCHLIST` means manual review only, missing data requires manual verification, freshness means recency context, and review status stays separate from scanner labels and scoring.
+- It does not add deployment, access gate, feedback persistence, backend production code, source activation, provider calls, OpenAI calls, secrets, `.env`, npm dependencies, scanner scoring changes, `final_label` changes, review semantics changes, or `WATCHLIST` meaning changes.
+- It does not replace the later private access, lightweight preview deployment, report library, or feedback capture work.
+- AI KINTEL remains deferred to a later integration stage after standalone trusted tester feedback.
+
+12C.1 document:
+
+- `../../docs/trusted_tester_preview_shell.md`
+
 ## 11A AI KINTEL Production MVP Planning
 
 11A defines the production direction as an AI KINTEL Crypto Market module, not a standalone SaaS. This UI mock remains a local RC baseline for porting and is not the production implementation.
@@ -143,6 +157,7 @@ These artifacts close the AI KINTEL planning package without deploying staging, 
 - **Dark, professional UI**: Aligned with the AIKINTEL aesthetic.
 - **Scanner Radar**: Product-grade candidate list and detail workspace showing scanner labels, local review status, security labels, market metrics, and read-only scanner reasons.
 - **Control Center**: Standalone preview status hub for product readiness, source freshness, review flow, reports, research-only boundaries, and trusted tester preparation.
+- **Trusted Preview**: Non-technical reviewer click path for understanding radar, project detail, source freshness, report preview, and feedback prompts.
 - **Webinar Teaser**: Demo-safe screenshot mode with controlled research-radar screens and a lightweight capture kit for webinar use.
 - **Market Context Panel**: Shows Alternative.me Fear & Greed plus DefiLlama context from the local API bridge.
 - **Candidate Detail Panel**: In-depth breakdown of a selected token, including research context/data coverage, a trader checklist, and risk reasons.
@@ -667,7 +682,8 @@ Diagnostics are available at `GET /api/scanner/sources`. This endpoint reports w
 This remains read-only and local. It does not add a database, auth, OpenAI, live token fetching, scanner logic changes, UI redesign, or trading signal behavior. Next stage: automate writing a real `tools/data-poc` run and verify the UI against API mode.
 
 ## Next Steps
-- 12C: shape Trusted Tester Preview Mode.
+- 12C.1: Trusted Tester Preview Shell is now the first non-technical click path.
+- 12C: continue shaping trusted tester preview mode around private access, feedback capture, and report accessibility.
 - 12D: add Reports Library + Feedback Loop.
 - 12E: prepare Lightweight Private Preview Deployment.
 - Treat 12B.2 Webinar Teaser Screenshot Mode and 12B.3 Webinar Screenshot Capture Kit as screenshot-only UI, not as trusted tester preview readiness.

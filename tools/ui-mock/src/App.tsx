@@ -9,6 +9,7 @@ import { MarketContextPanel, type MarketContextPanelState } from "./components/M
 import { LocalMvpWorkflowPanel } from "./components/LocalMvpWorkflowPanel";
 import { WorkspaceOverview } from "./components/WorkspaceOverview";
 import { ControlCenter } from "./components/ControlCenter";
+import { TrustedPreview } from "./components/TrustedPreview";
 import { WebinarTeaser } from "./components/WebinarTeaser";
 import {
   WorkspaceSection,
@@ -59,6 +60,7 @@ function buildSummary(candidates: MockCandidate[]) {
 const WORKSPACE_NAV_ITEMS: WorkspaceNavItem[] = [
   { id: "overview",    label: "Overview",        icon: "OV", description: "Status and health" },
   { id: "control-center", label: "Control Center", icon: "CC", description: "Preview readiness" },
+  { id: "trusted-preview", label: "Trusted Preview", icon: "TP", description: "Guided reviewer path" },
   { id: "webinar-teaser", label: "Webinar Teaser", icon: "WT", description: "Demo-safe screenshots" },
   { id: "scanner",     label: "Scanner Radar",   icon: "SR", description: "Read-only scanner output" },
   { id: "watchlist",   label: "Review Queue",    icon: "RQ", description: "Local analyst queue" },
@@ -75,6 +77,10 @@ const SECTION_COPY: Record<WorkspaceSectionId, { title: string; description: str
   "control-center": {
     title: "Control Center",
     description: "Standalone preview readiness, source freshness, review flow, reports and tester preparation.",
+  },
+  "trusted-preview": {
+    title: "Trusted Preview",
+    description: "Guided standalone preview path for a trusted external reviewer.",
   },
   "webinar-teaser": {
     title: "Webinar Teaser",
@@ -341,6 +347,12 @@ export default function App() {
             />
           </WorkspaceSection>
         );
+      case "trusted-preview":
+        return (
+          <WorkspaceSection {...SECTION_COPY["trusted-preview"]}>
+            <TrustedPreview />
+          </WorkspaceSection>
+        );
       case "webinar-teaser":
         return (
           <WorkspaceSection {...SECTION_COPY["webinar-teaser"]}>
@@ -408,6 +420,7 @@ export default function App() {
       sourceStatusText={sourceStatusText}
       fallbackMsg={fallbackMsg}
       presentationMode={activeSection === "webinar-teaser"}
+      trustedPreviewMode={activeSection === "trusted-preview"}
     >
       {renderSection()}
     </WorkspaceShell>
