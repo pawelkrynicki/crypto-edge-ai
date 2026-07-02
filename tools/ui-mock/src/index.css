@@ -985,6 +985,138 @@
     color: var(--text-secondary);
   }
 
+  .feedback-notes {
+    @apply grid max-w-6xl gap-3;
+  }
+
+  .feedback-notes-hero,
+  .feedback-notes-section {
+    @apply min-w-0 rounded-md;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+  }
+
+  .feedback-notes-hero {
+    @apply flex items-start justify-between gap-5 px-5 py-4;
+    border-color: var(--accent-border);
+  }
+
+  .feedback-notes-hero-copy {
+    @apply min-w-0;
+  }
+
+  .feedback-notes-hero-copy h3 {
+    @apply mt-1 text-2xl font-bold leading-tight;
+    color: var(--text-primary);
+  }
+
+  .feedback-notes-hero-copy p {
+    @apply mt-1 max-w-4xl text-[13px] leading-relaxed;
+    color: var(--text-secondary);
+  }
+
+  .feedback-notes-boundary-card {
+    @apply max-w-[340px] shrink-0 rounded-md px-3 py-2 text-[12px] font-semibold leading-relaxed;
+    color: var(--amber);
+    background: var(--amber-dim);
+    border: 1px solid var(--amber-border);
+  }
+
+  .feedback-notes-section {
+    @apply grid gap-3 px-4 py-3;
+  }
+
+  .feedback-notes-section-header {
+    @apply min-w-0;
+  }
+
+  .feedback-notes-section-header h3 {
+    @apply mt-0.5 text-base font-bold leading-tight;
+    color: var(--text-primary);
+  }
+
+  .feedback-notes-section-header p {
+    @apply mt-1 max-w-4xl text-[12px] leading-relaxed;
+    color: var(--text-secondary);
+  }
+
+  .feedback-notes-checklist,
+  .feedback-notes-prompt-grid,
+  .feedback-notes-triage-grid {
+    @apply grid gap-2;
+  }
+
+  .feedback-notes-checklist {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .feedback-notes-prompt-grid,
+  .feedback-notes-triage-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .feedback-notes-check-item,
+  .feedback-notes-prompt,
+  .feedback-notes-triage-card,
+  .feedback-notes-boundary-item {
+    @apply min-w-0 rounded-md px-3 py-2.5;
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+  }
+
+  .feedback-notes-check-item {
+    @apply flex items-start gap-2.5;
+  }
+
+  .feedback-notes-check-item span {
+    @apply flex h-5 w-5 shrink-0 items-center justify-center rounded text-[10px] font-bold;
+    color: var(--accent);
+    background: var(--accent-dim);
+    border: 1px solid var(--accent-border);
+  }
+
+  .feedback-notes-check-item p,
+  .feedback-notes-prompt,
+  .feedback-notes-boundary-item {
+    @apply min-w-0 text-[12px] font-semibold leading-relaxed;
+    color: var(--text-primary);
+    overflow-wrap: anywhere;
+  }
+
+  .feedback-notes-triage-card h4 {
+    @apply text-[12px] font-bold leading-tight;
+    color: var(--text-primary);
+  }
+
+  .feedback-notes-triage-card p {
+    @apply mt-1 text-[12px] leading-relaxed;
+    color: var(--text-secondary);
+    overflow-wrap: anywhere;
+  }
+
+  .feedback-notes-two-column {
+    @apply grid gap-3;
+    grid-template-columns: minmax(0, 0.9fr) minmax(320px, 1.1fr);
+  }
+
+  .feedback-notes-template {
+    @apply m-0 min-w-0 whitespace-pre-wrap rounded-md px-3 py-2.5 text-[12px] leading-relaxed;
+    color: var(--text-primary);
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  }
+
+  .feedback-notes-boundary-list {
+    @apply grid gap-2;
+  }
+
+  .feedback-notes-boundary-item {
+    color: var(--amber);
+    background: var(--amber-dim);
+    border-color: var(--amber-border);
+  }
+
   .webinar-teaser {
     @apply grid max-w-6xl gap-4;
   }
@@ -2196,10 +2328,17 @@
       grid-template-columns: 1fr;
     }
 
+    .feedback-notes-two-column {
+      grid-template-columns: 1fr;
+    }
+
     .trusted-preview-step-grid,
     .trusted-preview-card-grid,
     .trusted-preview-label-grid,
-    .trusted-preview-prompt-grid {
+    .trusted-preview-prompt-grid,
+    .feedback-notes-checklist,
+    .feedback-notes-prompt-grid,
+    .feedback-notes-triage-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
@@ -2298,6 +2437,7 @@
     .control-center-hero,
     .control-center-summary-card,
     .trusted-preview-hero,
+    .feedback-notes-hero,
     .webinar-hero,
     .webinar-source-row,
     .webinar-section-topline,
@@ -2314,6 +2454,10 @@
     }
 
     .trusted-preview-research-note {
+      @apply max-w-none;
+    }
+
+    .feedback-notes-boundary-card {
       @apply max-w-none;
     }
 
@@ -2363,6 +2507,9 @@
     .trusted-preview-card-grid,
     .trusted-preview-label-grid,
     .trusted-preview-prompt-grid,
+    .feedback-notes-checklist,
+    .feedback-notes-prompt-grid,
+    .feedback-notes-triage-grid,
     .webinar-flow {
       grid-template-columns: 1fr;
     }

@@ -65,6 +65,20 @@ Screenshot guide:
 
 - `../../docs/trusted_tester_preview_shell.md`
 
+## 12C.2 Feedback Prompt / Session Notes Shell
+
+12C.2 adds a standalone **Feedback Notes** tab after Trusted Preview.
+
+- Feedback Notes provides product-facing session prompts, a static checklist, triage buckets, and a notes template for organizing trusted tester feedback after the preview path.
+- It does not save data, submit feedback, replace a feedback capture backend, add private access, add deployment, or change the trusted tester access model.
+- Private access, lightweight preview deployment, report library, persisted feedback capture, and the real external tester session remain later steps.
+- AI KINTEL remains deferred to a later integration stage after standalone trusted tester feedback.
+- 12C.2 adds no dependencies, secrets, `.env`, backend production code, API endpoints, source adapters, provider calls, scanner scoring changes, `final_label` changes, review semantics changes, or `WATCHLIST` meaning changes.
+
+12C.2 document:
+
+- `../../docs/feedback_session_notes_shell.md`
+
 ## 11A AI KINTEL Production MVP Planning
 
 11A defines the production direction as an AI KINTEL Crypto Market module, not a standalone SaaS. This UI mock remains a local RC baseline for porting and is not the production implementation.
@@ -158,6 +172,7 @@ These artifacts close the AI KINTEL planning package without deploying staging, 
 - **Scanner Radar**: Product-grade candidate list and detail workspace showing scanner labels, local review status, security labels, market metrics, and read-only scanner reasons.
 - **Control Center**: Standalone preview status hub for product readiness, source freshness, review flow, reports, research-only boundaries, and trusted tester preparation.
 - **Trusted Preview**: Non-technical reviewer click path for understanding radar, project detail, source freshness, report preview, and feedback prompts.
+- **Feedback Notes**: Product-facing worksheet for session checklist, feedback prompts, triage buckets, and static notes after a trusted preview review.
 - **Webinar Teaser**: Demo-safe screenshot mode with controlled research-radar screens and a lightweight capture kit for webinar use.
 - **Market Context Panel**: Shows Alternative.me Fear & Greed plus DefiLlama context from the local API bridge.
 - **Candidate Detail Panel**: In-depth breakdown of a selected token, including research context/data coverage, a trader checklist, and risk reasons.
@@ -683,7 +698,8 @@ This remains read-only and local. It does not add a database, auth, OpenAI, live
 
 ## Next Steps
 - 12C.1: Trusted Tester Preview Shell is now the first non-technical click path.
-- 12C: continue shaping trusted tester preview mode around private access, feedback capture, and report accessibility.
+- 12C.2: Feedback Prompt / Session Notes Shell now helps structure post-session notes without saving feedback.
+- 12C: continue shaping trusted tester preview mode around private access, persisted feedback capture, and report accessibility.
 - 12D: add Reports Library + Feedback Loop.
 - 12E: prepare Lightweight Private Preview Deployment.
 - Treat 12B.2 Webinar Teaser Screenshot Mode and 12B.3 Webinar Screenshot Capture Kit as screenshot-only UI, not as trusted tester preview readiness.
