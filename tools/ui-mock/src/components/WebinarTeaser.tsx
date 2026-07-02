@@ -67,6 +67,23 @@ const reviewFlow = [
   "Follow-up",
 ];
 
+const captureScreens = [
+  { label: "Radar Overview", shot: "radar-overview" },
+  { label: "Project Research Snapshot", shot: "project-research-snapshot" },
+  { label: "Source Confidence Layer", shot: "source-confidence-layer" },
+  { label: "Analyst Research Brief", shot: "research-report-preview" },
+  { label: "Review Flow", shot: "review-flow" },
+  { label: "Research-only Closing Screen", shot: "closing-screen" },
+];
+
+const captureGuidance = [
+  "Use browser screenshot/crop tools.",
+  "Capture the product area only.",
+  "Hide browser chrome and local system UI.",
+  "Avoid internal setup views.",
+  "Use demo-safe sections only.",
+];
+
 export const WebinarTeaser: React.FC = () => (
   <div className="webinar-teaser">
     <section className="webinar-hero">
@@ -80,9 +97,33 @@ export const WebinarTeaser: React.FC = () => (
       </div>
     </section>
 
-    <section className="webinar-card webinar-radar-card">
+    <section className="webinar-capture-kit">
+      <div className="webinar-capture-copy">
+        <span className="section-label">Screenshot Capture Kit</span>
+        <h3>Capture 4-6 demo-safe screens for webinar use.</h3>
+        <p>Recommended viewport: 1920x1080 or 1440x900.</p>
+      </div>
+
+      <div className="webinar-capture-list">
+        {captureScreens.map((screen, index) => (
+          <div key={screen.shot} className="webinar-capture-item">
+            <span>Screen {index + 1}</span>
+            <strong>{screen.label}</strong>
+          </div>
+        ))}
+      </div>
+
+      <div className="webinar-capture-guidance">
+        {captureGuidance.map((item) => (
+          <span key={item}>{item}</span>
+        ))}
+      </div>
+    </section>
+
+    <section className="webinar-card webinar-radar-card" data-shot="radar-overview">
       <WebinarSectionHeader
         eyebrow="Radar Overview"
+        screenLabel="Screen 1"
         title="Crypto Research Radar"
         description="A controlled demo view showing how projects can be organized for further research."
       />
@@ -110,11 +151,12 @@ export const WebinarTeaser: React.FC = () => (
       </div>
     </section>
 
-    <section className="webinar-card webinar-snapshot-card">
+    <section className="webinar-card webinar-snapshot-card" data-shot="project-research-snapshot">
       <WebinarSectionHeader
         eyebrow="Project Research Snapshot"
+        screenLabel="Screen 2"
         title="Atlas Protocol"
-        description="Research snapshot for one demo project without score equations, weights or thresholds."
+        description="Research snapshot for one demo project with controlled, high-level context."
       />
 
       <div className="webinar-snapshot-layout">
@@ -135,11 +177,12 @@ export const WebinarTeaser: React.FC = () => (
       </div>
     </section>
 
-    <section className="webinar-card webinar-source-card">
+    <section className="webinar-card webinar-source-card" data-shot="source-confidence-layer">
       <WebinarSectionHeader
         eyebrow="Source Confidence Layer"
+        screenLabel="Screen 3"
         title="Source Confidence Layer"
-        description="Freshness and coverage are grouped at a high level, without vendor or API names."
+        description="Freshness and coverage are grouped at a high level with abstract source categories."
       />
 
       <div className="webinar-source-grid">
@@ -159,9 +202,10 @@ export const WebinarTeaser: React.FC = () => (
       </div>
     </section>
 
-    <section className="webinar-card webinar-report-card">
+    <section className="webinar-card webinar-report-card" data-shot="research-report-preview">
       <WebinarSectionHeader
         eyebrow="Research Report Preview"
+        screenLabel="Screen 4"
         title="Analyst research brief"
         description="excerpt / demo-safe preview"
       />
@@ -176,9 +220,10 @@ export const WebinarTeaser: React.FC = () => (
       </div>
     </section>
 
-    <section className="webinar-card webinar-flow-card">
+    <section className="webinar-card webinar-flow-card" data-shot="review-flow">
       <WebinarSectionHeader
         eyebrow="Review Flow"
+        screenLabel="Screen 5"
         title="Human analyst stays in control."
         description="The workflow is built for research triage, not automated decisions."
       />
@@ -197,8 +242,11 @@ export const WebinarTeaser: React.FC = () => (
       </div>
     </section>
 
-    <section className="webinar-closing">
-      <span className="section-label">Product Teaser / Closing Screen</span>
+    <section className="webinar-closing" data-shot="closing-screen">
+      <div className="webinar-section-topline">
+        <span className="section-label">Product Teaser / Closing Screen</span>
+        <span className="webinar-screen-label">Screen 6</span>
+      </div>
       <h3>Crypto Edge AI</h3>
       <p>Research radar for faster crypto project triage.</p>
       <p>Built to organize context, risks and next review steps.</p>
@@ -209,16 +257,21 @@ export const WebinarTeaser: React.FC = () => (
 
 function WebinarSectionHeader({
   eyebrow,
+  screenLabel,
   title,
   description,
 }: {
   eyebrow: string;
+  screenLabel: string;
   title: string;
   description: string;
 }) {
   return (
     <header className="webinar-section-header">
-      <span className="section-label">{eyebrow}</span>
+      <div className="webinar-section-topline">
+        <span className="section-label">{eyebrow}</span>
+        <span className="webinar-screen-label">{screenLabel}</span>
+      </div>
       <h3>{title}</h3>
       <p>{description}</p>
     </header>

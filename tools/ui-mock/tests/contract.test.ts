@@ -318,10 +318,19 @@ const webinarTeaserMarkup = renderToStaticMarkup(React.createElement(WorkspaceSh
   presentationMode: true,
 }, React.createElement(WorkspaceSection, {
   title: "Webinar Teaser",
-  description: "Demo-safe screenshot mode for showing the product concept without exposing methodology, thresholds, source vendors or internal roadmap.",
+  description: "Demo-safe screenshot mode for showing the product concept with controlled demo content.",
 }, React.createElement(WebinarTeaser))));
 
 assert.match(webinarTeaserMarkup, /Webinar Teaser/, "webinar teaser renders in navigation");
+assert.match(webinarTeaserMarkup, /Screenshot Capture Kit/, "webinar teaser renders screenshot capture kit");
+assert.match(
+  webinarTeaserMarkup,
+  /Capture 4-6 demo-safe screens for webinar use\./,
+  "webinar teaser renders capture kit purpose",
+);
+assert.match(webinarTeaserMarkup, /1920x1080/, "webinar teaser renders large viewport guidance");
+assert.match(webinarTeaserMarkup, /1440x900/, "webinar teaser renders compact viewport guidance");
+assert.match(webinarTeaserMarkup, /Use browser screenshot\/crop tools\./, "webinar teaser renders capture tool guidance");
 assert.match(webinarTeaserMarkup, /Crypto Research Radar/, "webinar teaser renders radar overview");
 assert.match(webinarTeaserMarkup, /Research snapshot/, "webinar teaser renders project snapshot");
 assert.match(webinarTeaserMarkup, /Source Confidence Layer/, "webinar teaser renders source confidence layer");
@@ -333,6 +342,28 @@ assert.match(
 );
 assert.match(webinarTeaserMarkup, /Research-only preview/, "webinar teaser renders research-only preview copy");
 
+for (const label of [
+  "Radar Overview",
+  "Project Research Snapshot",
+  "Source Confidence Layer",
+  "Analyst Research Brief",
+  "Review Flow",
+  "Research-only Closing Screen",
+]) {
+  assert.match(webinarTeaserMarkup, new RegExp(label), `webinar teaser renders capture label ${label}`);
+}
+
+for (const shotId of [
+  "radar-overview",
+  "project-research-snapshot",
+  "source-confidence-layer",
+  "research-report-preview",
+  "review-flow",
+  "closing-screen",
+]) {
+  assert.match(webinarTeaserMarkup, new RegExp(`data-shot="${shotId}"`), `webinar teaser renders data-shot ${shotId}`);
+}
+
 const forbiddenWebinarTerms = [
   /\bAI KINTEL\b/i,
   /Pawe[lł] Gr[aą]dziuk/i,
@@ -341,6 +372,11 @@ const forbiddenWebinarTerms = [
   /\bP2\b/i,
   /\bnot ready\b/i,
   /\bnot-ready\b/i,
+  /\bweights?\b/i,
+  /\bthresholds?\b/i,
+  /\bvendors?\b/i,
+  /\bendpoints?\b/i,
+  /\brepository\b/i,
   /\bbranch\b/i,
   /\bcommit\b/i,
   /\bscript\b/i,

@@ -42,6 +42,15 @@ Screenshot guide:
 
 - `../../docs/webinar_teaser_screenshot_plan.md`
 
+## 12B.3 Webinar Screenshot Capture Kit
+
+12B.3 adds a lightweight capture kit inside the **Webinar Teaser** tab to help prepare screenshots for the 2026-07-13 webinar.
+
+- The kit lists the recommended 4-6 screenshots, suggested viewport sizes, and safe capture guidance.
+- It is not a new product feature, trusted tester preview, production readiness marker, or source/data feature.
+- It changes no Local MVP RC behavior, sources, source checks, scoring, review semantics, `final_label`, or `WATCHLIST` meaning.
+- It adds no backend, deployment, access gate, provider calls, source activation, secrets, `.env`, npm dependencies, or AI KINTEL implementation.
+
 ## 11A AI KINTEL Production MVP Planning
 
 11A defines the production direction as an AI KINTEL Crypto Market module, not a standalone SaaS. This UI mock remains a local RC baseline for porting and is not the production implementation.
@@ -134,7 +143,7 @@ These artifacts close the AI KINTEL planning package without deploying staging, 
 - **Dark, professional UI**: Aligned with the AIKINTEL aesthetic.
 - **Scanner Radar**: Product-grade candidate list and detail workspace showing scanner labels, local review status, security labels, market metrics, and read-only scanner reasons.
 - **Control Center**: Standalone preview status hub for product readiness, source freshness, review flow, reports, research-only boundaries, and trusted tester preparation.
-- **Webinar Teaser**: Demo-safe screenshot mode with controlled research-radar screens for webinar use.
+- **Webinar Teaser**: Demo-safe screenshot mode with controlled research-radar screens and a lightweight capture kit for webinar use.
 - **Market Context Panel**: Shows Alternative.me Fear & Greed plus DefiLlama context from the local API bridge.
 - **Candidate Detail Panel**: In-depth breakdown of a selected token, including research context/data coverage, a trader checklist, and risk reasons.
 - **Local Review Session**: Local analyst workspace for per-candidate review status, analyst note, and last-updated timestamp.
@@ -661,7 +670,7 @@ This remains read-only and local. It does not add a database, auth, OpenAI, live
 - 12C: shape Trusted Tester Preview Mode.
 - 12D: add Reports Library + Feedback Loop.
 - 12E: prepare Lightweight Private Preview Deployment.
-- Treat 12B.2 Webinar Teaser Screenshot Mode as screenshot-only UI, not as trusted tester preview readiness.
+- Treat 12B.2 Webinar Teaser Screenshot Mode and 12B.3 Webinar Screenshot Capture Kit as screenshot-only UI, not as trusted tester preview readiness.
 - Keep AI KINTEL and real AI/provider integrations deferred until after standalone preview feedback and owner review.
 
 ## UI Data Adapter

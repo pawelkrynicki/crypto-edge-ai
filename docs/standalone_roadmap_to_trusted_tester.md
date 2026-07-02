@@ -2,7 +2,7 @@
 
 ## Status
 
-- Stage 12B.2.
+- Stage 12B.3.
 - Roadmap after strategic correction.
 - AI KINTEL is moved to the final integration stage after standalone preview feedback.
 
@@ -20,6 +20,7 @@
 |---|---|---|
 | 12A | Before vacation | Standalone Product Gap Audit + Trusted Tester Path. |
 | 12B.2 | Before vacation | Webinar Teaser Screenshot Mode. |
+| 12B.3 | Before vacation | Webinar Screenshot Capture Kit. |
 | 12B | 2026-07-26 to 2026-08-02 | Standalone Control Center / No-CMD Workflow. |
 | 12C | 2026-08-03 to 2026-08-09 | Trusted Tester Preview Mode. |
 | 12D | 2026-08-10 to 2026-08-16 | Reports Library + Feedback Loop. |
@@ -136,6 +137,33 @@ Acceptance criteria:
 - The tab is useful for webinar screenshots and stays demo-safe.
 - The webinar screen avoids AI KINTEL, Pawel Gradziuk, P0/P1/P2, not-ready wording, GitHub/Codex/CMD, technical roadmap details, full source/vendor names, and trading action language.
 - AI KINTEL remains a later integration stage.
+
+### 12B.3 - Webinar Screenshot Capture Kit
+
+Goal:
+
+- Add a lightweight capture kit to help the owner prepare 4-6 safe screenshots from the `Webinar Teaser` tab before the 2026-07-13 webinar.
+
+Deliverables:
+
+- `Screenshot Capture Kit` section inside the existing `Webinar Teaser` tab.
+- Recommended screenshot list, viewport guidance, and safe capture copy.
+- `data-shot` identifiers for the six webinar sections.
+- Expanded screenshot guide in `docs/webinar_teaser_screenshot_plan.md`.
+
+Not in scope:
+
+- New product functionality.
+- Trusted tester preview replacement.
+- Local MVP RC behavior changes.
+- Source checks, fetch logic, source policy, source adapters, source activation, provider calls, OpenAI calls, backend, deployment, secrets, dependencies, scoring changes, `final_label` changes, review semantics changes, or `WATCHLIST` meaning changes.
+- AI KINTEL implementation.
+
+Acceptance criteria:
+
+- The owner can quickly identify and capture the webinar-safe sections.
+- The webinar UI remains demo-safe and avoids AI KINTEL, Pawel Gradziuk, P0/P1/P2, not-ready wording, GitHub/Codex/CMD, branch/commit/script wording, technical roadmap details, full methodology, full source/vendor names, and trading action language.
+- Local MVP RC and source validation remain unchanged.
 
 ## 12C - Trusted Tester Preview Mode
 
