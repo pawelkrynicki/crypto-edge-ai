@@ -93,6 +93,7 @@ export const TrustedPreview: React.FC = () => (
         <h3>Trusted Preview</h3>
         <p>A guided standalone product walkthrough for a trusted external reviewer.</p>
         <p>Crypto Edge AI helps organize projects, context, risks, and next research steps in one readable workspace.</p>
+        <p>This view can be opened directly with #trusted-preview.</p>
       </div>
       <div className="trusted-preview-research-note">
         Research-only. WATCHLIST means manual review only.

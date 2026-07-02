@@ -3,6 +3,7 @@
 ## Status
 
 - Stage 12C.2.
+- Stage 12C.3 adds direct hash navigation for the Feedback Notes view.
 - UI shell only.
 - No backend.
 - No feedback persistence.
@@ -22,6 +23,12 @@
 2. Follow the 10-minute click path.
 3. Inspect radar, candidate/project, source freshness, report preview and labels.
 4. Capture feedback in notes.
+
+## Direct Link
+
+- `#feedback-notes`
+
+The direct link opens the Feedback Notes view only. It does not save feedback or add storage.
 
 ## Feedback Categories
 

@@ -79,6 +79,18 @@ Screenshot guide:
 
 - `../../docs/feedback_session_notes_shell.md`
 
+## 12C.3 Deep-Linkable Trusted Preview
+
+12C.3 adds hash navigation for the standalone UI mock so trusted preview views can be opened directly.
+
+- Supported preview links include `#trusted-preview`, `#feedback-notes`, `#webinar-teaser`, and `#control-center`.
+- Unknown hashes fall back to the safe default overview view.
+- The change is UI navigation only. It adds no router dependency, storage, backend, deployment, access gate, provider calls, source activation, secrets, `.env`, scanner scoring changes, `final_label` changes, review semantics changes, or `WATCHLIST` meaning changes.
+
+12C.3 document:
+
+- `../../docs/deep_linkable_preview_navigation.md`
+
 ## 11A AI KINTEL Production MVP Planning
 
 11A defines the production direction as an AI KINTEL Crypto Market module, not a standalone SaaS. This UI mock remains a local RC baseline for porting and is not the production implementation.
@@ -174,6 +186,7 @@ These artifacts close the AI KINTEL planning package without deploying staging, 
 - **Trusted Preview**: Non-technical reviewer click path for understanding radar, project detail, source freshness, report preview, and feedback prompts.
 - **Feedback Notes**: Product-facing worksheet for session checklist, feedback prompts, triage buckets, and static notes after a trusted preview review.
 - **Webinar Teaser**: Demo-safe screenshot mode with controlled research-radar screens and a lightweight capture kit for webinar use.
+- **Deep-Linkable Preview Navigation**: Hash links can open key trusted preview views directly without adding routing, storage, backend, or provider calls.
 - **Market Context Panel**: Shows Alternative.me Fear & Greed plus DefiLlama context from the local API bridge.
 - **Candidate Detail Panel**: In-depth breakdown of a selected token, including research context/data coverage, a trader checklist, and risk reasons.
 - **Local Review Session**: Local analyst workspace for per-candidate review status, analyst note, and last-updated timestamp.
