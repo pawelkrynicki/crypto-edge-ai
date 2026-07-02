@@ -851,6 +851,7 @@
   }
 
   .webinar-hero,
+  .webinar-capture-kit,
   .webinar-card,
   .webinar-closing {
     @apply min-w-0 rounded-md;
@@ -895,8 +896,71 @@
     @apply grid gap-3 px-4 py-4;
   }
 
+  .webinar-capture-kit {
+    @apply grid gap-3 px-4 py-3;
+    border-color: var(--slate-border);
+  }
+
+  .webinar-capture-copy {
+    @apply min-w-0;
+  }
+
+  .webinar-capture-copy h3 {
+    @apply mt-0.5 text-base font-bold leading-tight;
+    color: var(--text-primary);
+  }
+
+  .webinar-capture-copy p {
+    @apply mt-1 text-[12px] leading-relaxed;
+    color: var(--text-secondary);
+  }
+
+  .webinar-capture-list {
+    @apply grid gap-2;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .webinar-capture-item {
+    @apply min-w-0 rounded-md px-3 py-2;
+    background: rgba(8, 12, 16, 0.28);
+    border: 1px solid var(--border);
+  }
+
+  .webinar-capture-item span {
+    @apply block text-[10px] font-bold uppercase leading-tight;
+    color: var(--accent);
+  }
+
+  .webinar-capture-item strong {
+    @apply mt-1 block text-[12px] font-bold leading-snug;
+    color: var(--text-primary);
+    overflow-wrap: anywhere;
+  }
+
+  .webinar-capture-guidance {
+    @apply flex flex-wrap gap-2;
+  }
+
+  .webinar-capture-guidance span {
+    @apply rounded-md px-2.5 py-1 text-[11px] font-semibold leading-snug;
+    color: var(--text-secondary);
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+  }
+
   .webinar-section-header {
     @apply min-w-0;
+  }
+
+  .webinar-section-topline {
+    @apply flex min-w-0 items-center justify-between gap-3;
+  }
+
+  .webinar-screen-label {
+    @apply inline-flex shrink-0 rounded-md px-2 py-0.5 text-[10px] font-bold uppercase leading-tight;
+    color: var(--accent);
+    background: var(--accent-dim);
+    border: 1px solid var(--accent-border);
   }
 
   .webinar-section-header h3 {
@@ -1990,6 +2054,7 @@
     }
 
     .webinar-metric-grid,
+    .webinar-capture-list,
     .webinar-flow {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
@@ -2084,6 +2149,7 @@
     .control-center-summary-card,
     .webinar-hero,
     .webinar-source-row,
+    .webinar-section-topline,
     .control-status-card-topline {
       @apply items-start flex-col;
     }
@@ -2101,6 +2167,7 @@
     }
 
     .webinar-snapshot-grid,
+    .webinar-capture-list,
     .webinar-report-grid {
       grid-template-columns: 1fr;
     }
@@ -2136,6 +2203,7 @@
     }
 
     .webinar-metric-grid,
+    .webinar-capture-list,
     .webinar-flow {
       grid-template-columns: 1fr;
     }

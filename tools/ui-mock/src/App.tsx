@@ -78,7 +78,7 @@ const SECTION_COPY: Record<WorkspaceSectionId, { title: string; description: str
   },
   "webinar-teaser": {
     title: "Webinar Teaser",
-    description: "Demo-safe screenshot mode for showing the product concept without exposing methodology, thresholds, source vendors or internal roadmap.",
+    description: "Demo-safe screenshot mode for showing the product concept with controlled demo content.",
   },
   scanner: {
     title: "Scanner Radar",
