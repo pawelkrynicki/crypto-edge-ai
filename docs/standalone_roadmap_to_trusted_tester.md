@@ -2,13 +2,13 @@
 
 ## Status
 
-- Stage 12B.3.
+- Stage 12C.1.
 - Roadmap after strategic correction.
 - AI KINTEL is moved to the final integration stage after standalone preview feedback.
 
 ## Timing Context
 
-- 2026-07-01 is the planning date.
+- 2026-07-02 is the planning date.
 - Vacation: 2026-07-04 to 2026-07-25.
 - Before vacation, do not start large implementation.
 - Use 2026-07-01 to 2026-07-03 for 12A and possibly narrow 12B planning only.
@@ -21,6 +21,7 @@
 | 12A | Before vacation | Standalone Product Gap Audit + Trusted Tester Path. |
 | 12B.2 | Before vacation | Webinar Teaser Screenshot Mode. |
 | 12B.3 | Before vacation | Webinar Screenshot Capture Kit. |
+| 12C.1 | Before vacation | Trusted Tester Preview Shell. |
 | 12B | 2026-07-26 to 2026-08-02 | Standalone Control Center / No-CMD Workflow. |
 | 12C | 2026-08-03 to 2026-08-09 | Trusted Tester Preview Mode. |
 | 12D | 2026-08-10 to 2026-08-16 | Reports Library + Feedback Loop. |
@@ -191,6 +192,35 @@ Acceptance criteria:
 - Tester can understand purpose in 2-3 minutes.
 - Tester can navigate dashboard, candidate detail, source freshness, review, and report preview.
 - No critical confusion around research-only boundaries.
+
+### 12C.1 - Trusted Tester Preview Shell
+
+Goal:
+
+- Add the first non-technical, product-facing click path for a trusted external reviewer inside the existing UI mock.
+
+Deliverables:
+
+- `Trusted Preview` tab in the existing standalone UI mock.
+- Guided path through radar overview, candidate/project detail, source freshness, research snapshot, report preview, and structured feedback prompts.
+- Clear explanation that `WATCHLIST` means manual review only, missing data requires manual verification, freshness is context recency, and review status does not change scanner labels or scoring.
+- `docs/trusted_tester_preview_shell.md`.
+
+Not in scope:
+
+- Deployment.
+- Access gate.
+- Feedback capture or persistence.
+- Backend production code.
+- Source activation, provider calls, OpenAI calls, source adapters, secrets, dependencies, scoring changes, `final_label` changes, review semantics changes, or `WATCHLIST` meaning changes.
+- AI KINTEL implementation.
+
+Acceptance criteria:
+
+- Tester can understand the product purpose and what to click in 2-3 minutes.
+- The preview path does not require CMD, repository access, GitHub, Codex, local scripts, or developer explanation.
+- The UI does not present AI KINTEL as the next implementation target.
+- Private access, feedback capture, report library, and lightweight private preview deployment remain later steps.
 
 ## 12D - Reports Library + Feedback Loop
 

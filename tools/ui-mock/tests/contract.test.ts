@@ -13,6 +13,7 @@ import { LocalMvpWorkflowPanel } from "../src/components/LocalMvpWorkflowPanel";
 import { MarketContextPanel } from "../src/components/MarketContextPanel";
 import { ScannerRadar } from "../src/components/ScannerRadar";
 import { StatCards } from "../src/components/StatCards";
+import { TrustedPreview } from "../src/components/TrustedPreview";
 import { WatchlistTab } from "../src/components/WatchlistTab";
 import { WebinarTeaser } from "../src/components/WebinarTeaser";
 import { WorkspaceOverview } from "../src/components/WorkspaceOverview";
@@ -261,6 +262,7 @@ assert.match(
 const workspaceNavItems = [
   { id: "overview",    label: "Overview",        icon: "OV", description: "Status and health" },
   { id: "control-center", label: "Control Center", icon: "CC", description: "Preview readiness" },
+  { id: "trusted-preview", label: "Trusted Preview", icon: "TP", description: "Guided reviewer path" },
   { id: "webinar-teaser", label: "Webinar Teaser", icon: "WT", description: "Demo-safe screenshots" },
   { id: "scanner",     label: "Scanner Radar",   icon: "SR", description: "Read-only scanner output" },
   { id: "watchlist",   label: "Review Queue",    icon: "RQ", description: "Local analyst queue" },
@@ -290,6 +292,7 @@ const workspaceShellMarkup = renderToStaticMarkup(React.createElement(WorkspaceS
 assert.match(workspaceShellMarkup, /Local MVP Overview/, "workspace shell renders overview section");
 assert.match(workspaceShellMarkup, /Overview/, "workspace shell renders overview navigation");
 assert.match(workspaceShellMarkup, /Control Center/, "workspace shell renders control center navigation");
+assert.match(workspaceShellMarkup, /Trusted Preview/, "workspace shell renders trusted preview navigation");
 assert.match(workspaceShellMarkup, /Webinar Teaser/, "workspace shell renders webinar teaser navigation");
 assert.match(workspaceShellMarkup, /Scanner Radar/, "workspace shell renders scanner radar navigation");
 assert.match(workspaceShellMarkup, /Review Queue/, "workspace shell renders review queue navigation");
@@ -301,6 +304,67 @@ assert.match(
   /This is not a buy\/sell signal\./,
   "workspace shell renders compliance footer",
 );
+
+const trustedPreviewMarkup = renderToStaticMarkup(React.createElement(WorkspaceShell, {
+  navItems: workspaceNavItems,
+  activeSection: "trusted-preview",
+  onSectionChange: () => undefined,
+  dataSource: "fixture",
+  dataSourceOptions: [
+    { key: "fixture", label: "Fixture" },
+    { key: "static-json", label: "Static JSON" },
+    { key: "api", label: "API / latest" },
+  ],
+  onDataSourceChange: () => undefined,
+  loading: false,
+  sourceStatusText: "Scanner source: built-in fixture",
+  trustedPreviewMode: true,
+}, React.createElement(WorkspaceSection, {
+  title: "Trusted Preview",
+  description: "Guided standalone preview path for a trusted external reviewer.",
+}, React.createElement(TrustedPreview))));
+
+assert.match(trustedPreviewMarkup, /Trusted Preview/, "trusted preview renders title and navigation");
+assert.match(trustedPreviewMarkup, /Research-only/, "trusted preview renders research-only boundary");
+assert.match(
+  trustedPreviewMarkup,
+  /WATCHLIST means manual review only/,
+  "trusted preview renders WATCHLIST manual review boundary",
+);
+assert.match(trustedPreviewMarkup, /10-minute click path/, "trusted preview renders click path");
+assert.match(trustedPreviewMarkup, /Open a candidate\/project/, "trusted preview renders project open step");
+assert.match(trustedPreviewMarkup, /Check source freshness/, "trusted preview renders freshness step");
+assert.match(trustedPreviewMarkup, /Review report preview/, "trusted preview renders report preview step");
+assert.match(trustedPreviewMarkup, /Leave structured feedback/, "trusted preview renders feedback step");
+assert.match(trustedPreviewMarkup, /What this tool is/, "trusted preview renders tool purpose section");
+assert.match(trustedPreviewMarkup, /What this tool is not/, "trusted preview renders tool boundary section");
+assert.match(trustedPreviewMarkup, /Feedback prompts/, "trusted preview renders feedback prompts section");
+
+const forbiddenTrustedPreviewTerms = [
+  /\bAI KINTEL\b/i,
+  /Pawe(?:l|\u0142) Gr(?:a|\u0105)dziuk/i,
+  /\bP0\b/i,
+  /\bP1\b/i,
+  /\bP2\b/i,
+  /\bnot ready\b/i,
+  /\bnot-ready\b/i,
+  /\bGitHub\b/i,
+  /\bCodex\b/i,
+  /\bCMD\b/i,
+  /\bbranch\b/i,
+  /\bcommit\b/i,
+  /\bscripts?\b/i,
+  /\bendpoints?\b/i,
+  /\bbuy\b/i,
+  /\bsell\b/i,
+  /\bentry\b/i,
+  /\bsignal\b/i,
+  /\brecommendation\b/i,
+];
+
+for (const pattern of forbiddenTrustedPreviewTerms) {
+  assert.doesNotMatch(trustedPreviewMarkup, pattern, `trusted preview does not render forbidden term ${pattern}`);
+}
 
 const webinarTeaserMarkup = renderToStaticMarkup(React.createElement(WorkspaceShell, {
   navItems: workspaceNavItems,

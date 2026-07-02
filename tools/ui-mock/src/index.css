@@ -846,6 +846,145 @@
     overflow-wrap: anywhere;
   }
 
+  .trusted-preview {
+    @apply grid max-w-6xl gap-3;
+  }
+
+  .trusted-preview-hero,
+  .trusted-preview-section,
+  .trusted-preview-readiness-note {
+    @apply min-w-0 rounded-md;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+  }
+
+  .trusted-preview-hero {
+    @apply flex items-start justify-between gap-5 px-5 py-4;
+    border-color: var(--accent-border);
+  }
+
+  .trusted-preview-hero-copy {
+    @apply min-w-0;
+  }
+
+  .trusted-preview-hero-copy h3 {
+    @apply mt-1 text-2xl font-bold leading-tight;
+    color: var(--text-primary);
+  }
+
+  .trusted-preview-hero-copy p {
+    @apply mt-1 max-w-4xl text-[13px] leading-relaxed;
+    color: var(--text-secondary);
+  }
+
+  .trusted-preview-research-note {
+    @apply max-w-[360px] shrink-0 rounded-md px-3 py-2 text-[12px] font-semibold leading-relaxed;
+    color: var(--amber);
+    background: var(--amber-dim);
+    border: 1px solid var(--amber-border);
+  }
+
+  .trusted-preview-section {
+    @apply grid gap-3 px-4 py-3;
+  }
+
+  .trusted-preview-section-header {
+    @apply min-w-0;
+  }
+
+  .trusted-preview-section-header h3 {
+    @apply mt-0.5 text-base font-bold leading-tight;
+    color: var(--text-primary);
+  }
+
+  .trusted-preview-section-header p {
+    @apply mt-1 max-w-4xl text-[12px] leading-relaxed;
+    color: var(--text-secondary);
+  }
+
+  .trusted-preview-step-grid {
+    @apply grid gap-2;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .trusted-preview-step,
+  .trusted-preview-card,
+  .trusted-preview-label-card,
+  .trusted-preview-prompt,
+  .trusted-preview-boundary-item {
+    @apply min-w-0 rounded-md px-3 py-2.5;
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+  }
+
+  .trusted-preview-step h4,
+  .trusted-preview-card h4 {
+    @apply text-[12px] font-bold leading-tight;
+    color: var(--text-primary);
+  }
+
+  .trusted-preview-step p,
+  .trusted-preview-card p,
+  .trusted-preview-label-card p {
+    @apply mt-1 text-[12px] leading-relaxed;
+    color: var(--text-secondary);
+    overflow-wrap: anywhere;
+  }
+
+  .trusted-preview-two-column {
+    @apply grid gap-3;
+    grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr);
+  }
+
+  .trusted-preview-card-grid,
+  .trusted-preview-boundary-list {
+    @apply grid gap-2;
+  }
+
+  .trusted-preview-card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .trusted-preview-boundary-item {
+    @apply text-[12px] font-semibold leading-relaxed;
+    color: var(--text-secondary);
+  }
+
+  .trusted-preview-label-grid {
+    @apply grid gap-2;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .trusted-preview-label-card strong {
+    @apply block text-[11px] font-bold uppercase leading-tight;
+    color: var(--accent);
+  }
+
+  .trusted-preview-prompt-grid {
+    @apply grid gap-2;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .trusted-preview-prompt {
+    @apply text-[12px] font-semibold leading-relaxed;
+    color: var(--text-primary);
+  }
+
+  .trusted-preview-readiness-note {
+    @apply px-4 py-3;
+    border-color: var(--green-border);
+  }
+
+  .trusted-preview-readiness-note strong {
+    @apply block text-[12px] font-bold uppercase leading-tight;
+    color: var(--green);
+  }
+
+  .trusted-preview-readiness-note p {
+    @apply mt-1 text-[12px] leading-relaxed;
+    color: var(--text-secondary);
+  }
+
   .webinar-teaser {
     @apply grid max-w-6xl gap-4;
   }
@@ -2053,6 +2192,17 @@
       grid-template-columns: 1fr;
     }
 
+    .trusted-preview-two-column {
+      grid-template-columns: 1fr;
+    }
+
+    .trusted-preview-step-grid,
+    .trusted-preview-card-grid,
+    .trusted-preview-label-grid,
+    .trusted-preview-prompt-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
     .webinar-metric-grid,
     .webinar-capture-list,
     .webinar-flow {
@@ -2147,6 +2297,7 @@
     .review-item-actions,
     .control-center-hero,
     .control-center-summary-card,
+    .trusted-preview-hero,
     .webinar-hero,
     .webinar-source-row,
     .webinar-section-topline,
@@ -2159,6 +2310,10 @@
     }
 
     .control-center-research-note {
+      @apply max-w-none;
+    }
+
+    .trusted-preview-research-note {
       @apply max-w-none;
     }
 
@@ -2204,6 +2359,10 @@
 
     .webinar-metric-grid,
     .webinar-capture-list,
+    .trusted-preview-step-grid,
+    .trusted-preview-card-grid,
+    .trusted-preview-label-grid,
+    .trusted-preview-prompt-grid,
     .webinar-flow {
       grid-template-columns: 1fr;
     }
