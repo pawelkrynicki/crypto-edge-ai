@@ -470,6 +470,18 @@ scripts\win\serve-ui-preview.cmd control-center
 
 The production preview serves the built `dist` output from `tools\ui-mock` on `127.0.0.1:4173` and prints the direct hash URL for the selected view.
 
+### Trusted preview session starters
+
+```cmd
+scripts\win\start-trusted-preview-session.cmd
+scripts\win\start-feedback-notes-session.cmd
+```
+
+These starter scripts run `scripts\win\check-preview-launchers.cmd` first and stop if the check fails. When the check passes, they print the target URL and start the existing production-like preview through `scripts\win\serve-ui-preview.cmd`.
+
+- `scripts\win\start-trusted-preview-session.cmd` prints `http://127.0.0.1:4173/#trusted-preview`
+- `scripts\win\start-feedback-notes-session.cmd` prints `http://127.0.0.1:4173/#feedback-notes`
+
 ### Preview launch shortcuts
 
 ```cmd
