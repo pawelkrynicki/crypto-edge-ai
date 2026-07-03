@@ -68,6 +68,18 @@ This starts the local API on port `5177` and the frontend on port `5173` in sepa
 
 Record real click-through results in `docs\local_mvp_rc_manual_preview_notes.md`. Do not mark any area as `PASS` unless the preview was actually opened and clicked through.
 
+## Local production preview
+
+```cmd
+scripts\win\build-ui-preview.cmd
+scripts\win\serve-ui-preview.cmd trusted-preview
+scripts\win\serve-ui-preview.cmd feedback-notes
+scripts\win\serve-ui-preview.cmd webinar-teaser
+scripts\win\serve-ui-preview.cmd control-center
+```
+
+`build-ui-preview.cmd` runs the UI mock production build from `tools\ui-mock`. `serve-ui-preview.cmd` serves the built `dist` directory on `127.0.0.1:4173` and prints the direct preview URL for the selected hash view.
+
 ## Preview launch shortcuts
 
 ```cmd
@@ -75,6 +87,10 @@ scripts\win\dev-trusted-preview.cmd
 scripts\win\dev-feedback-notes.cmd
 scripts\win\dev-webinar-teaser.cmd
 scripts\win\dev-control-center.cmd
+scripts\win\preview-trusted-preview.cmd
+scripts\win\preview-feedback-notes.cmd
+scripts\win\preview-webinar-teaser.cmd
+scripts\win\preview-control-center.cmd
 ```
 
 SQLite Review Storage preview:
