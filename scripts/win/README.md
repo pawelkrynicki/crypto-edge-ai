@@ -93,6 +93,16 @@ scripts\win\preview-webinar-teaser.cmd
 scripts\win\preview-control-center.cmd
 ```
 
+## Preview launcher smoke check
+
+```cmd
+scripts\win\check-preview-launchers.cmd
+```
+
+This verifies that the production preview launcher scripts exist, confirms `tools\ui-mock\package.json`, runs the UI mock production build, checks `tools\ui-mock\dist\index.html`, and prints the expected deep-link preview URLs.
+
+It does not start `vite preview`, run network checks, call providers, require review storage, require a backend, or use AI KINTEL.
+
 SQLite Review Storage preview:
 
 ```cmd
