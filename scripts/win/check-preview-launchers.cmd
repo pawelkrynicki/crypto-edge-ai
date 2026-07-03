@@ -20,6 +20,8 @@ for %%F in (
   "scripts\win\preview-feedback-notes.cmd"
   "scripts\win\preview-webinar-teaser.cmd"
   "scripts\win\preview-control-center.cmd"
+  "scripts\win\start-trusted-preview-session.cmd"
+  "scripts\win\start-feedback-notes-session.cmd"
 ) do (
   if not exist "%REPO_ROOT%\%%~F" (
     echo ERROR: missing %%~F
