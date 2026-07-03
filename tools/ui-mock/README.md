@@ -458,6 +458,15 @@ npm run build   # Build for production
 
 Windows CMD helpers for checking the UI mock, starting the API/frontend preview, and freeing local ports are documented in `../../scripts/win/README.md`. The UI mock check uses direct binaries instead of `pnpm` because of the known Windows `node_modules` / `pnpm` `EPERM` issue.
 
+### Preview launch shortcuts
+
+```cmd
+scripts\win\dev-trusted-preview.cmd
+scripts\win\dev-feedback-notes.cmd
+scripts\win\dev-webinar-teaser.cmd
+scripts\win\dev-control-center.cmd
+```
+
 Local MVP runbook and freeze checklist:
 
 ```text

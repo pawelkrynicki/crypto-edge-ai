@@ -68,6 +68,15 @@ This starts the local API on port `5177` and the frontend on port `5173` in sepa
 
 Record real click-through results in `docs\local_mvp_rc_manual_preview_notes.md`. Do not mark any area as `PASS` unless the preview was actually opened and clicked through.
 
+## Preview launch shortcuts
+
+```cmd
+scripts\win\dev-trusted-preview.cmd
+scripts\win\dev-feedback-notes.cmd
+scripts\win\dev-webinar-teaser.cmd
+scripts\win\dev-control-center.cmd
+```
+
 SQLite Review Storage preview:
 
 ```cmd
