@@ -1,6 +1,10 @@
 # Frontend Target Flow Map
 
-Stage: 12E.1 Frontend Product UX Audit
+Stage: 12E.2 Candidate Results View
+
+Implemented deep link: `#candidate-results`
+
+Next implementation stage: 12E.3 Candidate Detail View
 
 Only target flow:
 

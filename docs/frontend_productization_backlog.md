@@ -1,8 +1,8 @@
 # Frontend Productization Backlog
 
-Stage: 12E.1 Frontend Product UX Audit
+Stage: 12E.2 Candidate Results View
 
-Next implementation stage: 12E.2 Candidate Results View
+Next implementation stage: 12E.3 Candidate Detail View
 
 Rules:
 
@@ -10,6 +10,15 @@ Rules:
 - Reports are not the critical path.
 - AI KINTEL remains later.
 - No backend, storage, provider calls, source activation, scoring, `final_label`, or `WATCHLIST` meaning changes.
+
+12E.2 delivery note:
+
+- Candidate Results is implemented as a product-facing research candidate list.
+- Deep link: `#candidate-results`.
+- The view shows token/project name, chain/network, research priority, reason on radar, source freshness, risk flags, manual review status, and next review step.
+- `WATCHLIST` remains manual review only.
+- Missing data stays `manual verification required`, `unknown`, or `not verified`.
+- Next stage: 12E.3 Candidate Detail View.
 
 | Stage | Task | Target files | Acceptance criteria | Not in scope | Priority |
 |---|---|---|---|---|---|

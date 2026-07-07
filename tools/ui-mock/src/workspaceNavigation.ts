@@ -5,6 +5,7 @@ export const DEFAULT_WORKSPACE_SECTION: WorkspaceSectionId = "overview";
 const WORKSPACE_SECTION_HASHES: Record<WorkspaceSectionId, string> = {
   overview: "#overview",
   "control-center": "#control-center",
+  "candidate-results": "#candidate-results",
   "trusted-preview": "#trusted-preview",
   "feedback-notes": "#feedback-notes",
   "webinar-teaser": "#webinar-teaser",
@@ -18,6 +19,7 @@ const WORKSPACE_SECTION_HASHES: Record<WorkspaceSectionId, string> = {
 const HASH_TO_WORKSPACE_SECTION: Record<string, WorkspaceSectionId> = {
   "#overview": "overview",
   "#control-center": "control-center",
+  "#candidate-results": "candidate-results",
   "#trusted-preview": "trusted-preview",
   "#feedback-notes": "feedback-notes",
   "#webinar-teaser": "webinar-teaser",

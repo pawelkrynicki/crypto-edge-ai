@@ -83,7 +83,7 @@ Screenshot guide:
 
 12C.3 adds hash navigation for the standalone UI mock so trusted preview views can be opened directly.
 
-- Supported preview links include `#trusted-preview`, `#feedback-notes`, `#webinar-teaser`, and `#control-center`.
+- Supported preview links include `#candidate-results`, `#trusted-preview`, `#feedback-notes`, `#webinar-teaser`, and `#control-center`.
 - Unknown hashes fall back to the safe default overview view.
 - The change is UI navigation only. It adds no router dependency, storage, backend, deployment, access gate, provider calls, source activation, secrets, `.env`, scanner scoring changes, `final_label` changes, review semantics changes, or `WATCHLIST` meaning changes.
 
@@ -106,6 +106,18 @@ Screenshot guide:
 - `../../docs/frontend_product_ux_audit.md`
 - `../../docs/frontend_productization_backlog.md`
 - `../../docs/frontend_target_flow_map.md`
+
+## 12E.2 Candidate Results View
+
+12E.2 adds the first product-facing **Candidate Results** view for reviewing scanner candidates as a research workflow.
+
+- Candidate Results is available from navigation and by direct deep link at `#candidate-results`.
+- The view uses the existing scanner mock/API bridge data and adds no backend, storage, provider call, source activation, dependency, scoring change, `final_label` change, or `WATCHLIST` meaning change.
+- Each research candidate shows token/project name, chain/network, research priority, reason on radar, source freshness, risk flags, manual review status, and next review step.
+- `WATCHLIST` is presented as manual review only.
+- Missing or unknown data is shown as `manual verification required`, `unknown`, or `not verified`.
+- Forbidden trading CTA language is not used in the Candidate Results actions.
+- Next stage: **12E.3 Candidate Detail View**.
 
 ## 11A AI KINTEL Production MVP Planning
 
@@ -197,12 +209,13 @@ These artifacts close the AI KINTEL planning package without deploying staging, 
 
 ## Features
 - **Dark, professional UI**: Aligned with the AIKINTEL aesthetic.
+- **Candidate Results**: Product-facing research candidate list with source freshness, risk flags, manual review status, and next review step.
 - **Scanner Radar**: Product-grade candidate list and detail workspace showing scanner labels, local review status, security labels, market metrics, and read-only scanner reasons.
 - **Control Center**: Standalone preview status hub for product readiness, source freshness, review flow, reports, research-only boundaries, and trusted tester preparation.
 - **Trusted Preview**: Non-technical reviewer click path for understanding radar, project detail, source freshness, report preview, and feedback prompts.
 - **Feedback Notes**: Product-facing worksheet for session checklist, feedback prompts, triage buckets, and static notes after a trusted preview review.
 - **Webinar Teaser**: Demo-safe screenshot mode with controlled research-radar screens and a lightweight capture kit for webinar use.
-- **Deep-Linkable Preview Navigation**: Hash links can open key trusted preview views directly without adding routing, storage, backend, or provider calls.
+- **Deep-Linkable Preview Navigation**: Hash links can open key trusted preview and candidate workflow views directly without adding routing, storage, backend, or provider calls.
 - **Market Context Panel**: Shows Alternative.me Fear & Greed plus DefiLlama context from the local API bridge.
 - **Candidate Detail Panel**: In-depth breakdown of a selected token, including research context/data coverage, a trader checklist, and risk reasons.
 - **Local Review Session**: Local analyst workspace for per-candidate review status, analyst note, and last-updated timestamp.
@@ -773,9 +786,9 @@ Diagnostics are available at `GET /api/scanner/sources`. This endpoint reports w
 This remains read-only and local. It does not add a database, auth, OpenAI, live token fetching, scanner logic changes, UI redesign, or trading signal behavior. Next stage: automate writing a real `tools/data-poc` run and verify the UI against API mode.
 
 ## Next Steps
-- 12E.1: Frontend Product UX Audit is the current documentation baseline.
-- 12E.2: Candidate Results View is the next frontend productization stage.
-- 12E.3-12E.12: continue Candidate Detail, Token / Contract Lookup, External Verification Links, Manual Verification Fallbacks, Research Action Panel, Navigation Cleanup, Empty / Error / Partial States, Copy / Naming, Visual Polish, and Frontend Contract Tests.
+- 12E.2: Candidate Results View is the current frontend productization baseline.
+- 12E.3: Candidate Detail View is the next frontend productization stage.
+- 12E.4-12E.12: continue Token / Contract Lookup, External Verification Links, Manual Verification Fallbacks, Research Action Panel, Navigation Cleanup, Empty / Error / Partial States, Copy / Naming, Visual Polish, and Frontend Contract Tests.
 - Reports remain useful supporting artifacts, but they are not the critical path for the next frontend rebuild.
 - Treat 12B.2 Webinar Teaser Screenshot Mode and 12B.3 Webinar Screenshot Capture Kit as screenshot-only UI, not as trusted tester preview readiness.
 - Keep AI KINTEL and real AI/provider integrations deferred until after standalone preview feedback and owner review.
@@ -809,7 +822,7 @@ The header now shows a **Fixture / Static JSON / API** segment control. Switchin
 1. Calls `loadScannerDataSourceResult(source)` from `scannerDataSource.ts`
 2. Runs the result through the existing adapter (`mapPersistableScannerOutputToUiCandidates`)
 3. Updates `candidates` state in `App.tsx`
-4. All tabs (Scanner Radar, Watchlist, Risk Alerts) re-render with new data
+4. Candidate Results, Scanner Radar, Watchlist, and Risk Alerts re-render with new data
 
 If a source is unavailable (e.g. API not yet implemented), the service falls back to the fixture and shows a yellow notice banner in the UI.
 
