@@ -91,6 +91,22 @@ Screenshot guide:
 
 - `../../docs/deep_linkable_preview_navigation.md`
 
+## 12E.1 Frontend Product UX Audit
+
+12E.1 documents the current standalone UI inventory and the frontend productization backlog before the next rebuild steps.
+
+- Frontend productization is now the main axis.
+- Next stage is **12E.2 Candidate Results View**.
+- Reports are not the critical path for the next frontend rebuild.
+- AI KINTEL remains deferred to a later integration stage after standalone trusted tester feedback.
+- This stage adds no runtime UI changes, backend, storage, provider calls, source activation, dependencies, scanner scoring changes, `final_label` changes, or `WATCHLIST` meaning changes.
+
+12E.1 documents:
+
+- `../../docs/frontend_product_ux_audit.md`
+- `../../docs/frontend_productization_backlog.md`
+- `../../docs/frontend_target_flow_map.md`
+
 ## 11A AI KINTEL Production MVP Planning
 
 11A defines the production direction as an AI KINTEL Crypto Market module, not a standalone SaaS. This UI mock remains a local RC baseline for porting and is not the production implementation.
@@ -757,11 +773,10 @@ Diagnostics are available at `GET /api/scanner/sources`. This endpoint reports w
 This remains read-only and local. It does not add a database, auth, OpenAI, live token fetching, scanner logic changes, UI redesign, or trading signal behavior. Next stage: automate writing a real `tools/data-poc` run and verify the UI against API mode.
 
 ## Next Steps
-- 12C.1: Trusted Tester Preview Shell is now the first non-technical click path.
-- 12C.2: Feedback Prompt / Session Notes Shell now helps structure post-session notes without saving feedback.
-- 12C: continue shaping trusted tester preview mode around private access, persisted feedback capture, and report accessibility.
-- 12D: add Reports Library + Feedback Loop.
-- 12E: prepare Lightweight Private Preview Deployment.
+- 12E.1: Frontend Product UX Audit is the current documentation baseline.
+- 12E.2: Candidate Results View is the next frontend productization stage.
+- 12E.3-12E.12: continue Candidate Detail, Token / Contract Lookup, External Verification Links, Manual Verification Fallbacks, Research Action Panel, Navigation Cleanup, Empty / Error / Partial States, Copy / Naming, Visual Polish, and Frontend Contract Tests.
+- Reports remain useful supporting artifacts, but they are not the critical path for the next frontend rebuild.
 - Treat 12B.2 Webinar Teaser Screenshot Mode and 12B.3 Webinar Screenshot Capture Kit as screenshot-only UI, not as trusted tester preview readiness.
 - Keep AI KINTEL and real AI/provider integrations deferred until after standalone preview feedback and owner review.
 

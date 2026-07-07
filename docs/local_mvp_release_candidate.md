@@ -3,6 +3,9 @@
 ## Status
 
 - Local MVP Release Candidate Stabilization v1.
+- Stage 12E.1 adds the Frontend Product UX Audit and productization backlog. It is documentation only and makes frontend productization the main axis.
+- Next frontend stage is 12E.2 Candidate Results View.
+- Reports are not the critical path for the next frontend rebuild.
 - Stage 12C.3 adds Deep-Linkable Trusted Preview navigation for direct hash links to key preview views. It is UI navigation only and does not add deployment, access, backend, or storage.
 - Stage 12C.2 adds a Feedback Prompt / Session Notes Shell for organizing post-session trusted tester feedback. It is UI shell only and does not save feedback.
 - Stage 12C.1 adds a Trusted Tester Preview Shell as the first non-technical click path for a trusted external reviewer. It is UI shell only and does not add access, deployment, or feedback persistence.
@@ -34,8 +37,15 @@
 - 12C.1 does not add backend, deployment, access gate, tunnel, feedback persistence, provider calls, source adapters, source activation, source check changes, fetch logic changes, secrets, `.env`, npm dependencies, scanner scoring changes, `final_label` changes, review semantics changes, or `WATCHLIST` meaning changes.
 - 12C.2 does not add backend, deployment, access gate, tunnel, feedback persistence, feedback capture backend, provider calls, source adapters, source activation, source check changes, fetch logic changes, secrets, `.env`, npm dependencies, scanner scoring changes, `final_label` changes, review semantics changes, or `WATCHLIST` meaning changes.
 - 12C.3 does not add backend, deployment, access gate, tunnel, feedback persistence, storage, provider calls, source adapters, source activation, source check changes, fetch logic changes, secrets, `.env`, npm dependencies, scanner scoring changes, `final_label` changes, review semantics changes, or `WATCHLIST` meaning changes.
+- 12E.1 does not add runtime UI changes, backend, storage, provider calls, source adapters, source activation, source check changes, fetch logic changes, secrets, `.env`, npm dependencies, scanner scoring changes, `final_label` changes, review semantics changes, or `WATCHLIST` meaning changes.
 - Trusted tester preview still needs private access, persisted feedback capture, report library, and lightweight private deployment before a real external test.
 - AI KINTEL remains a later integration stage.
+
+12E.1 frontend productization documents:
+
+- `docs/frontend_product_ux_audit.md`
+- `docs/frontend_productization_backlog.md`
+- `docs/frontend_target_flow_map.md`
 
 12A standalone trusted tester documents:
 
@@ -115,6 +125,7 @@
 ## Included In Local MVP
 
 - Standalone Control Center shell for preview readiness/status visibility.
+- Frontend Product UX Audit and 12E.2-12E.12 productization backlog.
 - Trusted Tester Preview Shell for the first non-technical reviewer click path.
 - Feedback Notes shell for structuring trusted tester session notes without saving data.
 - Deep-linkable preview navigation for direct links to key trusted preview views.
@@ -142,6 +153,7 @@
 - New data sources.
 - OpenAI calls.
 - Report generation from UI.
+- Reports as the critical frontend productization axis.
 - Auto-trading.
 - Investment recommendations or trading signals.
 - Webinar Teaser Screenshot Mode does not make the local RC production-ready.
