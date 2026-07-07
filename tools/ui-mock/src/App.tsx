@@ -9,6 +9,7 @@ import { MarketContextPanel, type MarketContextPanelState } from "./components/M
 import { LocalMvpWorkflowPanel } from "./components/LocalMvpWorkflowPanel";
 import { WorkspaceOverview } from "./components/WorkspaceOverview";
 import { ControlCenter } from "./components/ControlCenter";
+import { CandidateDetailView } from "./components/CandidateDetailView";
 import { CandidateResultsView } from "./components/CandidateResultsView";
 import { TrustedPreview } from "./components/TrustedPreview";
 import { FeedbackNotes } from "./components/FeedbackNotes";
@@ -29,6 +30,7 @@ import { loadLatestMarketContext } from "./services/contextDataSource";
 import {
   clearReviewRecord,
   createEmptyReviewSession,
+  getCandidateReview,
   loadReviewSession,
   saveReviewRecord,
   saveReviewSessionState,
@@ -67,6 +69,7 @@ function buildSummary(candidates: MockCandidate[]) {
 const WORKSPACE_NAV_ITEMS: WorkspaceNavItem[] = [
   { id: "overview",    label: "Overview",        icon: "OV", description: "Status and health" },
   { id: "candidate-results", label: "Candidate Results", icon: "CR", description: "Research candidates" },
+  { id: "candidate-detail", label: "Candidate Detail", icon: "CD", description: "Review candidate" },
   { id: "control-center", label: "Control Center", icon: "CC", description: "Preview readiness" },
   { id: "trusted-preview", label: "Trusted Preview", icon: "TP", description: "Guided reviewer path" },
   { id: "feedback-notes", label: "Feedback Notes", icon: "FN", description: "Session notes worksheet" },
@@ -90,6 +93,10 @@ const SECTION_COPY: Record<WorkspaceSectionId, { title: string; description: str
   "candidate-results": {
     title: "Candidate Results",
     description: "Research candidate list for manual review, source freshness, risk flags and next review step.",
+  },
+  "candidate-detail": {
+    title: "Candidate Detail",
+    description: "Candidate detail for manual review, source freshness, risk flags and next review step.",
   },
   "trusted-preview": {
     title: "Trusted Preview",
@@ -178,6 +185,14 @@ export default function App() {
   const summary = buildSummary(candidates);
   const sourceStatusText = SOURCE_STATUS_TEXT[resolvedSource];
   const contextSourceStatus = getContextSourceStatus(marketContextState);
+  const selectedDetailCandidate =
+    candidates.find((candidate) => candidate.id === selectedCandidateId) ??
+    candidates.find((candidate) => candidate.final_label === "WATCHLIST") ??
+    candidates[0] ??
+    null;
+  const selectedDetailReviewRecord = selectedDetailCandidate
+    ? getCandidateReview(selectedDetailCandidate.id, reviewSession)
+    : null;
 
   const loadData = useCallback(async (source: DataSourceKey) => {
     setLoading(true);
@@ -336,7 +351,7 @@ export default function App() {
 
   const handleOpenCandidate = useCallback((candidateId: string) => {
     setSelectedCandidateId(candidateId);
-    handleWorkspaceSectionChange("scanner");
+    handleWorkspaceSectionChange("candidate-detail");
   }, [handleWorkspaceSectionChange]);
 
   const renderLoadingSection = (sectionId: WorkspaceSectionId) => {
@@ -400,6 +415,16 @@ export default function App() {
               candidates={candidates}
               reviewSession={reviewSession}
               onOpenCandidate={handleOpenCandidate}
+            />
+          </WorkspaceSection>
+        );
+      case "candidate-detail":
+        return (
+          <WorkspaceSection {...SECTION_COPY["candidate-detail"]}>
+            <CandidateDetailView
+              candidate={selectedDetailCandidate}
+              reviewRecord={selectedDetailReviewRecord}
+              onBackToResults={() => handleWorkspaceSectionChange("candidate-results")}
             />
           </WorkspaceSection>
         );
