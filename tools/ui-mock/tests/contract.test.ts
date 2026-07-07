@@ -7,6 +7,7 @@ import type { AddressInfo } from "node:net";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { mapPersistableScannerOutputToUiCandidates } from "../src/adapters/scannerOutputAdapter";
+import { CandidateResultsView } from "../src/components/CandidateResultsView";
 import { CandidateDetail, getMissingSecurityText } from "../src/components/CandidateDetail";
 import { ControlCenter } from "../src/components/ControlCenter";
 import { LocalMvpWorkflowPanel } from "../src/components/LocalMvpWorkflowPanel";
@@ -266,6 +267,7 @@ assert.match(
 
 const workspaceNavItems = [
   { id: "overview",    label: "Overview",        icon: "OV", description: "Status and health" },
+  { id: "candidate-results", label: "Candidate Results", icon: "CR", description: "Research candidates" },
   { id: "control-center", label: "Control Center", icon: "CC", description: "Preview readiness" },
   { id: "trusted-preview", label: "Trusted Preview", icon: "TP", description: "Guided reviewer path" },
   { id: "feedback-notes", label: "Feedback Notes", icon: "FN", description: "Session notes worksheet" },
@@ -277,7 +279,7 @@ const workspaceNavItems = [
   { id: "methodology", label: "Methodology",     icon: "M",  description: "Scanner and review layers" },
 ] satisfies WorkspaceNavItem[];
 
-for (const label of ["Trusted Preview", "Feedback Notes", "Webinar Teaser", "Control Center"]) {
+for (const label of ["Candidate Results", "Trusted Preview", "Feedback Notes", "Webinar Teaser", "Control Center"]) {
   assert.ok(
     workspaceNavItems.some((item) => item.label === label),
     `workspace navigation includes ${label}`,
@@ -285,6 +287,7 @@ for (const label of ["Trusted Preview", "Feedback Notes", "Webinar Teaser", "Con
 }
 
 assert.equal(resolveInitialWorkspaceSection("#trusted-preview"), "trusted-preview");
+assert.equal(resolveInitialWorkspaceSection("#candidate-results"), "candidate-results");
 assert.equal(resolveInitialWorkspaceSection("#feedback-notes"), "feedback-notes");
 assert.equal(resolveInitialWorkspaceSection("#webinar-teaser"), "webinar-teaser");
 assert.equal(resolveInitialWorkspaceSection("#control-center"), "control-center");
@@ -293,6 +296,7 @@ assert.equal(resolveInitialWorkspaceSection(""), "overview");
 assert.equal(resolveInitialWorkspaceSection("#context"), "overview");
 assert.equal(resolveInitialWorkspaceSection("#workflow"), "overview");
 assert.equal(sectionToHash("trusted-preview"), "#trusted-preview");
+assert.equal(sectionToHash("candidate-results"), "#candidate-results");
 assert.equal(sectionToHash("feedback-notes"), "#feedback-notes");
 assert.equal(sectionToHash("webinar-teaser"), "#webinar-teaser");
 assert.equal(sectionToHash("control-center"), "#control-center");
@@ -317,6 +321,7 @@ const workspaceShellMarkup = renderToStaticMarkup(React.createElement(WorkspaceS
 
 assert.match(workspaceShellMarkup, /Local MVP Overview/, "workspace shell renders overview section");
 assert.match(workspaceShellMarkup, /Overview/, "workspace shell renders overview navigation");
+assert.match(workspaceShellMarkup, /Candidate Results/, "workspace shell renders candidate results navigation");
 assert.match(workspaceShellMarkup, /Control Center/, "workspace shell renders control center navigation");
 assert.match(workspaceShellMarkup, /Trusted Preview/, "workspace shell renders trusted preview navigation");
 assert.match(workspaceShellMarkup, /Feedback Notes/, "workspace shell renders feedback notes navigation");
@@ -677,6 +682,60 @@ assert.ok(savedReviewRecord, "saved review record is available from review sessi
 assert.equal(savedReviewRecord.status, "saved_for_follow_up", "review status is persisted");
 assert.equal(savedReviewRecord.note, "Track community and liquidity follow-up.", "review note is persisted");
 assert.ok(reviewStorage.getItem(REVIEW_SESSION_STORAGE_KEY), "review session is written to local storage key");
+
+const candidateResultsMarkup = renderToStaticMarkup(React.createElement(CandidateResultsView, {
+  candidates: [passMockCandidate, lowlMockCandidate, fdvMockCandidate],
+  reviewSession: savedReviewState,
+  onOpenCandidate: () => undefined,
+}));
+
+assert.match(candidateResultsMarkup, /Candidate Results/, "candidate results view exists");
+assert.match(candidateResultsMarkup, /research candidate/i, "candidate results renders research candidate copy");
+assert.match(candidateResultsMarkup, /manual review/i, "candidate results renders manual review copy");
+assert.match(candidateResultsMarkup, /source freshness/i, "candidate results renders source freshness");
+assert.match(candidateResultsMarkup, /risk flags/i, "candidate results renders risk flags");
+assert.match(candidateResultsMarkup, /next review step/i, "candidate results renders next review step");
+assert.match(candidateResultsMarkup, /Review candidate/, "candidate results renders neutral review candidate action");
+assert.match(
+  candidateResultsMarkup,
+  /WATCHLIST is shown as manual review only/,
+  "candidate results keeps WATCHLIST manual-review only",
+);
+assert.ok(
+  (candidateResultsMarkup.match(/candidate-result-card/g) ?? []).length >= 3,
+  "candidate results renders at least three candidate cards",
+);
+assert.doesNotMatch(
+  candidateResultsMarkup,
+  forbiddenActionPattern,
+  "candidate results does not render forbidden trading words as actions",
+);
+assert.doesNotMatch(
+  candidateResultsMarkup,
+  /\b(?:buy|sell|entry|signal|recommendation)\b/i,
+  "candidate results avoids forbidden trading vocabulary",
+);
+
+const candidateResultsMissingSecurityMarkup = renderToStaticMarkup(React.createElement(CandidateResultsView, {
+  candidates: [lowlMockCandidate],
+  reviewSession: createEmptyReviewSession(),
+}));
+
+assert.match(
+  candidateResultsMissingSecurityMarkup,
+  /not verified/i,
+  "candidate results marks missing security data as not verified",
+);
+assert.match(
+  candidateResultsMissingSecurityMarkup,
+  /manual verification required/i,
+  "candidate results requires manual verification when data is missing",
+);
+assert.doesNotMatch(
+  candidateResultsMissingSecurityMarkup,
+  /verified scanner security data/i,
+  "candidate results does not give missing data a positive security status",
+);
 
 const reloadedReviewState = loadReviewSession(reviewStorage);
 assert.equal(

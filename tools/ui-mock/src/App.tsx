@@ -9,6 +9,7 @@ import { MarketContextPanel, type MarketContextPanelState } from "./components/M
 import { LocalMvpWorkflowPanel } from "./components/LocalMvpWorkflowPanel";
 import { WorkspaceOverview } from "./components/WorkspaceOverview";
 import { ControlCenter } from "./components/ControlCenter";
+import { CandidateResultsView } from "./components/CandidateResultsView";
 import { TrustedPreview } from "./components/TrustedPreview";
 import { FeedbackNotes } from "./components/FeedbackNotes";
 import { WebinarTeaser } from "./components/WebinarTeaser";
@@ -65,6 +66,7 @@ function buildSummary(candidates: MockCandidate[]) {
 
 const WORKSPACE_NAV_ITEMS: WorkspaceNavItem[] = [
   { id: "overview",    label: "Overview",        icon: "OV", description: "Status and health" },
+  { id: "candidate-results", label: "Candidate Results", icon: "CR", description: "Research candidates" },
   { id: "control-center", label: "Control Center", icon: "CC", description: "Preview readiness" },
   { id: "trusted-preview", label: "Trusted Preview", icon: "TP", description: "Guided reviewer path" },
   { id: "feedback-notes", label: "Feedback Notes", icon: "FN", description: "Session notes worksheet" },
@@ -84,6 +86,10 @@ const SECTION_COPY: Record<WorkspaceSectionId, { title: string; description: str
   "control-center": {
     title: "Control Center",
     description: "Standalone preview readiness, source freshness, review flow, reports and tester preparation.",
+  },
+  "candidate-results": {
+    title: "Candidate Results",
+    description: "Research candidate list for manual review, source freshness, risk flags and next review step.",
   },
   "trusted-preview": {
     title: "Trusted Preview",
@@ -384,6 +390,16 @@ export default function App() {
               contextSourceDetail={contextSourceStatus.detail}
               marketContextState={marketContextState}
               reviewStorageStatus={reviewStorageStatus}
+            />
+          </WorkspaceSection>
+        );
+      case "candidate-results":
+        return (
+          <WorkspaceSection {...SECTION_COPY["candidate-results"]}>
+            <CandidateResultsView
+              candidates={candidates}
+              reviewSession={reviewSession}
+              onOpenCandidate={handleOpenCandidate}
             />
           </WorkspaceSection>
         );

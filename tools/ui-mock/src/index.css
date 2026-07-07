@@ -1448,6 +1448,264 @@
     border-color: var(--border-sub);
   }
 
+  .candidate-results-view {
+    @apply grid max-w-7xl gap-3;
+  }
+
+  .candidate-results-hero {
+    @apply flex items-start justify-between gap-4 rounded-md px-4 py-3;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+  }
+
+  .candidate-results-hero-copy {
+    @apply min-w-0;
+  }
+
+  .candidate-results-eyebrow {
+    @apply inline-flex rounded-md px-2 py-0.5 text-[10px] font-bold uppercase leading-tight;
+    color: var(--accent);
+    background: var(--accent-dim);
+    border: 1px solid var(--accent-border);
+  }
+
+  .candidate-results-hero-copy h3 {
+    @apply mt-1 text-xl font-bold leading-tight;
+    color: var(--text-primary);
+  }
+
+  .candidate-results-hero-copy p {
+    @apply mt-1 max-w-4xl text-[12px] leading-relaxed;
+    color: var(--text-secondary);
+  }
+
+  .candidate-results-boundary {
+    @apply min-w-[230px] rounded-md px-3 py-2 text-[11px] leading-relaxed;
+    color: var(--text-secondary);
+    background: var(--amber-dim);
+    border: 1px solid var(--amber-border);
+  }
+
+  .candidate-results-boundary strong {
+    @apply block text-[10px] uppercase leading-tight;
+    color: var(--amber);
+  }
+
+  .candidate-results-summary-grid {
+    @apply grid gap-2;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .candidate-results-summary-card {
+    @apply min-w-0 rounded-md px-3 py-2;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+  }
+
+  .candidate-results-summary-card span {
+    @apply block text-[10px] font-bold uppercase leading-snug;
+    color: var(--text-muted);
+  }
+
+  .candidate-results-summary-card strong {
+    @apply mt-1 block text-xl font-bold tabular-nums leading-tight;
+    color: var(--text-primary);
+  }
+
+  .candidate-results-summary-card p {
+    @apply mt-1 text-[10px] leading-snug;
+    color: var(--text-secondary);
+  }
+
+  .candidate-results-list {
+    @apply grid gap-2.5;
+  }
+
+  .candidate-result-card {
+    @apply min-w-0 rounded-md p-3 space-y-3;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+  }
+
+  .candidate-result-card.review {
+    border-color: var(--accent-border);
+    box-shadow: inset 3px 0 0 var(--accent);
+  }
+
+  .candidate-result-card.manual {
+    border-color: var(--amber-border);
+    box-shadow: inset 3px 0 0 var(--amber);
+  }
+
+  .candidate-result-card.critical {
+    border-color: var(--red-border);
+    box-shadow: inset 3px 0 0 var(--red);
+  }
+
+  .candidate-result-topline {
+    @apply flex min-w-0 items-start justify-between gap-3;
+  }
+
+  .candidate-result-token {
+    @apply min-w-0;
+  }
+
+  .candidate-result-token strong {
+    @apply mt-1 block truncate text-base font-bold leading-tight;
+    color: var(--text-primary);
+  }
+
+  .candidate-result-token span:last-child {
+    @apply block truncate text-[11px] leading-tight;
+    color: var(--text-secondary);
+  }
+
+  .candidate-result-badges {
+    @apply flex shrink-0 flex-wrap justify-end gap-1.5;
+  }
+
+  .candidate-result-grid {
+    @apply grid gap-2;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .candidate-result-field {
+    @apply min-w-0 rounded-md px-2.5 py-2;
+    background: rgba(8, 12, 16, 0.28);
+    border: 1px solid var(--border);
+  }
+
+  .candidate-result-field.review {
+    border-color: var(--accent-border);
+  }
+
+  .candidate-result-field.manual {
+    border-color: var(--amber-border);
+  }
+
+  .candidate-result-field.critical {
+    border-color: var(--red-border);
+  }
+
+  .candidate-result-field span,
+  .candidate-result-section-title span,
+  .candidate-result-review-state span,
+  .candidate-result-next-step span,
+  .candidate-result-reason span {
+    @apply block text-[10px] font-bold uppercase leading-tight;
+    color: var(--text-muted);
+  }
+
+  .candidate-result-field strong {
+    @apply mt-1 block text-[12px] font-bold leading-snug;
+    color: var(--text-primary);
+    overflow-wrap: anywhere;
+  }
+
+  .candidate-result-field p {
+    @apply mt-1 text-[10px] leading-snug;
+    color: var(--text-secondary);
+    overflow-wrap: anywhere;
+  }
+
+  .candidate-result-field.review strong {
+    color: var(--accent);
+  }
+
+  .candidate-result-field.manual strong {
+    color: var(--amber);
+  }
+
+  .candidate-result-field.critical strong {
+    color: var(--red);
+  }
+
+  .candidate-result-reason,
+  .candidate-result-risk-panel {
+    @apply rounded-md px-3 py-2;
+    background: rgba(8, 12, 16, 0.22);
+    border: 1px solid var(--border);
+  }
+
+  .candidate-result-reason p {
+    @apply mt-1 text-[12px] leading-relaxed;
+    color: var(--text-secondary);
+    overflow-wrap: anywhere;
+  }
+
+  .candidate-result-section-title {
+    @apply flex flex-wrap items-center justify-between gap-2;
+  }
+
+  .candidate-result-section-title small {
+    @apply text-[10px] leading-snug;
+    color: var(--text-muted);
+  }
+
+  .candidate-result-chip-list {
+    @apply mt-2 flex flex-wrap gap-1.5;
+  }
+
+  .candidate-results-chip {
+    @apply inline-flex min-w-0 max-w-full rounded-md px-2 py-0.5 text-[10px] font-semibold leading-tight;
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    background: var(--bg-raised);
+    overflow-wrap: anywhere;
+  }
+
+  .candidate-results-chip.manual {
+    color: var(--amber);
+    background: var(--amber-dim);
+    border-color: var(--amber-border);
+  }
+
+  .candidate-results-chip.critical {
+    color: var(--red);
+    background: var(--red-dim);
+    border-color: var(--red-border);
+  }
+
+  .candidate-result-footer {
+    @apply grid items-center gap-2;
+    grid-template-columns: minmax(160px, 0.75fr) minmax(220px, 1fr) auto;
+  }
+
+  .candidate-result-review-state,
+  .candidate-result-next-step {
+    @apply min-w-0 rounded-md px-2.5 py-2;
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+  }
+
+  .candidate-result-review-state {
+    @apply flex items-center justify-between gap-2;
+  }
+
+  .candidate-result-next-step strong {
+    @apply mt-1 block text-[12px] font-bold leading-snug;
+    color: var(--text-primary);
+    overflow-wrap: anywhere;
+  }
+
+  .candidate-result-review-button {
+    @apply rounded-md px-3 py-2 text-[12px] font-bold transition-colors;
+    color: var(--accent);
+    background: var(--accent-dim);
+    border: 1px solid var(--accent-border);
+  }
+
+  .candidate-result-review-button:hover {
+    background: rgba(90, 167, 255, 0.22);
+  }
+
+  .candidate-results-empty {
+    @apply rounded-md p-6 text-center text-sm;
+    color: var(--text-secondary);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+  }
+
   .scanner-workbench {
     @apply grid gap-3 min-h-[500px];
     grid-template-columns: minmax(320px, 430px) minmax(0, 1fr);
@@ -2324,6 +2582,15 @@
       grid-template-columns: 1fr;
     }
 
+    .candidate-results-summary-grid,
+    .candidate-result-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .candidate-result-footer {
+      grid-template-columns: 1fr;
+    }
+
     .trusted-preview-two-column {
       grid-template-columns: 1fr;
     }
@@ -2436,6 +2703,8 @@
     .review-item-actions,
     .control-center-hero,
     .control-center-summary-card,
+    .candidate-results-hero,
+    .candidate-result-topline,
     .trusted-preview-hero,
     .feedback-notes-hero,
     .webinar-hero,
@@ -2451,6 +2720,10 @@
 
     .control-center-research-note {
       @apply max-w-none;
+    }
+
+    .candidate-results-boundary {
+      @apply min-w-0 w-full;
     }
 
     .trusted-preview-research-note {
@@ -2503,6 +2776,8 @@
 
     .webinar-metric-grid,
     .webinar-capture-list,
+    .candidate-results-summary-grid,
+    .candidate-result-grid,
     .trusted-preview-step-grid,
     .trusted-preview-card-grid,
     .trusted-preview-label-grid,
