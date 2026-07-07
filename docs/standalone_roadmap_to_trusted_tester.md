@@ -2,9 +2,12 @@
 
 ## Status
 
-- Stage 12C.2.
+- Stage 12E.1.
 - Roadmap after strategic correction.
 - AI KINTEL is moved to the final integration stage after standalone preview feedback.
+- Frontend productization is now the main axis.
+- Next stage is 12E.2 Candidate Results View.
+- Reports are not the critical path for the next frontend rebuild.
 
 ## Timing Context
 
@@ -24,6 +27,7 @@
 | 12C.1 | Before vacation | Trusted Tester Preview Shell. |
 | 12C.2 | Before vacation | Feedback Prompt / Session Notes Shell. |
 | 12C.3 | Before vacation | Deep-Linkable Trusted Preview. |
+| 12E.1 | Before 12E.2 | Frontend Product UX Audit. |
 | 12B | 2026-07-26 to 2026-08-02 | Standalone Control Center / No-CMD Workflow. |
 | 12C | 2026-08-03 to 2026-08-09 | Trusted Tester Preview Mode. |
 | 12D | 2026-08-10 to 2026-08-16 | Reports Library + Feedback Loop. |
@@ -278,6 +282,36 @@ Acceptance criteria:
 - Known preview hashes open the intended UI section.
 - Unknown hashes fall back to the safe default overview view.
 - Navigation does not change scanner output, review behavior, source behavior, labels, or scoring.
+
+## 12E.1 - Frontend Product UX Audit
+
+Goal:
+
+- Audit the current standalone UI and define the implementation backlog for frontend productization.
+
+Deliverables:
+
+- `docs/frontend_product_ux_audit.md`
+- `docs/frontend_productization_backlog.md`
+- `docs/frontend_target_flow_map.md`
+
+Not in scope:
+
+- Runtime UI rebuild.
+- Backend, storage, provider calls, source activation, scraping, OpenAI calls, or paid sources.
+- Scanner scoring changes.
+- `final_label` changes.
+- `WATCHLIST` meaning changes.
+- AI KINTEL implementation.
+
+Acceptance criteria:
+
+- Current UI inventory, product gaps, candidate workflow gaps, token/contract verification gaps, external verification opportunities, copy, navigation, visual polish, and test gaps are documented.
+- Backlog covers 12E.2 through 12E.12.
+- Target flow is Start / Radar, Candidate Results, Candidate Detail, External Checks, Manual Verification, Review / Watchlist, Feedback Notes, with Control Center as admin/status.
+- Reports are documented as non-critical path for the next frontend rebuild.
+- AI KINTEL remains a later integration stage.
+- Next stage is 12E.2 Candidate Results View.
 
 ## 12D - Reports Library + Feedback Loop
 
