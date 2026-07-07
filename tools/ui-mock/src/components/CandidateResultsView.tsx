@@ -160,7 +160,7 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
                     className="candidate-result-review-button"
                     onClick={() => onOpenCandidate(candidate.id)}
                   >
-                    Review candidate
+                    Open candidate detail
                   </button>
                 )}
               </footer>
