@@ -1770,6 +1770,119 @@
     overflow-wrap: anywhere;
   }
 
+  .research-action-panel {
+    @apply grid min-w-0 gap-3 rounded-md px-3 py-2.5;
+    background: var(--bg-card);
+    border: 1px solid var(--accent-border);
+  }
+
+  .research-action-panel.compact {
+    @apply gap-2;
+    background: rgba(8, 12, 16, 0.2);
+  }
+
+  .research-action-panel-header {
+    @apply flex items-start justify-between gap-3;
+  }
+
+  .research-action-eyebrow {
+    @apply inline-flex rounded-md px-2 py-0.5 text-[10px] font-bold uppercase leading-tight;
+    color: var(--accent);
+    background: var(--accent-dim);
+    border: 1px solid var(--accent-border);
+  }
+
+  .research-action-panel-header h4 {
+    @apply mt-1 text-sm font-bold leading-tight;
+    color: var(--text-primary);
+  }
+
+  .research-action-panel-header p {
+    @apply mt-1 max-w-4xl text-[12px] leading-relaxed;
+    color: var(--text-secondary);
+    overflow-wrap: anywhere;
+  }
+
+  .research-action-panel-token {
+    @apply min-w-[160px] rounded-md px-2.5 py-2 text-[10px] leading-snug;
+    color: var(--text-secondary);
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+  }
+
+  .research-action-panel-token span,
+  .research-action-panel-token strong {
+    @apply block;
+    overflow-wrap: anywhere;
+  }
+
+  .research-action-panel-token span {
+    @apply font-bold uppercase;
+    color: var(--text-muted);
+  }
+
+  .research-action-panel-token strong {
+    @apply mt-1 text-[12px] leading-snug;
+    color: var(--text-primary);
+  }
+
+  .research-action-status-grid {
+    @apply grid gap-2;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .research-action-status {
+    @apply min-w-0 rounded-md px-2.5 py-2;
+    background: rgba(8, 12, 16, 0.26);
+    border: 1px solid var(--border);
+  }
+
+  .research-action-status span {
+    @apply block text-[10px] font-bold uppercase leading-tight;
+    color: var(--text-muted);
+  }
+
+  .research-action-status strong {
+    @apply mt-1 block text-[11px] font-bold leading-snug;
+    color: var(--text-primary);
+    overflow-wrap: anywhere;
+  }
+
+  .research-action-grid {
+    @apply grid gap-2;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .research-action-control {
+    @apply inline-flex min-h-[46px] min-w-0 flex-col items-start justify-center rounded-md px-3 py-2 text-left transition-colors;
+    color: var(--accent);
+    background: var(--accent-dim);
+    border: 1px solid var(--accent-border);
+  }
+
+  .research-action-control:hover {
+    background: rgba(90, 167, 255, 0.22);
+  }
+
+  .research-action-control.disabled,
+  .research-action-control:disabled {
+    color: var(--amber);
+    background: var(--amber-dim);
+    border-color: var(--amber-border);
+    cursor: not-allowed;
+  }
+
+  .research-action-control span {
+    @apply text-[12px] font-bold leading-tight;
+    overflow-wrap: anywhere;
+  }
+
+  .research-action-control small {
+    @apply mt-1 text-[10px] font-semibold leading-tight;
+    color: var(--text-muted);
+    overflow-wrap: anywhere;
+  }
+
   .candidate-detail-view {
     @apply grid max-w-7xl gap-3;
   }
@@ -3175,8 +3288,13 @@
     .token-lookup-grid,
     .manual-verification-gap-grid,
     .manual-verification-fallback.compact .manual-verification-gap-grid,
+    .research-action-status-grid,
     .external-checks-summary-grid,
     .external-checks-review-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .research-action-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
@@ -3308,6 +3426,7 @@
     .candidate-detail-hero,
     .token-lookup-hero,
     .external-checks-hero,
+    .research-action-panel-header,
     .token-lookup-result-topline,
     .candidate-result-topline,
     .trusted-preview-hero,
@@ -3340,6 +3459,10 @@
     }
 
     .external-checks-boundary {
+      @apply min-w-0 w-full;
+    }
+
+    .research-action-panel-token {
       @apply min-w-0 w-full;
     }
 
@@ -3403,6 +3526,8 @@
     .token-lookup-grid,
     .manual-verification-gap-grid,
     .manual-verification-fallback.compact .manual-verification-gap-grid,
+    .research-action-status-grid,
+    .research-action-grid,
     .external-checks-summary-grid,
     .external-checks-review-grid,
     .trusted-preview-step-grid,

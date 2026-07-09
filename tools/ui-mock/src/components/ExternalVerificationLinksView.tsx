@@ -10,6 +10,7 @@ import {
   ManualVerificationFallback,
   buildExternalVerificationGaps,
 } from "./ManualVerificationFallback";
+import { ResearchActionPanel } from "./ResearchActionPanel";
 
 interface ExternalVerificationLinksViewProps {
   candidate?: MockCandidate | null;
@@ -82,6 +83,11 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
       <ManualVerificationFallback
         title="Manual verification fallback"
         gaps={fallbackGaps}
+      />
+
+      <ResearchActionPanel
+        candidate={candidate}
+        tokenInput={tokenInput}
       />
 
       <section className="external-checks-list" aria-label="manual external check list">

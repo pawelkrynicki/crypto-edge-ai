@@ -3,7 +3,8 @@
 ## Status
 
 - Local MVP Release Candidate Stabilization v1.
-- Stage 12E.6 adds Manual Verification Fallbacks across Candidate Results, Candidate Detail, Token / Contract Lookup, and External Verification Links. Next frontend stage is 12E.7 Research Action Panel.
+- Stage 12E.7 adds Research Action Panel across Candidate Results, Candidate Detail, Token / Contract Lookup, and External Verification Links. Next frontend stage is 12E.8 Frontend Navigation Cleanup.
+- Stage 12E.6 adds Manual Verification Fallbacks across Candidate Results, Candidate Detail, Token / Contract Lookup, and External Verification Links.
 - Stage 12E.5 adds External Verification Links at `#external-checks` as a link-only manual external check view.
 - Stage 12E.4 adds the Token / Contract Lookup Shell at `#token-lookup` as a local frontend-only token/contract classification view. Next frontend stage is 12E.5 External Verification Links.
 - Stage 12E.3 adds the Candidate Detail View at `#candidate-detail` as the second product-facing research candidate view.
@@ -48,6 +49,7 @@
 - 12E.4 does not add real token lookup, honeypot links, external verification URL builder, backend, storage, provider calls, source activation, source check changes, URL fetches, scraping, secrets, `.env`, npm dependencies, scanner scoring changes, `final_label` changes, review semantics changes, or `WATCHLIST` meaning changes.
 - 12E.5 does not add real token lookup, backend, storage, provider calls, source activation, source check changes, URL fetches, scraping, secrets, `.env`, npm dependencies, scanner scoring changes, `final_label` changes, review semantics changes, or `WATCHLIST` meaning changes.
 - 12E.6 does not add backend, storage, provider calls, source activation, source check changes, URL fetches, scraping, OpenAI calls, paid sources, secrets, `.env`, npm dependencies, scanner scoring changes, `final_label` changes, review semantics changes, or `WATCHLIST` meaning changes.
+- 12E.7 does not add backend, storage, provider calls, source activation, source check changes, URL fetches, scraping, OpenAI calls, paid sources, secrets, `.env`, npm dependencies, scanner scoring changes, `final_label` changes, review semantics changes, or `WATCHLIST` meaning changes.
 - Trusted tester preview still needs private access, persisted feedback capture, report library, and lightweight private deployment before a real external test.
 - AI KINTEL remains a later integration stage.
 
@@ -57,8 +59,9 @@
 - `docs/frontend_productization_backlog.md`
 - `docs/frontend_target_flow_map.md`
 
-12E.6 frontend productization baseline:
+12E.7 frontend productization baseline:
 
+- `tools/ui-mock/src/components/ResearchActionPanel.tsx`
 - `tools/ui-mock/src/components/ManualVerificationFallback.tsx`
 - `tools/ui-mock/src/components/ExternalVerificationLinksView.tsx`
 - `tools/ui-mock/src/components/TokenContractLookupView.tsx`
@@ -69,7 +72,8 @@
 - `tools/ui-mock/src/workspaceNavigation.ts`
 - Deep links: `#candidate-results`, `#candidate-detail`, `#token-lookup`, `#external-checks`
 - Shared fallback names: `manual verification required`, `not verified`, `contract required`, `chain unknown`, `security not verified`, `liquidity unknown`, `source freshness unknown`, `external check required`, `manual review only`, `cannot infer safety`
-- Next stage: 12E.7 Research Action Panel
+- Research Action Panel actions: `open candidate detail`, `open token lookup`, `open external checks`, `copy contract`, `copy token input`, `view source freshness`, `mark for manual review`, `send feedback`, `add review note`
+- Next stage: 12E.8 Frontend Navigation Cleanup
 
 12A standalone trusted tester documents:
 
@@ -154,7 +158,8 @@
 - Token / Contract Lookup Shell at `#token-lookup` for local token/contract input classification.
 - External Verification Links at `#external-checks` for link-only manual external checks and copy/manual fallback.
 - Manual Verification Fallbacks for consistent data gap states and `next review step` copy.
-- Frontend Product UX Audit and 12E.6-12E.12 productization backlog.
+- Research Action Panel for safe frontend-only next review actions without saving review state.
+- Frontend Product UX Audit and 12E.7-12E.12 productization backlog.
 - Trusted Tester Preview Shell for the first non-technical reviewer click path.
 - Feedback Notes shell for structuring trusted tester session notes without saving data.
 - Deep-linkable preview navigation for direct links to key trusted preview views.
