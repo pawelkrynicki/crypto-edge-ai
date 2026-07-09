@@ -9,6 +9,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { mapPersistableScannerOutputToUiCandidates } from "../src/adapters/scannerOutputAdapter";
 import { CandidateDetailView } from "../src/components/CandidateDetailView";
 import { CandidateResultsView } from "../src/components/CandidateResultsView";
+import { TokenContractLookupView } from "../src/components/TokenContractLookupView";
 import { CandidateDetail, getMissingSecurityText } from "../src/components/CandidateDetail";
 import { ControlCenter } from "../src/components/ControlCenter";
 import { LocalMvpWorkflowPanel } from "../src/components/LocalMvpWorkflowPanel";
@@ -270,6 +271,7 @@ const workspaceNavItems = [
   { id: "overview",    label: "Overview",        icon: "OV", description: "Status and health" },
   { id: "candidate-results", label: "Candidate Results", icon: "CR", description: "Research candidates" },
   { id: "candidate-detail", label: "Candidate Detail", icon: "CD", description: "Review candidate" },
+  { id: "token-lookup", label: "Token Lookup", icon: "TL", description: "Contract lookup" },
   { id: "control-center", label: "Control Center", icon: "CC", description: "Preview readiness" },
   { id: "trusted-preview", label: "Trusted Preview", icon: "TP", description: "Guided reviewer path" },
   { id: "feedback-notes", label: "Feedback Notes", icon: "FN", description: "Session notes worksheet" },
@@ -281,7 +283,7 @@ const workspaceNavItems = [
   { id: "methodology", label: "Methodology",     icon: "M",  description: "Scanner and review layers" },
 ] satisfies WorkspaceNavItem[];
 
-for (const label of ["Candidate Results", "Candidate Detail", "Trusted Preview", "Feedback Notes", "Webinar Teaser", "Control Center"]) {
+for (const label of ["Candidate Results", "Candidate Detail", "Token Lookup", "Trusted Preview", "Feedback Notes", "Webinar Teaser", "Control Center"]) {
   assert.ok(
     workspaceNavItems.some((item) => item.label === label),
     `workspace navigation includes ${label}`,
@@ -291,6 +293,7 @@ for (const label of ["Candidate Results", "Candidate Detail", "Trusted Preview",
 assert.equal(resolveInitialWorkspaceSection("#trusted-preview"), "trusted-preview");
 assert.equal(resolveInitialWorkspaceSection("#candidate-results"), "candidate-results");
 assert.equal(resolveInitialWorkspaceSection("#candidate-detail"), "candidate-detail");
+assert.equal(resolveInitialWorkspaceSection("#token-lookup"), "token-lookup");
 assert.equal(resolveInitialWorkspaceSection("#feedback-notes"), "feedback-notes");
 assert.equal(resolveInitialWorkspaceSection("#webinar-teaser"), "webinar-teaser");
 assert.equal(resolveInitialWorkspaceSection("#control-center"), "control-center");
@@ -301,6 +304,7 @@ assert.equal(resolveInitialWorkspaceSection("#workflow"), "overview");
 assert.equal(sectionToHash("trusted-preview"), "#trusted-preview");
 assert.equal(sectionToHash("candidate-results"), "#candidate-results");
 assert.equal(sectionToHash("candidate-detail"), "#candidate-detail");
+assert.equal(sectionToHash("token-lookup"), "#token-lookup");
 assert.equal(sectionToHash("feedback-notes"), "#feedback-notes");
 assert.equal(sectionToHash("webinar-teaser"), "#webinar-teaser");
 assert.equal(sectionToHash("control-center"), "#control-center");
@@ -327,6 +331,7 @@ assert.match(workspaceShellMarkup, /Local MVP Overview/, "workspace shell render
 assert.match(workspaceShellMarkup, /Overview/, "workspace shell renders overview navigation");
 assert.match(workspaceShellMarkup, /Candidate Results/, "workspace shell renders candidate results navigation");
 assert.match(workspaceShellMarkup, /Candidate Detail/, "workspace shell renders candidate detail navigation");
+assert.match(workspaceShellMarkup, /Token Lookup/, "workspace shell renders token lookup navigation");
 assert.match(workspaceShellMarkup, /Control Center/, "workspace shell renders control center navigation");
 assert.match(workspaceShellMarkup, /Trusted Preview/, "workspace shell renders trusted preview navigation");
 assert.match(workspaceShellMarkup, /Feedback Notes/, "workspace shell renders feedback notes navigation");
@@ -746,6 +751,7 @@ const candidateDetailMarkup = renderToStaticMarkup(React.createElement(Candidate
   candidate: passMockCandidate,
   reviewRecord: savedReviewRecord,
   onBackToResults: () => undefined,
+  onOpenTokenLookup: () => undefined,
 }));
 
 assert.match(candidateDetailMarkup, /candidate detail/i, "candidate detail view exists");
@@ -757,6 +763,7 @@ assert.match(candidateDetailMarkup, /liquidity \/ market context/i, "candidate d
 assert.match(candidateDetailMarkup, /open questions/i, "candidate detail renders open questions");
 assert.match(candidateDetailMarkup, /manual review/i, "candidate detail renders manual review copy");
 assert.match(candidateDetailMarkup, /next review step/i, "candidate detail renders next review step");
+assert.match(candidateDetailMarkup, /Open token lookup/, "candidate detail links to token lookup");
 assert.match(
   candidateDetailMarkup,
   /WATCHLIST is manual review only/i,
@@ -831,6 +838,80 @@ assert.doesNotMatch(
   candidateDetailMissingDataMarkup,
   /security data present|security check complete|available now|status-good/i,
   "candidate detail does not give missing data a positive security status",
+);
+
+const tokenLookupMarkup = renderToStaticMarkup(React.createElement(TokenContractLookupView, {
+  initialInput: "PEPE",
+}));
+
+assert.match(tokenLookupMarkup, /token to verify/i, "token lookup renders token input copy");
+assert.match(tokenLookupMarkup, /contract lookup/i, "token lookup view exists");
+assert.match(tokenLookupMarkup, /manual verification required/i, "token lookup requires manual verification");
+assert.match(tokenLookupMarkup, /not verified/i, "token lookup marks security as not verified");
+assert.match(tokenLookupMarkup, /chain unknown/i, "token lookup marks unknown chain");
+assert.match(tokenLookupMarkup, /contract required/i, "token lookup requires contract for symbol input");
+assert.match(tokenLookupMarkup, /external check later/i, "token lookup defers external checks");
+assert.match(tokenLookupMarkup, /source freshness/i, "token lookup renders source freshness state");
+assert.match(tokenLookupMarkup, /risk flags/i, "token lookup renders risk flags state");
+assert.match(tokenLookupMarkup, /next review step/i, "token lookup renders next review step");
+assert.match(tokenLookupMarkup, /likely symbol/i, "token lookup classifies symbol input locally");
+assert.doesNotMatch(
+  tokenLookupMarkup,
+  forbiddenActionPattern,
+  "token lookup does not render forbidden trading words as actions",
+);
+assert.doesNotMatch(
+  tokenLookupMarkup,
+  /\b(?:buy|sell|entry|signal|recommendation)\b/i,
+  "token lookup avoids forbidden trading vocabulary",
+);
+assert.doesNotMatch(
+  tokenLookupMarkup,
+  /\b(?:ready|available|status-good|green|success|security check complete)\b/i,
+  "token lookup does not give missing data a green security status",
+);
+
+const tokenLookupContractMarkup = renderToStaticMarkup(React.createElement(TokenContractLookupView, {
+  initialInput: "base: 0x2222222222222222222222222222222222222222",
+}));
+
+assert.match(tokenLookupContractMarkup, /likely EVM contract address/i, "token lookup classifies EVM contract input");
+assert.match(tokenLookupContractMarkup, /contract address/i, "token lookup renders contract address state");
+assert.match(tokenLookupContractMarkup, /not verified/i, "token lookup keeps contract state unverified");
+assert.match(tokenLookupContractMarkup, /chain unknown \/ verify manually/i, "token lookup keeps chain manual");
+assert.match(tokenLookupContractMarkup, /external check later/i, "token lookup keeps external checks deferred");
+assert.match(tokenLookupContractMarkup, /security status/i, "token lookup renders security status");
+assert.match(tokenLookupContractMarkup, /liquidity unknown/i, "token lookup renders liquidity fallback");
+assert.match(tokenLookupContractMarkup, /source freshness unknown/i, "token lookup renders freshness fallback");
+
+const tokenLookupUrlMarkup = renderToStaticMarkup(React.createElement(TokenContractLookupView, {
+  initialInput: "https://example.org/project",
+}));
+
+assert.match(tokenLookupUrlMarkup, /likely URL/i, "token lookup classifies URL input");
+assert.match(tokenLookupUrlMarkup, /source URL not fetched/i, "token lookup does not fetch source URLs");
+assert.match(tokenLookupUrlMarkup, /manual verification required/i, "token lookup keeps URL manual");
+assert.match(tokenLookupUrlMarkup, /no scraping \/ no automatic fetch/i, "token lookup blocks scraping and automatic fetch");
+
+const tokenLookupProjectMarkup = renderToStaticMarkup(React.createElement(TokenContractLookupView, {
+  initialInput: "Lido Finance",
+}));
+
+assert.match(tokenLookupProjectMarkup, /likely project name/i, "token lookup classifies project name input");
+assert.match(tokenLookupProjectMarkup, /contract required/i, "token lookup requires contract for project input");
+
+const tokenLookupComponentSource = await readFile(resolve("src", "components", "TokenContractLookupView.tsx"), "utf8");
+assert.doesNotMatch(tokenLookupComponentSource, /\bfetch\s*\(/, "token lookup does not perform fetch calls");
+assert.doesNotMatch(tokenLookupComponentSource, /\bXMLHttpRequest\b/, "token lookup does not perform browser requests");
+assert.doesNotMatch(
+  tokenLookupComponentSource,
+  /loadScannerDataSourceResult|loadLatestMarketContext|loadReviewSessionFromApi|saveReviewSessionToApi/,
+  "token lookup does not call existing provider or source services",
+);
+assert.doesNotMatch(
+  tokenLookupComponentSource,
+  /source activation/i,
+  "token lookup does not add source activation",
 );
 
 const reloadedReviewState = loadReviewSession(reviewStorage);

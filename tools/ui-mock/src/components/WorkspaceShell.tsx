@@ -6,6 +6,7 @@ export type WorkspaceSectionId =
   | "control-center"
   | "candidate-results"
   | "candidate-detail"
+  | "token-lookup"
   | "trusted-preview"
   | "feedback-notes"
   | "webinar-teaser"

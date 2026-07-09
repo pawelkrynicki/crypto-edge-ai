@@ -11,6 +11,7 @@ import { WorkspaceOverview } from "./components/WorkspaceOverview";
 import { ControlCenter } from "./components/ControlCenter";
 import { CandidateDetailView } from "./components/CandidateDetailView";
 import { CandidateResultsView } from "./components/CandidateResultsView";
+import { TokenContractLookupView } from "./components/TokenContractLookupView";
 import { TrustedPreview } from "./components/TrustedPreview";
 import { FeedbackNotes } from "./components/FeedbackNotes";
 import { WebinarTeaser } from "./components/WebinarTeaser";
@@ -70,6 +71,7 @@ const WORKSPACE_NAV_ITEMS: WorkspaceNavItem[] = [
   { id: "overview",    label: "Overview",        icon: "OV", description: "Status and health" },
   { id: "candidate-results", label: "Candidate Results", icon: "CR", description: "Research candidates" },
   { id: "candidate-detail", label: "Candidate Detail", icon: "CD", description: "Review candidate" },
+  { id: "token-lookup", label: "Token Lookup", icon: "TL", description: "Contract lookup" },
   { id: "control-center", label: "Control Center", icon: "CC", description: "Preview readiness" },
   { id: "trusted-preview", label: "Trusted Preview", icon: "TP", description: "Guided reviewer path" },
   { id: "feedback-notes", label: "Feedback Notes", icon: "FN", description: "Session notes worksheet" },
@@ -97,6 +99,10 @@ const SECTION_COPY: Record<WorkspaceSectionId, { title: string; description: str
   "candidate-detail": {
     title: "Candidate Detail",
     description: "Candidate detail for manual review, source freshness, risk flags and next review step.",
+  },
+  "token-lookup": {
+    title: "Token / Contract Lookup",
+    description: "Contract lookup shell for local input classification and manual verification required states.",
   },
   "trusted-preview": {
     title: "Trusted Preview",
@@ -175,6 +181,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [fallbackMsg, setFallbackMsg] = useState<string | null>(null);
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null | undefined>(undefined);
+  const [tokenLookupInput, setTokenLookupInput] = useState("");
   const [reviewSession, setReviewSession] = useState<ReviewSessionState>(() => loadReviewSession());
   const [reviewStorageStatus, setReviewStorageStatus] = useState<ReviewStorageStatus>(INITIAL_REVIEW_STORAGE_STATUS);
   const [marketContextState, setMarketContextState] = useState<MarketContextPanelState>({
@@ -354,6 +361,14 @@ export default function App() {
     handleWorkspaceSectionChange("candidate-detail");
   }, [handleWorkspaceSectionChange]);
 
+  const handleOpenTokenLookup = useCallback((candidate?: MockCandidate) => {
+    if (candidate) {
+      setTokenLookupInput(formatTokenLookupInput(candidate));
+    }
+
+    handleWorkspaceSectionChange("token-lookup");
+  }, [handleWorkspaceSectionChange]);
+
   const renderLoadingSection = (sectionId: WorkspaceSectionId) => {
     const copy = SECTION_COPY[sectionId];
 
@@ -425,7 +440,14 @@ export default function App() {
               candidate={selectedDetailCandidate}
               reviewRecord={selectedDetailReviewRecord}
               onBackToResults={() => handleWorkspaceSectionChange("candidate-results")}
+              onOpenTokenLookup={handleOpenTokenLookup}
             />
+          </WorkspaceSection>
+        );
+      case "token-lookup":
+        return (
+          <WorkspaceSection {...SECTION_COPY["token-lookup"]}>
+            <TokenContractLookupView initialInput={tokenLookupInput} />
           </WorkspaceSection>
         );
       case "trusted-preview":
@@ -550,6 +572,15 @@ function getFallbackReviewStorageStatus(result: Exclude<ReviewSessionApiResult, 
     text: "Review storage: local API error, using browser localStorage fallback",
     detail: result.error,
   };
+}
+
+function formatTokenLookupInput(candidate: MockCandidate): string {
+  const contract = candidate.contract_address.trim();
+  const chain = candidate.chain.trim();
+
+  if (contract && chain) return `${chain}: ${contract}`;
+  if (contract) return contract;
+  return candidate.symbol || candidate.name || "";
 }
 
 function getContextSourceStatus(state: MarketContextPanelState): { text: string; detail?: string } {
