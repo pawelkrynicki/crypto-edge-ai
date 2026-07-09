@@ -9,6 +9,7 @@ interface CandidateDetailViewProps {
   reviewRecord?: CandidateReviewRecord | null;
   onBackToResults?: () => void;
   onOpenTokenLookup?: (candidate: MockCandidate) => void;
+  onOpenExternalChecks?: (candidate: MockCandidate) => void;
 }
 
 type DetailTone = "neutral" | "manual" | "risk";
@@ -41,6 +42,7 @@ export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
   reviewRecord,
   onBackToResults,
   onOpenTokenLookup,
+  onOpenExternalChecks,
 }) => {
   if (!candidate) {
     return (
@@ -171,6 +173,11 @@ export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
         {onOpenTokenLookup && (
           <button type="button" className="candidate-detail-secondary-button" onClick={() => onOpenTokenLookup(candidate)}>
             Open token lookup
+          </button>
+        )}
+        {onOpenExternalChecks && (
+          <button type="button" className="candidate-detail-secondary-button" onClick={() => onOpenExternalChecks(candidate)}>
+            Open external checks
           </button>
         )}
       </section>
