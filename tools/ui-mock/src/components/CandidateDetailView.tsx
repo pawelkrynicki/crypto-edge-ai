@@ -8,6 +8,7 @@ interface CandidateDetailViewProps {
   candidate: MockCandidate | null;
   reviewRecord?: CandidateReviewRecord | null;
   onBackToResults?: () => void;
+  onOpenTokenLookup?: (candidate: MockCandidate) => void;
 }
 
 type DetailTone = "neutral" | "manual" | "risk";
@@ -39,6 +40,7 @@ export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
   candidate,
   reviewRecord,
   onBackToResults,
+  onOpenTokenLookup,
 }) => {
   if (!candidate) {
     return (
@@ -164,6 +166,11 @@ export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
         {onBackToResults && (
           <button type="button" className="candidate-detail-secondary-button" onClick={onBackToResults}>
             Back to candidate results
+          </button>
+        )}
+        {onOpenTokenLookup && (
+          <button type="button" className="candidate-detail-secondary-button" onClick={() => onOpenTokenLookup(candidate)}>
+            Open token lookup
           </button>
         )}
       </section>

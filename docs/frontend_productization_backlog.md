@@ -1,8 +1,8 @@
 # Frontend Productization Backlog
 
-Stage: 12E.3 Candidate Detail View
+Stage: 12E.4 Token / Contract Lookup Shell
 
-Next implementation stage: 12E.4 Token / Contract Lookup Shell
+Next implementation stage: 12E.5 External Verification Links
 
 Rules:
 
@@ -30,11 +30,22 @@ Rules:
 - Missing contract, chain, security, liquidity, or freshness data stays `manual verification required`, `unknown`, or `not verified`.
 - Next stage: 12E.4 Token / Contract Lookup Shell.
 
+12E.4 delivery note:
+
+- Token / Contract Lookup Shell is implemented as a local frontend-only classification view.
+- Deep link: `#token-lookup`.
+- Candidate Detail links to it through `Open token lookup`.
+- The view accepts a token symbol, project name, contract address, URL, or chain + address and classifies the input locally.
+- Contract-like input remains `not verified`; chain stays `chain unknown / verify manually`; external checks are `external check later`.
+- Symbol, project, URL, unknown, missing security, missing liquidity, and missing source states remain `contract required`, `manual verification required`, `unknown`, or `not verified`.
+- No backend, storage, provider calls, source activation, external verification URL builder, scraping, scoring change, `final_label` change, or `WATCHLIST` meaning change was added.
+- Next stage: 12E.5 External Verification Links.
+
 | Stage | Task | Target files | Acceptance criteria | Not in scope | Priority |
 |---|---|---|---|---|---|
 | 12E.2 Candidate Results View | Build a candidate-first results surface from current scanner UI data. | `tools/ui-mock/src/App.tsx`, `tools/ui-mock/src/components/ScannerRadar.tsx`, `tools/ui-mock/src/components/ScannerCandidateCard.tsx`, `tools/ui-mock/src/components/WorkspaceShell.tsx`, `tools/ui-mock/src/index.css`, `tools/ui-mock/tests/contract.test.ts` | User sees `research candidate` rows/cards with token, chain, label, risk flags, source freshness, and `next review step`; empty/loading/partial states render. | Backend, provider calls, source activation, storage, scoring, label semantics, AI KINTEL. | High |
 | 12E.3 Candidate Detail View | Make selected candidate review a dedicated product surface. | `tools/ui-mock/src/components/CandidateDetailView.tsx`, `tools/ui-mock/src/App.tsx`, `tools/ui-mock/src/workspaceNavigation.ts`, `tools/ui-mock/src/components/WorkspaceShell.tsx`, `tools/ui-mock/src/index.css`, `tools/ui-mock/tests/contract.test.ts` | User can open `#candidate-detail` from Candidate Results and inspect one `review candidate` with snapshot, source freshness, source coverage, risk flags, security notes, liquidity / market context, open questions, manual review status, and next review step. | Real token lookup, honeypot links, external verification URL builder, backend, provider calls, storage, scoring changes, label changes, AI KINTEL. | High |
-| 12E.4 Token / Contract Lookup Shell | Add a safe shell for direct token/contract verification. | `tools/ui-mock/src/App.tsx`, `tools/ui-mock/src/components`, `tools/ui-mock/src/index.css`, `tools/ui-mock/tests/contract.test.ts` | User can enter or inspect token/contract input; shell shows valid, invalid, missing, unsupported chain, and partial states without fetching data. | Backend lookup, storage, provider calls, scraping, paid sources, source activation. | High |
+| 12E.4 Token / Contract Lookup Shell | Add a safe shell for direct token/contract verification. | `tools/ui-mock/src/App.tsx`, `tools/ui-mock/src/components`, `tools/ui-mock/src/index.css`, `tools/ui-mock/tests/contract.test.ts` | User can open `#token-lookup`, enter or inspect token/contract input, classify it locally, and see manual verification required states without fetching data. | Backend lookup, storage, provider calls, scraping, paid sources, source activation, external verification URL builder. | High |
 | 12E.5 External Verification Links | Add link-only external check cluster for known chain/contract/source states. | `tools/ui-mock/src/components/CandidateDetail.tsx`, `tools/ui-mock/src/components/CandidateResearchContext.tsx`, `tools/ui-mock/src/components`, `tools/ui-mock/tests/contract.test.ts` | External links render only when safe inputs exist; missing inputs show `manual review`; links open outside app and make no provider calls. | New data provider integration, scraping, paid source activation, browser fetches to verification sites. | High |
 | 12E.6 Manual Verification Fallbacks | Add fallback states for missing contract, stale source, unsupported chain, missing context, and unclear risk flags. | `tools/ui-mock/src/components/CandidateDetail.tsx`, `tools/ui-mock/src/components/RiskAlerts.tsx`, `tools/ui-mock/src/components/CandidateResearchContext.tsx`, `tools/ui-mock/tests/contract.test.ts` | User always receives a concrete manual review step when automated context is missing or partial. | Automated verdicts, source activation, scoring changes, `WATCHLIST` changes. | High |
 | 12E.7 Research Action Panel | Add candidate-level action panel for `next review step`, local note status, and watchlist follow-up. | `tools/ui-mock/src/components/CandidateDetail.tsx`, `tools/ui-mock/src/components/CandidateReviewControls.tsx`, `tools/ui-mock/src/components/WatchlistTab.tsx`, `tools/ui-mock/tests/contract.test.ts` | Candidate detail shows current local review status, clear next action, and safe follow-up controls without changing scanner output. | Report generation from UI, storage model changes, scoring, label changes, AI KINTEL. | High |
