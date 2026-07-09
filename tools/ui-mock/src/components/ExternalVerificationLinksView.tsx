@@ -6,6 +6,10 @@ import {
   type ExternalVerificationInput,
   type ExternalVerificationTarget,
 } from "../externalVerificationTargets";
+import {
+  ManualVerificationFallback,
+  buildExternalVerificationGaps,
+} from "./ManualVerificationFallback";
 
 interface ExternalVerificationLinksViewProps {
   candidate?: MockCandidate | null;
@@ -26,6 +30,11 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
     candidate?.symbol ||
     normalizedInput.tokenInput ||
     "token input";
+  const fallbackGaps = buildExternalVerificationGaps({
+    hasContract: Boolean(normalizedInput.contractAddress),
+    hasChain: Boolean(normalizedInput.chain),
+    isWatchlist: candidate?.final_label === "WATCHLIST",
+  });
 
   return (
     <div className="external-checks-view">
@@ -64,11 +73,16 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
         />
         <ExternalCheckMetric
           label="next review step"
-          value="manual review only"
-          detail="manual verification required"
+          value="external check required"
+          detail="manual review only"
           tone="manual"
         />
       </section>
+
+      <ManualVerificationFallback
+        title="Manual verification fallback"
+        gaps={fallbackGaps}
+      />
 
       <section className="external-checks-list" aria-label="manual external check list">
         {targets.map((target) => (

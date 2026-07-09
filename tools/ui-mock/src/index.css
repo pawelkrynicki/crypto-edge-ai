@@ -1706,6 +1706,70 @@
     border: 1px solid var(--border);
   }
 
+  .manual-verification-fallback {
+    @apply grid min-w-0 gap-3 rounded-md px-3 py-2.5;
+    background: var(--bg-card);
+    border: 1px solid var(--amber-border);
+  }
+
+  .manual-verification-fallback.compact {
+    @apply gap-2;
+    background: rgba(8, 12, 16, 0.2);
+  }
+
+  .manual-verification-fallback-header {
+    @apply min-w-0;
+  }
+
+  .manual-verification-eyebrow {
+    @apply inline-flex rounded-md px-2 py-0.5 text-[10px] font-bold uppercase leading-tight;
+    color: var(--amber);
+    background: var(--amber-dim);
+    border: 1px solid var(--amber-border);
+  }
+
+  .manual-verification-fallback-header h4 {
+    @apply mt-1 text-sm font-bold leading-tight;
+    color: var(--text-primary);
+  }
+
+  .manual-verification-fallback-header p {
+    @apply mt-1 max-w-4xl text-[12px] leading-relaxed;
+    color: var(--text-secondary);
+  }
+
+  .manual-verification-gap-grid {
+    @apply grid gap-2;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .manual-verification-fallback.compact .manual-verification-gap-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .manual-verification-gap {
+    @apply min-w-0 rounded-md px-2.5 py-2;
+    background: rgba(8, 12, 16, 0.26);
+    border: 1px solid var(--amber-border);
+  }
+
+  .manual-verification-gap span {
+    @apply block text-[10px] font-bold uppercase leading-tight;
+    color: var(--amber);
+  }
+
+  .manual-verification-gap p {
+    @apply mt-1 text-[10px] leading-snug;
+    color: var(--text-secondary);
+    overflow-wrap: anywhere;
+  }
+
+  .manual-verification-gap small {
+    @apply mt-1 block text-[10px] font-semibold leading-snug;
+    color: var(--text-muted);
+    overflow-wrap: anywhere;
+  }
+
   .candidate-detail-view {
     @apply grid max-w-7xl gap-3;
   }
@@ -3109,6 +3173,8 @@
     .candidate-result-grid,
     .candidate-detail-grid,
     .token-lookup-grid,
+    .manual-verification-gap-grid,
+    .manual-verification-fallback.compact .manual-verification-gap-grid,
     .external-checks-summary-grid,
     .external-checks-review-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3335,6 +3401,8 @@
     .candidate-result-grid,
     .candidate-detail-grid,
     .token-lookup-grid,
+    .manual-verification-gap-grid,
+    .manual-verification-fallback.compact .manual-verification-gap-grid,
     .external-checks-summary-grid,
     .external-checks-review-grid,
     .trusted-preview-step-grid,

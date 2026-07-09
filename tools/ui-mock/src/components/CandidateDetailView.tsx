@@ -3,6 +3,10 @@ import type { FinalLabel, MockCandidate } from "../mockData";
 import type { CandidateReviewRecord } from "../types/reviewSessionTypes";
 import { formatReasonText, formatSecurityFlag } from "../utils/displayText";
 import { ReviewStatusBadge } from "./CandidateReviewControls";
+import {
+  ManualVerificationFallback,
+  buildCandidateVerificationGaps,
+} from "./ManualVerificationFallback";
 
 interface CandidateDetailViewProps {
   candidate: MockCandidate | null;
@@ -155,6 +159,11 @@ export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
         </article>
       </section>
 
+      <ManualVerificationFallback
+        title="Manual verification fallback"
+        gaps={buildCandidateVerificationGaps(candidate)}
+      />
+
       <section className="candidate-detail-review-panel">
         <div>
           <span className="candidate-detail-eyebrow">manual review</span>
@@ -256,8 +265,8 @@ function getCandidateSummary(candidate: MockCandidate): string {
 function getSourceFreshness(candidate: MockCandidate): { value: string; detail: string; tone: DetailTone } {
   if (!candidate.last_checked || Number.isNaN(new Date(candidate.last_checked).getTime())) {
     return {
-      value: "freshness unknown",
-      detail: "freshness unknown - manual verification required",
+      value: "source freshness unknown",
+      detail: "source freshness unknown - manual verification required",
       tone: "manual",
     };
   }
@@ -273,7 +282,7 @@ function getContractState(candidate: MockCandidate): { value: string; detail: st
   const contract = candidate.contract_address.trim();
   if (!contract) {
     return {
-      value: "not verified",
+      value: "contract required",
       detail: "contract required for external/security checks",
       tone: "manual",
     };
@@ -289,7 +298,7 @@ function getContractState(candidate: MockCandidate): { value: string; detail: st
 function getChainState(candidate: MockCandidate): { value: string; detail: string; tone: DetailTone } {
   if (!candidate.chain.trim()) {
     return {
-      value: "unknown",
+      value: "chain unknown",
       detail: "chain unknown / verify manually",
       tone: "manual",
     };
@@ -326,7 +335,7 @@ function getSourceCoverage(candidate: MockCandidate): Array<{ text: string; tone
 function getRiskFlags(candidate: MockCandidate): { items: string[]; meta: string; tone: DetailTone } {
   if (!candidate.security) {
     return {
-      items: ["not verified", "manual verification required"],
+      items: ["security not verified", "manual verification required", "cannot infer safety"],
       meta: "not verified",
       tone: "manual",
     };
@@ -386,7 +395,7 @@ function getSecurityNotes(candidate: MockCandidate): { value: string; detail: st
 function getLiquidityContext(candidate: MockCandidate): { value: string; detail: string; tone: DetailTone } {
   if (candidate.liquidity_usd === null || candidate.volume_24h_usd === null || candidate.market_cap_usd === null) {
     return {
-      value: "unknown",
+      value: "liquidity unknown",
       detail: "liquidity unknown / market context not verified",
       tone: "manual",
     };
