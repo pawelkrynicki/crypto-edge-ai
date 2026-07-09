@@ -3,11 +3,12 @@
 ## Status
 
 - Local MVP Release Candidate Stabilization v1.
+- Stage 12E.5 adds External Verification Links at `#external-checks` as a link-only manual external check view. Next frontend stage is 12E.6 Manual Verification Fallbacks.
 - Stage 12E.4 adds the Token / Contract Lookup Shell at `#token-lookup` as a local frontend-only token/contract classification view. Next frontend stage is 12E.5 External Verification Links.
 - Stage 12E.3 adds the Candidate Detail View at `#candidate-detail` as the second product-facing research candidate view.
 - Stage 12E.2 adds the Candidate Results View at `#candidate-results` as the first product-facing research candidate list.
 - Stage 12E.1 adds the Frontend Product UX Audit and productization backlog. It is documentation only and makes frontend productization the main axis.
-- Candidate Results, Candidate Detail, and Token / Contract Lookup use existing UI mock data or local input only and do not add backend, storage, provider calls, source activation, dependencies, scoring changes, `final_label` changes, or `WATCHLIST` meaning changes.
+- Candidate Results, Candidate Detail, Token / Contract Lookup, and External Verification Links use existing UI mock data or local input only and do not add backend, storage, provider calls, source activation, dependencies, scoring changes, `final_label` changes, or `WATCHLIST` meaning changes.
 - Reports are not the critical path for the next frontend rebuild.
 - Stage 12C.3 adds Deep-Linkable Trusted Preview navigation for direct hash links to key preview views. It is UI navigation only and does not add deployment, access, backend, or storage.
 - Stage 12C.2 adds a Feedback Prompt / Session Notes Shell for organizing post-session trusted tester feedback. It is UI shell only and does not save feedback.
@@ -44,6 +45,7 @@
 - 12E.2 does not add backend, storage, provider calls, source adapters, source activation, source check changes, fetch logic changes, secrets, `.env`, npm dependencies, scanner scoring changes, `final_label` changes, review semantics changes, or `WATCHLIST` meaning changes.
 - 12E.3 does not add real token lookup, honeypot links, external verification URL builder, backend, storage, provider calls, source activation, source check changes, fetch logic changes, secrets, `.env`, npm dependencies, scanner scoring changes, `final_label` changes, review semantics changes, or `WATCHLIST` meaning changes.
 - 12E.4 does not add real token lookup, honeypot links, external verification URL builder, backend, storage, provider calls, source activation, source check changes, URL fetches, scraping, secrets, `.env`, npm dependencies, scanner scoring changes, `final_label` changes, review semantics changes, or `WATCHLIST` meaning changes.
+- 12E.5 does not add real token lookup, backend, storage, provider calls, source activation, source check changes, URL fetches, scraping, secrets, `.env`, npm dependencies, scanner scoring changes, `final_label` changes, review semantics changes, or `WATCHLIST` meaning changes.
 - Trusted tester preview still needs private access, persisted feedback capture, report library, and lightweight private deployment before a real external test.
 - AI KINTEL remains a later integration stage.
 
@@ -53,15 +55,17 @@
 - `docs/frontend_productization_backlog.md`
 - `docs/frontend_target_flow_map.md`
 
-12E.4 frontend productization baseline:
+12E.5 frontend productization baseline:
 
+- `tools/ui-mock/src/components/ExternalVerificationLinksView.tsx`
 - `tools/ui-mock/src/components/TokenContractLookupView.tsx`
 - `tools/ui-mock/src/components/CandidateDetailView.tsx`
 - `tools/ui-mock/src/components/CandidateResultsView.tsx`
+- `tools/ui-mock/src/externalVerificationTargets.ts`
 - `tools/ui-mock/src/App.tsx`
 - `tools/ui-mock/src/workspaceNavigation.ts`
-- Deep links: `#candidate-results`, `#candidate-detail`, `#token-lookup`
-- Next stage: 12E.5 External Verification Links
+- Deep links: `#candidate-results`, `#candidate-detail`, `#token-lookup`, `#external-checks`
+- Next stage: 12E.6 Manual Verification Fallbacks
 
 12A standalone trusted tester documents:
 
@@ -144,7 +148,8 @@
 - Candidate Results View at `#candidate-results` for research candidate review.
 - Candidate Detail View at `#candidate-detail` for one review candidate.
 - Token / Contract Lookup Shell at `#token-lookup` for local token/contract input classification.
-- Frontend Product UX Audit and 12E.4-12E.12 productization backlog.
+- External Verification Links at `#external-checks` for link-only manual external checks and copy/manual fallback.
+- Frontend Product UX Audit and 12E.5-12E.12 productization backlog.
 - Trusted Tester Preview Shell for the first non-technical reviewer click path.
 - Feedback Notes shell for structuring trusted tester session notes without saving data.
 - Deep-linkable preview navigation for direct links to key trusted preview views.

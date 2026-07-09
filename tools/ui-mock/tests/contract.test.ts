@@ -9,6 +9,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { mapPersistableScannerOutputToUiCandidates } from "../src/adapters/scannerOutputAdapter";
 import { CandidateDetailView } from "../src/components/CandidateDetailView";
 import { CandidateResultsView } from "../src/components/CandidateResultsView";
+import { ExternalVerificationLinksView } from "../src/components/ExternalVerificationLinksView";
 import { TokenContractLookupView } from "../src/components/TokenContractLookupView";
 import { CandidateDetail, getMissingSecurityText } from "../src/components/CandidateDetail";
 import { ControlCenter } from "../src/components/ControlCenter";
@@ -22,6 +23,7 @@ import { WatchlistTab } from "../src/components/WatchlistTab";
 import { WebinarTeaser } from "../src/components/WebinarTeaser";
 import { WorkspaceOverview } from "../src/components/WorkspaceOverview";
 import { WorkspaceSection, WorkspaceShell, type WorkspaceNavItem } from "../src/components/WorkspaceShell";
+import { buildExternalVerificationTargets } from "../src/externalVerificationTargets";
 import { PERSISTABLE_SCANNER_SAMPLE } from "../src/fixtures/persistableScannerSample";
 import { toMockCandidate } from "../src/mockData";
 import { interpretContextApiOutput, parseMarketContextApiOutput } from "../src/services/contextDataSource";
@@ -272,6 +274,7 @@ const workspaceNavItems = [
   { id: "candidate-results", label: "Candidate Results", icon: "CR", description: "Research candidates" },
   { id: "candidate-detail", label: "Candidate Detail", icon: "CD", description: "Review candidate" },
   { id: "token-lookup", label: "Token Lookup", icon: "TL", description: "Contract lookup" },
+  { id: "external-checks", label: "External Checks", icon: "EC", description: "Manual external checks" },
   { id: "control-center", label: "Control Center", icon: "CC", description: "Preview readiness" },
   { id: "trusted-preview", label: "Trusted Preview", icon: "TP", description: "Guided reviewer path" },
   { id: "feedback-notes", label: "Feedback Notes", icon: "FN", description: "Session notes worksheet" },
@@ -283,7 +286,7 @@ const workspaceNavItems = [
   { id: "methodology", label: "Methodology",     icon: "M",  description: "Scanner and review layers" },
 ] satisfies WorkspaceNavItem[];
 
-for (const label of ["Candidate Results", "Candidate Detail", "Token Lookup", "Trusted Preview", "Feedback Notes", "Webinar Teaser", "Control Center"]) {
+for (const label of ["Candidate Results", "Candidate Detail", "Token Lookup", "External Checks", "Trusted Preview", "Feedback Notes", "Webinar Teaser", "Control Center"]) {
   assert.ok(
     workspaceNavItems.some((item) => item.label === label),
     `workspace navigation includes ${label}`,
@@ -294,6 +297,7 @@ assert.equal(resolveInitialWorkspaceSection("#trusted-preview"), "trusted-previe
 assert.equal(resolveInitialWorkspaceSection("#candidate-results"), "candidate-results");
 assert.equal(resolveInitialWorkspaceSection("#candidate-detail"), "candidate-detail");
 assert.equal(resolveInitialWorkspaceSection("#token-lookup"), "token-lookup");
+assert.equal(resolveInitialWorkspaceSection("#external-checks"), "external-checks");
 assert.equal(resolveInitialWorkspaceSection("#feedback-notes"), "feedback-notes");
 assert.equal(resolveInitialWorkspaceSection("#webinar-teaser"), "webinar-teaser");
 assert.equal(resolveInitialWorkspaceSection("#control-center"), "control-center");
@@ -305,6 +309,7 @@ assert.equal(sectionToHash("trusted-preview"), "#trusted-preview");
 assert.equal(sectionToHash("candidate-results"), "#candidate-results");
 assert.equal(sectionToHash("candidate-detail"), "#candidate-detail");
 assert.equal(sectionToHash("token-lookup"), "#token-lookup");
+assert.equal(sectionToHash("external-checks"), "#external-checks");
 assert.equal(sectionToHash("feedback-notes"), "#feedback-notes");
 assert.equal(sectionToHash("webinar-teaser"), "#webinar-teaser");
 assert.equal(sectionToHash("control-center"), "#control-center");
@@ -332,6 +337,7 @@ assert.match(workspaceShellMarkup, /Overview/, "workspace shell renders overview
 assert.match(workspaceShellMarkup, /Candidate Results/, "workspace shell renders candidate results navigation");
 assert.match(workspaceShellMarkup, /Candidate Detail/, "workspace shell renders candidate detail navigation");
 assert.match(workspaceShellMarkup, /Token Lookup/, "workspace shell renders token lookup navigation");
+assert.match(workspaceShellMarkup, /External Checks/, "workspace shell renders external checks navigation");
 assert.match(workspaceShellMarkup, /Control Center/, "workspace shell renders control center navigation");
 assert.match(workspaceShellMarkup, /Trusted Preview/, "workspace shell renders trusted preview navigation");
 assert.match(workspaceShellMarkup, /Feedback Notes/, "workspace shell renders feedback notes navigation");
@@ -752,6 +758,7 @@ const candidateDetailMarkup = renderToStaticMarkup(React.createElement(Candidate
   reviewRecord: savedReviewRecord,
   onBackToResults: () => undefined,
   onOpenTokenLookup: () => undefined,
+  onOpenExternalChecks: () => undefined,
 }));
 
 assert.match(candidateDetailMarkup, /candidate detail/i, "candidate detail view exists");
@@ -764,6 +771,7 @@ assert.match(candidateDetailMarkup, /open questions/i, "candidate detail renders
 assert.match(candidateDetailMarkup, /manual review/i, "candidate detail renders manual review copy");
 assert.match(candidateDetailMarkup, /next review step/i, "candidate detail renders next review step");
 assert.match(candidateDetailMarkup, /Open token lookup/, "candidate detail links to token lookup");
+assert.match(candidateDetailMarkup, /Open external checks/, "candidate detail links to external checks");
 assert.match(
   candidateDetailMarkup,
   /WATCHLIST is manual review only/i,
@@ -842,6 +850,7 @@ assert.doesNotMatch(
 
 const tokenLookupMarkup = renderToStaticMarkup(React.createElement(TokenContractLookupView, {
   initialInput: "PEPE",
+  onOpenExternalChecks: () => undefined,
 }));
 
 assert.match(tokenLookupMarkup, /token to verify/i, "token lookup renders token input copy");
@@ -855,6 +864,7 @@ assert.match(tokenLookupMarkup, /source freshness/i, "token lookup renders sourc
 assert.match(tokenLookupMarkup, /risk flags/i, "token lookup renders risk flags state");
 assert.match(tokenLookupMarkup, /next review step/i, "token lookup renders next review step");
 assert.match(tokenLookupMarkup, /likely symbol/i, "token lookup classifies symbol input locally");
+assert.match(tokenLookupMarkup, /Open external checks/, "token lookup links to external checks");
 assert.doesNotMatch(
   tokenLookupMarkup,
   forbiddenActionPattern,
@@ -912,6 +922,121 @@ assert.doesNotMatch(
   tokenLookupComponentSource,
   /source activation/i,
   "token lookup does not add source activation",
+);
+
+const externalChecksMarkup = renderToStaticMarkup(React.createElement(ExternalVerificationLinksView, {
+  candidate: passMockCandidate,
+  tokenInput: "PASS",
+}));
+
+assert.match(externalChecksMarkup, /External Verification Links/, "external checks view exists");
+assert.match(externalChecksMarkup, /external checks/i, "external checks view renders external checks copy");
+assert.match(externalChecksMarkup, /manual external check/i, "external checks view renders manual external check copy");
+assert.match(externalChecksMarkup, /copy contract/i, "external checks view renders copy contract fallback");
+assert.match(externalChecksMarkup, /not verified/i, "external checks keeps targets not verified");
+assert.match(externalChecksMarkup, /manual verification required/i, "external checks requires manual verification");
+assert.match(externalChecksMarkup, /security not verified/i, "external checks keeps security unverified");
+assert.match(externalChecksMarkup, /liquidity unknown/i, "external checks keeps liquidity unknown");
+assert.match(externalChecksMarkup, /source freshness unknown/i, "external checks keeps source freshness unknown");
+assert.match(externalChecksMarkup, /next review step/i, "external checks renders next review step");
+assert.match(externalChecksMarkup, /manual review only/i, "external checks keeps WATCHLIST manual review only");
+assert.match(
+  externalChecksMarkup,
+  /target="_blank" rel="noreferrer noopener"/,
+  "external check links open in a new tab with noreferrer noopener",
+);
+assert.ok(
+  (externalChecksMarkup.match(/rel="noreferrer noopener"/g) ?? []).length >= 2,
+  "external checks renders multiple external links with noreferrer noopener",
+);
+assert.doesNotMatch(
+  externalChecksMarkup,
+  forbiddenActionPattern,
+  "external checks does not render forbidden trading words as actions",
+);
+assert.doesNotMatch(
+  externalChecksMarkup,
+  /\b(?:ready|available|status-good|green|success|security check complete)\b/i,
+  "external checks does not give missing data a green security status",
+);
+
+const externalChecksMissingMarkup = renderToStaticMarkup(React.createElement(ExternalVerificationLinksView, {
+  tokenInput: "PEPE",
+}));
+
+assert.match(externalChecksMissingMarkup, /contract required/i, "external checks requires contract for symbol input");
+assert.match(externalChecksMissingMarkup, /chain unknown/i, "external checks marks missing chain as unknown");
+assert.match(externalChecksMissingMarkup, /copy token input/i, "external checks falls back to copy token input");
+assert.match(
+  externalChecksMissingMarkup,
+  /manual verification required/i,
+  "external checks keeps missing inputs in manual verification",
+);
+assert.doesNotMatch(
+  externalChecksMissingMarkup,
+  /href="https:\/\/(?:etherscan|basescan|bscscan|solscan|dexscreener)/i,
+  "external checks does not build false explorer or DEX links without contract and chain",
+);
+
+const externalChecksUrlMarkup = renderToStaticMarkup(React.createElement(ExternalVerificationLinksView, {
+  tokenInput: "https://example.org/project",
+}));
+
+assert.match(externalChecksUrlMarkup, /source URL not fetched/i, "external checks marks URL as not fetched");
+assert.match(externalChecksUrlMarkup, /manual verification required/i, "external checks keeps URL input manual");
+assert.match(
+  externalChecksUrlMarkup,
+  /target="_blank" rel="noreferrer noopener"/,
+  "external checks URL link still opens manually outside the app",
+);
+
+const externalTargets = buildExternalVerificationTargets({
+  chain: "base",
+  contractAddress: "0x2222222222222222222222222222222222222222",
+  pairAddress: "0x3333333333333333333333333333333333333333",
+  sourceUrl: "https://example.org/project",
+});
+assert.ok(
+  externalTargets.some((target) => target.id === "explorer" && target.href?.startsWith("https://basescan.org/address/")),
+  "external target registry builds explorer href only from known chain and contract",
+);
+assert.ok(
+  externalTargets.some((target) => target.id === "dex" && target.href?.startsWith("https://dexscreener.com/base/")),
+  "external target registry builds DEX href only when pair context exists",
+);
+assert.ok(
+  externalTargets.some((target) => target.id === "source" && target.href === "https://example.org/project"),
+  "external target registry preserves source URL as user-click-only href",
+);
+
+const unknownChainTargets = buildExternalVerificationTargets({
+  contractAddress: "0x2222222222222222222222222222222222222222",
+});
+assert.equal(
+  unknownChainTargets.find((target) => target.id === "explorer")?.href,
+  undefined,
+  "external target registry does not build explorer href when chain is unknown",
+);
+assert.equal(
+  unknownChainTargets.find((target) => target.id === "security")?.href,
+  undefined,
+  "external target registry keeps uncertain security target as manual copy fallback",
+);
+
+const externalChecksComponentSource = await readFile(resolve("src", "components", "ExternalVerificationLinksView.tsx"), "utf8");
+const externalTargetsSource = await readFile(resolve("src", "externalVerificationTargets.ts"), "utf8");
+const externalChecksSource = `${externalChecksComponentSource}\n${externalTargetsSource}`;
+assert.doesNotMatch(externalChecksSource, /\bfetch\s*\(/, "external checks do not perform fetch calls");
+assert.doesNotMatch(externalChecksSource, /\bXMLHttpRequest\b/, "external checks do not perform browser requests");
+assert.doesNotMatch(
+  externalChecksSource,
+  /loadScannerDataSourceResult|loadLatestMarketContext|loadReviewSessionFromApi|saveReviewSessionToApi/,
+  "external checks do not call existing provider or source services",
+);
+assert.doesNotMatch(
+  externalChecksSource,
+  /source activation/i,
+  "external checks do not add source activation",
 );
 
 const reloadedReviewState = loadReviewSession(reviewStorage);

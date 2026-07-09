@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 
 interface TokenContractLookupViewProps {
   initialInput?: string;
+  onOpenExternalChecks?: (input: string) => void;
 }
 
 type LookupClassification =
@@ -42,6 +43,7 @@ const CHAIN_HINT_PATTERN = /\b(ethereum|eth|base|bsc|binance|polygon|arbitrum|op
 
 export const TokenContractLookupView: React.FC<TokenContractLookupViewProps> = ({
   initialInput = "",
+  onOpenExternalChecks,
 }) => {
   const [input, setInput] = useState(initialInput);
 
@@ -127,6 +129,15 @@ export const TokenContractLookupView: React.FC<TokenContractLookupViewProps> = (
             <li key={step}>{step}</li>
           ))}
         </ul>
+        {onOpenExternalChecks && (
+          <button
+            type="button"
+            className="token-lookup-secondary-button"
+            onClick={() => onOpenExternalChecks(input)}
+          >
+            Open external checks
+          </button>
+        )}
       </section>
     </div>
   );

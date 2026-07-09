@@ -11,6 +11,7 @@ import { WorkspaceOverview } from "./components/WorkspaceOverview";
 import { ControlCenter } from "./components/ControlCenter";
 import { CandidateDetailView } from "./components/CandidateDetailView";
 import { CandidateResultsView } from "./components/CandidateResultsView";
+import { ExternalVerificationLinksView } from "./components/ExternalVerificationLinksView";
 import { TokenContractLookupView } from "./components/TokenContractLookupView";
 import { TrustedPreview } from "./components/TrustedPreview";
 import { FeedbackNotes } from "./components/FeedbackNotes";
@@ -72,6 +73,7 @@ const WORKSPACE_NAV_ITEMS: WorkspaceNavItem[] = [
   { id: "candidate-results", label: "Candidate Results", icon: "CR", description: "Research candidates" },
   { id: "candidate-detail", label: "Candidate Detail", icon: "CD", description: "Review candidate" },
   { id: "token-lookup", label: "Token Lookup", icon: "TL", description: "Contract lookup" },
+  { id: "external-checks", label: "External Checks", icon: "EC", description: "Manual external checks" },
   { id: "control-center", label: "Control Center", icon: "CC", description: "Preview readiness" },
   { id: "trusted-preview", label: "Trusted Preview", icon: "TP", description: "Guided reviewer path" },
   { id: "feedback-notes", label: "Feedback Notes", icon: "FN", description: "Session notes worksheet" },
@@ -103,6 +105,10 @@ const SECTION_COPY: Record<WorkspaceSectionId, { title: string; description: str
   "token-lookup": {
     title: "Token / Contract Lookup",
     description: "Contract lookup shell for local input classification and manual verification required states.",
+  },
+  "external-checks": {
+    title: "External Checks",
+    description: "Link-only external checks with manual verification required and copy fallback states.",
   },
   "trusted-preview": {
     title: "Trusted Preview",
@@ -182,6 +188,8 @@ export default function App() {
   const [fallbackMsg, setFallbackMsg] = useState<string | null>(null);
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null | undefined>(undefined);
   const [tokenLookupInput, setTokenLookupInput] = useState("");
+  const [externalChecksInput, setExternalChecksInput] = useState("");
+  const [externalChecksCandidateId, setExternalChecksCandidateId] = useState<string | null | undefined>(undefined);
   const [reviewSession, setReviewSession] = useState<ReviewSessionState>(() => loadReviewSession());
   const [reviewStorageStatus, setReviewStorageStatus] = useState<ReviewStorageStatus>(INITIAL_REVIEW_STORAGE_STATUS);
   const [marketContextState, setMarketContextState] = useState<MarketContextPanelState>({
@@ -200,6 +208,12 @@ export default function App() {
   const selectedDetailReviewRecord = selectedDetailCandidate
     ? getCandidateReview(selectedDetailCandidate.id, reviewSession)
     : null;
+  const externalChecksCandidate =
+    externalChecksCandidateId === null
+      ? null
+      : externalChecksCandidateId
+        ? candidates.find((candidate) => candidate.id === externalChecksCandidateId) ?? selectedDetailCandidate
+        : selectedDetailCandidate;
 
   const loadData = useCallback(async (source: DataSourceKey) => {
     setLoading(true);
@@ -369,6 +383,19 @@ export default function App() {
     handleWorkspaceSectionChange("token-lookup");
   }, [handleWorkspaceSectionChange]);
 
+  const handleOpenExternalChecks = useCallback((candidate?: MockCandidate | null, tokenInput?: string) => {
+    if (candidate) {
+      setSelectedCandidateId(candidate.id);
+      setExternalChecksCandidateId(candidate.id);
+      setExternalChecksInput(formatTokenLookupInput(candidate));
+    } else {
+      setExternalChecksCandidateId(null);
+      setExternalChecksInput(tokenInput ?? tokenLookupInput);
+    }
+
+    handleWorkspaceSectionChange("external-checks");
+  }, [handleWorkspaceSectionChange, tokenLookupInput]);
+
   const renderLoadingSection = (sectionId: WorkspaceSectionId) => {
     const copy = SECTION_COPY[sectionId];
 
@@ -441,13 +468,26 @@ export default function App() {
               reviewRecord={selectedDetailReviewRecord}
               onBackToResults={() => handleWorkspaceSectionChange("candidate-results")}
               onOpenTokenLookup={handleOpenTokenLookup}
+              onOpenExternalChecks={handleOpenExternalChecks}
             />
           </WorkspaceSection>
         );
       case "token-lookup":
         return (
           <WorkspaceSection {...SECTION_COPY["token-lookup"]}>
-            <TokenContractLookupView initialInput={tokenLookupInput} />
+            <TokenContractLookupView
+              initialInput={tokenLookupInput}
+              onOpenExternalChecks={(input) => handleOpenExternalChecks(null, input)}
+            />
+          </WorkspaceSection>
+        );
+      case "external-checks":
+        return (
+          <WorkspaceSection {...SECTION_COPY["external-checks"]}>
+            <ExternalVerificationLinksView
+              candidate={externalChecksCandidate}
+              tokenInput={externalChecksInput}
+            />
           </WorkspaceSection>
         );
       case "trusted-preview":
