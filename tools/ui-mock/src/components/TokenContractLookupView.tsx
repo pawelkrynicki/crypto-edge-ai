@@ -1,4 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
+import {
+  ManualVerificationFallback,
+  buildLookupVerificationGaps,
+} from "./ManualVerificationFallback";
 
 interface TokenContractLookupViewProps {
   initialInput?: string;
@@ -52,6 +56,7 @@ export const TokenContractLookupView: React.FC<TokenContractLookupViewProps> = (
   }, [initialInput]);
 
   const lookup = useMemo(() => classifyTokenLookupInput(input), [input]);
+  const hasContract = lookup.classification === "likely EVM contract address";
 
   return (
     <div className="token-lookup-view">
@@ -118,11 +123,16 @@ export const TokenContractLookupView: React.FC<TokenContractLookupViewProps> = (
         </div>
       </section>
 
+      <ManualVerificationFallback
+        title="Manual verification fallback"
+        gaps={buildLookupVerificationGaps(hasContract)}
+      />
+
       <section className="token-lookup-review-panel">
         <div>
           <span className="token-lookup-eyebrow">next review step</span>
           <h3>manual review</h3>
-          <p>External check later. Contract and chain must be verified manually before any security context is trusted.</p>
+          <p>External check required. Contract and chain must be verified manually before any security context is trusted.</p>
         </div>
         <ul className="token-lookup-step-list">
           {lookup.reviewSteps.map((step) => (
@@ -247,8 +257,8 @@ function buildContractResult(input: string, evmAddress: string): LookupResult {
     },
     {
       label: "external checks",
-      value: "external check later",
-      detail: "next stage",
+      value: "external check required",
+      detail: "manual verification required",
       tone: "manual",
     },
     {
@@ -284,7 +294,7 @@ function buildContractResult(input: string, evmAddress: string): LookupResult {
     classification: "likely EVM contract address",
     summary: "Contract address format found locally. Address, chain, external checks and security status are not verified.",
     rows,
-    reviewSteps: buildManualReviewSteps("external check later"),
+    reviewSteps: buildManualReviewSteps("external check required"),
   };
 }
 
@@ -304,7 +314,7 @@ function buildMissingDataRows(): LookupRow[] {
     },
     {
       label: "external checks",
-      value: "external check later",
+      value: "external check required",
       detail: "manual verification required",
       tone: "manual",
     },

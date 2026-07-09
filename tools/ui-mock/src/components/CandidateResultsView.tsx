@@ -5,6 +5,10 @@ import type { CandidateReviewRecord, ReviewSessionState } from "../types/reviewS
 import { formatReasonText, formatSecurityFlag } from "../utils/displayText";
 import { ReviewStatusBadge } from "./CandidateReviewControls";
 import { LabelBadge } from "./LabelBadge";
+import {
+  ManualVerificationFallback,
+  buildCandidateVerificationGaps,
+} from "./ManualVerificationFallback";
 
 interface CandidateResultsViewProps {
   candidates: MockCandidate[];
@@ -72,7 +76,7 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
       <section className="candidate-results-summary-grid" aria-label="Candidate results summary">
         <SummaryCard label="research candidate" value={String(candidates.length)} detail="tokens to verify" />
         <SummaryCard label="manual review" value={String(manualReviewCount)} detail="need review or verification" />
-        <SummaryCard label="source freshness" value={missingFreshnessCount === 0 ? "known" : "unknown"} detail="unknown requires manual verification" />
+        <SummaryCard label="source freshness" value={missingFreshnessCount === 0 ? "not verified" : "source freshness unknown"} detail="manual verification required" />
         <SummaryCard label="risk flags" value={String(riskFlagCount)} detail="flags or missing checks surfaced" />
       </section>
 
@@ -120,9 +124,9 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
                 />
                 <CandidateField
                   label="external check"
-                  value={candidate.security ? "manual review" : "not verified"}
-                  detail={candidate.security ? "review candidate risk flags" : "manual verification required"}
-                  tone={candidate.security ? "neutral" : "manual"}
+                  value={candidate.security ? "external check required" : "security not verified"}
+                  detail={candidate.security ? "manual review only" : "cannot infer safety"}
+                  tone="manual"
                 />
               </div>
 
@@ -144,6 +148,12 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
                   ))}
                 </div>
               </section>
+
+              <ManualVerificationFallback
+                compact
+                title="Manual verification fallback"
+                gaps={buildCandidateVerificationGaps(candidate)}
+              />
 
               <footer className="candidate-result-footer">
                 <div className="candidate-result-review-state">
@@ -227,7 +237,7 @@ function getRadarReason(candidate: MockCandidate): string {
 function getSourceFreshness(candidate: MockCandidate): { value: string; detail: string; tone: CandidateTone } {
   if (!candidate.source_url || !candidate.last_checked) {
     return {
-      value: "unknown",
+      value: "source freshness unknown",
       detail: "manual verification required",
       tone: "manual",
     };
@@ -237,7 +247,7 @@ function getSourceFreshness(candidate: MockCandidate): { value: string; detail: 
 
   if (Number.isNaN(date.getTime())) {
     return {
-      value: "unknown",
+      value: "source freshness unknown",
       detail: "manual verification required",
       tone: "manual",
     };
@@ -253,7 +263,7 @@ function getSourceFreshness(candidate: MockCandidate): { value: string; detail: 
 function getRiskState(candidate: MockCandidate): { items: string[]; detail: string; tone: CandidateTone } {
   if (!candidate.security) {
     return {
-      items: ["not verified", "manual verification required"],
+      items: ["security not verified", "manual verification required", "cannot infer safety"],
       detail: "not verified",
       tone: "manual",
     };
@@ -317,7 +327,7 @@ function countRiskItems(candidate: MockCandidate): number {
 }
 
 function formatChain(chain: string): string {
-  if (!chain) return "unknown";
+  if (!chain) return "chain unknown";
   return CHAIN_LABELS[chain] ?? chain.toUpperCase();
 }
 

@@ -139,7 +139,7 @@ Screenshot guide:
 - Token / Contract Lookup is available from navigation and by direct deep link at `#token-lookup`.
 - Candidate Detail links to it with `Open token lookup`.
 - The view has one input field, quick examples, and local classification for likely symbol, likely project name, likely EVM contract address, likely URL, and unknown format.
-- Contract-like input stays `not verified`; chain stays `chain unknown / verify manually`; external checks stay `external check later`.
+- Contract-like input stays `not verified`; chain stays `chain unknown / verify manually`; external checks stay `external check required`.
 - Symbol, project, URL, unknown, missing security, missing liquidity, and missing source states stay `contract required`, `manual verification required`, `unknown`, or `not verified`.
 - This stage adds no backend, storage, provider call, source activation, URL fetch, scraping, external verification URL builder, dependency, scoring change, `final_label` change, or `WATCHLIST` meaning change.
 - Next stage: **12E.5 External Verification Links**.
@@ -156,6 +156,18 @@ Screenshot guide:
 - Missing contract, unknown chain, security, liquidity, source freshness, and WATCHLIST states remain `contract required`, `chain unknown`, `not verified`, `manual verification required`, `security not verified`, `liquidity unknown`, `source freshness unknown`, or manual review only.
 - This stage adds no backend, storage, provider call, source activation, external fetch, scraping, dependency, scoring change, `final_label` change, or `WATCHLIST` meaning change.
 - Next stage: **12E.6 Manual Verification Fallbacks**.
+
+## 12E.6 Manual Verification Fallbacks
+
+12E.6 adds shared frontend-only **Manual Verification Fallbacks** across the candidate flow.
+
+- Manual fallback panels are used in Candidate Results, Candidate Detail, Token / Contract Lookup, and External Verification Links.
+- Shared fallback names are `manual verification required`, `not verified`, `contract required`, `chain unknown`, `security not verified`, `liquidity unknown`, `source freshness unknown`, `external check required`, `manual review only`, and `cannot infer safety`.
+- Each fallback includes a short `next review step`.
+- Missing data is shown as a `data gap`; it is not treated as a positive status and cannot infer safety.
+- `WATCHLIST` remains manual review only.
+- This stage adds no backend, storage, provider call, source activation, external fetch, scraping, OpenAI call, paid source, dependency, scoring change, `final_label` change, or `WATCHLIST` meaning change.
+- Next stage: **12E.7 Research Action Panel**.
 
 ## 11A AI KINTEL Production MVP Planning
 
@@ -249,8 +261,9 @@ These artifacts close the AI KINTEL planning package without deploying staging, 
 - **Dark, professional UI**: Aligned with the AIKINTEL aesthetic.
 - **Candidate Results**: Product-facing research candidate list with source freshness, risk flags, manual review status, and next review step.
 - **Candidate Detail View**: Product-facing detail surface at `#candidate-detail` with reason on radar, source freshness, source coverage, risk flags, security notes, open questions, manual review status, and next review step.
-- **Token / Contract Lookup**: Frontend-only shell at `#token-lookup` for local input classification, manual verification required states, and external check later fallback.
+- **Token / Contract Lookup**: Frontend-only shell at `#token-lookup` for local input classification, manual verification required states, and external check required fallback.
 - **External Verification Links**: Link-only manual external checks at `#external-checks` with copy fallback, no provider calls, no scraping, and no automated external verdicts.
+- **Manual Verification Fallbacks**: Shared data gap panels across Candidate Results, Candidate Detail, Token / Contract Lookup, and External Verification Links with `next review step` and `cannot infer safety` copy.
 - **Scanner Radar**: Product-grade candidate list and detail workspace showing scanner labels, local review status, security labels, market metrics, and read-only scanner reasons.
 - **Control Center**: Standalone preview status hub for product readiness, source freshness, review flow, reports, research-only boundaries, and trusted tester preparation.
 - **Trusted Preview**: Non-technical reviewer click path for understanding radar, project detail, source freshness, report preview, and feedback prompts.
@@ -827,9 +840,9 @@ Diagnostics are available at `GET /api/scanner/sources`. This endpoint reports w
 This remains read-only and local. It does not add a database, auth, OpenAI, live token fetching, scanner logic changes, UI redesign, or trading signal behavior. Next stage: automate writing a real `tools/data-poc` run and verify the UI against API mode.
 
 ## Next Steps
-- 12E.5: External Verification Links is the current frontend productization baseline.
-- 12E.6: Manual Verification Fallbacks is the next frontend productization stage.
-- 12E.6-12E.12: continue Manual Verification Fallbacks, Research Action Panel, Navigation Cleanup, Empty / Error / Partial States, Copy / Naming, Visual Polish, and Frontend Contract Tests.
+- 12E.6: Manual Verification Fallbacks is the current frontend productization baseline.
+- 12E.7: Research Action Panel is the next frontend productization stage.
+- 12E.7-12E.12: continue Research Action Panel, Navigation Cleanup, Empty / Error / Partial States, Copy / Naming, Visual Polish, and Frontend Contract Tests.
 - Reports remain useful supporting artifacts, but they are not the critical path for the next frontend rebuild.
 - Treat 12B.2 Webinar Teaser Screenshot Mode and 12B.3 Webinar Screenshot Capture Kit as screenshot-only UI, not as trusted tester preview readiness.
 - Keep AI KINTEL and real AI/provider integrations deferred until after standalone preview feedback and owner review.
