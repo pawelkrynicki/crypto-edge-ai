@@ -9,11 +9,14 @@ import {
   ManualVerificationFallback,
   buildCandidateVerificationGaps,
 } from "./ManualVerificationFallback";
+import { ResearchActionPanel } from "./ResearchActionPanel";
 
 interface CandidateResultsViewProps {
   candidates: MockCandidate[];
   reviewSession: ReviewSessionState;
   onOpenCandidate?: (candidateId: string) => void;
+  onOpenTokenLookup?: (candidate: MockCandidate) => void;
+  onOpenExternalChecks?: (candidate: MockCandidate) => void;
 }
 
 type CandidateTone = "review" | "manual" | "critical" | "neutral";
@@ -52,6 +55,8 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
   candidates,
   reviewSession,
   onOpenCandidate,
+  onOpenTokenLookup,
+  onOpenExternalChecks,
 }) => {
   const manualReviewCount = candidates.filter((candidate) => requiresManualReview(candidate)).length;
   const missingFreshnessCount = candidates.filter((candidate) => !hasKnownFreshness(candidate)).length;
@@ -153,6 +158,14 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
                 compact
                 title="Manual verification fallback"
                 gaps={buildCandidateVerificationGaps(candidate)}
+              />
+
+              <ResearchActionPanel
+                variant="compact"
+                candidate={candidate}
+                onOpenCandidateDetail={onOpenCandidate ? () => onOpenCandidate(candidate.id) : undefined}
+                onOpenTokenLookup={onOpenTokenLookup ? () => onOpenTokenLookup(candidate) : undefined}
+                onOpenExternalChecks={onOpenExternalChecks ? () => onOpenExternalChecks(candidate) : undefined}
               />
 
               <footer className="candidate-result-footer">

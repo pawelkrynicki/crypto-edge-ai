@@ -169,6 +169,19 @@ Screenshot guide:
 - This stage adds no backend, storage, provider call, source activation, external fetch, scraping, OpenAI call, paid source, dependency, scoring change, `final_label` change, or `WATCHLIST` meaning change.
 - Next stage: **12E.7 Research Action Panel**.
 
+## 12E.7 Research Action Panel
+
+12E.7 adds a shared frontend-only **Research Action Panel** across the candidate workflow.
+
+- Research Action Panel is used in Candidate Results, Candidate Detail, Token / Contract Lookup, and External Verification Links.
+- The panel gives safe next review actions: `open candidate detail`, `open token lookup`, `open external checks`, `copy contract`, `copy token input`, `view source freshness`, `mark for manual review`, `send feedback`, and `add review note`.
+- Feedback and review-note actions route to the existing `#feedback-notes` flow.
+- `mark for manual review` is a UI-only manual state and does not save review state.
+- Missing contract, unknown chain, unknown source freshness, and partial context stay `contract required`, `chain unknown`, `source freshness unknown`, `manual verification required`, `not verified`, or `cannot infer safety`.
+- `WATCHLIST` remains manual review only.
+- This stage adds no backend, storage, provider call, source activation, external fetch, scraping, OpenAI call, paid source, dependency, scoring change, `final_label` change, or `WATCHLIST` meaning change.
+- Next stage: **12E.8 Frontend Navigation Cleanup**.
+
 ## 11A AI KINTEL Production MVP Planning
 
 11A defines the production direction as an AI KINTEL Crypto Market module, not a standalone SaaS. This UI mock remains a local RC baseline for porting and is not the production implementation.
@@ -264,6 +277,7 @@ These artifacts close the AI KINTEL planning package without deploying staging, 
 - **Token / Contract Lookup**: Frontend-only shell at `#token-lookup` for local input classification, manual verification required states, and external check required fallback.
 - **External Verification Links**: Link-only manual external checks at `#external-checks` with copy fallback, no provider calls, no scraping, and no automated external verdicts.
 - **Manual Verification Fallbacks**: Shared data gap panels across Candidate Results, Candidate Detail, Token / Contract Lookup, and External Verification Links with `next review step` and `cannot infer safety` copy.
+- **Research Action Panel**: Shared frontend-only action panel with safe hash links, copy fallbacks, source freshness state, feedback links, and UI-only manual review action.
 - **Scanner Radar**: Product-grade candidate list and detail workspace showing scanner labels, local review status, security labels, market metrics, and read-only scanner reasons.
 - **Control Center**: Standalone preview status hub for product readiness, source freshness, review flow, reports, research-only boundaries, and trusted tester preparation.
 - **Trusted Preview**: Non-technical reviewer click path for understanding radar, project detail, source freshness, report preview, and feedback prompts.
@@ -840,9 +854,9 @@ Diagnostics are available at `GET /api/scanner/sources`. This endpoint reports w
 This remains read-only and local. It does not add a database, auth, OpenAI, live token fetching, scanner logic changes, UI redesign, or trading signal behavior. Next stage: automate writing a real `tools/data-poc` run and verify the UI against API mode.
 
 ## Next Steps
-- 12E.6: Manual Verification Fallbacks is the current frontend productization baseline.
-- 12E.7: Research Action Panel is the next frontend productization stage.
-- 12E.7-12E.12: continue Research Action Panel, Navigation Cleanup, Empty / Error / Partial States, Copy / Naming, Visual Polish, and Frontend Contract Tests.
+- 12E.7: Research Action Panel is the current frontend productization baseline.
+- 12E.8: Frontend Navigation Cleanup is the next frontend productization stage.
+- 12E.8-12E.12: continue Navigation Cleanup, Empty / Error / Partial States, Copy / Naming, Visual Polish, and Frontend Contract Tests.
 - Reports remain useful supporting artifacts, but they are not the critical path for the next frontend rebuild.
 - Treat 12B.2 Webinar Teaser Screenshot Mode and 12B.3 Webinar Screenshot Capture Kit as screenshot-only UI, not as trusted tester preview readiness.
 - Keep AI KINTEL and real AI/provider integrations deferred until after standalone preview feedback and owner review.

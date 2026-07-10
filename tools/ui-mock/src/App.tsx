@@ -457,6 +457,8 @@ export default function App() {
               candidates={candidates}
               reviewSession={reviewSession}
               onOpenCandidate={handleOpenCandidate}
+              onOpenTokenLookup={handleOpenTokenLookup}
+              onOpenExternalChecks={handleOpenExternalChecks}
             />
           </WorkspaceSection>
         );

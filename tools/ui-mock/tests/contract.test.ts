@@ -16,6 +16,7 @@ import {
   buildExternalVerificationGaps,
   buildLookupVerificationGaps,
 } from "../src/components/ManualVerificationFallback";
+import { ResearchActionPanel } from "../src/components/ResearchActionPanel";
 import { TokenContractLookupView } from "../src/components/TokenContractLookupView";
 import { CandidateDetail, getMissingSecurityText } from "../src/components/CandidateDetail";
 import { ControlCenter } from "../src/components/ControlCenter";
@@ -726,10 +727,84 @@ assert.doesNotMatch(
   "manual fallback does not give missing data a green security status",
 );
 
+const researchActionPanelMarkup = renderToStaticMarkup(React.createElement(ResearchActionPanel, {
+  candidate: passMockCandidate,
+  tokenInput: "PASS",
+  onOpenCandidateDetail: () => undefined,
+  onOpenTokenLookup: () => undefined,
+  onOpenExternalChecks: () => undefined,
+}));
+
+assert.match(researchActionPanelMarkup, /research action panel/i, "research action panel component exists");
+for (const expectedCopy of [
+  "open candidate detail",
+  "open token lookup",
+  "open external checks",
+  "copy contract",
+  "copy token input",
+  "view source freshness",
+  "mark for manual review",
+  "send feedback",
+  "add review note",
+  "manual review only",
+  "cannot infer safety",
+]) {
+  assert.match(
+    researchActionPanelMarkup,
+    new RegExp(expectedCopy, "i"),
+    `research action panel renders ${expectedCopy}`,
+  );
+}
+for (const expectedHref of ["#candidate-detail", "#token-lookup", "#external-checks", "#feedback-notes"]) {
+  assert.match(
+    researchActionPanelMarkup,
+    new RegExp(`href="${expectedHref}"`),
+    `research action panel links to ${expectedHref}`,
+  );
+}
+assert.doesNotMatch(
+  researchActionPanelMarkup,
+  forbiddenActionPattern,
+  "research action panel does not render forbidden trading words as actions",
+);
+assert.doesNotMatch(
+  researchActionPanelMarkup,
+  /\b(?:buy|sell|entry|signal|recommendation)\b/i,
+  "research action panel avoids forbidden trading vocabulary",
+);
+
+const missingResearchActionPanelMarkup = renderToStaticMarkup(React.createElement(ResearchActionPanel, {
+  tokenInput: "",
+}));
+assert.match(missingResearchActionPanelMarkup, /contract required/i, "research action panel disables copy contract without contract");
+assert.match(missingResearchActionPanelMarkup, /chain unknown/i, "research action panel shows chain unknown without chain");
+assert.match(
+  missingResearchActionPanelMarkup,
+  /source freshness unknown/i,
+  "research action panel shows source freshness unknown without source data",
+);
+assert.match(
+  missingResearchActionPanelMarkup,
+  /manual verification required/i,
+  "research action panel keeps missing data in manual verification",
+);
+assert.match(
+  missingResearchActionPanelMarkup,
+  /cannot infer safety/i,
+  "research action panel states missing data cannot infer safety",
+);
+assert.doesNotMatch(
+  missingResearchActionPanelMarkup,
+  /\b(?:ready|available|status-good|green|success|security check complete)\b/i,
+  "research action panel does not give missing data a green security status",
+);
+
 const candidateResultsMarkup = renderToStaticMarkup(React.createElement(CandidateResultsView, {
   candidates: [passMockCandidate, lowlMockCandidate, fdvMockCandidate],
   reviewSession: savedReviewState,
   onOpenCandidate: () => undefined,
+  onOpenTokenLookup: () => undefined,
+  onOpenExternalChecks: () => undefined,
 }));
 
 assert.match(candidateResultsMarkup, /Candidate Results/, "candidate results view exists");
@@ -739,6 +814,7 @@ assert.match(candidateResultsMarkup, /source freshness/i, "candidate results ren
 assert.match(candidateResultsMarkup, /risk flags/i, "candidate results renders risk flags");
 assert.match(candidateResultsMarkup, /next review step/i, "candidate results renders next review step");
 assert.match(candidateResultsMarkup, /manual verification fallback/i, "candidate results renders manual verification fallback");
+assert.match(candidateResultsMarkup, /research action panel/i, "candidate results renders research action panel");
 assert.match(candidateResultsMarkup, /external check required/i, "candidate results renders external check required fallback");
 assert.match(candidateResultsMarkup, /cannot infer safety/i, "candidate results states missing data cannot infer safety");
 assert.match(candidateResultsMarkup, /Open candidate detail/, "candidate results links to candidate detail");
@@ -811,6 +887,7 @@ assert.match(candidateDetailMarkup, /open questions/i, "candidate detail renders
 assert.match(candidateDetailMarkup, /manual review/i, "candidate detail renders manual review copy");
 assert.match(candidateDetailMarkup, /next review step/i, "candidate detail renders next review step");
 assert.match(candidateDetailMarkup, /manual verification fallback/i, "candidate detail renders manual verification fallback");
+assert.match(candidateDetailMarkup, /research action panel/i, "candidate detail renders research action panel");
 assert.match(candidateDetailMarkup, /external check required/i, "candidate detail renders external check required fallback");
 assert.match(candidateDetailMarkup, /cannot infer safety/i, "candidate detail states missing data cannot infer safety");
 assert.match(candidateDetailMarkup, /Open token lookup/, "candidate detail links to token lookup");
@@ -940,6 +1017,7 @@ assert.match(tokenLookupMarkup, /source freshness/i, "token lookup renders sourc
 assert.match(tokenLookupMarkup, /risk flags/i, "token lookup renders risk flags state");
 assert.match(tokenLookupMarkup, /next review step/i, "token lookup renders next review step");
 assert.match(tokenLookupMarkup, /manual verification fallback/i, "token lookup renders manual verification fallback");
+assert.match(tokenLookupMarkup, /research action panel/i, "token lookup renders research action panel");
 assert.match(tokenLookupMarkup, /cannot infer safety/i, "token lookup states missing data cannot infer safety");
 assert.match(tokenLookupMarkup, /manual review only/i, "token lookup keeps manual review only fallback visible");
 assert.match(tokenLookupMarkup, /likely symbol/i, "token lookup classifies symbol input locally");
@@ -991,6 +1069,7 @@ assert.match(tokenLookupProjectMarkup, /contract required/i, "token lookup requi
 
 const tokenLookupComponentSource = await readFile(resolve("src", "components", "TokenContractLookupView.tsx"), "utf8");
 const manualFallbackComponentSource = await readFile(resolve("src", "components", "ManualVerificationFallback.tsx"), "utf8");
+const researchActionPanelComponentSource = await readFile(resolve("src", "components", "ResearchActionPanel.tsx"), "utf8");
 assert.doesNotMatch(tokenLookupComponentSource, /\bfetch\s*\(/, "token lookup does not perform fetch calls");
 assert.doesNotMatch(tokenLookupComponentSource, /\bXMLHttpRequest\b/, "token lookup does not perform browser requests");
 assert.doesNotMatch(
@@ -1015,6 +1094,23 @@ assert.doesNotMatch(
   /source activation/i,
   "manual fallback does not add source activation",
 );
+assert.doesNotMatch(researchActionPanelComponentSource, /\bfetch\s*\(/, "research action panel does not perform fetch calls");
+assert.doesNotMatch(researchActionPanelComponentSource, /\bXMLHttpRequest\b/, "research action panel does not perform browser requests");
+assert.doesNotMatch(
+  researchActionPanelComponentSource,
+  /\b(?:localStorage|sessionStorage)\b/,
+  "research action panel does not write browser storage",
+);
+assert.doesNotMatch(
+  researchActionPanelComponentSource,
+  /loadScannerDataSourceResult|loadLatestMarketContext|loadReviewSessionFromApi|saveReviewSessionToApi/,
+  "research action panel does not call existing provider or source services",
+);
+assert.doesNotMatch(
+  researchActionPanelComponentSource,
+  /source activation/i,
+  "research action panel does not add source activation",
+);
 
 const externalChecksMarkup = renderToStaticMarkup(React.createElement(ExternalVerificationLinksView, {
   candidate: passMockCandidate,
@@ -1028,6 +1124,7 @@ assert.match(externalChecksMarkup, /copy contract/i, "external checks view rende
 assert.match(externalChecksMarkup, /not verified/i, "external checks keeps targets not verified");
 assert.match(externalChecksMarkup, /manual verification required/i, "external checks requires manual verification");
 assert.match(externalChecksMarkup, /manual verification fallback/i, "external checks renders manual verification fallback");
+assert.match(externalChecksMarkup, /research action panel/i, "external checks renders research action panel");
 assert.match(externalChecksMarkup, /external check required/i, "external checks renders external check required fallback");
 assert.match(externalChecksMarkup, /security not verified/i, "external checks keeps security unverified");
 assert.match(externalChecksMarkup, /liquidity unknown/i, "external checks keeps liquidity unknown");

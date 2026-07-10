@@ -3,6 +3,7 @@ import {
   ManualVerificationFallback,
   buildLookupVerificationGaps,
 } from "./ManualVerificationFallback";
+import { ResearchActionPanel } from "./ResearchActionPanel";
 
 interface TokenContractLookupViewProps {
   initialInput?: string;
@@ -126,6 +127,11 @@ export const TokenContractLookupView: React.FC<TokenContractLookupViewProps> = (
       <ManualVerificationFallback
         title="Manual verification fallback"
         gaps={buildLookupVerificationGaps(hasContract)}
+      />
+
+      <ResearchActionPanel
+        tokenInput={input}
+        onOpenExternalChecks={onOpenExternalChecks ? () => onOpenExternalChecks(input) : undefined}
       />
 
       <section className="token-lookup-review-panel">

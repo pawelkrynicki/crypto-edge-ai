@@ -7,6 +7,7 @@ import {
   ManualVerificationFallback,
   buildCandidateVerificationGaps,
 } from "./ManualVerificationFallback";
+import { ResearchActionPanel } from "./ResearchActionPanel";
 
 interface CandidateDetailViewProps {
   candidate: MockCandidate | null;
@@ -162,6 +163,12 @@ export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
       <ManualVerificationFallback
         title="Manual verification fallback"
         gaps={buildCandidateVerificationGaps(candidate)}
+      />
+
+      <ResearchActionPanel
+        candidate={candidate}
+        onOpenTokenLookup={onOpenTokenLookup ? () => onOpenTokenLookup(candidate) : undefined}
+        onOpenExternalChecks={onOpenExternalChecks ? () => onOpenExternalChecks(candidate) : undefined}
       />
 
       <section className="candidate-detail-review-panel">
