@@ -182,6 +182,18 @@ Screenshot guide:
 - This stage adds no backend, storage, provider call, source activation, external fetch, scraping, OpenAI call, paid source, dependency, scoring change, `final_label` change, or `WATCHLIST` meaning change.
 - Next stage: **12E.8 Frontend Navigation Cleanup**.
 
+## 12E.8 Frontend Navigation Cleanup
+
+12E.8 separates the frontend navigation hierarchy so the product research flow is first and admin/demo surfaces no longer compete with it.
+
+- `Product Flow` contains Candidate Results, Candidate Detail, Token Lookup, and External Checks.
+- `Review / Feedback` keeps Feedback Notes visible after the manual review only flow, alongside the local review queue.
+- `Admin / Status` contains Control Center, Source freshness/status context, scanner/reference surfaces, and other technical views.
+- `Demo / Preview` contains Trusted Preview and Webinar Teaser.
+- Existing direct links remain preserved: `#candidate-results`, `#candidate-detail`, `#token-lookup`, `#external-checks`, `#feedback-notes`, `#control-center`, `#trusted-preview`, and `#webinar-teaser`.
+- This stage adds no backend, storage, provider call, source activation, external fetch, scraping, OpenAI call, paid source, dependency, scoring change, `final_label` change, or `WATCHLIST` meaning change.
+- Next stage: **12E.9 Empty / Error / Partial States**.
+
 ## 11A AI KINTEL Production MVP Planning
 
 11A defines the production direction as an AI KINTEL Crypto Market module, not a standalone SaaS. This UI mock remains a local RC baseline for porting and is not the production implementation.
@@ -854,9 +866,9 @@ Diagnostics are available at `GET /api/scanner/sources`. This endpoint reports w
 This remains read-only and local. It does not add a database, auth, OpenAI, live token fetching, scanner logic changes, UI redesign, or trading signal behavior. Next stage: automate writing a real `tools/data-poc` run and verify the UI against API mode.
 
 ## Next Steps
-- 12E.7: Research Action Panel is the current frontend productization baseline.
-- 12E.8: Frontend Navigation Cleanup is the next frontend productization stage.
-- 12E.8-12E.12: continue Navigation Cleanup, Empty / Error / Partial States, Copy / Naming, Visual Polish, and Frontend Contract Tests.
+- 12E.8: Frontend Navigation Cleanup is the current frontend productization baseline.
+- 12E.9: Empty / Error / Partial States is the next frontend productization stage.
+- 12E.9-12E.12: continue Empty / Error / Partial States, Copy / Naming, Visual Polish, and Frontend Contract Tests.
 - Reports remain useful supporting artifacts, but they are not the critical path for the next frontend rebuild.
 - Treat 12B.2 Webinar Teaser Screenshot Mode and 12B.3 Webinar Screenshot Capture Kit as screenshot-only UI, not as trusted tester preview readiness.
 - Keep AI KINTEL and real AI/provider integrations deferred until after standalone preview feedback and owner review.
