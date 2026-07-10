@@ -194,6 +194,19 @@ Screenshot guide:
 - This stage adds no backend, storage, provider call, source activation, external fetch, scraping, OpenAI call, paid source, dependency, scoring change, `final_label` change, or `WATCHLIST` meaning change.
 - Next stage: **12E.9 Empty / Error / Partial States**.
 
+## 12E.9 Empty / Error / Partial States
+
+12E.9 adds shared frontend-only product states for empty, partial, and error/data-gap moments in the main candidate workflow.
+
+- `ProductStateNotice` is used across Candidate Results, Candidate Detail, Token / Contract Lookup, and External Checks.
+- Candidate Results shows `no candidates found` and `partial source coverage` as data gaps with a `next review step`.
+- Candidate Detail shows partial source coverage, `source freshness unknown`, and manual review-only boundaries.
+- Token / Contract Lookup shows `contract required`, `chain unknown`, `external check required`, and missing safety/liquidity/source states without fetching data.
+- External Checks shows link-only `external check required`, `security not verified`, `liquidity unknown`, and missing contract/chain states.
+- Missing or partial data stays `data gap`, `not verified`, `manual verification required`, `manual review only`, and `cannot infer safety`.
+- This stage adds no backend, storage, provider call, source activation, external fetch, scraping, OpenAI call, paid source, dependency, scoring change, `final_label` change, or `WATCHLIST` meaning change.
+- Next stage: **12E.10 Frontend Copy / Naming**.
+
 ## 11A AI KINTEL Production MVP Planning
 
 11A defines the production direction as an AI KINTEL Crypto Market module, not a standalone SaaS. This UI mock remains a local RC baseline for porting and is not the production implementation.
@@ -866,9 +879,9 @@ Diagnostics are available at `GET /api/scanner/sources`. This endpoint reports w
 This remains read-only and local. It does not add a database, auth, OpenAI, live token fetching, scanner logic changes, UI redesign, or trading signal behavior. Next stage: automate writing a real `tools/data-poc` run and verify the UI against API mode.
 
 ## Next Steps
-- 12E.8: Frontend Navigation Cleanup is the current frontend productization baseline.
-- 12E.9: Empty / Error / Partial States is the next frontend productization stage.
-- 12E.9-12E.12: continue Empty / Error / Partial States, Copy / Naming, Visual Polish, and Frontend Contract Tests.
+- 12E.9: Empty / Error / Partial States is the current frontend productization baseline.
+- 12E.10: Frontend Copy / Naming is the next frontend productization stage.
+- 12E.10-12E.12: continue Copy / Naming, Visual Polish, and Frontend Contract Tests.
 - Reports remain useful supporting artifacts, but they are not the critical path for the next frontend rebuild.
 - Treat 12B.2 Webinar Teaser Screenshot Mode and 12B.3 Webinar Screenshot Capture Kit as screenshot-only UI, not as trusted tester preview readiness.
 - Keep AI KINTEL and real AI/provider integrations deferred until after standalone preview feedback and owner review.

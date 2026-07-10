@@ -9,6 +9,7 @@ import {
   ManualVerificationFallback,
   buildCandidateVerificationGaps,
 } from "./ManualVerificationFallback";
+import { ProductStateNotice, type ProductStateNoticeItem } from "./ProductStateNotice";
 import { ResearchActionPanel } from "./ResearchActionPanel";
 
 interface CandidateResultsViewProps {
@@ -84,6 +85,17 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
         <SummaryCard label="source freshness" value={missingFreshnessCount === 0 ? "not verified" : "source freshness unknown"} detail="manual verification required" />
         <SummaryCard label="risk flags" value={String(riskFlagCount)} detail="flags or missing checks surfaced" />
       </section>
+
+      {candidates.length > 0 && (
+        <ProductStateNotice
+          variant="partial"
+          title="partial source coverage"
+          status="partial source coverage"
+          detail="data gap: source freshness unknown, security not verified, liquidity unknown, and external check required states remain manual review only until a human verifies them."
+          nextReviewStep="open candidate detail, then keep manual verification required for every not verified field"
+          items={buildCandidateResultsStateItems(missingFreshnessCount, riskFlagCount)}
+        />
+      )}
 
       <section className="candidate-results-list" aria-label="research candidate list">
         {candidates.length > 0 ? candidates.map((candidate) => {
@@ -190,9 +202,18 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
             </article>
           );
         }) : (
-          <div className="candidate-results-empty">
-            No research candidate rows available. Manual verification required before any token to verify is treated as reviewed.
-          </div>
+          <ProductStateNotice
+            variant="empty"
+            title="no candidates found"
+            status="no candidates found"
+            detail="data gap: no research candidate rows are present, so the UI cannot infer safety and cannot mark anything as reviewed."
+            nextReviewStep="confirm source freshness, then continue manual review only when candidates exist"
+            items={[
+              { label: "source coverage", value: "partial source coverage", detail: "source freshness unknown" },
+              { label: "contract", value: "contract required", detail: "chain unknown / external check required" },
+              { label: "security", value: "security not verified", detail: "liquidity unknown" },
+            ]}
+          />
         )}
       </section>
     </div>
@@ -337,6 +358,31 @@ function hasKnownFreshness(candidate: MockCandidate): boolean {
 function countRiskItems(candidate: MockCandidate): number {
   if (!candidate.security) return 1;
   return Math.max(1, candidate.security.risk_flags.length + candidate.security.missing_data.length);
+}
+
+function buildCandidateResultsStateItems(missingFreshnessCount: number, riskFlagCount: number): ProductStateNoticeItem[] {
+  return [
+    {
+      label: "source freshness",
+      value: missingFreshnessCount > 0 ? "source freshness unknown" : "not verified",
+      detail: "manual verification required",
+    },
+    {
+      label: "external check",
+      value: "external check required",
+      detail: "manual review only",
+    },
+    {
+      label: "risk coverage",
+      value: riskFlagCount > 0 ? "security not verified" : "cannot infer safety",
+      detail: "missing data stays a data gap",
+    },
+    {
+      label: "market context",
+      value: "liquidity unknown",
+      detail: "not verified",
+    },
+  ];
 }
 
 function formatChain(chain: string): string {

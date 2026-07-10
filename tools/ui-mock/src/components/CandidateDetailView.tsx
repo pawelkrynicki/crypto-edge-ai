@@ -7,6 +7,7 @@ import {
   ManualVerificationFallback,
   buildCandidateVerificationGaps,
 } from "./ManualVerificationFallback";
+import { ProductStateNotice, type ProductStateNoticeItem } from "./ProductStateNotice";
 import { ResearchActionPanel } from "./ResearchActionPanel";
 
 interface CandidateDetailViewProps {
@@ -62,6 +63,18 @@ export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
             </button>
           )}
         </section>
+        <ProductStateNotice
+          variant="empty"
+          title="no candidates found"
+          status="no candidates found"
+          detail="data gap: candidate detail has no selected research candidate, so source freshness unknown and cannot infer safety remain visible."
+          nextReviewStep="return to candidate results and select a candidate for manual review only"
+          items={[
+            { label: "source coverage", value: "partial source coverage", detail: "not verified" },
+            { label: "contract", value: "contract required", detail: "chain unknown" },
+            { label: "external check", value: "external check required", detail: "manual verification required" },
+          ]}
+        />
       </div>
     );
   }
@@ -101,6 +114,15 @@ export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
         <DetailMetric label="contract address" value={contractState.value} detail={contractState.detail} tone={contractState.tone} />
         <DetailMetric label="research priority" value={priority.label} detail={priority.detail} tone={priority.tone} />
       </section>
+
+      <ProductStateNotice
+        variant="partial"
+        title="partial source coverage"
+        status={sourceFreshness.value === "source freshness unknown" ? "source freshness unknown" : "partial source coverage"}
+        detail="data gap: candidate detail can show local candidate context, but security not verified, liquidity unknown, and source freshness unknown fields stay not verified until manual checks are complete."
+        nextReviewStep={nextReviewStep}
+        items={buildDetailStateItems(candidate, sourceFreshness, securityNotes, liquidityContext)}
+      />
 
       <section className="candidate-detail-main-grid">
         <article className="candidate-detail-section">
@@ -438,6 +460,41 @@ function getOpenQuestions(candidate: MockCandidate): string[] {
   }
 
   return questions;
+}
+
+function buildDetailStateItems(
+  candidate: MockCandidate,
+  sourceFreshness: { value: string; detail: string; tone: DetailTone },
+  securityNotes: { value: string; detail: string; tone: DetailTone },
+  liquidityContext: { value: string; detail: string; tone: DetailTone },
+): ProductStateNoticeItem[] {
+  return [
+    {
+      label: "contract",
+      value: candidate.contract_address.trim() ? "not verified" : "contract required",
+      detail: "external check required",
+    },
+    {
+      label: "chain",
+      value: candidate.chain.trim() ? candidate.chain.toUpperCase() : "chain unknown",
+      detail: "manual verification required",
+    },
+    {
+      label: "source freshness",
+      value: sourceFreshness.value,
+      detail: sourceFreshness.detail,
+    },
+    {
+      label: "security",
+      value: securityNotes.value,
+      detail: securityNotes.detail,
+    },
+    {
+      label: "liquidity",
+      value: liquidityContext.value,
+      detail: liquidityContext.detail,
+    },
+  ];
 }
 
 function getNextReviewStep(candidate: MockCandidate, reviewRecord?: CandidateReviewRecord | null): string {

@@ -16,6 +16,7 @@ import {
   buildExternalVerificationGaps,
   buildLookupVerificationGaps,
 } from "../src/components/ManualVerificationFallback";
+import { ProductStateNotice } from "../src/components/ProductStateNotice";
 import { ResearchActionPanel } from "../src/components/ResearchActionPanel";
 import { TokenContractLookupView } from "../src/components/TokenContractLookupView";
 import { CandidateDetail, getMissingSecurityText } from "../src/components/CandidateDetail";
@@ -767,6 +768,36 @@ assert.doesNotMatch(
   "manual fallback does not give missing data a green security status",
 );
 
+const productStateNoticeMarkup = renderToStaticMarkup(React.createElement(ProductStateNotice, {
+  variant: "partial",
+  title: "partial source coverage",
+  status: "source freshness unknown",
+  detail: "data gap: external check required, security not verified, liquidity unknown, and manual verification required.",
+  nextReviewStep: "manual review only",
+  items: [
+    { label: "contract", value: "contract required", detail: "chain unknown" },
+    { label: "safety", value: "cannot infer safety", detail: "not verified" },
+  ],
+}));
+assert.match(productStateNoticeMarkup, /partial source coverage/i, "empty/error/partial state component exists");
+assert.match(productStateNoticeMarkup, /source freshness unknown/i, "state notice renders source freshness unknown");
+assert.match(productStateNoticeMarkup, /contract required/i, "state notice renders contract required");
+assert.match(productStateNoticeMarkup, /chain unknown/i, "state notice renders chain unknown");
+assert.match(productStateNoticeMarkup, /external check required/i, "state notice renders external check required");
+assert.match(productStateNoticeMarkup, /security not verified/i, "state notice renders security not verified");
+assert.match(productStateNoticeMarkup, /liquidity unknown/i, "state notice renders liquidity unknown");
+assert.match(productStateNoticeMarkup, /manual verification required/i, "state notice renders manual verification required");
+assert.match(productStateNoticeMarkup, /cannot infer safety/i, "state notice renders cannot infer safety");
+assert.match(productStateNoticeMarkup, /next review step/i, "state notice renders next review step");
+assert.match(productStateNoticeMarkup, /data gap/i, "state notice renders data gap");
+assert.match(productStateNoticeMarkup, /not verified/i, "state notice renders not verified");
+assert.match(productStateNoticeMarkup, /manual review only/i, "state notice renders manual review only");
+assert.doesNotMatch(
+  productStateNoticeMarkup,
+  /\b(?:ready|available|status-good|green|success|security check complete)\b/i,
+  "state notice does not give missing data a green security status",
+);
+
 const researchActionPanelMarkup = renderToStaticMarkup(React.createElement(ResearchActionPanel, {
   candidate: passMockCandidate,
   tokenInput: "PASS",
@@ -855,6 +886,8 @@ assert.match(candidateResultsMarkup, /risk flags/i, "candidate results renders r
 assert.match(candidateResultsMarkup, /next review step/i, "candidate results renders next review step");
 assert.match(candidateResultsMarkup, /manual verification fallback/i, "candidate results renders manual verification fallback");
 assert.match(candidateResultsMarkup, /research action panel/i, "candidate results renders research action panel");
+assert.match(candidateResultsMarkup, /partial source coverage/i, "candidate results renders partial source coverage");
+assert.match(candidateResultsMarkup, /data gap/i, "candidate results renders data gap state copy");
 assert.match(candidateResultsMarkup, /external check required/i, "candidate results renders external check required fallback");
 assert.match(candidateResultsMarkup, /cannot infer safety/i, "candidate results states missing data cannot infer safety");
 assert.match(candidateResultsMarkup, /Open candidate detail/, "candidate results links to candidate detail");
@@ -876,6 +909,31 @@ assert.doesNotMatch(
   candidateResultsMarkup,
   /\b(?:buy|sell|entry|signal|recommendation)\b/i,
   "candidate results avoids forbidden trading vocabulary",
+);
+
+const candidateResultsEmptyMarkup = renderToStaticMarkup(React.createElement(CandidateResultsView, {
+  candidates: [],
+  reviewSession: createEmptyReviewSession(),
+}));
+
+assert.match(candidateResultsEmptyMarkup, /no candidates found/i, "candidate results shows no candidates found empty state");
+assert.match(candidateResultsEmptyMarkup, /partial source coverage/i, "candidate results empty state keeps partial coverage visible");
+assert.match(candidateResultsEmptyMarkup, /data gap/i, "candidate results empty state names the data gap");
+assert.match(candidateResultsEmptyMarkup, /source freshness unknown/i, "candidate results empty state keeps source freshness unknown");
+assert.match(candidateResultsEmptyMarkup, /contract required/i, "candidate results empty state requires contract before checks");
+assert.match(candidateResultsEmptyMarkup, /chain unknown/i, "candidate results empty state keeps chain unknown");
+assert.match(candidateResultsEmptyMarkup, /external check required/i, "candidate results empty state keeps external checks manual");
+assert.match(candidateResultsEmptyMarkup, /security not verified/i, "candidate results empty state keeps security not verified");
+assert.match(candidateResultsEmptyMarkup, /liquidity unknown/i, "candidate results empty state keeps liquidity unknown");
+assert.match(candidateResultsEmptyMarkup, /manual verification required/i, "candidate results empty state requires manual verification");
+assert.match(candidateResultsEmptyMarkup, /cannot infer safety/i, "candidate results empty state cannot infer safety");
+assert.match(candidateResultsEmptyMarkup, /next review step/i, "candidate results empty state shows next review step");
+assert.match(candidateResultsEmptyMarkup, /not verified/i, "candidate results empty state keeps data not verified");
+assert.match(candidateResultsEmptyMarkup, /manual review only/i, "candidate results empty state keeps manual review only");
+assert.doesNotMatch(
+  candidateResultsEmptyMarkup,
+  /\b(?:ready|available|status-good|green|success|security check complete)\b/i,
+  "candidate results empty state does not give missing data a green security status",
 );
 
 const candidateResultsMissingSecurityMarkup = renderToStaticMarkup(React.createElement(CandidateResultsView, {
@@ -928,6 +986,8 @@ assert.match(candidateDetailMarkup, /manual review/i, "candidate detail renders 
 assert.match(candidateDetailMarkup, /next review step/i, "candidate detail renders next review step");
 assert.match(candidateDetailMarkup, /manual verification fallback/i, "candidate detail renders manual verification fallback");
 assert.match(candidateDetailMarkup, /research action panel/i, "candidate detail renders research action panel");
+assert.match(candidateDetailMarkup, /partial source coverage/i, "candidate detail renders partial source coverage state");
+assert.match(candidateDetailMarkup, /data gap/i, "candidate detail renders data gap state copy");
 assert.match(candidateDetailMarkup, /external check required/i, "candidate detail renders external check required fallback");
 assert.match(candidateDetailMarkup, /cannot infer safety/i, "candidate detail states missing data cannot infer safety");
 assert.match(candidateDetailMarkup, /Open token lookup/, "candidate detail links to token lookup");
@@ -1058,6 +1118,7 @@ assert.match(tokenLookupMarkup, /risk flags/i, "token lookup renders risk flags 
 assert.match(tokenLookupMarkup, /next review step/i, "token lookup renders next review step");
 assert.match(tokenLookupMarkup, /manual verification fallback/i, "token lookup renders manual verification fallback");
 assert.match(tokenLookupMarkup, /research action panel/i, "token lookup renders research action panel");
+assert.match(tokenLookupMarkup, /data gap/i, "token lookup renders data gap state copy");
 assert.match(tokenLookupMarkup, /cannot infer safety/i, "token lookup states missing data cannot infer safety");
 assert.match(tokenLookupMarkup, /manual review only/i, "token lookup keeps manual review only fallback visible");
 assert.match(tokenLookupMarkup, /likely symbol/i, "token lookup classifies symbol input locally");
@@ -1109,30 +1170,73 @@ assert.match(tokenLookupProjectMarkup, /contract required/i, "token lookup requi
 
 const tokenLookupComponentSource = await readFile(resolve("src", "components", "TokenContractLookupView.tsx"), "utf8");
 const manualFallbackComponentSource = await readFile(resolve("src", "components", "ManualVerificationFallback.tsx"), "utf8");
+const productStateNoticeComponentSource = await readFile(resolve("src", "components", "ProductStateNotice.tsx"), "utf8");
 const researchActionPanelComponentSource = await readFile(resolve("src", "components", "ResearchActionPanel.tsx"), "utf8");
+const candidateResultsComponentSource = await readFile(resolve("src", "components", "CandidateResultsView.tsx"), "utf8");
+const candidateDetailViewComponentSource = await readFile(resolve("src", "components", "CandidateDetailView.tsx"), "utf8");
+const emptyErrorPartialStateSource = [
+  productStateNoticeComponentSource,
+  candidateResultsComponentSource,
+  candidateDetailViewComponentSource,
+  tokenLookupComponentSource,
+].join("\n");
 assert.doesNotMatch(tokenLookupComponentSource, /\bfetch\s*\(/, "token lookup does not perform fetch calls");
+assert.doesNotMatch(emptyErrorPartialStateSource, /\bfetch\s*\(/, "empty/error/partial states do not perform fetch calls");
 assert.doesNotMatch(tokenLookupComponentSource, /\bXMLHttpRequest\b/, "token lookup does not perform browser requests");
+assert.doesNotMatch(emptyErrorPartialStateSource, /\bXMLHttpRequest\b/, "empty/error/partial states do not perform browser requests");
 assert.doesNotMatch(
   tokenLookupComponentSource,
   /loadScannerDataSourceResult|loadLatestMarketContext|loadReviewSessionFromApi|saveReviewSessionToApi/,
   "token lookup does not call existing provider or source services",
 );
 assert.doesNotMatch(
+  emptyErrorPartialStateSource,
+  /loadScannerDataSourceResult|loadLatestMarketContext|loadReviewSessionFromApi|saveReviewSessionToApi/,
+  "empty/error/partial states do not call existing provider or source services",
+);
+assert.doesNotMatch(
   tokenLookupComponentSource,
   /source activation/i,
   "token lookup does not add source activation",
 );
+assert.doesNotMatch(
+  emptyErrorPartialStateSource,
+  /source activation/i,
+  "empty/error/partial states do not add source activation",
+);
+assert.doesNotMatch(
+  emptyErrorPartialStateSource,
+  /\b(?:localStorage|sessionStorage)\b/,
+  "empty/error/partial states do not write browser storage",
+);
 assert.doesNotMatch(manualFallbackComponentSource, /\bfetch\s*\(/, "manual fallback does not perform fetch calls");
+assert.doesNotMatch(productStateNoticeComponentSource, /\bfetch\s*\(/, "empty/error/partial state notice does not perform fetch calls");
 assert.doesNotMatch(manualFallbackComponentSource, /\bXMLHttpRequest\b/, "manual fallback does not perform browser requests");
+assert.doesNotMatch(productStateNoticeComponentSource, /\bXMLHttpRequest\b/, "empty/error/partial state notice does not perform browser requests");
 assert.doesNotMatch(
   manualFallbackComponentSource,
   /loadScannerDataSourceResult|loadLatestMarketContext|loadReviewSessionFromApi|saveReviewSessionToApi/,
   "manual fallback does not call existing provider or source services",
 );
 assert.doesNotMatch(
+  productStateNoticeComponentSource,
+  /loadScannerDataSourceResult|loadLatestMarketContext|loadReviewSessionFromApi|saveReviewSessionToApi/,
+  "empty/error/partial state notice does not call existing provider or source services",
+);
+assert.doesNotMatch(
   manualFallbackComponentSource,
   /source activation/i,
   "manual fallback does not add source activation",
+);
+assert.doesNotMatch(
+  productStateNoticeComponentSource,
+  /source activation/i,
+  "empty/error/partial state notice does not add source activation",
+);
+assert.doesNotMatch(
+  productStateNoticeComponentSource,
+  /\b(?:localStorage|sessionStorage)\b/,
+  "empty/error/partial state notice does not write browser storage",
 );
 assert.doesNotMatch(researchActionPanelComponentSource, /\bfetch\s*\(/, "research action panel does not perform fetch calls");
 assert.doesNotMatch(researchActionPanelComponentSource, /\bXMLHttpRequest\b/, "research action panel does not perform browser requests");
@@ -1165,6 +1269,7 @@ assert.match(externalChecksMarkup, /not verified/i, "external checks keeps targe
 assert.match(externalChecksMarkup, /manual verification required/i, "external checks requires manual verification");
 assert.match(externalChecksMarkup, /manual verification fallback/i, "external checks renders manual verification fallback");
 assert.match(externalChecksMarkup, /research action panel/i, "external checks renders research action panel");
+assert.match(externalChecksMarkup, /data gap/i, "external checks renders data gap state copy");
 assert.match(externalChecksMarkup, /external check required/i, "external checks renders external check required fallback");
 assert.match(externalChecksMarkup, /security not verified/i, "external checks keeps security unverified");
 assert.match(externalChecksMarkup, /liquidity unknown/i, "external checks keeps liquidity unknown");
@@ -1213,6 +1318,50 @@ assert.match(
   externalChecksMissingMarkup,
   /cannot infer safety/i,
   "external checks states that missing input cannot infer safety",
+);
+
+const emptyErrorPartialViewMarkup = [
+  productStateNoticeMarkup,
+  candidateResultsMarkup,
+  candidateResultsEmptyMarkup,
+  candidateDetailMarkup,
+  candidateDetailMissingDataMarkup,
+  tokenLookupMarkup,
+  externalChecksMarkup,
+  externalChecksMissingMarkup,
+].join("\n");
+
+for (const expectedCopy of [
+  "no candidates found",
+  "partial source coverage",
+  "source freshness unknown",
+  "contract required",
+  "chain unknown",
+  "external check required",
+  "security not verified",
+  "liquidity unknown",
+  "manual verification required",
+  "cannot infer safety",
+  "next review step",
+  "data gap",
+  "not verified",
+  "manual review only",
+]) {
+  assert.match(
+    emptyErrorPartialViewMarkup,
+    new RegExp(expectedCopy, "i"),
+    `empty/error/partial states render ${expectedCopy}`,
+  );
+}
+assert.doesNotMatch(
+  emptyErrorPartialViewMarkup,
+  forbiddenActionPattern,
+  "empty/error/partial states do not render forbidden trading words as actions",
+);
+assert.doesNotMatch(
+  emptyErrorPartialViewMarkup,
+  /\b(?:ready|available|status-good|green|success|security check complete)\b/i,
+  "empty/error/partial states do not give missing data a green security status",
 );
 assert.doesNotMatch(
   externalChecksMissingMarkup,

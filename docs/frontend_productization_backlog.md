@@ -1,8 +1,8 @@
 # Frontend Productization Backlog
 
-Stage: 12E.8 Frontend Navigation Cleanup
+Stage: 12E.9 Empty / Error / Partial States
 
-Next implementation stage: 12E.9 Empty / Error / Partial States
+Next implementation stage: 12E.10 Frontend Copy / Naming
 
 Rules:
 
@@ -83,6 +83,15 @@ Rules:
 - Existing deep links remain preserved: `#candidate-results`, `#candidate-detail`, `#token-lookup`, `#external-checks`, `#feedback-notes`, `#control-center`, `#trusted-preview`, and `#webinar-teaser`.
 - No backend, storage, provider calls, source activation, scraping, external fetch, OpenAI calls, paid sources, scoring change, `final_label` change, or `WATCHLIST` meaning change was added.
 - Next stage: 12E.9 Empty / Error / Partial States.
+
+12E.9 delivery note:
+
+- Empty / Error / Partial States are implemented through the shared frontend-only `ProductStateNotice` component.
+- Candidate Results, Candidate Detail, Token / Contract Lookup, and External Verification Links now show explicit empty, partial, or error/data-gap notices with `next review step`.
+- Shared state copy covers `no candidates found`, `partial source coverage`, `source freshness unknown`, `contract required`, `chain unknown`, `external check required`, `security not verified`, `liquidity unknown`, `manual verification required`, `cannot infer safety`, `data gap`, `not verified`, and `manual review only`.
+- Missing or partial data remains a data gap and cannot infer safety; no green safe/verified/approved state is added for missing data.
+- No backend, storage, provider calls, source activation, scraping, external fetch, OpenAI calls, paid sources, scoring change, `final_label` change, or `WATCHLIST` meaning change was added.
+- Next stage: 12E.10 Frontend Copy / Naming.
 
 | Stage | Task | Target files | Acceptance criteria | Not in scope | Priority |
 |---|---|---|---|---|---|

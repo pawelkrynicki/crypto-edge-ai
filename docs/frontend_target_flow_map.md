@@ -1,10 +1,10 @@
 # Frontend Target Flow Map
 
-Stage: 12E.8 Frontend Navigation Cleanup
+Stage: 12E.9 Empty / Error / Partial States
 
 Implemented deep links: `#candidate-results`, `#candidate-detail`, `#token-lookup`, `#external-checks`, `#feedback-notes`, `#control-center`, `#trusted-preview`, `#webinar-teaser`
 
-Next implementation stage: 12E.9 Empty / Error / Partial States
+Next implementation stage: 12E.10 Frontend Copy / Naming
 
 Only target flow:
 
@@ -22,6 +22,8 @@ Navigation groups after 12E.8:
 - `Demo / Preview`: Trusted Preview and Webinar Teaser.
 
 The 12E.8 cleanup preserves existing deep links and does not add backend, storage, provider calls, source activation, fetches, scraping, scoring changes, `final_label` changes, or `WATCHLIST` meaning changes.
+
+The 12E.9 pass adds shared frontend-only Empty / Error / Partial States through `ProductStateNotice`. Candidate Results, Candidate Detail, Token / Contract Lookup, and External Checks now show data gaps, partial source coverage, unknown freshness, missing contract/chain, required external checks, security/liquidity gaps, and a `next review step` without adding backend, storage, provider calls, source activation, fetches, scraping, scoring changes, `final_label` changes, or `WATCHLIST` meaning changes. Next stage: 12E.10 Frontend Copy / Naming.
 
 | Flow | Goal | User sees | Do not show | Next step |
 |---|---|---|---|---|
