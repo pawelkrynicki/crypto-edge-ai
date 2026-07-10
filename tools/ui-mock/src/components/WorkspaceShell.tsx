@@ -24,13 +24,20 @@ export interface WorkspaceNavItem {
   description: string;
 }
 
+export interface WorkspaceNavGroup {
+  id: string;
+  label: string;
+  description: string;
+  items: WorkspaceNavItem[];
+}
+
 interface DataSourceOption {
   key: DataSourceKey;
   label: string;
 }
 
 interface WorkspaceShellProps {
-  navItems: WorkspaceNavItem[];
+  navGroups: WorkspaceNavGroup[];
   activeSection: WorkspaceSectionId;
   onSectionChange: (sectionId: WorkspaceSectionId) => void;
   dataSource: DataSourceKey;
@@ -51,7 +58,7 @@ interface WorkspaceSectionProps {
 }
 
 export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
-  navItems,
+  navGroups,
   activeSection,
   onSectionChange,
   dataSource,
@@ -88,8 +95,8 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
           </>
         ) : (
           <>
-            <div className="source-control" aria-label="Data source">
-              <span>Data source</span>
+            <div className="source-control" aria-label="Source freshness">
+              <span>Source freshness</span>
               <div className="source-segment">
                 {dataSourceOptions.map((opt) => (
                   <button
@@ -115,24 +122,38 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
     <div className="workspace-shell-body">
       <aside className="workspace-sidebar" aria-label="Workspace navigation">
         <nav className="workspace-nav">
-          {navItems.map((item) => {
-            const active = activeSection === item.id;
+          {navGroups.map((group) => (
+            <section
+              className="workspace-nav-group"
+              key={group.id}
+              data-nav-group={group.label}
+              aria-label={group.label}
+            >
+              <div className="workspace-nav-group-header">
+                <span>{group.label}</span>
+                <small>{group.description}</small>
+              </div>
 
-            return (
-              <button
-                type="button"
-                key={item.id}
-                onClick={() => onSectionChange(item.id)}
-                className={`workspace-nav-item ${active ? "active" : ""}`}
-              >
-                <span className="workspace-nav-icon">{item.icon}</span>
-                <span className="workspace-nav-copy">
-                  <span>{item.label}</span>
-                  <small>{item.description}</small>
-                </span>
-              </button>
-            );
-          })}
+              {group.items.map((item) => {
+                const active = activeSection === item.id;
+
+                return (
+                  <button
+                    type="button"
+                    key={item.id}
+                    onClick={() => onSectionChange(item.id)}
+                    className={`workspace-nav-item ${active ? "active" : ""}`}
+                  >
+                    <span className="workspace-nav-icon">{item.icon}</span>
+                    <span className="workspace-nav-copy">
+                      <span>{item.label}</span>
+                      <small>{item.description}</small>
+                    </span>
+                  </button>
+                );
+              })}
+            </section>
+          ))}
         </nav>
       </aside>
 
@@ -164,7 +185,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
       ) : (
         <>
           <p>Research workspace only. Scanner context and local review do not change labels or scoring.</p>
-          <span>This is not a buy/sell signal.</span>
+          <span>Manual review only.</span>
         </>
       )}
     </footer>

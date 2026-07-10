@@ -19,7 +19,6 @@ import { WebinarTeaser } from "./components/WebinarTeaser";
 import {
   WorkspaceSection,
   WorkspaceShell,
-  type WorkspaceNavItem,
   type WorkspaceSectionId,
 } from "./components/WorkspaceShell";
 import {
@@ -48,6 +47,7 @@ import { mapPersistableScannerOutputToUiCandidates } from "./adapters/scannerOut
 import { toMockCandidate, type MockCandidate } from "./mockData";
 import {
   DEFAULT_WORKSPACE_SECTION,
+  WORKSPACE_NAV_GROUPS,
   resolveInitialWorkspaceSection,
   sectionToHash,
 } from "./workspaceNavigation";
@@ -68,31 +68,14 @@ function buildSummary(candidates: MockCandidate[]) {
   };
 }
 
-const WORKSPACE_NAV_ITEMS: WorkspaceNavItem[] = [
-  { id: "overview",    label: "Overview",        icon: "OV", description: "Status and health" },
-  { id: "candidate-results", label: "Candidate Results", icon: "CR", description: "Research candidates" },
-  { id: "candidate-detail", label: "Candidate Detail", icon: "CD", description: "Review candidate" },
-  { id: "token-lookup", label: "Token Lookup", icon: "TL", description: "Contract lookup" },
-  { id: "external-checks", label: "External Checks", icon: "EC", description: "Manual external checks" },
-  { id: "control-center", label: "Control Center", icon: "CC", description: "Preview readiness" },
-  { id: "trusted-preview", label: "Trusted Preview", icon: "TP", description: "Guided reviewer path" },
-  { id: "feedback-notes", label: "Feedback Notes", icon: "FN", description: "Session notes worksheet" },
-  { id: "webinar-teaser", label: "Webinar Teaser", icon: "WT", description: "Demo-safe screenshots" },
-  { id: "scanner",     label: "Scanner Radar",   icon: "SR", description: "Read-only scanner output" },
-  { id: "watchlist",   label: "Review Queue",    icon: "RQ", description: "Local analyst queue" },
-  { id: "research",    label: "Research Review", icon: "RR", description: "Mock categorization" },
-  { id: "risks",       label: "Risk Alerts",     icon: "RA", description: "Critical and manual checks" },
-  { id: "methodology", label: "Methodology",     icon: "M",  description: "Scanner and review layers" },
-];
-
 const SECTION_COPY: Record<WorkspaceSectionId, { title: string; description: string }> = {
   overview: {
-    title: "Local MVP Overview",
-    description: "Current local workflow status and health commands.",
+    title: "Admin / Status Overview",
+    description: "Source freshness, local workflow status and health context.",
   },
   "control-center": {
     title: "Control Center",
-    description: "Standalone preview readiness, source freshness, review flow, reports and tester preparation.",
+    description: "Admin / status view for preview readiness, source freshness and owner follow-up.",
   },
   "candidate-results": {
     title: "Candidate Results",
@@ -104,11 +87,11 @@ const SECTION_COPY: Record<WorkspaceSectionId, { title: string; description: str
   },
   "token-lookup": {
     title: "Token / Contract Lookup",
-    description: "Contract lookup shell for local input classification and manual verification required states.",
+    description: "Token lookup shell for local input classification and manual verification required states.",
   },
   "external-checks": {
     title: "External Checks",
-    description: "Link-only external checks with manual verification required and copy fallback states.",
+    description: "External checks with link-only manual verification and copy fallback states.",
   },
   "trusted-preview": {
     title: "Trusted Preview",
@@ -116,23 +99,23 @@ const SECTION_COPY: Record<WorkspaceSectionId, { title: string; description: str
   },
   "feedback-notes": {
     title: "Feedback Notes",
-    description: "Structured session notes for a trusted preview review.",
+    description: "Review / feedback notes after the manual review only flow.",
   },
   "webinar-teaser": {
     title: "Webinar Teaser",
-    description: "Demo-safe screenshot mode for showing the product concept with controlled demo content.",
+    description: "Demo / preview screenshot mode for controlled product concept content.",
   },
   scanner: {
     title: "Scanner Radar",
-    description: "Scanner output is read-only. WATCHLIST means eligible for further manual review only.",
+    description: "Admin / status scanner output. WATCHLIST means eligible for further manual review only.",
   },
   watchlist: {
     title: "Review Queue",
-    description: "Local analyst status and notes. This does not change scanner labels.",
+    description: "Review / feedback queue for local analyst status and notes.",
   },
   research: {
     title: "Research Review",
-    description: "Mock research categorization workspace. It is not an external AI call.",
+    description: "Admin / status mock research categorization workspace. It is not an external AI call.",
   },
   risks: {
     title: "Risk Alerts",
@@ -140,7 +123,7 @@ const SECTION_COPY: Record<WorkspaceSectionId, { title: string; description: str
   },
   methodology: {
     title: "Methodology",
-    description: "How local scanner labels, context and review layers fit together.",
+    description: "Admin / status reference for scanner labels, context and review layers.",
   },
 };
 
@@ -561,7 +544,7 @@ export default function App() {
 
   return (
     <WorkspaceShell
-      navItems={WORKSPACE_NAV_ITEMS}
+      navGroups={WORKSPACE_NAV_GROUPS}
       activeSection={activeSection}
       onSectionChange={handleWorkspaceSectionChange}
       dataSource={dataSource}

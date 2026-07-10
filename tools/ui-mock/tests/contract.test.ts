@@ -29,7 +29,7 @@ import { TrustedPreview } from "../src/components/TrustedPreview";
 import { WatchlistTab } from "../src/components/WatchlistTab";
 import { WebinarTeaser } from "../src/components/WebinarTeaser";
 import { WorkspaceOverview } from "../src/components/WorkspaceOverview";
-import { WorkspaceSection, WorkspaceShell, type WorkspaceNavItem } from "../src/components/WorkspaceShell";
+import { WorkspaceSection, WorkspaceShell } from "../src/components/WorkspaceShell";
 import { buildExternalVerificationTargets } from "../src/externalVerificationTargets";
 import { PERSISTABLE_SCANNER_SAMPLE } from "../src/fixtures/persistableScannerSample";
 import { toMockCandidate } from "../src/mockData";
@@ -55,6 +55,8 @@ import { interpretScannerApiOutput } from "../src/services/scannerDataSource";
 import type { ReviewSessionState } from "../src/types/reviewSessionTypes";
 import type { PersistableScannerOutput, ScannerApiOutput } from "../src/types/scannerTypes";
 import {
+  WORKSPACE_NAV_GROUPS,
+  flattenWorkspaceNavGroups,
   resolveInitialWorkspaceSection,
   sectionToHash,
 } from "../src/workspaceNavigation";
@@ -276,22 +278,8 @@ assert.match(
   "local MVP workflow panel renders compliance copy",
 );
 
-const workspaceNavItems = [
-  { id: "overview",    label: "Overview",        icon: "OV", description: "Status and health" },
-  { id: "candidate-results", label: "Candidate Results", icon: "CR", description: "Research candidates" },
-  { id: "candidate-detail", label: "Candidate Detail", icon: "CD", description: "Review candidate" },
-  { id: "token-lookup", label: "Token Lookup", icon: "TL", description: "Contract lookup" },
-  { id: "external-checks", label: "External Checks", icon: "EC", description: "Manual external checks" },
-  { id: "control-center", label: "Control Center", icon: "CC", description: "Preview readiness" },
-  { id: "trusted-preview", label: "Trusted Preview", icon: "TP", description: "Guided reviewer path" },
-  { id: "feedback-notes", label: "Feedback Notes", icon: "FN", description: "Session notes worksheet" },
-  { id: "webinar-teaser", label: "Webinar Teaser", icon: "WT", description: "Demo-safe screenshots" },
-  { id: "scanner",     label: "Scanner Radar",   icon: "SR", description: "Read-only scanner output" },
-  { id: "watchlist",   label: "Review Queue",    icon: "RQ", description: "Local analyst queue" },
-  { id: "research",    label: "Research Review", icon: "RR", description: "Mock categorization" },
-  { id: "risks",       label: "Risk Alerts",     icon: "RA", description: "Critical and manual checks" },
-  { id: "methodology", label: "Methodology",     icon: "M",  description: "Scanner and review layers" },
-] satisfies WorkspaceNavItem[];
+const workspaceNavGroups = WORKSPACE_NAV_GROUPS;
+const workspaceNavItems = flattenWorkspaceNavGroups(workspaceNavGroups);
 
 for (const label of ["Candidate Results", "Candidate Detail", "Token Lookup", "External Checks", "Trusted Preview", "Feedback Notes", "Webinar Teaser", "Control Center"]) {
   assert.ok(
@@ -300,30 +288,62 @@ for (const label of ["Candidate Results", "Candidate Detail", "Token Lookup", "E
   );
 }
 
-assert.equal(resolveInitialWorkspaceSection("#trusted-preview"), "trusted-preview");
-assert.equal(resolveInitialWorkspaceSection("#candidate-results"), "candidate-results");
-assert.equal(resolveInitialWorkspaceSection("#candidate-detail"), "candidate-detail");
-assert.equal(resolveInitialWorkspaceSection("#token-lookup"), "token-lookup");
-assert.equal(resolveInitialWorkspaceSection("#external-checks"), "external-checks");
-assert.equal(resolveInitialWorkspaceSection("#feedback-notes"), "feedback-notes");
-assert.equal(resolveInitialWorkspaceSection("#webinar-teaser"), "webinar-teaser");
-assert.equal(resolveInitialWorkspaceSection("#control-center"), "control-center");
-assert.equal(resolveInitialWorkspaceSection("#unknown-preview"), "overview");
-assert.equal(resolveInitialWorkspaceSection(""), "overview");
+for (const groupLabel of ["Product Flow", "Review / Feedback", "Admin / Status", "Demo / Preview"]) {
+  assert.ok(
+    workspaceNavGroups.some((group) => group.label === groupLabel),
+    `workspace navigation includes ${groupLabel} group`,
+  );
+}
+
+const productFlowGroup = workspaceNavGroups.find((group) => group.label === "Product Flow");
+const reviewFeedbackGroup = workspaceNavGroups.find((group) => group.label === "Review / Feedback");
+const adminStatusGroup = workspaceNavGroups.find((group) => group.label === "Admin / Status");
+const demoPreviewGroup = workspaceNavGroups.find((group) => group.label === "Demo / Preview");
+
+assert.ok(productFlowGroup, "Product Flow group exists");
+assert.deepEqual(
+  productFlowGroup.items.map((item) => item.label),
+  ["Candidate Results", "Candidate Detail", "Token Lookup", "External Checks"],
+  "Product Flow contains the main candidate research views first",
+);
+assert.ok(reviewFeedbackGroup?.items.some((item) => item.label === "Feedback Notes"), "Feedback Notes remains visible in Review / Feedback");
+assert.ok(
+  adminStatusGroup?.items.some((item) => item.label === "Control Center" && /admin \/ status/i.test(item.description)),
+  "Control Center is marked as admin/status",
+);
+assert.ok(
+  demoPreviewGroup?.items.some((item) => item.label === "Trusted Preview" && /demo \/ preview/i.test(item.description)),
+  "Trusted Preview is marked as demo/preview",
+);
+assert.ok(
+  demoPreviewGroup?.items.some((item) => item.label === "Webinar Teaser" && /demo \/ preview/i.test(item.description)),
+  "Webinar Teaser is marked as demo/preview",
+);
+
+const requiredDeepLinks = [
+  ["#candidate-results", "candidate-results"],
+  ["#candidate-detail", "candidate-detail"],
+  ["#token-lookup", "token-lookup"],
+  ["#external-checks", "external-checks"],
+  ["#feedback-notes", "feedback-notes"],
+  ["#control-center", "control-center"],
+  ["#trusted-preview", "trusted-preview"],
+  ["#webinar-teaser", "webinar-teaser"],
+] as const;
+
+for (const [hash, section] of requiredDeepLinks) {
+  assert.equal(resolveInitialWorkspaceSection(hash), section, `${hash} resolves to ${section}`);
+  assert.equal(sectionToHash(section), hash, `${section} maps back to ${hash}`);
+}
+
+assert.equal(resolveInitialWorkspaceSection("#unknown-preview"), "candidate-results");
+assert.equal(resolveInitialWorkspaceSection(""), "candidate-results");
 assert.equal(resolveInitialWorkspaceSection("#context"), "overview");
 assert.equal(resolveInitialWorkspaceSection("#workflow"), "overview");
-assert.equal(sectionToHash("trusted-preview"), "#trusted-preview");
-assert.equal(sectionToHash("candidate-results"), "#candidate-results");
-assert.equal(sectionToHash("candidate-detail"), "#candidate-detail");
-assert.equal(sectionToHash("token-lookup"), "#token-lookup");
-assert.equal(sectionToHash("external-checks"), "#external-checks");
-assert.equal(sectionToHash("feedback-notes"), "#feedback-notes");
-assert.equal(sectionToHash("webinar-teaser"), "#webinar-teaser");
-assert.equal(sectionToHash("control-center"), "#control-center");
 
 const workspaceShellMarkup = renderToStaticMarkup(React.createElement(WorkspaceShell, {
-  navItems: workspaceNavItems,
-  activeSection: "overview",
+  navGroups: workspaceNavGroups,
+  activeSection: "candidate-results",
   onSectionChange: () => undefined,
   dataSource: "fixture",
   dataSourceOptions: [
@@ -335,11 +355,15 @@ const workspaceShellMarkup = renderToStaticMarkup(React.createElement(WorkspaceS
   loading: false,
   sourceStatusText: "Scanner source: built-in fixture",
 }, React.createElement(WorkspaceSection, {
-  title: "Local MVP Overview",
-  description: "Current local workflow status and health commands.",
+  title: "Candidate Results",
+  description: "Research candidate list for manual review, source freshness, risk flags and next review step.",
 }, React.createElement("div", null, "Overview body"))));
 
-assert.match(workspaceShellMarkup, /Local MVP Overview/, "workspace shell renders overview section");
+assert.match(workspaceShellMarkup, /Candidate Results/, "workspace shell renders active section");
+assert.match(workspaceShellMarkup, /Product Flow/, "workspace shell renders Product Flow group");
+assert.match(workspaceShellMarkup, /Review \/ Feedback/, "workspace shell renders Review / Feedback group");
+assert.match(workspaceShellMarkup, /Admin \/ Status/, "workspace shell renders Admin / Status group");
+assert.match(workspaceShellMarkup, /Demo \/ Preview/, "workspace shell renders Demo / Preview group");
 assert.match(workspaceShellMarkup, /Overview/, "workspace shell renders overview navigation");
 assert.match(workspaceShellMarkup, /Candidate Results/, "workspace shell renders candidate results navigation");
 assert.match(workspaceShellMarkup, /Candidate Detail/, "workspace shell renders candidate detail navigation");
@@ -354,14 +378,30 @@ assert.match(workspaceShellMarkup, /Review Queue/, "workspace shell renders revi
 assert.match(workspaceShellMarkup, /Research Review/, "workspace shell renders research review navigation");
 assert.match(workspaceShellMarkup, /Risk Alerts/, "workspace shell renders risk alerts navigation");
 assert.match(workspaceShellMarkup, /Methodology/, "workspace shell renders methodology navigation");
+assert.match(workspaceShellMarkup, /Manual review only/, "workspace shell renders manual review boundary");
 assert.match(
   workspaceShellMarkup,
-  /This is not a buy\/sell signal\./,
-  "workspace shell renders compliance footer",
+  /Source freshness/,
+  "workspace shell renders source freshness copy",
 );
 
+const navigationCleanupSource = [
+  await readFile(resolve("src", "workspaceNavigation.ts"), "utf8"),
+  await readFile(resolve("src", "components", "WorkspaceShell.tsx"), "utf8"),
+].join("\n");
+
+assert.doesNotMatch(navigationCleanupSource, /\bfetch\s*\(/, "navigation cleanup does not perform fetch calls");
+assert.doesNotMatch(navigationCleanupSource, /\bXMLHttpRequest\b/, "navigation cleanup does not perform browser requests");
+assert.doesNotMatch(navigationCleanupSource, /\b(?:localStorage|sessionStorage)\b/, "navigation cleanup does not add storage");
+assert.doesNotMatch(
+  navigationCleanupSource,
+  /loadScannerDataSourceResult|loadLatestMarketContext|loadReviewSessionFromApi|saveReviewSessionToApi/,
+  "navigation cleanup does not call provider or source services",
+);
+assert.doesNotMatch(navigationCleanupSource, /source activation/i, "navigation cleanup does not add source activation");
+
 const trustedPreviewMarkup = renderToStaticMarkup(React.createElement(WorkspaceShell, {
-  navItems: workspaceNavItems,
+  navGroups: workspaceNavGroups,
   activeSection: "trusted-preview",
   onSectionChange: () => undefined,
   dataSource: "fixture",
@@ -427,7 +467,7 @@ for (const pattern of forbiddenTrustedPreviewTerms) {
 }
 
 const feedbackNotesMarkup = renderToStaticMarkup(React.createElement(WorkspaceShell, {
-  navItems: workspaceNavItems,
+  navGroups: workspaceNavGroups,
   activeSection: "feedback-notes",
   onSectionChange: () => undefined,
   dataSource: "fixture",
@@ -499,7 +539,7 @@ for (const pattern of forbiddenFeedbackNotesTerms) {
 }
 
 const webinarTeaserMarkup = renderToStaticMarkup(React.createElement(WorkspaceShell, {
-  navItems: workspaceNavItems,
+  navGroups: workspaceNavGroups,
   activeSection: "webinar-teaser",
   onSectionChange: () => undefined,
   dataSource: "fixture",

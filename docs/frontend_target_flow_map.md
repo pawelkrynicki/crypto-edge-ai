@@ -1,10 +1,10 @@
 # Frontend Target Flow Map
 
-Stage: 12E.7 Research Action Panel
+Stage: 12E.8 Frontend Navigation Cleanup
 
-Implemented deep links: `#candidate-results`, `#candidate-detail`, `#token-lookup`, `#external-checks`, `#feedback-notes`
+Implemented deep links: `#candidate-results`, `#candidate-detail`, `#token-lookup`, `#external-checks`, `#feedback-notes`, `#control-center`, `#trusted-preview`, `#webinar-teaser`
 
-Next implementation stage: 12E.8 Frontend Navigation Cleanup
+Next implementation stage: 12E.9 Empty / Error / Partial States
 
 Only target flow:
 
@@ -13,6 +13,15 @@ Start / Radar -> Candidate Results -> Candidate Detail -> Token / Contract Looku
 ```
 
 Control Center remains an admin/status view.
+
+Navigation groups after 12E.8:
+
+- `Product Flow`: Candidate Results, Candidate Detail, Token Lookup, External Checks.
+- `Review / Feedback`: Feedback Notes and the local review queue.
+- `Admin / Status`: Control Center, source freshness/status surfaces, scanner/reference views, and technical review surfaces.
+- `Demo / Preview`: Trusted Preview and Webinar Teaser.
+
+The 12E.8 cleanup preserves existing deep links and does not add backend, storage, provider calls, source activation, fetches, scraping, scoring changes, `final_label` changes, or `WATCHLIST` meaning changes.
 
 | Flow | Goal | User sees | Do not show | Next step |
 |---|---|---|---|---|
