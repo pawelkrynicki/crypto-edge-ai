@@ -10,9 +10,16 @@ import {
   alternativeMeFngAdapter
 } from "../src/sources/alternativeMeFngAdapter.js";
 import { DEFILLAMA_PROTOCOLS_URL, DEFILLAMA_SOURCE_ID, defillamaAdapter } from "../src/sources/defillamaAdapter.js";
-import { APPROVED_SOURCES_OUTPUT_FILENAME, runApprovedSourcesPoc } from "../src/sources/runApprovedSourcesPoc.js";
+import {
+  APPROVED_SOURCES_OUTPUT_FILENAME,
+  DEGRADED_EXTERNAL_SOURCE_STATUS,
+  EXTERNAL_SOURCE_DEGRADED_LABEL,
+  runApprovedSourcesPoc,
+  shouldFailApprovedSourcesRun
+} from "../src/sources/runApprovedSourcesPoc.js";
 import { getApprovedSourceAdapters, getSourceAdapter } from "../src/sources/sourceAdapterRegistry.js";
-import { getSourcePolicyDecision } from "../src/sourcePolicy.js";
+import type { SourceAdapter } from "../src/sources/sourceAdapterTypes.js";
+import { assertSourceActionAllowed, getSourcePolicyDecision } from "../src/sourcePolicy.js";
 import { resolveRepoFile } from "../src/sourceRegistryValidator.js";
 
 describe("approved free source adapters", () => {
@@ -179,6 +186,123 @@ describe("approved free source adapters", () => {
     }
   });
 
+  it("treats a PUBLIC_BETA DefiLlama fetch failure as degraded for local RC", async () => {
+    const tempRoot = await mkdtemp(resolve(tmpdir(), "crypto-edge-approved-sources-"));
+    const adapter = failingLiveAdapter(DEFILLAMA_SOURCE_ID, "DefiLlama API", new Error("fetch failed"));
+
+    try {
+      const result = await runApprovedSourcesPoc({
+        mode: "live",
+        environment: "PUBLIC_BETA",
+        now: new Date("2026-06-24T12:34:56.000Z"),
+        baseOutputDir: tempRoot,
+        adapters: [adapter]
+      });
+      const source = result.output.sources[0];
+
+      assert.equal(source.source_id, DEFILLAMA_SOURCE_ID);
+      assert.equal(source.policy.allowed, true);
+      assert.equal(source.policy.environment, "PUBLIC_BETA");
+      assert.equal(source.policy.action, "live_fetch");
+      assert.equal(source.health_status, DEGRADED_EXTERNAL_SOURCE_STATUS);
+      assert.notEqual(source.health_status, "ok");
+      assert.deepEqual(source.records, []);
+      assert.deepEqual(source.errors, ["fetch failed"]);
+      assert.match(source.warnings.join("\n"), new RegExp(EXTERNAL_SOURCE_DEGRADED_LABEL));
+      assert.match(source.warnings.join("\n"), new RegExp(DEGRADED_EXTERNAL_SOURCE_STATUS));
+      assert.equal(result.output.summary.errors_total, 1);
+      assert.equal(result.output.summary.warnings_total, 1);
+      assert.equal(result.output.summary.degraded_external_sources_total, 1);
+      assert.equal(result.output.summary.hard_failures_total, 0);
+      assert.equal(shouldFailApprovedSourcesRun(result.output), false);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps strict live source mode hard-failing on degraded external sources", async () => {
+    const tempRoot = await mkdtemp(resolve(tmpdir(), "crypto-edge-approved-sources-"));
+    const adapter = failingLiveAdapter(DEFILLAMA_SOURCE_ID, "DefiLlama API", new Error("fetch failed"));
+
+    try {
+      const result = await runApprovedSourcesPoc({
+        mode: "live",
+        environment: "PUBLIC_BETA",
+        now: new Date("2026-06-24T12:34:56.000Z"),
+        baseOutputDir: tempRoot,
+        adapters: [adapter]
+      });
+
+      assert.equal(shouldFailApprovedSourcesRun(result.output, { strictLiveSources: true }), true);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps policy denied live sources as hard failures", async () => {
+    const tempRoot = await mkdtemp(resolve(tmpdir(), "crypto-edge-approved-sources-"));
+    const adapter: SourceAdapter = {
+      sourceId: "dexscreener",
+      displayName: "DexScreener",
+      supportedActions: ["fixture_load", "live_fetch"],
+      async fetchFixture() {
+        throw new Error("not used");
+      },
+      async fetchLive(options) {
+        assertSourceActionAllowed({
+          sourceId: "dexscreener",
+          environment: options.environment,
+          action: "live_fetch"
+        });
+        throw new Error("unreachable");
+      }
+    };
+
+    try {
+      const result = await runApprovedSourcesPoc({
+        mode: "live",
+        environment: "PUBLIC_BETA",
+        now: new Date("2026-06-24T12:34:56.000Z"),
+        baseOutputDir: tempRoot,
+        adapters: [adapter]
+      });
+      const source = result.output.sources[0];
+
+      assert.equal(source.policy.allowed, false);
+      assert.equal(source.health_status, "error");
+      assert.equal(source.warnings.some((warning) => warning.includes(DEGRADED_EXTERNAL_SOURCE_STATUS)), false);
+      assert.equal(result.output.summary.degraded_external_sources_total, 0);
+      assert.equal(result.output.summary.hard_failures_total, 1);
+      assert.equal(shouldFailApprovedSourcesRun(result.output), true);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps non-fetch live source errors as hard failures", async () => {
+    const tempRoot = await mkdtemp(resolve(tmpdir(), "crypto-edge-approved-sources-"));
+    const adapter = failingLiveAdapter(DEFILLAMA_SOURCE_ID, "DefiLlama API", new Error("Cannot read properties of undefined"));
+
+    try {
+      const result = await runApprovedSourcesPoc({
+        mode: "live",
+        environment: "PUBLIC_BETA",
+        now: new Date("2026-06-24T12:34:56.000Z"),
+        baseOutputDir: tempRoot,
+        adapters: [adapter]
+      });
+      const source = result.output.sources[0];
+
+      assert.equal(source.policy.allowed, true);
+      assert.equal(source.health_status, "error");
+      assert.equal(result.output.summary.degraded_external_sources_total, 0);
+      assert.equal(result.output.summary.hard_failures_total, 1);
+      assert.equal(shouldFailApprovedSourcesRun(result.output), true);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
   it("registers only the approved Camp BETA adapters", () => {
     assert.deepEqual(
       getApprovedSourceAdapters().map((adapter) => adapter.sourceId).sort(),
@@ -202,3 +326,17 @@ describe("approved free source adapters", () => {
     }
   });
 });
+
+function failingLiveAdapter(sourceId: string, displayName: string, error: Error): SourceAdapter {
+  return {
+    sourceId,
+    displayName,
+    supportedActions: ["fixture_load", "live_fetch"],
+    async fetchFixture() {
+      throw new Error("not used");
+    },
+    async fetchLive() {
+      throw error;
+    }
+  };
+}

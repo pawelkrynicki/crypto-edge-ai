@@ -4,6 +4,7 @@
 
 - Local MVP Release Candidate Stabilization v1.
 - Stage 12E.8 adds Frontend Navigation Cleanup: `Product Flow`, `Review / Feedback`, `Admin / Status`, and `Demo / Preview` now separate the main research path from admin/status and demo/preview surfaces. Next frontend stage is 12E.9 Empty / Error / Partial States.
+- Stage 12E.9A keeps local RC resilient to transient approved external live-source fetch failures: local RC reports them as `EXTERNAL SOURCE DEGRADED` / `degraded_external_source`, while strict live-source validation can still hard-fail on the same condition.
 - Stage 12E.7 adds Research Action Panel across Candidate Results, Candidate Detail, Token / Contract Lookup, and External Verification Links.
 - Stage 12E.6 adds Manual Verification Fallbacks across Candidate Results, Candidate Detail, Token / Contract Lookup, and External Verification Links.
 - Stage 12E.5 adds External Verification Links at `#external-checks` as a link-only manual external check view.
@@ -52,6 +53,7 @@
 - 12E.6 does not add backend, storage, provider calls, source activation, source check changes, URL fetches, scraping, OpenAI calls, paid sources, secrets, `.env`, npm dependencies, scanner scoring changes, `final_label` changes, review semantics changes, or `WATCHLIST` meaning changes.
 - 12E.7 does not add backend, storage, provider calls, source activation, source check changes, URL fetches, scraping, OpenAI calls, paid sources, secrets, `.env`, npm dependencies, scanner scoring changes, `final_label` changes, review semantics changes, or `WATCHLIST` meaning changes.
 - 12E.8 does not add backend, storage, provider calls, source activation, source check changes, URL fetches, scraping, OpenAI calls, paid sources, secrets, `.env`, npm dependencies, scanner scoring changes, `final_label` changes, review semantics changes, or `WATCHLIST` meaning changes.
+- 12E.9A does not change the frontend product flow, AI KINTEL, backend, storage, dependencies, provider calls, source activation, scoring, `final_label`, or `WATCHLIST` meaning.
 - Trusted tester preview still needs private access, persisted feedback capture, report library, and lightweight private deployment before a real external test.
 - AI KINTEL remains a later integration stage.
 
@@ -213,9 +215,14 @@ scripts\win\check-local-workflow-smoke.cmd
 scripts\win\check-review-storage-modes.cmd
 scripts\win\check-data-poc.cmd
 scripts\win\check-ui-mock.cmd
+scripts\win\check-live-sources-strict.cmd
 ```
 
 Before marking an RC, confirm the working tree is clean separately with `git status`.
+
+`scripts\win\check-local-rc.cmd` and `scripts\win\check-local-mvp.cmd` tolerate a transient external live-source fetch failure from an allowed `PUBLIC_BETA` source as a degraded warning, not a hard local RC failure. The output must still show `EXTERNAL SOURCE DEGRADED` and `degraded_external_source`; degraded does not mean verified, healthy, or OK. Policy denial, unauthorized source activation, forbidden provider calls, application errors, UI tests, typecheck, build, and other critical local checks remain hard failures.
+
+Use `scripts\win\check-live-sources-strict.cmd` for hard live-source validation when external source availability itself must fail the run.
 
 ## Manual Preview
 

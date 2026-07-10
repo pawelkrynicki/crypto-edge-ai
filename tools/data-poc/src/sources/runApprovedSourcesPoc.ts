@@ -12,6 +12,8 @@ import type {
 } from "./sourceAdapterTypes.js";
 
 export const APPROVED_SOURCES_OUTPUT_FILENAME = "approved_sources_output.json";
+export const EXTERNAL_SOURCE_DEGRADED_LABEL = "EXTERNAL SOURCE DEGRADED";
+export const DEGRADED_EXTERNAL_SOURCE_STATUS = "degraded_external_source";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_OUTPUT_DIR = resolve(__dirname, "../../../output");
@@ -28,6 +30,10 @@ export type RunApprovedSourcesPocResult = {
   output: ApprovedSourcesRunOutput;
   output_dir: string;
   output_file: string;
+};
+
+export type ApprovedSourcesRunFailureOptions = {
+  strictLiveSources?: boolean;
 };
 
 export async function runApprovedSourcesPoc(options: RunApprovedSourcesPocOptions = {}): Promise<RunApprovedSourcesPocResult> {
@@ -81,12 +87,14 @@ function buildErrorOutput(
         action: mode === "live" ? "live_fetch" : "fixture_load"
       });
   const message = error instanceof Error ? error.message : String(error);
+  const isDegradedExternalSource = isDegradedExternalLiveSourceFailure(mode, decision, error, message);
 
   return {
     source_id: adapter.sourceId,
     source_name: adapter.displayName,
     mode,
     fetched_at: now.toISOString(),
+    health_status: isDegradedExternalSource ? DEGRADED_EXTERNAL_SOURCE_STATUS : "error",
     policy: {
       environment: decision.environment,
       action: decision.action,
@@ -95,9 +103,20 @@ function buildErrorOutput(
     },
     data_category: dataCategoryForSource(adapter.sourceId),
     records: [],
-    warnings: [],
+    warnings: isDegradedExternalSource
+      ? [`${EXTERNAL_SOURCE_DEGRADED_LABEL}: ${DEGRADED_EXTERNAL_SOURCE_STATUS} for ${adapter.sourceId}: ${message}`]
+      : [],
     errors: [message]
   };
+}
+
+export function shouldFailApprovedSourcesRun(
+  output: ApprovedSourcesRunOutput,
+  options: ApprovedSourcesRunFailureOptions = {}
+): boolean {
+  if (output.summary.errors_total === 0) return false;
+  if (options.strictLiveSources) return true;
+  return output.summary.hard_failures_total > 0;
 }
 
 function summarizeSources(sourcesRequested: number, sources: NormalizedSourceOutput[]): ApprovedSourcesRunOutput["summary"] {
@@ -107,8 +126,42 @@ function summarizeSources(sourcesRequested: number, sources: NormalizedSourceOut
     sources_denied: sources.filter((source) => !source.policy.allowed).length,
     records_total: sources.reduce((total, source) => total + source.records.length, 0),
     warnings_total: sources.reduce((total, source) => total + source.warnings.length, 0),
-    errors_total: sources.reduce((total, source) => total + source.errors.length, 0)
+    errors_total: sources.reduce((total, source) => total + source.errors.length, 0),
+    degraded_external_sources_total: sources.filter((source) => source.health_status === DEGRADED_EXTERNAL_SOURCE_STATUS).length,
+    hard_failures_total: sources.filter((source) => source.health_status === "error" && source.errors.length > 0).length
   };
+}
+
+function isDegradedExternalLiveSourceFailure(
+  mode: SourceAdapterMode,
+  decision: ReturnType<typeof getSourcePolicyDecision>,
+  error: unknown,
+  message: string
+): boolean {
+  if (isSourcePolicyError(error)) return false;
+  if (mode !== "live") return false;
+  if (decision.environment !== "PUBLIC_BETA" || decision.action !== "live_fetch" || !decision.allowed) return false;
+
+  return isTransientExternalFetchFailure(message);
+}
+
+function isTransientExternalFetchFailure(message: string): boolean {
+  const normalized = message.toLowerCase();
+
+  return [
+    "fetch failed",
+    "request failed with http",
+    "network",
+    "timeout",
+    "timed out",
+    "econn",
+    "etimedout",
+    "enotfound",
+    "eai_again",
+    "terminated",
+    "unexpected end of json input",
+    "is not valid json"
+  ].some((pattern) => normalized.includes(pattern));
 }
 
 function dataCategoryForSource(sourceId: string): SourceDataCategory {
@@ -153,15 +206,26 @@ function parseArgs(args: string[]): Record<string, string> {
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
   const mode = args.mode === "live" ? "live" : "fixture";
+  const strictLiveSources = isTruthy(args["strict-live-sources"]) || isTruthy(process.env.STRICT_LIVE_SOURCES);
   const result = await runApprovedSourcesPoc({
     mode,
     environment: args.environment
   });
 
   console.log(JSON.stringify(result.output, null, 2));
-  if (result.output.summary.errors_total > 0) {
+  for (const source of result.output.sources) {
+    if (source.health_status === DEGRADED_EXTERNAL_SOURCE_STATUS) {
+      console.warn(`${EXTERNAL_SOURCE_DEGRADED_LABEL}: ${source.source_id} ${DEGRADED_EXTERNAL_SOURCE_STATUS}`);
+    }
+  }
+  if (shouldFailApprovedSourcesRun(result.output, { strictLiveSources })) {
     process.exitCode = 1;
   }
+}
+
+function isTruthy(value: string | undefined): boolean {
+  if (!value) return false;
+  return ["1", "true", "yes", "on"].includes(value.toLowerCase());
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

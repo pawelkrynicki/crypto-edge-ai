@@ -33,4 +33,6 @@ The registry at `docs/compliance/data_source_registry_v1.json` is a research and
 
 Runtime authorization must use the explicit operational policy at `config/data_source_runtime_policy.json`; narrative registry fields must not be the only authorization logic. The runtime policy is intentionally stricter than the research registry. Unknown or unconfigured sources fail closed.
 
+Local RC may classify a transient fetch failure from an allowed `PUBLIC_BETA` live source as `EXTERNAL SOURCE DEGRADED` / `degraded_external_source` so frontend/local validation can continue. This is a warning state, not a healthy or verified state. Policy denial, unknown sources, unauthorized activation, forbidden provider calls, scraping fallbacks, invented data, and raw-storage violations remain hard failures. Strict live-source validation is available separately through `scripts\win\check-live-sources-strict.cmd`.
+
 `WATCHLIST` means eligible for further review. It is not a buy signal, sell signal, or investment advice.
