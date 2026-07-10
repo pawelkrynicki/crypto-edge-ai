@@ -119,7 +119,7 @@ function getChainLabel(chain: string): string {
 
 function getCandidateReason(candidate: MockCandidate): string {
   const firstReason = candidate.final_reasons[0];
-  return firstReason ? formatReasonText(firstReason) : "No scanner reason available.";
+  return firstReason ? formatReasonText(firstReason) : "No candidate source reason available.";
 }
 
 function filterReviewRecord(record: CandidateReviewRecord, filter: ReviewQueueFilter): boolean {
@@ -128,10 +128,10 @@ function filterReviewRecord(record: CandidateReviewRecord, filter: ReviewQueueFi
 
 function getFilteredEmptyText(filter: ReviewQueueFilter): string {
   if (filter === "saved_for_follow_up") {
-    return "No saved follow-up items in this session.";
+    return "No saved follow-up items in this Manual Review session.";
   }
 
-  return "No local review items match this filter.";
+  return "No Manual Review items match this filter.";
 }
 
 function getReviewEntryCountText(count: number): string {
@@ -315,10 +315,10 @@ export const WatchlistTab: React.FC<Props> = ({
     {
       label: "Scanner WATCHLIST",
       value: watchlist.length,
-      detail: "Current scanner candidates eligible for further manual review only.",
+      detail: "Current Watchlist Candidates. Manual Review Only.",
     },
     {
-      label: "Local review entries",
+      label: "Manual Review entries",
       value: localReviewEntryCount,
       detail: "Stored local review status and analyst notes.",
     },
@@ -328,22 +328,22 @@ export const WatchlistTab: React.FC<Props> = ({
       detail: "Local status only, separate from scanner labels.",
     },
     {
-      label: "Needs more research",
+      label: "Needs Manual Research",
       value: countReviewStatus(localReviewRecords, "needs_more_research"),
       detail: "Analyst marked for more manual context.",
     },
     {
-      label: "Waiting for more data",
+      label: "Waiting For Data",
       value: countReviewStatus(localReviewRecords, "waiting_for_more_data"),
       detail: "Local queue item waiting on future coverage.",
     },
     {
-      label: "Dismissed after review",
+      label: "Dismissed After Review",
       value: countReviewStatus(localReviewRecords, "dismissed_after_review"),
       detail: "Local review cleanup state only.",
     },
     {
-      label: "Stored reviews not in current scan",
+      label: "Stored reviews outside current source",
       value: storedReviewsNotInScan.length,
       detail: "Notes from earlier scanner outputs.",
     },
@@ -353,8 +353,8 @@ export const WatchlistTab: React.FC<Props> = ({
     <div className="review-workspace">
       <header className="review-workspace-header">
         <div className="review-workspace-title">
-          <span className="section-label">Local analyst layer</span>
-          <h2>Review Queue Workspace</h2>
+          <span className="section-label">Manual Review layer</span>
+          <h2>Manual Review Workspace</h2>
           <p>Local analyst status and notes only.</p>
         </div>
 
@@ -362,12 +362,12 @@ export const WatchlistTab: React.FC<Props> = ({
           <span>Scope</span>
           <div>
             <p>Review status does not change scanner labels, scoring, final_label or WATCHLIST meaning.</p>
-            <p>This is not a buy/sell signal.</p>
+            <p>Research-only. Human Manual Review Required.</p>
           </div>
         </div>
       </header>
 
-      <section className="review-summary-grid" aria-label="Review queue summary">
+      <section className="review-summary-grid" aria-label="Manual Review summary">
         {summaryCards.map((card) => (
           <ReviewSummaryCard
             key={card.label}
@@ -537,21 +537,21 @@ export const WatchlistTab: React.FC<Props> = ({
 
       <section className="review-workspace-section scanner-watchlist-section">
         <ReviewSectionHeader
-          title="Scanner Watchlist"
-          description="Current scanner candidates with final_label = WATCHLIST."
+          title="Watchlist Candidate"
+          description="Current candidates with final_label = WATCHLIST. Manual Review Only."
           meta={`${watchlist.length} item${watchlist.length !== 1 ? "s" : ""}`}
         />
 
         <div className="review-info-note">
           <span>WATCHLIST</span>
           <p>
-            WATCHLIST means eligible for further manual review only. Local review status is a separate analyst layer.
-            This is not a buy/sell signal.
+            WATCHLIST means Manual Review Only. Local review status is a separate analyst layer.
+            Research-only. Human Manual Review Required.
           </p>
         </div>
 
         {watchlist.length === 0 ? (
-          <div className="review-empty-state">No scanner watchlist candidates in the current output.</div>
+          <div className="review-empty-state">No Watchlist Candidate items in the current output.</div>
         ) : (
           <div className="review-card-list">
             {watchlist.map((c) => (
@@ -588,7 +588,7 @@ export const WatchlistTab: React.FC<Props> = ({
                 </div>
 
                 <div>
-                  <div className="section-label mb-1">Why Watchlist</div>
+                  <div className="section-label mb-1">Why Watchlist Candidate</div>
                   <p className="text-xs text-secondary">{c.final_reasons.map(formatReasonText).join(" - ")}</p>
                 </div>
 
@@ -606,7 +606,7 @@ export const WatchlistTab: React.FC<Props> = ({
                 <div className="review-item-actions">
                   <span>Last checked: {new Date(c.last_checked).toLocaleString()}</span>
                   <button type="button" className="details-button" onClick={() => onOpenCandidate(c.id)}>
-                    Open details
+                    Open Candidate Detail
                   </button>
                 </div>
               </div>
@@ -617,7 +617,7 @@ export const WatchlistTab: React.FC<Props> = ({
 
       <section className="review-workspace-section local-review-section">
         <ReviewSectionHeader
-          title="Local Review Queue"
+          title="Manual Review Items"
           description="Local review status is separate from scanner final_label, scoring, and WATCHLIST meaning."
           meta={`${localReviewRecords.length} local item${localReviewRecords.length !== 1 ? "s" : ""}`}
         />
@@ -639,12 +639,12 @@ export const WatchlistTab: React.FC<Props> = ({
 
         {!hasLocalReviews ? (
           <div className="review-empty-state">
-            <p>No local review items yet.</p>
-            <p>Mark a candidate as Saved for follow-up or Needs more research from the scanner detail panel.</p>
+            <p>No Manual Review items yet.</p>
+            <p>Mark a candidate as Saved for follow-up or Needs Manual Research from Candidate Detail.</p>
           </div>
         ) : filteredQueueItems.length === 0 ? (
           <div className="review-empty-state">
-            <p>{hasFilteredReviews ? "No current-scan local review items match this filter." : getFilteredEmptyText(reviewFilter)}</p>
+            <p>{hasFilteredReviews ? "No current-source Manual Review items match this filter." : getFilteredEmptyText(reviewFilter)}</p>
           </div>
         ) : (
           <div className="review-card-list">
@@ -663,18 +663,18 @@ export const WatchlistTab: React.FC<Props> = ({
 
       <section className="review-workspace-section stored-review-section">
         <ReviewSectionHeader
-          title="Stored Reviews Not In Current Scan"
-          description="Local notes from previous scans. These entries do not imply the candidate is active in the current scanner output."
+          title="Stored Reviews Outside Current Source"
+          description="Local notes from previous scans. These entries do not imply the candidate is active in the current source output."
           meta={`${storedReviewsNotInScan.length} stored item${storedReviewsNotInScan.length !== 1 ? "s" : ""}`}
         />
 
         {storedReviewsNotInScan.length === 0 ? (
           <div className="review-empty-state">
-            <p>No stored reviews outside the current scan.</p>
+            <p>No stored reviews outside the current source output.</p>
           </div>
         ) : filteredStoredReviews.length === 0 ? (
           <div className="review-empty-state">
-            <p>No stored reviews outside the current scan match this filter.</p>
+            <p>No stored reviews outside the current source output match this filter.</p>
           </div>
         ) : (
           <div className="review-card-list">
@@ -700,8 +700,8 @@ export const WatchlistTab: React.FC<Props> = ({
             The report is Markdown plus JSON and contains scanner summary, market context, review notes, stored reviews not in current scan,
             candidate snapshot, and compliance.
           </p>
-          <p>It is a local research workflow export, not investment advice.</p>
-          <p className="report-compliance">This is not a buy/sell signal.</p>
+          <p>It is a local research workflow export. Human Manual Review Required.</p>
+          <p className="report-compliance">Research-only. Human Manual Review Required.</p>
         </div>
 
         <div className="report-command-grid">
@@ -772,7 +772,7 @@ function ReviewQueueItemCard({
       <div className="review-item-topline">
         <div className="review-item-token">
           <strong>{candidate?.symbol ?? "Stored review"}</strong>
-          <span>{candidate?.name ?? "Not present in current scanner output"}</span>
+          <span>{candidate?.name ?? "Not present in current source output"}</span>
         </div>
         <div className="review-item-badges">
           {candidate && <LabelBadge label={candidate.final_label} />}
@@ -786,7 +786,7 @@ function ReviewQueueItemCard({
         {candidate ? (
           <span>final_label: {candidate.final_label}</span>
         ) : (
-          <span>This review belongs to a candidate not present in the current scanner output.</span>
+          <span>This review belongs to a candidate not present in the current source output.</span>
         )}
       </div>
 
@@ -804,17 +804,17 @@ function ReviewQueueItemCard({
           <p>{formatReviewDate(reviewRecord.updated_at)}</p>
         </div>
         <div>
-          <span className="section-label">Scanner reason</span>
-          <p>{candidate ? getCandidateReason(candidate) : "Scanner reason unavailable in the current output."}</p>
+          <span className="section-label">Research Reason</span>
+          <p>{candidate ? getCandidateReason(candidate) : "Research Reason unavailable in the current output."}</p>
         </div>
       </div>
 
       <div className="review-item-actions">
-        <span>{candidate ? "Current scanner output" : "Local note from an earlier scan"}</span>
+        <span>{candidate ? "Current source output" : "Local note from an earlier scan"}</span>
         <div className="flex items-center gap-2">
           {candidate && onOpenCandidate && (
             <button type="button" className="details-button" onClick={() => onOpenCandidate(candidate.id)}>
-              Open details
+              Open Candidate Detail
             </button>
           )}
           <button type="button" className="pill" onClick={() => onClearReview(reviewRecord.candidate_id)}>

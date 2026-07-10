@@ -230,10 +230,10 @@ const fixturePanelMarkup = renderToStaticMarkup(React.createElement(MarketContex
 assert.match(fixturePanelMarkup, /42/, "panel renders Fear & Greed value");
 assert.match(fixturePanelMarkup, /Lido/, "panel renders DefiLlama protocol rows");
 assert.match(fixturePanelMarkup, /Uniswap V3/, "panel renders multiple DefiLlama rows");
-assert.match(fixturePanelMarkup, /Fixture fallback/, "panel renders fixture fallback badge");
+assert.match(fixturePanelMarkup, /Sample fallback/i, "panel renders sample fallback badge");
 assert.match(
   fixturePanelMarkup,
-  /Context data is for research only\. It is not a buy\/sell signal\./,
+  /Context data is research-only\. Human Manual Review Required\./,
   "panel renders compliance note",
 );
 
@@ -249,20 +249,20 @@ assert.match(apiFailureMarkup, /API unavailable/, "panel shows API failure state
 assert.match(apiFailureMarkup, /Context API unavailable: test failure/, "panel renders API failure detail");
 
 const localMvpWorkflowMarkup = renderToStaticMarkup(React.createElement(LocalMvpWorkflowPanel, {
-  scannerSourceText: "Scanner source: real-output",
-  contextSourceText: "Context source: approved-sources-output",
+  scannerSourceText: "Source Freshness: latest local output",
+  contextSourceText: "Source Freshness: approved local context",
   reviewStorageText: "Review storage: local API (file-backed JSON)",
   reviewStorageDetail: "tools/ui-mock/.local/review-session.json",
 }));
 
 assert.match(localMvpWorkflowMarkup, /Local MVP workflow/, "local MVP workflow panel renders title");
-assert.match(localMvpWorkflowMarkup, /Scanner latest/, "local MVP workflow panel renders scanner step");
-assert.match(localMvpWorkflowMarkup, /Market context/, "local MVP workflow panel renders market context step");
-assert.match(localMvpWorkflowMarkup, /Candidate detail/, "local MVP workflow panel renders candidate detail step");
-assert.match(localMvpWorkflowMarkup, /Local review/, "local MVP workflow panel renders local review step");
-assert.match(localMvpWorkflowMarkup, /Review queue/, "local MVP workflow panel renders review queue step");
-assert.match(localMvpWorkflowMarkup, /Analyst report/, "local MVP workflow panel renders analyst report step");
-assert.match(localMvpWorkflowMarkup, /Local MVP health check/, "local MVP workflow panel renders health check step");
+assert.match(localMvpWorkflowMarkup, /Candidate Source/, "local MVP workflow panel renders candidate source step");
+assert.match(localMvpWorkflowMarkup, /Market Context/, "local MVP workflow panel renders market context step");
+assert.match(localMvpWorkflowMarkup, /Candidate Detail/, "local MVP workflow panel renders candidate detail step");
+assert.match(localMvpWorkflowMarkup, /Manual Review/, "local MVP workflow panel renders manual review step");
+assert.match(localMvpWorkflowMarkup, /Watchlist Candidate/, "local MVP workflow panel renders watchlist candidate step");
+assert.match(localMvpWorkflowMarkup, /Analyst Report/, "local MVP workflow panel renders analyst report step");
+assert.match(localMvpWorkflowMarkup, /Local Health Check/, "local MVP workflow panel renders health check step");
 assert.match(
   localMvpWorkflowMarkup,
   /scripts\\win\\check-local-mvp\.cmd/,
@@ -275,7 +275,7 @@ assert.match(
 );
 assert.match(
   localMvpWorkflowMarkup,
-  /This is not a buy\/sell signal\./,
+  /Research-only\. Human Manual Review Required\./,
   "local MVP workflow panel renders compliance copy",
 );
 
@@ -348,13 +348,13 @@ const workspaceShellMarkup = renderToStaticMarkup(React.createElement(WorkspaceS
   onSectionChange: () => undefined,
   dataSource: "fixture",
   dataSourceOptions: [
-    { key: "fixture", label: "Fixture" },
-    { key: "static-json", label: "Static JSON" },
-    { key: "api", label: "API / latest" },
+    { key: "fixture", label: "Built-in sample" },
+    { key: "static-json", label: "Local data file" },
+    { key: "api", label: "Latest local data" },
   ],
   onDataSourceChange: () => undefined,
   loading: false,
-  sourceStatusText: "Scanner source: built-in fixture",
+  sourceStatusText: "Source Freshness: built-in sample",
 }, React.createElement(WorkspaceSection, {
   title: "Candidate Results",
   description: "Research candidate list for manual review, source freshness, risk flags and next review step.",
@@ -374,15 +374,15 @@ assert.match(workspaceShellMarkup, /Control Center/, "workspace shell renders co
 assert.match(workspaceShellMarkup, /Trusted Preview/, "workspace shell renders trusted preview navigation");
 assert.match(workspaceShellMarkup, /Feedback Notes/, "workspace shell renders feedback notes navigation");
 assert.match(workspaceShellMarkup, /Webinar Teaser/, "workspace shell renders webinar teaser navigation");
-assert.match(workspaceShellMarkup, /Scanner Radar/, "workspace shell renders scanner radar navigation");
-assert.match(workspaceShellMarkup, /Review Queue/, "workspace shell renders review queue navigation");
-assert.match(workspaceShellMarkup, /Research Review/, "workspace shell renders research review navigation");
-assert.match(workspaceShellMarkup, /Risk Alerts/, "workspace shell renders risk alerts navigation");
+assert.match(workspaceShellMarkup, /Candidate Source Review/, "workspace shell renders candidate source review navigation");
+assert.match(workspaceShellMarkup, /Manual Review/, "workspace shell renders manual review navigation");
+assert.match(workspaceShellMarkup, /Manual Research Notes/, "workspace shell renders manual research notes navigation");
+assert.match(workspaceShellMarkup, /Risk Flags/, "workspace shell renders risk flags navigation");
 assert.match(workspaceShellMarkup, /Methodology/, "workspace shell renders methodology navigation");
-assert.match(workspaceShellMarkup, /Manual review only/, "workspace shell renders manual review boundary");
+assert.match(workspaceShellMarkup, /Manual Review Only/, "workspace shell renders manual review boundary");
 assert.match(
   workspaceShellMarkup,
-  /Source freshness/,
+  /Source Freshness/,
   "workspace shell renders source freshness copy",
 );
 
@@ -407,13 +407,13 @@ const trustedPreviewMarkup = renderToStaticMarkup(React.createElement(WorkspaceS
   onSectionChange: () => undefined,
   dataSource: "fixture",
   dataSourceOptions: [
-    { key: "fixture", label: "Fixture" },
-    { key: "static-json", label: "Static JSON" },
-    { key: "api", label: "API / latest" },
+    { key: "fixture", label: "Built-in sample" },
+    { key: "static-json", label: "Local data file" },
+    { key: "api", label: "Latest local data" },
   ],
   onDataSourceChange: () => undefined,
   loading: false,
-  sourceStatusText: "Scanner source: built-in fixture",
+  sourceStatusText: "Source Freshness: built-in sample",
   trustedPreviewMode: true,
 }, React.createElement(WorkspaceSection, {
   title: "Trusted Preview",
@@ -429,7 +429,7 @@ assert.match(
 assert.match(trustedPreviewMarkup, /Research-only/, "trusted preview renders research-only boundary");
 assert.match(
   trustedPreviewMarkup,
-  /WATCHLIST means manual review only/,
+  /WATCHLIST means Manual Review Only/,
   "trusted preview renders WATCHLIST manual review boundary",
 );
 assert.match(trustedPreviewMarkup, /10-minute click path/, "trusted preview renders click path");
@@ -473,13 +473,13 @@ const feedbackNotesMarkup = renderToStaticMarkup(React.createElement(WorkspaceSh
   onSectionChange: () => undefined,
   dataSource: "fixture",
   dataSourceOptions: [
-    { key: "fixture", label: "Fixture" },
-    { key: "static-json", label: "Static JSON" },
-    { key: "api", label: "API / latest" },
+    { key: "fixture", label: "Built-in sample" },
+    { key: "static-json", label: "Local data file" },
+    { key: "api", label: "Latest local data" },
   ],
   onDataSourceChange: () => undefined,
   loading: false,
-  sourceStatusText: "Scanner source: built-in fixture",
+  sourceStatusText: "Source Freshness: built-in sample",
   trustedPreviewMode: true,
 }, React.createElement(WorkspaceSection, {
   title: "Feedback Notes",
@@ -545,13 +545,13 @@ const webinarTeaserMarkup = renderToStaticMarkup(React.createElement(WorkspaceSh
   onSectionChange: () => undefined,
   dataSource: "fixture",
   dataSourceOptions: [
-    { key: "fixture", label: "Fixture" },
-    { key: "static-json", label: "Static JSON" },
-    { key: "api", label: "API / latest" },
+    { key: "fixture", label: "Built-in sample" },
+    { key: "static-json", label: "Local data file" },
+    { key: "api", label: "Latest local data" },
   ],
   onDataSourceChange: () => undefined,
   loading: false,
-  sourceStatusText: "Scanner source: built-in fixture",
+  sourceStatusText: "Source Freshness: built-in sample",
   presentationMode: true,
 }, React.createElement(WorkspaceSection, {
   title: "Webinar Teaser",
@@ -574,7 +574,7 @@ assert.match(webinarTeaserMarkup, /Source Confidence Layer/, "webinar teaser ren
 assert.match(webinarTeaserMarkup, /Analyst research brief/, "webinar teaser renders report preview");
 assert.match(
   webinarTeaserMarkup,
-  /WATCHLIST means manual review only/,
+  /WATCHLIST means Manual Review Only/,
   "webinar teaser renders WATCHLIST manual review boundary",
 );
 assert.match(webinarTeaserMarkup, /Research-only preview/, "webinar teaser renders research-only preview copy");
@@ -634,11 +634,11 @@ for (const pattern of forbiddenWebinarTerms) {
 const controlCenterMarkup = renderToStaticMarkup(React.createElement(ControlCenter, {
   candidateCount: uiCandidates.length,
   resolvedScannerSource: "fixture-fallback",
-  scannerSourceText: "Scanner source: fixture-fallback",
+  scannerSourceText: "Source Freshness: sample fallback",
   scannerFallbackReason: "no valid real scanner output found",
   scannerGeneratedAt: realFixture.scan_run.finished_at,
   scannerMode: realFixture.scan_run.mode,
-  contextSourceText: "Context source: fixture-fallback",
+  contextSourceText: "Source Freshness: sample fallback",
   contextSourceDetail: "Context API returned the local fixture fallback.",
   marketContextState: {
     status: "ready",
@@ -655,7 +655,7 @@ const controlCenterMarkup = renderToStaticMarkup(React.createElement(ControlCent
 assert.match(controlCenterMarkup, /Control Center/, "control center renders title");
 assert.match(
   controlCenterMarkup,
-  /Research-only\. WATCHLIST means manual review only\./,
+  /Research-only\. WATCHLIST means Manual Review Only\./,
   "control center renders research-only WATCHLIST boundary",
 );
 assert.match(controlCenterMarkup, /Trusted Tester Readiness/, "control center renders readiness section");
@@ -670,9 +670,9 @@ assert.match(controlCenterMarkup, /Feedback path/, "control center renders feedb
 assert.match(controlCenterMarkup, /No paid source activation/, "control center renders paid source P0");
 assert.match(controlCenterMarkup, /Not ready/, "control center does not claim tester preview is ready");
 assert.match(controlCenterMarkup, /Data &amp; Source Freshness/, "control center renders data freshness status");
-assert.match(controlCenterMarkup, /fixture-fallback/, "control center renders fixture fallback state");
+assert.match(controlCenterMarkup, /sample fallback/i, "control center renders sample fallback state");
 assert.match(controlCenterMarkup, /Review &amp; Reports/, "control center renders review and reports section");
-assert.match(controlCenterMarkup, /Review is separate from scanner label/, "control center renders review separation");
+assert.match(controlCenterMarkup, /Review is separate from candidate label/, "control center renders review separation");
 assert.match(controlCenterMarkup, /Safety &amp; Compliance/, "control center renders safety section");
 assert.match(controlCenterMarkup, /No investment advice\./, "control center renders investment advice boundary");
 assert.match(controlCenterMarkup, /Missing data = manual verification required\./, "control center renders missing data boundary");
@@ -683,7 +683,20 @@ assert.match(
   "control center keeps AI KINTEL out of nearest implementation target",
 );
 
-const forbiddenActionPattern = /<(button|a)\b[^>]*>[\s\S]*?\b(?:buy|sell|entry|signal|recommendation)\b[\s\S]*?<\/\1>/i;
+const forbiddenUiCopyPatterns = [
+  /\bbuy\b/i,
+  /\bsell\b/i,
+  /\bentry\b/i,
+  /\bsignal\b/i,
+  /\brecommendation\b/i,
+  /\bsafe token\b/i,
+  /\bapproved token\b/i,
+  /\bverified safe\b/i,
+  /\bguaranteed\b/i,
+  /\bprofit\b/i,
+  /\bpump\b/i,
+];
+const forbiddenActionPattern = /<(button|a)\b[^>]*>[\s\S]*?\b(?:buy|sell|entry|signal|recommendation|safe token|approved token|verified safe|guaranteed|profit|pump)\b[\s\S]*?<\/\1>/i;
 assert.doesNotMatch(
   controlCenterMarkup,
   forbiddenActionPattern,
@@ -708,8 +721,8 @@ const workspaceOverviewMarkup = renderToStaticMarkup(React.createElement(Workspa
     },
   }),
   workflowPanel: React.createElement(LocalMvpWorkflowPanel, {
-    scannerSourceText: "Scanner source: real-output",
-    contextSourceText: "Context source: approved-sources-output",
+    scannerSourceText: "Source Freshness: latest local output",
+    contextSourceText: "Source Freshness: approved local context",
     reviewStorageText: "Review storage: local API (file-backed JSON)",
   }),
 }));
@@ -808,15 +821,15 @@ const researchActionPanelMarkup = renderToStaticMarkup(React.createElement(Resea
 
 assert.match(researchActionPanelMarkup, /research action panel/i, "research action panel component exists");
 for (const expectedCopy of [
-  "open candidate detail",
-  "open token lookup",
-  "open external checks",
-  "copy contract",
-  "copy token input",
-  "view source freshness",
-  "mark for manual review",
-  "send feedback",
-  "add review note",
+  "Open Candidate Detail",
+  "Open Token Lookup",
+  "Open External Checks",
+  "Copy Contract",
+  "Copy Token Input",
+  "View Source Freshness",
+  "Mark For Manual Review",
+  "Send Feedback",
+  "Add Review Note",
   "manual review only",
   "cannot infer safety",
 ]) {
@@ -890,10 +903,10 @@ assert.match(candidateResultsMarkup, /partial source coverage/i, "candidate resu
 assert.match(candidateResultsMarkup, /data gap/i, "candidate results renders data gap state copy");
 assert.match(candidateResultsMarkup, /external check required/i, "candidate results renders external check required fallback");
 assert.match(candidateResultsMarkup, /cannot infer safety/i, "candidate results states missing data cannot infer safety");
-assert.match(candidateResultsMarkup, /Open candidate detail/, "candidate results links to candidate detail");
+assert.match(candidateResultsMarkup, /Open Candidate Detail/, "candidate results links to Candidate Detail");
 assert.match(
   candidateResultsMarkup,
-  /WATCHLIST is shown as manual review only/,
+  /WATCHLIST is shown as Manual Review Only/,
   "candidate results keeps WATCHLIST manual-review only",
 );
 assert.ok(
@@ -990,8 +1003,8 @@ assert.match(candidateDetailMarkup, /partial source coverage/i, "candidate detai
 assert.match(candidateDetailMarkup, /data gap/i, "candidate detail renders data gap state copy");
 assert.match(candidateDetailMarkup, /external check required/i, "candidate detail renders external check required fallback");
 assert.match(candidateDetailMarkup, /cannot infer safety/i, "candidate detail states missing data cannot infer safety");
-assert.match(candidateDetailMarkup, /Open token lookup/, "candidate detail links to token lookup");
-assert.match(candidateDetailMarkup, /Open external checks/, "candidate detail links to external checks");
+assert.match(candidateDetailMarkup, /Open Token Lookup/, "candidate detail links to Token Lookup");
+assert.match(candidateDetailMarkup, /Open External Checks/, "candidate detail links to External Checks");
 assert.match(
   candidateDetailMarkup,
   /WATCHLIST is manual review only/i,
@@ -1034,7 +1047,7 @@ const candidateDetailMissingDataMarkup = renderToStaticMarkup(React.createElemen
 
 assert.match(
   candidateDetailMissingDataMarkup,
-  /contract required for external\/security checks/i,
+  /Contract Required for External Checks and security checks/i,
   "candidate detail requires contract before external or security checks",
 );
 assert.match(
@@ -1107,7 +1120,7 @@ const tokenLookupMarkup = renderToStaticMarkup(React.createElement(TokenContract
 }));
 
 assert.match(tokenLookupMarkup, /token to verify/i, "token lookup renders token input copy");
-assert.match(tokenLookupMarkup, /contract lookup/i, "token lookup view exists");
+assert.match(tokenLookupMarkup, /Token Lookup/i, "token lookup view exists");
 assert.match(tokenLookupMarkup, /manual verification required/i, "token lookup requires manual verification");
 assert.match(tokenLookupMarkup, /not verified/i, "token lookup marks security as not verified");
 assert.match(tokenLookupMarkup, /chain unknown/i, "token lookup marks unknown chain");
@@ -1122,7 +1135,7 @@ assert.match(tokenLookupMarkup, /data gap/i, "token lookup renders data gap stat
 assert.match(tokenLookupMarkup, /cannot infer safety/i, "token lookup states missing data cannot infer safety");
 assert.match(tokenLookupMarkup, /manual review only/i, "token lookup keeps manual review only fallback visible");
 assert.match(tokenLookupMarkup, /likely symbol/i, "token lookup classifies symbol input locally");
-assert.match(tokenLookupMarkup, /Open external checks/, "token lookup links to external checks");
+assert.match(tokenLookupMarkup, /Open External Checks/, "token lookup links to External Checks");
 assert.doesNotMatch(
   tokenLookupMarkup,
   forbiddenActionPattern,
@@ -1261,7 +1274,7 @@ const externalChecksMarkup = renderToStaticMarkup(React.createElement(ExternalVe
   tokenInput: "PASS",
 }));
 
-assert.match(externalChecksMarkup, /External Verification Links/, "external checks view exists");
+assert.match(externalChecksMarkup, /External Checks/, "external checks view exists");
 assert.match(externalChecksMarkup, /external checks/i, "external checks view renders external checks copy");
 assert.match(externalChecksMarkup, /manual external check/i, "external checks view renders manual external check copy");
 assert.match(externalChecksMarkup, /copy contract/i, "external checks view renders copy contract fallback");
@@ -1369,6 +1382,63 @@ assert.doesNotMatch(
   "external checks does not build false explorer or DEX links without contract and chain",
 );
 
+const standardizedFrontendCopyMarkup = [
+  workspaceShellMarkup,
+  manualFallbackMarkup,
+  productStateNoticeMarkup,
+  researchActionPanelMarkup,
+  candidateResultsMarkup,
+  candidateResultsEmptyMarkup,
+  candidateDetailMarkup,
+  candidateDetailMissingDataMarkup,
+  tokenLookupMarkup,
+  externalChecksMarkup,
+  externalChecksMissingMarkup,
+].join("\n");
+
+for (const acceptedName of [
+  "Candidate Results",
+  "Candidate Detail",
+  "Token Lookup",
+  "External Checks",
+  "Manual Review",
+  "Source Freshness",
+  "Risk Flags",
+  "Data Gap",
+  "Next Review Step",
+  "Manual Verification Required",
+  "Cannot Infer Safety",
+  "Watchlist Candidate",
+]) {
+  assert.match(
+    standardizedFrontendCopyMarkup,
+    new RegExp(acceptedName, "i"),
+    `12E.10 frontend copy renders accepted name: ${acceptedName}`,
+  );
+}
+assert.match(
+  standardizedFrontendCopyMarkup,
+  /WATCHLIST[\s\S]{0,120}Manual Review Only|Manual Review Only[\s\S]{0,120}WATCHLIST/i,
+  "12E.10 frontend copy keeps WATCHLIST as manual review only",
+);
+assert.match(
+  standardizedFrontendCopyMarkup,
+  /Data Gap[\s\S]{0,180}Cannot Infer Safety|Cannot Infer Safety[\s\S]{0,180}Data Gap/i,
+  "12E.10 frontend copy treats missing data as a data gap and cannot infer safety",
+);
+for (const pattern of forbiddenUiCopyPatterns) {
+  assert.doesNotMatch(
+    standardizedFrontendCopyMarkup,
+    pattern,
+    `12E.10 frontend copy avoids forbidden visible UI term ${pattern}`,
+  );
+}
+assert.doesNotMatch(
+  standardizedFrontendCopyMarkup,
+  forbiddenActionPattern,
+  "12E.10 frontend copy does not render forbidden terms in buttons or links",
+);
+
 const externalChecksUrlMarkup = renderToStaticMarkup(React.createElement(ExternalVerificationLinksView, {
   tokenInput: "https://example.org/project",
 }));
@@ -1451,6 +1521,30 @@ assert.doesNotMatch(
   externalChecksSource,
   /source activation/i,
   "external checks do not add source activation",
+);
+
+const frontendCopyNamingSource = [
+  navigationCleanupSource,
+  candidateResultsComponentSource,
+  candidateDetailViewComponentSource,
+  tokenLookupComponentSource,
+  externalChecksSource,
+  manualFallbackComponentSource,
+  productStateNoticeComponentSource,
+  researchActionPanelComponentSource,
+].join("\n");
+assert.doesNotMatch(frontendCopyNamingSource, /\bfetch\s*\(/, "12E.10 copy cleanup does not perform fetch calls");
+assert.doesNotMatch(frontendCopyNamingSource, /\bXMLHttpRequest\b/, "12E.10 copy cleanup does not perform browser requests");
+assert.doesNotMatch(
+  frontendCopyNamingSource,
+  /loadScannerDataSourceResult|loadLatestMarketContext|loadReviewSessionFromApi|saveReviewSessionToApi/,
+  "12E.10 copy cleanup does not call provider or source services",
+);
+assert.doesNotMatch(frontendCopyNamingSource, /source activation/i, "12E.10 copy cleanup does not add source activation");
+assert.doesNotMatch(
+  frontendCopyNamingSource,
+  /\b(?:localStorage|sessionStorage)\b/,
+  "12E.10 copy cleanup does not add browser storage",
 );
 
 const reloadedReviewState = loadReviewSession(reviewStorage);
@@ -1933,9 +2027,9 @@ assert.match(detailWithContextMarkup, /42 - Fear/, "candidate detail renders Fea
 assert.match(detailWithContextMarkup, /Paid market\/onchain data/, "candidate detail shows paid market source category as deferred");
 assert.match(detailWithContextMarkup, /Clarification pending; no new source connected/, "candidate detail shows dedicated security source category as deferred");
 assert.match(detailWithContextMarkup, /Token unlocks \/ vesting/, "candidate detail shows unlock source category as deferred");
-assert.match(detailWithContextMarkup, /This is not a buy\/sell signal\./, "candidate detail renders compliance note");
+assert.match(detailWithContextMarkup, /Research-only\. Human Manual Review Required\./, "candidate detail renders compliance note");
 assert.match(detailWithContextMarkup, /Context does not alter scanner label\./, "candidate detail explains context does not alter label");
-assert.match(detailWithContextMarkup, /Fixture context/, "candidate detail represents fixture context fallback");
+assert.match(detailWithContextMarkup, /Sample context/, "candidate detail represents sample context fallback");
 assert.match(detailWithContextMarkup, /Local Review Session/, "candidate detail renders local review session");
 assert.match(detailWithContextMarkup, /This does not change scanner label\./, "candidate detail explains review does not change label");
 assert.match(
@@ -1950,15 +2044,15 @@ assert.match(
 );
 assert.match(
   detailWithContextMarkup,
-  /WATCHLIST means eligible for further manual review only/,
-  "candidate detail explains WATCHLIST as manual follow-up only",
+  /WATCHLIST means Manual Review Only/,
+  "candidate detail explains WATCHLIST as Manual Review Only",
 );
 assert.match(
   detailWithContextMarkup,
-  /Missing security or context data means manual verification is required, not a positive assessment/,
+  /Missing security or context data means Manual Verification Required, not a positive assessment/,
   "candidate detail explains missing data is not a positive assessment",
 );
-assert.match(detailWithContextMarkup, /Scanner Label vs Local Review/, "candidate detail renders scanner-vs-review section");
+assert.match(detailWithContextMarkup, /Candidate Label vs Local Review/, "candidate detail renders candidate-vs-review section");
 assert.match(detailWithContextMarkup, /Quick Snapshot/, "candidate detail renders quick snapshot section");
 assert.match(detailWithContextMarkup, /Security.*Manual Verification/, "candidate detail renders security manual verification section");
 assert.match(detailWithContextMarkup, /Reasoning Checklist/, "candidate detail renders reasoning checklist section");
@@ -1991,19 +2085,19 @@ const radarWithReviewMarkup = renderToStaticMarkup(React.createElement(ScannerRa
   onClearReview: () => undefined,
 }));
 
-assert.match(radarWithReviewMarkup, /Scanner Radar/, "scanner radar renders workspace title");
+assert.match(radarWithReviewMarkup, /Candidate Source Review/, "candidate source review renders workspace title");
 assert.match(radarWithReviewMarkup, /scanner-candidate-card/, "scanner radar renders candidate cards");
 assert.match(radarWithReviewMarkup, /Selected/, "scanner radar renders selected candidate state");
-assert.match(radarWithReviewMarkup, /View details/, "scanner radar renders neutral detail action copy");
-assert.match(radarWithReviewMarkup, /Scanner output is read-only/, "scanner radar renders read-only guidance");
+assert.match(radarWithReviewMarkup, /Open Candidate Detail/, "candidate source review renders neutral detail action copy");
+assert.match(radarWithReviewMarkup, /Candidate source output is read-only/, "candidate source review renders read-only guidance");
 assert.match(
   radarWithReviewMarkup,
-  /WATCHLIST means eligible for further manual review only/,
+  /WATCHLIST means Manual Review Only/,
   "scanner radar explains WATCHLIST scope",
 );
 assert.match(radarWithReviewMarkup, /Local Review Session/, "scanner radar renders selected candidate detail");
 assert.match(radarWithReviewMarkup, /Quick Snapshot/, "scanner radar renders selected candidate detail sections");
-assert.match(radarWithReviewMarkup, /This is not a buy\/sell signal\./, "scanner radar renders compliance copy");
+assert.match(radarWithReviewMarkup, /Research-only\. Human Manual Review Required\./, "candidate source review renders compliance copy");
 assert.match(radarWithReviewMarkup, /Follow-up/, "scanner radar renders local review badge");
 assert.equal(passMockCandidate.final_label, "WATCHLIST", "scanner radar review status does not mutate final_label");
 
@@ -2047,10 +2141,10 @@ const reviewQueueMarkup = renderToStaticMarkup(React.createElement(WatchlistTab,
   onResetReviewSession: async () => ({ status: "ready" as const, message: "Reset completed in test." }),
 }));
 
-assert.match(reviewQueueMarkup, /Review Queue Workspace/, "watchlist tab renders review queue workspace");
-assert.match(reviewQueueMarkup, /Local Review Queue/, "review queue renders local review queue section");
-assert.match(reviewQueueMarkup, /Scanner Watchlist/, "review queue renders scanner watchlist section");
-assert.match(reviewQueueMarkup, /Stored Reviews Not In Current Scan/, "review queue renders stored reviews section");
+assert.match(reviewQueueMarkup, /Manual Review Workspace/, "watchlist tab renders manual review workspace");
+assert.match(reviewQueueMarkup, /Manual Review Items/, "manual review renders manual review items section");
+assert.match(reviewQueueMarkup, /Watchlist Candidate/, "manual review renders watchlist candidate section");
+assert.match(reviewQueueMarkup, /Stored Reviews Outside Current Source/, "manual review renders stored reviews section");
 assert.match(reviewQueueMarkup, /Storage &amp; Backup/, "review queue renders storage and backup section");
 assert.match(reviewQueueMarkup, /Analyst Report Workspace/, "review queue renders analyst report workspace");
 assert.match(
@@ -2070,7 +2164,7 @@ assert.match(
 );
 assert.match(
   reviewQueueMarkup,
-  /This is not a buy\/sell signal/,
+  /Research-only\. Human Manual Review Required\./,
   "review queue renders compliance copy",
 );
 assert.match(reviewQueueMarkup, /Review Backup/, "review queue renders backup controls");
@@ -2112,12 +2206,12 @@ assert.match(reviewQueueMarkup, /Further review only/, "review queue keeps scann
 assert.match(reviewQueueMarkup, /Needs more research/, "review queue renders needs research status");
 assert.match(reviewQueueMarkup, /Waiting for more data/, "review queue renders waiting data status");
 assert.match(reviewQueueMarkup, /Dismissed after review/, "review queue renders dismissed status");
-assert.match(reviewQueueMarkup, /Stored reviews not in current scan/, "review queue summary renders missing-current-scan count");
+assert.match(reviewQueueMarkup, /Stored reviews outside current source/, "manual review summary renders outside-current-source count");
 assert.match(reviewQueueMarkup, /stored-review-not-in-scan/, "review queue shows stored review candidate_id");
 assert.match(
   reviewQueueMarkup,
-  /This review belongs to a candidate not present in the current scanner output\./,
-  "review queue explains stored reviews outside current scan",
+  /This review belongs to a candidate not present in the current source output\./,
+  "manual review explains stored reviews outside current source",
 );
 assert.match(
   reviewQueueMarkup,
@@ -2142,11 +2236,11 @@ const emptyReviewQueueMarkup = renderToStaticMarkup(React.createElement(Watchlis
   onResetReviewSession: async () => ({ status: "ready" as const, message: "Reset completed in test." }),
 }));
 
-assert.match(emptyReviewQueueMarkup, /No local review items yet\./, "review queue renders empty state");
+assert.match(emptyReviewQueueMarkup, /No Manual Review items yet\./, "manual review renders empty state");
 assert.match(
   emptyReviewQueueMarkup,
-  /Mark a candidate as Saved for follow-up or Needs more research from the scanner detail panel\./,
-  "review queue empty state points back to scanner detail",
+  /Mark a candidate as Saved for follow-up or Needs Manual Research from Candidate Detail\./,
+  "manual review empty state points back to Candidate Detail",
 );
 
 const detailFailureMarkup = renderToStaticMarkup(React.createElement(CandidateDetail, {

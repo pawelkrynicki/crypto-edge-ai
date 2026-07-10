@@ -21,7 +21,7 @@ const CHAIN_LABELS: Record<string, string> = {
 
 const SECURITY_LABELS: Record<string, { text: string; cls: string }> = {
   SECURITY_PASSED: {
-    text: "Security passed",
+    text: "Security data present",
     cls: "research-context-chip available",
   },
   CRITICAL_RISK: {
@@ -29,11 +29,11 @@ const SECURITY_LABELS: Record<string, { text: string; cls: string }> = {
     cls: "research-context-chip critical",
   },
   NEEDS_MANUAL_VERIFICATION: {
-    text: "Manual security check",
+    text: "Manual Verification Required",
     cls: "research-context-chip pending",
   },
   NOT_CHECKED: {
-    text: "Security not checked",
+    text: "Security Not Verified",
     cls: "research-context-chip unavailable",
   },
 };
@@ -83,7 +83,7 @@ export const ScannerCandidateCard: React.FC<ScannerCandidateCardProps> = ({
 }) => {
   const firstReason = candidate.final_reasons[0]
     ? formatReasonText(candidate.final_reasons[0])
-    : "No scanner reason available.";
+    : "No source reason available.";
 
   return (
     <button
@@ -120,7 +120,7 @@ export const ScannerCandidateCard: React.FC<ScannerCandidateCardProps> = ({
       </span>
 
       <span className="scanner-card-reason">{firstReason}</span>
-      <span className="scanner-card-action">View details</span>
+      <span className="scanner-card-action">Open Candidate Detail</span>
     </button>
   );
 };

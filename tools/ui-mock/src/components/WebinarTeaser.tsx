@@ -11,7 +11,7 @@ const demoProjects = [
   { name: "Atlas Protocol", category: "Infrastructure", status: "Review priority", context: "Governance update and liquidity shift" },
   { name: "Nova Layer", category: "Layer network", status: "Needs context check", context: "New ecosystem activity" },
   { name: "Orion Markets", category: "Market tools", status: "Fresh sources", context: "Volume and community context changed" },
-  { name: "Helio Finance", category: "DeFi research", status: "Manual review", context: "Security notes need analyst follow-up" },
+  { name: "Helio Finance", category: "DeFi research", status: "Manual Review", context: "Security notes need analyst follow-up" },
 ];
 
 const snapshotSections = [
@@ -54,7 +54,7 @@ const reportPreview = [
     body: "Security notes, liquidity depth, ownership concentration and dependency on a single narrative remain open.",
   },
   {
-    title: "Next review step",
+    title: "Next Review Step",
     body: "Prepare a short analyst note and schedule a follow-up context check.",
   },
 ];
@@ -162,7 +162,7 @@ export const WebinarTeaser: React.FC = () => (
       <div className="webinar-snapshot-layout">
         <div className="webinar-watchlist-panel">
           <span>Review state</span>
-          <strong>Watchlist = manual review only</strong>
+          <strong>Watchlist = Manual Review Only</strong>
           <p>Analyst attention is requested before any conclusion is formed.</p>
         </div>
 
@@ -238,7 +238,7 @@ export const WebinarTeaser: React.FC = () => (
       </div>
 
       <div className="webinar-research-boundary">
-        WATCHLIST means manual review only.
+        WATCHLIST means Manual Review Only.
       </div>
     </section>
 

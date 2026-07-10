@@ -21,7 +21,7 @@ export interface ExternalVerificationTarget {
   state: ExternalVerificationTargetState;
   href?: string;
   copyValue?: string;
-  copyLabel?: "copy contract" | "copy token input";
+  copyLabel?: "Copy Contract" | "Copy Token Input";
   reason?: string;
 }
 
@@ -74,7 +74,7 @@ const EXPLORER_TARGETS: Record<string, ExplorerTarget> = {
 export function buildExternalVerificationTargets(input: ExternalVerificationInput): ExternalVerificationTarget[] {
   const normalized = normalizeExternalVerificationInput(input);
   const copyValue = normalized.contractAddress || normalized.tokenInput;
-  const copyLabel = normalized.contractAddress ? "copy contract" : "copy token input";
+  const copyLabel = normalized.contractAddress ? "Copy Contract" : "Copy Token Input";
 
   return [
     buildExplorerTarget(normalized, copyValue, copyLabel),
@@ -102,22 +102,22 @@ export function normalizeExternalVerificationInput(input: ExternalVerificationIn
 function buildExplorerTarget(
   input: Required<ExternalVerificationInput>,
   copyValue: string,
-  copyLabel: "copy contract" | "copy token input",
+  copyLabel: "Copy Contract" | "Copy Token Input",
 ): ExternalVerificationTarget {
-  const missingContract = getMissingContractTarget("explorer", "explorer/manual address check", copyValue, copyLabel);
+  const missingContract = getMissingContractTarget("explorer", "Explorer / Manual Address Check", copyValue, copyLabel);
   if (!input.contractAddress) return missingContract;
 
   if (!input.chain) {
     return {
       id: "explorer",
-      title: "explorer/manual address check",
-      label: "manual external check",
-      status: "chain unknown",
-      detail: "chain unknown / verify manually",
+      title: "Explorer / Manual Address Check",
+      label: "Manual External Check",
+      status: "Chain Unknown",
+      detail: "Chain Unknown / verify manually",
       state: "manual",
       copyValue,
       copyLabel,
-      reason: "manual verification required",
+      reason: "Manual Verification Required",
     };
   }
 
@@ -125,23 +125,23 @@ function buildExplorerTarget(
   if (!explorerTarget) {
     return {
       id: "explorer",
-      title: "explorer/manual address check",
-      label: "manual external check",
-      status: "chain unknown",
-      detail: "chain unknown / verify manually",
+      title: "Explorer / Manual Address Check",
+      label: "Manual External Check",
+      status: "Chain Unknown",
+      detail: "Chain Unknown / verify manually",
       state: "manual",
       copyValue,
       copyLabel,
-      reason: "manual verification required",
+      reason: "Manual Verification Required",
     };
   }
 
   return {
     id: "explorer",
-    title: "explorer/manual address check",
+    title: "Explorer / Manual Address Check",
     label: explorerTarget.chainLabel,
-    status: "not verified",
-    detail: "open external check",
+    status: "Not Verified",
+    detail: "Open External Check",
     state: "link",
     href: explorerTarget.buildHref(input.contractAddress),
     copyValue,
@@ -152,32 +152,32 @@ function buildExplorerTarget(
 function buildDexTarget(
   input: Required<ExternalVerificationInput>,
   copyValue: string,
-  copyLabel: "copy contract" | "copy token input",
+  copyLabel: "Copy Contract" | "Copy Token Input",
 ): ExternalVerificationTarget {
   if (!input.contractAddress) {
-    return getMissingContractTarget("dex", "DEX/liquidity manual check", copyValue, copyLabel);
+    return getMissingContractTarget("dex", "DEX / Liquidity Manual Check", copyValue, copyLabel);
   }
 
   if (!input.chain || !input.pairAddress) {
     return {
       id: "dex",
-      title: "DEX/liquidity manual check",
-      label: "manual external check",
-      status: input.chain ? "liquidity unknown" : "chain unknown",
-      detail: input.chain ? "liquidity unknown" : "chain unknown / verify manually",
+      title: "DEX / Liquidity Manual Check",
+      label: "Manual External Check",
+      status: input.chain ? "Liquidity Unknown" : "Chain Unknown",
+      detail: input.chain ? "Liquidity Unknown" : "Chain Unknown / verify manually",
       state: "manual",
       copyValue,
       copyLabel,
-      reason: "manual verification required",
+      reason: "Manual Verification Required",
     };
   }
 
   return {
     id: "dex",
-    title: "DEX/liquidity manual check",
+    title: "DEX / Liquidity Manual Check",
     label: input.chain,
-    status: "liquidity unknown",
-    detail: "open external check",
+    status: "Liquidity Unknown",
+    detail: "Open External Check",
     state: "link",
     href: `https://dexscreener.com/${encodeURIComponent(input.chain)}/${encodeURIComponent(input.pairAddress)}`,
     copyValue,
@@ -188,39 +188,39 @@ function buildDexTarget(
 function buildSecurityTarget(
   input: Required<ExternalVerificationInput>,
   copyValue: string,
-  copyLabel: "copy contract" | "copy token input",
+  copyLabel: "Copy Contract" | "Copy Token Input",
 ): ExternalVerificationTarget {
   if (!input.contractAddress) {
-    return getMissingContractTarget("security", "honeypot/security manual check", copyValue, copyLabel);
+    return getMissingContractTarget("security", "Honeypot / Security Manual Check", copyValue, copyLabel);
   }
 
   return {
     id: "security",
-    title: "honeypot/security manual check",
-    label: "manual external check",
-    status: "security not verified",
-    detail: "not verified",
+    title: "Honeypot / Security Manual Check",
+    label: "Manual External Check",
+    status: "Security Not Verified",
+    detail: "Not Verified",
     state: "manual",
     copyValue,
     copyLabel,
-    reason: "manual verification required",
+    reason: "Manual Verification Required",
   };
 }
 
 function buildSourceTarget(
   input: Required<ExternalVerificationInput>,
   copyValue: string,
-  copyLabel: "copy contract" | "copy token input",
+  copyLabel: "Copy Contract" | "Copy Token Input",
 ): ExternalVerificationTarget {
   const href = normalizeHttpUrl(input.sourceUrl);
 
   if (href) {
     return {
       id: "source",
-      title: "source/context manual check",
-      label: "manual external check",
-      status: "source URL not fetched",
-      detail: "source freshness unknown",
+      title: "Source / Context Manual Check",
+      label: "Manual External Check",
+      status: "Source URL Not Fetched",
+      detail: "Source Freshness Unknown",
       state: "link",
       href,
       copyValue,
@@ -230,14 +230,14 @@ function buildSourceTarget(
 
   return {
     id: "source",
-    title: "source/context manual check",
-    label: "manual external check",
-    status: "source freshness unknown",
-    detail: "manual verification required",
+    title: "Source / Context Manual Check",
+    label: "Manual External Check",
+    status: "Source Freshness Unknown",
+    detail: "Manual Verification Required",
     state: "manual",
     copyValue,
     copyLabel,
-    reason: "manual verification required",
+    reason: "Manual Verification Required",
   };
 }
 
@@ -245,18 +245,18 @@ function getMissingContractTarget(
   id: ExternalVerificationTargetKind,
   title: string,
   copyValue: string,
-  copyLabel: "copy contract" | "copy token input",
+  copyLabel: "Copy Contract" | "Copy Token Input",
 ): ExternalVerificationTarget {
   return {
     id,
     title,
-    label: "manual external check",
-    status: "contract required",
-    detail: "manual verification required",
+    label: "Manual External Check",
+    status: "Contract Required",
+    detail: "Manual Verification Required",
     state: "manual",
     copyValue,
     copyLabel,
-    reason: "contract required",
+    reason: "Contract Required",
   };
 }
 

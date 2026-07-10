@@ -139,7 +139,7 @@ export const CandidateReviewControls: React.FC<CandidateReviewControlsProps> = (
 
       <div className="rounded-md px-2.5 py-1.5 text-[10px] leading-snug"
         style={{ background: "var(--accent-dim)", border: "1px solid var(--accent-border)", color: "var(--text-secondary)" }}>
-        Local review workspace only. This does not change scanner label. This is not a buy/sell signal.
+        Local review workspace only. This does not change scanner label. Research-only. Human Manual Review Required.
       </div>
     </div>
   );

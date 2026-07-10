@@ -83,7 +83,7 @@ export async function loadScannerDataSourceResult(
         };
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        return fallbackResult(`Static JSON not available: ${msg}`);
+        return fallbackResult(`Local data file unavailable: ${msg}`);
       }
     }
 
@@ -94,7 +94,7 @@ export async function loadScannerDataSourceResult(
         return interpretScannerApiOutput(output);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        return fallbackResult(`API not available: ${msg}`);
+        return fallbackResult(`Latest local data unavailable: ${msg}`);
       }
     }
   }

@@ -20,16 +20,16 @@ export interface ProductStateNoticeProps {
 
 const VARIANT_COPY: Record<ProductStateNoticeVariant, { eyebrow: string; boundary: string }> = {
   empty: {
-    eyebrow: "empty state",
-    boundary: "data gap",
+    eyebrow: "Data Gap",
+    boundary: "Data Gap",
   },
   partial: {
-    eyebrow: "partial state",
-    boundary: "partial source coverage",
+    eyebrow: "Partial Source Coverage",
+    boundary: "Partial Source Coverage",
   },
   error: {
-    eyebrow: "error state",
-    boundary: "not verified",
+    eyebrow: "Manual Verification Required",
+    boundary: "Not Verified",
   },
 };
 
@@ -55,11 +55,11 @@ export const ProductStateNotice: React.FC<ProductStateNoticeProps> = ({
         <p>{detail}</p>
       </div>
 
-      <div className="product-state-status-grid" aria-label="empty error partial state summary">
-        <ProductStateMetric label="state" value={status} detail={copy.boundary} />
-        <ProductStateMetric label="data gap" value="data gap" detail="not verified" />
-        <ProductStateMetric label="safety boundary" value="cannot infer safety" detail="manual review only" />
-        <ProductStateMetric label="next review step" value={nextReviewStep} detail="manual verification required" />
+      <div className="product-state-status-grid" aria-label="Data Gap and Next Review Step summary">
+        <ProductStateMetric label="State" value={status} detail={copy.boundary} />
+        <ProductStateMetric label="Data Gap" value="Data Gap" detail="Not Verified" />
+        <ProductStateMetric label="Cannot Infer Safety" value="Cannot Infer Safety" detail="Manual Review Only" />
+        <ProductStateMetric label="Next Review Step" value={nextReviewStep} detail="Manual Verification Required" />
       </div>
 
       {items.length > 0 && (

@@ -43,7 +43,7 @@ export const ResearchReview: React.FC = () => {
     <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 max-w-5xl">
       <div className="flex flex-col gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-primary mb-0.5">Research Review</h2>
+          <h2 className="text-sm font-semibold text-primary mb-0.5">Manual Research Notes</h2>
           <p className="text-xs text-secondary">
             Paste a news snippet, token description, market event, link, or your own observation to surface key risk considerations.
           </p>
@@ -58,7 +58,7 @@ export const ResearchReview: React.FC = () => {
           />
           <div className="flex items-center justify-between">
             <span className="text-[10px] italic" style={{ color: "var(--text-muted)" }}>
-              Mock review only. External model connection is not enabled in this preview.
+              Frontend-only review. External model connection is not enabled in this preview.
             </span>
             <button
               onClick={handleAnalyze}
@@ -77,7 +77,7 @@ export const ResearchReview: React.FC = () => {
             <div className="flex items-center justify-between border-b pb-2" style={{ borderColor: "var(--border)" }}>
               <span className="section-label">Analysis Result</span>
               <span className="text-[10px] italic" style={{ color: "var(--text-muted)" }}>
-                Mock review only.
+                Frontend-only review.
               </span>
             </div>
 
@@ -115,13 +115,13 @@ export const ResearchReview: React.FC = () => {
             </div>
 
             <div className="pt-2 border-t text-[10px] italic" style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
-              Crypto Edge AI is a research and risk review tool. This is not a buy/sell signal.
+              Crypto Edge AI is a research and risk review tool. Human Manual Review Required.
             </div>
           </div>
         ) : (
           <div className="card p-6 flex flex-col items-center justify-center h-full min-h-[200px] text-center gap-2">
             <div className="text-2xl opacity-20">RR</div>
-            <p className="text-secondary text-xs">Enter text on the left and click Analyze topic to see a mock review.</p>
+            <p className="text-secondary text-xs">Enter text on the left and click Analyze topic to see a frontend-only review.</p>
           </div>
         )}
       </div>

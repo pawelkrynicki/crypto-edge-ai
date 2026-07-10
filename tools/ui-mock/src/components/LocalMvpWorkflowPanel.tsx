@@ -10,13 +10,13 @@ interface Props {
 }
 
 const WORKFLOW_STEPS = [
-  "Scanner latest",
-  "Market context",
-  "Candidate detail",
-  "Local review",
-  "Review queue",
-  "Analyst report",
-  "Local MVP health check",
+  "Candidate Source",
+  "Market Context",
+  "Candidate Detail",
+  "Manual Review",
+  "Watchlist Candidate",
+  "Analyst Report",
+  "Local Health Check",
 ];
 
 const ANALYST_REPORT_COMMAND = "scripts\\win\\generate-analyst-report.cmd";
@@ -51,8 +51,8 @@ export const LocalMvpWorkflowPanel: React.FC<Props> = ({
     </div>
 
     <div className="local-mvp-status-grid">
-      <StatusItem label="Scanner source" value={scannerSourceText} detail={scannerFallbackReason} />
-      <StatusItem label="Context source" value={contextSourceText} detail={contextSourceDetail} />
+      <StatusItem label="Candidate Source" value={scannerSourceText} detail={scannerFallbackReason} />
+      <StatusItem label="Context Source Freshness" value={contextSourceText} detail={contextSourceDetail} />
       <StatusItem label="Review storage" value={reviewStorageText} detail={reviewStorageDetail} />
       <StatusItem
         label="Analyst report"
@@ -70,7 +70,7 @@ export const LocalMvpWorkflowPanel: React.FC<Props> = ({
 
     <div className="local-mvp-workflow-note">
       <span>Scanner label and local review status are separate workflow layers.</span>
-      <span>This is not a buy/sell signal.</span>
+      <span>Research-only. Human Manual Review Required.</span>
     </div>
   </section>
 );

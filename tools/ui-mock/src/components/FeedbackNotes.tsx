@@ -16,7 +16,7 @@ const feedbackPrompts = [
   "Which screen is most useful?",
   "What feels confusing?",
   "Is source freshness clear?",
-  "Is WATCHLIST understood as manual review only?",
+  "Is WATCHLIST understood as Manual Review Only?",
   "Are missing-data states clear?",
   "Does the report preview help?",
   "What would you need before accepting this direction?",

@@ -44,63 +44,63 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
     <div className="external-checks-view">
       <section className="external-checks-hero">
         <div className="external-checks-hero-copy">
-          <span className="external-checks-eyebrow">external checks</span>
-          <h3>External Verification Links</h3>
+          <span className="external-checks-eyebrow">External Checks</span>
+          <h3>External Checks</h3>
           <p>
-            manual external check only. Links open outside the app by user click, and every security,
-            liquidity and source freshness state remains not verified until manual review.
+            Manual External Check only. Links open outside the app by user click, and every security,
+            liquidity and Source Freshness state remains Not Verified until Manual Review.
           </p>
         </div>
         <div className="external-checks-boundary">
-          <strong>not verified</strong>
-          <span>manual verification required</span>
+          <strong>Not Verified</strong>
+          <span>Manual Verification Required</span>
         </div>
       </section>
 
-      <section className="external-checks-summary-grid" aria-label="external checks summary">
+      <section className="external-checks-summary-grid" aria-label="External Checks summary">
         <ExternalCheckMetric
-          label="token input"
+          label="Token Input"
           value={displayName}
-          detail={normalizedInput.contractAddress ? "copy contract" : "copy token input"}
+          detail={normalizedInput.contractAddress ? "Copy Contract" : "Copy Token Input"}
         />
         <ExternalCheckMetric
-          label="contract address"
-          value={normalizedInput.contractAddress ? "not verified" : "contract required"}
-          detail={normalizedInput.contractAddress || "manual verification required"}
+          label="Contract Address"
+          value={normalizedInput.contractAddress ? "Not Verified" : "Contract Required"}
+          detail={normalizedInput.contractAddress || "Manual Verification Required"}
           tone="manual"
         />
         <ExternalCheckMetric
-          label="chain"
-          value={normalizedInput.chain || "chain unknown"}
-          detail={normalizedInput.chain ? "not verified" : "chain unknown / verify manually"}
+          label="Chain"
+          value={normalizedInput.chain || "Chain Unknown"}
+          detail={normalizedInput.chain ? "Not Verified" : "Chain Unknown / verify manually"}
           tone="manual"
         />
         <ExternalCheckMetric
-          label="next review step"
-          value="external check required"
-          detail="manual review only"
+          label="Next Review Step"
+          value="External Check Required"
+          detail="Manual Review Only"
           tone="manual"
         />
       </section>
 
       <ProductStateNotice
         variant={hasContract && hasChain ? "partial" : "error"}
-        title="external check required"
-        status="external check required"
-        detail="data gap: external checks are link-only, security not verified and liquidity unknown remain manual review only, and missing contract or chain keeps checks not verified."
+        title="External Check Required"
+        status="External Check Required"
+        detail="Data Gap: External Checks are link-only, Security Not Verified and Liquidity Unknown remain Manual Review Only, and missing contract or chain keeps checks Not Verified."
         nextReviewStep={hasContract && hasChain
-          ? "open the user-clicked external checks and record manual verification separately"
-          : "add contract and chain manually before relying on any external check"}
+          ? "Open the user-clicked External Checks and record Manual Verification separately"
+          : "Add contract and chain manually before relying on any External Check"}
         items={[
-          { label: "contract", value: hasContract ? "not verified" : "contract required", detail: "manual verification required" },
-          { label: "chain", value: hasChain ? normalizedInput.chain : "chain unknown", detail: "not verified" },
-          { label: "security", value: "security not verified", detail: "cannot infer safety" },
-          { label: "liquidity", value: "liquidity unknown", detail: "source freshness unknown" },
+          { label: "Contract", value: hasContract ? "Not Verified" : "Contract Required", detail: "Manual Verification Required" },
+          { label: "Chain", value: hasChain ? normalizedInput.chain : "Chain Unknown", detail: "Not Verified" },
+          { label: "Security", value: "Security Not Verified", detail: "Cannot Infer Safety" },
+          { label: "Liquidity", value: "Liquidity Unknown", detail: "Source Freshness Unknown" },
         ]}
       />
 
       <ManualVerificationFallback
-        title="Manual verification fallback"
+        title="Manual Verification Required"
         gaps={fallbackGaps}
       />
 
@@ -109,7 +109,7 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
         tokenInput={tokenInput}
       />
 
-      <section className="external-checks-list" aria-label="manual external check list">
+      <section className="external-checks-list" aria-label="Manual External Check list">
         {targets.map((target) => (
           <ExternalCheckCard key={target.id} target={target} />
         ))}
@@ -117,28 +117,28 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
 
       <section className="external-checks-review-panel">
         <div>
-          <span className="external-checks-eyebrow">next review step</span>
-          <h3>manual external check</h3>
+          <span className="external-checks-eyebrow">Next Review Step</span>
+          <h3>Manual External Check</h3>
           <p>
-            security not verified. liquidity unknown. source freshness unknown. WATCHLIST remains manual review only.
+            Security Not Verified. Liquidity Unknown. Source Freshness Unknown. WATCHLIST remains Manual Review Only.
           </p>
         </div>
         <div className="external-checks-review-grid">
           <ExternalCheckMetric
-            label="security"
-            value="security not verified"
-            detail="manual verification required"
+            label="Security"
+            value="Security Not Verified"
+            detail="Manual Verification Required"
             tone="manual"
           />
           <ExternalCheckMetric
-            label="liquidity"
-            value="liquidity unknown"
-            detail="manual external check"
+            label="Liquidity"
+            value="Liquidity Unknown"
+            detail="Manual External Check"
             tone="manual"
           />
           <ExternalCheckMetric
-            label="source freshness"
-            value="source freshness unknown"
+            label="Source Freshness"
+            value="Source Freshness Unknown"
             detail="source URL not fetched"
             tone="manual"
           />
@@ -158,7 +158,7 @@ function ExternalCheckCard({ target }: { target: ExternalVerificationTarget }) {
       </div>
 
       <div className="external-check-card-status">
-        <span>not verified</span>
+        <span>Not Verified</span>
         <strong>{target.status}</strong>
         {target.reason && <p>{target.reason}</p>}
       </div>
@@ -171,11 +171,11 @@ function ExternalCheckCard({ target }: { target: ExternalVerificationTarget }) {
             target="_blank"
             rel="noreferrer noopener"
           >
-            Open external check
+            Open External Check
           </a>
         ) : (
           <span className="external-check-disabled" aria-disabled="true">
-            manual external check
+            Manual External Check
           </span>
         )}
         {target.copyValue && (

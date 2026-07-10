@@ -43,28 +43,28 @@ export const ResearchActionPanel: React.FC<ResearchActionPanelProps> = ({
   const actions: PanelAction[] = [
     {
       type: "link",
-      label: "open candidate detail",
+      label: "Open Candidate Detail",
       href: "#candidate-detail",
       detail: candidate ? "next review step" : "manual verification required",
       onClick: onOpenCandidateDetail,
     },
     {
       type: "link",
-      label: "open token lookup",
+      label: "Open Token Lookup",
       href: "#token-lookup",
       detail: panelState.tokenInput ? "copy token input" : "manual verification required",
       onClick: onOpenTokenLookup,
     },
     {
       type: "link",
-      label: "open external checks",
+      label: "Open External Checks",
       href: "#external-checks",
       detail: panelState.hasContract ? "not verified" : "contract required",
       onClick: onOpenExternalChecks,
     },
     {
       type: "button",
-      label: "copy contract",
+      label: "Copy Contract",
       detail: panelState.hasContract ? "not verified" : "contract required",
       disabled: !panelState.hasContract,
       disabledReason: "contract required",
@@ -72,7 +72,7 @@ export const ResearchActionPanel: React.FC<ResearchActionPanelProps> = ({
     },
     {
       type: "button",
-      label: "copy token input",
+      label: "Copy Token Input",
       detail: panelState.tokenInput ? "not verified" : "manual verification required",
       disabled: !panelState.tokenInput,
       disabledReason: "manual verification required",
@@ -81,33 +81,33 @@ export const ResearchActionPanel: React.FC<ResearchActionPanelProps> = ({
     panelState.hasCandidate
       ? {
           type: "link",
-          label: "view source freshness",
+          label: "View Source Freshness",
           href: "#candidate-detail",
           detail: panelState.sourceFreshnessDetail,
           onClick: onOpenCandidateDetail,
         }
       : {
           type: "button",
-          label: "view source freshness",
+          label: "View Source Freshness",
           detail: panelState.sourceFreshnessDetail,
           disabled: true,
           disabledReason: panelState.sourceFreshnessStatus,
         },
     {
       type: "button",
-      label: markedForManualReview ? "manual review only" : "mark for manual review",
+      label: markedForManualReview ? "Manual Review Only" : "Mark For Manual Review",
       detail: "manual review only",
       onClick: () => setMarkedForManualReview(true),
     },
     {
       type: "link",
-      label: "send feedback",
+      label: "Send Feedback",
       href: "#feedback-notes",
       detail: "manual verification required",
     },
     {
       type: "link",
-      label: "add review note",
+      label: "Add Review Note",
       href: "#feedback-notes",
       detail: "manual review only",
     },
@@ -117,9 +117,9 @@ export const ResearchActionPanel: React.FC<ResearchActionPanelProps> = ({
     <section className={`research-action-panel ${variant}`} aria-label="research action panel">
       <div className="research-action-panel-header">
         <div>
-          <span className="research-action-eyebrow">research action panel</span>
-          <h4>next review step</h4>
-          <p>not verified. manual verification required. missing data cannot infer safety.</p>
+          <span className="research-action-eyebrow">Research Action Panel</span>
+          <h4>Next Review Step</h4>
+          <p>Not Verified. Manual Verification Required. Data Gap: Cannot Infer Safety.</p>
         </div>
         <div className="research-action-panel-token">
           <span>{panelState.displayName}</span>
@@ -128,11 +128,11 @@ export const ResearchActionPanel: React.FC<ResearchActionPanelProps> = ({
       </div>
 
       <div className="research-action-status-grid" aria-label="research action panel states">
-        <ResearchActionStatus label="manual review only" value={panelState.manualReviewState} />
-        <ResearchActionStatus label="contract" value={panelState.hasContract ? "not verified" : "contract required"} />
-        <ResearchActionStatus label="chain" value={panelState.chain || "chain unknown"} />
-        <ResearchActionStatus label="source freshness" value={panelState.sourceFreshnessStatus} />
-        <ResearchActionStatus label="safety boundary" value="cannot infer safety" />
+        <ResearchActionStatus label="Manual Review Only" value={panelState.manualReviewState} />
+        <ResearchActionStatus label="Contract" value={panelState.hasContract ? "not verified" : "contract required"} />
+        <ResearchActionStatus label="Chain" value={panelState.chain || "chain unknown"} />
+        <ResearchActionStatus label="Source Freshness" value={panelState.sourceFreshnessStatus} />
+        <ResearchActionStatus label="Cannot Infer Safety" value="cannot infer safety" />
       </div>
 
       <div className="research-action-grid">

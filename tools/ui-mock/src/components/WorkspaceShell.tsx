@@ -91,12 +91,12 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
           <>
             <span className="badge badge-context">Trusted Preview</span>
             <span className="badge badge-context">Research only</span>
-            <span className="source-status">WATCHLIST means manual review only.</span>
+            <span className="source-status">WATCHLIST means Manual Review Only.</span>
           </>
         ) : (
           <>
-            <div className="source-control" aria-label="Source freshness">
-              <span>Source freshness</span>
+            <div className="source-control" aria-label="Source Freshness">
+              <span>Source Freshness</span>
               <div className="source-segment">
                 {dataSourceOptions.map((opt) => (
                   <button
@@ -160,7 +160,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
       <div className="workspace-main">
         {fallbackMsg && !presentationMode && (
           <div className="app-notice workspace-notice">
-            <span>Scanner fixture fallback</span>
+            <span>Candidate data sample fallback</span>
             <p>{fallbackMsg}</p>
           </div>
         )}
@@ -175,17 +175,17 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
       {presentationMode ? (
         <>
           <p>Research preview only. Context, risks and review steps stay analyst-controlled.</p>
-          <span>Manual review boundary.</span>
+          <span>Manual Review boundary.</span>
         </>
       ) : trustedPreviewMode ? (
         <>
           <p>Research-only preview. Scanner context and local review do not change labels or scoring.</p>
-          <span>WATCHLIST means manual review only.</span>
+          <span>WATCHLIST means Manual Review Only.</span>
         </>
       ) : (
         <>
           <p>Research workspace only. Scanner context and local review do not change labels or scoring.</p>
-          <span>Manual review only.</span>
+          <span>Manual Review Only.</span>
         </>
       )}
     </footer>

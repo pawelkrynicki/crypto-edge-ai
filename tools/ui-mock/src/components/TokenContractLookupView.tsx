@@ -12,11 +12,11 @@ interface TokenContractLookupViewProps {
 }
 
 type LookupClassification =
-  | "likely symbol"
-  | "likely project name"
-  | "likely EVM contract address"
-  | "likely URL"
-  | "unknown format";
+  | "Likely Symbol"
+  | "Likely Project Name"
+  | "Likely EVM Contract Address"
+  | "Likely URL"
+  | "Unknown Format";
 
 type LookupTone = "neutral" | "manual" | "risk";
 
@@ -35,11 +35,11 @@ interface LookupResult {
 }
 
 const QUICK_EXAMPLES = [
-  { label: "symbol", value: "PEPE" },
-  { label: "project name", value: "Lido Finance" },
-  { label: "contract", value: "0x1111111111111111111111111111111111111111" },
+  { label: "Symbol", value: "PEPE" },
+  { label: "Project Name", value: "Lido Finance" },
+  { label: "Contract", value: "0x1111111111111111111111111111111111111111" },
   { label: "URL", value: "https://example.org/project" },
-  { label: "chain + address", value: "base: 0x2222222222222222222222222222222222222222" },
+  { label: "Chain + Address", value: "base: 0x2222222222222222222222222222222222222222" },
 ];
 
 const EVM_ADDRESS_PATTERN = /0x[a-fA-F0-9]{40}/;
@@ -58,29 +58,29 @@ export const TokenContractLookupView: React.FC<TokenContractLookupViewProps> = (
   }, [initialInput]);
 
   const lookup = useMemo(() => classifyTokenLookupInput(input), [input]);
-  const hasContract = lookup.classification === "likely EVM contract address";
+  const hasContract = lookup.classification === "Likely EVM Contract Address";
   const stateNotice = buildLookupStateNotice(input, hasContract);
 
   return (
     <div className="token-lookup-view">
       <section className="token-lookup-hero">
         <div className="token-lookup-hero-copy">
-          <span className="token-lookup-eyebrow">token to verify</span>
-          <h3>contract lookup</h3>
+          <span className="token-lookup-eyebrow">Token to Verify</span>
+          <h3>Token Lookup</h3>
           <p>
-            Manual verification required. This shell classifies local input only and keeps every security, chain,
-            liquidity and source freshness state as unknown or not verified.
+            Manual Verification Required. This shell classifies local input only and keeps every security, chain,
+            liquidity and Source Freshness state as unknown or Not Verified.
           </p>
         </div>
         <div className="token-lookup-boundary">
-          <strong>manual review</strong>
-          <span>not verified until a human checks contract, chain, source freshness and risk flags.</span>
+          <strong>Manual Review</strong>
+          <span>Not Verified until a human checks contract, chain, Source Freshness and Risk Flags.</span>
         </div>
       </section>
 
-      <section className="token-lookup-input-panel" aria-label="token to verify input">
+      <section className="token-lookup-input-panel" aria-label="Token to Verify input">
         <label className="token-lookup-input-label" htmlFor="token-lookup-input">
-          token to verify
+          Token to Verify
         </label>
         <input
           id="token-lookup-input"
@@ -103,13 +103,13 @@ export const TokenContractLookupView: React.FC<TokenContractLookupViewProps> = (
         </div>
       </section>
 
-      <section className="token-lookup-result-panel" aria-label="contract lookup result">
+      <section className="token-lookup-result-panel" aria-label="Token Lookup result">
         <div className="token-lookup-result-topline">
           <div>
-            <span className="token-lookup-eyebrow">contract lookup</span>
+            <span className="token-lookup-eyebrow">Token Lookup</span>
             <h3>{lookup.classification}</h3>
           </div>
-          <span className="token-lookup-status">manual verification required</span>
+          <span className="token-lookup-status">Manual Verification Required</span>
         </div>
         <p>{lookup.summary}</p>
 
@@ -129,7 +129,7 @@ export const TokenContractLookupView: React.FC<TokenContractLookupViewProps> = (
       <ProductStateNotice {...stateNotice} />
 
       <ManualVerificationFallback
-        title="Manual verification fallback"
+        title="Manual Verification Required"
         gaps={buildLookupVerificationGaps(hasContract)}
       />
 
@@ -140,9 +140,9 @@ export const TokenContractLookupView: React.FC<TokenContractLookupViewProps> = (
 
       <section className="token-lookup-review-panel">
         <div>
-          <span className="token-lookup-eyebrow">next review step</span>
-          <h3>manual review</h3>
-          <p>External check required. Contract and chain must be verified manually before any security context is trusted.</p>
+          <span className="token-lookup-eyebrow">Next Review Step</span>
+          <h3>Manual Review</h3>
+          <p>External Check Required. Contract and chain must be verified manually before any security context is trusted.</p>
         </div>
         <ul className="token-lookup-step-list">
           {lookup.reviewSteps.map((step) => (
@@ -155,7 +155,7 @@ export const TokenContractLookupView: React.FC<TokenContractLookupViewProps> = (
             className="token-lookup-secondary-button"
             onClick={() => onOpenExternalChecks(input)}
           >
-            Open external checks
+            Open External Checks
           </button>
         )}
       </section>
@@ -188,10 +188,10 @@ export function classifyTokenLookupInput(rawInput: string): LookupResult {
 
   if (!input) {
     return {
-      classification: "unknown format",
-      summary: "Enter a token to verify. Contract required before security checks can move past manual review.",
+      classification: "Unknown Format",
+      summary: "Enter a Token to Verify. Contract Required before security checks can move past Manual Review.",
       rows: buildMissingDataRows(),
-      reviewSteps: buildManualReviewSteps("contract required"),
+      reviewSteps: buildManualReviewSteps("Contract Required"),
     };
   }
 
@@ -203,18 +203,18 @@ export function classifyTokenLookupInput(rawInput: string): LookupResult {
 
   if (isLikelyUrl(input)) {
     return {
-      classification: "likely URL",
-      summary: "Source URL not fetched. Manual verification required; no scraping / no automatic fetch is performed.",
+      classification: "Likely URL",
+      summary: "Source URL not fetched. Manual Verification Required; no scraping / no automatic fetch is performed.",
       rows: [
         {
-          label: "source URL",
+          label: "Source URL",
           value: "source URL not fetched",
-          detail: "manual verification required",
+          detail: "Manual Verification Required",
           tone: "manual",
         },
         {
-          label: "source freshness",
-          value: "source freshness unknown",
+          label: "Source Freshness",
+          value: "Source Freshness Unknown",
           detail: "no automatic fetch",
           tone: "manual",
         },
@@ -226,25 +226,25 @@ export function classifyTokenLookupInput(rawInput: string): LookupResult {
 
   if (SYMBOL_PATTERN.test(input)) {
     return {
-      classification: "likely symbol",
-      summary: "Likely symbol only. Contract required for security checks and chain required for external checks.",
+      classification: "Likely Symbol",
+      summary: "Likely symbol only. Contract Required for security checks and Chain Required for External Checks.",
       rows: buildMissingDataRows(),
-      reviewSteps: buildManualReviewSteps("contract required"),
+      reviewSteps: buildManualReviewSteps("Contract Required"),
     };
   }
 
   if (PROJECT_NAME_PATTERN.test(input) && input.length >= 3) {
     return {
-      classification: "likely project name",
-      summary: "Likely project name only. Manual verification required before any contract lookup can continue.",
+      classification: "Likely Project Name",
+      summary: "Likely project name only. Manual Verification Required before Token Lookup can continue.",
       rows: buildMissingDataRows(),
-      reviewSteps: buildManualReviewSteps("contract required"),
+      reviewSteps: buildManualReviewSteps("Contract Required"),
     };
   }
 
   return {
-    classification: "unknown format",
-    summary: "Unknown format. Manual verification required and missing data remains unknown.",
+    classification: "Unknown Format",
+    summary: "Unknown format. Manual Verification Required and missing data remains unknown.",
     rows: buildMissingDataRows(),
     reviewSteps: buildManualReviewSteps("unknown format"),
   };
@@ -254,102 +254,102 @@ function buildContractResult(input: string, evmAddress: string): LookupResult {
   const chainHint = input.replace(evmAddress, "").match(CHAIN_HINT_PATTERN)?.[0] ?? "";
   const rows: LookupRow[] = [
     {
-      label: "contract address",
-      value: "not verified",
+      label: "Contract Address",
+      value: "Not Verified",
       detail: evmAddress,
       tone: "manual",
     },
     {
-      label: "chain",
-      value: "chain unknown",
-      detail: "chain unknown / verify manually",
+      label: "Chain",
+      value: "Chain Unknown",
+      detail: "Chain Unknown / verify manually",
       tone: "manual",
     },
     {
-      label: "external checks",
-      value: "external check required",
-      detail: "manual verification required",
+      label: "External Checks",
+      value: "External Check Required",
+      detail: "Manual Verification Required",
       tone: "manual",
     },
     {
-      label: "security status",
-      value: "not verified",
-      detail: "manual verification required",
+      label: "Security Status",
+      value: "Not Verified",
+      detail: "Manual Verification Required",
       tone: "manual",
     },
     {
-      label: "liquidity",
-      value: "liquidity unknown",
+      label: "Liquidity",
+      value: "Liquidity Unknown",
       detail: "missing data cannot create a positive security status",
       tone: "manual",
     },
     {
-      label: "source freshness",
-      value: "source freshness unknown",
-      detail: "manual review",
+      label: "Source Freshness",
+      value: "Source Freshness Unknown",
+      detail: "Manual Review",
       tone: "manual",
     },
   ];
 
   if (chainHint) {
     rows.splice(2, 0, {
-      label: "chain hint",
+      label: "Chain Hint",
       value: chainHint.toLowerCase(),
-      detail: "manual review",
+      detail: "Manual Review",
       tone: "neutral",
     });
   }
 
   return {
-    classification: "likely EVM contract address",
-    summary: "Contract address format found locally. Address, chain, external checks and security status are not verified.",
+    classification: "Likely EVM Contract Address",
+    summary: "Contract address format found locally. Address, chain, External Checks and security status are Not Verified.",
     rows,
-    reviewSteps: buildManualReviewSteps("external check required"),
+    reviewSteps: buildManualReviewSteps("External Check Required"),
   };
 }
 
 function buildMissingDataRows(): LookupRow[] {
   return [
     {
-      label: "contract address",
-      value: "contract required",
-      detail: "contract required for security checks",
+      label: "Contract Address",
+      value: "Contract Required",
+      detail: "Contract Required for security checks",
       tone: "manual",
     },
     {
-      label: "chain",
-      value: "chain unknown",
-      detail: "chain required for external checks / verify manually",
+      label: "Chain",
+      value: "Chain Unknown",
+      detail: "Chain Required for External Checks / verify manually",
       tone: "manual",
     },
     {
-      label: "external checks",
-      value: "external check required",
-      detail: "manual verification required",
+      label: "External Checks",
+      value: "External Check Required",
+      detail: "Manual Verification Required",
       tone: "manual",
     },
     {
-      label: "security status",
-      value: "not verified",
-      detail: "security not verified",
+      label: "Security Status",
+      value: "Not Verified",
+      detail: "Security Not Verified",
       tone: "manual",
     },
     {
-      label: "liquidity",
-      value: "liquidity unknown",
-      detail: "manual review",
+      label: "Liquidity",
+      value: "Liquidity Unknown",
+      detail: "Manual Review",
       tone: "manual",
     },
     {
-      label: "source freshness",
-      value: "source freshness unknown",
-      detail: "manual verification required",
+      label: "Source Freshness",
+      value: "Source Freshness Unknown",
+      detail: "Manual Verification Required",
       tone: "manual",
     },
     {
-      label: "risk flags",
-      value: "manual verification required",
-      detail: "risk flags unknown",
+      label: "Risk Flags",
+      value: "Manual Verification Required",
+      detail: "Risk Flags unknown",
       tone: "manual",
     },
   ];
@@ -358,10 +358,10 @@ function buildMissingDataRows(): LookupRow[] {
 function buildManualReviewSteps(reason: string): string[] {
   return [
     reason,
-    "chain unknown / verify manually",
-    "security not verified",
-    "liquidity unknown",
-    "source freshness unknown",
+    "Chain Unknown / verify manually",
+    "Security Not Verified",
+    "Liquidity Unknown",
+    "Source Freshness Unknown",
   ];
 }
 
@@ -369,32 +369,32 @@ function buildLookupStateNotice(input: string, hasContract: boolean) {
   if (!input.trim()) {
     return {
       variant: "empty" as const,
-      title: "contract required",
-      status: "contract required",
-      detail: "data gap: no token input is present, chain unknown and external check required states stay not verified.",
-      nextReviewStep: "enter a token input, then verify contract and chain manually",
+      title: "Contract Required",
+      status: "Contract Required",
+      detail: "Data Gap: no token input is present, Chain Unknown and External Check Required states stay Not Verified.",
+      nextReviewStep: "Enter a token input, then verify contract and chain manually",
       items: [
-        { label: "chain", value: "chain unknown", detail: "manual verification required" },
-        { label: "security", value: "security not verified", detail: "cannot infer safety" },
-        { label: "liquidity", value: "liquidity unknown", detail: "manual review only" },
-        { label: "source freshness", value: "source freshness unknown", detail: "not verified" },
+        { label: "Chain", value: "Chain Unknown", detail: "Manual Verification Required" },
+        { label: "Security", value: "Security Not Verified", detail: "Cannot Infer Safety" },
+        { label: "Liquidity", value: "Liquidity Unknown", detail: "Manual Review Only" },
+        { label: "Source Freshness", value: "Source Freshness Unknown", detail: "Not Verified" },
       ],
     };
   }
 
   return {
     variant: hasContract ? "partial" as const : "error" as const,
-    title: hasContract ? "chain unknown" : "contract required",
-    status: hasContract ? "chain unknown" : "contract required",
-    detail: "data gap: token lookup is frontend-only, so external check required, security not verified, liquidity unknown, and source freshness unknown remain manual review only.",
+    title: hasContract ? "Chain Unknown" : "Contract Required",
+    status: hasContract ? "Chain Unknown" : "Contract Required",
+    detail: "Data Gap: Token Lookup is frontend-only, so External Check Required, Security Not Verified, Liquidity Unknown, and Source Freshness Unknown remain Manual Review Only.",
     nextReviewStep: hasContract
-      ? "verify chain manually before opening external checks"
-      : "find the contract address before external checks",
+      ? "Verify chain manually before opening External Checks"
+      : "Find the contract address before External Checks",
     items: [
-      { label: "external check", value: "external check required", detail: "manual verification required" },
-      { label: "security", value: "security not verified", detail: "cannot infer safety" },
-      { label: "liquidity", value: "liquidity unknown", detail: "not verified" },
-      { label: "source freshness", value: "source freshness unknown", detail: "manual review only" },
+      { label: "External Check", value: "External Check Required", detail: "Manual Verification Required" },
+      { label: "Security", value: "Security Not Verified", detail: "Cannot Infer Safety" },
+      { label: "Liquidity", value: "Liquidity Unknown", detail: "Not Verified" },
+      { label: "Source Freshness", value: "Source Freshness Unknown", detail: "Manual Review Only" },
     ],
   };
 }

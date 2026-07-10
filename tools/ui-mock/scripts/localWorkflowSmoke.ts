@@ -230,7 +230,7 @@ function assertUiSmoke({
     },
   }));
   assertMarkupIncludes(marketContextMarkup, "Market Context", "MarketContextPanel");
-  assertMarkupIncludes(marketContextMarkup, "not a buy/sell signal", "MarketContextPanel");
+  assertMarkupIncludes(marketContextMarkup, "Human Manual Review Required", "MarketContextPanel");
 
   const candidateDetailMarkup = renderToStaticMarkup(React.createElement(CandidateDetail, {
     candidate: reviewCandidate,
@@ -246,7 +246,7 @@ function assertUiSmoke({
   assertMarkupIncludes(candidateDetailMarkup, reviewCandidate.symbol, "CandidateDetail");
   assertMarkupIncludes(candidateDetailMarkup, "Saved for follow-up", "CandidateDetail");
   assertMarkupIncludes(candidateDetailMarkup, smokeNote, "CandidateDetail");
-  assertMarkupIncludes(candidateDetailMarkup, "not a buy/sell signal", "CandidateDetail");
+  assertMarkupIncludes(candidateDetailMarkup, "Human Manual Review Required", "CandidateDetail");
 
   const watchlistMarkup = renderToStaticMarkup(React.createElement(WatchlistTab, {
     candidates: mockCandidates,
@@ -264,9 +264,9 @@ function assertUiSmoke({
       message: "Local workflow smoke reset skipped.",
     }),
   }));
-  assertMarkupIncludes(watchlistMarkup, "Review Queue", "WatchlistTab");
+  assertMarkupIncludes(watchlistMarkup, "Manual Review", "WatchlistTab");
   assertMarkupIncludes(watchlistMarkup, "Review status does not change scanner labels", "WatchlistTab");
-  assertMarkupIncludes(watchlistMarkup, "not a buy/sell signal", "WatchlistTab");
+  assertMarkupIncludes(watchlistMarkup, "Human Manual Review Required", "WatchlistTab");
   assert.ok(
     watchlistMarkup.includes(reviewCandidate.symbol) || watchlistMarkup.includes(reviewCandidate.id),
     "WatchlistTab must render the selected candidate symbol or candidate_id",

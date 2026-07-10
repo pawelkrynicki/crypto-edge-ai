@@ -28,7 +28,7 @@ interface ManualVerificationFallbackProps {
 export const FALLBACKS: Record<VerificationGapStatus, VerificationGap> = {
   "manual verification required": {
     status: "manual verification required",
-    detail: "system did not complete this verification",
+    detail: "the system did not complete this verification",
     nextReviewStep: "review the missing fields manually",
   },
   "not verified": {
@@ -86,7 +86,7 @@ const BASE_GAPS: VerificationGap[] = [
 ];
 
 export const ManualVerificationFallback: React.FC<ManualVerificationFallbackProps> = ({
-  title = "Manual verification fallback",
+  title = "Manual Verification Required",
   gaps,
   compact = false,
 }) => {
@@ -98,10 +98,10 @@ export const ManualVerificationFallback: React.FC<ManualVerificationFallbackProp
       aria-label="manual verification fallback"
     >
       <div className="manual-verification-fallback-header">
-        <span className="manual-verification-eyebrow">data gap</span>
+        <span className="manual-verification-eyebrow">Data Gap</span>
         <h4>{title}</h4>
         <p>
-          Missing data stays not verified. Data gaps require manual verification and cannot infer safety.
+          Missing data stays Not Verified. Data gaps require Manual Verification Required and Cannot Infer Safety.
         </p>
       </div>
 
@@ -110,7 +110,7 @@ export const ManualVerificationFallback: React.FC<ManualVerificationFallbackProp
           <article key={gap.status} className="manual-verification-gap">
             <span>{gap.status}</span>
             <p>{gap.detail}</p>
-            <small>next review step: {gap.nextReviewStep}</small>
+            <small>Next Review Step: {gap.nextReviewStep}</small>
           </article>
         ))}
       </div>
