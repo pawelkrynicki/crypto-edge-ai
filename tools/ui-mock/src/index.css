@@ -1725,6 +1725,116 @@
     border: 1px solid var(--border);
   }
 
+  .product-state-notice {
+    @apply grid min-w-0 gap-3 rounded-md px-3 py-2.5;
+    background: var(--bg-card);
+    border: 1px solid var(--amber-border);
+  }
+
+  .product-state-notice.compact {
+    @apply gap-2;
+    background: rgba(8, 12, 16, 0.2);
+  }
+
+  .product-state-notice.empty {
+    border-color: var(--slate-border);
+  }
+
+  .product-state-notice.error {
+    border-color: var(--red-border);
+  }
+
+  .product-state-notice-header {
+    @apply min-w-0;
+  }
+
+  .product-state-eyebrow {
+    @apply inline-flex rounded-md px-2 py-0.5 text-[10px] font-bold uppercase leading-tight;
+    color: var(--amber);
+    background: var(--amber-dim);
+    border: 1px solid var(--amber-border);
+  }
+
+  .product-state-notice.empty .product-state-eyebrow {
+    color: var(--slate);
+    background: var(--slate-dim);
+    border-color: var(--slate-border);
+  }
+
+  .product-state-notice.error .product-state-eyebrow {
+    color: var(--red);
+    background: var(--red-dim);
+    border-color: var(--red-border);
+  }
+
+  .product-state-notice-header h4 {
+    @apply mt-1 text-sm font-bold leading-tight;
+    color: var(--text-primary);
+  }
+
+  .product-state-notice-header p {
+    @apply mt-1 max-w-4xl text-[12px] leading-relaxed;
+    color: var(--text-secondary);
+    overflow-wrap: anywhere;
+  }
+
+  .product-state-status-grid,
+  .product-state-item-grid {
+    @apply grid gap-2;
+  }
+
+  .product-state-status-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .product-state-item-grid {
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  }
+
+  .product-state-metric {
+    @apply min-w-0 rounded-md px-2.5 py-2;
+    background: rgba(8, 12, 16, 0.26);
+    border: 1px solid var(--border);
+  }
+
+  .product-state-notice.partial .product-state-metric {
+    border-color: var(--amber-border);
+  }
+
+  .product-state-notice.error .product-state-metric {
+    border-color: var(--red-border);
+  }
+
+  .product-state-metric span {
+    @apply block text-[10px] font-bold uppercase leading-tight;
+    color: var(--text-muted);
+  }
+
+  .product-state-metric strong {
+    @apply mt-1 block text-[12px] font-bold leading-snug;
+    color: var(--text-primary);
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .product-state-notice.partial .product-state-metric strong {
+    color: var(--amber);
+  }
+
+  .product-state-notice.error .product-state-metric strong {
+    color: var(--red);
+  }
+
+  .product-state-notice.empty .product-state-metric strong {
+    color: var(--slate);
+  }
+
+  .product-state-metric p {
+    @apply mt-1 text-[10px] leading-snug;
+    color: var(--text-secondary);
+    overflow-wrap: anywhere;
+  }
+
   .manual-verification-fallback {
     @apply grid min-w-0 gap-3 rounded-md px-3 py-2.5;
     background: var(--bg-card);
@@ -3305,6 +3415,7 @@
     .candidate-result-grid,
     .candidate-detail-grid,
     .token-lookup-grid,
+    .product-state-status-grid,
     .manual-verification-gap-grid,
     .manual-verification-fallback.compact .manual-verification-gap-grid,
     .research-action-status-grid,
@@ -3562,6 +3673,8 @@
     .candidate-result-grid,
     .candidate-detail-grid,
     .token-lookup-grid,
+    .product-state-status-grid,
+    .product-state-item-grid,
     .manual-verification-gap-grid,
     .manual-verification-fallback.compact .manual-verification-gap-grid,
     .research-action-status-grid,

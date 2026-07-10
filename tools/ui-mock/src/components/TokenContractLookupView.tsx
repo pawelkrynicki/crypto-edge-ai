@@ -3,6 +3,7 @@ import {
   ManualVerificationFallback,
   buildLookupVerificationGaps,
 } from "./ManualVerificationFallback";
+import { ProductStateNotice } from "./ProductStateNotice";
 import { ResearchActionPanel } from "./ResearchActionPanel";
 
 interface TokenContractLookupViewProps {
@@ -58,6 +59,7 @@ export const TokenContractLookupView: React.FC<TokenContractLookupViewProps> = (
 
   const lookup = useMemo(() => classifyTokenLookupInput(input), [input]);
   const hasContract = lookup.classification === "likely EVM contract address";
+  const stateNotice = buildLookupStateNotice(input, hasContract);
 
   return (
     <div className="token-lookup-view">
@@ -123,6 +125,8 @@ export const TokenContractLookupView: React.FC<TokenContractLookupViewProps> = (
           ))}
         </div>
       </section>
+
+      <ProductStateNotice {...stateNotice} />
 
       <ManualVerificationFallback
         title="Manual verification fallback"
@@ -359,6 +363,40 @@ function buildManualReviewSteps(reason: string): string[] {
     "liquidity unknown",
     "source freshness unknown",
   ];
+}
+
+function buildLookupStateNotice(input: string, hasContract: boolean) {
+  if (!input.trim()) {
+    return {
+      variant: "empty" as const,
+      title: "contract required",
+      status: "contract required",
+      detail: "data gap: no token input is present, chain unknown and external check required states stay not verified.",
+      nextReviewStep: "enter a token input, then verify contract and chain manually",
+      items: [
+        { label: "chain", value: "chain unknown", detail: "manual verification required" },
+        { label: "security", value: "security not verified", detail: "cannot infer safety" },
+        { label: "liquidity", value: "liquidity unknown", detail: "manual review only" },
+        { label: "source freshness", value: "source freshness unknown", detail: "not verified" },
+      ],
+    };
+  }
+
+  return {
+    variant: hasContract ? "partial" as const : "error" as const,
+    title: hasContract ? "chain unknown" : "contract required",
+    status: hasContract ? "chain unknown" : "contract required",
+    detail: "data gap: token lookup is frontend-only, so external check required, security not verified, liquidity unknown, and source freshness unknown remain manual review only.",
+    nextReviewStep: hasContract
+      ? "verify chain manually before opening external checks"
+      : "find the contract address before external checks",
+    items: [
+      { label: "external check", value: "external check required", detail: "manual verification required" },
+      { label: "security", value: "security not verified", detail: "cannot infer safety" },
+      { label: "liquidity", value: "liquidity unknown", detail: "not verified" },
+      { label: "source freshness", value: "source freshness unknown", detail: "manual review only" },
+    ],
+  };
 }
 
 function isLikelyUrl(value: string): boolean {

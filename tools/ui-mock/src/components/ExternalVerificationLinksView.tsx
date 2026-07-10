@@ -10,6 +10,7 @@ import {
   ManualVerificationFallback,
   buildExternalVerificationGaps,
 } from "./ManualVerificationFallback";
+import { ProductStateNotice } from "./ProductStateNotice";
 import { ResearchActionPanel } from "./ResearchActionPanel";
 
 interface ExternalVerificationLinksViewProps {
@@ -36,6 +37,8 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
     hasChain: Boolean(normalizedInput.chain),
     isWatchlist: candidate?.final_label === "WATCHLIST",
   });
+  const hasContract = Boolean(normalizedInput.contractAddress);
+  const hasChain = Boolean(normalizedInput.chain);
 
   return (
     <div className="external-checks-view">
@@ -79,6 +82,22 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
           tone="manual"
         />
       </section>
+
+      <ProductStateNotice
+        variant={hasContract && hasChain ? "partial" : "error"}
+        title="external check required"
+        status="external check required"
+        detail="data gap: external checks are link-only, security not verified and liquidity unknown remain manual review only, and missing contract or chain keeps checks not verified."
+        nextReviewStep={hasContract && hasChain
+          ? "open the user-clicked external checks and record manual verification separately"
+          : "add contract and chain manually before relying on any external check"}
+        items={[
+          { label: "contract", value: hasContract ? "not verified" : "contract required", detail: "manual verification required" },
+          { label: "chain", value: hasChain ? normalizedInput.chain : "chain unknown", detail: "not verified" },
+          { label: "security", value: "security not verified", detail: "cannot infer safety" },
+          { label: "liquidity", value: "liquidity unknown", detail: "source freshness unknown" },
+        ]}
+      />
 
       <ManualVerificationFallback
         title="Manual verification fallback"
