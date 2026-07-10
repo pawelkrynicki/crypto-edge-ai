@@ -3,8 +3,9 @@
 ## Status
 
 - Local MVP Release Candidate Stabilization v1.
-- Stage 12E.9 adds Empty / Error / Partial States through a shared frontend-only `ProductStateNotice` in Candidate Results, Candidate Detail, Token / Contract Lookup, and External Verification Links. Next frontend stage is 12E.10 Frontend Copy / Naming.
-- Stage 12E.8 adds Frontend Navigation Cleanup: `Product Flow`, `Review / Feedback`, `Admin / Status`, and `Demo / Preview` now separate the main research path from admin/status and demo/preview surfaces.
+- Stage 12E.9 adds Empty / Error / Partial States through a shared frontend-only ProductStateNotice in Candidate Results, Candidate Detail, Token / Contract Lookup, and External Verification Links. Next frontend stage is 12E.10 Frontend Copy / Naming.
+- Stage 12E.8 adds Frontend Navigation Cleanup: `Product Flow`, `Review / Feedback`, `Admin / Status`, and `Demo / Preview` now separate the main research path from admin/status and demo/preview surfaces. Next frontend stage is 12E.9 Empty / Error / Partial States.
+- Stage 12E.9A keeps local RC resilient to transient approved external live-source fetch failures: local RC reports them as `EXTERNAL SOURCE DEGRADED` / `degraded_external_source`, while strict live-source validation can still hard-fail on the same condition.
 - Stage 12E.7 adds Research Action Panel across Candidate Results, Candidate Detail, Token / Contract Lookup, and External Verification Links.
 - Stage 12E.6 adds Manual Verification Fallbacks across Candidate Results, Candidate Detail, Token / Contract Lookup, and External Verification Links.
 - Stage 12E.5 adds External Verification Links at `#external-checks` as a link-only manual external check view.
@@ -53,7 +54,8 @@
 - 12E.6 does not add backend, storage, provider calls, source activation, source check changes, URL fetches, scraping, OpenAI calls, paid sources, secrets, `.env`, npm dependencies, scanner scoring changes, `final_label` changes, review semantics changes, or `WATCHLIST` meaning changes.
 - 12E.7 does not add backend, storage, provider calls, source activation, source check changes, URL fetches, scraping, OpenAI calls, paid sources, secrets, `.env`, npm dependencies, scanner scoring changes, `final_label` changes, review semantics changes, or `WATCHLIST` meaning changes.
 - 12E.8 does not add backend, storage, provider calls, source activation, source check changes, URL fetches, scraping, OpenAI calls, paid sources, secrets, `.env`, npm dependencies, scanner scoring changes, `final_label` changes, review semantics changes, or `WATCHLIST` meaning changes.
-- 12E.9 does not add backend, storage, provider calls, source activation, source check changes, URL fetches, scraping, OpenAI calls, paid sources, secrets, `.env`, npm dependencies, scanner scoring changes, `final_label` changes, review semantics changes, or `WATCHLIST` meaning changes.
+- 12E.9 does not add backend, storage, provider calls, source activation, source check changes, URL fetches, scraping, OpenAI calls, paid sources, secrets, .env, npm dependencies, scanner scoring changes, final_label changes, review semantics changes, or WATCHLIST meaning changes.
+- 12E.9A does not change the frontend product flow, AI KINTEL, backend, storage, dependencies, provider calls, source activation, scoring, `final_label`, or `WATCHLIST` meaning.
 - Trusted tester preview still needs private access, persisted feedback capture, report library, and lightweight private deployment before a real external test.
 - AI KINTEL remains a later integration stage.
 
@@ -63,11 +65,10 @@
 - `docs/frontend_productization_backlog.md`
 - `docs/frontend_target_flow_map.md`
 
-12E.9 frontend productization baseline:
+12E.8 frontend productization baseline:
 
 - `tools/ui-mock/src/components/ResearchActionPanel.tsx`
 - `tools/ui-mock/src/components/ManualVerificationFallback.tsx`
-- `tools/ui-mock/src/components/ProductStateNotice.tsx`
 - `tools/ui-mock/src/components/ExternalVerificationLinksView.tsx`
 - `tools/ui-mock/src/components/TokenContractLookupView.tsx`
 - `tools/ui-mock/src/components/CandidateDetailView.tsx`
@@ -77,10 +78,9 @@
 - `tools/ui-mock/src/workspaceNavigation.ts`
 - Navigation groups: `Product Flow`, `Review / Feedback`, `Admin / Status`, `Demo / Preview`
 - Deep links: `#candidate-results`, `#candidate-detail`, `#token-lookup`, `#external-checks`, `#feedback-notes`, `#control-center`, `#trusted-preview`, `#webinar-teaser`
-- Empty / Error / Partial state copy: `no candidates found`, `partial source coverage`, `source freshness unknown`, `contract required`, `chain unknown`, `external check required`, `security not verified`, `liquidity unknown`, `manual verification required`, `cannot infer safety`, `next review step`, `data gap`, `not verified`, `manual review only`
 - Shared fallback names: `manual verification required`, `not verified`, `contract required`, `chain unknown`, `security not verified`, `liquidity unknown`, `source freshness unknown`, `external check required`, `manual review only`, `cannot infer safety`
 - Research Action Panel actions: `open candidate detail`, `open token lookup`, `open external checks`, `copy contract`, `copy token input`, `view source freshness`, `mark for manual review`, `send feedback`, `add review note`
-- Next stage: 12E.10 Frontend Copy / Naming
+- Next stage: 12E.9 Empty / Error / Partial States
 
 12A standalone trusted tester documents:
 
@@ -166,7 +166,6 @@
 - External Verification Links at `#external-checks` for link-only manual external checks and copy/manual fallback.
 - Manual Verification Fallbacks for consistent data gap states and `next review step` copy.
 - Research Action Panel for safe frontend-only next review actions without saving review state.
-- Empty / Error / Partial States for explicit no-candidate, partial-source, unknown-freshness, missing-contract, unknown-chain, required-external-check, security, liquidity, and manual-review-only gaps.
 - Frontend Navigation Cleanup with Product Flow, Review / Feedback, Admin / Status, and Demo / Preview groups while preserving direct deep links.
 - Frontend Product UX Audit and 12E.8-12E.12 productization backlog.
 - Trusted Tester Preview Shell for the first non-technical reviewer click path.
@@ -218,9 +217,14 @@ scripts\win\check-local-workflow-smoke.cmd
 scripts\win\check-review-storage-modes.cmd
 scripts\win\check-data-poc.cmd
 scripts\win\check-ui-mock.cmd
+scripts\win\check-live-sources-strict.cmd
 ```
 
 Before marking an RC, confirm the working tree is clean separately with `git status`.
+
+`scripts\win\check-local-rc.cmd` and `scripts\win\check-local-mvp.cmd` tolerate a transient external live-source fetch failure from an allowed `PUBLIC_BETA` source as a degraded warning, not a hard local RC failure. The output must still show `EXTERNAL SOURCE DEGRADED` and `degraded_external_source`; degraded does not mean verified, healthy, or OK. Policy denial, unauthorized source activation, forbidden provider calls, application errors, UI tests, typecheck, build, and other critical local checks remain hard failures.
+
+Use `scripts\win\check-live-sources-strict.cmd` for hard live-source validation when external source availability itself must fail the run.
 
 ## Manual Preview
 

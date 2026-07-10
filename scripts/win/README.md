@@ -48,7 +48,19 @@ scripts\win\check-local-rc.cmd
 
 This is the 10C local release-candidate checkpoint. It verifies the required runbook/checklist documents and core local MVP scripts are present, then runs `scripts\win\check-local-mvp.cmd`.
 
+The local RC path tolerates a transient external fetch failure from an allowed `PUBLIC_BETA` live source as `EXTERNAL SOURCE DEGRADED` / `degraded_external_source`. This remains visible in the approved source output and warnings, and it is not treated as healthy or OK.
+
 It does not check `git status --porcelain`, because development branches are expected to have changes before commit. Before marking a release candidate, confirm a clean working tree separately with `git status`.
+
+Policy denial, unauthorized source activation, forbidden provider calls, UI tests, typecheck, build, application errors, and other local checks still hard-fail.
+
+## Strict Live Source Check
+
+```cmd
+scripts\win\check-live-sources-strict.cmd
+```
+
+This runs the approved live source context with `CRYPTO_EDGE_DATA_ENV=PUBLIC_BETA` and `STRICT_LIVE_SOURCES=1`. Use it when live source availability itself must hard-fail the run, including transient `fetch failed` responses from allowed external APIs.
 
 ## Generate Live Context
 
