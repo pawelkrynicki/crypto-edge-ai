@@ -2,6 +2,7 @@ import type { SourceAction } from "../sourcePolicy.js";
 
 export type SourceAdapterMode = "fixture" | "live";
 export type SourceDataCategory = "sentiment" | "defi_context" | "market_context";
+export type SourceHealthStatus = "degraded_external_source" | "error";
 
 export type NormalizedSourcePolicy = {
   environment: string;
@@ -35,6 +36,7 @@ export type NormalizedSourceOutput = {
   source_name: string;
   mode: SourceAdapterMode;
   fetched_at: string;
+  health_status?: SourceHealthStatus;
   policy: NormalizedSourcePolicy;
   data_category: SourceDataCategory;
   records: NormalizedSourceRecord[];
@@ -54,6 +56,8 @@ export type ApprovedSourcesRunOutput = {
     records_total: number;
     warnings_total: number;
     errors_total: number;
+    degraded_external_sources_total: number;
+    hard_failures_total: number;
   };
 };
 

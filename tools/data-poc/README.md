@@ -131,6 +131,7 @@ type NormalizedSourceOutput = {
   source_name: string;
   mode: "fixture" | "live";
   fetched_at: string;
+  health_status?: "degraded_external_source" | "error";
   policy: {
     environment: string;
     action: string;
@@ -198,12 +199,32 @@ The output directory is ignored by git. The file contains:
     sources_denied,
     records_total,
     warnings_total,
-    errors_total
+    errors_total,
+    degraded_external_sources_total,
+    hard_failures_total
   }
 }
 ```
 
 Raw provider responses are not stored in this output.
+
+For local MVP/RC checks, a transient fetch failure from an allowed `PUBLIC_BETA` live source is reported as `EXTERNAL SOURCE DEGRADED` with `health_status: "degraded_external_source"`. The original error remains in `errors`, the warning includes `degraded_external_source`, and the source must not be treated as verified, healthy, or OK.
+
+Strict live-source validation can be run with:
+
+```powershell
+$env:CRYPTO_EDGE_DATA_ENV = "PUBLIC_BETA"
+$env:STRICT_LIVE_SOURCES = "1"
+pnpm run sources:approved:live
+```
+
+On Windows, use:
+
+```cmd
+scripts\win\check-live-sources-strict.cmd
+```
+
+Policy denial, unknown sources, unauthorized activation, forbidden provider calls, adapter/application errors, scraping fallback attempts, and raw-storage violations remain hard failures.
 
 Future API bridge target:
 
