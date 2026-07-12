@@ -1,8 +1,8 @@
 # Frontend Productization Backlog
 
-Stage: 12E.9 Empty / Error / Partial States
+Stage: 12E.10 Frontend Copy / Naming
 
-Next implementation stage: 12E.10 Frontend Copy / Naming
+Next implementation stage: 12E.11 Frontend Visual Polish
 
 Rules:
 
@@ -92,6 +92,16 @@ Rules:
 - Missing or partial data remains a data gap and cannot infer safety; no green safe/verified/approved state is added for missing data.
 - No backend, storage, provider calls, source activation, scraping, external fetch, OpenAI calls, paid sources, scoring change, `final_label` change, or `WATCHLIST` meaning change was added.
 - Next stage: 12E.10 Frontend Copy / Naming.
+
+12E.10 delivery note:
+
+- Frontend Copy / Naming standardizes the product-facing UI language across Candidate Results, Candidate Detail, Token Lookup, External Checks, Manual Review, shared fallback states, and admin/status navigation.
+- Accepted names are: `Candidate Results`, `Candidate Detail`, `Token Lookup`, `External Checks`, `Manual Review`, `Source Freshness`, `Risk Flags`, `Data Gap`, `Next Review Step`, `Manual Verification Required`, `Cannot Infer Safety`, and `Watchlist Candidate`.
+- `WATCHLIST` remains Manual Review Only.
+- Missing or partial data is described as `Data Gap`, `Manual Verification Required`, `Not Verified`, `Partial Source Coverage`, or `Cannot Infer Safety`; missing data does not imply safety.
+- UI copy is research-only and does not suggest an investment recommendation.
+- No backend, storage, provider calls, source activation, scraping, external fetch, OpenAI calls, paid sources, dependency, scoring change, `final_label` change, or `WATCHLIST` meaning change was added.
+- Next stage: 12E.11 Frontend Visual Polish.
 
 | Stage | Task | Target files | Acceptance criteria | Not in scope | Priority |
 |---|---|---|---|---|---|

@@ -65,14 +65,14 @@ export const CandidateResearchContext: React.FC<Props> = ({ candidate, marketCon
           detail={defiRecords.length > 0 ? `${defiRecords.length} record${defiRecords.length === 1 ? "" : "s"} available` : contextFallbackText(marketContextState)}
         />
         <CoverageItem
-          label="Scanner candidate snapshot"
+          label="Candidate Snapshot"
           state="available"
-          detail={`${candidate.symbol} scanner output loaded`}
+          detail={`${candidate.symbol} candidate source output loaded`}
         />
         <CoverageItem
           label="Security check"
           state={candidate.security ? "available" : "missing"}
-          detail={candidate.security ? "Candidate security data available" : "Manual review still required"}
+          detail={candidate.security ? "Candidate security data available" : "Manual Review still required"}
         />
       </div>
 
@@ -87,7 +87,7 @@ export const CandidateResearchContext: React.FC<Props> = ({ candidate, marketCon
         <div className="research-context-block">
           <div className="flex flex-wrap items-center gap-2 mb-2">
             <span className="section-label">Approved free sources active</span>
-            {fixtureFallback && <span className="badge badge-manual text-[10px]">Fixture context</span>}
+            {fixtureFallback && <span className="badge badge-manual text-[10px]">Sample context</span>}
           </div>
           <div className="flex flex-wrap gap-1.5">
             {activeSources.length > 0 ? activeSources.map((sourceName) => (
@@ -138,7 +138,7 @@ export const CandidateResearchContext: React.FC<Props> = ({ candidate, marketCon
 
       <div className="research-context-note">
         <div>Market context may help frame research, but it does not change this candidate's label.</div>
-        <div>This is not a buy/sell signal.</div>
+        <div>Research-only. Human Manual Review Required.</div>
         <div>Context does not alter scanner label.</div>
       </div>
     </div>
@@ -156,7 +156,7 @@ function CoverageItem({
 }) {
   const stateLabel: Record<"available" | "missing" | "loading" | "unavailable", string> = {
     available: "Available now",
-    missing: "Manual review",
+    missing: "Manual Review",
     loading: "Loading",
     unavailable: "Unavailable",
   };

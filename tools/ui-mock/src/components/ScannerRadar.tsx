@@ -20,10 +20,10 @@ type ScannerFilter = FinalLabel | "ALL" | "FOLLOW_UP";
 
 const FILTER_OPTIONS: { label: string; value: ScannerFilter }[] = [
   { label: "All", value: "ALL" },
-  { label: "Watchlist", value: "WATCHLIST" },
-  { label: "Critical Risk", value: "CRITICAL_RISK" },
-  { label: "Manual Check", value: "NEEDS_MANUAL_VERIFICATION" },
-  { label: "Rejected", value: "REJECT" },
+  { label: "Watchlist Candidate", value: "WATCHLIST" },
+  { label: "Risk Flags", value: "CRITICAL_RISK" },
+  { label: "Manual Verification Required", value: "NEEDS_MANUAL_VERIFICATION" },
+  { label: "Out of Research Scope", value: "REJECT" },
   { label: "Follow-up", value: "FOLLOW_UP" },
 ];
 
@@ -60,12 +60,12 @@ export const ScannerRadar: React.FC<Props> = ({
       <section className="scanner-list-panel">
         <header className="scanner-radar-header">
           <div className="min-w-0">
-            <h3>Scanner Radar</h3>
-            <p>Scanner output is read-only. WATCHLIST means eligible for further manual review only.</p>
+            <h3>Candidate Source Review</h3>
+            <p>Candidate source output is read-only. WATCHLIST means Manual Review Only.</p>
           </div>
-          <div className="scanner-guidance-list" aria-label="Scanner guidance">
+          <div className="scanner-guidance-list" aria-label="Candidate source guidance">
             <span>Local review status is an analyst note layer and does not change scanner label.</span>
-            <span>This is not a buy/sell signal.</span>
+            <span>Research-only. Human Manual Review Required.</span>
           </div>
         </header>
 
@@ -85,7 +85,7 @@ export const ScannerRadar: React.FC<Props> = ({
           </span>
         </div>
 
-        <div className="scanner-card-list" aria-label="Candidate list">
+        <div className="scanner-card-list" aria-label="Research Candidate list">
           {filtered.length > 0 ? filtered.map((candidate) => (
             <ScannerCandidateCard
               key={candidate.id}
@@ -96,7 +96,7 @@ export const ScannerRadar: React.FC<Props> = ({
             />
           )) : (
             <div className="scanner-empty-state">
-              No candidates match the current filter.
+              No Research Candidates match the current filter.
             </div>
           )}
         </div>
@@ -114,7 +114,7 @@ export const ScannerRadar: React.FC<Props> = ({
           />
         ) : (
           <div className="scanner-empty-state">
-            Select a token to view details.
+            Select a token to open Candidate Detail.
           </div>
         )}
       </aside>

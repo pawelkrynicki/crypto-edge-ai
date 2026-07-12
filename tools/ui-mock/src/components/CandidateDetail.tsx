@@ -61,7 +61,7 @@ const MissingTag: React.FC = () => (
 
 const DECISION_COPY: Record<string, { explanation: string; nextStep: string }> = {
   WATCHLIST: {
-    explanation: "Passed basic filters and available security checks. Eligible for further review only.",
+    explanation: "Passed basic filters with security data present. Watchlist Candidate remains Manual Review Only.",
     nextStep: "Complete manual community, narrative, and chart review before any independent decision.",
   },
   CRITICAL_RISK: {
@@ -69,7 +69,7 @@ const DECISION_COPY: Record<string, { explanation: string; nextStep: string }> =
     nextStep: "Review every flagged risk manually and keep the candidate out of the follow-up path unless resolved.",
   },
   NEEDS_MANUAL_VERIFICATION: {
-    explanation: "Important security data is missing or unclear. Manual verification is required.",
+    explanation: "Important security data is missing or unclear. Manual Verification Required.",
     nextStep: "Verify every missing data point before making any assessment.",
   },
   REJECT: {
@@ -80,8 +80,8 @@ const DECISION_COPY: Record<string, { explanation: string; nextStep: string }> =
 
 const CHECKLIST_ITEMS = {
   Security: [
-    { key: "honeypot", label: "Honeypot check passed" },
-    { key: "tax", label: "Tax below threshold" },
+    { key: "honeypot", label: "Honeypot check reviewed" },
+    { key: "tax", label: "Tax fields reviewed" },
     { key: "contract", label: "Contract verification reviewed" },
   ],
   Distribution: [
@@ -176,9 +176,9 @@ export const CandidateDetail: React.FC<Props> = ({
         </div>
 
         <div className="detail-header-summary">
-          <span>Scanner output is read-only.</span>
+          <span>Candidate source output is read-only.</span>
           <span>Local review status is an analyst note layer and does not change scanner label.</span>
-          <span>This is not a buy/sell signal.</span>
+          <span>Research-only. Human Manual Review Required.</span>
         </div>
 
         <div className="detail-header-meta">
@@ -212,7 +212,7 @@ export const CandidateDetail: React.FC<Props> = ({
         </section>
 
         <section className="detail-section">
-          <SectionTitle>Scanner Label vs Local Review</SectionTitle>
+          <SectionTitle>Candidate Label vs Local Review</SectionTitle>
           <div className="space-y-2 text-xs" style={{ color: "var(--text-secondary)" }}>
             <p>
               <code>final_label</code> comes from scanner latest output and remains separate from the local review status.
@@ -221,9 +221,9 @@ export const CandidateDetail: React.FC<Props> = ({
               Saving a review status records a local analyst note only; it does not change scanner scoring or label.
             </p>
             <p>
-              WATCHLIST means eligible for further manual review only. Missing security or context data means manual verification is required, not a positive assessment.
+              WATCHLIST means Manual Review Only. Missing security or context data means Manual Verification Required, not a positive assessment.
             </p>
-            <p>This is not a buy/sell signal.</p>
+            <p>Research-only. Human Manual Review Required.</p>
           </div>
         </section>
 
@@ -313,15 +313,15 @@ export const CandidateDetail: React.FC<Props> = ({
         </section>
 
         <section className="detail-section">
-          <SectionTitle>Scanner Label / Reasons</SectionTitle>
+          <SectionTitle>Candidate Label / Research Reasons</SectionTitle>
           <div className="space-y-3">
             <div className="flex items-center gap-2 flex-wrap">
               <LabelBadge label={c.final_label} size="md" />
-              <span className="research-context-chip">This is not a buy/sell signal.</span>
+              <span className="research-context-chip">Research-only. Human Manual Review Required.</span>
             </div>
             <p className="text-secondary text-xs">{decision.explanation}</p>
             <div>
-              <div className="section-label mb-0.5">Next Step</div>
+              <div className="section-label mb-0.5">Next Review Step</div>
               <p className="text-secondary text-xs">{decision.nextStep}</p>
             </div>
             {c.final_reasons.length > 0 && (

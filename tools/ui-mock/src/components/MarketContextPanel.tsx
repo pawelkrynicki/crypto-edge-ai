@@ -26,7 +26,7 @@ interface Props {
   state: MarketContextPanelState;
 }
 
-const COMPLIANCE_NOTE = "Context data is for research only. It is not a buy/sell signal.";
+const COMPLIANCE_NOTE = "Context data is research-only. Human Manual Review Required.";
 
 export const MarketContextPanel: React.FC<Props> = ({ state }) => {
   if (state.status === "loading") {
@@ -60,8 +60,8 @@ export const MarketContextPanel: React.FC<Props> = ({ state }) => {
   const defiRows = findDefiRecords(context).slice(0, 3);
   const sourceKind = context._source_meta.source_kind;
   const sourceLabel = sourceKind === "approved-sources-output"
-    ? "Context source: approved-sources-output"
-    : "Fixture fallback: fixture-fallback";
+    ? "Source Freshness: approved local context"
+    : "Source Freshness: sample fallback";
   const sourceBadgeClass = sourceKind === "approved-sources-output" ? "badge-watchlist" : "badge-manual";
   const warningNotes = collectSourceNotes(context, "warnings");
   const errorNotes = collectSourceNotes(context, "errors");
@@ -82,7 +82,7 @@ export const MarketContextPanel: React.FC<Props> = ({ state }) => {
         <div className="market-notes">
           {state.message && (
             <div className="market-context-warning">
-              <span className="font-semibold">Fixture fallback:</span>{" "}
+              <span className="font-semibold">Sample fallback:</span>{" "}
               <span>{state.message}</span>
             </div>
           )}

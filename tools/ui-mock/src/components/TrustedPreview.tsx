@@ -60,7 +60,7 @@ const notToolItems = [
 const labelGuidance = [
   {
     label: "WATCHLIST",
-    detail: "manual review only",
+    detail: "Manual Review Only",
   },
   {
     label: "Missing data",
@@ -81,7 +81,7 @@ const feedbackPrompts = [
   "Which view is most useful?",
   "What feels confusing?",
   "Is source freshness clear?",
-  "Is WATCHLIST understood as manual review only?",
+  "Is WATCHLIST understood as Manual Review Only?",
   "What would you need before accepting this direction?",
 ];
 
@@ -96,7 +96,7 @@ export const TrustedPreview: React.FC = () => (
         <p>This view can be opened directly with #trusted-preview.</p>
       </div>
       <div className="trusted-preview-research-note">
-        Research-only. WATCHLIST means manual review only.
+        Research-only. WATCHLIST means Manual Review Only.
       </div>
     </section>
 

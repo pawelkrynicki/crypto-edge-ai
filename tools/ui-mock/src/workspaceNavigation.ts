@@ -10,7 +10,7 @@ export const WORKSPACE_NAV_GROUPS: WorkspaceNavGroup[] = [
   {
     id: "product-flow",
     label: "Product Flow",
-    description: "Candidate results to external checks.",
+    description: "Candidate Results to External Checks.",
     items: [
       { id: "candidate-results", label: "Candidate Results", icon: "CR", description: "Candidate results" },
       { id: "candidate-detail", label: "Candidate Detail", icon: "CD", description: "Candidate detail" },
@@ -21,22 +21,22 @@ export const WORKSPACE_NAV_GROUPS: WorkspaceNavGroup[] = [
   {
     id: "review-feedback",
     label: "Review / Feedback",
-    description: "Manual review only notes and follow-up.",
+    description: "Manual Review only notes and follow-up.",
     items: [
-      { id: "feedback-notes", label: "Feedback Notes", icon: "FN", description: "Manual review only" },
-      { id: "watchlist", label: "Review Queue", icon: "RQ", description: "Review / feedback queue" },
+      { id: "feedback-notes", label: "Feedback Notes", icon: "FN", description: "Manual Review only" },
+      { id: "watchlist", label: "Manual Review", icon: "MR", description: "Watchlist Candidate review" },
     ],
   },
   {
     id: "admin-status",
     label: "Admin / Status",
-    description: "Source freshness and operational status.",
+    description: "Source Freshness and operational status.",
     items: [
       { id: "control-center", label: "Control Center", icon: "CC", description: "Admin / status view" },
-      { id: "overview", label: "Overview", icon: "OV", description: "Source freshness overview" },
-      { id: "scanner", label: "Scanner Radar", icon: "SR", description: "Read-only scanner output" },
-      { id: "risks", label: "Risk Alerts", icon: "RA", description: "Critical and manual checks" },
-      { id: "research", label: "Research Review", icon: "RR", description: "Technical review mock" },
+      { id: "overview", label: "Source Freshness Overview", icon: "SF", description: "Source Freshness overview" },
+      { id: "scanner", label: "Candidate Source Review", icon: "CS", description: "Read-only candidate source" },
+      { id: "risks", label: "Risk Flags", icon: "RF", description: "Critical and manual checks" },
+      { id: "research", label: "Manual Research Notes", icon: "MN", description: "Frontend-only research notes" },
       { id: "methodology", label: "Methodology", icon: "M", description: "Scanner and review reference" },
     ],
   },

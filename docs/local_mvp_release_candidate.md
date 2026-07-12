@@ -3,6 +3,7 @@
 ## Status
 
 - Local MVP Release Candidate Stabilization v1.
+- Stage 12E.10 standardizes Frontend Copy / Naming across Candidate Results, Candidate Detail, Token Lookup, External Checks, Manual Review, Source Freshness, Risk Flags, Data Gap, Next Review Step, Manual Verification Required, Cannot Infer Safety, and Watchlist Candidate. Copy stays research-only, does not suggest an investment recommendation, and keeps `WATCHLIST` as Manual Review Only. Next frontend stage is 12E.11 Frontend Visual Polish.
 - Stage 12E.9 adds Empty / Error / Partial States through a shared frontend-only ProductStateNotice in Candidate Results, Candidate Detail, Token / Contract Lookup, and External Verification Links. Next frontend stage is 12E.10 Frontend Copy / Naming.
 - Stage 12E.8 adds Frontend Navigation Cleanup: `Product Flow`, `Review / Feedback`, `Admin / Status`, and `Demo / Preview` now separate the main research path from admin/status and demo/preview surfaces. Next frontend stage is 12E.9 Empty / Error / Partial States.
 - Stage 12E.9A keeps local RC resilient to transient approved external live-source fetch failures: local RC reports them as `EXTERNAL SOURCE DEGRADED` / `degraded_external_source`, while strict live-source validation can still hard-fail on the same condition.
@@ -55,6 +56,7 @@
 - 12E.7 does not add backend, storage, provider calls, source activation, source check changes, URL fetches, scraping, OpenAI calls, paid sources, secrets, `.env`, npm dependencies, scanner scoring changes, `final_label` changes, review semantics changes, or `WATCHLIST` meaning changes.
 - 12E.8 does not add backend, storage, provider calls, source activation, source check changes, URL fetches, scraping, OpenAI calls, paid sources, secrets, `.env`, npm dependencies, scanner scoring changes, `final_label` changes, review semantics changes, or `WATCHLIST` meaning changes.
 - 12E.9 does not add backend, storage, provider calls, source activation, source check changes, URL fetches, scraping, OpenAI calls, paid sources, secrets, .env, npm dependencies, scanner scoring changes, final_label changes, review semantics changes, or WATCHLIST meaning changes.
+- 12E.10 does not add backend, storage, provider calls, source activation, source check changes, URL fetches, scraping, OpenAI calls, paid sources, secrets, `.env`, npm dependencies, scanner scoring changes, `final_label` changes, review semantics changes, or `WATCHLIST` meaning changes.
 - 12E.9A does not change the frontend product flow, AI KINTEL, backend, storage, dependencies, provider calls, source activation, scoring, `final_label`, or `WATCHLIST` meaning.
 - Trusted tester preview still needs private access, persisted feedback capture, report library, and lightweight private deployment before a real external test.
 - AI KINTEL remains a later integration stage.
@@ -65,7 +67,7 @@
 - `docs/frontend_productization_backlog.md`
 - `docs/frontend_target_flow_map.md`
 
-12E.8 frontend productization baseline:
+12E.10 frontend productization baseline:
 
 - `tools/ui-mock/src/components/ResearchActionPanel.tsx`
 - `tools/ui-mock/src/components/ManualVerificationFallback.tsx`
@@ -78,9 +80,10 @@
 - `tools/ui-mock/src/workspaceNavigation.ts`
 - Navigation groups: `Product Flow`, `Review / Feedback`, `Admin / Status`, `Demo / Preview`
 - Deep links: `#candidate-results`, `#candidate-detail`, `#token-lookup`, `#external-checks`, `#feedback-notes`, `#control-center`, `#trusted-preview`, `#webinar-teaser`
+- Accepted names: `Candidate Results`, `Candidate Detail`, `Token Lookup`, `External Checks`, `Manual Review`, `Source Freshness`, `Risk Flags`, `Data Gap`, `Next Review Step`, `Manual Verification Required`, `Cannot Infer Safety`, `Watchlist Candidate`
 - Shared fallback names: `manual verification required`, `not verified`, `contract required`, `chain unknown`, `security not verified`, `liquidity unknown`, `source freshness unknown`, `external check required`, `manual review only`, `cannot infer safety`
-- Research Action Panel actions: `open candidate detail`, `open token lookup`, `open external checks`, `copy contract`, `copy token input`, `view source freshness`, `mark for manual review`, `send feedback`, `add review note`
-- Next stage: 12E.9 Empty / Error / Partial States
+- Research Action Panel actions: `Open Candidate Detail`, `Open Token Lookup`, `Open External Checks`, `Copy Contract`, `Copy Token Input`, `View Source Freshness`, `Mark For Manual Review`, `Send Feedback`, `Add Review Note`
+- Next stage: 12E.11 Frontend Visual Polish
 
 12A standalone trusted tester documents:
 

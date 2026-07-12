@@ -207,6 +207,17 @@ Screenshot guide:
 - This stage adds no backend, storage, provider call, source activation, external fetch, scraping, OpenAI call, paid source, dependency, scoring change, `final_label` change, or `WATCHLIST` meaning change.
 - Next stage: **12E.10 Frontend Copy / Naming**.
 
+## 12E.10 Frontend Copy / Naming
+
+12E.10 standardizes visible UI copy so the mock reads as a research workflow rather than a developer mock.
+
+- Accepted UI names: `Candidate Results`, `Candidate Detail`, `Token Lookup`, `External Checks`, `Manual Review`, `Source Freshness`, `Risk Flags`, `Data Gap`, `Next Review Step`, `Manual Verification Required`, `Cannot Infer Safety`, and `Watchlist Candidate`.
+- `WATCHLIST` remains Manual Review Only.
+- Missing or partial data stays `Data Gap`, `Manual Verification Required`, `Not Verified`, `Partial Source Coverage`, or `Cannot Infer Safety`.
+- Copy is research-only and does not suggest an investment recommendation.
+- This stage adds no backend, storage, provider call, source activation, external fetch, scraping, OpenAI call, paid source, dependency, scoring change, `final_label` change, or `WATCHLIST` meaning change.
+- Next stage: **12E.11 Frontend Visual Polish**.
+
 ## 11A AI KINTEL Production MVP Planning
 
 11A defines the production direction as an AI KINTEL Crypto Market module, not a standalone SaaS. This UI mock remains a local RC baseline for porting and is not the production implementation.
@@ -879,9 +890,9 @@ Diagnostics are available at `GET /api/scanner/sources`. This endpoint reports w
 This remains read-only and local. It does not add a database, auth, OpenAI, live token fetching, scanner logic changes, UI redesign, or trading signal behavior. Next stage: automate writing a real `tools/data-poc` run and verify the UI against API mode.
 
 ## Next Steps
-- 12E.9: Empty / Error / Partial States is the current frontend productization baseline.
-- 12E.10: Frontend Copy / Naming is the next frontend productization stage.
-- 12E.10-12E.12: continue Copy / Naming, Visual Polish, and Frontend Contract Tests.
+- 12E.10: Frontend Copy / Naming is the current frontend productization baseline.
+- 12E.11: Frontend Visual Polish is the next frontend productization stage.
+- 12E.11-12E.12: continue Visual Polish and Frontend Contract Tests.
 - Reports remain useful supporting artifacts, but they are not the critical path for the next frontend rebuild.
 - Treat 12B.2 Webinar Teaser Screenshot Mode and 12B.3 Webinar Screenshot Capture Kit as screenshot-only UI, not as trusted tester preview readiness.
 - Keep AI KINTEL and real AI/provider integrations deferred until after standalone preview feedback and owner review.

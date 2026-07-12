@@ -31,23 +31,23 @@ const CHAIN_LABELS: Record<string, string> = {
 
 const PRIORITY_COPY: Record<FinalLabel, { label: string; detail: string; tone: CandidateTone }> = {
   WATCHLIST: {
-    label: "Review candidate",
-    detail: "watchlist candidate - manual review only",
+    label: "Watchlist Candidate",
+    detail: "Watchlist Candidate - Manual Review Only",
     tone: "review",
   },
   CRITICAL_RISK: {
-    label: "Risk flag priority",
-    detail: "manual review before any next step",
+    label: "Risk Flags Priority",
+    detail: "Manual Review before any Next Review Step",
     tone: "critical",
   },
   NEEDS_MANUAL_VERIFICATION: {
-    label: "Manual verification priority",
-    detail: "manual verification required",
+    label: "Manual Verification Required",
+    detail: "Manual Verification Required",
     tone: "manual",
   },
   REJECT: {
-    label: "Lower research priority",
-    detail: "manual review only if scope changes",
+    label: "Lower Research Priority",
+    detail: "Manual Review only if scope changes",
     tone: "neutral",
   },
 };
@@ -67,37 +67,37 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
     <div className="candidate-results-view">
       <section className="candidate-results-hero">
         <div className="candidate-results-hero-copy">
-          <span className="candidate-results-eyebrow">research candidate</span>
+          <span className="candidate-results-eyebrow">Research Candidate</span>
           <h3>Candidate Results</h3>
           <p>
-            Token to verify list for manual review. WATCHLIST is shown as manual review only and missing data stays unknown until checked.
+            Token to verify list for Manual Review. WATCHLIST is shown as Manual Review Only and missing data stays a Data Gap until checked.
           </p>
         </div>
         <div className="candidate-results-boundary">
-          <strong>manual review</strong>
-          <span>External check and source freshness remain human-controlled.</span>
+          <strong>Manual Review</strong>
+          <span>External Checks and Source Freshness remain human-controlled.</span>
         </div>
       </section>
 
-      <section className="candidate-results-summary-grid" aria-label="Candidate results summary">
-        <SummaryCard label="research candidate" value={String(candidates.length)} detail="tokens to verify" />
-        <SummaryCard label="manual review" value={String(manualReviewCount)} detail="need review or verification" />
-        <SummaryCard label="source freshness" value={missingFreshnessCount === 0 ? "not verified" : "source freshness unknown"} detail="manual verification required" />
-        <SummaryCard label="risk flags" value={String(riskFlagCount)} detail="flags or missing checks surfaced" />
+      <section className="candidate-results-summary-grid" aria-label="Candidate Results summary">
+        <SummaryCard label="Research Candidate" value={String(candidates.length)} detail="Tokens to Verify" />
+        <SummaryCard label="Manual Review" value={String(manualReviewCount)} detail="Need review or verification" />
+        <SummaryCard label="Source Freshness" value={missingFreshnessCount === 0 ? "Not Verified" : "Source Freshness Unknown"} detail="Manual Verification Required" />
+        <SummaryCard label="Risk Flags" value={String(riskFlagCount)} detail="Flags or missing checks surfaced" />
       </section>
 
       {candidates.length > 0 && (
         <ProductStateNotice
           variant="partial"
-          title="partial source coverage"
-          status="partial source coverage"
-          detail="data gap: source freshness unknown, security not verified, liquidity unknown, and external check required states remain manual review only until a human verifies them."
-          nextReviewStep="open candidate detail, then keep manual verification required for every not verified field"
+          title="Partial Source Coverage"
+          status="Partial Source Coverage"
+          detail="Data Gap: Source Freshness unknown, security not verified, liquidity unknown, and External Check Required states remain Manual Review Only until a human verifies them."
+          nextReviewStep="Open Candidate Detail, then keep Manual Verification Required for every Not Verified field"
           items={buildCandidateResultsStateItems(missingFreshnessCount, riskFlagCount)}
         />
       )}
 
-      <section className="candidate-results-list" aria-label="research candidate list">
+      <section className="candidate-results-list" aria-label="Research Candidate list">
         {candidates.length > 0 ? candidates.map((candidate) => {
           const reviewRecord = getCandidateReview(candidate.id, reviewSession);
           const priority = getResearchPriority(candidate);
@@ -109,7 +109,7 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
             <article key={candidate.id} className={`candidate-result-card ${priority.tone}`}>
               <header className="candidate-result-topline">
                 <div className="candidate-result-token">
-                  <span className="candidate-results-eyebrow">research candidate</span>
+                  <span className="candidate-results-eyebrow">Research Candidate</span>
                   <strong>{candidate.symbol}</strong>
                   <span>{candidate.name || "unknown project"}</span>
                 </div>
@@ -123,38 +123,38 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
 
               <div className="candidate-result-grid">
                 <CandidateField
-                  label="chain / network"
+                  label="Chain / Network"
                   value={formatChain(candidate.chain)}
                   detail={candidate.dex || "unknown"}
                 />
                 <CandidateField
-                  label="research priority"
+                  label="Research Priority"
                   value={priority.label}
                   detail={priority.detail}
                   tone={priority.tone}
                 />
                 <CandidateField
-                  label="source freshness"
+                  label="Source Freshness"
                   value={sourceFreshness.value}
                   detail={sourceFreshness.detail}
                   tone={sourceFreshness.tone}
                 />
                 <CandidateField
-                  label="external check"
-                  value={candidate.security ? "external check required" : "security not verified"}
-                  detail={candidate.security ? "manual review only" : "cannot infer safety"}
+                  label="External Check"
+                  value={candidate.security ? "External Check Required" : "Security Not Verified"}
+                  detail={candidate.security ? "Manual Review Only" : "Cannot Infer Safety"}
                   tone="manual"
                 />
               </div>
 
               <section className="candidate-result-reason">
-                <span>reason on radar</span>
+                <span>Research Reason</span>
                 <p>{getRadarReason(candidate)}</p>
               </section>
 
               <section className="candidate-result-risk-panel">
                 <div className="candidate-result-section-title">
-                  <span>risk flags</span>
+                  <span>Risk Flags</span>
                   <small>{riskState.detail}</small>
                 </div>
                 <div className="candidate-result-chip-list">
@@ -168,7 +168,7 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
 
               <ManualVerificationFallback
                 compact
-                title="Manual verification fallback"
+                title="Manual Verification Required"
                 gaps={buildCandidateVerificationGaps(candidate)}
               />
 
@@ -182,11 +182,11 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
 
               <footer className="candidate-result-footer">
                 <div className="candidate-result-review-state">
-                  <span>manual review status</span>
+                  <span>Manual Review Status</span>
                   <ReviewStatusBadge status={reviewRecord?.status ?? "not_reviewed"} />
                 </div>
                 <div className="candidate-result-next-step">
-                  <span>next review step</span>
+                  <span>Next Review Step</span>
                   <strong>{nextReviewStep}</strong>
                 </div>
                 {onOpenCandidate && (
@@ -195,7 +195,7 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
                     className="candidate-result-review-button"
                     onClick={() => onOpenCandidate(candidate.id)}
                   >
-                    Open candidate detail
+                    Open Candidate Detail
                   </button>
                 )}
               </footer>
@@ -204,14 +204,14 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
         }) : (
           <ProductStateNotice
             variant="empty"
-            title="no candidates found"
-            status="no candidates found"
-            detail="data gap: no research candidate rows are present, so the UI cannot infer safety and cannot mark anything as reviewed."
-            nextReviewStep="confirm source freshness, then continue manual review only when candidates exist"
+            title="No Candidates Found"
+            status="No Candidates Found"
+            detail="Data Gap: no Research Candidate rows are present, so the UI Cannot Infer Safety and cannot mark anything as reviewed."
+            nextReviewStep="Confirm Source Freshness, then continue Manual Review Only when candidates exist"
             items={[
-              { label: "source coverage", value: "partial source coverage", detail: "source freshness unknown" },
-              { label: "contract", value: "contract required", detail: "chain unknown / external check required" },
-              { label: "security", value: "security not verified", detail: "liquidity unknown" },
+              { label: "Source Coverage", value: "Partial Source Coverage", detail: "Source Freshness Unknown" },
+              { label: "Contract", value: "Contract Required", detail: "Chain Unknown / External Check Required" },
+              { label: "Security", value: "Security Not Verified", detail: "Liquidity Unknown" },
             ]}
           />
         )}
@@ -252,8 +252,8 @@ function CandidateField({
 
 function getResearchPriority(candidate: MockCandidate): { label: string; detail: string; tone: CandidateTone } {
   return PRIORITY_COPY[candidate.final_label] ?? {
-    label: "Manual review",
-    detail: "unknown - manual verification required",
+    label: "Manual Review",
+    detail: "Unknown - Manual Verification Required",
     tone: "manual",
   };
 }
@@ -262,7 +262,7 @@ function getRadarReason(candidate: MockCandidate): string {
   const reason = candidate.final_reasons[0];
 
   if (!reason) {
-    return "manual verification required because the radar reason is unknown.";
+    return "Manual Verification Required because the Research Reason is unknown.";
   }
 
   return formatReasonText(reason);
@@ -271,8 +271,8 @@ function getRadarReason(candidate: MockCandidate): string {
 function getSourceFreshness(candidate: MockCandidate): { value: string; detail: string; tone: CandidateTone } {
   if (!candidate.source_url || !candidate.last_checked) {
     return {
-      value: "source freshness unknown",
-      detail: "manual verification required",
+      value: "Source Freshness Unknown",
+      detail: "Manual Verification Required",
       tone: "manual",
     };
   }
@@ -281,14 +281,14 @@ function getSourceFreshness(candidate: MockCandidate): { value: string; detail: 
 
   if (Number.isNaN(date.getTime())) {
     return {
-      value: "source freshness unknown",
-      detail: "manual verification required",
+      value: "Source Freshness Unknown",
+      detail: "Manual Verification Required",
       tone: "manual",
     };
   }
 
   return {
-    value: "last scanner check",
+    value: "Last Local Check",
     detail: date.toISOString().slice(0, 10),
     tone: "neutral",
   };
@@ -297,8 +297,8 @@ function getSourceFreshness(candidate: MockCandidate): { value: string; detail: 
 function getRiskState(candidate: MockCandidate): { items: string[]; detail: string; tone: CandidateTone } {
   if (!candidate.security) {
     return {
-      items: ["security not verified", "manual verification required", "cannot infer safety"],
-      detail: "not verified",
+      items: ["Security Not Verified", "Manual Verification Required", "Cannot Infer Safety"],
+      detail: "Not Verified",
       tone: "manual",
     };
   }
@@ -309,41 +309,41 @@ function getRiskState(candidate: MockCandidate): { items: string[]; detail: stri
 
   if (items.length === 0) {
     return {
-      items: ["unknown - manual verification required"],
-      detail: "no risk flags returned",
+      items: ["Risk Flags Not Verified"],
+      detail: "Manual Verification Required",
       tone: "manual",
     };
   }
 
   return {
     items,
-    detail: "review candidate before external check",
+    detail: "Review Candidate before External Checks",
     tone: "neutral",
   };
 }
 
 function getNextReviewStep(candidate: MockCandidate, reviewRecord?: CandidateReviewRecord | null): string {
   if (reviewRecord?.status === "waiting_for_more_data") {
-    return "wait for more data, then manual review";
+    return "Wait for more data, then Manual Review";
   }
 
   if (!candidate.contract_address || !candidate.security) {
-    return "manual verification required";
+    return "Manual Verification Required";
   }
 
   if (candidate.final_label === "WATCHLIST") {
-    return "manual review";
+    return "Manual Review";
   }
 
   if (candidate.final_label === "CRITICAL_RISK") {
-    return "review candidate risk flags";
+    return "Review Candidate Risk Flags";
   }
 
   if (candidate.final_label === "NEEDS_MANUAL_VERIFICATION") {
-    return "manual verification required";
+    return "Manual Verification Required";
   }
 
-  return "manual review only if revisited";
+  return "Manual Review Only if revisited";
 }
 
 function requiresManualReview(candidate: MockCandidate): boolean {
@@ -363,24 +363,24 @@ function countRiskItems(candidate: MockCandidate): number {
 function buildCandidateResultsStateItems(missingFreshnessCount: number, riskFlagCount: number): ProductStateNoticeItem[] {
   return [
     {
-      label: "source freshness",
-      value: missingFreshnessCount > 0 ? "source freshness unknown" : "not verified",
-      detail: "manual verification required",
+      label: "Source Freshness",
+      value: missingFreshnessCount > 0 ? "Source Freshness Unknown" : "Not Verified",
+      detail: "Manual Verification Required",
     },
     {
-      label: "external check",
-      value: "external check required",
-      detail: "manual review only",
+      label: "External Check",
+      value: "External Check Required",
+      detail: "Manual Review Only",
     },
     {
-      label: "risk coverage",
-      value: riskFlagCount > 0 ? "security not verified" : "cannot infer safety",
-      detail: "missing data stays a data gap",
+      label: "Risk Flags",
+      value: riskFlagCount > 0 ? "Security Not Verified" : "Cannot Infer Safety",
+      detail: "Missing data stays a Data Gap",
     },
     {
-      label: "market context",
-      value: "liquidity unknown",
-      detail: "not verified",
+      label: "Market Context",
+      value: "Liquidity Unknown",
+      detail: "Not Verified",
     },
   ];
 }

@@ -70,8 +70,8 @@ function buildSummary(candidates: MockCandidate[]) {
 
 const SECTION_COPY: Record<WorkspaceSectionId, { title: string; description: string }> = {
   overview: {
-    title: "Admin / Status Overview",
-    description: "Source freshness, local workflow status and health context.",
+    title: "Source Freshness Overview",
+    description: "Admin / status view for source freshness, local workflow status and health context.",
   },
   "control-center": {
     title: "Control Center",
@@ -86,7 +86,7 @@ const SECTION_COPY: Record<WorkspaceSectionId, { title: string; description: str
     description: "Candidate detail for manual review, source freshness, risk flags and next review step.",
   },
   "token-lookup": {
-    title: "Token / Contract Lookup",
+    title: "Token Lookup",
     description: "Token lookup shell for local input classification and manual verification required states.",
   },
   "external-checks": {
@@ -99,45 +99,45 @@ const SECTION_COPY: Record<WorkspaceSectionId, { title: string; description: str
   },
   "feedback-notes": {
     title: "Feedback Notes",
-    description: "Review / feedback notes after the manual review only flow.",
+    description: "Review / feedback notes after the Manual Review Only flow.",
   },
   "webinar-teaser": {
     title: "Webinar Teaser",
     description: "Demo / preview screenshot mode for controlled product concept content.",
   },
   scanner: {
-    title: "Scanner Radar",
-    description: "Admin / status scanner output. WATCHLIST means eligible for further manual review only.",
+    title: "Candidate Source Review",
+    description: "Admin / status read-only candidate source view. WATCHLIST means Manual Review Only.",
   },
   watchlist: {
-    title: "Review Queue",
-    description: "Review / feedback queue for local analyst status and notes.",
+    title: "Manual Review",
+    description: "Review / feedback flow for watchlist candidate status and local notes.",
   },
   research: {
-    title: "Research Review",
-    description: "Admin / status mock research categorization workspace. It is not an external AI call.",
+    title: "Manual Research Notes",
+    description: "Admin / status frontend-only research note workspace. It is not an external AI call.",
   },
   risks: {
-    title: "Risk Alerts",
-    description: "Critical and manual-verification candidates from current scanner output.",
+    title: "Risk Flags",
+    description: "Critical Risk Flags and Manual Verification Required candidates from current candidate output.",
   },
   methodology: {
     title: "Methodology",
-    description: "Admin / status reference for scanner labels, context and review layers.",
+    description: "Admin / status reference for candidate labels, context and review layers.",
   },
 };
 
 const DATA_SOURCE_OPTIONS: { key: DataSourceKey; label: string }[] = [
-  { key: "fixture",     label: "Fixture" },
-  { key: "static-json", label: "Static JSON" },
-  { key: "api",         label: "API / latest" },
+  { key: "fixture",     label: "Built-in sample" },
+  { key: "static-json", label: "Local data file" },
+  { key: "api",         label: "Latest local data" },
 ];
 
 const SOURCE_STATUS_TEXT: Record<ResolvedScannerSource, string> = {
-  "built-in-fixture": "Scanner source: built-in fixture",
-  "static-json": "Scanner source: static-json fixture",
-  "real-output": "Scanner source: real-output",
-  "fixture-fallback": "Scanner source: fixture-fallback",
+  "built-in-fixture": "Source Freshness: built-in sample",
+  "static-json": "Source Freshness: local data file",
+  "real-output": "Source Freshness: latest local output",
+  "fixture-fallback": "Source Freshness: sample fallback",
 };
 
 type ReviewStorageStatus = {
@@ -610,20 +610,26 @@ function formatTokenLookupInput(candidate: MockCandidate): string {
 
 function getContextSourceStatus(state: MarketContextPanelState): { text: string; detail?: string } {
   if (state.status === "loading") {
-    return { text: "Context source: loading local API" };
+    return { text: "Source Freshness: loading local context" };
   }
 
   if (state.status === "error") {
     return {
-      text: "Context source: unavailable",
+      text: "Source Freshness: context unavailable",
       detail: state.message,
     };
   }
 
   return {
-    text: `Context source: ${state.context._source_meta.source_kind}`,
+    text: `Source Freshness: ${formatContextSourceKind(state.context._source_meta.source_kind)}`,
     detail: state.message ?? state.context._source_meta.output_file ?? undefined,
   };
+}
+
+function formatContextSourceKind(sourceKind: string): string {
+  if (sourceKind === "approved-sources-output") return "approved local context";
+  if (sourceKind === "fixture-fallback") return "sample fallback";
+  return sourceKind;
 }
 
 function formatReviewStorageProvider(sourceKind?: ReviewSessionApiSourceMeta["source_kind"]): string {

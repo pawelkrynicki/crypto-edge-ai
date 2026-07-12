@@ -51,7 +51,7 @@ export function interpretContextApiOutput(output: MarketContextApiOutput): Marke
     status: "ready",
     resolvedSource: output._source_meta.source_kind,
     usedFallback,
-    fallbackReason: usedFallback ? "Context API returned the local fixture fallback." : undefined,
+    fallbackReason: usedFallback ? "Market context is using the local sample fallback." : undefined,
     output,
   };
 }

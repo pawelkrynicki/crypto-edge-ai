@@ -3,7 +3,7 @@ import React from "react";
 const STAGES = [
   { step: "01", title: "Discovery", desc: "New token pairs are reviewed from the existing scanner data flow." },
   { step: "02", title: "Basic Filters", desc: "Market cap $300K-$10M, liquidity minimum $30K, 24h volume minimum $30K, Volume/MC ratio, and pair age." },
-  { step: "03", title: "Security Review", desc: "Contract risk, tax risk, wallet concentration, and missing data are surfaced from the existing scanner output." },
+  { step: "03", title: "Security Review", desc: "Contract risk, tax risk, wallet concentration, and missing data are surfaced from the existing candidate source output." },
   { step: "04", title: "Final Label", desc: "WATCHLIST, CRITICAL_RISK, NEEDS_MANUAL_VERIFICATION, or REJECT based on the existing scanner logic." },
   { step: "05", title: "Analyst Review", desc: "The analyst uses local notes, status, and checklist items to organize further research." },
 ];
@@ -25,7 +25,7 @@ const SECURITY_CHECKS = [
 ];
 
 const LABELS = [
-  { label: "WATCHLIST",                 color: "badge-watchlist", desc: "Passed basic filters and available security checks. Eligible for further review only." },
+  { label: "WATCHLIST",                 color: "badge-watchlist", desc: "Watchlist Candidate. Manual Review Only." },
   { label: "CRITICAL_RISK",             color: "badge-critical",  desc: "Critical security flag detected. Manual investigation required." },
   { label: "NEEDS_MANUAL_VERIFICATION", color: "badge-manual",    desc: "Important security data is missing or unclear. Manual verification required." },
   { label: "REJECT",                    color: "badge-reject",    desc: "Failed basic market/liquidity filters. Not eligible for further review." },
@@ -100,7 +100,7 @@ export const Methodology: React.FC = () => (
 
     <div className="rounded-md px-4 py-3 text-xs italic"
       style={{ background: "var(--bg-raised)", border: "1px solid var(--border)", color: "var(--text-muted)" }}>
-      Crypto Edge AI is a research and risk review tool. This is not a buy/sell signal. All decisions remain with the analyst.
+      Crypto Edge AI is a research and risk review tool. Human Manual Review Required. All decisions remain with the analyst.
     </div>
   </div>
 );

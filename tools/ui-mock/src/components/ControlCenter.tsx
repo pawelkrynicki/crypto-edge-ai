@@ -49,8 +49,8 @@ const NEXT_BUILD_STEPS = [
 const SAFETY_ITEMS = [
   "Research-only.",
   "No investment advice.",
-  "No trading CTA: buy, sell, entry, signal.",
-  "WATCHLIST = manual review only.",
+  "No trading CTA language or action prompts.",
+  "WATCHLIST = Manual Review Only.",
   "Missing data = manual verification required.",
   "No paid source activation.",
 ];
@@ -87,7 +87,7 @@ export const ControlCenter: React.FC<ControlCenterProps> = ({
           </p>
         </div>
         <div className="control-center-research-note">
-          Research-only. WATCHLIST means manual review only.
+          Research-only. WATCHLIST means Manual Review Only.
         </div>
       </section>
 
@@ -127,39 +127,39 @@ export const ControlCenter: React.FC<ControlCenterProps> = ({
         />
         <div className="control-status-grid">
           <StatusCard
-            label="Scanner data"
+            label="Candidate Data"
             status={scannerDataKind.status}
             value={scannerDataKind.value}
             detail={scannerFallbackReason ?? scannerSourceText}
           />
           <StatusCard
-            label="Scanner freshness"
+            label="Source Freshness"
             status={scannerGeneratedAt ? "Partial" : "Manual check required"}
             value={scannerFreshness}
             detail={scannerMode ? `scan_run.mode: ${scannerMode}` : "Runtime scanner metadata is not fully available in the UI."}
           />
           <StatusCard
-            label="Context data"
+            label="Market Context"
             status={contextKind.status}
             value={contextKind.value}
             detail={contextSourceDetail ?? contextSourceText}
           />
           <StatusCard
-            label="Context freshness"
+            label="Context Freshness"
             status={contextFreshness.status}
             value={contextFreshness.value}
             detail={contextFreshness.detail}
           />
           <StatusCard
-            label="Source status summary"
+            label="Source Freshness Summary"
             status={sourceState.status}
             value={sourceState.value}
             detail={sourceState.detail}
           />
           <StatusCard
-            label="Stale / partial / unknown state"
+            label="Data Gap State"
             status="Manual check required"
-            value="Preview data / mock state"
+            value="Preview data sample"
             detail="Unknown or fixture-backed data must be manually verified before tester use."
           />
         </div>
@@ -180,7 +180,7 @@ export const ControlCenter: React.FC<ControlCenterProps> = ({
           <StatusCard
             label="Review semantics"
             status="Ready"
-            value="Review is separate from scanner label"
+            value="Review is separate from candidate label"
             detail="Review status does not change scanner labels, scoring, final_label, or WATCHLIST meaning."
           />
           <StatusCard
@@ -250,7 +250,7 @@ function buildControlCenterStatus(candidateCount: number): ControlCenterStatus {
         label: "Candidate list/detail",
         status: candidateCount > 0 ? "Ready" : "Manual check required",
         detail: candidateCount > 0
-          ? `${candidateCount} current preview candidates render in the scanner workspace.`
+          ? `${candidateCount} current preview candidates render in Candidate Results.`
           : "No current UI candidate count is available.",
       },
       {
@@ -359,21 +359,21 @@ function statusClass(status: PreviewReadinessStatus): string {
 
 function getScannerDataKind(source: ResolvedScannerSource): { status: PreviewReadinessStatus; value: string } {
   if (source === "real-output") {
-    return { status: "Partial", value: "real-output" };
+    return { status: "Partial", value: "Latest local output" };
   }
 
   if (source === "fixture-fallback") {
-    return { status: "Manual check required", value: "fixture-fallback" };
+    return { status: "Manual check required", value: "Sample fallback" };
   }
 
-  return { status: "Manual check required", value: "Preview data / mock state" };
+  return { status: "Manual check required", value: "Preview data sample" };
 }
 
 function getContextKind(state: MarketContextPanelState): { status: PreviewReadinessStatus; value: string } {
   if (state.status === "ready") {
     return {
       status: state.context._source_meta.source_kind === "approved-sources-output" ? "Partial" : "Manual check required",
-      value: state.context._source_meta.source_kind,
+      value: formatContextSourceKind(state.context._source_meta.source_kind),
     };
   }
 
@@ -425,8 +425,22 @@ function getSourceState(
   return {
     status: hasPreviewFallback ? "Manual check required" : "Partial",
     value: hasPreviewFallback ? "partial / unknown" : "local outputs visible",
-    detail: `Scanner: ${scannerSource}; context: ${contextSource}.`,
+    detail: `Candidate data: ${formatScannerSource(scannerSource)}; context: ${formatContextSourceKind(contextSource)}.`,
   };
+}
+
+function formatScannerSource(source: string): string {
+  if (source === "real-output") return "Latest local output";
+  if (source === "fixture-fallback") return "Sample fallback";
+  if (source === "built-in-fixture") return "Built-in sample";
+  if (source === "static-json") return "Local data file";
+  return source;
+}
+
+function formatContextSourceKind(sourceKind: string): string {
+  if (sourceKind === "approved-sources-output") return "approved local context";
+  if (sourceKind === "fixture-fallback") return "sample fallback";
+  return sourceKind;
 }
 
 function formatDate(value: string): string {
