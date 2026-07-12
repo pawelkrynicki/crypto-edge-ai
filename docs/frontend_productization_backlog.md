@@ -1,8 +1,8 @@
 # Frontend Productization Backlog
 
-Stage: 12E.11 Frontend Visual Polish
+Stage: 12E.12 Frontend Contract Tests
 
-Next implementation stage: 12E.12 Frontend Contract Tests
+Next implementation stage: 12F.1 — Private Preview Access Method
 
 Rules:
 
@@ -110,6 +110,16 @@ Rules:
 - The polish is CSS/UI-only and does not add backend, storage, provider calls, source activation, scraping, external fetch, OpenAI calls, paid sources, dependencies, scoring changes, `final_label` changes, or `WATCHLIST` meaning changes.
 - Next stage: 12E.12 Frontend Contract Tests.
 
+12E.12 delivery note:
+
+- Frontend Contract Tests now lock the main standalone product flow after 12E.11.
+- The suite covers required deep links, Candidate Results as the default product view, navigation group ownership, Candidate Results, Candidate Detail, Token Lookup local classifications, External Checks link-only/manual semantics, Manual Verification fallback states, Product State notices, Research Action Panel actions, forbidden trading CTA copy, and forbidden frontend mechanisms in the product flow files.
+- Protected manual states include `Manual Verification Required`, `Not Verified`, `Contract Required`, `Chain Unknown`, `Security Not Verified`, `Liquidity Unknown`, `Source Freshness Unknown`, `External Check Required`, `Partial Source Coverage`, `Cannot Infer Safety`, `Data Gap`, `No Candidates Found`, `Next Review Step`, and `Manual Review Only`.
+- Run from the repo root with `scripts\win\check-ui-mock.cmd`.
+- No browser automation dependency was added. The repo does not currently include a browser/responsive harness, so 1440x900, 1920x1080, and 390x844 no-horizontal-overflow checks remain manual preview validation.
+- 12E Frontend Productization is complete.
+- Next stage: 12F.1 — Private Preview Access Method.
+
 | Stage | Task | Target files | Acceptance criteria | Not in scope | Priority |
 |---|---|---|---|---|---|
 | 12E.2 Candidate Results View | Build a candidate-first results surface from current scanner UI data. | `tools/ui-mock/src/App.tsx`, `tools/ui-mock/src/components/ScannerRadar.tsx`, `tools/ui-mock/src/components/ScannerCandidateCard.tsx`, `tools/ui-mock/src/components/WorkspaceShell.tsx`, `tools/ui-mock/src/index.css`, `tools/ui-mock/tests/contract.test.ts` | User sees `research candidate` rows/cards with token, chain, label, risk flags, source freshness, and `next review step`; empty/loading/partial states render. | Backend, provider calls, source activation, storage, scoring, label semantics, AI KINTEL. | High |
@@ -122,4 +132,4 @@ Rules:
 | 12E.9 Empty / Error / Partial States | Productize missing, loading, stale, fallback, API unavailable, no candidates, and no contract states. | `tools/ui-mock/src/App.tsx`, `tools/ui-mock/src/components`, `tools/ui-mock/src/index.css`, `tools/ui-mock/tests/contract.test.ts` | Each major view has useful empty/error/partial copy and a `next review step`. | New provider calls, storage, data mutation, scoring changes. | High |
 | 12E.10 Frontend Copy / Naming | Replace developer/mock/scanner-first names with product workflow language. | `tools/ui-mock/src/App.tsx`, `tools/ui-mock/src/components`, `tools/ui-mock/README.md`, `tools/ui-mock/tests/contract.test.ts` | User-facing copy uses `research candidate`, `review candidate`, `token to verify`, `manual review`, `external check`, `source freshness`, `risk flags`, and `next review step`. | Runtime logic changes, AI KINTEL implementation, trading action vocabulary. | Medium |
 | 12E.11 Frontend Visual Polish | Tighten hierarchy, density, spacing, buttons, icons, responsive behavior, and detail readability. | `tools/ui-mock/src/index.css`, `tools/ui-mock/src/components`, `tools/ui-mock/tests/contract.test.ts` | Candidate workflow scans clearly on desktop and mobile; admin/demo surfaces no longer compete with primary product value. | Redesign outside current UI mock, new dependencies, backend changes. | Medium |
-| 12E.12 Frontend Contract Tests | Lock the 12E product workflow through focused rendering tests. | `tools/ui-mock/tests/contract.test.ts`, `tools/ui-mock/src/components`, `tools/ui-mock/src/workspaceNavigation.ts` | Tests cover nav, candidate results, detail, lookup states, external link guardrails, manual fallbacks, copy vocabulary, and no behavior changes to scoring/labels. | E2E browser suite, network tests, provider calls, new dependencies. | High |
+| 12E.12 Frontend Contract Tests | Lock the 12E product workflow through focused rendering tests. | `tools/ui-mock/tests/contract.test.ts`, `tools/ui-mock/src/components`, `tools/ui-mock/src/workspaceNavigation.ts` | Tests cover nav, candidate results, detail, lookup states, external link guardrails, manual fallbacks, copy vocabulary, forbidden mechanism scans, and no behavior changes to scoring/labels. 12E is complete after this stage. | E2E browser suite, network tests, provider calls, new dependencies. | High |

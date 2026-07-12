@@ -1,6 +1,6 @@
 # Frontend Target Flow Map
 
-Stage: 12E.11 Frontend Visual Polish
+Stage: 12E.12 Frontend Contract Tests
 
 Implemented deep links: `#candidate-results`, `#candidate-detail`, `#token-lookup`, `#external-checks`, `#feedback-notes`, `#control-center`, `#trusted-preview`, `#webinar-teaser`
 
@@ -27,7 +27,9 @@ The 12E.9 pass adds shared frontend-only Empty / Error / Partial States through 
 
 The 12E.10 pass standardizes frontend copy and naming around `Candidate Results`, `Candidate Detail`, `Token Lookup`, `External Checks`, `Manual Review`, `Source Freshness`, `Risk Flags`, `Data Gap`, `Next Review Step`, `Manual Verification Required`, `Cannot Infer Safety`, and `Watchlist Candidate`. Copy stays research-only, does not suggest an investment recommendation, keeps `WATCHLIST` as Manual Review Only, and does not add backend, storage, provider calls, source activation, fetches, scraping, scoring changes, `final_label` changes, or `WATCHLIST` meaning changes.
 
-The 12E.11 pass polishes the visual hierarchy of the same target flow: spacing, cards, status badges, Manual Verification / Product State notices, Research Action Panel, header/sidebar framing, and responsive behavior. It is UI polish only and preserves the existing flow, implemented deep links, data logic, scoring, `final_label`, and `WATCHLIST` meaning. Next stage: 12E.12 Frontend Contract Tests.
+The 12E.11 pass polishes the visual hierarchy of the same target flow: spacing, cards, status badges, Manual Verification / Product State notices, Research Action Panel, header/sidebar framing, and responsive behavior. It is UI polish only and preserves the existing flow, implemented deep links, data logic, scoring, `final_label`, and `WATCHLIST` meaning.
+
+The 12E.12 pass locks the same standalone target flow with frontend contract tests. Coverage protects required deep links, Candidate Results as the default product view, navigation group ownership, Candidate Results, Candidate Detail, Token Lookup local classifications, External Checks link-only/manual semantics, Manual Verification and Product State copy, Research Action Panel actions, forbidden trading CTA copy, and forbidden frontend mechanisms in the product flow files. No browser automation dependency was added; responsive no-horizontal-overflow checks for 1440x900, 1920x1080, and 390x844 remain manual preview validation because the repo has no existing browser harness. 12E Frontend Productization is complete. Next stage: 12F.1 — Private Preview Access Method.
 
 | Flow | Goal | User sees | Do not show | Next step |
 |---|---|---|---|---|
