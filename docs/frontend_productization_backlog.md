@@ -1,8 +1,8 @@
 # Frontend Productization Backlog
 
-Stage: 12E.10 Frontend Copy / Naming
+Stage: 12E.11 Frontend Visual Polish
 
-Next implementation stage: 12E.11 Frontend Visual Polish
+Next implementation stage: 12E.12 Frontend Contract Tests
 
 Rules:
 
@@ -102,6 +102,13 @@ Rules:
 - UI copy is research-only and does not suggest an investment recommendation.
 - No backend, storage, provider calls, source activation, scraping, external fetch, OpenAI calls, paid sources, dependency, scoring change, `final_label` change, or `WATCHLIST` meaning change was added.
 - Next stage: 12E.11 Frontend Visual Polish.
+
+12E.11 delivery note:
+
+- Frontend Visual Polish tightens the standalone preview layout, spacing, card hierarchy, status badges, notices, Research Action Panel, header/sidebar framing, and responsive behavior.
+- Candidate Results, Candidate Detail, Token Lookup, External Checks, Manual Verification Fallbacks, and Product State notices keep the same data, flow, deep links, and review semantics.
+- The polish is CSS/UI-only and does not add backend, storage, provider calls, source activation, scraping, external fetch, OpenAI calls, paid sources, dependencies, scoring changes, `final_label` changes, or `WATCHLIST` meaning changes.
+- Next stage: 12E.12 Frontend Contract Tests.
 
 | Stage | Task | Target files | Acceptance criteria | Not in scope | Priority |
 |---|---|---|---|---|---|
