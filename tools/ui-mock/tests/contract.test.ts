@@ -18,7 +18,10 @@ import {
 } from "../src/components/ManualVerificationFallback";
 import { ProductStateNotice } from "../src/components/ProductStateNotice";
 import { ResearchActionPanel } from "../src/components/ResearchActionPanel";
-import { TokenContractLookupView } from "../src/components/TokenContractLookupView";
+import {
+  TokenContractLookupView,
+  classifyTokenLookupInput,
+} from "../src/components/TokenContractLookupView";
 import { CandidateDetail, getMissingSecurityText } from "../src/components/CandidateDetail";
 import { ControlCenter } from "../src/components/ControlCenter";
 import { LocalMvpWorkflowPanel } from "../src/components/LocalMvpWorkflowPanel";
@@ -56,6 +59,7 @@ import { interpretScannerApiOutput } from "../src/services/scannerDataSource";
 import type { ReviewSessionState } from "../src/types/reviewSessionTypes";
 import type { PersistableScannerOutput, ScannerApiOutput } from "../src/types/scannerTypes";
 import {
+  DEFAULT_WORKSPACE_SECTION,
   WORKSPACE_NAV_GROUPS,
   flattenWorkspaceNavGroups,
   resolveInitialWorkspaceSection,
@@ -335,8 +339,13 @@ const requiredDeepLinks = [
 for (const [hash, section] of requiredDeepLinks) {
   assert.equal(resolveInitialWorkspaceSection(hash), section, `${hash} resolves to ${section}`);
   assert.equal(sectionToHash(section), hash, `${section} maps back to ${hash}`);
+  assert.ok(
+    workspaceNavItems.some((item) => item.id === section),
+    `${hash} has a matching navigation item`,
+  );
 }
 
+assert.equal(DEFAULT_WORKSPACE_SECTION, "candidate-results", "Candidate Results is the default main product view");
 assert.equal(resolveInitialWorkspaceSection("#unknown-preview"), "candidate-results");
 assert.equal(resolveInitialWorkspaceSection(""), "candidate-results");
 assert.equal(resolveInitialWorkspaceSection("#context"), "overview");
@@ -904,6 +913,7 @@ assert.match(candidateResultsMarkup, /data gap/i, "candidate results renders dat
 assert.match(candidateResultsMarkup, /external check required/i, "candidate results renders external check required fallback");
 assert.match(candidateResultsMarkup, /cannot infer safety/i, "candidate results states missing data cannot infer safety");
 assert.match(candidateResultsMarkup, /Open Candidate Detail/, "candidate results links to Candidate Detail");
+assert.match(candidateResultsMarkup, /href="#candidate-detail"/, "candidate results action panel links to Candidate Detail deep link");
 assert.match(
   candidateResultsMarkup,
   /WATCHLIST is shown as Manual Review Only/,
@@ -1005,6 +1015,8 @@ assert.match(candidateDetailMarkup, /external check required/i, "candidate detai
 assert.match(candidateDetailMarkup, /cannot infer safety/i, "candidate detail states missing data cannot infer safety");
 assert.match(candidateDetailMarkup, /Open Token Lookup/, "candidate detail links to Token Lookup");
 assert.match(candidateDetailMarkup, /Open External Checks/, "candidate detail links to External Checks");
+assert.match(candidateDetailMarkup, /href="#token-lookup"/, "candidate detail action panel links to Token Lookup deep link");
+assert.match(candidateDetailMarkup, /href="#external-checks"/, "candidate detail action panel links to External Checks deep link");
 assert.match(
   candidateDetailMarkup,
   /WATCHLIST is manual review only/i,
@@ -1181,6 +1193,28 @@ const tokenLookupProjectMarkup = renderToStaticMarkup(React.createElement(TokenC
 assert.match(tokenLookupProjectMarkup, /likely project name/i, "token lookup classifies project name input");
 assert.match(tokenLookupProjectMarkup, /contract required/i, "token lookup requires contract for project input");
 
+const tokenLookupUnknownMarkup = renderToStaticMarkup(React.createElement(TokenContractLookupView, {
+  initialInput: "???",
+}));
+
+assert.match(tokenLookupUnknownMarkup, /unknown format/i, "token lookup classifies unknown input locally");
+assert.match(tokenLookupUnknownMarkup, /manual verification required/i, "token lookup keeps unknown input manual");
+assert.match(tokenLookupUnknownMarkup, /contract required/i, "token lookup requires contract for unknown input");
+
+for (const [input, expectedClassification] of [
+  ["PEPE", "Likely Symbol"],
+  ["Lido Finance", "Likely Project Name"],
+  ["0x1111111111111111111111111111111111111111", "Likely EVM Contract Address"],
+  ["https://example.org/project", "Likely URL"],
+  ["???", "Unknown Format"],
+] as const) {
+  assert.equal(
+    classifyTokenLookupInput(input).classification,
+    expectedClassification,
+    `token lookup locally classifies ${input} as ${expectedClassification}`,
+  );
+}
+
 const tokenLookupComponentSource = await readFile(resolve("src", "components", "TokenContractLookupView.tsx"), "utf8");
 const manualFallbackComponentSource = await readFile(resolve("src", "components", "ManualVerificationFallback.tsx"), "utf8");
 const productStateNoticeComponentSource = await readFile(resolve("src", "components", "ProductStateNotice.tsx"), "utf8");
@@ -1299,6 +1333,12 @@ assert.ok(
   (externalChecksMarkup.match(/rel="noreferrer noopener"/g) ?? []).length >= 2,
   "external checks renders multiple external links with noreferrer noopener",
 );
+const externalCheckHttpAnchors = [...externalChecksMarkup.matchAll(/<a\b[^>]*href="https?:\/\/[^"]+"[^>]*>/g)];
+assert.ok(externalCheckHttpAnchors.length >= 2, "external checks renders user-clicked external anchors");
+for (const [anchor] of externalCheckHttpAnchors) {
+  assert.match(anchor, /target="_blank"/, "external check external anchor opens in a new tab");
+  assert.match(anchor, /rel="noreferrer noopener"/, "external check external anchor uses noreferrer noopener");
+}
 assert.doesNotMatch(
   externalChecksMarkup,
   forbiddenActionPattern,
@@ -1340,6 +1380,7 @@ const emptyErrorPartialViewMarkup = [
   candidateDetailMarkup,
   candidateDetailMissingDataMarkup,
   tokenLookupMarkup,
+  tokenLookupUnknownMarkup,
   externalChecksMarkup,
   externalChecksMissingMarkup,
 ].join("\n");
@@ -1392,6 +1433,7 @@ const standardizedFrontendCopyMarkup = [
   candidateDetailMarkup,
   candidateDetailMissingDataMarkup,
   tokenLookupMarkup,
+  tokenLookupUnknownMarkup,
   externalChecksMarkup,
   externalChecksMissingMarkup,
 ].join("\n");
@@ -1483,6 +1525,32 @@ assert.equal(
   undefined,
   "external target registry keeps uncertain security target as manual copy fallback",
 );
+assert.equal(
+  unknownChainTargets.find((target) => target.id === "security")?.status,
+  "Security Not Verified",
+  "external target registry keeps honeypot/security fallback not verified",
+);
+assert.equal(
+  unknownChainTargets.find((target) => target.id === "explorer")?.status,
+  "Chain Unknown",
+  "external target registry shows Chain Unknown when contract exists without chain",
+);
+
+const missingContractTargets = buildExternalVerificationTargets({
+  tokenInput: "PEPE",
+});
+for (const target of missingContractTargets.filter((target) => target.id !== "source")) {
+  assert.equal(
+    target.status,
+    "Contract Required",
+    `${target.id} target requires contract before external checks`,
+  );
+  assert.equal(
+    target.href,
+    undefined,
+    `${target.id} target does not create an external href without contract`,
+  );
+}
 
 const externalGapStatuses = buildExternalVerificationGaps({
   hasContract: false,
@@ -1546,6 +1614,92 @@ assert.doesNotMatch(
   /\b(?:localStorage|sessionStorage)\b/,
   "12E.10 copy cleanup does not add browser storage",
 );
+
+const frontendProductContractSource = [
+  navigationCleanupSource,
+  candidateResultsComponentSource,
+  candidateDetailViewComponentSource,
+  tokenLookupComponentSource,
+  externalChecksSource,
+  manualFallbackComponentSource,
+  productStateNoticeComponentSource,
+  researchActionPanelComponentSource,
+].join("\n");
+
+for (const [pattern, label] of [
+  [/\bfetch\s*\(/, "fetch calls"],
+  [/\bXMLHttpRequest\b/, "XMLHttpRequest"],
+  [/\bWebSocket\b/, "WebSocket"],
+  [/\baxios\b/, "axios"],
+  [/\b(?:localStorage|sessionStorage)\b/, "browser storage"],
+  [/loadScannerDataSourceResult|loadLatestMarketContext|loadReviewSessionFromApi|saveReviewSessionToApi/, "provider/source service calls"],
+  [/provider calls/i, "provider calls"],
+  [/source activation/i, "source activation"],
+  [/OpenAI|openai/i, "OpenAI calls"],
+] as const) {
+  assert.doesNotMatch(
+    frontendProductContractSource,
+    pattern,
+    `12E.12 frontend product contract files do not contain ${label}`,
+  );
+}
+
+assert.doesNotMatch(
+  researchActionPanelComponentSource,
+  /saveReviewRecord|saveReviewSessionState|saveReviewSessionToApi|REVIEW_SESSION_STORAGE_KEY/,
+  "Mark For Manual Review remains local UI state and does not persist review state",
+);
+
+const standaloneMainFlowMarkup = [
+  workspaceShellMarkup,
+  candidateResultsMarkup,
+  candidateDetailMarkup,
+  tokenLookupMarkup,
+  tokenLookupContractMarkup,
+  tokenLookupUrlMarkup,
+  tokenLookupProjectMarkup,
+  tokenLookupUnknownMarkup,
+  externalChecksMarkup,
+  externalChecksMissingMarkup,
+  trustedPreviewMarkup,
+  feedbackNotesMarkup,
+  controlCenterMarkup,
+  webinarTeaserMarkup,
+].join("\n");
+
+for (const pattern of forbiddenUiCopyPatterns) {
+  assert.doesNotMatch(
+    standaloneMainFlowMarkup,
+    pattern,
+    `12E.12 standalone main flow avoids forbidden visible UI term ${pattern}`,
+  );
+}
+assert.doesNotMatch(
+  standaloneMainFlowMarkup,
+  forbiddenActionPattern,
+  "12E.12 standalone main flow avoids forbidden trading CTA/action copy",
+);
+
+assert.ok(
+  ([
+    candidateResultsMarkup,
+    candidateDetailMarkup,
+    tokenLookupMarkup,
+    externalChecksMarkup,
+  ].join("\n").match(/research action panel/gi) ?? []).length >= 4,
+  "research action panel exists in all four main product views",
+);
+
+const uiMockPackageJson = JSON.parse(await readFile(resolve("package.json"), "utf8")) as {
+  dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
+};
+const uiMockPackages = {
+  ...(uiMockPackageJson.dependencies ?? {}),
+  ...(uiMockPackageJson.devDependencies ?? {}),
+};
+assert.equal(uiMockPackages.playwright, undefined, "12E.12 does not add Playwright dependency");
+assert.equal(uiMockPackages.puppeteer, undefined, "12E.12 does not add Puppeteer dependency");
 
 const reloadedReviewState = loadReviewSession(reviewStorage);
 assert.equal(

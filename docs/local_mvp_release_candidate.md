@@ -3,7 +3,8 @@
 ## Status
 
 - Local MVP Release Candidate Stabilization v1.
-- Stage 12E.11 polishes the standalone frontend preview visual layer across Candidate Results, Candidate Detail, Token Lookup, External Checks, Manual Verification / Product State notices, Research Action Panel, sidebar, header, cards, status badges, spacing, and responsive behavior. This is UI polish only, preserves the existing flow and deep links, and keeps `WATCHLIST` as Manual Review Only. Next frontend stage is 12E.12 Frontend Contract Tests.
+- Stage 12E.12 hardens the standalone frontend preview with contract tests for required deep links, Candidate Results as the default product view, navigation groups, Candidate Results, Candidate Detail, Token Lookup, External Checks, Manual Verification semantics, Product State notices, Research Action Panel, forbidden trading CTA copy, and forbidden frontend mechanisms in the product flow files. 12E Frontend Productization is complete. Next stage is 12F.1 — Private Preview Access Method.
+- Stage 12E.11 polishes the standalone frontend preview visual layer across Candidate Results, Candidate Detail, Token Lookup, External Checks, Manual Verification / Product State notices, Research Action Panel, sidebar, header, cards, status badges, spacing, and responsive behavior. This is UI polish only, preserves the existing flow and deep links, and keeps `WATCHLIST` as Manual Review Only.
 - Stage 12E.10 standardizes Frontend Copy / Naming across Candidate Results, Candidate Detail, Token Lookup, External Checks, Manual Review, Source Freshness, Risk Flags, Data Gap, Next Review Step, Manual Verification Required, Cannot Infer Safety, and Watchlist Candidate. Copy stays research-only, does not suggest an investment recommendation, and keeps `WATCHLIST` as Manual Review Only.
 - Stage 12E.9 adds Empty / Error / Partial States through a shared frontend-only ProductStateNotice in Candidate Results, Candidate Detail, Token / Contract Lookup, and External Verification Links. Next frontend stage is 12E.10 Frontend Copy / Naming.
 - Stage 12E.8 adds Frontend Navigation Cleanup: `Product Flow`, `Review / Feedback`, `Admin / Status`, and `Demo / Preview` now separate the main research path from admin/status and demo/preview surfaces. Next frontend stage is 12E.9 Empty / Error / Partial States.
@@ -69,7 +70,7 @@
 - `docs/frontend_productization_backlog.md`
 - `docs/frontend_target_flow_map.md`
 
-12E.11 frontend productization baseline:
+12E.12 frontend productization baseline:
 
 - `tools/ui-mock/src/index.css`
 - `tools/ui-mock/src/components/ResearchActionPanel.tsx`
@@ -86,7 +87,10 @@
 - Accepted names: `Candidate Results`, `Candidate Detail`, `Token Lookup`, `External Checks`, `Manual Review`, `Source Freshness`, `Risk Flags`, `Data Gap`, `Next Review Step`, `Manual Verification Required`, `Cannot Infer Safety`, `Watchlist Candidate`
 - Shared fallback names: `manual verification required`, `not verified`, `contract required`, `chain unknown`, `security not verified`, `liquidity unknown`, `source freshness unknown`, `external check required`, `manual review only`, `cannot infer safety`
 - Research Action Panel actions: `Open Candidate Detail`, `Open Token Lookup`, `Open External Checks`, `Copy Contract`, `Copy Token Input`, `View Source Freshness`, `Mark For Manual Review`, `Send Feedback`, `Add Review Note`
-- Next stage: 12E.12 Frontend Contract Tests
+- Contract test command: `scripts\win\check-ui-mock.cmd`
+- Browser/responsive contract: no automated browser harness is currently present, so no-horizontal-overflow checks for 1440x900, 1920x1080, and 390x844 remain manual preview validation.
+- 12E Frontend Productization is complete.
+- Next stage: 12F.1 — Private Preview Access Method
 
 12A standalone trusted tester documents:
 
@@ -174,6 +178,7 @@
 - Research Action Panel for safe frontend-only next review actions without saving review state.
 - Frontend Navigation Cleanup with Product Flow, Review / Feedback, Admin / Status, and Demo / Preview groups while preserving direct deep links.
 - Frontend Visual Polish for a more coherent standalone preview layout, card hierarchy, status badges, notices, Research Action Panel, and responsive behavior.
+- Frontend Contract Tests covering the main standalone product flow and 12E productization guardrails.
 - Frontend Product UX Audit and 12E.8-12E.12 productization backlog.
 - Trusted Tester Preview Shell for the first non-technical reviewer click path.
 - Feedback Notes shell for structuring trusted tester session notes without saving data.
