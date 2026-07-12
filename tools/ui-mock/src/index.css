@@ -4,14 +4,14 @@
 
 @layer base {
   :root {
-    --bg-base: #080c10;
-    --bg-surface: #0d141b;
-    --bg-card: #111b24;
-    --bg-raised: #16222e;
-    --bg-soft: #1b2a36;
-    --bg-hover: #1f3140;
-    --border: #21303c;
-    --border-sub: #2b4050;
+    --bg-base: #090b0f;
+    --bg-surface: #10151a;
+    --bg-card: #141b21;
+    --bg-raised: #1a232b;
+    --bg-soft: #202a33;
+    --bg-hover: #25323c;
+    --border: #28323b;
+    --border-sub: #3a4853;
 
     --text-primary: #eef4f8;
     --text-secondary: #a6b4bf;
@@ -36,6 +36,10 @@
     --slate: #8fa0ad;
     --slate-dim: rgba(143, 160, 173, 0.11);
     --slate-border: rgba(143, 160, 173, 0.28);
+
+    --shadow-soft: 0 12px 32px rgba(0, 0, 0, 0.2);
+    --shadow-panel: 0 18px 42px rgba(0, 0, 0, 0.28);
+    --focus-ring: 0 0 0 3px rgba(90, 167, 255, 0.14);
   }
 
   html {
@@ -88,9 +92,10 @@
   }
 
   .app-header {
-    @apply min-w-0 shrink-0 flex flex-wrap items-center justify-between gap-4 px-5 py-2.5;
+    @apply min-w-0 shrink-0 flex flex-wrap items-center justify-between gap-4 px-6 py-3;
     background: var(--bg-surface);
     border-bottom: 1px solid var(--border);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.025);
   }
 
   .workspace-header {
@@ -99,7 +104,7 @@
 
   .workspace-shell-body {
     @apply flex-1 min-h-0 grid overflow-hidden;
-    grid-template-columns: 240px minmax(0, 1fr);
+    grid-template-columns: 264px minmax(0, 1fr);
   }
 
   .workspace-sidebar {
@@ -109,7 +114,7 @@
   }
 
   .workspace-nav {
-    @apply flex flex-col gap-3 p-3;
+    @apply flex flex-col gap-4 p-3.5;
   }
 
   .workspace-nav-group {
@@ -117,7 +122,7 @@
   }
 
   .workspace-nav-group-header {
-    @apply min-w-0 px-1 pb-0.5;
+    @apply min-w-0 px-1 pb-1;
   }
 
   .workspace-nav-group-header span {
@@ -132,7 +137,7 @@
   }
 
   .workspace-nav-item {
-    @apply flex w-full items-start gap-2.5 rounded-md px-2.5 py-2 text-left transition-colors;
+    @apply flex w-full items-start gap-2.5 rounded-md px-2.5 py-2.5 text-left transition-colors;
     color: var(--text-secondary);
     border: 1px solid transparent;
   }
@@ -147,6 +152,7 @@
     color: var(--accent);
     background: var(--accent-dim);
     border-color: var(--accent-border);
+    box-shadow: inset 3px 0 0 var(--accent);
   }
 
   .workspace-nav-icon {
@@ -185,25 +191,25 @@
   }
 
   .workspace-content {
-    @apply px-5 py-4 min-h-full;
+    @apply px-6 py-5 min-h-full;
   }
 
   .workspace-section {
-    @apply min-w-0 space-y-3;
+    @apply min-w-0 space-y-4;
   }
 
   .workspace-section-header {
-    @apply flex items-start justify-between gap-3 pb-1;
+    @apply flex items-start justify-between gap-3 pb-3;
     border-bottom: 1px solid var(--border);
   }
 
   .workspace-section-header h2 {
-    @apply text-lg font-bold leading-tight;
+    @apply text-xl font-bold leading-tight;
     color: var(--text-primary);
   }
 
   .workspace-section-header p {
-    @apply mt-0.5 text-[12px] leading-snug;
+    @apply mt-1 max-w-4xl text-[12px] leading-relaxed;
     color: var(--text-secondary);
   }
 
@@ -248,14 +254,15 @@
   }
 
   .product-logo {
-    @apply w-8 h-8 rounded-md flex items-center justify-center text-xs font-bold shrink-0;
+    @apply w-9 h-9 rounded-md flex items-center justify-center text-xs font-bold shrink-0;
     background: var(--accent-dim);
     border: 1px solid var(--accent-border);
     color: var(--accent);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
   }
 
   .product-mark h1 {
-    @apply text-base font-bold leading-tight truncate;
+    @apply text-[17px] font-bold leading-tight truncate;
     color: var(--text-primary);
   }
 
@@ -286,6 +293,7 @@
     @apply inline-flex items-center overflow-hidden rounded-md;
     background: var(--bg-raised);
     border: 1px solid var(--border);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
   }
 
   .source-segment button {
@@ -371,8 +379,9 @@
   }
 
   .badge {
-    @apply inline-flex max-w-full items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase leading-tight whitespace-normal;
+    @apply inline-flex min-h-[22px] max-w-full items-center gap-1.5 rounded-md px-2.5 py-0.5 text-[10px] font-bold uppercase leading-tight whitespace-normal;
     overflow-wrap: anywhere;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055);
   }
 
   .badge-watchlist {
@@ -404,6 +413,7 @@
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: 8px;
+    box-shadow: var(--shadow-soft);
   }
 
   .section-label {
@@ -1468,13 +1478,15 @@
   }
 
   .candidate-results-view {
-    @apply grid max-w-7xl gap-3;
+    @apply grid max-w-7xl gap-4;
+    max-width: 1440px;
   }
 
   .candidate-results-hero {
-    @apply flex items-start justify-between gap-4 rounded-md px-4 py-3;
+    @apply flex items-start justify-between gap-5 rounded-md px-5 py-4;
     background: var(--bg-card);
     border: 1px solid var(--border);
+    box-shadow: var(--shadow-soft);
   }
 
   .candidate-results-hero-copy {
@@ -1489,36 +1501,38 @@
   }
 
   .candidate-results-hero-copy h3 {
-    @apply mt-1 text-xl font-bold leading-tight;
+    @apply mt-2 text-2xl font-bold leading-tight;
     color: var(--text-primary);
   }
 
   .candidate-results-hero-copy p {
-    @apply mt-1 max-w-4xl text-[12px] leading-relaxed;
+    @apply mt-2 max-w-4xl text-[13px] leading-relaxed;
     color: var(--text-secondary);
   }
 
   .candidate-results-boundary {
-    @apply min-w-[230px] rounded-md px-3 py-2 text-[11px] leading-relaxed;
+    @apply min-w-[240px] rounded-md px-3.5 py-3 text-[11px] leading-relaxed;
     color: var(--text-secondary);
     background: var(--amber-dim);
     border: 1px solid var(--amber-border);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
   }
 
   .candidate-results-boundary strong {
-    @apply block text-[10px] uppercase leading-tight;
+    @apply block text-[10px] font-bold uppercase leading-tight;
     color: var(--amber);
   }
 
   .candidate-results-summary-grid {
-    @apply grid gap-2;
+    @apply grid gap-3;
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .candidate-results-summary-card {
-    @apply min-w-0 rounded-md px-3 py-2;
+    @apply min-w-0 rounded-md px-4 py-3;
     background: var(--bg-card);
     border: 1px solid var(--border);
+    box-shadow: var(--shadow-soft);
   }
 
   .candidate-results-summary-card span {
@@ -1527,42 +1541,48 @@
   }
 
   .candidate-results-summary-card strong {
-    @apply mt-1 block text-xl font-bold tabular-nums leading-tight;
+    @apply mt-2 block text-2xl font-bold tabular-nums leading-tight;
     color: var(--text-primary);
   }
 
   .candidate-results-summary-card p {
-    @apply mt-1 text-[10px] leading-snug;
+    @apply mt-1 text-[11px] leading-snug;
     color: var(--text-secondary);
   }
 
   .candidate-results-list {
-    @apply grid gap-2.5;
+    @apply grid gap-3;
   }
 
   .candidate-result-card {
-    @apply min-w-0 rounded-md p-3 space-y-3;
+    @apply min-w-0 rounded-md p-4 space-y-3.5 transition-colors;
     background: var(--bg-card);
     border: 1px solid var(--border);
+    box-shadow: var(--shadow-soft);
+  }
+
+  .candidate-result-card:hover {
+    background: #172029;
+    border-color: var(--border-sub);
   }
 
   .candidate-result-card.review {
     border-color: var(--accent-border);
-    box-shadow: inset 3px 0 0 var(--accent);
+    box-shadow: inset 3px 0 0 var(--accent), var(--shadow-soft);
   }
 
   .candidate-result-card.manual {
     border-color: var(--amber-border);
-    box-shadow: inset 3px 0 0 var(--amber);
+    box-shadow: inset 3px 0 0 var(--amber), var(--shadow-soft);
   }
 
   .candidate-result-card.critical {
     border-color: var(--red-border);
-    box-shadow: inset 3px 0 0 var(--red);
+    box-shadow: inset 3px 0 0 var(--red), var(--shadow-soft);
   }
 
   .candidate-result-topline {
-    @apply flex min-w-0 items-start justify-between gap-3;
+    @apply flex min-w-0 items-start justify-between gap-4;
   }
 
   .candidate-result-token {
@@ -1570,28 +1590,29 @@
   }
 
   .candidate-result-token strong {
-    @apply mt-1 block truncate text-base font-bold leading-tight;
+    @apply mt-1.5 block truncate text-lg font-bold leading-tight;
     color: var(--text-primary);
   }
 
   .candidate-result-token span:last-child {
-    @apply block truncate text-[11px] leading-tight;
+    @apply mt-0.5 block truncate text-[12px] leading-tight;
     color: var(--text-secondary);
   }
 
   .candidate-result-badges {
-    @apply flex shrink-0 flex-wrap justify-end gap-1.5;
+    @apply flex shrink-0 flex-wrap justify-end gap-2;
   }
 
   .candidate-result-grid {
-    @apply grid gap-2;
+    @apply grid gap-2.5;
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .candidate-result-field {
-    @apply min-w-0 rounded-md px-2.5 py-2;
+    @apply min-w-0 rounded-md px-3 py-2.5;
     background: rgba(8, 12, 16, 0.28);
     border: 1px solid var(--border);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
   }
 
   .candidate-result-field.review {
@@ -1616,7 +1637,7 @@
   }
 
   .candidate-result-field strong {
-    @apply mt-1 block text-[12px] font-bold leading-snug;
+    @apply mt-1.5 block text-[13px] font-bold leading-snug;
     color: var(--text-primary);
     overflow-wrap: anywhere;
   }
@@ -1641,7 +1662,7 @@
 
   .candidate-result-reason,
   .candidate-result-risk-panel {
-    @apply rounded-md px-3 py-2;
+    @apply rounded-md px-3.5 py-3;
     background: rgba(8, 12, 16, 0.22);
     border: 1px solid var(--border);
   }
@@ -1666,11 +1687,12 @@
   }
 
   .candidate-results-chip {
-    @apply inline-flex min-w-0 max-w-full rounded-md px-2 py-0.5 text-[10px] font-semibold leading-tight;
+    @apply inline-flex min-h-[22px] min-w-0 max-w-full items-center rounded-md px-2.5 py-0.5 text-[10px] font-semibold leading-tight;
     border: 1px solid var(--border);
     color: var(--text-secondary);
     background: var(--bg-raised);
     overflow-wrap: anywhere;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
   }
 
   .candidate-results-chip.manual {
@@ -1686,13 +1708,13 @@
   }
 
   .candidate-result-footer {
-    @apply grid items-center gap-2;
+    @apply grid items-center gap-2.5 pt-1;
     grid-template-columns: minmax(160px, 0.75fr) minmax(220px, 1fr) auto;
   }
 
   .candidate-result-review-state,
   .candidate-result-next-step {
-    @apply min-w-0 rounded-md px-2.5 py-2;
+    @apply min-w-0 rounded-md px-3 py-2.5;
     background: var(--bg-raised);
     border: 1px solid var(--border);
   }
@@ -1708,7 +1730,7 @@
   }
 
   .candidate-result-review-button {
-    @apply rounded-md px-3 py-2 text-[12px] font-bold transition-colors;
+    @apply min-h-[40px] rounded-md px-4 py-2 text-[12px] font-bold transition-colors;
     color: var(--accent);
     background: var(--accent-dim);
     border: 1px solid var(--accent-border);
@@ -1726,13 +1748,14 @@
   }
 
   .product-state-notice {
-    @apply grid min-w-0 gap-3 rounded-md px-3 py-2.5;
+    @apply grid min-w-0 gap-3 rounded-md px-4 py-3.5;
     background: var(--bg-card);
     border: 1px solid var(--amber-border);
+    box-shadow: var(--shadow-soft);
   }
 
   .product-state-notice.compact {
-    @apply gap-2;
+    @apply gap-2 px-3 py-2.5;
     background: rgba(8, 12, 16, 0.2);
   }
 
@@ -1768,7 +1791,7 @@
   }
 
   .product-state-notice-header h4 {
-    @apply mt-1 text-sm font-bold leading-tight;
+    @apply mt-1.5 text-base font-bold leading-tight;
     color: var(--text-primary);
   }
 
@@ -1780,7 +1803,7 @@
 
   .product-state-status-grid,
   .product-state-item-grid {
-    @apply grid gap-2;
+    @apply grid gap-2.5;
   }
 
   .product-state-status-grid {
@@ -1792,9 +1815,10 @@
   }
 
   .product-state-metric {
-    @apply min-w-0 rounded-md px-2.5 py-2;
+    @apply min-w-0 rounded-md px-3 py-2.5;
     background: rgba(8, 12, 16, 0.26);
     border: 1px solid var(--border);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
   }
 
   .product-state-notice.partial .product-state-metric {
@@ -1836,13 +1860,14 @@
   }
 
   .manual-verification-fallback {
-    @apply grid min-w-0 gap-3 rounded-md px-3 py-2.5;
+    @apply grid min-w-0 gap-3 rounded-md px-4 py-3.5;
     background: var(--bg-card);
     border: 1px solid var(--amber-border);
+    box-shadow: var(--shadow-soft);
   }
 
   .manual-verification-fallback.compact {
-    @apply gap-2;
+    @apply gap-2 px-3 py-2.5;
     background: rgba(8, 12, 16, 0.2);
   }
 
@@ -1858,7 +1883,7 @@
   }
 
   .manual-verification-fallback-header h4 {
-    @apply mt-1 text-sm font-bold leading-tight;
+    @apply mt-1.5 text-base font-bold leading-tight;
     color: var(--text-primary);
   }
 
@@ -1868,7 +1893,7 @@
   }
 
   .manual-verification-gap-grid {
-    @apply grid gap-2;
+    @apply grid gap-2.5;
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
@@ -1877,9 +1902,10 @@
   }
 
   .manual-verification-gap {
-    @apply min-w-0 rounded-md px-2.5 py-2;
+    @apply min-w-0 rounded-md px-3 py-2.5;
     background: rgba(8, 12, 16, 0.26);
     border: 1px solid var(--amber-border);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
   }
 
   .manual-verification-gap span {
@@ -1900,18 +1926,19 @@
   }
 
   .research-action-panel {
-    @apply grid min-w-0 gap-3 rounded-md px-3 py-2.5;
+    @apply grid min-w-0 gap-3 rounded-md px-4 py-3.5;
     background: var(--bg-card);
     border: 1px solid var(--accent-border);
+    box-shadow: var(--shadow-soft);
   }
 
   .research-action-panel.compact {
-    @apply gap-2;
+    @apply gap-2 px-3 py-2.5;
     background: rgba(8, 12, 16, 0.2);
   }
 
   .research-action-panel-header {
-    @apply flex items-start justify-between gap-3;
+    @apply flex items-start justify-between gap-4;
   }
 
   .research-action-eyebrow {
@@ -1922,7 +1949,7 @@
   }
 
   .research-action-panel-header h4 {
-    @apply mt-1 text-sm font-bold leading-tight;
+    @apply mt-1.5 text-base font-bold leading-tight;
     color: var(--text-primary);
   }
 
@@ -1933,10 +1960,11 @@
   }
 
   .research-action-panel-token {
-    @apply min-w-[160px] rounded-md px-2.5 py-2 text-[10px] leading-snug;
+    @apply min-w-[180px] rounded-md px-3 py-2.5 text-[10px] leading-snug;
     color: var(--text-secondary);
     background: var(--bg-raised);
     border: 1px solid var(--border);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
   }
 
   .research-action-panel-token span,
@@ -1956,14 +1984,15 @@
   }
 
   .research-action-status-grid {
-    @apply grid gap-2;
+    @apply grid gap-2.5;
     grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 
   .research-action-status {
-    @apply min-w-0 rounded-md px-2.5 py-2;
+    @apply min-w-0 rounded-md px-3 py-2.5;
     background: rgba(8, 12, 16, 0.26);
     border: 1px solid var(--border);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
   }
 
   .research-action-status span {
@@ -1978,15 +2007,16 @@
   }
 
   .research-action-grid {
-    @apply grid gap-2;
+    @apply grid gap-2.5;
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .research-action-control {
-    @apply inline-flex min-h-[46px] min-w-0 flex-col items-start justify-center rounded-md px-3 py-2 text-left transition-colors;
+    @apply inline-flex min-h-[52px] min-w-0 flex-col items-start justify-center rounded-md px-3 py-2.5 text-left transition-colors;
     color: var(--accent);
     background: var(--accent-dim);
     border: 1px solid var(--accent-border);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
   }
 
   .research-action-control:hover {
@@ -2013,13 +2043,15 @@
   }
 
   .candidate-detail-view {
-    @apply grid max-w-7xl gap-3;
+    @apply grid max-w-7xl gap-4;
+    max-width: 1440px;
   }
 
   .candidate-detail-hero {
-    @apply flex items-start justify-between gap-4 rounded-md px-4 py-3;
+    @apply flex items-start justify-between gap-5 rounded-md px-5 py-4;
     background: var(--bg-card);
     border: 1px solid var(--border);
+    box-shadow: var(--shadow-soft);
   }
 
   .candidate-detail-hero-copy {
@@ -2036,14 +2068,19 @@
   .candidate-detail-hero-copy h3,
   .candidate-detail-review-panel h3,
   .candidate-detail-empty h3 {
-    @apply mt-1 text-xl font-bold leading-tight;
+    @apply mt-1.5 text-2xl font-bold leading-tight;
     color: var(--text-primary);
+  }
+
+  .candidate-detail-review-panel h3,
+  .candidate-detail-empty h3 {
+    @apply text-lg;
   }
 
   .candidate-detail-hero-copy p,
   .candidate-detail-review-panel p,
   .candidate-detail-empty p {
-    @apply mt-1 max-w-4xl text-[12px] leading-relaxed;
+    @apply mt-2 max-w-4xl text-[13px] leading-relaxed;
     color: var(--text-secondary);
   }
 
@@ -2060,26 +2097,28 @@
   }
 
   .candidate-detail-boundary {
-    @apply min-w-[210px] rounded-md px-3 py-2 text-[11px] leading-relaxed;
+    @apply min-w-[220px] rounded-md px-3.5 py-3 text-[11px] leading-relaxed;
     color: var(--text-secondary);
     background: var(--amber-dim);
     border: 1px solid var(--amber-border);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
   }
 
   .candidate-detail-boundary strong {
-    @apply block text-[10px] uppercase leading-tight;
+    @apply block text-[10px] font-bold uppercase leading-tight;
     color: var(--amber);
   }
 
   .candidate-detail-grid {
-    @apply grid gap-2;
+    @apply grid gap-3;
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .candidate-detail-metric {
-    @apply min-w-0 rounded-md px-3 py-2;
+    @apply min-w-0 rounded-md px-4 py-3;
     background: var(--bg-card);
     border: 1px solid var(--border);
+    box-shadow: var(--shadow-soft);
   }
 
   .candidate-detail-metric.manual {
@@ -2098,7 +2137,7 @@
   }
 
   .candidate-detail-metric strong {
-    @apply mt-1 block text-[12px] font-bold leading-snug;
+    @apply mt-1.5 block text-[13px] font-bold leading-snug;
     color: var(--text-primary);
     overflow-wrap: anywhere;
   }
@@ -2118,16 +2157,17 @@
   }
 
   .candidate-detail-main-grid {
-    @apply grid gap-2.5;
+    @apply grid gap-3;
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .candidate-detail-section,
   .candidate-detail-review-panel,
   .candidate-detail-empty {
-    @apply min-w-0 rounded-md px-3 py-2.5;
+    @apply min-w-0 rounded-md px-4 py-3;
     background: var(--bg-card);
     border: 1px solid var(--border);
+    box-shadow: var(--shadow-soft);
   }
 
   .candidate-detail-section-title {
@@ -2189,19 +2229,19 @@
   }
 
   .candidate-detail-review-panel {
-    @apply grid items-center gap-3;
+    @apply grid items-center gap-3.5;
     grid-template-columns: minmax(0, 1fr) minmax(160px, auto) auto auto;
     border-color: var(--amber-border);
   }
 
   .candidate-detail-review-status {
-    @apply min-w-0 rounded-md px-2.5 py-2;
+    @apply min-w-0 rounded-md px-3 py-2.5;
     background: var(--bg-raised);
     border: 1px solid var(--border);
   }
 
   .candidate-detail-secondary-button {
-    @apply rounded-md px-3 py-2 text-[12px] font-bold transition-colors;
+    @apply min-h-[40px] rounded-md px-4 py-2 text-[12px] font-bold transition-colors;
     color: var(--accent);
     background: var(--accent-dim);
     border: 1px solid var(--accent-border);
@@ -2212,13 +2252,15 @@
   }
 
   .token-lookup-view {
-    @apply grid max-w-7xl gap-3;
+    @apply grid max-w-7xl gap-4;
+    max-width: 1440px;
   }
 
   .token-lookup-hero {
-    @apply flex items-start justify-between gap-4 rounded-md px-4 py-3;
+    @apply flex items-start justify-between gap-5 rounded-md px-5 py-4;
     background: var(--bg-card);
     border: 1px solid var(--border);
+    box-shadow: var(--shadow-soft);
   }
 
   .token-lookup-hero-copy {
@@ -2235,39 +2277,46 @@
   .token-lookup-hero-copy h3,
   .token-lookup-result-topline h3,
   .token-lookup-review-panel h3 {
-    @apply mt-1 text-xl font-bold leading-tight;
+    @apply mt-1.5 text-2xl font-bold leading-tight;
     color: var(--text-primary);
+  }
+
+  .token-lookup-result-topline h3,
+  .token-lookup-review-panel h3 {
+    @apply text-lg;
   }
 
   .token-lookup-hero-copy p,
   .token-lookup-result-panel > p,
   .token-lookup-review-panel p {
-    @apply mt-1 max-w-4xl text-[12px] leading-relaxed;
+    @apply mt-2 max-w-4xl text-[13px] leading-relaxed;
     color: var(--text-secondary);
   }
 
   .token-lookup-boundary {
-    @apply min-w-[250px] rounded-md px-3 py-2 text-[11px] leading-relaxed;
+    @apply min-w-[260px] rounded-md px-3.5 py-3 text-[11px] leading-relaxed;
     color: var(--text-secondary);
     background: var(--amber-dim);
     border: 1px solid var(--amber-border);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
   }
 
   .token-lookup-boundary strong {
-    @apply block text-[10px] uppercase leading-tight;
+    @apply block text-[10px] font-bold uppercase leading-tight;
     color: var(--amber);
   }
 
   .token-lookup-input-panel,
   .token-lookup-result-panel,
   .token-lookup-review-panel {
-    @apply min-w-0 rounded-md px-3 py-2.5;
+    @apply min-w-0 rounded-md px-4 py-3.5;
     background: var(--bg-card);
     border: 1px solid var(--border);
+    box-shadow: var(--shadow-soft);
   }
 
   .token-lookup-input-panel {
-    @apply grid gap-2;
+    @apply grid gap-2.5;
   }
 
   .token-lookup-input-label,
@@ -2277,7 +2326,7 @@
   }
 
   .token-lookup-input {
-    @apply min-h-[42px] w-full rounded-md px-3 py-2 text-sm font-semibold outline-none transition-colors;
+    @apply min-h-[46px] w-full rounded-md px-3.5 py-2 text-sm font-semibold outline-none transition-colors;
     color: var(--text-primary);
     background: rgba(8, 12, 16, 0.34);
     border: 1px solid var(--border);
@@ -2285,7 +2334,7 @@
 
   .token-lookup-input:focus {
     border-color: var(--accent-border);
-    box-shadow: 0 0 0 3px rgba(90, 167, 255, 0.12);
+    box-shadow: var(--focus-ring);
   }
 
   .token-lookup-examples {
@@ -2310,21 +2359,22 @@
   }
 
   .token-lookup-status {
-    @apply rounded-md px-2 py-1 text-[10px] font-bold uppercase leading-tight;
+    @apply rounded-md px-2.5 py-1 text-[10px] font-bold uppercase leading-tight;
     color: var(--amber);
     background: var(--amber-dim);
     border: 1px solid var(--amber-border);
   }
 
   .token-lookup-grid {
-    @apply mt-3 grid gap-2;
+    @apply mt-3 grid gap-2.5;
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .token-lookup-metric {
-    @apply min-w-0 rounded-md px-3 py-2;
+    @apply min-w-0 rounded-md px-3 py-2.5;
     background: rgba(8, 12, 16, 0.24);
     border: 1px solid var(--border);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
   }
 
   .token-lookup-metric.manual {
@@ -2356,7 +2406,7 @@
   }
 
   .token-lookup-review-panel {
-    @apply grid items-start gap-3;
+    @apply grid items-start gap-3.5;
     grid-template-columns: minmax(0, 0.9fr) minmax(260px, 1fr);
     border-color: var(--amber-border);
   }
@@ -2367,7 +2417,7 @@
   }
 
   .token-lookup-secondary-button {
-    @apply rounded-md px-3 py-2 text-[12px] font-bold transition-colors;
+    @apply min-h-[40px] rounded-md px-4 py-2 text-[12px] font-bold transition-colors;
     color: var(--accent);
     background: var(--accent-dim);
     border: 1px solid var(--accent-border);
@@ -2378,13 +2428,15 @@
   }
 
   .external-checks-view {
-    @apply grid max-w-7xl gap-3;
+    @apply grid max-w-7xl gap-4;
+    max-width: 1440px;
   }
 
   .external-checks-hero {
-    @apply flex items-start justify-between gap-4 rounded-md px-4 py-3;
+    @apply flex items-start justify-between gap-5 rounded-md px-5 py-4;
     background: var(--bg-card);
     border: 1px solid var(--border);
+    box-shadow: var(--shadow-soft);
   }
 
   .external-checks-hero-copy {
@@ -2400,8 +2452,12 @@
 
   .external-checks-hero-copy h3,
   .external-checks-review-panel h3 {
-    @apply mt-1 text-xl font-bold leading-tight;
+    @apply mt-1.5 text-2xl font-bold leading-tight;
     color: var(--text-primary);
+  }
+
+  .external-checks-review-panel h3 {
+    @apply text-lg;
   }
 
   .external-check-card h4 {
@@ -2412,37 +2468,39 @@
   .external-checks-hero-copy p,
   .external-checks-review-panel p,
   .external-check-card-main p {
-    @apply mt-1 max-w-4xl text-[12px] leading-relaxed;
+    @apply mt-2 max-w-4xl text-[13px] leading-relaxed;
     color: var(--text-secondary);
     overflow-wrap: anywhere;
   }
 
   .external-checks-boundary {
-    @apply min-w-[240px] rounded-md px-3 py-2 text-[11px] leading-relaxed;
+    @apply min-w-[250px] rounded-md px-3.5 py-3 text-[11px] leading-relaxed;
     color: var(--text-secondary);
     background: var(--amber-dim);
     border: 1px solid var(--amber-border);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
   }
 
   .external-checks-boundary strong {
-    @apply block text-[10px] uppercase leading-tight;
+    @apply block text-[10px] font-bold uppercase leading-tight;
     color: var(--amber);
   }
 
   .external-checks-summary-grid {
-    @apply grid gap-2;
+    @apply grid gap-3;
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .external-checks-review-grid {
-    @apply grid gap-2;
+    @apply grid gap-2.5;
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .external-check-metric {
-    @apply min-w-0 rounded-md px-3 py-2;
+    @apply min-w-0 rounded-md px-4 py-3;
     background: var(--bg-card);
     border: 1px solid var(--border);
+    box-shadow: var(--shadow-soft);
   }
 
   .external-check-metric.manual {
@@ -2457,7 +2515,7 @@
 
   .external-check-metric strong,
   .external-check-card-status strong {
-    @apply mt-1 block text-[12px] font-bold leading-snug;
+    @apply mt-1.5 block text-[13px] font-bold leading-snug;
     color: var(--text-primary);
     overflow-wrap: anywhere;
   }
@@ -2475,18 +2533,20 @@
   }
 
   .external-checks-list {
-    @apply grid gap-2.5;
+    @apply grid gap-3;
   }
 
   .external-check-card {
-    @apply grid min-w-0 items-center gap-3 rounded-md px-3 py-2.5;
+    @apply grid min-w-0 items-center gap-4 rounded-md px-4 py-3.5;
     grid-template-columns: minmax(0, 1fr) minmax(170px, 0.34fr) auto;
     background: var(--bg-card);
     border: 1px solid var(--border);
+    box-shadow: var(--shadow-soft);
   }
 
   .external-check-card.manual {
     border-color: var(--amber-border);
+    box-shadow: inset 3px 0 0 var(--amber), var(--shadow-soft);
   }
 
   .external-check-card-main,
@@ -2495,19 +2555,20 @@
   }
 
   .external-check-card-status {
-    @apply rounded-md px-2.5 py-2;
+    @apply rounded-md px-3 py-2.5;
     background: rgba(8, 12, 16, 0.24);
     border: 1px solid var(--border);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
   }
 
   .external-check-actions {
-    @apply flex min-w-[160px] flex-col gap-1.5;
+    @apply flex min-w-[170px] flex-col gap-2;
   }
 
   .external-check-link,
   .external-check-copy-button,
   .external-check-disabled {
-    @apply inline-flex min-h-[34px] items-center justify-center rounded-md px-3 py-2 text-center text-[12px] font-bold leading-tight;
+    @apply inline-flex min-h-[40px] items-center justify-center rounded-md px-3 py-2 text-center text-[12px] font-bold leading-tight;
   }
 
   .external-check-link,
@@ -2529,10 +2590,11 @@
   }
 
   .external-checks-review-panel {
-    @apply grid items-start gap-3 rounded-md px-3 py-2.5;
+    @apply grid items-start gap-3.5 rounded-md px-4 py-3.5;
     grid-template-columns: minmax(0, 0.75fr) minmax(320px, 1fr);
     background: var(--bg-card);
     border: 1px solid var(--amber-border);
+    box-shadow: var(--shadow-soft);
   }
 
   .scanner-workbench {

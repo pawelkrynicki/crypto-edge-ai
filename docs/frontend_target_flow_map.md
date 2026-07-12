@@ -1,10 +1,10 @@
 # Frontend Target Flow Map
 
-Stage: 12E.10 Frontend Copy / Naming
+Stage: 12E.11 Frontend Visual Polish
 
 Implemented deep links: `#candidate-results`, `#candidate-detail`, `#token-lookup`, `#external-checks`, `#feedback-notes`, `#control-center`, `#trusted-preview`, `#webinar-teaser`
 
-Next implementation stage: 12E.11 Frontend Visual Polish
+Next implementation stage: 12E.12 Frontend Contract Tests
 
 Only target flow:
 
@@ -25,7 +25,9 @@ The 12E.8 cleanup preserves existing deep links and does not add backend, storag
 
 The 12E.9 pass adds shared frontend-only Empty / Error / Partial States through `ProductStateNotice`. Candidate Results, Candidate Detail, Token Lookup, and External Checks now show data gaps, partial source coverage, unknown freshness, missing contract/chain, required external checks, security/liquidity gaps, and a `next review step` without adding backend, storage, provider calls, source activation, fetches, scraping, scoring changes, `final_label` changes, or `WATCHLIST` meaning changes.
 
-The 12E.10 pass standardizes frontend copy and naming around `Candidate Results`, `Candidate Detail`, `Token Lookup`, `External Checks`, `Manual Review`, `Source Freshness`, `Risk Flags`, `Data Gap`, `Next Review Step`, `Manual Verification Required`, `Cannot Infer Safety`, and `Watchlist Candidate`. Copy stays research-only, does not suggest an investment recommendation, keeps `WATCHLIST` as Manual Review Only, and does not add backend, storage, provider calls, source activation, fetches, scraping, scoring changes, `final_label` changes, or `WATCHLIST` meaning changes. Next stage: 12E.11 Frontend Visual Polish.
+The 12E.10 pass standardizes frontend copy and naming around `Candidate Results`, `Candidate Detail`, `Token Lookup`, `External Checks`, `Manual Review`, `Source Freshness`, `Risk Flags`, `Data Gap`, `Next Review Step`, `Manual Verification Required`, `Cannot Infer Safety`, and `Watchlist Candidate`. Copy stays research-only, does not suggest an investment recommendation, keeps `WATCHLIST` as Manual Review Only, and does not add backend, storage, provider calls, source activation, fetches, scraping, scoring changes, `final_label` changes, or `WATCHLIST` meaning changes.
+
+The 12E.11 pass polishes the visual hierarchy of the same target flow: spacing, cards, status badges, Manual Verification / Product State notices, Research Action Panel, header/sidebar framing, and responsive behavior. It is UI polish only and preserves the existing flow, implemented deep links, data logic, scoring, `final_label`, and `WATCHLIST` meaning. Next stage: 12E.12 Frontend Contract Tests.
 
 | Flow | Goal | User sees | Do not show | Next step |
 |---|---|---|---|---|
