@@ -6,6 +6,18 @@ Camp BETA should be a working Crypto Edge AI tool on real data in a limited, sta
 
 This is still a planning document. It does not implement real fetchers, production cron scripts, migrations, auth, UI, or AI calls.
 
+## 12R.1 Real Data Readiness Audit
+
+Stage 12R.1 audits the standalone real-data path from provider policy through local artifacts, Scanner API, frontend data selection, and the current private VPS boundary.
+
+- Audit and execution plan: `docs/real_data_readiness_audit.md`.
+- Current verdict: `NO-GO` for resuming the external test.
+- The approved context path is only partially ready; the token scanner has no policy-compliant live path for `INTERNAL_BETA` or `PUBLIC_BETA` under the current runtime policy.
+- The current frontend is fixture-first, and the local Scanner API can classify a fixture file as `real-output`.
+- Work after 12R.1 must add fail-closed provenance, freshness, storage/display policy gates, VPS runtime integration, production data mode, failure drills, and owner acceptance before the CAMP deadline on 31.08.2026.
+
+12R.1 is documentation and analysis only. It does not activate sources, change the source registry or runtime policy, call providers, store raw responses, add scraping or paid APIs, change scoring, change `final_label`, change `WATCHLIST` meaning, rebuild the frontend, remove test fixtures, deploy to VPS, modify AI KINTEL, or merge a PR.
+
 ## 12A Standalone Trusted Tester Strategy Correction
 
 After 11G, the near-term priority changes from immediate AI KINTEL implementation to a standalone trusted tester preview path.
