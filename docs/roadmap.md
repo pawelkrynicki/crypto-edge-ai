@@ -1,5 +1,20 @@
 # Roadmap
 
+## Stage 12R.2: Real Data Policy & Environment Decisions
+
+Status: **decision record complete on 15.07.2026; implementation not started**.
+
+- Canonical policy: `docs/real_data_policy_decisions.md`.
+- Updated readiness audit: `docs/real_data_readiness_audit.md`.
+- Updated execution plan: `docs/camp_beta_real_data_plan.md`.
+- `cryptoedge.crmallintraders.pl` is `INTERNAL_BETA`; `PUBLIC_BETA` and external tester access remain disabled.
+- DexScreener is the approved token discovery source. GoPlus is primary and Honeypot.is is secondary for security.
+- Raw provider payload storage and all automatic fixture fallback are denied.
+- Freshness SLA, degraded/last-known-good rules, real-data-only VPS mode, development-only demo separation, and owner acceptance gates are approved.
+- No provider call, source activation, VPS change, deployment, scoring change, `final_label` change, or AI KINTEL implementation belongs to 12R.2.
+
+Next stage: **12R.3 — Fail-Closed Real Data Boundary**. Implement and test the environment and action gates, response allowlists, freshness checks, explicit degraded/unavailable states, no-fixture production path, and real-data/development build boundary before any source activation or VPS deployment.
+
 ## Stage 12A: Standalone Product Gap Audit + Trusted Tester Path
 
 Strategic correction after 11G:
@@ -254,6 +269,8 @@ Design the limited real-data flow:
 Current artifacts:
 
 - `docs/camp_beta_real_data_plan.md`.
+- `docs/real_data_readiness_audit.md`.
+- `docs/real_data_policy_decisions.md`.
 - `docs/rug_pull_risk_engine.md`.
 - `docs/token_scorecard_model.md`.
 
@@ -264,13 +281,14 @@ Data Source Registry Enforcement v1:
 - Sources reviewed: 21.
 - Priority A: 12.
 - Priority B: 9.
-- Sources currently cleared for Camp BETA: 2.
+- Sources currently cleared by the checked-in runtime policy for Camp BETA: 2.
 - Safe default: `FIXTURE_ONLY` when `CRYPTO_EDGE_DATA_ENV` is missing or invalid.
 - Environments: `FIXTURE_ONLY`, `LOCAL_POC`, `INTERNAL_BETA`, `PUBLIC_BETA`, `COMMERCIAL`.
 - Actions: `fixture_load`, `live_fetch`, `normalized_storage`, `raw_storage`, `user_display`, `derived_score_display`.
 - LOCAL_POC live mode requires `CRYPTO_EDGE_DATA_ENV=LOCAL_POC`.
 - PUBLIC_BETA allows Alternative.me Fear & Greed and DefiLlama only.
-- PUBLIC_BETA blocks DexScreener, GoPlus Security, and Honeypot.is pending written clarification or permission.
+- 12R.2 approves DexScreener, GoPlus Security, and Honeypot.is for the target `INTERNAL_BETA`; runtime enforcement remains open for 12R.3.
+- PUBLIC_BETA remains disabled and continues to block DexScreener, GoPlus Security, and Honeypot.is.
 - Runtime policy is intentionally stricter than the research registry; unknown or unconfigured sources fail closed.
 - Raw API response storage is disabled in v1.
 - No scraping fallback, undocumented endpoints, browser automation for data collection, or invented data.
