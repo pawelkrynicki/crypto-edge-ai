@@ -18,6 +18,23 @@ Stage 12R.1 audits the standalone real-data path from provider policy through lo
 
 12R.1 is documentation and analysis only. It does not activate sources, change the source registry or runtime policy, call providers, store raw responses, add scraping or paid APIs, change scoring, change `final_label`, change `WATCHLIST` meaning, rebuild the frontend, remove test fixtures, deploy to VPS, modify AI KINTEL, or merge a PR.
 
+## 12R.2 Real Data Policy & Environment Decisions
+
+Stage 12R.2 records the owner's accepted policy for the real-data `INTERNAL_BETA` before implementation begins.
+
+- Canonical decision record: `docs/real_data_policy_decisions.md`.
+- `cryptoedge.crmallintraders.pl` is `INTERNAL_BETA`; `PUBLIC_BETA` remains disabled and the external tester remains on hold.
+- DexScreener is the approved discovery source for `live_fetch`, normalized storage, and allowlisted user display; raw storage is denied.
+- GoPlus is the primary and Honeypot.is the secondary security source. Missing or partial results must be explicit and must never be translated to `Safe Token` or `Verified Safe`.
+- Freshness is fixed at 30 minutes for DexScreener scans and security results, 30 hours for Alternative.me, and 6 hours for DefiLlama. Collection intervals are 15 minutes, 6 hours, and 2 hours respectively; security runs for scan candidates.
+- Context may use last-known-good only within SLA and as `DEGRADED`; after SLA all datasets are unavailable.
+- The VPS build is real-data-only, has no fixture/sample fallback or demo surface, and exposes only Radar / Szczegóły / Weryfikacja / Metodologia in the main menu.
+- External tester access requires the complete acceptance checklist and the owner's explicit statement: „akceptuję wersję dla testera”.
+
+12R.2 changes documentation only. It makes no provider call, source activation, runtime-policy change, scoring or `final_label` change, VPS change, deployment, or AI KINTEL implementation. The accepted target policy takes precedence over unresolved questions in older planning sections, but it is not active until implemented and tested.
+
+The next stage is **12R.3 — Fail-Closed Real Data Boundary**. It must enforce environment, fetch/storage/display gates, field allowlists, freshness, degraded/unavailable states, no fixture fallback, and the production/development mode boundary.
+
 ## 12A Standalone Trusted Tester Strategy Correction
 
 After 11G, the near-term priority changes from immediate AI KINTEL implementation to a standalone trusted tester preview path.
@@ -145,11 +162,12 @@ $env:CRYPTO_EDGE_DATA_ENV = "LOCAL_POC"
 pnpm run scanner:live -- --query SOL --max-candidates 3
 ```
 
-Current Camp BETA clearance:
+Current runtime implementation before 12R.3:
 
 - Alternative.me Fear & Greed and DefiLlama are the only sources currently cleared by the registry for Camp BETA.
 - The runtime policy is intentionally stricter than the research registry; registry presence does not grant runtime permission.
-- DexScreener, GoPlus Security, and Honeypot.is are not approved for PUBLIC_BETA; they remain LOCAL_POC-only POC sources pending written clarification or permission.
+- The 12R.2 owner decision approves DexScreener, GoPlus Security, and Honeypot.is for the defined `INTERNAL_BETA` path, but the checked-in runtime policy still keeps them `LOCAL_POC`-only until 12R.3 implements and tests the decision.
+- `PUBLIC_BETA` remains disabled and receives no approval for DexScreener, GoPlus Security, or Honeypot.is from 12R.2.
 - BscScan, AIKINTEL Market News automated access, Etherscan, and all unlisted sources remain blocked until an explicit future runtime-policy update.
 - Unknown sources fail closed.
 - Raw API response storage is disabled in v1.
@@ -214,7 +232,7 @@ Approved context API bridge and panel:
 GET /api/context/latest
 ```
 
-This endpoint is now implemented in the local UI mock API bridge. It reads the newest valid `tools/data-poc/output/<run_id>/approved_sources_output.json`, validates the normalized shape, strips unexpected raw-provider fields, and falls back to a local fixture when no valid output exists.
+This endpoint is now implemented in the local UI mock API bridge. It reads the newest valid `tools/data-poc/output/<run_id>/approved_sources_output.json`, validates the normalized shape, strips unexpected raw-provider fields, and falls back to a local fixture when no valid output exists. That fallback is development-only legacy behavior and must be unreachable in the VPS build under the 12R.2 policy.
 
 The Market Context Panel in `tools/ui-mock` consumes this endpoint. It shows Alternative.me Fear & Greed sentiment context, up to 5 DefiLlama protocol or chain context rows, source status, environment, summary counts, and warning/error counts.
 
@@ -229,7 +247,7 @@ Paid or clarification-dependent sources remain explicitly deferred:
 - CoinGecko Analyst as first paid market/onchain source candidate.
 - TokenSniffer as first paid security pilot candidate.
 - Tokenomist as unlock/vesting candidate.
-- GoPlus only after written commercial-use clarification.
+- GoPlus is approved as primary security source only for the 12R.2 `INTERNAL_BETA` boundary; `PUBLIC_BETA` and commercial rollout remain outside this decision.
 - Bubblemaps/Arkham only after sales and pricing clarification.
 
 ## Local Review Session UI Layer

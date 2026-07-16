@@ -8,9 +8,23 @@
 | Bazowy `main` | `dfe329f6eef9cc97bf794f362e19c0b617ad91b6` |
 | Branch audytu | `codex/real-data-readiness-audit` |
 | Data audytu | 14.07.2026 |
+| Aktualizacja decyzji | 12R.2, 15.07.2026, bazowy `main` `3d639919bb70cba22b9e0fa534ea9f3ca41cc23a` |
 | Deadline CAMP | 31.08.2026 |
 | Cel runtime | prywatny frontend VPS: `https://cryptoedge.crmallintraders.pl`, lokalnie `127.0.0.1:4180` |
 | Werdykt | **NO-GO — nie wznawiać testu zewnętrznego** |
+
+## Aktualizacja 12R.2 — decyzje ownera
+
+Owner zaakceptował decyzje polityczne opisane w `docs/real_data_policy_decisions.md`:
+
+- VPS `cryptoedge.crmallintraders.pl` jest `INTERNAL_BETA`; `PUBLIC_BETA` i dostęp testera zewnętrznego pozostają wyłączone;
+- DexScreener jest źródłem token discovery z dozwolonym `live_fetch`, `normalized_storage` i `user_display` wyłącznie zatwierdzonych pól; `raw_storage` jest zabronione;
+- GoPlus jest primary, a Honeypot.is secondary security source; brak lub niepełność danych nie może zostać przedstawiona jako bezpieczeństwo;
+- zatwierdzono SLA, reguły `DEGRADED`/last-known-good, `Data Unavailable` po przekroczeniu SLA i całkowity brak automatycznego fixture fallback;
+- build VPS ma działać wyłącznie w real-data mode, a demo pozostaje osobnym development mode niedostępnym w buildzie VPS;
+- tester pozostaje zablokowany do spełnienia checklisty i jawnego komunikatu ownera: „akceptuję wersję dla testera”.
+
+Ta aktualizacja zamyka pytania decyzyjne, ale nie usuwa luk implementacyjnych wykrytych w 12R.1. Registry, runtime policy, kod, providery i VPS nie zostały zmienione. Werdykt dla testera pozostaje `NO-GO`, a następnym etapem jest **12R.3 — Fail-Closed Real Data Boundary**.
 
 ## 1. Decyzja audytowa
 
@@ -212,9 +226,9 @@ Poza scanner fixture dostępne są dodatkowe kontrolowane powierzchnie demo:
 
 Fixture należy zachować do testów, ale żaden z tych mechanizmów nie może być osiągalnym fallbackiem ani nieoznaczoną treścią w docelowym trybie real-data na VPS.
 
-## 5. Matryca obecnej polityki
+## 5. Matryca polityki zaimplementowanej na dzień audytu
 
-Poniższa tabela opisuje istniejącą politykę. 12R.1 jej nie zmienia.
+Poniższa tabela opisuje politykę faktycznie zapisaną w runtime na dzień 12R.1. 12R.1 jej nie zmienił, a dokumentacyjny etap 12R.2 również nie aktualizuje konfiguracji wykonawczej.
 
 | Source | `live_fetch` | `normalized_storage` | `user_display` | `derived_score_display` | Wniosek dla prywatnego VPS |
 |---|---|---|---|---|---|
@@ -226,7 +240,7 @@ Poniższa tabela opisuje istniejącą politykę. 12R.1 jej nie zmienia.
 
 `raw_storage` jest zabronione dla wszystkich powyższych źródeł.
 
-Najważniejszy wniosek polityczny: **nie istnieje obecnie środowisko inne niż `LOCAL_POC`, w którym token discovery może działać live, a security fields nie mają uprawnienia `user_display` nawet w `LOCAL_POC`**. Prywatny URL nie staje się automatycznie `LOCAL_POC`. Docelowe środowisko VPS (`INTERNAL_BETA` albo `PUBLIC_BETA`) musi zostać jawnie ustalone, a pełny scanner pozostaje zablokowany do osobnej decyzji źródłowej/politycznej.
+Wniosek z 12R.1 pozostaje prawdziwy dla obecnej konfiguracji: **runtime nie ma jeszcze środowiska innego niż `LOCAL_POC`, w którym token discovery może działać live, a security fields nie mają zaimplementowanego uprawnienia `user_display`**. Decyzja 12R.2 zatwierdza docelową politykę dla `INTERNAL_BETA`, lecz jej egzekwowanie należy do 12R.3. Do tego czasu pełny scanner pozostaje zablokowany i nie wolno wykonywać provider calls przez obejście konfiguracji.
 
 Ustawienie `CRYPTO_EDGE_DATA_ENV=LOCAL_POC` na VPS wyłącznie po to, aby ominąć ograniczenia, byłoby niezgodne z intencją fail-closed policy.
 
@@ -234,13 +248,15 @@ Ustawienie `CRYPTO_EDGE_DATA_ENV=LOCAL_POC` na VPS wyłącznie po to, aby ominą
 
 ### P0 — blokery wznowienia testu
 
-#### RDR-F01 — brak autoryzowanej ścieżki live dla tokenów
+#### RDR-F01 — autoryzowana ścieżka live nie jest jeszcze zaimplementowana
 
 **Dowód:** runtime policy dopuszcza DexScreener, GoPlus i Honeypot.is tylko w `LOCAL_POC`; `goplus_security.user_display` i `honeypot_is.user_display` są puste.
 
 **Skutek:** prywatny VPS nie może obecnie pokazać kompletnego live scanner output zgodnie z polityką.
 
-**Wymagany rezultat:** formalna decyzja o środowisku VPS oraz osobna, autoryzowana decyzja źródłowa. Bez niej produkt może legalnie pokazać tylko approved context i pusty stan skanera.
+**Status decyzji:** zamknięty w 12R.2 — `INTERNAL_BETA`, DexScreener, GoPlus i Honeypot.is zostały zaakceptowane w granicach opisanych w `docs/real_data_policy_decisions.md`.
+
+**Wymagany rezultat:** 12R.3 implementuje osobne gates dla fetch/storage/display, allowlistę oraz fail-closed zachowanie. Do tego czasu produkt może pokazać tylko dane dopuszczone przez istniejącą runtime policy albo pusty stan skanera; provider calls pozostają poza zakresem.
 
 #### RDR-F02 — frontend jest fixture-first i fallback-open
 
@@ -366,7 +382,7 @@ Bez tego API nie może niezależnie udowodnić, że snapshot kwalifikuje się do
 
 ## 7. Definicja danych dopuszczonych do prywatnej wersji
 
-Poniższe kryteria są proponowanym kontraktem technicznym do wdrożenia w następnym etapie. Nie zmieniają source registry ani runtime policy.
+Poniższe kryteria, uzupełnione decyzjami z `docs/real_data_policy_decisions.md`, są zatwierdzonym kontraktem technicznym do wdrożenia w 12R.3. Sam zapis dokumentacyjny nie zmienia source registry ani runtime policy.
 
 ### 7.1 `real`
 
@@ -392,7 +408,7 @@ Snapshot jest `current` tylko wtedy, gdy:
 - UI pokazuje `generated_at`/`fetched_at`, obliczony age oraz status `fresh`/`stale`;
 - brak SLA oznacza `not_ready`, nie „fresh”.
 
-Wartości SLA muszą zostać jawnie zatwierdzone dla scanner, Fear & Greed i DefiLlama. 12R.1 nie ustala arbitralnych limitów.
+Wartości SLA zatwierdzono w 12R.2: DexScreener collect co 15 minut i fresh do 30 minut; wyniki GoPlus/Honeypot.is ważne do 30 minut; Alternative.me collect co 6 godzin i fresh do 30 godzin; DefiLlama collect co 2 godziny i fresh do 6 godzin.
 
 ### 7.3 `policy_compliant`
 
@@ -406,15 +422,16 @@ Snapshot jest `policy_compliant` tylko wtedy, gdy:
 - wymagane attribution/branding są spełnione;
 - nie wykonano scrapingu ani fallbacku do niezatwierdzonego mechanizmu.
 
-### 7.4 `healthy`
+### 7.4 `healthy` i zatwierdzone `degraded`
 
 Snapshot jest `healthy` tylko wtedy, gdy:
 
 - wymagane źródła zakończyły się zgodnie z zaakceptowaną regułą kompletności;
 - nie ma policy denial ani hard failure;
-- degraded state jest zachowany i widoczny end-to-end;
 - errors/warnings nie są ukrywane przez API;
 - decyzja last-known-good jest jawna i nie przekracza SLA.
+
+Stan `DEGRADED` nie jest `healthy`. Może być dopuszczony do prezentacji wyłącznie dla context last-known-good pozostającego w granicach SLA. Brak albo awaria security source nie usuwa kandydata, ale musi dać `SECURITY DATA UNAVAILABLE` lub `PARTIAL SECURITY COVERAGE`; nie może tworzyć pozytywnego statusu bezpieczeństwa.
 
 ### 7.5 `display_eligible`
 
@@ -422,11 +439,11 @@ Snapshot jest `healthy` tylko wtedy, gdy:
 display_eligible = real
   AND current
   AND policy_compliant
-  AND healthy
   AND schema_valid
+  AND (healthy OR approved_degraded)
 ```
 
-Jeśli warunek jest fałszywy, API ma zwrócić kontrolowany `not_ready`/HTTP 503, a frontend ma pokazać pusty lub błędny stan bez danych zastępczych.
+`approved_degraded` oznacza wyłącznie context last-known-good w granicach SLA ze statusem `DEGRADED` albo jawnie niepełne/niedostępne pokrycie security przy kandydacie, bez pozytywnej interpretacji. Jeśli warunek jest fałszywy, API ma zwrócić kontrolowany `not_ready`/HTTP 503, a frontend ma pokazać pusty lub błędny stan bez danych zastępczych.
 
 Scoring, `final_label` i znaczenie `WATCHLIST` pozostają bez zmian. `WATCHLIST` nadal oznacza wyłącznie manual review, nie sygnał transakcyjny.
 
@@ -467,8 +484,8 @@ Plan nie autoryzuje żadnej zmiany polityki, aktywacji źródła, provider call 
 
 | Etap | Termin | Zakres | Bramka wyjścia |
 |---|---|---|---|
-| **12R.2 — Real Data Contract & Fail-Closed Design** | 15-20.07 | Ustalić target environment, kontrakt `display_eligible`, lineage manifest, stale/degraded semantics i brak fixture w production mode. | Zatwierdzony kontrakt, SLA decision list i source-decision owner. Bez provider calls. |
-| **12R.3 — Readiness Validators & API Hardening** | 21-28.07 | Wdrożyć pełną walidację scanner/context, policy gates dla storage/display, sanitizację, 503 zamiast fallback, relative-path hardening i testy. | Fixture/stale/denied/degraded są odrzucane; wszystkie testy bez sieci przechodzą. |
+| **12R.2 — Real Data Policy & Environment Decisions** | 15.07 | **Zakończone:** zatwierdzić target environment, source actions, SLA, degraded/last-known-good, real-data product mode i owner acceptance gates. | `docs/real_data_policy_decisions.md`; bez provider calls, wdrożenia i zmian VPS. |
+| **12R.3 — Fail-Closed Real Data Boundary** | 21-28.07 | Wdrożyć pełną walidację scanner/context, policy gates dla storage/display, allowlistę, freshness, sanitizację, 503/empty state zamiast fallback, rozdzielenie real-data/dev mode i testy. | Fixture/stale/denied są odrzucane, partial/unavailable są jawne, a wszystkie testy bez sieci przechodzą. |
 | **12R.4 — Authorized Collector & Atomic Publishing** | 29.07-07.08 | Wdrożyć scheduler/runner, timeouty, lock, temporary write + atomic publish, manifest, retention i last-success. Scanner track tylko po jawnej zgodzie źródłowej. | Powtarzalny run produkuje wyłącznie normalized artifact; brak raw storage; failure nie publikuje niegotowego snapshotu. |
 | **12R.5 — VPS API & Same-Origin Integration** | 08-14.08 | Osobny autoryzowany deployment: API na loopback, service manager, reverse proxy `/api`, production env, logi i readiness endpoint. | `https://cryptoedge.crmallintraders.pl/api/...` działa przez access gate; port API nie jest publiczny; restart jest bezpieczny. |
 | **12R.6 — Frontend Real-Data Runtime Mode** | 15-20.08 | Skonfigurować API jako jedyne źródło produkcyjne, usunąć runtime fallback do fixture, odseparować demo/mock surfaces, pokazać provenance/age/degraded/error. Bez redesignu scoringu. | W production build nie można wyświetlić `PASS`, `LOWL`, `FDV` ani demo metrics; brak danych daje pusty/error state. |
@@ -477,26 +494,22 @@ Plan nie autoryzuje żadnej zmiany polityki, aktywacji źródła, provider call 
 
 ### Ścieżka krytyczna
 
-Do 20.07.2026 musi zapaść decyzja:
+Decyzje krytyczne zapadły 15.07.2026 w 12R.2: środowiskiem jest `INTERNAL_BETA`, źródła i akcje są określone, security display jest ograniczone do zatwierdzonych statusów/pól, a SLA i product mode są ustalone.
 
-1. Czy prywatny VPS jest `INTERNAL_BETA`, czy `PUBLIC_BETA`?
-2. Które istniejące lub przyszłe źródło może zgodnie z polityką dostarczać realne token discovery i security data w tym środowisku?
-3. Czy provider-derived security fields mogą mieć `user_display`, czy UI może pokazywać wyłącznie dozwolone derived labels?
-
-Bez jawnej decyzji nie wolno uruchomić pełnego token scanner na VPS. Prace nad fail-closed validatorami, API, testami i UI error states mogą być wykonane wcześniej na fixture/mocked inputs bez połączeń z providerami.
+Ścieżką krytyczną jest teraz 12R.3: techniczne egzekwowanie fail-closed bez provider calls w testach. Samo zatwierdzenie decyzji nie pozwala uruchomić pełnego token scanner na VPS; aktywacja źródeł i wdrożenie wymagają osobnych etapów i weryfikacji.
 
 ## 10. Backlog wykonawczy
 
 | ID | Priorytet | Zadanie | Kryterium akceptacji |
 |---|---|---|---|
-| RDR-001 | P0 | Zatwierdzić target environment VPS. | Jedna wartość środowiska w runbooku i deployment env; brak domyślnego `FIXTURE_ONLY` i brak nadużycia `LOCAL_POC`. |
-| RDR-002 | P0 | Rozstrzygnąć źródło live dla token discovery/security. | Pisemna decyzja owner/compliance; do czasu decyzji brak aktywacji i provider calls. |
-| RDR-003 | P0 | Dodać kanoniczny validator `display_eligible`. | Odrzuca fixture, stale, policy-denied, schema-invalid, incomplete lineage i hard/degraded state według zatwierdzonych reguł. |
+| RDR-001 | P0 | Wyegzekwować zatwierdzone target environment VPS. | Runtime i runbook używają wyłącznie `INTERNAL_BETA`; `PUBLIC_BETA` pozostaje wyłączone i nie występuje nadużycie `LOCAL_POC`. |
+| RDR-002 | P0 | Wdrożyć zatwierdzoną politykę discovery/security. | DexScreener, GoPlus i Honeypot.is przechodzą osobne gates fetch/storage/display, allowlistę i testy; raw storage jest niemożliwe. |
+| RDR-003 | P0 | Dodać kanoniczny validator `display_eligible`. | Odrzuca fixture, stale, policy-denied, schema-invalid, incomplete lineage i hard failure; dopuszcza wyłącznie zatwierdzone degraded/partial states, jawnie oznaczone według 12R.2. |
 | RDR-004 | P0 | Egzekwować `normalized_storage`, `user_display`, `derived_score_display`. | Test udowadnia brak write/publish/display po denial; fetch gate pozostaje. |
 | RDR-005 | P0 | Zmienić production Scanner API na fail-closed. | `/api/scanner/latest` nie zwraca fixture; brak kwalifikowanego live snapshotu daje 503 i reason code. |
 | RDR-006 | P0 | Zmienić production Context API na fail-closed. | Tylko live, target environment, allowed policy, valid, current output; brak fixture fallback. |
 | RDR-007 | P0 | Wprowadzić production data mode we frontendzie. | API jest jedynym źródłem; selector fixture/static jest dev-only; błędy nie zasilają kandydatów sample. |
-| RDR-008 | P0 | Odseparować demo/mock surfaces od prywatnej wersji real-data. | Demo może pozostać w repo, lecz nie jest osiągalne z produkcyjnej nawigacji/data path bez jawnego demo build. |
+| RDR-008 | P0 | Odseparować demo/mock surfaces od prywatnej wersji real-data. | Demo pozostaje wyłącznie w development mode, nie jest dostępne w buildzie VPS, a główne menu zawiera tylko Radar / Szczegóły / Weryfikacja / Metodologia. |
 | RDR-009 | P1 | Dodać manifest provenance i per-source health. | API może wykazać mode, environment, source IDs, policy decisions, timestamps, version i `fixture_used: false`. |
 | RDR-010 | P1 | Dodać atomic publish oraz retention. | Czytelnik widzi wyłącznie kompletny snapshot; collision run_id nie nadpisuje innego runu. |
 | RDR-011 | P1 | Dodać scheduler i operational controls. | Lock, timeout, bounded retry/backoff, exit codes, last-success, alert i cleanup; brak unbounded calls. |
@@ -504,7 +517,7 @@ Bez jawnej decyzji nie wolno uruchomić pełnego token scanner na VPS. Prace nad
 | RDR-013 | P1 | Dodać readiness/diagnostics bez danych wrażliwych. | Health procesu jest oddzielony od scanner/context readiness; monitoring wykrywa stale/degraded/no-output. |
 | RDR-014 | P1 | Rozszerzyć testy. | Pełna macierz z sekcji 12 przechodzi offline; VPS smoke nie wywołuje nieautoryzowanych providerów. |
 | RDR-015 | P1 | Ujednolicić dokumentację i runbook. | Jedna aktualna procedura generate/validate/publish/deploy/rollback; stare POC wyraźnie historyczne. |
-| RDR-016 | P0 | Uzyskać owner acceptance. | Właściciel potwierdza czytelność i poprawność real-data flow przed jakimkolwiek testerem zewnętrznym. |
+| RDR-016 | P0 | Uzyskać owner acceptance. | Owner przechodzi Radar → Szczegóły → Weryfikacja → Manual Review i pisze: „akceptuję wersję dla testera”. |
 
 ## 11. Bramka GO/NO-GO dla testu zewnętrznego
 
@@ -512,7 +525,8 @@ Każda pozycja jest obowiązkowa. Jeden wynik negatywny oznacza `NO-GO`.
 
 ### A. Source i policy
 
-- [ ] Target environment VPS jest jawnie zatwierdzone.
+- [x] Target environment VPS jest jawnie zatwierdzone jako `INTERNAL_BETA`; `PUBLIC_BETA` pozostaje wyłączone.
+- [x] Owner zatwierdził source/action matrix opisaną w `docs/real_data_policy_decisions.md`.
 - [ ] Każdy aktywny source ma uprawnienie `live_fetch` w tym środowisku.
 - [ ] Każdy zapisany source ma uprawnienie `normalized_storage`.
 - [ ] Każde pole widoczne użytkownikowi ma `user_display` albo odpowiednio `derived_score_display`.
@@ -529,7 +543,8 @@ Każda pozycja jest obowiązkowa. Jeden wynik negatywny oznacza `NO-GO`.
 
 ### C. Aktualność i health
 
-- [ ] SLA per dataset jest zatwierdzone i egzekwowane.
+- [x] SLA per dataset jest zatwierdzone.
+- [ ] SLA per dataset jest egzekwowane end-to-end.
 - [ ] Stale/future/invalid timestamps są odrzucane.
 - [ ] Degraded/partial/hard failure nie udają healthy.
 - [ ] Brak danych daje 503/empty state.
@@ -546,6 +561,7 @@ Każda pozycja jest obowiązkowa. Jeden wynik negatywny oznacza `NO-GO`.
 ### E. Frontend
 
 - [ ] Default data source to production API.
+- [x] Zatwierdzono real-data-only product mode dla builda VPS i osobny development demo mode.
 - [ ] `PASS`, `LOWL`, `FDV` nie mogą pojawić się w production build.
 - [ ] Demo projects/metrics nie są częścią real-data product mode.
 - [ ] UI pokazuje age i stale/degraded/error bez dwuznacznych zielonych statusów.
@@ -561,9 +577,9 @@ Każda pozycja jest obowiązkowa. Jeden wynik negatywny oznacza `NO-GO`.
 
 ### G. Product acceptance
 
-- [ ] Właściciel przeszedł scenariusz Candidate Results -> Detail -> External Checks -> Manual Review.
+- [ ] Owner przeszedł scenariusz Radar → Szczegóły → Weryfikacja → Manual Review.
 - [ ] Właściciel rozumie source/freshness/error states bez pomocy dewelopera.
-- [ ] Właściciel udzielił jawnej akceptacji.
+- [ ] Owner przekazał jawny komunikat: „akceptuję wersję dla testera”.
 - [ ] Dopiero wtedy można zaprosić testera zewnętrznego.
 
 ## 12. Wymagana macierz testów
@@ -608,22 +624,24 @@ Każda pozycja jest obowiązkowa. Jeden wynik negatywny oznacza `NO-GO`.
 9. Rollback nie przywraca fixture-first build.
 10. Logi i artefakty nie zawierają raw provider responses ani secretów.
 
-## 13. Decyzje wymagane od właściciela/compliance
+## 13. Decyzje rozstrzygnięte przez właściciela/compliance
 
-1. Klasyfikacja prywatnego VPS: `INTERNAL_BETA` czy `PUBLIC_BETA`.
-2. Dopuszczone źródło token discovery dla tego środowiska.
-3. Dopuszczone źródło security enrichment oraz zasady display/attribution.
-4. Czy dozwolone są wyłącznie derived security labels, gdy raw provider fields nie mają `user_display`.
-5. SLA świeżości dla scanner, Fear & Greed i DefiLlama.
-6. Reguła degraded i last-known-good: kiedy wolno pokazać ostatni snapshot, a kiedy wymagane jest 503.
-7. Czy demo/webinar/research mock ma być całkowicie wyłączony w prywatnym product mode.
-8. Scenariusz i kryteria owner acceptance.
+Wszystkie pytania z 12R.1 rozstrzygnięto w 12R.2 i zapisano kanonicznie w `docs/real_data_policy_decisions.md`:
 
-Żadna z tych decyzji nie powinna być zasymulowana przez kod albo domyślną wartość.
+1. VPS to `INTERNAL_BETA`; `PUBLIC_BETA` pozostaje wyłączone.
+2. DexScreener jest źródłem token discovery.
+3. GoPlus jest primary, a Honeypot.is secondary security source; display podlega jawnej allowliście i zakazowi komunikatów o bezpieczeństwie.
+4. `raw_storage` jest zabronione; dozwolone są wyłącznie zatwierdzone znormalizowane pola i statusy.
+5. SLA zatwierdzono osobno dla DexScreener, security, Alternative.me i DefiLlama.
+6. Last-known-good jest dopuszczalne wyłącznie dla context, w granicach SLA i ze statusem `DEGRADED`; po SLA obowiązuje `Data Unavailable`.
+7. Demo jest wyłączone z builda VPS i dostępne wyłącznie w osobnym development mode.
+8. Tester wymaga pełnej checklisty, przejścia ownera przez Radar → Szczegóły → Weryfikacja → Manual Review oraz jawnej akceptacji.
+
+Decyzje nie mogą zostać zastąpione domyślną wartością w kodzie. Muszą zostać jawnie wyegzekwowane i przetestowane w 12R.3.
 
 ## 14. Podsumowanie 12R.1
 
-Najkrótsza bezpieczna droga nie polega na podmianie fixture jednym plikiem live. Najpierw trzeba zbudować techniczną granicę prawdy danych: provenance, pełne policy gates, freshness SLA, fail-closed API i production data mode bez sample fallback. Równolegle właściciel/compliance muszą rozstrzygnąć źródło token discovery/security dla docelowego środowiska VPS.
+Najkrótsza bezpieczna droga nie polega na podmianie fixture jednym plikiem live. Decyzje środowiskowe, źródłowe, SLA i produktowe są już zatwierdzone w 12R.2. Teraz trzeba zbudować techniczną granicę prawdy danych: provenance, pełne policy gates, freshness SLA, fail-closed API i production data mode bez sample fallback.
 
 Do czasu spełnienia wszystkich bramek:
 
