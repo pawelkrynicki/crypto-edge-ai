@@ -2785,7 +2785,7 @@ try {
   await writeContextRun(outputDir, makeContextOutput("approved_sources_20260624010101", 3));
   await writeContextRun(outputDir, makeContextOutput("approved_sources_20260624020202", 9));
 
-  const latestContext = await readLatestContextOutput({ outputDirPath: outputDir, fixturePath: contextFixturePath });
+  const latestContext = await readLatestContextOutput({ runtimeMode: "DEVELOPMENT_DEMO", outputDirPath: outputDir, fixturePath: contextFixturePath });
   assert.equal(
     latestContext.run_id,
     "approved_sources_20260624020202",
@@ -2801,6 +2801,7 @@ try {
   );
 
   const server = createScannerApiServer({
+    runtimeMode: "DEVELOPMENT_DEMO",
     context: {
       outputDirPath: outputDir,
       fixturePath: contextFixturePath,
@@ -2826,7 +2827,7 @@ try {
 
   const emptyOutputDir = resolve(contextTempRoot, "empty-output");
   await mkdir(emptyOutputDir, { recursive: true });
-  const fallbackContext = await readLatestContextOutput({ outputDirPath: emptyOutputDir, fixturePath: contextFixturePath });
+  const fallbackContext = await readLatestContextOutput({ runtimeMode: "DEVELOPMENT_DEMO", outputDirPath: emptyOutputDir, fixturePath: contextFixturePath });
   assert.equal(fallbackContext._source_meta.source_kind, "fixture-fallback", "context reader falls back when no output exists");
   assert.equal(fallbackContext._source_meta.output_file, null, "fixture fallback does not claim an output file");
 
@@ -2837,7 +2838,7 @@ try {
     "{ invalid json",
     "utf8",
   );
-  const invalidFallbackContext = await readLatestContextOutput({ outputDirPath: invalidOutputDir, fixturePath: contextFixturePath });
+  const invalidFallbackContext = await readLatestContextOutput({ runtimeMode: "DEVELOPMENT_DEMO", outputDirPath: invalidOutputDir, fixturePath: contextFixturePath });
   assert.equal(
     invalidFallbackContext._source_meta.source_kind,
     "fixture-fallback",
@@ -2852,7 +2853,7 @@ try {
   }) as typeof fetch;
 
   try {
-    await readLatestContextOutput({ outputDirPath: outputDir, fixturePath: contextFixturePath });
+    await readLatestContextOutput({ runtimeMode: "DEVELOPMENT_DEMO", outputDirPath: outputDir, fixturePath: contextFixturePath });
     assert.equal(fetchCalled, false, "context reader does not call network");
   } finally {
     globalThis.fetch = originalFetch;
@@ -2875,7 +2876,7 @@ try {
       })),
     })),
   });
-  const sanitizedContext = await readLatestContextOutput({ outputDirPath: rawLeakOutputDir, fixturePath: contextFixturePath });
+  const sanitizedContext = await readLatestContextOutput({ runtimeMode: "DEVELOPMENT_DEMO", outputDirPath: rawLeakOutputDir, fixturePath: contextFixturePath });
   const serializedContext = JSON.stringify(sanitizedContext);
   for (const forbiddenField of ["metadata", "description", "symbol", "chains", "raw", "provider_response"]) {
     assert.equal(

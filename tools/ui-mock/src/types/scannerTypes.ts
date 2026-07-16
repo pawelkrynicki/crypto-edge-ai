@@ -13,7 +13,11 @@ export type PersistableSecurityLabel =
   | "SECURITY_PASSED"
   | "NEEDS_MANUAL_VERIFICATION"
   | "CRITICAL_RISK"
-  | "NOT_CHECKED";
+  | "NOT_CHECKED"
+  | "CRITICAL RISK"
+  | "NEEDS MANUAL VERIFICATION"
+  | "SECURITY DATA UNAVAILABLE"
+  | "PARTIAL SECURITY COVERAGE";
 
 export type PersistableBasicFilterStatus =
   | "passed_basic_filter"
@@ -26,8 +30,8 @@ export type PersistableScanRun = {
   source: "combined-scanner-poc";
   mode: "fixture" | "live";
   query: string;
-  filters: Record<string, unknown>;
-  limits: Record<string, unknown>;
+  filters?: Record<string, unknown>;
+  limits?: Record<string, unknown>;
   started_at: string | null;
   finished_at: string;
   total_raw: number;
@@ -71,6 +75,7 @@ export type PersistableSecurityCheck = {
   run_id: string;
   candidate_id: string;
   sources: string[];
+  coverage_status?: "SECURITY DATA UNAVAILABLE" | "PARTIAL SECURITY COVERAGE" | null;
   honeypot_status: string;
   buy_tax: number | null;
   sell_tax: number | null;
@@ -90,7 +95,7 @@ export type PersistableSecurityCheck = {
   security_label: string;
   critical_reasons: string[];
   warning_reasons: string[];
-  checked_at: string;
+  checked_at: string | null;
 };
 
 export type PersistableScorecard = {
@@ -115,6 +120,19 @@ export type PersistableScorecard = {
 };
 
 export type PersistableScannerOutput = {
+  provenance?: {
+    schema_version: string;
+    contract_version: string;
+    generator_version: string;
+    environment: string;
+    mode: "fixture" | "live";
+    fixture_used: boolean;
+    run_id: string;
+    generated_at: string;
+    finished_at: string;
+    source_ids: string[];
+    policy_decisions: Record<string, Record<string, "allowed" | "denied">>;
+  };
   scan_run: PersistableScanRun;
   candidates: PersistableCandidate[];
   security_checks: PersistableSecurityCheck[];
@@ -123,10 +141,13 @@ export type PersistableScannerOutput = {
 
 export type ScannerSourceMeta = {
   source: "real-output" | "fixture-fallback";
-  path: string;
+  path?: string;
   reason: string;
   selected_run_id: string | null;
   loaded_at: string;
+  runtime_mode?: "DEVELOPMENT_DEMO" | "INTERNAL_BETA" | "UNCONFIGURED";
+  age_seconds?: number | null;
+  source_ids?: string[];
 };
 
 export type ScannerApiOutput = PersistableScannerOutput & {

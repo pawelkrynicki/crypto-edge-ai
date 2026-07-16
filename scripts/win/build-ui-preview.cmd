@@ -5,7 +5,7 @@ set "SCRIPT_DIR=%~dp0"
 for %%I in ("%SCRIPT_DIR%..\..") do set "REPO_ROOT=%%~fI"
 
 echo.
-echo === Crypto Edge AI: production UI mock build ===
+echo === Crypto Edge AI: explicit DEVELOPMENT_DEMO UI build ===
 echo Repo root: %REPO_ROOT%
 
 cd /d "%REPO_ROOT%" || exit /b 1
@@ -28,8 +28,8 @@ if not exist "node_modules\.bin\vite.cmd" (
 )
 
 echo.
-echo === Running package.json build ===
-call npm run build
+echo === Running explicit DEVELOPMENT_DEMO build ===
+call npm run build:demo
 if errorlevel 1 exit /b %ERRORLEVEL%
 
 if not exist "dist\index.html" (
@@ -38,6 +38,6 @@ if not exist "dist\index.html" (
 )
 
 echo.
-echo OK: production UI preview build gotowy.
+echo OK: DEVELOPMENT_DEMO UI preview build gotowy.
 echo Dist: %REPO_ROOT%\tools\ui-mock\dist
 exit /b 0

@@ -1,7 +1,15 @@
 import { createHash } from "node:crypto";
+import {
+  buildSnapshotProvenanceManifest,
+  type SnapshotProvenanceManifest,
+} from "./provenanceManifest.js";
 import type { CombinedScannerFinalLabel, CombinedScannerOutput } from "./types.js";
 
+export const SCANNER_SCHEMA_VERSION = "scanner_snapshot_v1";
+export const SCANNER_GENERATOR_VERSION = "data_poc_persistable_scanner_v1";
+
 export type PersistableScannerOutput = {
+  provenance?: SnapshotProvenanceManifest;
   scan_run: PersistableScanRun;
   candidates: PersistableCandidate[];
   security_checks: PersistableSecurityCheck[];
@@ -106,6 +114,7 @@ export type BuildPersistableScannerInput = {
   runId?: string;
   startedAt?: string | null;
   finishedAt?: string;
+  environment?: string;
 };
 
 export function buildPersistableScannerOutput(input: BuildPersistableScannerInput): PersistableScannerOutput {
@@ -194,7 +203,22 @@ export function buildPersistableScannerOutput(input: BuildPersistableScannerInpu
     created_at: finishedAt
   }));
 
+  const securitySourceIds = input.combined.candidates.flatMap((item) => (
+    item.security?.sources.map((source) => source === "goplus" ? "goplus_security" : "honeypot_is") ?? []
+  ));
+  const sourceIds = ["dexscreener", ...new Set(securitySourceIds)];
+
   return {
+    provenance: buildSnapshotProvenanceManifest({
+      schemaVersion: SCANNER_SCHEMA_VERSION,
+      generatorVersion: SCANNER_GENERATOR_VERSION,
+      environment: input.environment ?? "FIXTURE_ONLY",
+      mode: input.combined.mode,
+      runId,
+      generatedAt: finishedAt,
+      finishedAt,
+      sourceIds,
+    }),
     scan_run: {
       run_id: runId,
       source: input.combined.source,

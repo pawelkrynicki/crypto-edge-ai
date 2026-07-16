@@ -181,6 +181,11 @@ describe("approved free source adapters", () => {
       assert.equal(result.output.summary.sources_allowed, 2);
       assert.equal(result.output.summary.sources_denied, 0);
       assert.equal(result.output.summary.records_total, 3);
+      assert.equal(result.output.provenance.schema_version, "context_snapshot_v1");
+      assert.equal(result.output.provenance.contract_version, "real_data_boundary_v1");
+      assert.equal(result.output.provenance.environment, "DEVELOPMENT_DEMO");
+      assert.equal(result.output.provenance.fixture_used, true);
+      assert.equal(result.output.provenance.policy_decisions.alternative_me_fng.raw_storage, "denied");
     } finally {
       await rm(tempRoot, { recursive: true, force: true });
     }

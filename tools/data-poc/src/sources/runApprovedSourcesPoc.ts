@@ -2,6 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { getActiveSourceEnvironment, getSourcePolicyDecision, isSourcePolicyError } from "../sourcePolicy.js";
+import { buildSnapshotProvenanceManifest } from "../provenanceManifest.js";
 import { getApprovedSourceAdapters } from "./sourceAdapterRegistry.js";
 import type {
   ApprovedSourcesRunOutput,
@@ -14,6 +15,8 @@ import type {
 export const APPROVED_SOURCES_OUTPUT_FILENAME = "approved_sources_output.json";
 export const EXTERNAL_SOURCE_DEGRADED_LABEL = "EXTERNAL SOURCE DEGRADED";
 export const DEGRADED_EXTERNAL_SOURCE_STATUS = "degraded_external_source";
+export const CONTEXT_SCHEMA_VERSION = "context_snapshot_v1";
+export const CONTEXT_GENERATOR_VERSION = "approved_sources_poc_v1";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_OUTPUT_DIR = resolve(__dirname, "../../../output");
@@ -52,8 +55,19 @@ export async function runApprovedSourcesPoc(options: RunApprovedSourcesPocOption
     }
   }
 
+  const runId = `approved_sources_${formatRunIdDate(now)}`;
   const output: ApprovedSourcesRunOutput = {
-    run_id: `approved_sources_${formatRunIdDate(now)}`,
+    provenance: buildSnapshotProvenanceManifest({
+      schemaVersion: CONTEXT_SCHEMA_VERSION,
+      generatorVersion: CONTEXT_GENERATOR_VERSION,
+      environment,
+      mode,
+      runId,
+      generatedAt,
+      finishedAt: generatedAt,
+      sourceIds: adapters.map((adapter) => adapter.sourceId),
+    }),
+    run_id: runId,
     generated_at: generatedAt,
     environment,
     sources,

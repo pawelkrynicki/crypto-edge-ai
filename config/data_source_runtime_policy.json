@@ -96,22 +96,25 @@
           "FIXTURE_ONLY"
         ],
         "live_fetch": [
-          "LOCAL_POC"
+          "LOCAL_POC",
+          "INTERNAL_BETA"
         ],
         "normalized_storage": [
-          "LOCAL_POC"
+          "LOCAL_POC",
+          "INTERNAL_BETA"
         ],
         "raw_storage": [],
         "user_display": [
-          "LOCAL_POC"
+          "LOCAL_POC",
+          "INTERNAL_BETA"
         ],
         "derived_score_display": [
           "LOCAL_POC"
         ]
       },
       "notes": [
-        "DexScreener live fetch is LOCAL_POC only.",
-        "PUBLIC_BETA and COMMERCIAL are blocked until written clarification.",
+        "DexScreener is approved for the allowlisted INTERNAL_BETA path by 12R.2.",
+        "PUBLIC_BETA and COMMERCIAL remain blocked.",
         "Raw storage is disabled in v1."
       ]
     },
@@ -121,21 +124,25 @@
           "FIXTURE_ONLY"
         ],
         "live_fetch": [
-          "LOCAL_POC"
+          "LOCAL_POC",
+          "INTERNAL_BETA"
         ],
         "normalized_storage": [
-          "LOCAL_POC"
+          "LOCAL_POC",
+          "INTERNAL_BETA"
         ],
         "raw_storage": [],
-        "user_display": [],
+        "user_display": [
+          "INTERNAL_BETA"
+        ],
         "derived_score_display": [
           "LOCAL_POC"
         ]
       },
       "notes": [
-        "GoPlus live fetch is LOCAL_POC only.",
-        "User display is disabled in v1.",
-        "Future user display requires Powered by GoPlus attribution and approval.",
+        "GoPlus is approved for candidate-scoped INTERNAL_BETA checks by 12R.2.",
+        "User display is limited to the normalized 12R.3 security allowlist and approved statuses.",
+        "Powered by GoPlus attribution remains required wherever applicable.",
         "Raw storage is disabled in v1."
       ]
     },
@@ -145,21 +152,25 @@
           "FIXTURE_ONLY"
         ],
         "live_fetch": [
-          "LOCAL_POC"
+          "LOCAL_POC",
+          "INTERNAL_BETA"
         ],
         "normalized_storage": [
-          "LOCAL_POC"
+          "LOCAL_POC",
+          "INTERNAL_BETA"
         ],
         "raw_storage": [],
-        "user_display": [],
+        "user_display": [
+          "INTERNAL_BETA"
+        ],
         "derived_score_display": [
           "LOCAL_POC"
         ]
       },
       "notes": [
-        "Honeypot.is live fetch is LOCAL_POC only.",
-        "PUBLIC_BETA and COMMERCIAL are blocked pending written permission.",
-        "User display and raw storage are disabled in v1."
+        "Honeypot.is is approved as the secondary candidate-scoped INTERNAL_BETA source by 12R.2.",
+        "PUBLIC_BETA and COMMERCIAL remain blocked.",
+        "User display is limited to the normalized 12R.3 security allowlist; raw storage remains disabled."
       ]
     },
     "aikintel_market_news": {

@@ -22,12 +22,17 @@ call pnpm run sources:approved:fixture
 if errorlevel 1 exit /b %ERRORLEVEL%
 
 echo.
-echo === Generate approved source live context ===
-set "CRYPTO_EDGE_DATA_ENV=PUBLIC_BETA"
-call pnpm run sources:approved:live
-set "LIVE_EXIT=%ERRORLEVEL%"
-set "CRYPTO_EDGE_DATA_ENV="
-if not "%LIVE_EXIT%"=="0" exit /b %LIVE_EXIT%
+echo === Live context check gate ===
+if /I "%CRYPTO_EDGE_ALLOW_LIVE_SOURCE_CHECK%"=="1" (
+  echo Explicit live check enabled. This is outside the offline 12R.3 validation path.
+  set "CRYPTO_EDGE_DATA_ENV=PUBLIC_BETA"
+  call pnpm run sources:approved:live
+  set "LIVE_EXIT=%ERRORLEVEL%"
+  set "CRYPTO_EDGE_DATA_ENV="
+  if not "%LIVE_EXIT%"=="0" exit /b %LIVE_EXIT%
+) else (
+  echo SKIP: live provider calls are disabled. Set CRYPTO_EDGE_ALLOW_LIVE_SOURCE_CHECK=1 only in an authorized live-source stage.
+)
 
 echo.
 echo === Run data-poc tests ===

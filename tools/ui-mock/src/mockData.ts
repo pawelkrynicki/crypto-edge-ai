@@ -1,5 +1,3 @@
-import { mapPersistableScannerOutputToUiCandidates } from "./adapters/scannerOutputAdapter";
-import { PERSISTABLE_SCANNER_SAMPLE } from "./fixtures/persistableScannerSample";
 import type { UiTokenCandidate } from "./types/scannerTypes";
 
 export type FinalLabel = UiTokenCandidate["finalLabel"];
@@ -102,18 +100,3 @@ export function toMockCandidate(u: UiTokenCandidate): MockCandidate {
     last_checked: u.lastCheckedAt,
   };
 }
-
-const UI_CANDIDATES: UiTokenCandidate[] =
-  mapPersistableScannerOutputToUiCandidates(PERSISTABLE_SCANNER_SAMPLE);
-
-export const MOCK_CANDIDATES: MockCandidate[] = UI_CANDIDATES.map(toMockCandidate);
-
-export const MOCK_SUMMARY = {
-  total_candidates: MOCK_CANDIDATES.length,
-  watchlist: MOCK_CANDIDATES.filter((c) => c.final_label === "WATCHLIST").length,
-  critical_risk: MOCK_CANDIDATES.filter((c) => c.final_label === "CRITICAL_RISK").length,
-  needs_manual_verification: MOCK_CANDIDATES.filter((c) => c.final_label === "NEEDS_MANUAL_VERIFICATION").length,
-  rejected: MOCK_CANDIDATES.filter((c) => c.final_label === "REJECT").length,
-};
-
-export const MOCK_SCAN_RUN = PERSISTABLE_SCANNER_SAMPLE.scan_run;

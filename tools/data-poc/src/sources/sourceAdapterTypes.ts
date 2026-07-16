@@ -1,4 +1,5 @@
 import type { SourceAction } from "../sourcePolicy.js";
+import type { SnapshotProvenanceManifest } from "../provenanceManifest.js";
 
 export type SourceAdapterMode = "fixture" | "live";
 export type SourceDataCategory = "sentiment" | "defi_context" | "market_context";
@@ -45,6 +46,7 @@ export type NormalizedSourceOutput = {
 };
 
 export type ApprovedSourcesRunOutput = {
+  provenance: SnapshotProvenanceManifest;
   run_id: string;
   generated_at: string;
   environment: string;

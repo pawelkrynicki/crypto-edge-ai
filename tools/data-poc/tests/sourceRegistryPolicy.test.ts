@@ -77,8 +77,11 @@ describe("source registry validation", () => {
     const sourceIds = new Set(registry.sources.map((source) => source.source_id));
     const references = [...registry.sources_ready_for_camp_beta, ...registry.sources_blocked_or_pending];
 
-    assert.deepEqual([...registry.sources_ready_for_camp_beta].sort(), ["alternative_me_fng", "defillama_api"]);
-    assert.equal(registry.sources_blocked_or_pending.length, 19);
+    assert.deepEqual(
+      [...registry.sources_ready_for_camp_beta].sort(),
+      ["alternative_me_fng", "defillama_api", "dexscreener", "goplus_security", "honeypot_is"].sort()
+    );
+    assert.equal(registry.sources_blocked_or_pending.length, 16);
     assert.equal(references.every((sourceId) => sourceIds.has(sourceId)), true);
   });
 
@@ -133,6 +136,20 @@ describe("source runtime policy", () => {
     });
 
     assert.equal(decision.allowed, true);
+  });
+
+  it("allows approved scanner sources through INTERNAL_BETA fetch/storage/display gates", () => {
+    for (const sourceId of ["dexscreener", "goplus_security", "honeypot_is"]) {
+      for (const action of ["live_fetch", "normalized_storage", "user_display"] as const) {
+        const decision = getSourcePolicyDecision({
+          sourceId,
+          environment: "INTERNAL_BETA",
+          action
+        });
+
+        assert.equal(decision.allowed, true, `${sourceId} ${action} should be allowed in INTERNAL_BETA`);
+      }
+    }
   });
 
   it("blocks dexscreener live_fetch in PUBLIC_BETA", () => {

@@ -74,7 +74,12 @@ export const MarketContextPanel: React.FC<Props> = ({ state }) => {
         sourceLabel={sourceLabel}
         sourceBadgeClass={sourceBadgeClass}
         environment={context.environment}
-        titleMeta={`Loaded ${formatDate(context._source_meta.loaded_at || context.generated_at)}`}
+        titleMeta={[
+          `Run ${context.run_id}`,
+          `generated ${formatDate(context.generated_at)}`,
+          context._source_meta.age_seconds == null ? null : `age ${formatAge(context._source_meta.age_seconds)}`,
+          context._source_meta.source_ids?.join(", "),
+        ].filter((value): value is string => Boolean(value)).join(" · ")}
         summary={context.summary}
       />
 
@@ -82,7 +87,7 @@ export const MarketContextPanel: React.FC<Props> = ({ state }) => {
         <div className="market-notes">
           {state.message && (
             <div className="market-context-warning">
-              <span className="font-semibold">Sample fallback:</span>{" "}
+              <span className="font-semibold">{sourceKind === "fixture-fallback" ? "Development demo fixture:" : "Data notice:"}</span>{" "}
               <span>{state.message}</span>
             </div>
           )}
@@ -173,6 +178,12 @@ export const MarketContextPanel: React.FC<Props> = ({ state }) => {
     </section>
   );
 };
+
+function formatAge(ageSeconds: number): string {
+  if (ageSeconds < 60) return `${ageSeconds}s`;
+  if (ageSeconds < 3600) return `${Math.floor(ageSeconds / 60)}m`;
+  return `${Math.floor(ageSeconds / 3600)}h`;
+}
 
 function PanelHeader({
   sourceLabel,

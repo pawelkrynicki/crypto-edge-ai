@@ -29,6 +29,11 @@ import {
 } from "./services/scannerDataSource";
 import { loadLatestMarketContext } from "./services/contextDataSource";
 import {
+  getProductRuntimeMode,
+  isDevelopmentDemoMode,
+  type ResolvedProductRuntimeMode,
+} from "./runtimeMode";
+import {
   clearReviewRecord,
   createEmptyReviewSession,
   getCandidateReview,
@@ -47,7 +52,7 @@ import { mapPersistableScannerOutputToUiCandidates } from "./adapters/scannerOut
 import { toMockCandidate, type MockCandidate } from "./mockData";
 import {
   DEFAULT_WORKSPACE_SECTION,
-  WORKSPACE_NAV_GROUPS,
+  getWorkspaceNavGroups,
   resolveInitialWorkspaceSection,
   sectionToHash,
 } from "./workspaceNavigation";
@@ -138,6 +143,7 @@ const SOURCE_STATUS_TEXT: Record<ResolvedScannerSource, string> = {
   "static-json": "Source Freshness: local data file",
   "real-output": "Source Freshness: latest local output",
   "fixture-fallback": "Source Freshness: sample fallback",
+  unavailable: "Source Freshness: Data Unavailable",
 };
 
 type ReviewStorageStatus = {
@@ -157,18 +163,27 @@ const INITIAL_REVIEW_STORAGE_STATUS: ReviewStorageStatus = {
 };
 
 export default function App() {
+  const runtimeMode = getProductRuntimeMode();
+  const developmentDemo = isDevelopmentDemoMode(runtimeMode);
+  const navGroups = getWorkspaceNavGroups(runtimeMode);
+  const dataSourceOptions = getDataSourceOptions(runtimeMode);
+  const initialDataSource: DataSourceKey = developmentDemo ? "fixture" : "api";
   const [activeSection, setActiveSection] = useState<WorkspaceSectionId>(() => {
     if (typeof window === "undefined") return DEFAULT_WORKSPACE_SECTION;
-    return resolveInitialWorkspaceSection(window.location.hash);
+    return resolveInitialWorkspaceSection(window.location.hash, runtimeMode);
   });
 
-  const [dataSource, setDataSource] = useState<DataSourceKey>("fixture");
-  const [resolvedSource, setResolvedSource] = useState<ResolvedScannerSource>("built-in-fixture");
+  const [dataSource, setDataSource] = useState<DataSourceKey>(initialDataSource);
+  const [resolvedSource, setResolvedSource] = useState<ResolvedScannerSource>(developmentDemo ? "built-in-fixture" : "unavailable");
   const [scannerGeneratedAt, setScannerGeneratedAt] = useState<string | null>(null);
   const [scannerMode, setScannerMode] = useState<string | null>(null);
+  const [scannerRunId, setScannerRunId] = useState<string | null>(null);
+  const [scannerAgeSeconds, setScannerAgeSeconds] = useState<number | null>(null);
+  const [scannerSources, setScannerSources] = useState<string[]>([]);
   const [candidates, setCandidates] = useState<MockCandidate[]>([]);
   const [loading, setLoading] = useState(false);
   const [fallbackMsg, setFallbackMsg] = useState<string | null>(null);
+  const [dataUnavailableReasonCode, setDataUnavailableReasonCode] = useState<string | null>(null);
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null | undefined>(undefined);
   const [tokenLookupInput, setTokenLookupInput] = useState("");
   const [externalChecksInput, setExternalChecksInput] = useState("");
@@ -181,7 +196,12 @@ export default function App() {
   });
 
   const summary = buildSummary(candidates);
-  const sourceStatusText = SOURCE_STATUS_TEXT[resolvedSource];
+  const sourceStatusText = formatScannerSourceStatus(
+    resolvedSource,
+    scannerRunId,
+    scannerAgeSeconds,
+    scannerSources,
+  );
   const contextSourceStatus = getContextSourceStatus(marketContextState);
   const selectedDetailCandidate =
     candidates.find((candidate) => candidate.id === selectedCandidateId) ??
@@ -201,26 +221,47 @@ export default function App() {
   const loadData = useCallback(async (source: DataSourceKey) => {
     setLoading(true);
     setFallbackMsg(null);
+    setDataUnavailableReasonCode(null);
     try {
-      const result = await loadScannerDataSourceResult(source);
+      const result = await loadScannerDataSourceResult(source, { runtimeMode });
+      if (result.status === "error") {
+        setCandidates([]);
+        setResolvedSource("unavailable");
+        setScannerGeneratedAt(null);
+        setScannerMode(null);
+        setScannerRunId(null);
+        setScannerAgeSeconds(null);
+        setScannerSources([]);
+        setDataUnavailableReasonCode(result.reasonCode);
+        setFallbackMsg(`Data Unavailable — ${result.reasonCode}: ${result.error}`);
+        return;
+      }
       const built = buildMockCandidates(result);
       setCandidates(built);
       setResolvedSource(result.resolvedSource);
       setScannerGeneratedAt(result.output.scan_run.finished_at ?? result.output.scan_run.started_at ?? null);
       setScannerMode(result.output.scan_run.mode ?? null);
+      setScannerRunId(result.output.scan_run.run_id ?? null);
+      setScannerAgeSeconds(result.output._source_meta?.age_seconds ?? null);
+      setScannerSources(result.output._source_meta?.source_ids ?? []);
       if (result.usedFallback && result.fallbackReason) {
         setFallbackMsg(result.fallbackReason);
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      setResolvedSource("built-in-fixture");
+      setCandidates([]);
+      setResolvedSource("unavailable");
       setScannerGeneratedAt(null);
       setScannerMode(null);
-      setFallbackMsg(`Unexpected error: ${msg}`);
+      setScannerRunId(null);
+      setScannerAgeSeconds(null);
+      setScannerSources([]);
+      setDataUnavailableReasonCode("SCANNER_UNEXPECTED_ERROR");
+      setFallbackMsg(`Data Unavailable — SCANNER_UNEXPECTED_ERROR: ${msg}`);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [runtimeMode]);
 
   const loadMarketContext = useCallback(async () => {
     setMarketContextState({ status: "loading", context: null });
@@ -238,13 +279,13 @@ export default function App() {
     setMarketContextState({
       status: "error",
       context: null,
-      message: result.error,
+      message: `Data Unavailable — ${result.reasonCode}: ${result.error}`,
     });
   }, []);
 
   useEffect(() => {
-    loadData("fixture");
-  }, [loadData]);
+    loadData(initialDataSource);
+  }, [initialDataSource, loadData]);
 
   useEffect(() => {
     loadMarketContext();
@@ -254,7 +295,7 @@ export default function App() {
     if (typeof window === "undefined") return undefined;
 
     const handleHashChange = () => {
-      setActiveSection(resolveInitialWorkspaceSection(window.location.hash));
+      setActiveSection(resolveInitialWorkspaceSection(window.location.hash, runtimeMode));
     };
 
     window.addEventListener("hashchange", handleHashChange);
@@ -262,7 +303,7 @@ export default function App() {
     return () => {
       window.removeEventListener("hashchange", handleHashChange);
     };
-  }, []);
+  }, [runtimeMode]);
 
   useEffect(() => {
     let cancelled = false;
@@ -544,15 +585,17 @@ export default function App() {
 
   return (
     <WorkspaceShell
-      navGroups={WORKSPACE_NAV_GROUPS}
+      navGroups={navGroups}
       activeSection={activeSection}
       onSectionChange={handleWorkspaceSectionChange}
       dataSource={dataSource}
-      dataSourceOptions={DATA_SOURCE_OPTIONS}
+      dataSourceOptions={dataSourceOptions}
       onDataSourceChange={handleSourceChange}
       loading={loading}
       sourceStatusText={sourceStatusText}
       fallbackMsg={fallbackMsg}
+      dataUnavailableReasonCode={dataUnavailableReasonCode}
+      runtimeMode={runtimeMode}
       presentationMode={activeSection === "webinar-teaser"}
       trustedPreviewMode={activeSection === "trusted-preview" || activeSection === "feedback-notes"}
     >
@@ -622,8 +665,37 @@ function getContextSourceStatus(state: MarketContextPanelState): { text: string;
 
   return {
     text: `Source Freshness: ${formatContextSourceKind(state.context._source_meta.source_kind)}`,
-    detail: state.message ?? state.context._source_meta.output_file ?? undefined,
+    detail: state.message ?? [
+      `run ${state.context.run_id}`,
+      `generated ${state.context.generated_at}`,
+      state.context._source_meta.age_seconds == null ? null : `age ${formatAge(state.context._source_meta.age_seconds)}`,
+      state.context._source_meta.source_ids?.join(", "),
+    ].filter((value): value is string => Boolean(value)).join(" · "),
   };
+}
+
+export function getDataSourceOptions(runtimeMode: ResolvedProductRuntimeMode): typeof DATA_SOURCE_OPTIONS {
+  return runtimeMode === "DEVELOPMENT_DEMO" ? DATA_SOURCE_OPTIONS : [];
+}
+
+function formatScannerSourceStatus(
+  source: ResolvedScannerSource,
+  runId: string | null,
+  ageSeconds: number | null,
+  sourceIds: string[],
+): string {
+  const details = [
+    runId ? `run ${runId}` : null,
+    ageSeconds == null ? null : `age ${formatAge(ageSeconds)}`,
+    sourceIds.length > 0 ? sourceIds.join(", ") : null,
+  ].filter((value): value is string => Boolean(value));
+  return details.length > 0 ? `${SOURCE_STATUS_TEXT[source]} · ${details.join(" · ")}` : SOURCE_STATUS_TEXT[source];
+}
+
+function formatAge(ageSeconds: number): string {
+  if (ageSeconds < 60) return `${ageSeconds}s`;
+  if (ageSeconds < 3600) return `${Math.floor(ageSeconds / 60)}m`;
+  return `${Math.floor(ageSeconds / 3600)}h`;
 }
 
 function formatContextSourceKind(sourceKind: string): string {

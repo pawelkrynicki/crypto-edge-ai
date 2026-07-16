@@ -41,6 +41,7 @@ async function runSmoke(): Promise<void> {
   await removeSmokeStorageFile(storageFile);
 
   const server = createScannerApiServer({
+    runtimeMode: "DEVELOPMENT_DEMO",
     reviewSession: {
       storageFilePath: storageFile,
     },

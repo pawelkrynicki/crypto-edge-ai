@@ -23,6 +23,8 @@ pnpm-debug.log*
 .env
 .env.*
 !.env.example
+!tools/ui-mock/.env.internal-beta
+!tools/ui-mock/.env.development-demo
 *.pem
 *.key
 

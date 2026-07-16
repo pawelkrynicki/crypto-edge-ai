@@ -48,7 +48,7 @@ function mapSecurity(security: PersistableSecurityCheck): UiTokenCandidate["secu
     proxyRisk: security.proxy_risk,
     topWalletPct: security.top_wallet_pct,
     top10WalletsPct: security.top_10_wallets_pct,
-    checkedAt: security.checked_at,
+    checkedAt: security.checked_at ?? "",
   };
 }
 

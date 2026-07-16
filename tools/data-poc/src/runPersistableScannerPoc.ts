@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import { writePersistableScannerOutput } from "./fileStorage.js";
 import { buildPersistableScannerOutput } from "./persistableScannerModel.js";
 import { runCombinedScannerPoc } from "./runCombinedScannerPoc.js";
-import { isSourcePolicyError } from "./sourcePolicy.js";
+import { getActiveSourceEnvironment, isSourcePolicyError } from "./sourcePolicy.js";
 import type { DexScreenerPocMode } from "./types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -17,7 +17,11 @@ async function main(): Promise<void> {
   const maxCandidates = Math.max(1, Math.min(Number(args["max-candidates"] ?? DEFAULT_MAX_CANDIDATES), DEFAULT_MAX_CANDIDATES));
   const startedAt = new Date().toISOString();
   const combined = await runCombinedScannerPoc({ mode, query, maxCandidates });
-  const persistable = buildPersistableScannerOutput({ combined, startedAt });
+  const persistable = buildPersistableScannerOutput({
+    combined,
+    startedAt,
+    environment: getActiveSourceEnvironment(),
+  });
   const stored = await writePersistableScannerOutput(persistable, OUTPUT_DIR);
 
   console.log(
