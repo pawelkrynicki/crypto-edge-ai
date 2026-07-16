@@ -4,7 +4,7 @@
 
 Camp BETA should be a working Crypto Edge AI tool on real data in a limited, stable pipeline.
 
-This is still a planning document. It does not implement real fetchers, production cron scripts, migrations, auth, UI, or AI calls.
+This plan now records the implemented 12R.3 fail-closed read/publish boundary. It still does not implement approved live collectors, production cron, VPS deployment, migrations, auth, or AI calls.
 
 ## 12R.1 Real Data Readiness Audit
 
@@ -33,7 +33,40 @@ Stage 12R.2 records the owner's accepted policy for the real-data `INTERNAL_BETA
 
 12R.2 changes documentation only. It makes no provider call, source activation, runtime-policy change, scoring or `final_label` change, VPS change, deployment, or AI KINTEL implementation. The accepted target policy takes precedence over unresolved questions in older planning sections, but it is not active until implemented and tested.
 
-The next stage is **12R.3 — Fail-Closed Real Data Boundary**. It must enforce environment, fetch/storage/display gates, field allowlists, freshness, degraded/unavailable states, no fixture fallback, and the production/development mode boundary.
+Historical hand-off: **12R.3 — Fail-Closed Real Data Boundary** was required to enforce environment, fetch/storage/display gates, field allowlists, freshness, degraded/unavailable states, no fixture fallback, and the product/demo boundary. That boundary is now implemented below; 12R.4 is next.
+
+## 12R.3 Fail-Closed Real Data Boundary
+
+Stage 12R.3 implements the accepted 12R.2 decisions without provider calls or VPS changes.
+
+- Canonical API/runtime contract: `docs/real_data_api_contract.md`.
+- Product runtime flag: `CRYPTO_EDGE_RUNTIME_MODE` with `DEVELOPMENT_DEMO` and `INTERNAL_BETA`; missing/invalid values fail closed.
+- Scanner schema: `scanner_snapshot_v1`; context schema: `context_snapshot_v1`; shared contract: `real_data_boundary_v1`.
+- `INTERNAL_BETA` requires `mode=live`, `fixture_used=false`, target environment, known sources, full fetch/storage/display/raw-storage decisions, and agreement with checked-in runtime policy.
+- Scanner freshness is 30 minutes; security is 30 minutes; Alternative.me is 30 hours; DefiLlama is 6 hours; future tolerance is 5 minutes.
+- Scanner/context endpoints publish only normalized allowlisted fields, remove raw/unknown data and host paths, and return HTTP 503 with stable reason codes for missing, invalid, stale, fixture, or policy-denied data.
+- `/api/health` reports only process health. `/api/readiness` reports scanner/context data readiness independently.
+- `INTERNAL_BETA` frontend is API-only, never silently falls back to a sample, shows zero candidates on error, and removes demo/sample controls and demo navigation from the product menu.
+- `DEVELOPMENT_DEMO` remains explicit and offline; fixture are never selected because the host is localhost or private.
+- Dynamic responses and errors use `Cache-Control: no-store, max-age=0`; product mode has no wildcard CORS.
+
+Offline commands:
+
+```powershell
+cd tools/ui-mock
+pnpm run test:contract
+pnpm run build:internal-beta
+
+cd ../data-poc
+pnpm run test
+pnpm run typecheck
+```
+
+`scripts\win\check-data-poc.cmd` skips live provider calls by default. A live-source check now requires the separate explicit opt-in `CRYPTO_EDGE_ALLOW_LIVE_SOURCE_CHECK=1` and is outside 12R.3.
+
+12R.3 does not activate DexScreener, GoPlus, Honeypot.is, Alternative.me or DefiLlama; it only makes unauthorized/non-provable snapshots impossible to publish. It does not change scoring, `final_label`, or `WATCHLIST = Manual Review Only`.
+
+Next stage: **12R.4 — Approved Live Collectors & Normalized Snapshot**. Add authorized collectors and normalized-only atomic snapshot publishing; do not weaken the 12R.3 reader.
 
 ## 12A Standalone Trusted Tester Strategy Correction
 
@@ -232,7 +265,7 @@ Approved context API bridge and panel:
 GET /api/context/latest
 ```
 
-This endpoint is now implemented in the local UI mock API bridge. It reads the newest valid `tools/data-poc/output/<run_id>/approved_sources_output.json`, validates the normalized shape, strips unexpected raw-provider fields, and falls back to a local fixture when no valid output exists. That fallback is development-only legacy behavior and must be unreachable in the VPS build under the 12R.2 policy.
+This endpoint is implemented in the local UI API bridge. It reads the newest valid `tools/data-poc/output/<run_id>/approved_sources_output.json`, validates provenance and policy, enforces per-source freshness, and strips unexpected/raw-provider fields. `INTERNAL_BETA` returns `503 Data Unavailable` when no acceptable output exists; fixture fallback is restricted to explicit `DEVELOPMENT_DEMO`.
 
 The Market Context Panel in `tools/ui-mock` consumes this endpoint. It shows Alternative.me Fear & Greed sentiment context, up to 5 DefiLlama protocol or chain context rows, source status, environment, summary counts, and warning/error counts.
 
@@ -947,7 +980,7 @@ The `tools/ui-mock` frontend now includes a UI Data Adapter layer (`src/adapters
 - `scannerDataSource.ts` service with three sources: fixture / static-json / api
 - `persistableScannerSample.json` static fixture in `public/fixtures/`
 - Header data source selector (Fixture / Static JSON / API / latest)
-- Fallback to fixture with yellow banner when source unavailable
+- Explicit demo-only fallback to fixture with a notice when a demo source is unavailable
 - All components now receive `candidates` via props (no global mock imports)
 
 ## Thin Scanner API POC
@@ -959,11 +992,11 @@ The UI mock now has a thin local API bridge for scanner output.
 - Default port: `5177`.
 - Port override: `SCANNER_API_PORT`.
 - UI env var: `VITE_SCANNER_API_URL=http://localhost:5177`.
-- Current data source remains fixture/static JSON: `tools/ui-mock/public/fixtures/persistableScannerSample.json`.
+- `DEVELOPMENT_DEMO` may use `tools/ui-mock/public/fixtures/persistableScannerSample.json`; `INTERNAL_BETA` is API-only and fail-closed.
 
 This is not a production backend. It does not add DB, MySQL, Drizzle, auth, OpenAI, live token fetch, production cron, trading execution, or buy/sell signals.
 
-Next stage: connect the bridge to `tools/data-poc/output/<run_id>/full_output.json` when a real persisted run is available.
+The bridge is now connected to persisted output behind the 12R.3 provenance/policy/freshness boundary.
 
 ## Real Scanner Output Bridge POC
 
@@ -971,8 +1004,9 @@ The thin scanner API can now read the latest real persisted scanner output from 
 
 - `/api/scanner/latest` selects the newest valid `full_output.json`.
 - Selection prefers `scan_run.finished_at`, then `scan_run.started_at`, then file mtime.
-- If no valid real output exists, it falls back to `tools/ui-mock/public/fixtures/persistableScannerSample.json`.
-- Responses include `_source_meta` describing whether data came from `real-output` or `fixture-fallback`.
+- In `INTERNAL_BETA`, missing/invalid/denied/stale output returns 503 and never falls back to a fixture.
+- In explicit `DEVELOPMENT_DEMO`, fixture responses remain visibly marked as demo data.
+- Product responses expose safe provenance metadata without absolute filesystem paths.
 - `/api/scanner/sources` reports output directory status, run counts, detected full output files, selected latest file, fixture availability, and up to 10 recent run diagnostics.
 
 This remains a local read-only bridge. It does not add DB, MySQL, Drizzle, auth, OpenAI, live token fetch, scanner logic changes, production cron, or trading signals.

@@ -1,8 +1,27 @@
 # Roadmap
 
+## Stage 12R.3: Fail-Closed Real Data Boundary
+
+Status: **implemented and verified offline on 16.07.2026**.
+
+- Runtime modes: `DEVELOPMENT_DEMO` and `INTERNAL_BETA` through the single `CRYPTO_EDGE_RUNTIME_MODE` flag; missing/invalid configuration is fail-closed.
+- Provenance: versioned scanner/context manifests with environment, live mode, `fixture_used=false`, run/timestamps, source IDs, generator/contract versions and per-source policy decisions.
+- Policy: manifest claims are checked against registry/runtime policy; unknown source, denial, mismatch or raw-storage permission is rejected.
+- Publication: explicit candidate/security/context allowlists remove raw payloads, unknown fields, secrets and host paths.
+- Freshness: scanner/security 30 minutes, Alternative.me 30 hours, DefiLlama 6 hours, with invalid/future/stale handling.
+- Security display: only `CRITICAL RISK`, `NEEDS MANUAL VERIFICATION`, `PARTIAL SECURITY COVERAGE`, and `SECURITY DATA UNAVAILABLE`; no positive safety claims.
+- API: process health separated from data readiness, stable reason codes, 503 Data Unavailable, no wildcard CORS, and no-store caching.
+- Frontend: API-only `INTERNAL_BETA`, zero sample candidates on errors, no Built-in sample / Local data file controls, and no demo navigation in the product menu.
+- Tests: complete offline boundary matrix plus existing Data PoC/UI contracts and builds.
+- Excluded: provider calls, live source activation, VPS/reverse-proxy changes, raw storage, scoring/final-label changes, AI KINTEL and merge.
+
+Canonical contract: `docs/real_data_api_contract.md`.
+
+Next stage: **12R.4 — Approved Live Collectors & Normalized Snapshot**. Implement explicitly authorized collectors, normalized-only artifacts and atomic publishing while preserving the 12R.3 fail-closed reader.
+
 ## Stage 12R.2: Real Data Policy & Environment Decisions
 
-Status: **decision record complete on 15.07.2026; implementation not started**.
+Status: **decision record complete on 15.07.2026; enforcement implemented by 12R.3 on 16.07.2026**.
 
 - Canonical policy: `docs/real_data_policy_decisions.md`.
 - Updated readiness audit: `docs/real_data_readiness_audit.md`.
@@ -13,7 +32,7 @@ Status: **decision record complete on 15.07.2026; implementation not started**.
 - Freshness SLA, degraded/last-known-good rules, real-data-only VPS mode, development-only demo separation, and owner acceptance gates are approved.
 - No provider call, source activation, VPS change, deployment, scoring change, `final_label` change, or AI KINTEL implementation belongs to 12R.2.
 
-Next stage: **12R.3 — Fail-Closed Real Data Boundary**. Implement and test the environment and action gates, response allowlists, freshness checks, explicit degraded/unavailable states, no-fixture production path, and real-data/development build boundary before any source activation or VPS deployment.
+Historical hand-off: **12R.3 — Fail-Closed Real Data Boundary** implemented the environment/action gates, allowlists, freshness, unavailable states and product/demo boundary. Current next stage is 12R.4.
 
 ## Stage 12A: Standalone Product Gap Audit + Trusted Tester Path
 
@@ -281,13 +300,13 @@ Data Source Registry Enforcement v1:
 - Sources reviewed: 21.
 - Priority A: 12.
 - Priority B: 9.
-- Sources currently cleared by the checked-in runtime policy for Camp BETA: 2.
+- Sources with checked-in `INTERNAL_BETA` action gates: 5 (DexScreener, GoPlus, Honeypot.is, Alternative.me and DefiLlama); this does not activate collectors.
 - Safe default: `FIXTURE_ONLY` when `CRYPTO_EDGE_DATA_ENV` is missing or invalid.
 - Environments: `FIXTURE_ONLY`, `LOCAL_POC`, `INTERNAL_BETA`, `PUBLIC_BETA`, `COMMERCIAL`.
 - Actions: `fixture_load`, `live_fetch`, `normalized_storage`, `raw_storage`, `user_display`, `derived_score_display`.
 - LOCAL_POC live mode requires `CRYPTO_EDGE_DATA_ENV=LOCAL_POC`.
 - PUBLIC_BETA allows Alternative.me Fear & Greed and DefiLlama only.
-- 12R.2 approves DexScreener, GoPlus Security, and Honeypot.is for the target `INTERNAL_BETA`; runtime enforcement remains open for 12R.3.
+- 12R.2 approved DexScreener, GoPlus Security, and Honeypot.is for `INTERNAL_BETA`; 12R.3 now enforces their fetch/storage/display decisions at the publication boundary.
 - PUBLIC_BETA remains disabled and continues to block DexScreener, GoPlus Security, and Honeypot.is.
 - Runtime policy is intentionally stricter than the research registry; unknown or unconfigured sources fail closed.
 - Raw API response storage is disabled in v1.
@@ -300,7 +319,7 @@ Approved free source adapter framework:
 - Fixture command: `pnpm run sources:approved:fixture`.
 - Live command: `CRYPTO_EDGE_DATA_ENV=PUBLIC_BETA pnpm run sources:approved:live`.
 - Output file: `tools/data-poc/output/<run_id>/approved_sources_output.json`.
-- UI/API bridge: `GET /api/context/latest` reads the latest valid approved-source output and falls back to a local fixture.
+- UI/API bridge: `GET /api/context/latest` accepts only authorized fresh live output in `INTERNAL_BETA` and returns 503 otherwise; fixture fallback is demo-only.
 - Raw provider responses are not stored; only normalized context records are written.
 - Future source additions require registry entry, runtime policy, official docs URL, terms URL, fixture, adapter, normalizer, tests, UI display rule, attribution rule, no raw storage, and no scraping fallback.
 - The Market Context Panel consumes `GET /api/context/latest` from `tools/ui-mock`, showing Alternative.me Fear & Greed and DefiLlama context as research-only market context.
@@ -686,7 +705,7 @@ The `tools/ui-mock` frontend now includes a UI Data Adapter layer (`src/adapters
 
 - Local JSON / API bridge service (`scannerDataSource.ts`)
 - Static JSON fixture in `public/fixtures/` (drop-in for real `full_output.json`)
-- Data source selector in UI header
+- Data source selector in the explicit development-demo UI only
 
 ## Thin Scanner API POC
 
@@ -695,17 +714,17 @@ The `tools/ui-mock` frontend now includes a UI Data Adapter layer (`src/adapters
 - `GET /api/scanner/latest` returns `PersistableScannerOutput`.
 - Default port is `5177`; `SCANNER_API_PORT` can override it.
 - UI can target the API through `VITE_SCANNER_API_URL`.
-- Current source remains `tools/ui-mock/public/fixtures/persistableScannerSample.json`.
+- Demo mode may use `tools/ui-mock/public/fixtures/persistableScannerSample.json`; `INTERNAL_BETA` is API-only.
 - No DB, MySQL, Drizzle, auth, OpenAI, live token fetch, auto-trading, or buy/sell signal behavior.
-- Next step: read `tools/data-poc/output/<run_id>/full_output.json`.
+- The 12R.3 bridge now reads persisted output behind provenance, policy, allowlist and freshness checks.
 
 ## Real Scanner Output Bridge POC
 
 - Extend the thin scanner API to read the latest `tools/data-poc/output/<run_id>/full_output.json`.
 - Select latest output by `scan_run.finished_at`, then `scan_run.started_at`, then file mtime.
-- Fall back to `tools/ui-mock/public/fixtures/persistableScannerSample.json` when no valid real output exists.
-- Add `_source_meta` to show `real-output` versus `fixture-fallback`.
+- Return 503 in `INTERNAL_BETA` when no valid real output exists; fixture fallback is restricted to explicit demo mode.
+- Add safe `_source_meta` provenance without exposing absolute host paths.
 - Add `GET /api/scanner/sources` diagnostics.
 - Keep the bridge read-only: no DB, auth, OpenAI, live token fetch, scanner logic changes, UI redesign, or trading signals.
-- Next step: automate creation of a real `tools/data-poc` output and validate UI API mode against it.
+- Next stage: **12R.4 — Approved Live Collectors & Normalized Snapshot**.
 - Props-based data flow: App.tsx → StatCards, ScannerRadar, WatchlistTab, RiskAlerts

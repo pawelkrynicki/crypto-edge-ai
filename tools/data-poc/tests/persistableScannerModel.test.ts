@@ -122,6 +122,17 @@ describe("buildPersistableScannerOutput", () => {
     assert.deepEqual(output.scan_run.errors, []);
   });
 
+  it("adds an explicit development fixture provenance manifest", () => {
+    const output = buildPersistableScannerOutput({ combined: combinedOutput(), runId: "scan_test" });
+    assert.ok(output.provenance);
+    assert.equal(output.provenance.schema_version, "scanner_snapshot_v1");
+    assert.equal(output.provenance.contract_version, "real_data_boundary_v1");
+    assert.equal(output.provenance.environment, "DEVELOPMENT_DEMO");
+    assert.equal(output.provenance.mode, "fixture");
+    assert.equal(output.provenance.fixture_used, true);
+    assert.equal(output.provenance.policy_decisions.dexscreener.raw_storage, "denied");
+  });
+
   it("adds run_id and deterministic candidate_id to candidates", () => {
     const output = buildPersistableScannerOutput({ combined: combinedOutput(), runId: "scan_test" });
     assert.equal(output.candidates[0].run_id, "scan_test");

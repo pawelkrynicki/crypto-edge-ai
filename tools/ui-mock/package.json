@@ -6,8 +6,11 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:internal-beta": "tsc -b && vite build --mode internal-beta && node --import tsx scripts/assertInternalBetaBuild.ts",
+    "build:demo": "tsc -b && vite build --mode development-demo",
     "api": "tsx server/scannerApiServer.ts",
-    "test:contract": "tsx tests/contract.test.ts",
+    "test:contract": "node --import tsx tests/contract.test.ts && node --import tsx --test tests/realDataBoundary.test.ts",
+    "test:boundary": "node --import tsx --test tests/realDataBoundary.test.ts",
     "workflow:smoke": "tsx scripts/localWorkflowSmoke.ts",
     "report:analyst": "tsx scripts/generateAnalystReport.ts",
     "report:analyst:smoke": "tsx scripts/generateAnalystReport.ts --smoke",

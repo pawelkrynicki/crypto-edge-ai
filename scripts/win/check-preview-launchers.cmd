@@ -37,7 +37,7 @@ if not exist "%REPO_ROOT%\tools\ui-mock\package.json" (
 )
 
 echo.
-echo === Build production UI mock ===
+echo === Build explicit DEVELOPMENT_DEMO UI mock ===
 call "%REPO_ROOT%\scripts\win\build-ui-preview.cmd"
 if errorlevel 1 exit /b %ERRORLEVEL%
 

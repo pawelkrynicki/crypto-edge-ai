@@ -1,6 +1,6 @@
 {
-  "registry_version": "1.0",
-  "reviewed_at": "2026-06-23",
+  "registry_version": "1.1",
+  "reviewed_at": "2026-07-16",
   "sources": [
     {
       "source_id": "dexscreener",
@@ -8,7 +8,7 @@
       "category": "DEX pair/token market data",
       "priority": "A",
       "access_status": "APPROVED_API",
-      "usage_scope": "COMMERCIAL_PENDING",
+      "usage_scope": "INTERNAL_BETA",
       "confidence": "HIGH",
       "official_docs_url": "https://docs.dexscreener.com/api/reference",
       "official_terms_url": "https://docs.dexscreener.com/api/api-terms-and-conditions",
@@ -44,7 +44,7 @@
       "category": "Token/contract security risk detection",
       "priority": "A",
       "access_status": "PENDING_TERMS_REVIEW",
-      "usage_scope": "COMMERCIAL_PENDING",
+      "usage_scope": "INTERNAL_BETA",
       "confidence": "MEDIUM",
       "official_docs_url": "https://docs.gopluslabs.io/reference/api-overview",
       "official_terms_url": "https://docs.gopluslabs.io/reference/api-license-agreement-new",
@@ -81,7 +81,7 @@
       "category": "Token honeypot/scam contract detection",
       "priority": "A",
       "access_status": "PENDING_TERMS_REVIEW",
-      "usage_scope": "POC_ONLY",
+      "usage_scope": "INTERNAL_BETA",
       "confidence": "HIGH",
       "official_docs_url": "https://docs.honeypot.is/ishoneypot",
       "official_terms_url": "https://docs.honeypot.is/terms",
@@ -102,7 +102,7 @@
       "current_endpoint": "https://api.honeypot.is/v2/IsHoneypot?address=<address>&chainID=<chainId>",
       "implementation_changes_required": [
         "Seek explicit written permission from honeypot.is for the intended automated, multi-user product use case before any public or commercial launch",
-        "Treat as fixture/manual-research only until the Third-Party Restriction clause is clarified by the provider",
+        "Keep PUBLIC_BETA and COMMERCIAL blocked until the Third-Party Restriction clause is clarified; 12R.2 authorizes only the candidate-scoped INTERNAL_BETA path",
         "Monitor t.me/honeypotis_news as referenced in official docs for API key/terms changes"
       ],
       "open_questions": [
@@ -716,12 +716,12 @@
   "undocumented_endpoints_recommended": false,
   "sources_ready_for_camp_beta": [
     "alternative_me_fng",
-    "defillama_api"
-  ],
-  "sources_blocked_or_pending": [
+    "defillama_api",
     "dexscreener",
     "goplus_security",
-    "honeypot_is",
+    "honeypot_is"
+  ],
+  "sources_blocked_or_pending": [
     "coingecko_api",
     "geckoterminal_api",
     "etherscan_api",

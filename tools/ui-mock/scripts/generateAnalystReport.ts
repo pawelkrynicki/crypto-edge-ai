@@ -55,11 +55,12 @@ async function generateAnalystReport(options: { smoke: boolean }): Promise<void>
 
   const server = createScannerApiServer(options.smoke
     ? {
+        runtimeMode: "DEVELOPMENT_DEMO",
         reviewSession: {
           storageFilePath: smokeReviewStorageFile,
         },
       }
-    : {});
+    : { runtimeMode: "DEVELOPMENT_DEMO" });
 
   try {
     await listen(server);

@@ -4,6 +4,7 @@ import type {
   NormalizedContextRecord,
   NormalizedSourceOutput,
 } from "../types/contextTypes";
+import { getProductRuntimeMode } from "../runtimeMode";
 
 export type ResolvedMarketContextSource = "approved-sources-output" | "fixture-fallback";
 
@@ -17,6 +18,7 @@ export type MarketContextDataSourceResult =
     }
   | {
       status: "error";
+      reasonCode: string;
       error: string;
       output: null;
     };
@@ -27,13 +29,32 @@ type ViteImportMeta = ImportMeta & {
   };
 };
 
+class ContextDataSourceHttpError extends Error {
+  readonly reasonCode: string;
+
+  constructor(reasonCode: string, message: string) {
+    super(message);
+    this.reasonCode = reasonCode;
+  }
+}
+
 async function fetchJson(url: string): Promise<unknown> {
   const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error(`HTTP ${res.status} ${res.statusText} - ${url}`);
+  let body: unknown = null;
+  try {
+    body = await res.json() as unknown;
+  } catch {
+    body = null;
   }
 
-  return res.json() as Promise<unknown>;
+  if (!res.ok) {
+    const reasonCode = isRecord(body) && typeof body.reason_code === "string"
+      ? body.reason_code
+      : `HTTP_${res.status}`;
+    throw new ContextDataSourceHttpError(reasonCode, `HTTP ${res.status} ${res.statusText} - ${url}`);
+  }
+
+  return body;
 }
 
 export function parseMarketContextApiOutput(value: unknown): MarketContextApiOutput {
@@ -60,11 +81,20 @@ export async function loadLatestMarketContext(): Promise<MarketContextDataSource
   try {
     const apiBaseUrl = getApiBaseUrl();
     const output = parseMarketContextApiOutput(await fetchJson(`${apiBaseUrl}/api/context/latest`));
+    if (getProductRuntimeMode() !== "DEVELOPMENT_DEMO" && output._source_meta.source_kind === "fixture-fallback") {
+      return {
+        status: "error",
+        reasonCode: "CONTEXT_FIXTURE_FORBIDDEN",
+        error: "Context fixture is not eligible outside DEVELOPMENT_DEMO.",
+        output: null,
+      };
+    }
     return interpretContextApiOutput(output);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return {
       status: "error",
+      reasonCode: err instanceof ContextDataSourceHttpError ? err.reasonCode : "CONTEXT_API_UNAVAILABLE",
       error: `Context API unavailable: ${msg}`,
       output: null,
     };
@@ -164,6 +194,9 @@ function isContextSourceMeta(value: unknown): value is MarketContextApiOutput["_
     (value.source_kind === "approved-sources-output" || value.source_kind === "fixture-fallback")
     && isNullableString(value.output_file)
     && typeof value.loaded_at === "string"
+    && (value.runtime_mode === undefined || value.runtime_mode === "DEVELOPMENT_DEMO" || value.runtime_mode === "INTERNAL_BETA" || value.runtime_mode === "UNCONFIGURED")
+    && (value.age_seconds === undefined || isNullableNumber(value.age_seconds))
+    && (value.source_ids === undefined || isStringArray(value.source_ids))
   );
 }
 

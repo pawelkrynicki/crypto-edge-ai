@@ -26,6 +26,20 @@ Owner zaakceptował decyzje polityczne opisane w `docs/real_data_policy_decision
 
 Ta aktualizacja zamyka pytania decyzyjne, ale nie usuwa luk implementacyjnych wykrytych w 12R.1. Registry, runtime policy, kod, providery i VPS nie zostały zmienione. Werdykt dla testera pozostaje `NO-GO`, a następnym etapem jest **12R.3 — Fail-Closed Real Data Boundary**.
 
+## Aktualizacja 12R.3 — granica fail-closed
+
+16.07.2026 wdrożono offline granicę publikacji bez uruchamiania providerów i bez zmian VPS. Zamknięto implementacyjnie luki RDR-F01, F02, F03, F05, F06, F07, F08, F10, F12, F14 i F16 w zakresie granicy odczytu/API/frontendu:
+
+- `CRYPTO_EDGE_RUNTIME_MODE` rozdziela `DEVELOPMENT_DEMO` od `INTERNAL_BETA`; missing/invalid jest `UNCONFIGURED` i fail-closed;
+- scanner/context wymagają wersjonowanego provenance manifestu, pełnych decyzji policy i zgodności z checked-in runtime policy;
+- allowlisty usuwają raw/unknown fields oraz ścieżki hosta;
+- SLA jest egzekwowane od `generated_at`/`finished_at`/`fetched_at`/`checked_at` z pięciominutową tolerancją zegara;
+- API rozdziela `/api/health` od `/api/readiness`, zwraca 503 z reason codes i nigdy nie wraca do fixture w `INTERNAL_BETA`;
+- frontend `INTERNAL_BETA` ma API-only data path, zero sample candidates po błędzie i ograniczoną nawigację produktu;
+- testy obejmują fixture leakage, brak/wersję manifestu, policy denial, unknown source, freshness, security coverage, sanitizację, health/readiness i jawny demo mode.
+
+Werdykt testera nadal pozostaje `NO-GO`: brak autoryzowanego collectora, atomowej publikacji, VPS API/reverse proxy, soak i owner acceptance. Następny etap to **12R.4 — Approved Live Collectors & Normalized Snapshot**.
+
 ## 1. Decyzja audytowa
 
 Repozytorium nie ma dziś kompletnego, automatycznego i zgodnego z polityką przepływu, który może zasilać prywatną wersję VPS wyłącznie rzeczywistymi i aktualnymi danymi.
@@ -485,8 +499,8 @@ Plan nie autoryzuje żadnej zmiany polityki, aktywacji źródła, provider call 
 | Etap | Termin | Zakres | Bramka wyjścia |
 |---|---|---|---|
 | **12R.2 — Real Data Policy & Environment Decisions** | 15.07 | **Zakończone:** zatwierdzić target environment, source actions, SLA, degraded/last-known-good, real-data product mode i owner acceptance gates. | `docs/real_data_policy_decisions.md`; bez provider calls, wdrożenia i zmian VPS. |
-| **12R.3 — Fail-Closed Real Data Boundary** | 21-28.07 | Wdrożyć pełną walidację scanner/context, policy gates dla storage/display, allowlistę, freshness, sanitizację, 503/empty state zamiast fallback, rozdzielenie real-data/dev mode i testy. | Fixture/stale/denied są odrzucane, partial/unavailable są jawne, a wszystkie testy bez sieci przechodzą. |
-| **12R.4 — Authorized Collector & Atomic Publishing** | 29.07-07.08 | Wdrożyć scheduler/runner, timeouty, lock, temporary write + atomic publish, manifest, retention i last-success. Scanner track tylko po jawnej zgodzie źródłowej. | Powtarzalny run produkuje wyłącznie normalized artifact; brak raw storage; failure nie publikuje niegotowego snapshotu. |
+| **12R.3 — Fail-Closed Real Data Boundary** | 16.07 | **Zakończone:** walidacja scanner/context, policy gates dla storage/display, allowlisty, freshness, sanitizacja, 503/empty state zamiast fallback, rozdzielenie real-data/dev mode i testy offline. | Fixture/stale/denied są odrzucane, partial/unavailable są jawne, a testy bez sieci przechodzą. |
+| **12R.4 — Approved Live Collectors & Normalized Snapshot** | 29.07-07.08 | Wdrożyć jawnie zatwierdzone collectory, scheduler/runner, timeouty, lock, temporary write + atomic publish, manifest, retention i last-success. | Powtarzalny run produkuje wyłącznie normalized artifact; brak raw storage; failure nie publikuje niegotowego snapshotu. |
 | **12R.5 — VPS API & Same-Origin Integration** | 08-14.08 | Osobny autoryzowany deployment: API na loopback, service manager, reverse proxy `/api`, production env, logi i readiness endpoint. | `https://cryptoedge.crmallintraders.pl/api/...` działa przez access gate; port API nie jest publiczny; restart jest bezpieczny. |
 | **12R.6 — Frontend Real-Data Runtime Mode** | 15-20.08 | Skonfigurować API jako jedyne źródło produkcyjne, usunąć runtime fallback do fixture, odseparować demo/mock surfaces, pokazać provenance/age/degraded/error. Bez redesignu scoringu. | W production build nie można wyświetlić `PASS`, `LOWL`, `FDV` ani demo metrics; brak danych daje pusty/error state. |
 | **12R.7 — Soak, Failure Drills & Owner Candidate** | 21-26.08 | Minimum 72 h ciągłej obserwacji, source outage, stale data, invalid artifact, restart VPS, clock skew, no-output i rollback drill. | Brak fixture leakage, brak stale-as-fresh, alerty działają, runbook jest odtworzony przez drugą osobę. |
@@ -496,7 +510,7 @@ Plan nie autoryzuje żadnej zmiany polityki, aktywacji źródła, provider call 
 
 Decyzje krytyczne zapadły 15.07.2026 w 12R.2: środowiskiem jest `INTERNAL_BETA`, źródła i akcje są określone, security display jest ograniczone do zatwierdzonych statusów/pól, a SLA i product mode są ustalone.
 
-Ścieżką krytyczną jest teraz 12R.3: techniczne egzekwowanie fail-closed bez provider calls w testach. Samo zatwierdzenie decyzji nie pozwala uruchomić pełnego token scanner na VPS; aktywacja źródeł i wdrożenie wymagają osobnych etapów i weryfikacji.
+Granica 12R.3 jest wdrożona i zweryfikowana offline. Ścieżką krytyczną jest teraz **12R.4 — Approved Live Collectors & Normalized Snapshot**; aktywacja źródeł i wdrożenie VPS nadal wymagają osobnych etapów i weryfikacji.
 
 ## 10. Backlog wykonawczy
 
@@ -637,11 +651,11 @@ Wszystkie pytania z 12R.1 rozstrzygnięto w 12R.2 i zapisano kanonicznie w `docs
 7. Demo jest wyłączone z builda VPS i dostępne wyłącznie w osobnym development mode.
 8. Tester wymaga pełnej checklisty, przejścia ownera przez Radar → Szczegóły → Weryfikacja → Manual Review oraz jawnej akceptacji.
 
-Decyzje nie mogą zostać zastąpione domyślną wartością w kodzie. Muszą zostać jawnie wyegzekwowane i przetestowane w 12R.3.
+Decyzje nie mogą zostać zastąpione domyślną wartością w kodzie. Zostały jawnie wyegzekwowane i przetestowane offline w 12R.3.
 
 ## 14. Podsumowanie 12R.1
 
-Najkrótsza bezpieczna droga nie polega na podmianie fixture jednym plikiem live. Decyzje środowiskowe, źródłowe, SLA i produktowe są już zatwierdzone w 12R.2. Teraz trzeba zbudować techniczną granicę prawdy danych: provenance, pełne policy gates, freshness SLA, fail-closed API i production data mode bez sample fallback.
+Najkrótsza bezpieczna droga nie polega na podmianie fixture jednym plikiem live. Decyzje środowiskowe, źródłowe, SLA i produktowe zatwierdzono w 12R.2, a granicę prawdy danych wdrożono w 12R.3. Następny krok to zatwierdzone collectory i znormalizowana, atomowo publikowana migawka w 12R.4.
 
 Do czasu spełnienia wszystkich bramek:
 

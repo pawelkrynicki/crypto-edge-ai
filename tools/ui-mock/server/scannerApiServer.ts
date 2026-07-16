@@ -1,9 +1,13 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { fileURLToPath } from "node:url";
-import { type LatestContextOutputOptions, readLatestContextOutput } from "./latestContextOutput.js";
+import {
+  ContextOutputError,
+  type LatestContextOutputOptions,
+  readLatestContextOutput,
+} from "./latestContextOutput.js";
 import {
   getScannerSourcesDiagnostics,
-  INVALID_SCANNER_OUTPUT,
+  type LatestScannerOutputOptions,
   readLatestScannerOutput,
   ScannerOutputError,
 } from "./latestScannerOutput.js";
@@ -14,108 +18,104 @@ import {
   type ReviewSessionStorageProvider,
   type ReviewSessionStorageResult,
 } from "./reviewSessionStorageProvider.js";
+import {
+  resolveProductRuntimeMode,
+  type ProductRuntimeMode,
+  type ResolvedProductRuntimeMode,
+} from "../src/runtimeMode.js";
 
 const DEFAULT_PORT = 5177;
 const port = Number.parseInt(process.env.SCANNER_API_PORT ?? String(DEFAULT_PORT), 10);
-
-const headers = {
-  "access-control-allow-origin": "*",
-  "access-control-allow-methods": "GET, PUT, OPTIONS",
-  "access-control-allow-headers": "content-type",
-  "content-type": "application/json; charset=utf-8",
-};
+const DEMO_CORS_ORIGINS = new Set(["http://127.0.0.1:5173", "http://localhost:5173"]);
 
 export type ScannerApiServerOptions = {
+  runtimeMode?: ProductRuntimeMode | string;
+  scanner?: LatestScannerOutputOptions;
   context?: LatestContextOutputOptions;
   reviewSession?: ReviewSessionFileStoreOptions;
   reviewSessionProvider?: ReviewSessionStorageProvider;
 };
 
 export function createScannerApiServer(options: ScannerApiServerOptions = {}) {
+  const runtimeMode = resolveProductRuntimeMode(options.runtimeMode ?? process.env.CRYPTO_EDGE_RUNTIME_MODE);
   const reviewSessionProvider = options.reviewSessionProvider
-    ?? createConfiguredReviewSessionStorageProvider({
-      reviewSession: options.reviewSession,
-    });
+    ?? createConfiguredReviewSessionStorageProvider({ reviewSession: options.reviewSession });
+  const scannerOptions: LatestScannerOutputOptions = { ...options.scanner, runtimeMode };
+  const contextOptions: LatestContextOutputOptions = { ...options.context, runtimeMode };
 
   return createServer(async (req, res) => {
     const path = getRequestPath(req.url);
 
     if (req.method === "OPTIONS") {
-      res.writeHead(204, headers);
-      res.end();
+      sendEmpty(req, res, isCorsOriginDenied(req, runtimeMode) ? 403 : 204, runtimeMode);
       return;
     }
 
     if (req.method === "GET" && path === "/api/health") {
-      sendJson(res, 200, {
+      sendJson(req, res, 200, {
         status: "ok",
         service: "crypto-edge-ai-scanner-api",
-      });
+        runtime_mode: runtimeMode,
+      }, runtimeMode);
+      return;
+    }
+
+    if (req.method === "GET" && path === "/api/readiness") {
+      const [scanner, context] = await Promise.all([
+        getReadinessEntry(() => readLatestScannerOutput(scannerOptions)),
+        getReadinessEntry(() => readLatestContextOutput(contextOptions)),
+      ]);
+      const ready = scanner.ready && context.ready;
+      sendJson(req, res, ready ? 200 : 503, {
+        status: ready ? "ready" : "not_ready",
+        runtime_mode: runtimeMode,
+        scanner,
+        context,
+        reason_codes: [scanner.reason_code, context.reason_code].filter(isString),
+      }, runtimeMode);
       return;
     }
 
     if (req.method === "GET" && path === "/api/context/latest") {
       try {
-        const output = await readLatestContextOutput(options.context);
-        sendJson(res, 200, output);
-      } catch {
-        sendJson(res, 500, {
-          error: "context_output_unavailable",
-          message: "Approved source context output is unavailable",
-        });
+        sendJson(req, res, 200, await readLatestContextOutput(contextOptions), runtimeMode);
+      } catch (error) {
+        sendDataUnavailable(req, res, errorCode(error, "CONTEXT_OUTPUT_UNAVAILABLE"), runtimeMode);
       }
       return;
     }
 
     if (req.method === "GET" && path === "/api/scanner/latest") {
       try {
-        const output = await readLatestScannerOutput();
-        sendJson(res, 200, output);
+        sendJson(req, res, 200, await readLatestScannerOutput(scannerOptions), runtimeMode);
       } catch (error) {
-        if (error instanceof ScannerOutputError && error.code === INVALID_SCANNER_OUTPUT) {
-          sendJson(res, 500, {
-            error: "invalid_scanner_output",
-            message: "Scanner output does not match expected PersistableScannerOutput shape",
-          });
-          return;
-        }
-
-        sendJson(res, 500, {
-          error: "scanner_output_unavailable",
-          message: "Scanner output file is unavailable",
-        });
+        sendDataUnavailable(req, res, errorCode(error, "SCANNER_OUTPUT_UNAVAILABLE"), runtimeMode);
       }
       return;
     }
 
     if (req.method === "GET" && path === "/api/scanner/sources") {
       try {
-        const diagnostics = await getScannerSourcesDiagnostics();
-        sendJson(res, 200, diagnostics);
+        sendJson(req, res, 200, await getScannerSourcesDiagnostics(scannerOptions), runtimeMode);
       } catch {
-        sendJson(res, 500, {
-          error: "scanner_sources_unavailable",
-          message: "Scanner source diagnostics are unavailable",
-        });
+        sendDataUnavailable(req, res, "SCANNER_SOURCES_UNAVAILABLE", runtimeMode);
       }
       return;
     }
 
     if (req.method === "GET" && path === "/api/review-session") {
-      const output = await reviewSessionProvider.read();
-      sendReviewSessionJson(res, 200, output);
+      sendReviewSessionJson(req, res, 200, await reviewSessionProvider.read(), runtimeMode);
       return;
     }
 
     if (req.method === "GET" && path === "/api/review-session/diagnostics") {
       try {
-        const diagnostics = await reviewSessionProvider.diagnostics();
-        sendJson(res, 200, diagnostics);
+        sendJson(req, res, 200, await reviewSessionProvider.diagnostics(), runtimeMode);
       } catch {
-        sendJson(res, 500, {
+        sendJson(req, res, 500, {
           error: "review_session_diagnostics_unavailable",
           message: "Review session storage diagnostics are unavailable",
-        });
+        }, runtimeMode);
       }
       return;
     }
@@ -123,60 +123,131 @@ export function createScannerApiServer(options: ScannerApiServerOptions = {}) {
     if (req.method === "PUT" && path === "/api/review-session") {
       try {
         const body = await readJsonBody(req);
-        const output = await reviewSessionProvider.write(body);
-        sendReviewSessionJson(res, 200, output);
+        sendReviewSessionJson(req, res, 200, await reviewSessionProvider.write(body), runtimeMode);
       } catch (error) {
         if (error instanceof RequestBodyError || (
           error instanceof ReviewSessionStorageProviderError
           && error.code === "invalid_review_session"
         )) {
-          sendJson(res, 400, {
+          sendJson(req, res, 400, {
             error: "invalid_review_session",
             message: error.message,
-          });
+          }, runtimeMode);
           return;
         }
-
-        sendJson(res, 500, {
+        sendJson(req, res, 500, {
           error: "review_session_storage_unavailable",
           message: "Review session storage could not be written",
-        });
+        }, runtimeMode);
       }
       return;
     }
 
-    sendJson(res, 404, {
+    sendJson(req, res, 404, {
       error: "not_found",
       message: "Route not found",
-    });
+    }, runtimeMode);
   });
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const server = createScannerApiServer();
-  server.listen(port, () => {
-    console.log(`Scanner API listening on http://localhost:${port}`);
+  server.listen(port, "127.0.0.1", () => {
+    console.log(`Scanner API listening on http://127.0.0.1:${port}`);
   });
 }
 
-function sendJson(res: ServerResponse, status: number, body: unknown) {
-  res.writeHead(status, headers);
+function sendDataUnavailable(
+  req: IncomingMessage,
+  res: ServerResponse,
+  reasonCode: string,
+  runtimeMode: ResolvedProductRuntimeMode,
+): void {
+  sendJson(req, res, 503, {
+    status: "data_unavailable",
+    reason_code: reasonCode,
+    message: "Data Unavailable",
+  }, runtimeMode);
+}
+
+function sendJson(
+  req: IncomingMessage,
+  res: ServerResponse,
+  status: number,
+  body: unknown,
+  runtimeMode: ResolvedProductRuntimeMode,
+) {
+  res.writeHead(status, responseHeaders(req, runtimeMode));
   res.end(JSON.stringify(body));
 }
 
+function sendEmpty(
+  req: IncomingMessage,
+  res: ServerResponse,
+  status: number,
+  runtimeMode: ResolvedProductRuntimeMode,
+): void {
+  res.writeHead(status, responseHeaders(req, runtimeMode));
+  res.end();
+}
+
+function responseHeaders(req: IncomingMessage, runtimeMode: ResolvedProductRuntimeMode): Record<string, string> {
+  const headers: Record<string, string> = {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "no-store, max-age=0",
+    "x-content-type-options": "nosniff",
+  };
+  const origin = req.headers.origin;
+
+  if (runtimeMode === "DEVELOPMENT_DEMO" && origin && DEMO_CORS_ORIGINS.has(origin)) {
+    headers["access-control-allow-origin"] = origin;
+    headers["access-control-allow-methods"] = "GET, PUT, OPTIONS";
+    headers["access-control-allow-headers"] = "content-type";
+    headers.vary = "Origin";
+  }
+
+  return headers;
+}
+
+function isCorsOriginDenied(req: IncomingMessage, runtimeMode: ResolvedProductRuntimeMode): boolean {
+  const origin = req.headers.origin;
+  if (!origin) return false;
+  return runtimeMode !== "DEVELOPMENT_DEMO" || !DEMO_CORS_ORIGINS.has(origin);
+}
+
 function sendReviewSessionJson(
+  req: IncomingMessage,
   res: ServerResponse,
   status: number,
   result: ReviewSessionStorageResult,
+  runtimeMode: ResolvedProductRuntimeMode,
 ) {
-  sendJson(res, status, {
-    ...result.state,
-    _source_meta: result._source_meta,
-  });
+  sendJson(req, res, status, { ...result.state, _source_meta: result._source_meta }, runtimeMode);
+}
+
+async function getReadinessEntry(read: () => Promise<unknown>): Promise<{
+  ready: boolean;
+  reason_code: string | null;
+}> {
+  try {
+    await read();
+    return { ready: true, reason_code: null };
+  } catch (error) {
+    return { ready: false, reason_code: errorCode(error, "DATA_UNAVAILABLE") };
+  }
+}
+
+function errorCode(error: unknown, fallback: string): string {
+  if (error instanceof ScannerOutputError || error instanceof ContextOutputError) return error.code;
+  return fallback;
 }
 
 function getRequestPath(url: string | undefined): string {
   return url?.split("?")[0] ?? "/";
+}
+
+function isString(value: unknown): value is string {
+  return typeof value === "string";
 }
 
 class RequestBodyError extends Error {
@@ -191,15 +262,12 @@ class RequestBodyError extends Error {
 async function readJsonBody(req: IncomingMessage): Promise<unknown> {
   const chunks: Buffer[] = [];
   let totalBytes = 0;
-
   for await (const chunk of req) {
     const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     totalBytes += buffer.length;
-
     if (totalBytes > 1_000_000) {
       throw new RequestBodyError("body_too_large", "Review session request body is too large.");
     }
-
     chunks.push(buffer);
   }
 

@@ -3,6 +3,7 @@ import type {
   WorkspaceNavItem,
   WorkspaceSectionId,
 } from "./components/WorkspaceShell";
+import type { ResolvedProductRuntimeMode } from "./runtimeMode";
 
 export const DEFAULT_WORKSPACE_SECTION: WorkspaceSectionId = "candidate-results";
 
@@ -51,6 +52,20 @@ export const WORKSPACE_NAV_GROUPS: WorkspaceNavGroup[] = [
   },
 ];
 
+export const INTERNAL_BETA_NAV_GROUPS: WorkspaceNavGroup[] = [
+  {
+    id: "internal-beta-product",
+    label: "Crypto Edge AI",
+    description: "Fail-closed real-data workspace.",
+    items: [
+      { id: "candidate-results", label: "Radar", icon: "R", description: "Rzeczywiste kandydatury" },
+      { id: "candidate-detail", label: "Szczegóły", icon: "S", description: "Szczegóły kandydata" },
+      { id: "external-checks", label: "Weryfikacja", icon: "W", description: "Manualna weryfikacja" },
+      { id: "methodology", label: "Metodologia", icon: "M", description: "Kontrakt i metodologia" },
+    ],
+  },
+];
+
 const WORKSPACE_SECTION_HASHES: Record<WorkspaceSectionId, string> = {
   overview: "#overview",
   "control-center": "#control-center",
@@ -87,8 +102,19 @@ const HASH_TO_WORKSPACE_SECTION: Record<string, WorkspaceSectionId> = {
   "#workflow": "overview",
 };
 
-export function resolveInitialWorkspaceSection(hash: string): WorkspaceSectionId {
-  return HASH_TO_WORKSPACE_SECTION[normalizeWorkspaceHash(hash)] ?? DEFAULT_WORKSPACE_SECTION;
+export function getWorkspaceNavGroups(runtimeMode: ResolvedProductRuntimeMode): WorkspaceNavGroup[] {
+  return runtimeMode === "DEVELOPMENT_DEMO" ? WORKSPACE_NAV_GROUPS : INTERNAL_BETA_NAV_GROUPS;
+}
+
+export function resolveInitialWorkspaceSection(
+  hash: string,
+  runtimeMode: ResolvedProductRuntimeMode = "DEVELOPMENT_DEMO",
+): WorkspaceSectionId {
+  const resolved = HASH_TO_WORKSPACE_SECTION[normalizeWorkspaceHash(hash)] ?? DEFAULT_WORKSPACE_SECTION;
+  if (runtimeMode === "DEVELOPMENT_DEMO") return resolved;
+
+  const allowedSections = new Set(flattenWorkspaceNavGroups(INTERNAL_BETA_NAV_GROUPS).map((item) => item.id));
+  return allowedSections.has(resolved) ? resolved : DEFAULT_WORKSPACE_SECTION;
 }
 
 export function sectionToHash(section: WorkspaceSectionId): string {

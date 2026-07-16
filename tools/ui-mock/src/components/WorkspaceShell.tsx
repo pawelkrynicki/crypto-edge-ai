@@ -1,5 +1,6 @@
 import React from "react";
 import type { DataSourceKey } from "../services/scannerDataSource";
+import type { ResolvedProductRuntimeMode } from "../runtimeMode";
 
 export type WorkspaceSectionId =
   | "overview"
@@ -46,6 +47,8 @@ interface WorkspaceShellProps {
   loading: boolean;
   sourceStatusText: string;
   fallbackMsg?: string | null;
+  dataUnavailableReasonCode?: string | null;
+  runtimeMode?: ResolvedProductRuntimeMode;
   presentationMode?: boolean;
   trustedPreviewMode?: boolean;
   children: React.ReactNode;
@@ -67,6 +70,8 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
   loading,
   sourceStatusText,
   fallbackMsg,
+  dataUnavailableReasonCode,
+  runtimeMode = "DEVELOPMENT_DEMO",
   presentationMode = false,
   trustedPreviewMode = false,
   children,
@@ -95,23 +100,27 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
           </>
         ) : (
           <>
-            <div className="source-control" aria-label="Source Freshness">
-              <span>Source Freshness</span>
-              <div className="source-segment">
-                {dataSourceOptions.map((opt) => (
-                  <button
-                    type="button"
-                    key={opt.key}
-                    onClick={() => onDataSourceChange(opt.key)}
-                    className={dataSource === opt.key ? "active" : ""}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
+            {dataSourceOptions.length > 0 ? (
+              <div className="source-control" aria-label="Source Freshness">
+                <span>Source Freshness</span>
+                <div className="source-segment">
+                  {dataSourceOptions.map((opt) => (
+                    <button
+                      type="button"
+                      key={opt.key}
+                      onClick={() => onDataSourceChange(opt.key)}
+                      className={dataSource === opt.key ? "active" : ""}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                {loading && <em>loading...</em>}
               </div>
-              {loading && <em>loading...</em>}
-            </div>
-            <span className="badge badge-context">Local MVP</span>
+            ) : (
+              <span className="source-status">API only · fail-closed</span>
+            )}
+            <span className="badge badge-context">{runtimeMode}</span>
             <span className="badge badge-context">Research only</span>
             <span className="source-status">{sourceStatusText}</span>
           </>
@@ -160,7 +169,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
       <div className="workspace-main">
         {fallbackMsg && !presentationMode && (
           <div className="app-notice workspace-notice">
-            <span>Candidate data sample fallback</span>
+            <span>{dataUnavailableReasonCode ? `Data Unavailable · ${dataUnavailableReasonCode}` : "Development demo data notice"}</span>
             <p>{fallbackMsg}</p>
           </div>
         )}

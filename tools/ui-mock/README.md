@@ -2,6 +2,59 @@
 
 This directory contains the first UI mock / frontend preview for the **Crypto Edge AI Camp BETA**. 
 
+## 12R.3 Fail-Closed Real Data Boundary
+
+The UI/API bridge now has one explicit product runtime flag: `CRYPTO_EDGE_RUNTIME_MODE`.
+
+| Mode | Data path | Fixture behavior |
+|---|---|---|
+| `DEVELOPMENT_DEMO` | explicit local demo sources or local API | fixture allowed and visibly marked as development demo |
+| `INTERNAL_BETA` | `/api/scanner/latest` and `/api/context/latest` only | fixture/static sample forbidden; errors produce zero candidates and Data Unavailable |
+| missing/unknown | fail-closed | no implicit localhost/private-host inference |
+
+Run an offline demo:
+
+```powershell
+$env:CRYPTO_EDGE_RUNTIME_MODE = "DEVELOPMENT_DEMO"
+pnpm run dev:with-api
+```
+
+Build the fail-closed product:
+
+```powershell
+pnpm run build:internal-beta
+```
+
+Run the API without provider calls:
+
+```powershell
+$env:CRYPTO_EDGE_RUNTIME_MODE = "INTERNAL_BETA"
+pnpm run api
+```
+
+Without a display-eligible live snapshot, `INTERNAL_BETA` intentionally returns HTTP 503. It never calls a provider from the API read path.
+
+Endpoints:
+
+- `GET /api/health` — process state only;
+- `GET /api/readiness` — scanner/context data readiness and reason codes;
+- `GET /api/scanner/latest` — provenance/freshness/policy-validated allowlisted scanner output;
+- `GET /api/context/latest` — provenance/freshness/policy-validated allowlisted context output;
+- `GET /api/scanner/sources` — safe diagnostics with no absolute host paths.
+
+The product build uses a separate `ProductApp` entrypoint with API-only data selection and navigation limited to Radar / Szczegóły / Weryfikacja / Metodologia. Development sample controls and demo/preview components remain available only in `DEVELOPMENT_DEMO`. The internal build does not copy `public/fixtures` into `dist`, and `assertInternalBetaBuild.ts` fails the build if fixture paths or demo/sample surface markers are bundled.
+
+API responses use `Cache-Control: no-store, max-age=0`; `INTERNAL_BETA` does not emit wildcard CORS. Data errors use `503` and a stable `reason_code`. Full manifest, allowlist, freshness and reason-code details are in `../../docs/real_data_api_contract.md`.
+
+Offline verification:
+
+```powershell
+pnpm run test:contract
+pnpm run build:internal-beta
+```
+
+This boundary does not activate a source, call DexScreener/GoPlus/Honeypot.is, change scoring or `final_label`, or change `WATCHLIST = Manual Review Only`.
+
 ## 12A Standalone Trusted Tester Strategy Correction
 
 After 11G, the near-term product priority is a standalone trusted tester preview, not immediate AI KINTEL implementation.
@@ -659,7 +712,7 @@ scripts\win\preview-control-center.cmd
 scripts\win\check-preview-launchers.cmd
 ```
 
-This verifies that the production preview launcher scripts exist, confirms `tools\ui-mock\package.json`, runs the UI mock production build, checks `tools\ui-mock\dist\index.html`, and prints the expected deep-link preview URLs.
+This verifies that the development preview launcher scripts exist, confirms `tools\ui-mock\package.json`, runs the explicit `DEVELOPMENT_DEMO` build, checks `tools\ui-mock\dist\index.html`, and prints the expected deep-link preview URLs. It is separate from the `INTERNAL_BETA` product build.
 
 It does not start `vite preview`, run network checks, call providers, require review storage, require a backend, or use AI KINTEL.
 
@@ -749,6 +802,7 @@ The generator starts the existing local API on `127.0.0.1`, uses only existing e
 The local API bridge closes the current loop from persisted scanner-shaped JSON into the UI mock without adding a production backend.
 
 - `GET /api/health` returns `{ "status": "ok", "service": "crypto-edge-ai-scanner-api" }`.
+- `GET /api/readiness` reports scanner/context readiness separately from process health.
 - `GET /api/context/latest` returns normalized approved free source context.
 - `GET /api/scanner/latest` returns `PersistableScannerOutput` JSON.
 - `GET /api/review-session` returns the current review session plus `_source_meta` from the configured provider.
@@ -757,7 +811,8 @@ The local API bridge closes the current loop from persisted scanner-shaped JSON 
 - Default API port: `5177`.
 - Port override: `SCANNER_API_PORT`.
 - UI API base URL: `VITE_SCANNER_API_URL=http://localhost:5177`.
-- Current API data source: `public/fixtures/persistableScannerSample.json`.
+- In `INTERNAL_BETA`, scanner/context endpoints accept only policy-authorized, fresh live artifacts with `real_data_boundary_v1` provenance and return `503 Data Unavailable` otherwise.
+- Fixtures are reachable only when the whole runtime is explicitly started as `DEVELOPMENT_DEMO`.
 
 Commands:
 
@@ -889,7 +944,7 @@ The endpoint selects the newest valid directory whose name starts with `approved
 }
 ```
 
-If no valid approved-source output exists, it falls back to `public/fixtures/contextLatestFixture.json`.
+In `INTERNAL_BETA`, a missing, invalid, denied, future-dated, or stale approved-source output returns `503 Data Unavailable`; there is no fixture fallback. `public/fixtures/contextLatestFixture.json` is available only in an explicitly configured `DEVELOPMENT_DEMO` runtime.
 
 The Market Context Panel consumes this endpoint from the frontend. It displays:
 
@@ -906,31 +961,30 @@ Paid sources remain deferred: CoinGecko Analyst, TokenSniffer, Tokenomist, GoPlu
 
 ## Real Scanner Output Bridge POC
 
-`GET /api/scanner/latest` now checks `tools/data-poc/output/<run_id>/full_output.json` before using the fixture. It selects the newest valid run by preferring `scan_run.finished_at`, then `scan_run.started_at`, then the `full_output.json` file mtime.
+`GET /api/scanner/latest` checks `tools/data-poc/output/<run_id>/full_output.json`. It selects the newest valid run by preferring `scan_run.finished_at`, then `scan_run.started_at`, then the `full_output.json` file mtime.
 
-If no valid real output is available, the endpoint falls back to `public/fixtures/persistableScannerSample.json`. The response includes `_source_meta` with the selected source, path, reason, selected run id, and load timestamp.
+In `INTERNAL_BETA`, the endpoint additionally requires an authorized provenance manifest, policy compliance, field allowlists and freshness. If no acceptable real output is available it returns 503; it never falls back to `public/fixtures/persistableScannerSample.json`. Response metadata contains safe relative identifiers and timestamps, never absolute host paths.
 
 Diagnostics are available at `GET /api/scanner/sources`. This endpoint reports whether the output directory exists, how many runs and `full_output.json` files were found, which file would be selected, fixture availability, and up to 10 recent runs with validation status.
 
-This remains read-only and local. It does not add a database, auth, OpenAI, live token fetching, scanner logic changes, UI redesign, or trading signal behavior. Next stage: automate writing a real `tools/data-poc` run and verify the UI against API mode.
+This remains read-only and local. It does not add a database, auth, OpenAI, live token fetching, scanner logic changes, UI redesign, or trading signal behavior. Next stage: **12R.4 — Approved Live Collectors & Normalized Snapshot**.
 
 ## Next Steps
-- 12E.12: Frontend Contract Tests closes the 12E Frontend Productization package.
-- 12F.1: Private Preview Access Method is the next standalone preview stage.
-- Reports remain useful supporting artifacts, but they are not the critical path for the next frontend rebuild.
-- Treat 12B.2 Webinar Teaser Screenshot Mode and 12B.3 Webinar Screenshot Capture Kit as screenshot-only UI, not as trusted tester preview readiness.
-- Keep AI KINTEL and real AI/provider integrations deferred until after standalone preview feedback and owner review.
+
+- 12R.4: implement explicitly approved live collectors and normalized-only atomic snapshot publishing without weakening the 12R.3 reader.
+- Keep tester access blocked until collectors, VPS integration, soak and owner acceptance are complete.
+- Keep AI KINTEL, paid sources and unrelated product scope deferred.
 
 ## UI Data Adapter
 
-The UI currently operates without a backend or live API. However, it is structurally prepared to consume real data from the `tools/data-poc` pipeline via the UI Data Adapter.
+The UI consumes scanner data through the runtime data-source service and the local API bridge. `INTERNAL_BETA` is API-only; `DEVELOPMENT_DEMO` may explicitly use fixture/static data.
 
 - **Types (`src/types/scannerTypes.ts`)**: Defines `PersistableScannerOutput` matching the exact shape of `full_output.json`. Also defines `UiTokenCandidate`, the flat structure consumed by React components.
 - **Adapter (`src/adapters/scannerOutputAdapter.ts`)**: A mapping function `mapPersistableScannerOutputToUiCandidates` that transforms the nested persistable data into flat UI candidates. It handles security check matching, fallback labels, and splitting reasons into filter/critical/warning categories.
 - **Fixture (`src/fixtures/persistableScannerSample.ts`)**: A mock dataset in the exact shape of `PersistableScannerOutput`, providing 7 candidates that cover all edge cases (WATCHLIST, REJECT, CRITICAL_RISK, NEEDS_MANUAL_VERIFICATION, missing security data, partial scorecards).
-- **Integration (`src/mockData.ts`)**: The UI uses the adapter to generate the `MockCandidate` array from the fixture. 
+- **Integration (`src/App.tsx`)**: The UI loads runtime data through `scannerDataSource.ts`, then maps it with the adapter. `mockData.ts` contains shared UI types/conversion helpers, not a product-runtime sample candidate array.
 
-**Next Step**: To connect real data, replace `PERSISTABLE_SCANNER_SAMPLE` in `mockData.ts` with a `fetch()` call to a local `full_output.json` file or a thin API endpoint.
+**Current boundary**: real-data publication requires the API, provenance, policy gates, allowlists and freshness. The next step is the 12R.4 collector/publisher, not a fixture substitution.
 
 ---
 
@@ -946,13 +1000,13 @@ The UI currently operates without a backend or live API. However, it is structur
 
 ### Data source selector
 
-The header now shows a **Fixture / Static JSON / API** segment control. Switching source:
+Only `DEVELOPMENT_DEMO` shows the **Fixture / Static JSON / API** segment control. `INTERNAL_BETA` hides sample controls and uses API-only data. In demo mode, switching source:
 1. Calls `loadScannerDataSourceResult(source)` from `scannerDataSource.ts`
 2. Runs the result through the existing adapter (`mapPersistableScannerOutputToUiCandidates`)
 3. Updates `candidates` state in `App.tsx`
 4. Candidate Results, Scanner Radar, Watchlist, and Risk Alerts re-render with new data
 
-If a source is unavailable (e.g. API not yet implemented), the service falls back to the fixture and shows a yellow notice banner in the UI.
+If a demo source is unavailable, `DEVELOPMENT_DEMO` may show the explicit fixture with a notice. In `INTERNAL_BETA`, an unavailable API clears candidates and shows `Data Unavailable` with the server reason code; no sample fallback is attempted.
 
 ### Connecting real data
 

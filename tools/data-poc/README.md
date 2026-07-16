@@ -16,6 +16,38 @@ It also includes an approved free source adapter framework. This normalizes Alte
 
 This is not the product. It does not include UI, database, migrations, auth, production cron scripts, AI calls, exchange integration, MT4, Telegram/Discord, payments, or auto-trading.
 
+## 12R.3 Provenance Contract
+
+Persistable scanner and approved context generators now attach a versioned `provenance` manifest. The manifest contains:
+
+- dataset `schema_version`;
+- `contract_version=real_data_boundary_v1`;
+- generator version;
+- environment and mode;
+- `fixture_used`;
+- `run_id`, `generated_at`, and `finished_at`;
+- source IDs;
+- per-source decisions for `live_fetch`, `normalized_storage`, `user_display`, and `raw_storage`.
+
+Scanner uses `scanner_snapshot_v1` / `data_poc_persistable_scanner_v1`. Approved context uses `context_snapshot_v1` / `approved_sources_poc_v1`.
+
+Fixture commands produce an explicit `DEVELOPMENT_DEMO`, `mode=fixture`, `fixture_used=true` manifest. Those artifacts remain valid for tests/demo but are rejected by the `INTERNAL_BETA` reader. A future live run is not display-eligible merely because it has `mode=live`: its manifest must say `INTERNAL_BETA`, contain no fixture marker, have all required policy decisions, and agree with checked-in runtime policy.
+
+12R.3 updates registry/runtime policy for the accepted `INTERNAL_BETA` source actions but does not activate collectors or execute provider calls. `PUBLIC_BETA` remains blocked for DexScreener, GoPlus and Honeypot.is; raw storage remains denied everywhere.
+
+Offline validation:
+
+```powershell
+pnpm run test
+pnpm run typecheck
+pnpm run sources:approved:fixture
+pnpm run scanner:persist:fixture
+```
+
+Do not run `sources:approved:live`, `scanner:live`, `security:live` or the strict live-source helper as part of 12R.3. `scripts\win\check-data-poc.cmd` skips live calls by default and requires a separate explicit `CRYPTO_EDGE_ALLOW_LIVE_SOURCE_CHECK=1` opt-in outside this stage.
+
+The consumer contract and reason codes are documented in `../../docs/real_data_api_contract.md`. The next stage is 12R.4 — Approved Live Collectors & Normalized Snapshot.
+
 ## Install
 
 ```bash

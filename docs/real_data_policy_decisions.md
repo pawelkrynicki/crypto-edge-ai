@@ -10,13 +10,26 @@
 | Status | **zaakceptowane przez ownera** |
 | Środowisko docelowe | `INTERNAL_BETA` na `https://cryptoedge.crmallintraders.pl` |
 | Stan testu zewnętrznego | **wstrzymany — NO-GO** |
-| Następny etap | **12R.3 — Fail-Closed Real Data Boundary** |
+| Następny etap | **12R.4 — Approved Live Collectors & Normalized Snapshot** |
 
 ## 1. Charakter i pierwszeństwo dokumentu
 
 Ten dokument formalnie zamyka pytania decyzyjne wskazane w `docs/real_data_readiness_audit.md` po etapie 12R.1. Jest normatywnym źródłem zaakceptowanej polityki real-data dla `INTERNAL_BETA`.
 
 Akceptacja decyzji nie oznacza, że źródła zostały aktywowane albo że bieżący runtime już je egzekwuje. Rejestr źródeł, runtime policy, API, frontend i konfiguracja VPS pozostają bez zmian w 12R.2. Do czasu wdrożenia oraz weryfikacji granicy fail-closed w 12R.3 system ma odmawiać publikacji danych, których nie potrafi udowodnić jako dozwolone, rzeczywiste i aktualne.
+
+## Aktualizacja wykonawcza 12R.3 — 16.07.2026
+
+Decyzje 12R.2 zostały technicznie zakodowane w granicy odczytu/publikacji opisanej w `docs/real_data_api_contract.md`:
+
+- product runtime rozróżnia wyłącznie jawne `DEVELOPMENT_DEMO` i `INTERNAL_BETA`; brak/nieznana wartość fail-closed;
+- manifest `real_data_boundary_v1` jest obowiązkowy dla danych dopuszczanych do `INTERNAL_BETA` i jest porównywany z runtime policy;
+- DexScreener, GoPlus i Honeypot.is otrzymały zatwierdzone gates `INTERNAL_BETA` w registry/runtime policy, bez aktywacji i bez provider calls;
+- scanner/context API publikuje wyłącznie allowlisty, egzekwuje SLA i zwraca 503 z reason code zamiast fixture fallback;
+- frontend `INTERNAL_BETA` korzysta tylko z API, nie pokazuje selektorów sample ani demo navigation;
+- etap wykonano całkowicie offline; VPS pozostał bez zmian.
+
+To nie jest aktywacja źródeł ani potwierdzenie gotowości danych. Do czasu 12R.4 oczekiwanym stanem `INTERNAL_BETA` bez poprawnego live snapshotu jest `Data Unavailable` / 503.
 
 ## 2. Environment
 
@@ -147,6 +160,6 @@ W tym etapie nie wykonuje się:
 
 ## 10. Następny etap
 
-Następny etap to **12R.3 — Fail-Closed Real Data Boundary**.
+Następny etap to **12R.4 — Approved Live Collectors & Normalized Snapshot**.
 
-12R.3 ma technicznie wyegzekwować zaakceptowane decyzje: target environment, action gates dla fetch/storage/display, allowlistę odpowiedzi, freshness SLA, jawne degraded/unavailable states, brak fixture fallback oraz rozdzielenie production real-data mode od development demo. Sam dokument 12R.2 nie upoważnia do provider calls, wdrożenia ani zmian VPS.
+12R.3 technicznie wyegzekwował target environment, action gates dla fetch/storage/display, allowlistę odpowiedzi, freshness SLA, jawne degraded/unavailable states, brak fixture fallback oraz rozdzielenie product real-data mode od development demo. 12R.4 może dodać wyłącznie jawnie zatwierdzone collectory i znormalizowaną, atomowo publikowaną migawkę; nie może osłabić granicy 12R.3 ani samodzielnie autoryzować zmian VPS.

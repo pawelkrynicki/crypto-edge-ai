@@ -26,6 +26,8 @@ This is the pre-holiday local MVP health check. It runs the existing checks in o
 
 It does not start the dev preview or open a browser. It stops on the first failing check and prints `LOCAL MVP CHECK OK` when the local MVP stack is healthy.
 
+Since 12R.3 this aggregate is offline by default. `check-data-poc.cmd` runs fixture generation, tests and typechecks but skips every live provider call unless an operator separately sets `CRYPTO_EDGE_ALLOW_LIVE_SOURCE_CHECK=1`. Do not set that opt-in during 12R.3 validation.
+
 Runbook and freeze notes:
 
 - `docs\local_mvp_runbook.md`
@@ -48,7 +50,7 @@ scripts\win\check-local-rc.cmd
 
 This is the 10C local release-candidate checkpoint. It verifies the required runbook/checklist documents and core local MVP scripts are present, then runs `scripts\win\check-local-mvp.cmd`.
 
-The local RC path tolerates a transient external fetch failure from an allowed `PUBLIC_BETA` live source as `EXTERNAL SOURCE DEGRADED` / `degraded_external_source`. This remains visible in the approved source output and warnings, and it is not treated as healthy or OK.
+The local RC path is offline by default. Historical degraded handling for an explicitly authorized live-source run remains in the adapter POC, but `check-local-rc.cmd` does not invoke it during 12R.3.
 
 It does not check `git status --porcelain`, because development branches are expected to have changes before commit. Before marking a release candidate, confirm a clean working tree separately with `git status`.
 
@@ -61,6 +63,8 @@ scripts\win\check-live-sources-strict.cmd
 ```
 
 This runs the approved live source context with `CRYPTO_EDGE_DATA_ENV=PUBLIC_BETA` and `STRICT_LIVE_SOURCES=1`. Use it when live source availability itself must hard-fail the run, including transient `fetch failed` responses from allowed external APIs.
+
+This command performs real provider calls and is explicitly outside the 12R.3 offline validation path.
 
 ## Generate Live Context
 
@@ -78,6 +82,8 @@ scripts\win\dev-ui.cmd
 
 This starts the local API on port `5177` and the frontend on port `5173` in separate CMD windows.
 
+The helper explicitly sets `CRYPTO_EDGE_RUNTIME_MODE=DEVELOPMENT_DEMO` in both processes. Localhost itself never selects demo mode.
+
 Record real click-through results in `docs\local_mvp_rc_manual_preview_notes.md`. Do not mark any area as `PASS` unless the preview was actually opened and clicked through.
 
 ## Local production preview
@@ -90,7 +96,7 @@ scripts\win\serve-ui-preview.cmd webinar-teaser
 scripts\win\serve-ui-preview.cmd control-center
 ```
 
-`build-ui-preview.cmd` runs the UI mock production build from `tools\ui-mock`. `serve-ui-preview.cmd` serves the built `dist` directory on `127.0.0.1:4173` and prints the direct preview URL for the selected hash view.
+`build-ui-preview.cmd` runs the explicit `DEVELOPMENT_DEMO` build from `tools/ui-mock`. `serve-ui-preview.cmd` serves the built `dist` directory on `127.0.0.1:4173` and prints the direct hash URL. The fail-closed product build is `pnpm run build:internal-beta` and is not used by the demo preview launchers.
 
 ## Trusted preview session starters
 
@@ -123,7 +129,7 @@ scripts\win\preview-control-center.cmd
 scripts\win\check-preview-launchers.cmd
 ```
 
-This verifies that the production preview launcher scripts exist, confirms `tools\ui-mock\package.json`, runs the UI mock production build, checks `tools\ui-mock\dist\index.html`, and prints the expected deep-link preview URLs.
+This verifies that the development preview launcher scripts exist, confirms `tools\ui-mock\package.json`, runs the explicit `DEVELOPMENT_DEMO` build, checks `tools\ui-mock\dist\index.html`, and prints the expected deep-link preview URLs. It is not the `INTERNAL_BETA` product build.
 
 It does not start `vite preview`, run network checks, call providers, require review storage, require a backend, or use AI KINTEL.
 
