@@ -152,25 +152,21 @@
           "FIXTURE_ONLY"
         ],
         "live_fetch": [
-          "LOCAL_POC",
-          "INTERNAL_BETA"
+          "LOCAL_POC"
         ],
         "normalized_storage": [
-          "LOCAL_POC",
-          "INTERNAL_BETA"
+          "LOCAL_POC"
         ],
         "raw_storage": [],
-        "user_display": [
-          "INTERNAL_BETA"
-        ],
+        "user_display": [],
         "derived_score_display": [
           "LOCAL_POC"
         ]
       },
       "notes": [
-        "Honeypot.is is approved as the secondary candidate-scoped INTERNAL_BETA source by 12R.2.",
-        "PUBLIC_BETA and COMMERCIAL remain blocked.",
-        "User display is limited to the normalized 12R.3 security allowlist; raw storage remains disabled."
+        "Honeypot.is is blocked from automated INTERNAL_BETA product use by the official Third-Party Restriction.",
+        "MANUAL_LINK_ONLY pending explicit written permission; PUBLIC_BETA and COMMERCIAL remain blocked.",
+        "The legacy client remains available only for fixture/demo and explicitly allowed LOCAL_POC work; raw storage remains disabled."
       ]
     },
     "aikintel_market_news": {

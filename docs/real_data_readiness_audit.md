@@ -40,6 +40,28 @@ Ta aktualizacja zamyka pytania decyzyjne, ale nie usuwa luk implementacyjnych wy
 
 Werdykt testera nadal pozostaje `NO-GO`: brak autoryzowanego collectora, atomowej publikacji, VPS API/reverse proxy, soak i owner acceptance. Następny etap to **12R.4 — Approved Live Collectors & Normalized Snapshot**.
 
+## Aktualizacja readiness 12R.4 — 16.07.2026
+
+Lokalna warstwa collector/publisher została wdrożona bez zmian VPS. Historyczne ustalenia poniżej o braku collectora, query `SOL`, nieatomowym zapisie i aktywnym Honeypot.is są zastąpione przez ten stan:
+
+- DexScreener latest profiles → bounded token pairs → najwyższa poprawna płynność → deduplikacja → istniejące basic filters;
+- 20/30 seedów i 10/20 security candidates;
+- GoPlus jako jedyne aktywne automated security source; Honeypot.is jako `MANUAL_LINK_ONLY / blocked pending written permission`;
+- brak GoPlus nie usuwa kandydata i daje `SECURITY DATA UNAVAILABLE`; brak formalnie wyłączonego Honeypot.is nie daje partial coverage;
+- live Alternative.me i darmowe DefiLlama bez fixture fallback;
+- timeout 10 s, jeden retry, concurrency 3, bounded `Retry-After`, User-Agent, request counters i twardy call budget;
+- `scanner_snapshot_v1` / `real_data_boundary_v1`, faktyczne source IDs, runtime-policy decisions, brak raw fields i brak scorecards;
+- walidacja przed temporary write, atomic rename i collision protection;
+- wszystkie testy offline używają injected fetch/mock transport.
+
+Jeden kontrolowany smoke używa `npm run collect:internal-beta -- --seed-limit 10 --security-limit 3`; offline validation używa `npm run snapshot:validate:latest`. Scheduler, retention, VPS, public deployment i AI KINTEL pozostają poza zakresem.
+
+Pełna walidacja offline z 17.07.2026 przeszła jako `LOCAL MVP RC CHECK OK`: registry, 122 testy data-poc, typecheck, oba storage smoke, workflow/report smoke, UI contracts, 34 testy boundary i build `INTERNAL_BETA`. Opt-in live pozostawał wyłączony podczas całej walidacji.
+
+Jedyny autoryzowany smoke w tym przebiegu, 17.07.2026, użył `seed-limit=10` i `security-limit=3`, po czym zakończył się `DEXSCREENER_NETWORK_ERROR` po jednej ograniczonej próbie ponownej. Nie powstał `run_id`; request attempts: DexScreener 2, GoPlus 0, Alternative.me 0, DefiLlama 0; seedy/pary/kandydaci: 0/0/0; security: `NOT_INVOKED`. Nie opublikowano scanner ani context snapshotu i nie pozostał plik tymczasowy. Poprzedni smoke z 16.07 zakończył się na tej samej granicy. Bramka działającego live runu pozostaje otwarta, a 12R.5 nie powinien się rozpocząć bez osobnej autoryzacji skutecznego runu.
+
+Planowany następny etap: **12R.5 — Product Radar Redesign & Local Owner Review**, po zamknięciu live gate 12R.4.
+
 ## 1. Decyzja audytowa
 
 Repozytorium nie ma dziś kompletnego, automatycznego i zgodnego z polityką przepływu, który może zasilać prywatną wersję VPS wyłącznie rzeczywistymi i aktualnymi danymi.

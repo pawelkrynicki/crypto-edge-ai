@@ -4,6 +4,20 @@
 
 Ten kontrakt opisuje wyłącznie lokalną granicę odczytu i publikacji danych dla `INTERNAL_BETA`. Etap 12R.3 nie uruchamia collectorów, nie wykonuje provider calls, nie wdraża niczego na VPS i nie wystawia nowego portu publicznego.
 
+## Aktualizacja kontraktu 12R.4
+
+Reader `real_data_boundary_v1` pozostaje fail-closed. Aktywny scanner manifest wymaga `dexscreener` oraz dopuszcza `goplus_security` wyłącznie wtedy, gdy GoPlus faktycznie wykonał request. `honeypot_is` jest zabroniony w provenance `INTERNAL_BETA`.
+
+GoPlus jest pełnym aktualnie zatwierdzonym security contract. Jeden świeży wynik GoPlus nie oznacza partial coverage. Brak GoPlus daje `SECURITY DATA UNAVAILABLE`; pozytywne zapewnienia bezpieczeństwa nadal są zabronione.
+
+Metadata scanner snapshotu zawiera discovery method, liczbę seedów/par/kandydatów, security limit, request counts per source, source health i attribution `provider=GoPlus Security`. Context zawiera faktyczne `alternative_me_fng` i `defillama_api`, attribution requirements oraz źródłowe timestampy.
+
+Publikacja jest atomiczna: pełna walidacja, plik tymczasowy w katalogu docelowym, atomic rename oraz blokada collision `run_id`. Snapshot nie zawiera raw provider fields ani publikowanych scorecards.
+
+Collector wymaga równocześnie `CRYPTO_EDGE_DATA_ENV=INTERNAL_BETA`, `CRYPTO_EDGE_RUNTIME_MODE=INTERNAL_BETA` i `ALLOW_LIVE_PROVIDER_CALLS=1`; brak zgody kończy proces przed pierwszym fetch. Komenda offline to `npm run snapshot:validate:latest`.
+
+12R.4 nie obejmuje schedulera, retention, deploymentu ani zmian VPS. Następny etap: **12R.5 — Product Radar Redesign & Local Owner Review**.
+
 ## Runtime mode
 
 Jedyną flagą trybu produktu jest `CRYPTO_EDGE_RUNTIME_MODE`:
@@ -31,7 +45,7 @@ Minimalny manifest:
   "run_id": "scan_YYYYMMDDhhmmss",
   "generated_at": "ISO-8601",
   "finished_at": "ISO-8601",
-  "source_ids": ["dexscreener", "goplus_security", "honeypot_is"],
+  "source_ids": ["dexscreener", "goplus_security"],
   "policy_decisions": {
     "dexscreener": {
       "live_fetch": "allowed",
@@ -57,7 +71,6 @@ Security publikuje wyłącznie znormalizowane pola podatków, flag ryzyka, cover
 
 - `CRITICAL RISK`;
 - `NEEDS MANUAL VERIFICATION`;
-- `PARTIAL SECURITY COVERAGE`;
 - `SECURITY DATA UNAVAILABLE`.
 
 `SECURITY_PASSED` nie jest publikowane jako pozytywne zapewnienie; mapuje się na `NEEDS MANUAL VERIFICATION`. `Safe Token`, `Verified Safe`, raw payload, nieznane pola, sekrety i absolutne ścieżki hosta nie są publikowane. `final_label` i scoring nie są przeliczane ani zmieniane; nieallowlistowane scorecards nie są publikowane przez ścieżkę `INTERNAL_BETA`.
@@ -65,12 +78,12 @@ Security publikuje wyłącznie znormalizowane pola podatków, flag ryzyka, cover
 ## Freshness
 
 - scanner `generated_at`/`finished_at`: maksymalnie 30 minut;
-- GoPlus/Honeypot `checked_at`: maksymalnie 30 minut;
+- GoPlus `checked_at`: maksymalnie 30 minut;
 - Alternative.me `fetched_at`: maksymalnie 30 godzin;
 - DefiLlama `fetched_at`: maksymalnie 6 godzin;
 - tolerancja zegara w przyszłość: 5 minut.
 
-Brakujący, nieparsowalny albo zbyt przyszły timestamp jest invalid. Stary scanner/context daje 503. Stary security check traci swoje pola interpretacyjne i staje się `SECURITY DATA UNAVAILABLE`. Jedno świeże źródło security daje `PARTIAL SECURITY COVERAGE`; brak obu daje `SECURITY DATA UNAVAILABLE`.
+Brakujący, nieparsowalny albo zbyt przyszły timestamp jest invalid. Stary scanner/context daje 503. Stary security check traci swoje pola interpretacyjne i staje się `SECURITY DATA UNAVAILABLE`. Świeży wynik GoPlus stanowi pełne pokrycie aktualnego aktywnego kontraktu; brak GoPlus daje `SECURITY DATA UNAVAILABLE`.
 
 Context last-known-good jest dopuszczalny tylko wewnątrz SLA, z rekordami oraz jawnym `DEGRADED`. Po SLA endpoint zwraca 503.
 

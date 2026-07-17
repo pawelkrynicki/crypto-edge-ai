@@ -6,7 +6,12 @@ import type { FearGreedIndexRecord, NormalizedSourceOutput, NormalizedSourcePoli
 
 export const ALTERNATIVE_ME_FNG_SOURCE_ID = "alternative_me_fng";
 export const ALTERNATIVE_ME_FNG_DISPLAY_NAME = "Alternative.me Fear & Greed Index";
-export const ALTERNATIVE_ME_FNG_URL = "https://api.alternative.me/fng/";
+export const ALTERNATIVE_ME_FNG_URL = "https://api.alternative.me/fng/?limit=1";
+export const ALTERNATIVE_ME_ATTRIBUTION = {
+  provider: "Alternative.me",
+  requirement: "Attribution appreciated, not required",
+  url: "https://alternative.me/crypto/fear-and-greed-index/",
+} as const;
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const FIXTURE_PATH = resolve(__dirname, "../../../fixtures/alternative_me_fng_sample.json");
@@ -35,17 +40,15 @@ export const alternativeMeFngAdapter: SourceAdapter = {
 
     return normalizeAlternativeMeFngResponse(payload, "fixture", toOutputPolicy(decision));
   },
-  async fetchLive(options: { environment?: string }): Promise<NormalizedSourceOutput> {
+  async fetchLive(options): Promise<NormalizedSourceOutput> {
     const decision = assertSourceActionAllowed({
       sourceId: ALTERNATIVE_ME_FNG_SOURCE_ID,
       environment: options.environment,
       action: "live_fetch"
     });
-    const response = await fetch(ALTERNATIVE_ME_FNG_URL);
-    if (!response.ok) {
-      throw new Error(`Alternative.me Fear & Greed request failed with HTTP ${response.status}`);
-    }
-    const payload = (await response.json()) as AlternativeMeFngResponse;
+    const payload = options.requestJson
+      ? await options.requestJson<AlternativeMeFngResponse>(ALTERNATIVE_ME_FNG_URL)
+      : await defaultRequestJson<AlternativeMeFngResponse>(ALTERNATIVE_ME_FNG_URL);
 
     return normalizeAlternativeMeFngResponse(payload, "live", toOutputPolicy(decision));
   }
@@ -83,13 +86,24 @@ export function normalizeAlternativeMeFngResponse(
     source_id: ALTERNATIVE_ME_FNG_SOURCE_ID,
     source_name: ALTERNATIVE_ME_FNG_DISPLAY_NAME,
     mode,
-    fetched_at: now.toISOString(),
+    fetched_at: records[0]?.timestamp ?? now.toISOString(),
+    attribution: ALTERNATIVE_ME_ATTRIBUTION,
     policy,
     data_category: "sentiment",
     records,
     warnings,
     errors: []
   };
+}
+
+async function defaultRequestJson<T>(url: string): Promise<T> {
+  const response = await fetch(url, {
+    headers: { accept: "application/json" },
+  });
+  if (!response.ok) {
+    throw new Error(`Alternative.me Fear & Greed request failed with HTTP ${response.status}`);
+  }
+  return await response.json() as T;
 }
 
 function toOutputPolicy(decision: SourcePolicyDecision): NormalizedSourcePolicy {

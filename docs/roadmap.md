@@ -1,5 +1,23 @@
 # Roadmap
 
+## Stage 12R.4: Approved Live Collectors & Normalized Snapshot
+
+Status: **implemented locally; full offline validation passed; the controlled live release gate remains open**.
+
+Offline gate result (17.07.2026): **passed** — `LOCAL MVP RC CHECK OK`, including registry validation, 122 data-poc tests, typecheck, storage/workflow/report smokes, UI contract tests, 34 fail-closed boundary tests and the `INTERNAL_BETA` build assertion. The live-source opt-in stayed disabled throughout this gate.
+
+Live gate result (17.07.2026): **not passed** — the one authorized limited smoke (`seed-limit=10`, `security-limit=3`) ended with `DEXSCREENER_NETWORK_ERROR` after the single bounded retry. No `run_id` was assigned, request attempts were DexScreener 2 and all other sources 0, seed/pair/candidate counts were 0, security was `NOT_INVOKED`, and no scanner/context snapshot or temporary file was published. This confirms fail-closed behavior but does not satisfy the operational live gate. The earlier 16.07 attempt ended at the same boundary.
+
+- Discovery: `dexscreener_latest_token_profiles`, 20 seeds default / 30 hard max, per-token pairs, highest valid liquidity, deduplication and existing basic filters.
+- Security: GoPlus only after filters, 10 candidates default / 20 hard max; unsupported/auth/provider failures become `SECURITY DATA UNAVAILABLE`.
+- Context: Alternative.me `limit=1` and free DefiLlama `api.llama.fi`, normalized and attributed, without fixture fallback.
+- Transport: 10 s timeout, concurrency 3, at most one retry, bounded `Retry-After`, request counters and hard budgets.
+- Publication: `scanner_snapshot_v1` / `real_data_boundary_v1`, normalized allowlists, no raw storage or scorecards, validation plus atomic rename and collision protection.
+- Compliance: Honeypot.is is `MANUAL_LINK_ONLY / blocked pending written permission`; it is not called or included in live provenance. GoPlus alone is full coverage for the active contract.
+- Operation: explicit network opt-in, manual local run and separate offline validation; no scheduler, retention, VPS/public deployment, scoring changes, AI KINTEL, scraping or paid sources.
+
+Planned next stage: **12R.5 — Product Radar Redesign & Local Owner Review**, only after a separately authorized live run satisfies the 12R.4 operational gate. VPS remains unchanged.
+
 ## Stage 12R.3: Fail-Closed Real Data Boundary
 
 Status: **implemented and verified offline on 16.07.2026**.

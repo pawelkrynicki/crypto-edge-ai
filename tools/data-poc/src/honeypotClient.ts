@@ -7,10 +7,7 @@ const HONEYPOT_CHAIN_IDS: Record<string, string> = {
   eth: "1",
   ethereum: "1",
   bsc: "56",
-  base: "8453",
-  arbitrum: "42161",
-  polygon: "137",
-  avalanche: "43114"
+  base: "8453"
 };
 
 export async function fetchHoneypotToken(
@@ -48,5 +45,5 @@ export async function fetchHoneypotToken(
 
 export function toHoneypotChainId(chain: string): string | null {
   const normalized = chain.toLowerCase();
-  return HONEYPOT_CHAIN_IDS[normalized] ?? (/^\d+$/.test(chain) ? chain : null);
+  return HONEYPOT_CHAIN_IDS[normalized] ?? null;
 }

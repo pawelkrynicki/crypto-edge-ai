@@ -103,9 +103,15 @@ describe("INTERNAL_BETA scanner provenance boundary", () => {
 
   it("rejects security lineage not declared in the manifest", async () => {
     const output = makeScannerOutput();
-    output.provenance.source_ids = ["dexscreener", "goplus_security"];
-    delete output.provenance.policy_decisions.honeypot_is;
+    output.provenance.source_ids = ["dexscreener"];
+    delete output.provenance.policy_decisions.goplus_security;
     await expectScannerCode(output, "SCANNER_LINEAGE_MISMATCH");
+  });
+
+  it("rejects unknown scanner metadata fields", async () => {
+    const output = makeScannerOutput();
+    output.provenance.metadata.raw_payload = { secret: true };
+    await expectScannerCode(output, "SCANNER_METADATA_INVALID");
   });
 
   it("rejects source URLs carrying query data", async () => {
@@ -141,16 +147,16 @@ describe("INTERNAL_BETA scanner provenance boundary", () => {
     assert.deepEqual(security.sources, []);
   });
 
-  it("marks one available security source as PARTIAL SECURITY COVERAGE", async () => {
+  it("treats GoPlus as full coverage for the active security contract", async () => {
     const output = makeScannerOutput();
     output.security_checks[0].sources = ["goplus"];
     const result = await readScanner(output);
     const security = asRecords(result.security_checks)[0];
-    assert.equal(security.coverage_status, "PARTIAL SECURITY COVERAGE");
-    assert.equal(security.security_label, "PARTIAL SECURITY COVERAGE");
+    assert.equal(security.coverage_status, null);
+    assert.equal(security.security_label, "NEEDS MANUAL VERIFICATION");
   });
 
-  it("marks both unavailable security sources as SECURITY DATA UNAVAILABLE", async () => {
+  it("marks the active security source as SECURITY DATA UNAVAILABLE", async () => {
     const output = makeScannerOutput();
     output.security_checks[0].sources = [];
     const result = await readScanner(output);
@@ -328,6 +334,13 @@ describe("INTERNAL_BETA context freshness boundary", () => {
     assert.equal(result.environment, "INTERNAL_BETA");
     assert.equal(result.summary.data_status, "READY");
     assert.deepEqual(result._source_meta.source_ids, ["alternative_me_fng", "defillama_api"]);
+    assert.deepEqual(result.sources.map((source) => source.attribution?.provider), ["Alternative.me", "DefiLlama"]);
+  });
+
+  it("rejects context metadata that could carry raw provider data", async () => {
+    const output = makeContextOutput();
+    output.provenance.metadata.raw_payload = { secret: true };
+    await expectContextCode(output, "CONTEXT_METADATA_INVALID");
   });
 
   it("rejects Alternative.me after 30 hours", async () => {
@@ -409,7 +422,7 @@ function makeScannerOutput(): ScannerFactoryOutput {
   const runId = "scan_20260716120000";
   output.scan_run.run_id = runId;
   output.scan_run.mode = "live";
-  output.scan_run.query = "SOL";
+  output.scan_run.query = "dexscreener_latest_token_profiles";
   output.scan_run.started_at = "2026-07-16T11:58:00.000Z";
   output.scan_run.finished_at = NOW.toISOString();
   output.scan_run.errors = [];
@@ -429,7 +442,7 @@ function makeScannerOutput(): ScannerFactoryOutput {
     run_id: runId,
     candidate_id: candidateIds[index] ?? candidateIds[0],
     checked_at: NOW.toISOString(),
-    sources: ["goplus", "honeypot"],
+    sources: ["goplus"],
   }));
   output.scorecards = output.scorecards.map((scorecard, index) => ({
     ...scorecard,
@@ -447,11 +460,35 @@ function makeScannerOutput(): ScannerFactoryOutput {
     run_id: runId,
     generated_at: NOW.toISOString(),
     finished_at: NOW.toISOString(),
-    source_ids: ["dexscreener", "goplus_security", "honeypot_is"],
+    source_ids: ["dexscreener", "goplus_security"],
     policy_decisions: {
       dexscreener: allowedPolicy(),
       goplus_security: allowedPolicy(),
-      honeypot_is: allowedPolicy(),
+    },
+    metadata: {
+      discovery_method: "dexscreener_latest_token_profiles",
+      seed_count: output.candidates.length,
+      pairs_loaded: output.candidates.length,
+      candidates_before_filters: output.candidates.length,
+      candidates_after_filters: output.candidates.filter((candidate) => candidate.basic_filter_status === "passed_basic_filter").length,
+      security_candidate_limit: 3,
+      security_candidates_requested: Math.min(
+        3,
+        output.candidates.filter((candidate) => candidate.basic_filter_status === "passed_basic_filter").length,
+      ),
+      request_counts: {
+        dexscreener: output.candidates.length + 1,
+        goplus_security: 1,
+        alternative_me_fng: 1,
+        defillama_api: 1,
+      },
+      source_health: {
+        dexscreener: "READY",
+        goplus_security: "READY",
+        alternative_me_fng: "READY",
+        defillama_api: "READY",
+      },
+      attribution: { provider: "GoPlus Security" },
     },
   };
   return output;
@@ -481,6 +518,14 @@ function makeContextOutput(): ContextFactoryOutput {
         alternative_me_fng: allowedPolicy(),
         defillama_api: allowedPolicy(),
       },
+      metadata: {
+        request_counts: { alternative_me_fng: 1, defillama_api: 1 },
+        attributions: {
+          alternative_me_fng: alternativeMeAttribution(),
+          defillama_api: defillamaAttribution(),
+        },
+        raw_payload: undefined,
+      },
     },
     run_id: runId,
     generated_at: NOW.toISOString(),
@@ -491,6 +536,7 @@ function makeContextOutput(): ContextFactoryOutput {
         source_name: "Alternative.me Fear & Greed Index",
         mode: "live",
         fetched_at: "2026-07-16T11:00:00.000Z",
+        attribution: alternativeMeAttribution(),
         policy: internalFetchPolicy("alternative_me_fng"),
         data_category: "sentiment",
         records: [{
@@ -508,6 +554,7 @@ function makeContextOutput(): ContextFactoryOutput {
         source_name: "DefiLlama API",
         mode: "live",
         fetched_at: "2026-07-16T11:00:00.000Z",
+        attribution: defillamaAttribution(),
         policy: internalFetchPolicy("defillama_api"),
         data_category: "defi_context",
         records: [{
@@ -552,6 +599,22 @@ function internalFetchPolicy(sourceId: string) {
   };
 }
 
+function alternativeMeAttribution() {
+  return {
+    provider: "Alternative.me",
+    requirement: "Attribution appreciated, not required",
+    url: "https://alternative.me/crypto/fear-and-greed-index/",
+  };
+}
+
+function defillamaAttribution() {
+  return {
+    provider: "DefiLlama",
+    requirement: "Attribution appreciated",
+    url: "https://defillama.com/",
+  };
+}
+
 function asRecords(value: unknown): Record<string, unknown>[] {
   assert.ok(Array.isArray(value));
   assert.equal(value.every(isRecord), true);
@@ -585,6 +648,19 @@ type ScannerFactoryOutput = PersistableScannerOutput & {
     finished_at: string;
     source_ids: string[];
     policy_decisions: Record<string, ReturnType<typeof allowedPolicy>>;
+    metadata: {
+      discovery_method: string;
+      seed_count: number;
+      pairs_loaded: number;
+      candidates_before_filters: number;
+      candidates_after_filters: number;
+      security_candidate_limit: number;
+      security_candidates_requested: number;
+      request_counts: Record<string, number>;
+      source_health: Record<string, string>;
+      attribution: { provider: string };
+      raw_payload?: unknown;
+    };
   };
   candidates: Array<Record<string, unknown> & PersistableCandidate>;
 };
@@ -605,6 +681,11 @@ function makeContextOutputShape() {
       finished_at: "",
       source_ids: [] as string[],
       policy_decisions: {} as Record<string, ReturnType<typeof allowedPolicy>>,
+      metadata: {
+        request_counts: {} as Record<string, number>,
+        attributions: {} as Record<string, ReturnType<typeof alternativeMeAttribution>>,
+        raw_payload: undefined as unknown,
+      },
     },
     run_id: "",
     generated_at: "",
@@ -615,6 +696,7 @@ function makeContextOutputShape() {
       mode: "live";
       fetched_at: string;
       health_status?: "degraded_external_source";
+      attribution: ReturnType<typeof alternativeMeAttribution>;
       policy: ReturnType<typeof internalFetchPolicy>;
       data_category: "sentiment" | "defi_context";
       records: Array<Record<string, unknown>>;

@@ -115,6 +115,9 @@ export type BuildPersistableScannerInput = {
   startedAt?: string | null;
   finishedAt?: string;
   environment?: string;
+  sourceIds?: string[];
+  metadata?: Record<string, unknown>;
+  publishScorecards?: boolean;
 };
 
 export function buildPersistableScannerOutput(input: BuildPersistableScannerInput): PersistableScannerOutput {
@@ -182,7 +185,7 @@ export function buildPersistableScannerOutput(input: BuildPersistableScannerInpu
     ];
   });
 
-  const scorecards = input.combined.candidates.map((item) => ({
+  const scorecards = input.publishScorecards === false ? [] : input.combined.candidates.map((item) => ({
     run_id: runId,
     candidate_id: buildCandidateId(item.candidate.chain, item.candidate.contract_address, item.candidate.pair_address, item.candidate.source),
     security_score: null,
@@ -206,7 +209,7 @@ export function buildPersistableScannerOutput(input: BuildPersistableScannerInpu
   const securitySourceIds = input.combined.candidates.flatMap((item) => (
     item.security?.sources.map((source) => source === "goplus" ? "goplus_security" : "honeypot_is") ?? []
   ));
-  const sourceIds = ["dexscreener", ...new Set(securitySourceIds)];
+  const sourceIds = input.sourceIds ?? ["dexscreener", ...new Set(securitySourceIds)];
 
   return {
     provenance: buildSnapshotProvenanceManifest({
@@ -218,6 +221,7 @@ export function buildPersistableScannerOutput(input: BuildPersistableScannerInpu
       generatedAt: finishedAt,
       finishedAt,
       sourceIds,
+      metadata: input.metadata,
     }),
     scan_run: {
       run_id: runId,

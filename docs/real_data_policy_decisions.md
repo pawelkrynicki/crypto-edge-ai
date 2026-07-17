@@ -31,6 +31,22 @@ Decyzje 12R.2 zostały technicznie zakodowane w granicy odczytu/publikacji opisa
 
 To nie jest aktywacja źródeł ani potwierdzenie gotowości danych. Do czasu 12R.4 oczekiwanym stanem `INTERNAL_BETA` bez poprawnego live snapshotu jest `Data Unavailable` / 503.
 
+## Aktualizacja wykonawcza 12R.4 — 16.07.2026
+
+Ta aktualizacja ma pierwszeństwo przed historycznymi zapisami 12R.2/12R.3:
+
+- aktywne źródła `INTERNAL_BETA` to `dexscreener`, `goplus_security` (tylko gdy faktycznie wywołane), `alternative_me_fng` i `defillama_api`;
+- `honeypot_is` zachowuje `access_status=PENDING_TERMS_REVIEW`, ale jest `MANUAL_LINK_ONLY / blocked pending written permission`; `INTERNAL_BETA` usunięto z `live_fetch`, `normalized_storage` i `user_display`;
+- GoPlus jest jedynym aktywnym źródłem security, więc brak Honeypot.is nie oznacza `PARTIAL SECURITY COVERAGE`;
+- DexScreener discovery używa latest token profiles i per-token pairs, 20 seedów domyślnie / 30 maksymalnie oraz 10 / 20 kandydatów security po basic filters;
+- transport ma timeout 10 s, concurrency 3, maksymalnie jeden retry i twarde budżety: DexScreener 26/36, GoPlus 13/23, Alternative.me 2, DefiLlama 2;
+- publikowane są wyłącznie normalized snapshots; walidacja poprzedza temporary write i atomic rename, collision `run_id` nie nadpisuje pliku;
+- nie dodano schedulera, retention cleanup ani zmian VPS.
+
+Kanoniczna komenda: `npm run collect:internal-beta`; walidacja bez sieci: `npm run snapshot:validate:latest` w `tools/data-poc`.
+
+Następny etap: **12R.5 — Product Radar Redesign & Local Owner Review**.
+
 ## 2. Environment
 
 - VPS `cryptoedge.crmallintraders.pl` jest środowiskiem `INTERNAL_BETA`.

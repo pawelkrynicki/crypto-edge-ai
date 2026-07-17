@@ -27,6 +27,8 @@ export type RunApprovedSourcesPocOptions = {
   now?: Date;
   baseOutputDir?: string;
   adapters?: SourceAdapter[];
+  runId?: string;
+  requestJsonBySource?: Record<string, <T>(url: string | URL, init?: RequestInit) => Promise<T>>;
 };
 
 export type RunApprovedSourcesPocResult = {
@@ -40,6 +42,22 @@ export type ApprovedSourcesRunFailureOptions = {
 };
 
 export async function runApprovedSourcesPoc(options: RunApprovedSourcesPocOptions = {}): Promise<RunApprovedSourcesPocResult> {
+  const output = await collectApprovedSourcesOutput(options);
+  const outputDir = resolve(options.baseOutputDir ?? DEFAULT_OUTPUT_DIR, output.run_id);
+  const outputFile = resolve(outputDir, APPROVED_SOURCES_OUTPUT_FILENAME);
+  await mkdir(outputDir, { recursive: true });
+  await writeFile(outputFile, `${JSON.stringify(output, null, 2)}\n`, "utf8");
+
+  return {
+    output,
+    output_dir: outputDir,
+    output_file: outputFile
+  };
+}
+
+export async function collectApprovedSourcesOutput(
+  options: RunApprovedSourcesPocOptions = {},
+): Promise<ApprovedSourcesRunOutput> {
   const mode = options.mode ?? "fixture";
   const now = options.now ?? new Date();
   const generatedAt = now.toISOString();
@@ -49,13 +67,18 @@ export async function runApprovedSourcesPoc(options: RunApprovedSourcesPocOption
 
   for (const adapter of adapters) {
     try {
-      sources.push(mode === "live" ? await adapter.fetchLive({ environment }) : await adapter.fetchFixture());
+      sources.push(mode === "live"
+        ? await adapter.fetchLive({
+            environment,
+            requestJson: options.requestJsonBySource?.[adapter.sourceId],
+          })
+        : await adapter.fetchFixture());
     } catch (error: unknown) {
       sources.push(buildErrorOutput(adapter, mode, environment, error, now));
     }
   }
 
-  const runId = `approved_sources_${formatRunIdDate(now)}`;
+  const runId = options.runId ?? `approved_sources_${formatRunIdDate(now)}`;
   const output: ApprovedSourcesRunOutput = {
     provenance: buildSnapshotProvenanceManifest({
       schemaVersion: CONTEXT_SCHEMA_VERSION,
@@ -74,16 +97,7 @@ export async function runApprovedSourcesPoc(options: RunApprovedSourcesPocOption
     summary: summarizeSources(adapters.length, sources)
   };
 
-  const outputDir = resolve(options.baseOutputDir ?? DEFAULT_OUTPUT_DIR, output.run_id);
-  const outputFile = resolve(outputDir, APPROVED_SOURCES_OUTPUT_FILENAME);
-  await mkdir(outputDir, { recursive: true });
-  await writeFile(outputFile, `${JSON.stringify(output, null, 2)}\n`, "utf8");
-
-  return {
-    output,
-    output_dir: outputDir,
-    output_file: outputFile
-  };
+  return output;
 }
 
 function buildErrorOutput(
@@ -108,6 +122,11 @@ function buildErrorOutput(
     source_name: adapter.displayName,
     mode,
     fetched_at: now.toISOString(),
+    attribution: {
+      provider: adapter.displayName,
+      requirement: "Unavailable because the source request failed",
+      url: "",
+    },
     health_status: isDegradedExternalSource ? DEGRADED_EXTERNAL_SOURCE_STATUS : "error",
     policy: {
       environment: decision.environment,

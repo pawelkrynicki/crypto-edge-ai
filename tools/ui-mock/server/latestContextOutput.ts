@@ -43,6 +43,12 @@ type ContextPolicy = {
   reason: string;
 };
 
+type ContextAttribution = {
+  provider: string;
+  requirement: string;
+  url: string;
+};
+
 type FearGreedIndexRecord = {
   record_type: "fear_greed_index";
   value: number;
@@ -70,6 +76,7 @@ type NormalizedContextSource = {
   fetched_at: string;
   age_seconds?: number;
   status?: "READY" | "DEGRADED";
+  attribution?: ContextAttribution;
   policy: ContextPolicy;
   data_category: "sentiment" | "defi_context" | "market_context";
   records: NormalizedContextRecord[];
@@ -235,6 +242,7 @@ function sanitizeInternalBetaContextOutput(value: unknown, now: Date, directoryR
       throw new RealDataBoundaryError("CONTEXT_SOURCE_REQUIRED");
     }
   }
+  const contextMetadata = sanitizeContextMetadata(manifest.metadata, normalizedSources);
 
   const degradedSources = normalizedSources.filter((source) => source.status === "DEGRADED").length;
   const summary: ContextSummary = {
@@ -249,7 +257,7 @@ function sanitizeInternalBetaContextOutput(value: unknown, now: Date, directoryR
   };
 
   return withSourceMeta({
-    provenance: manifest,
+    provenance: { ...manifest, metadata: contextMetadata },
     run_id: manifest.run_id,
     generated_at: manifest.generated_at,
     environment: "INTERNAL_BETA",
@@ -276,11 +284,13 @@ function sanitizeInternalSource(value: unknown, now: Date): NormalizedContextSou
   }
 
   const policy = sanitizePolicy(value.policy);
+  const attribution = sanitizeAttribution(value.attribution, value.source_id);
   const records = Array.isArray(value.records) ? value.records.map(sanitizeRecord) : null;
   const warnings = toStringArray(value.warnings);
   const errors = toStringArray(value.errors);
   if (
     !policy
+    || !attribution
     || policy.environment !== "INTERNAL_BETA"
     || policy.action !== "live_fetch"
     || policy.allowed !== true
@@ -314,6 +324,7 @@ function sanitizeInternalSource(value: unknown, now: Date): NormalizedContextSou
     fetched_at: freshness.timestamp,
     age_seconds: freshness.ageSeconds,
     status: degraded ? "DEGRADED" : "READY",
+    attribution,
     policy,
     data_category: value.data_category,
     records: records as NormalizedContextRecord[],
@@ -405,21 +416,83 @@ function sanitizeDemoSource(value: unknown): NormalizedContextSource | null {
   if (value.mode !== "fixture" && value.mode !== "live") return null;
   if (!isDataCategory(value.data_category) || typeof value.source_name !== "string" || typeof value.fetched_at !== "string") return null;
   const policy = sanitizePolicy(value.policy);
+  const attribution = value.attribution === undefined ? undefined : sanitizeAttribution(value.attribution, value.source_id);
   const records = Array.isArray(value.records) ? value.records.map(sanitizeRecord) : null;
   const warnings = toStringArray(value.warnings);
   const errors = toStringArray(value.errors);
-  if (!policy || !records || records.some((record) => record === null) || !warnings || !errors) return null;
+  if (!policy || (value.attribution !== undefined && !attribution) || !records || records.some((record) => record === null) || !warnings || !errors) return null;
   return {
     source_id: value.source_id,
     source_name: value.source_name,
     mode: value.mode,
     fetched_at: value.fetched_at,
+    ...(attribution ? { attribution } : {}),
     policy,
     data_category: value.data_category,
     records: records as NormalizedContextRecord[],
     warnings,
     errors,
   };
+}
+
+function sanitizeAttribution(value: unknown, sourceId: (typeof APPROVED_SOURCE_IDS)[number]): ContextAttribution | null {
+  if (!isRecord(value)) return null;
+  const keys = Object.keys(value);
+  if (
+    keys.length !== 3
+    || !keys.includes("provider")
+    || !keys.includes("requirement")
+    || !keys.includes("url")
+    || typeof value.provider !== "string"
+    || typeof value.requirement !== "string"
+    || typeof value.url !== "string"
+  ) return null;
+  const expectedProvider = sourceId === "alternative_me_fng" ? "Alternative.me" : "DefiLlama";
+  if (value.provider !== expectedProvider || value.requirement.length === 0 || !isSafeHttpsUrl(value.url)) return null;
+  return { provider: value.provider, requirement: value.requirement, url: value.url };
+}
+
+function sanitizeContextMetadata(value: unknown, sources: NormalizedContextSource[]): Record<string, unknown> {
+  if (!isRecord(value) || !hasExactKeys(value, ["request_counts", "attributions"])) {
+    throw new RealDataBoundaryError("CONTEXT_METADATA_INVALID");
+  }
+  if (!isRecord(value.request_counts) || !isRecord(value.attributions)) {
+    throw new RealDataBoundaryError("CONTEXT_METADATA_INVALID");
+  }
+  const sourceIds = [...APPROVED_SOURCE_IDS];
+  if (!hasExactKeys(value.request_counts, sourceIds) || !hasExactKeys(value.attributions, sourceIds)) {
+    throw new RealDataBoundaryError("CONTEXT_METADATA_INVALID");
+  }
+
+  const requestCounts: Record<string, number> = {};
+  const attributions: Record<string, ContextAttribution> = {};
+  for (const source of sources) {
+    const count = value.request_counts[source.source_id];
+    const attribution = sanitizeAttribution(value.attributions[source.source_id], source.source_id);
+    if (!Number.isInteger(count) || Number(count) < 1 || Number(count) > 2 || !attribution || !source.attribution) {
+      throw new RealDataBoundaryError("CONTEXT_METADATA_INVALID");
+    }
+    if (JSON.stringify(attribution) !== JSON.stringify(source.attribution)) {
+      throw new RealDataBoundaryError("CONTEXT_METADATA_INVALID");
+    }
+    requestCounts[source.source_id] = Number(count);
+    attributions[source.source_id] = attribution;
+  }
+  return { request_counts: requestCounts, attributions };
+}
+
+function hasExactKeys(value: Record<string, unknown>, fields: readonly string[]): boolean {
+  const keys = Object.keys(value);
+  return keys.length === fields.length && fields.every((field) => keys.includes(field));
+}
+
+function isSafeHttpsUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && !url.username && !url.password;
+  } catch {
+    return false;
+  }
 }
 
 function sanitizePolicy(value: unknown): ContextPolicy | null {

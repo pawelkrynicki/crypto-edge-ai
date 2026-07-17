@@ -1,5 +1,32 @@
 # Crypto Edge AI Data POC
 
+## 12R.4 Canonical INTERNAL_BETA Collector
+
+The canonical collector is manual, local-only and fail-closed:
+
+```powershell
+$env:CRYPTO_EDGE_DATA_ENV = "INTERNAL_BETA"
+$env:CRYPTO_EDGE_RUNTIME_MODE = "INTERNAL_BETA"
+$env:ALLOW_LIVE_PROVIDER_CALLS = "1"
+npm run collect:internal-beta -- --seed-limit 10 --security-limit 3
+```
+
+Without all three flags it exits before the first fetch. It prints only run/source health, request/candidate counts, repo-relative paths, security coverage and manifest summary.
+
+Discovery uses DexScreener latest token profiles and bounded per-token pairs, selects highest valid liquidity, deduplicates and runs existing basic filters before GoPlus. Defaults/hard limits: 20/30 seeds and 10/20 security candidates. Request budgets default/hard: DexScreener 26/36, GoPlus 13/23, Alternative.me 2/2 and DefiLlama 2/2. Network defaults are timeout 10 s, concurrency 3 and at most one retry.
+
+GoPlus is the only active automated security source. EVM uses an explicit allowlist; Solana uses its separate endpoint and optional `GOPLUS_API_TOKEN`. Unavailable data retains the candidate and reports `SECURITY DATA UNAVAILABLE`. Attribution is `provider: GoPlus Security`.
+
+Honeypot.is is blocked from `INTERNAL_BETA` automated fetch/storage/display by the Third-Party Restriction. Its legacy fixture/demo/LOCAL_POC client supports only Ethereum, BSC and Base and is never called by this collector.
+
+Alternative.me uses `limit=1` and source timestamps; DefiLlama uses only free `api.llama.fi`. Scanner/context outputs are normalized, attributed, fixture-free and atomically published. Raw responses, unknown fields, host paths and scorecards are not published.
+
+Offline validation (zero network calls): `npm run snapshot:validate:latest`.
+
+Latest controlled gate (17.07.2026): the full offline RC passed, then the one authorized limited live smoke failed closed as `DEXSCREENER_NETWORK_ERROR` after one retry. It produced no run ID or snapshot; request attempts were `2/0/0/0` for DexScreener/GoPlus/Alternative.me/DefiLlama, discovery counts were `0/0/0`, and security was `NOT_INVOKED`. Do not repeat the live command without separate authorization.
+
+No scheduler, retention, VPS/public deployment, scraping, paid sources, AI KINTEL, scoring or `final_label` changes are included. `WATCHLIST` remains Manual Review Only. Next: **12R.5 — Product Radar Redesign & Local Owner Review**.
+
 ## Purpose
 
 This is a small Data Integration POC for Crypto Edge AI Camp BETA.

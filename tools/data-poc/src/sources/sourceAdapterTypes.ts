@@ -12,6 +12,12 @@ export type NormalizedSourcePolicy = {
   reason: string;
 };
 
+export type SourceAttribution = {
+  provider: string;
+  requirement: string;
+  url: string;
+};
+
 export type FearGreedIndexRecord = {
   record_type: "fear_greed_index";
   value: number;
@@ -38,6 +44,7 @@ export type NormalizedSourceOutput = {
   mode: SourceAdapterMode;
   fetched_at: string;
   health_status?: SourceHealthStatus;
+  attribution: SourceAttribution;
   policy: NormalizedSourcePolicy;
   data_category: SourceDataCategory;
   records: NormalizedSourceRecord[];
@@ -68,5 +75,8 @@ export type SourceAdapter = {
   displayName: string;
   supportedActions: SourceAction[];
   fetchFixture(): Promise<NormalizedSourceOutput>;
-  fetchLive(options: { environment?: string }): Promise<NormalizedSourceOutput>;
+  fetchLive(options: {
+    environment?: string;
+    requestJson?: <T>(url: string | URL, init?: RequestInit) => Promise<T>;
+  }): Promise<NormalizedSourceOutput>;
 };

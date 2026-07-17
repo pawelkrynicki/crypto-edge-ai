@@ -81,7 +81,7 @@
       "category": "Token honeypot/scam contract detection",
       "priority": "A",
       "access_status": "PENDING_TERMS_REVIEW",
-      "usage_scope": "INTERNAL_BETA",
+      "usage_scope": "POC_ONLY",
       "confidence": "HIGH",
       "official_docs_url": "https://docs.honeypot.is/ishoneypot",
       "official_terms_url": "https://docs.honeypot.is/terms",
@@ -101,15 +101,16 @@
       "current_code_files": ["tools/data-poc/src/honeypotClient.ts"],
       "current_endpoint": "https://api.honeypot.is/v2/IsHoneypot?address=<address>&chainID=<chainId>",
       "implementation_changes_required": [
-        "Seek explicit written permission from honeypot.is for the intended automated, multi-user product use case before any public or commercial launch",
-        "Keep PUBLIC_BETA and COMMERCIAL blocked until the Third-Party Restriction clause is clarified; 12R.2 authorizes only the candidate-scoped INTERNAL_BETA path",
+        "Seek explicit written permission from honeypot.is for the intended automated, multi-user product use case before any product activation",
+        "Keep INTERNAL_BETA, PUBLIC_BETA and COMMERCIAL automated fetch/storage/display blocked until the Third-Party Restriction clause is clarified",
+        "Expose only a MANUAL_LINK_ONLY operator workflow while written permission is pending",
         "Monitor t.me/honeypotis_news as referenced in official docs for API key/terms changes"
       ],
       "open_questions": [
         "Does showing a derived risk flag (e.g. 'high risk - possible honeypot') to end users of Crypto Edge AI constitute making the API's 'functionality' available to a third party under the Third-Party Restriction clause? NOT CONFIRMED - this is the single largest open compliance question for this source",
         "Will an API key requirement be introduced, and will it change terms?"
       ],
-      "notes": "This is the most legally ambiguous source in the registry. The literal text of the Third-Party Restriction clause is broad enough to be read as prohibiting any multi-user product (since every user of such a product would be receiving the API's functionality indirectly). A conservative compliance posture treats this as POC_ONLY / internal-research-only pending direct clarification from honeypot.is."
+      "notes": "MANUAL_LINK_ONLY / blocked pending written permission. The Third-Party Restriction is broad enough to prohibit an automated multi-user product path. The client may remain for fixture/demo and explicitly allowed LOCAL_POC work, but Honeypot.is is not an active INTERNAL_BETA source."
     },
     {
       "source_id": "coingecko_api",
@@ -718,8 +719,7 @@
     "alternative_me_fng",
     "defillama_api",
     "dexscreener",
-    "goplus_security",
-    "honeypot_is"
+    "goplus_security"
   ],
   "sources_blocked_or_pending": [
     "coingecko_api",
@@ -737,6 +737,7 @@
     "dextools_api",
     "arkham_api",
     "lunarcrush_api",
-    "token_unlocks_tokenomist"
+    "token_unlocks_tokenomist",
+    "honeypot_is"
   ]
 }
