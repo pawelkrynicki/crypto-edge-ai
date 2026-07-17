@@ -40,6 +40,30 @@ Ta aktualizacja zamyka pytania decyzyjne, ale nie usuwa luk implementacyjnych wy
 
 Werdykt testera nadal pozostaje `NO-GO`: brak autoryzowanego collectora, atomowej publikacji, VPS API/reverse proxy, soak i owner acceptance. Następny etap to **12R.4 — Approved Live Collectors & Normalized Snapshot**.
 
+## Aktualizacja readiness 12R.4 — 16.07.2026
+
+Lokalna warstwa collector/publisher została wdrożona bez zmian VPS. Historyczne ustalenia poniżej o braku collectora, query `SOL`, nieatomowym zapisie i aktywnym Honeypot.is są zastąpione przez ten stan:
+
+- DexScreener latest profiles → bounded token pairs → najwyższa poprawna płynność → deduplikacja → istniejące basic filters;
+- 20/30 seedów i 10/20 security candidates;
+- GoPlus jako jedyne aktywne automated security source; Honeypot.is jako `MANUAL_LINK_ONLY / blocked pending written permission`;
+- brak GoPlus nie usuwa kandydata i daje `SECURITY DATA UNAVAILABLE`; brak formalnie wyłączonego Honeypot.is nie daje partial coverage;
+- live Alternative.me i darmowe DefiLlama bez fixture fallback;
+- timeout 10 s, jeden retry, concurrency 3, bounded `Retry-After`, User-Agent, request counters i twardy call budget;
+- `scanner_snapshot_v1` / `real_data_boundary_v1`, faktyczne source IDs, runtime-policy decisions, brak raw fields i brak scorecards;
+- walidacja przed temporary write, atomic rename i collision protection;
+- wszystkie testy offline używają injected fetch/mock transport.
+
+Jeden kontrolowany smoke używa `npm run collect:internal-beta -- --seed-limit 10 --security-limit 3`; offline validation używa `npm run snapshot:validate:latest`. Scheduler, retention, VPS, public deployment i AI KINTEL pozostają poza zakresem.
+
+Pełna walidacja offline z 17.07.2026 przeszła jako `LOCAL MVP RC CHECK OK`: registry, 123 testy data-poc, typecheck, oba storage smoke, workflow/report smoke, UI contracts, 34 testy boundary i build `INTERNAL_BETA`. Opt-in live pozostawał wyłączony podczas całej walidacji.
+
+Po naprawie utraty kontekstu domyślnego `globalThis.fetch` jedyny autoryzowany smoke w tym przebiegu, 17.07.2026, użył `seed-limit=10` i `security-limit=3` i przeszedł jako `scan_20260717201111_bfd5fb1d`. Request counts: DexScreener 13, GoPlus 0, Alternative.me 1, DefiLlama 1. Discovery zwróciło 10 seedów, 13 par, 7 kandydatów przed filtrami i 0 po filtrach. Security coverage jest `NOT_INVOKED`, ponieważ żaden kandydat nie przeszedł basic filters; Honeypot.is wykonał 0 wywołań. DefiLlama ma health `DEGRADED` wyłącznie z powodu jawnego ograniczenia normalized context do 10 rekordów, bez hard failure.
+
+Opublikowane fixture-free snapshoty mają `mode=live`, `environment=INTERNAL_BETA`, właściwe source IDs i `raw_storage=denied`. `snapshot:validate:latest` zwrócił `valid=true`, a lokalne `/api/readiness` zwróciło HTTP 200, scanner/context `ready=true` i pustą listę reason codes. Pliki: `tools/data-poc/output/scan_20260717201111_bfd5fb1d/full_output.json` oraz `tools/data-poc/output/approved_sources_20260717201111_71b5ca78/approved_sources_output.json`. Lokalna bramka operacyjna 12R.4 jest zamknięta; nie oznacza to zgody na zewnętrznego testera ani deployment.
+
+Planowany następny etap: **12R.5 — Product Radar Redesign & Local Owner Review**. VPS pozostaje bez zmian.
+
 ## 1. Decyzja audytowa
 
 Repozytorium nie ma dziś kompletnego, automatycznego i zgodnego z polityką przepływu, który może zasilać prywatną wersję VPS wyłącznie rzeczywistymi i aktualnymi danymi.

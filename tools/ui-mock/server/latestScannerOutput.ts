@@ -23,8 +23,8 @@ export const SCANNER_GENERATOR_VERSION = "data_poc_persistable_scanner_v1";
 export const SCANNER_MAX_AGE_MS = 30 * 60 * 1000;
 export const SECURITY_MAX_AGE_MS = 30 * 60 * 1000;
 
-const SCANNER_SOURCE_IDS = ["dexscreener", "goplus_security", "honeypot_is"] as const;
-const SECURITY_SOURCE_IDS = ["goplus_security", "honeypot_is"] as const;
+const SCANNER_SOURCE_IDS = ["dexscreener", "goplus_security"] as const;
+const SECURITY_SOURCE_IDS = ["goplus_security"] as const;
 const FINAL_LABELS = ["WATCHLIST", "CRITICAL_RISK", "NEEDS_MANUAL_VERIFICATION", "REJECT"] as const;
 const BASIC_FILTER_STATUSES = ["passed_basic_filter", "rejected_basic_filter"] as const;
 
@@ -225,6 +225,8 @@ function sanitizeInternalBetaScannerOutput(value: unknown, now: Date): ScannerOu
     allowedSourceIds: SCANNER_SOURCE_IDS,
     requiredSourceIds: ["dexscreener"],
   });
+  const scannerMetadata = sanitizeScannerMetadata(manifest.metadata, manifest.source_ids);
+  const sanitizedManifest = { ...manifest, metadata: scannerMetadata };
   const scanRun = value.scan_run;
 
   if (
@@ -280,7 +282,7 @@ function sanitizeInternalBetaScannerOutput(value: unknown, now: Date): ScannerOu
   );
 
   return withSourceMeta({
-    provenance: manifest,
+    provenance: sanitizedManifest,
     scan_run: sanitizedScanRun,
     candidates,
     security_checks: securityChecks,
@@ -294,6 +296,98 @@ function sanitizeInternalBetaScannerOutput(value: unknown, now: Date): ScannerOu
     age_seconds: freshness.ageSeconds,
     source_ids: manifest.source_ids,
   });
+}
+
+function sanitizeScannerMetadata(value: unknown, sourceIds: string[]): Record<string, unknown> {
+  if (!isRecord(value)) throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
+  const allowedFields = [
+    "discovery_method", "seed_count", "pairs_loaded", "candidates_before_filters", "candidates_after_filters",
+    "security_candidate_limit", "security_candidates_requested", "request_counts", "source_health", "attribution",
+  ];
+  if (Object.keys(value).some((key) => !allowedFields.includes(key))) {
+    throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
+  }
+
+  const numericFields = [
+    "seed_count", "pairs_loaded", "candidates_before_filters", "candidates_after_filters",
+    "security_candidate_limit", "security_candidates_requested",
+  ] as const;
+  if (
+    value.discovery_method !== "dexscreener_latest_token_profiles"
+    || numericFields.some((field) => !isNonNegativeInteger(value[field]))
+    || !isRecord(value.request_counts)
+    || !isRecord(value.source_health)
+  ) throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
+  const requestCounts = value.request_counts;
+  const sourceHealth = value.source_health;
+
+  const requestFields = ["dexscreener", "goplus_security", "alternative_me_fng", "defillama_api"];
+  const healthFields = ["dexscreener", "goplus_security", "alternative_me_fng", "defillama_api"];
+  if (
+    !hasExactKeys(requestCounts, requestFields)
+    || Object.values(requestCounts).some((count) => !isNonNegativeInteger(count))
+    || !hasExactKeys(sourceHealth, healthFields)
+    || Object.values(sourceHealth).some((health) => !["READY", "DEGRADED", "UNAVAILABLE", "NOT_INVOKED"].includes(String(health)))
+  ) throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
+
+  const seedCount = value.seed_count as number;
+  const pairsLoaded = value.pairs_loaded as number;
+  const candidatesBefore = value.candidates_before_filters as number;
+  const candidatesAfter = value.candidates_after_filters as number;
+  const securityLimit = value.security_candidate_limit as number;
+  const securityRequested = value.security_candidates_requested as number;
+  const dexCount = requestCounts.dexscreener as number;
+  const goPlusCount = requestCounts.goplus_security as number;
+  if (
+    seedCount < 1 || seedCount > 30
+    || candidatesBefore < 1 || candidatesBefore > pairsLoaded
+    || candidatesAfter > candidatesBefore
+    || securityLimit < 1 || securityLimit > 20
+    || securityRequested > securityLimit || securityRequested > candidatesAfter
+    || dexCount < 1 || dexCount > 1 + seedCount + Math.min(seedCount, 5)
+    || goPlusCount > securityLimit + Math.min(securityLimit, 3)
+    || (requestCounts.alternative_me_fng as number) < 1
+    || (requestCounts.alternative_me_fng as number) > 2
+    || (requestCounts.defillama_api as number) < 1
+    || (requestCounts.defillama_api as number) > 2
+    || sourceHealth.dexscreener !== "READY"
+  ) throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
+
+  const goplusInvoked = goPlusCount > 0;
+  if (goplusInvoked !== sourceIds.includes("goplus_security")) {
+    throw new RealDataBoundaryError("SCANNER_LINEAGE_MISMATCH");
+  }
+  let attribution: { provider: "GoPlus Security" } | undefined;
+  if (goplusInvoked) {
+    if (!isRecord(value.attribution) || !hasExactKeys(value.attribution, ["provider"]) || value.attribution.provider !== "GoPlus Security") {
+      throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
+    }
+    attribution = { provider: "GoPlus Security" };
+  } else if (value.attribution !== undefined) {
+    throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
+  }
+
+  return {
+    discovery_method: "dexscreener_latest_token_profiles",
+    seed_count: seedCount,
+    pairs_loaded: pairsLoaded,
+    candidates_before_filters: candidatesBefore,
+    candidates_after_filters: candidatesAfter,
+    security_candidate_limit: securityLimit,
+    security_candidates_requested: securityRequested,
+    request_counts: Object.fromEntries(requestFields.map((field) => [field, requestCounts[field]])),
+    source_health: Object.fromEntries(healthFields.map((field) => [field, sourceHealth[field]])),
+    ...(attribution ? { attribution } : {}),
+  };
+}
+
+function hasExactKeys(value: Record<string, unknown>, fields: string[]): boolean {
+  const keys = Object.keys(value);
+  return keys.length === fields.length && fields.every((field) => keys.includes(field));
+}
+
+function isNonNegativeInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0;
 }
 
 function sanitizeScanRun(value: Record<string, unknown>): Record<string, unknown> | null {
@@ -479,16 +573,12 @@ function sanitizeSecurityCheck(
 
   const coverageStatus = sourceIds.length === 0
     ? "SECURITY DATA UNAVAILABLE"
-    : sourceIds.length === 1
-      ? "PARTIAL SECURITY COVERAGE"
-      : null;
+    : null;
   const securityLabel = sourceIds.length === 0
     ? "SECURITY DATA UNAVAILABLE"
     : value.security_label === "CRITICAL_RISK"
       ? "CRITICAL RISK"
-      : sourceIds.length === 1
-        ? "PARTIAL SECURITY COVERAGE"
-        : "NEEDS MANUAL VERIFICATION";
+      : "NEEDS MANUAL VERIFICATION";
 
   return {
     run_id: manifest.run_id,

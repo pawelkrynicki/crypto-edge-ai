@@ -8,12 +8,18 @@ export type DexScreenerToken = {
   symbol?: string;
 };
 
+export type DexScreenerTokenProfile = {
+  chainId?: unknown;
+  tokenAddress?: unknown;
+};
+
 export type DexScreenerPair = {
   chainId?: string;
   dexId?: string;
   url?: string;
   pairAddress?: string;
   baseToken?: DexScreenerToken;
+  quoteToken?: DexScreenerToken;
   priceUsd?: string;
   fdv?: number;
   marketCap?: number;

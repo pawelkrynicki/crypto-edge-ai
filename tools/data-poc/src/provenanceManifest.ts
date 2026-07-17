@@ -21,6 +21,7 @@ export type SnapshotProvenanceManifest = {
     user_display: ProvenanceDecisionState;
     raw_storage: ProvenanceDecisionState;
   }>;
+  metadata?: Record<string, unknown>;
 };
 
 export type BuildSnapshotProvenanceInput = {
@@ -32,6 +33,7 @@ export type BuildSnapshotProvenanceInput = {
   generatedAt: string;
   finishedAt: string;
   sourceIds: string[];
+  metadata?: Record<string, unknown>;
 };
 
 export function buildSnapshotProvenanceManifest(
@@ -60,6 +62,7 @@ export function buildSnapshotProvenanceManifest(
         raw_storage: decisionState(sourceId, policyEnvironment, "raw_storage"),
       },
     ])),
+    ...(input.metadata ? { metadata: input.metadata } : {}),
   };
 }
 

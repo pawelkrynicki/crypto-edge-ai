@@ -16,6 +16,12 @@ export type ContextPolicy = {
   reason: string;
 };
 
+export type ContextAttribution = {
+  provider: string;
+  requirement: string;
+  url: string;
+};
+
 export type FearGreedIndexRecord = {
   record_type: "fear_greed_index";
   value: number;
@@ -43,6 +49,7 @@ export type NormalizedSourceOutput = {
   fetched_at: string;
   age_seconds?: number;
   status?: "READY" | "DEGRADED";
+  attribution?: ContextAttribution;
   policy: ContextPolicy;
   data_category: "sentiment" | "defi_context" | "market_context";
   records: NormalizedContextRecord[];
@@ -74,6 +81,7 @@ export type MarketContextApiOutput = {
     finished_at: string;
     source_ids: string[];
     policy_decisions: Record<string, Record<string, "allowed" | "denied">>;
+    metadata?: unknown;
   };
   run_id: string;
   generated_at: string;

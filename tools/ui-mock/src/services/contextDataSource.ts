@@ -128,6 +128,7 @@ function isNormalizedSourceOutput(value: unknown): value is NormalizedSourceOutp
     && typeof value.source_name === "string"
     && (value.mode === "fixture" || value.mode === "live")
     && typeof value.fetched_at === "string"
+    && (value.attribution === undefined || isContextAttribution(value.attribution))
     && isContextPolicy(value.policy)
     && isDataCategory(value.data_category)
     && Array.isArray(value.records)
@@ -135,6 +136,13 @@ function isNormalizedSourceOutput(value: unknown): value is NormalizedSourceOutp
     && isStringArray(value.warnings)
     && isStringArray(value.errors)
   );
+}
+
+function isContextAttribution(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  return typeof value.provider === "string"
+    && typeof value.requirement === "string"
+    && typeof value.url === "string";
 }
 
 function isContextPolicy(value: unknown): value is ContextPolicy {

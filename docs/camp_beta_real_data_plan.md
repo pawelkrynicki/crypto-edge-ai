@@ -68,6 +68,26 @@ pnpm run typecheck
 
 Next stage: **12R.4 — Approved Live Collectors & Normalized Snapshot**. Add authorized collectors and normalized-only atomic snapshot publishing; do not weaken the 12R.3 reader.
 
+## 12R.4 Approved Live Collectors & Normalized Snapshot
+
+Aktualny ręczny pipeline `INTERNAL_BETA`:
+
+`DexScreener latest profiles → bounded token pairs → highest-liquidity pair + deduplication → existing basic filters → candidate-scoped GoPlus → Alternative.me + DefiLlama → validated normalized snapshots → atomic publish → existing fail-closed API boundary`.
+
+Discovery nie używa token boosts ani domyślnego query `SOL`. Profil jest wyłącznie seedem, nie rekomendacją. Limity: 20/30 seedów i 10/20 kandydatów security. Domyślny/hard request budget: DexScreener 26/36, GoPlus 13/23, Alternative.me 2/2, DefiLlama 2/2; timeout 10 s, concurrency 3, jeden bounded retry.
+
+Aktywne źródła: DexScreener, GoPlus Security, Alternative.me i DefiLlama. Honeypot.is jest wyłączony z `INTERNAL_BETA`, nie jest wywoływany ani deklarowany w provenance i pozostaje `MANUAL_LINK_ONLY` do pisemnej zgody.
+
+Collector publikuje tylko normalized allowlists, bez raw payloadów i scorecards. Nie zmienia scoringu, `final_label` ani `WATCHLIST = Manual Review Only`. Brak GoPlus daje `SECURITY DATA UNAVAILABLE`, bez fixture/static fallback.
+
+Uruchomienie: `npm run collect:internal-beta -- --seed-limit 10 --security-limit 3` po ustawieniu wymaganych flag. Offline validation: `npm run snapshot:validate:latest`.
+
+Poza zakresem: scheduler, retention, VPS, public deployment, paid sources, scraping i AI KINTEL. Następny etap: **12R.5 — Product Radar Redesign & Local Owner Review**.
+
+Walidacja 17.07.2026: pełny offline `LOCAL MVP RC CHECK OK` przeszedł przy wyłączonym opt-in live, w tym 123 testy Data PoC i 34 testy fail-closed boundary. Po naprawie kontekstu wywołania domyślnego `globalThis.fetch` jedyny autoryzowany ograniczony smoke (`10` seedów, limit `3` kandydatów security) przeszedł jako `scan_20260717201111_bfd5fb1d`. Wynik discovery: 10 seedów, 13 par, 7 kandydatów przed filtrami i 0 po filtrach. Request counts DexScreener/GoPlus/Alternative.me/DefiLlama: `13/0/1/1`; security `NOT_INVOKED`, ponieważ żaden kandydat nie przeszedł filtrów; Honeypot.is nie został wywołany. Fixture-free normalized snapshots przeszły walidację offline, a lokalne `/api/readiness` zwróciło HTTP 200 z gotowym scannerem i contextem. VPS pozostaje bez zmian.
+
+Output: `tools/data-poc/output/scan_20260717201111_bfd5fb1d/full_output.json` oraz `tools/data-poc/output/approved_sources_20260717201111_71b5ca78/approved_sources_output.json`. Provenance deklaruje odpowiednio `dexscreener` oraz `alternative_me_fng` + `defillama_api`, zawsze z `mode=live`, `fixture_used=false`, środowiskiem `INTERNAL_BETA` i `raw_storage=denied`.
+
 ## 12A Standalone Trusted Tester Strategy Correction
 
 After 11G, the near-term priority changes from immediate AI KINTEL implementation to a standalone trusted tester preview path.

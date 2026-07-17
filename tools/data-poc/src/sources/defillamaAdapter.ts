@@ -8,6 +8,11 @@ export const DEFILLAMA_SOURCE_ID = "defillama_api";
 export const DEFILLAMA_DISPLAY_NAME = "DefiLlama API";
 export const DEFILLAMA_PROTOCOLS_URL = "https://api.llama.fi/protocols";
 export const DEFILLAMA_MAX_PROTOCOL_RECORDS = 10;
+export const DEFILLAMA_ATTRIBUTION = {
+  provider: "DefiLlama",
+  requirement: "Attribution appreciated",
+  url: "https://defillama.com/",
+} as const;
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const FIXTURE_PATH = resolve(__dirname, "../../../fixtures/defillama_protocols_sample.json");
@@ -35,17 +40,15 @@ export const defillamaAdapter: SourceAdapter = {
 
     return normalizeDefillamaProtocolsResponse(payload, "fixture", toOutputPolicy(decision));
   },
-  async fetchLive(options: { environment?: string }): Promise<NormalizedSourceOutput> {
+  async fetchLive(options): Promise<NormalizedSourceOutput> {
     const decision = assertSourceActionAllowed({
       sourceId: DEFILLAMA_SOURCE_ID,
       environment: options.environment,
       action: "live_fetch"
     });
-    const response = await fetch(DEFILLAMA_PROTOCOLS_URL);
-    if (!response.ok) {
-      throw new Error(`DefiLlama protocols request failed with HTTP ${response.status}`);
-    }
-    const payload = await response.json();
+    const payload = options.requestJson
+      ? await options.requestJson<unknown>(DEFILLAMA_PROTOCOLS_URL)
+      : await defaultRequestJson(DEFILLAMA_PROTOCOLS_URL);
 
     return normalizeDefillamaProtocolsResponse(payload, "live", toOutputPolicy(decision));
   }
@@ -81,12 +84,23 @@ export function normalizeDefillamaProtocolsResponse(
     source_name: DEFILLAMA_DISPLAY_NAME,
     mode,
     fetched_at: now.toISOString(),
+    attribution: DEFILLAMA_ATTRIBUTION,
     policy,
     data_category: "defi_context",
     records,
     warnings,
     errors: []
   };
+}
+
+async function defaultRequestJson(url: string): Promise<unknown> {
+  const response = await fetch(url, {
+    headers: { accept: "application/json" },
+  });
+  if (!response.ok) {
+    throw new Error(`DefiLlama protocols request failed with HTTP ${response.status}`);
+  }
+  return response.json();
 }
 
 function toProtocolRecord(protocol: DefillamaProtocol): DefiContextRecord | null {

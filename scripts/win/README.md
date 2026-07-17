@@ -2,6 +2,22 @@
 
 These scripts are developer tooling for Windows CMD. Run them from the repo root or any other current directory; each script resolves the repo root from its own location.
 
+## 12R.4 Manual Collector and Offline Validation
+
+12R.4 adds no scheduler or automatic launcher. Run the single controlled smoke manually from `tools\data-poc` only after offline tests pass:
+
+```powershell
+$env:CRYPTO_EDGE_DATA_ENV = "INTERNAL_BETA"
+$env:CRYPTO_EDGE_RUNTIME_MODE = "INTERNAL_BETA"
+$env:ALLOW_LIVE_PROVIDER_CALLS = "1"
+npm run collect:internal-beta -- --seed-limit 10 --security-limit 3
+npm run snapshot:validate:latest
+```
+
+The collector is bounded and never calls Honeypot.is. Do not repeat `check-live-sources-strict.cmd`; strict live checking belongs only to the single authorized smoke. Normal validation helpers remain offline by default.
+
+No 12R.4 script changes VPS, installs a scheduler, performs retention cleanup, enables AI KINTEL or deploys publicly. Next: **12R.5 — Product Radar Redesign & Local Owner Review**.
+
 ## After Every Merge
 
 ```cmd

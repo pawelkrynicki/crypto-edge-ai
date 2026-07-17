@@ -2,6 +2,20 @@
 
 This directory contains the first UI mock / frontend preview for the **Crypto Edge AI Camp BETA**. 
 
+## 12R.4 Live Snapshot Consumption
+
+The existing 12R.3 reader consumes canonical local `INTERNAL_BETA` snapshots without weakening fail-closed behavior:
+
+- scanner requires `dexscreener`; `goplus_security` appears only when actually requested;
+- `honeypot_is` is rejected from `INTERNAL_BETA` provenance and is never called by the collector;
+- GoPlus is the complete active security contract, so a fresh GoPlus result is not partial; no result is `SECURITY DATA UNAVAILABLE`;
+- candidate/security/context fields remain allowlisted; unknown/raw fields and scorecards are not returned;
+- context requires live Alternative.me and DefiLlama with no fixture/static fallback.
+
+After the collector and offline validation, start the local API with `CRYPTO_EDGE_RUNTIME_MODE=INTERNAL_BETA` and verify `GET /api/readiness`. The API reader never calls providers.
+
+VPS, scheduler, retention and public deployment remain unchanged/out of scope. Next: **12R.5 — Product Radar Redesign & Local Owner Review**.
+
 ## 12R.3 Fail-Closed Real Data Boundary
 
 The UI/API bridge now has one explicit product runtime flag: `CRYPTO_EDGE_RUNTIME_MODE`.
