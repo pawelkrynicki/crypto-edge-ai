@@ -23,7 +23,9 @@ Alternative.me uses `limit=1` and source timestamps; DefiLlama uses only free `a
 
 Offline validation (zero network calls): `npm run snapshot:validate:latest`.
 
-Latest controlled gate (17.07.2026): the full offline RC passed, then the one authorized limited live smoke failed closed as `DEXSCREENER_NETWORK_ERROR` after one retry. It produced no run ID or snapshot; request attempts were `2/0/0/0` for DexScreener/GoPlus/Alternative.me/DefiLlama, discovery counts were `0/0/0`, and security was `NOT_INVOKED`. Do not repeat the live command without separate authorization.
+Latest controlled gate (17.07.2026): the full offline RC passed with 123 Data PoC tests and 34 fail-closed boundary tests. The one authorized limited live smoke then passed as run `scan_20260717201111_bfd5fb1d`: 10 seeds, 13 pairs, 7 candidates before filters and 0 after filters. Request counts were `13/0/1/1` for DexScreener/GoPlus/Alternative.me/DefiLlama. Security was `NOT_INVOKED` because no candidate passed the basic filters, and Honeypot.is made zero calls. The fixture-free normalized scanner/context snapshots passed offline validation; local `/api/readiness` returned HTTP 200 with both datasets ready.
+
+Published outputs: `output/scan_20260717201111_bfd5fb1d/full_output.json` and `output/approved_sources_20260717201111_71b5ca78/approved_sources_output.json`. Scanner provenance declares `source_ids=[dexscreener]`; context provenance declares `source_ids=[alternative_me_fng, defillama_api]`; every published source declares `raw_storage=denied`.
 
 No scheduler, retention, VPS/public deployment, scraping, paid sources, AI KINTEL, scoring or `final_label` changes are included. `WATCHLIST` remains Manual Review Only. Next: **12R.5 — Product Radar Redesign & Local Owner Review**.
 

@@ -45,6 +45,8 @@ Ta aktualizacja ma pierwszeństwo przed historycznymi zapisami 12R.2/12R.3:
 
 Kanoniczna komenda: `npm run collect:internal-beta`; walidacja bez sieci: `npm run snapshot:validate:latest` w `tools/data-poc`.
 
+Weryfikacja 17.07.2026: po pełnej walidacji offline jedyny autoryzowany ograniczony smoke przeszedł jako `scan_20260717201111_bfd5fb1d`. Zebrał 10 seedów i 13 par, utworzył 7 kandydatów przed filtrami oraz 0 po filtrach. Request counts DexScreener/GoPlus/Alternative.me/DefiLlama wyniosły `13/0/1/1`. Security pozostało `NOT_INVOKED`, ponieważ nie było kandydatów po filtrach; Honeypot.is nie został wywołany. Oba normalized snapshots są `INTERNAL_BETA`, `mode=live`, `fixture_used=false`, zachowują source allowlist i `raw_storage=denied`; walidacja snapshotu przeszła, a lokalne `/api/readiness` zwróciło HTTP 200.
+
 Następny etap: **12R.5 — Product Radar Redesign & Local Owner Review**.
 
 ## 2. Environment

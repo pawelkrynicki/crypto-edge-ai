@@ -56,11 +56,13 @@ Lokalna warstwa collector/publisher została wdrożona bez zmian VPS. Historyczn
 
 Jeden kontrolowany smoke używa `npm run collect:internal-beta -- --seed-limit 10 --security-limit 3`; offline validation używa `npm run snapshot:validate:latest`. Scheduler, retention, VPS, public deployment i AI KINTEL pozostają poza zakresem.
 
-Pełna walidacja offline z 17.07.2026 przeszła jako `LOCAL MVP RC CHECK OK`: registry, 122 testy data-poc, typecheck, oba storage smoke, workflow/report smoke, UI contracts, 34 testy boundary i build `INTERNAL_BETA`. Opt-in live pozostawał wyłączony podczas całej walidacji.
+Pełna walidacja offline z 17.07.2026 przeszła jako `LOCAL MVP RC CHECK OK`: registry, 123 testy data-poc, typecheck, oba storage smoke, workflow/report smoke, UI contracts, 34 testy boundary i build `INTERNAL_BETA`. Opt-in live pozostawał wyłączony podczas całej walidacji.
 
-Jedyny autoryzowany smoke w tym przebiegu, 17.07.2026, użył `seed-limit=10` i `security-limit=3`, po czym zakończył się `DEXSCREENER_NETWORK_ERROR` po jednej ograniczonej próbie ponownej. Nie powstał `run_id`; request attempts: DexScreener 2, GoPlus 0, Alternative.me 0, DefiLlama 0; seedy/pary/kandydaci: 0/0/0; security: `NOT_INVOKED`. Nie opublikowano scanner ani context snapshotu i nie pozostał plik tymczasowy. Poprzedni smoke z 16.07 zakończył się na tej samej granicy. Bramka działającego live runu pozostaje otwarta, a 12R.5 nie powinien się rozpocząć bez osobnej autoryzacji skutecznego runu.
+Po naprawie utraty kontekstu domyślnego `globalThis.fetch` jedyny autoryzowany smoke w tym przebiegu, 17.07.2026, użył `seed-limit=10` i `security-limit=3` i przeszedł jako `scan_20260717201111_bfd5fb1d`. Request counts: DexScreener 13, GoPlus 0, Alternative.me 1, DefiLlama 1. Discovery zwróciło 10 seedów, 13 par, 7 kandydatów przed filtrami i 0 po filtrach. Security coverage jest `NOT_INVOKED`, ponieważ żaden kandydat nie przeszedł basic filters; Honeypot.is wykonał 0 wywołań. DefiLlama ma health `DEGRADED` wyłącznie z powodu jawnego ograniczenia normalized context do 10 rekordów, bez hard failure.
 
-Planowany następny etap: **12R.5 — Product Radar Redesign & Local Owner Review**, po zamknięciu live gate 12R.4.
+Opublikowane fixture-free snapshoty mają `mode=live`, `environment=INTERNAL_BETA`, właściwe source IDs i `raw_storage=denied`. `snapshot:validate:latest` zwrócił `valid=true`, a lokalne `/api/readiness` zwróciło HTTP 200, scanner/context `ready=true` i pustą listę reason codes. Pliki: `tools/data-poc/output/scan_20260717201111_bfd5fb1d/full_output.json` oraz `tools/data-poc/output/approved_sources_20260717201111_71b5ca78/approved_sources_output.json`. Lokalna bramka operacyjna 12R.4 jest zamknięta; nie oznacza to zgody na zewnętrznego testera ani deployment.
+
+Planowany następny etap: **12R.5 — Product Radar Redesign & Local Owner Review**. VPS pozostaje bez zmian.
 
 ## 1. Decyzja audytowa
 

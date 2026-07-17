@@ -57,7 +57,7 @@ export class BoundedHttpClient {
 
   constructor(options: BoundedHttpClientOptions) {
     this.sourceId = options.sourceId;
-    this.fetchImpl = options.fetchImpl ?? globalThis.fetch;
+    this.fetchImpl = options.fetchImpl ?? ((input, init) => globalThis.fetch(input, init));
     this.timeoutMs = positiveInteger(options.timeoutMs, DEFAULT_HTTP_TIMEOUT_MS);
     this.maxRetries = clampInteger(options.maxRetries, DEFAULT_HTTP_MAX_RETRIES, 0, 1);
     this.concurrency = positiveInteger(options.concurrency, DEFAULT_HTTP_CONCURRENCY);

@@ -2,11 +2,13 @@
 
 ## Stage 12R.4: Approved Live Collectors & Normalized Snapshot
 
-Status: **implemented locally; full offline validation passed; the controlled live release gate remains open**.
+Status: **implemented and validated locally; full offline validation and the controlled live gate passed**.
 
-Offline gate result (17.07.2026): **passed** — `LOCAL MVP RC CHECK OK`, including registry validation, 122 data-poc tests, typecheck, storage/workflow/report smokes, UI contract tests, 34 fail-closed boundary tests and the `INTERNAL_BETA` build assertion. The live-source opt-in stayed disabled throughout this gate.
+Offline gate result (17.07.2026): **passed** — `LOCAL MVP RC CHECK OK`, including registry validation, 123 data-poc tests, typecheck, storage/workflow/report smokes, UI contract tests, 34 fail-closed boundary tests and the `INTERNAL_BETA` build assertion. The live-source opt-in stayed disabled throughout this gate.
 
-Live gate result (17.07.2026): **not passed** — the one authorized limited smoke (`seed-limit=10`, `security-limit=3`) ended with `DEXSCREENER_NETWORK_ERROR` after the single bounded retry. No `run_id` was assigned, request attempts were DexScreener 2 and all other sources 0, seed/pair/candidate counts were 0, security was `NOT_INVOKED`, and no scanner/context snapshot or temporary file was published. This confirms fail-closed behavior but does not satisfy the operational live gate. The earlier 16.07 attempt ended at the same boundary.
+Live gate result (17.07.2026): **passed** after preserving the `globalThis` context of the default fetch. The single authorized smoke (`seed-limit=10`, `security-limit=3`) produced run `scan_20260717201111_bfd5fb1d`: 10 seeds, 13 pairs, 7 candidates before filters and 0 after filters. Request counts were DexScreener 13, GoPlus 0, Alternative.me 1 and DefiLlama 1. Security coverage was `NOT_INVOKED` because no candidate passed the basic filters; Honeypot.is was not called. DefiLlama was marked `DEGRADED` only because its normalized context was intentionally capped at 10 records.
+
+The published scanner and context snapshots are fixture-free `INTERNAL_BETA` live artifacts with allowlisted source IDs and `raw_storage=denied`. Offline snapshot validation returned `valid=true`, and local `/api/readiness` returned HTTP 200 with scanner/context both ready and no reason codes. Outputs: `tools/data-poc/output/scan_20260717201111_bfd5fb1d/full_output.json` and `tools/data-poc/output/approved_sources_20260717201111_71b5ca78/approved_sources_output.json`.
 
 - Discovery: `dexscreener_latest_token_profiles`, 20 seeds default / 30 hard max, per-token pairs, highest valid liquidity, deduplication and existing basic filters.
 - Security: GoPlus only after filters, 10 candidates default / 20 hard max; unsupported/auth/provider failures become `SECURITY DATA UNAVAILABLE`.
@@ -16,7 +18,7 @@ Live gate result (17.07.2026): **not passed** — the one authorized limited smo
 - Compliance: Honeypot.is is `MANUAL_LINK_ONLY / blocked pending written permission`; it is not called or included in live provenance. GoPlus alone is full coverage for the active contract.
 - Operation: explicit network opt-in, manual local run and separate offline validation; no scheduler, retention, VPS/public deployment, scoring changes, AI KINTEL, scraping or paid sources.
 
-Planned next stage: **12R.5 — Product Radar Redesign & Local Owner Review**, only after a separately authorized live run satisfies the 12R.4 operational gate. VPS remains unchanged.
+Planned next stage: **12R.5 — Product Radar Redesign & Local Owner Review**. This local gate does not authorize external tester access or deployment. VPS remains unchanged.
 
 ## Stage 12R.3: Fail-Closed Real Data Boundary
 

@@ -7,6 +7,32 @@ import {
 } from "../src/boundedHttpClient.js";
 
 describe("BoundedHttpClient", () => {
+  it("preserves the globalThis context for the default fetch without using the network", async () => {
+    const originalFetch = globalThis.fetch;
+    let calls = 0;
+    globalThis.fetch = function (this: typeof globalThis, input, init) {
+      calls += 1;
+      assert.equal(this, globalThis);
+      assert.equal(String(input), "https://example.test/default-fetch-context");
+      assert.equal(new Headers(init?.headers).get("accept"), "application/json");
+      return Promise.resolve(Response.json({ ok: true }));
+    } as typeof globalThis.fetch;
+
+    try {
+      const client = new BoundedHttpClient({
+        sourceId: "default_fetch_context",
+        maxRequests: 1,
+      });
+      assert.deepEqual(
+        await client.requestJson("https://example.test/default-fetch-context"),
+        { ok: true },
+      );
+      assert.equal(calls, 1);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   it("retries 429 once and respects bounded Retry-After", async () => {
     let calls = 0;
     const delays: number[] = [];

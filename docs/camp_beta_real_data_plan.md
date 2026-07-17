@@ -84,7 +84,9 @@ Uruchomienie: `npm run collect:internal-beta -- --seed-limit 10 --security-limit
 
 Poza zakresem: scheduler, retention, VPS, public deployment, paid sources, scraping i AI KINTEL. Następny etap: **12R.5 — Product Radar Redesign & Local Owner Review**.
 
-Walidacja 17.07.2026: pełny offline `LOCAL MVP RC CHECK OK` przeszedł przy wyłączonym opt-in live. Następnie jeden ograniczony smoke (`10` seedów, `3` kandydatów security) zakończył się fail-closed jako `DEXSCREENER_NETWORK_ERROR` po jednej próbie ponownej: bez `run_id`, z request attempts `2/0/0/0` dla DexScreener/GoPlus/Alternative.me/DefiLlama, z `0/0/0` seedów/par/kandydatów, security `NOT_INVOKED` i bez opublikowanego lub tymczasowego snapshotu. Implementacja jest gotowa do review, ale operacyjna bramka live 12R.4 pozostaje otwarta; VPS pozostaje bez zmian.
+Walidacja 17.07.2026: pełny offline `LOCAL MVP RC CHECK OK` przeszedł przy wyłączonym opt-in live, w tym 123 testy Data PoC i 34 testy fail-closed boundary. Po naprawie kontekstu wywołania domyślnego `globalThis.fetch` jedyny autoryzowany ograniczony smoke (`10` seedów, limit `3` kandydatów security) przeszedł jako `scan_20260717201111_bfd5fb1d`. Wynik discovery: 10 seedów, 13 par, 7 kandydatów przed filtrami i 0 po filtrach. Request counts DexScreener/GoPlus/Alternative.me/DefiLlama: `13/0/1/1`; security `NOT_INVOKED`, ponieważ żaden kandydat nie przeszedł filtrów; Honeypot.is nie został wywołany. Fixture-free normalized snapshots przeszły walidację offline, a lokalne `/api/readiness` zwróciło HTTP 200 z gotowym scannerem i contextem. VPS pozostaje bez zmian.
+
+Output: `tools/data-poc/output/scan_20260717201111_bfd5fb1d/full_output.json` oraz `tools/data-poc/output/approved_sources_20260717201111_71b5ca78/approved_sources_output.json`. Provenance deklaruje odpowiednio `dexscreener` oraz `alternative_me_fng` + `defillama_api`, zawsze z `mode=live`, `fixture_used=false`, środowiskiem `INTERNAL_BETA` i `raw_storage=denied`.
 
 ## 12A Standalone Trusted Tester Strategy Correction
 
