@@ -1,22 +1,9 @@
 import { runEstablishedDiscoveryPrototype } from "./establishedDiscoveryPrototype.js";
 
 async function main(): Promise<void> {
-  const queries = parseQueries(process.argv.slice(2));
-  const result = await runEstablishedDiscoveryPrototype({ queries });
+  if (process.argv.length > 2) throw new Error("ESTABLISHED_DISCOVERY_COMMAND_ARGUMENTS_NOT_ALLOWED");
+  const result = await runEstablishedDiscoveryPrototype();
   console.log(JSON.stringify(result, null, 2));
-}
-
-function parseQueries(args: string[]): string[] {
-  const queries: string[] = [];
-  for (let index = 0; index < args.length; index += 1) {
-    if (args[index] !== "--query") continue;
-    const value = args[index + 1];
-    if (value && !value.startsWith("--")) {
-      queries.push(value);
-      index += 1;
-    }
-  }
-  return queries;
 }
 
 main().catch((error: unknown) => {

@@ -2,7 +2,7 @@ import { BoundedHttpClient } from "./boundedHttpClient.js";
 import type { DexScreenerPair, DexScreenerSearchResponse, DexScreenerTokenProfile } from "./types.js";
 import { assertSourceActionAllowed } from "./sourcePolicy.js";
 
-const DEXSCREENER_SEARCH_URL = "https://api.dexscreener.com/latest/dex/search";
+export const DEXSCREENER_SEARCH_URL = "https://api.dexscreener.com/latest/dex/search";
 export const DEXSCREENER_TOKEN_PROFILES_URL = "https://api.dexscreener.com/token-profiles/latest/v1";
 export const DEXSCREENER_TOKEN_PAIRS_BASE_URL = "https://api.dexscreener.com/token-pairs/v1";
 

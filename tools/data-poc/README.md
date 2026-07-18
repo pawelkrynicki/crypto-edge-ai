@@ -21,13 +21,16 @@ npm run discovery:diagnostic -- --seed-limit 30
 
 The one authorized 18.07.2026 run loaded 30 profiles, 54 pairs and 20 normalized candidates; baseline and A–E returned 0. All 20 failed the baseline age gate. DexScreener made 34 requests including 3 retries; all security/context counts were 0. No snapshot was stored or published.
 
-An inactive `established-small-cap` prototype is available only for owner-approved explicit queries to the official DexScreener search API:
+The versioned `established_basket_v1` diagnostic uses only the owner-approved plan in `config/established_discovery_query_plan_v1.json` and the official DexScreener search API:
 
 ```powershell
-npm run discovery:prototype -- --query "<owner-approved-query>"
+$env:CRYPTO_EDGE_DATA_ENV = "INTERNAL_BETA"
+$env:CRYPTO_EDGE_RUNTIME_MODE = "INTERNAL_BETA"
+$env:ALLOW_LIVE_PROVIDER_CALLS = "1"
+npm run discovery:established:validate
 ```
 
-It has no default query, caps the query list at 5, selects the highest-liquidity pair per chain/base token and does not publish. It was tested offline only and is not connected to the canonical collector. Full analysis: `../../docs/discovery_filter_calibration.md`.
+The command rejects arguments and unknown/additional queries, exits before fetch without all three flags, caps concurrency at 3, uses a 10-second timeout and at most one retry, prints only normalized diagnostics, and has no raw-storage or publish path. The single authorized 18.07.2026 run returned 120 raw pairs, 57 exact anchor matches, 1 unique candidate and 0 baseline passes; verdict: `NO_GO_QUERY_PLAN`. `USDT` failed after one retry and the run was not repeated. The established search direction is not connected to the production collector. Full analysis: `../../docs/established_basket_validation.md`.
 
 ## 12R.4 Canonical INTERNAL_BETA Collector
 

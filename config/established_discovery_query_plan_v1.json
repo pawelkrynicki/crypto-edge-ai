@@ -1,0 +1,34 @@
+{
+  "plan_version": "established_basket_v1",
+  "status": "OWNER_APPROVED_DIAGNOSTIC_ONLY",
+  "production_enabled": false,
+  "provider": "dexscreener",
+  "endpoint_type": "search",
+  "query_limit": 5,
+  "queries": [
+    "USDC",
+    "USDT",
+    "WETH",
+    "WBNB",
+    "SOL"
+  ],
+  "anchor_aliases": {
+    "USDC": ["USDC"],
+    "USDT": ["USDT"],
+    "WETH": ["WETH"],
+    "WBNB": ["WBNB"],
+    "SOL": ["SOL", "WSOL"]
+  },
+  "supported_chains": [
+    "ethereum",
+    "bsc",
+    "base",
+    "arbitrum",
+    "polygon",
+    "avalanche",
+    "solana"
+  ],
+  "explicitly_unsupported_chains": ["robinhood"],
+  "identity_confidence": "SYMBOL_EXACT_DIAGNOSTIC_ONLY",
+  "owner_acceptance_required_before_production_integration": true
+}

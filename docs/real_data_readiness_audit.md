@@ -66,6 +66,12 @@ Planowany następny etap: **12R.5 — Product Radar Redesign & Local Owner Revie
 
 ## Aktualizacja readiness 12R.5A — 18.07.2026
 
+### 12R.5A.1 — Established Basket Validation
+
+Owner-approved `established_basket_v1` został zweryfikowany w dokładnie jednym kontrolowanym live runie oficjalnego DexScreener search API. Wynik: 120 raw pairs, 57 exact anchor matches, 60 unsupported-chain, 56 quote-side kandydatów bez bezpiecznie przypisywalnych danych rynkowych, 1 unikalny normalized candidate i 0 baseline passes. `USDT` zakończyło się `NETWORK_ERROR` po jednym retry; run nie został powtórzony. Request/retry/failure: 7/2/1. GoPlus, Honeypot.is i context sources: 0 wywołań; raw storage i publish: false.
+
+Werdykt readiness: **`NO_GO_QUERY_PLAN`**. Established search zostaje zatrzymany i nie zasili produkcyjnego collectora. Ewentualny następny kierunek wymaga nowej decyzji ownera dla address-seeded universe na oficjalnych DexScreener token/pair endpoints. Baseline, collector, UI, VPS i tester zewnętrzny pozostają bez zmian; `12R.5B` nadal jest wstrzymane. Kanoniczny raport: `docs/established_basket_validation.md`.
+
 Kalibracja na rzeczywistym snapshotcie wykazała, że `0/7` nie wynika z brakujących danych: 7/7 kandydatów ma komplet wymaganych metryk, 0 używa FDV zamiast market cap, a wszystkie pary mają 0–1 dzień. `STX` spełnia wszystkie hard filters poza `pair_age >7`. Warianty A–E zwracają po 0.
 
 Jedyny diagnostic 30 seedów potwierdził konflikt populacji: 30 profili, 54 pary, 20 kandydatów, 0 baseline pass; 20/20 nie spełnia age gate. Chain distribution kandydatów: robinhood 10, solana 7, bsc/base/polygon po 1. Brakujące pola: tylko `pairCreatedAt/pairAge` dla 1 kandydata. DexScreener wykonał 34 requesty przy budżecie 36; wszystkie security/context request counts wyniosły 0. Nie było storage ani publish.

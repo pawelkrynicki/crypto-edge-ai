@@ -1,5 +1,13 @@
 # Roadmap
 
+## Stage 12R.5A.1: Established Basket Validation
+
+Status: **implemented and validated on 18.07.2026 — `NO_GO_QUERY_PLAN`**.
+
+The owner-approved diagnostic plan `established_basket_v1` queried the official DexScreener search API exactly once for `USDC`, `USDT`, `WETH`, `WBNB`, and `SOL`. It returned 120 raw pairs, 57 exact anchor matches, 60 unsupported-chain results, 56 quote-side candidates without safely attributable market data, 1 unique normalized candidate and 0 baseline passes. `USDT` failed with `NETWORK_ERROR` after its single allowed retry; the run was not repeated. Seven total requests included two retries and one final failure.
+
+Verdict: stop the established search-query direction. Keep `dexscreener_basic_filters_v1`, the production collector, scoring, labels, UI and VPS unchanged. The next owner decision should evaluate an address-seeded established universe through official DexScreener token/pair endpoints; do not integrate it yet. Stage 12R.5B and the external tester remain **NO-GO**. Canonical report: `docs/established_basket_validation.md`.
+
 ## Stage 12R.5A: Discovery & Filter Calibration
 
 Status: **implemented and validated locally on 18.07.2026; owner discovery decision pending**.

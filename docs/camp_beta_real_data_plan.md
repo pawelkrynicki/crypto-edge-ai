@@ -90,6 +90,12 @@ Output: `tools/data-poc/output/scan_20260717201111_bfd5fb1d/full_output.json` or
 
 ## 12R.5A Discovery & Filter Calibration
 
+### 12R.5A.1 Established Basket Validation — 18.07.2026
+
+Owner-approved plan `established_basket_v1` objął dokładnie `USDC`, `USDT`, `WETH`, `WBNB`, `SOL` na oficjalnym DexScreener search API. Jedyny live run zwrócił 120 raw pairs i 57 exact anchor matches. Odrzucono 60 wyników z unsupported chains, 3 ambiguous-anchor oraz 56 kandydatów quote-side, którym nie można bezpiecznie przypisać base-scoped market data. Pozostał 1 unikalny kandydat na Solanie, wiek 89 dni, lecz 0 kandydatów przeszło niezmieniony baseline. `USDT` zakończyło się `NETWORK_ERROR` po jednym dozwolonym retry; run nie został powtórzony.
+
+Klasyfikacja: **`NO_GO_QUERY_PLAN`**. Established search-query basket nie będzie integrowany z collectorem. Rekomendowana alternatywa do osobnej akceptacji ownera to address-seeded established universe używający wyłącznie oficjalnych endpointów DexScreener dla znanych adresów i address-backed anchor identity. Nie dodano providera, raw storage, security/context calls ani publish. `12R.5B`, VPS i tester zewnętrzny pozostają bez zmian / `NO-GO`. Szczegóły: `docs/established_basket_validation.md`.
+
 Analiza `scan_20260717201111_bfd5fb1d` potwierdziła komplet wymaganych danych dla 7/7 kandydatów i brak użycia FDV jako fallback. Wszystkie pary miały 0–1 dzień i wszystkie odpadły przez `pair_age_not_above_7_days`; `STX` odpadł wyłącznie przez wiek. Warianty A–E dały po 0.
 
 Jedyny bounded discovery-only run dla 30 seedów zwrócił 30 profili, 54 pary, 20 kandydatów i 0 po baseline. Wszystkich 20 kandydatów nie spełniało kryterium wieku. Request counts: DexScreener 34, pozostałe źródła 0. Run nie zapisał raw payloadów, nie wykonał security/context calls i niczego nie opublikował.
