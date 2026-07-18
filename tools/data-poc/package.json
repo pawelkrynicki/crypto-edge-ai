@@ -26,6 +26,7 @@
     "collect:internal-beta": "tsc && node dist/src/runInternalBetaCollector.js",
     "discovery:diagnostic": "tsc && node dist/src/runDiscoveryDiagnostic.js",
     "discovery:prototype": "tsc && node dist/src/runEstablishedDiscoveryPrototype.js",
+    "discovery:established:validate": "tsc && node dist/src/runEstablishedDiscoveryPrototype.js",
     "filters:calibrate": "tsc && node dist/src/runFilterCalibration.js",
     "snapshot:validate:latest": "tsc && node dist/src/runValidateLatestSnapshot.js",
     "test": "tsc && node --test dist/tests/*.js",

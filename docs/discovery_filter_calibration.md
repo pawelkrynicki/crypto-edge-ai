@@ -1,5 +1,11 @@
 # 12R.5A — Discovery & Filter Calibration
 
+## Aktualizacja 12R.5A.1 — Established Basket Validation
+
+Owner zatwierdził diagnostyczny query plan `USDC`, `USDT`, `WETH`, `WBNB`, `SOL`. Jedyny kontrolowany run oficjalnego DexScreener search API zwrócił 120 raw pairs, 57 exact anchor matches, 60 unsupported-chain wyników, 56 przypadków bez bezpiecznie przypisywalnych quote-side market data, 1 unikalnego kandydata i 0 baseline passes. `USDT` zakończyło się `NETWORK_ERROR` po jednym retry; run nie został powtórzony.
+
+Werdykt: **`NO_GO_QUERY_PLAN`**. Search-query basket nie daje reprezentatywnej populacji established-small-cap. Aktywny profil `dexscreener_basic_filters_v1`, collector i progi pozostają bez zmian. Kierunek search zostaje zatrzymany; alternatywa do osobnej decyzji ownera to address-seeded universe korzystający wyłącznie z oficjalnych endpointów DexScreener dla znanych adresów. Kanoniczny raport: `docs/established_basket_validation.md`. 12R.5B i tester zewnętrzny pozostają `NO-GO`.
+
 Data analizy: 18.07.2026
 
 Bazowy `main`: `8881ffaa0e1594e9738da0ef0499e1fd6e2d583d`
