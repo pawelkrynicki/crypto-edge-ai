@@ -64,6 +64,16 @@ Opublikowane fixture-free snapshoty mają `mode=live`, `environment=INTERNAL_BET
 
 Planowany następny etap: **12R.5 — Product Radar Redesign & Local Owner Review**. VPS pozostaje bez zmian.
 
+## Aktualizacja readiness 12R.5A — 18.07.2026
+
+Kalibracja na rzeczywistym snapshotcie wykazała, że `0/7` nie wynika z brakujących danych: 7/7 kandydatów ma komplet wymaganych metryk, 0 używa FDV zamiast market cap, a wszystkie pary mają 0–1 dzień. `STX` spełnia wszystkie hard filters poza `pair_age >7`. Warianty A–E zwracają po 0.
+
+Jedyny diagnostic 30 seedów potwierdził konflikt populacji: 30 profili, 54 pary, 20 kandydatów, 0 baseline pass; 20/20 nie spełnia age gate. Chain distribution kandydatów: robinhood 10, solana 7, bsc/base/polygon po 1. Brakujące pola: tylko `pairCreatedAt/pairAge` dla 1 kandydata. DexScreener wykonał 34 requesty przy budżecie 36; wszystkie security/context request counts wyniosły 0. Nie było storage ani publish.
+
+Readiness filtrów pozostaje bez zmian. Główna luka to reprezentatywność discovery: latest profiles pasuje do `new/emerging`, nie do populacji starszej niż 7 dni. Dodano offline calibration, discovery-only diagnostic i nieaktywny established-small-cap search prototype. Produkcyjny collector i VPS nie zostały zmienione. Szczegóły: `docs/discovery_filter_calibration.md`.
+
+Werdykt: 12R.5A technicznie kompletne; 12R.5B `NO-GO` do owner acceptance strategii dwóch koszy i query planu. Tester zewnętrzny pozostaje `NO-GO`.
+
 ## 1. Decyzja audytowa
 
 Repozytorium nie ma dziś kompletnego, automatycznego i zgodnego z polityką przepływu, który może zasilać prywatną wersję VPS wyłącznie rzeczywistymi i aktualnymi danymi.

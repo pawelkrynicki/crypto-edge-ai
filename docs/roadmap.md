@@ -1,5 +1,17 @@
 # Roadmap
 
+## Stage 12R.5A: Discovery & Filter Calibration
+
+Status: **implemented and validated locally on 18.07.2026; owner discovery decision pending**.
+
+Analysis of normalized live run `scan_20260717201111_bfd5fb1d` found complete required filter data for all 7 candidates, no FDV fallback, and a `0–1 day` pair-age range. All 7 failed `pair_age >7`; the only candidate meeting every other hard threshold (`STX`) failed solely on age. Variants A–E each returned 0 candidates.
+
+The single authorized discovery-only diagnostic loaded 30 profiles, 54 pairs and 20 normalized candidates. Baseline and variants A–E again returned 0. All 20 candidates failed baseline age (`17` at 0–3 days, `2` at 7 days, `1` missing age). It made 34 bounded DexScreener requests including 3 successful retries and zero GoPlus, Honeypot.is, Alternative.me or DefiLlama requests; no raw storage or publish occurred.
+
+Recommendation: keep `dexscreener_basic_filters_v1` active and change discovery before weakening safeguards. Use latest profiles only for `new/emerging`; validate a separate owner-approved `established-small-cap` search-query basket through the diagnostic prototype. No production collector, scoring, `final_label`, `WATCHLIST`, UI, VPS or tester-access change is included.
+
+Canonical report: `docs/discovery_filter_calibration.md`. 12R.5B remains **NO-GO until owner acceptance** of the discovery strategy and query plan; the external tester remains NO-GO.
+
 ## Stage 12R.4: Approved Live Collectors & Normalized Snapshot
 
 Status: **implemented and validated locally; full offline validation and the controlled live gate passed**.
