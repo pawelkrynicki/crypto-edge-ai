@@ -1,5 +1,34 @@
 # Crypto Edge AI Data POC
 
+## 12R.5A Discovery and Filter Calibration
+
+Offline calibration reads an existing normalized snapshot, never modifies it, makes zero provider calls and prints JSON:
+
+```powershell
+npm run filters:calibrate -- --snapshot output/scan_20260717201111_bfd5fb1d/full_output.json
+```
+
+The report separates hard/soft reasons, summarizes missing fields and metric distributions, and evaluates versioned diagnostic variants A–E. `filter_calibration_12r5a_v1` is diagnostic only; the active production profile remains `dexscreener_basic_filters_v1`.
+
+The bounded discovery-only command requires the same three explicit `INTERNAL_BETA` flags as the collector. It invokes only DexScreener, performs no security/context calls, stores no raw payloads and has no publish path:
+
+```powershell
+$env:CRYPTO_EDGE_DATA_ENV = "INTERNAL_BETA"
+$env:CRYPTO_EDGE_RUNTIME_MODE = "INTERNAL_BETA"
+$env:ALLOW_LIVE_PROVIDER_CALLS = "1"
+npm run discovery:diagnostic -- --seed-limit 30
+```
+
+The one authorized 18.07.2026 run loaded 30 profiles, 54 pairs and 20 normalized candidates; baseline and A–E returned 0. All 20 failed the baseline age gate. DexScreener made 34 requests including 3 retries; all security/context counts were 0. No snapshot was stored or published.
+
+An inactive `established-small-cap` prototype is available only for owner-approved explicit queries to the official DexScreener search API:
+
+```powershell
+npm run discovery:prototype -- --query "<owner-approved-query>"
+```
+
+It has no default query, caps the query list at 5, selects the highest-liquidity pair per chain/base token and does not publish. It was tested offline only and is not connected to the canonical collector. Full analysis: `../../docs/discovery_filter_calibration.md`.
+
 ## 12R.4 Canonical INTERNAL_BETA Collector
 
 The canonical collector is manual, local-only and fail-closed:
