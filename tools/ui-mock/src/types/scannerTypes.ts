@@ -131,9 +131,22 @@ export type ScannerDiscoveryMetadata = {
   new_emerging?: {
     discovery_method?: "dexscreener_latest_token_profiles";
     seed_count?: number;
+    pair_requests_succeeded?: number;
+    pair_requests_failed?: number;
     pairs_loaded?: number;
     candidates_before_filters?: number;
     candidates_after_filters?: number;
+    discovery_status?: "READY" | "DEGRADED";
+    failure_reason_counts?: Partial<Record<
+      | "NETWORK_ERROR"
+      | "TIMEOUT"
+      | "HTTP_429"
+      | "HTTP_4XX"
+      | "HTTP_5XX"
+      | "INVALID_RESPONSE"
+      | "REQUEST_BUDGET_EXHAUSTED",
+      number
+    >>;
   };
   established?: {
     discovery_method?: "address_seeded_universe";
@@ -202,7 +215,7 @@ export type ProductReadinessEntry = {
 
 export type ProductBasketReadiness = ProductReadinessEntry & {
   configured?: boolean;
-  status: "ready" | "empty_configured" | "unavailable";
+  status: "ready" | "degraded" | "empty_configured" | "unavailable";
 };
 
 export type ProductReadinessOutput = {

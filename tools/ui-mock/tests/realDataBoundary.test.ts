@@ -303,6 +303,53 @@ describe("API and frontend fail-closed behavior", () => {
     }
   });
 
+  it("keeps degraded DexScreener candidates available through readiness and latest", async () => {
+    const scanner = makeEmptyEstablishedScannerOutput();
+    Object.assign(scanner.provenance.metadata.new_emerging, {
+      seed_count: 10,
+      pair_requests_succeeded: 9,
+      pair_requests_failed: 1,
+      pairs_loaded: 9,
+      candidates_before_filters: 1,
+      candidates_after_filters: scanner.candidates[0]?.basic_filter_status === "passed_basic_filter" ? 1 : 0,
+      discovery_status: "DEGRADED",
+      failure_reason_counts: { NETWORK_ERROR: 1 },
+    });
+    scanner.provenance.metadata.readiness.new_emerging = "DEGRADED";
+    scanner.provenance.metadata.source_health.dexscreener = "DEGRADED";
+    scanner.provenance.metadata.request_counts.dexscreener = 12;
+    const scannerDir = await writeScanner(scanner);
+    const contextDir = await writeContext(makeContextOutput());
+    const server = createScannerApiServer({
+      runtimeMode: "INTERNAL_BETA",
+      scanner: { outputDirPath: scannerDir, now: NOW },
+      context: { outputDirPath: contextDir, now: NOW },
+    });
+    await listen(server);
+    try {
+      const address = server.address() as AddressInfo;
+      const base = `http://127.0.0.1:${address.port}`;
+      const readinessResponse = await fetch(`${base}/api/readiness`);
+      const readiness = await readinessResponse.json() as Record<string, unknown>;
+      assert.equal(readinessResponse.status, 200);
+      assert.deepEqual(readiness.new_emerging, {
+        ready: true,
+        status: "degraded",
+        reason_code: "DEXSCREENER_PARTIAL_COVERAGE",
+      });
+      assert.equal(JSON.stringify(readiness.reason_codes).includes("DEXSCREENER_PARTIAL_COVERAGE"), true);
+
+      const latestResponse = await fetch(`${base}/api/scanner/latest`);
+      const latest = await latestResponse.json() as Record<string, unknown>;
+      assert.equal(latestResponse.status, 200);
+      assert.equal(asRecords(latest.candidates).length, 1);
+      assert.equal(JSON.stringify(latest).includes("fixture-fallback"), false);
+      assert.equal(JSON.stringify(latest).includes("NETWORK_ERROR"), true);
+    } finally {
+      await close(server);
+    }
+  });
+
   it("returns zero sample candidates after a frontend API error", async () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = (async () => new Response(JSON.stringify({
@@ -535,10 +582,14 @@ function makeScannerOutput(): ScannerFactoryOutput {
       discovery_architecture: "two_basket_discovery_v1",
       new_emerging: {
         discovery_method: "dexscreener_latest_token_profiles",
-        seed_count: 1,
+        seed_count: 3,
+        pair_requests_succeeded: 3,
+        pair_requests_failed: 0,
         pairs_loaded: 1,
         candidates_before_filters: 1,
         candidates_after_filters: output.candidates.filter((candidate) => candidate.discovery_basket === "new_emerging" && candidate.basic_filter_status === "passed_basic_filter").length,
+        discovery_status: "READY",
+        failure_reason_counts: {},
       },
       established: {
         discovery_method: "address_seeded_universe",
@@ -592,10 +643,14 @@ function makeEmptyEstablishedScannerOutput(): ScannerFactoryOutput {
   delete output.provenance.policy_decisions.goplus_security;
   output.provenance.metadata.new_emerging = {
     discovery_method: "dexscreener_latest_token_profiles",
-    seed_count: 1,
+    seed_count: 3,
+    pair_requests_succeeded: 3,
+    pair_requests_failed: 0,
     pairs_loaded: 1,
     candidates_before_filters: 1,
     candidates_after_filters: observation.basic_filter_status === "passed_basic_filter" ? 1 : 0,
+    discovery_status: "READY",
+    failure_reason_counts: {},
   };
   output.provenance.metadata.established = {
     discovery_method: "address_seeded_universe",
@@ -616,7 +671,7 @@ function makeEmptyEstablishedScannerOutput(): ScannerFactoryOutput {
     context: "READY",
   };
   output.provenance.metadata.security_candidates_requested = 0;
-  output.provenance.metadata.request_counts.dexscreener = 2;
+  output.provenance.metadata.request_counts.dexscreener = 4;
   output.provenance.metadata.request_counts.goplus_security = 0;
   output.provenance.metadata.source_health.goplus_security = "NOT_INVOKED";
   delete (output.provenance.metadata as Record<string, unknown>).attribution;

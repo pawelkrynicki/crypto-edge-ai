@@ -324,7 +324,11 @@ function sanitizeScannerMetadata(value: unknown, sourceIds: string[]): Record<st
   ) throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
   const newEmerging = sanitizeNewEmergingMetadata(value.new_emerging);
   const established = sanitizeEstablishedMetadata(value.established);
-  const readiness = sanitizeDiscoveryReadiness(value.readiness, established.universe_status as string);
+  const readiness = sanitizeDiscoveryReadiness(
+    value.readiness,
+    established.universe_status as string,
+    newEmerging.discovery_status as string,
+  );
   const requestCounts = value.request_counts;
   const sourceHealth = value.source_health;
 
@@ -346,14 +350,14 @@ function sanitizeScannerMetadata(value: unknown, sourceIds: string[]): Record<st
   if (
     securityLimit < 1 || securityLimit > 20
     || securityRequested > securityLimit || securityRequested > (established.candidates_after_filters as number)
-    || dexCount < 1 || dexCount > 1 + seedCount + Math.min(seedCount, 5)
+    || dexCount < 1 + seedCount || dexCount > 1 + seedCount + Math.min(seedCount, 5)
       + establishedEnabled + Math.min(establishedEnabled, 5)
     || goPlusCount > securityLimit + Math.min(securityLimit, 3)
     || (requestCounts.alternative_me_fng as number) < 1
     || (requestCounts.alternative_me_fng as number) > 2
     || (requestCounts.defillama_api as number) < 1
     || (requestCounts.defillama_api as number) > 2
-    || sourceHealth.dexscreener !== "READY"
+    || sourceHealth.dexscreener !== newEmerging.discovery_status
   ) throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
 
   const goplusInvoked = goPlusCount > 0;
@@ -384,21 +388,45 @@ function sanitizeScannerMetadata(value: unknown, sourceIds: string[]): Record<st
 }
 
 function sanitizeNewEmergingMetadata(value: unknown): Record<string, unknown> {
-  const fields = ["discovery_method", "seed_count", "pairs_loaded", "candidates_before_filters", "candidates_after_filters"];
+  const fields = [
+    "discovery_method", "seed_count", "pair_requests_succeeded", "pair_requests_failed", "pairs_loaded",
+    "candidates_before_filters", "candidates_after_filters", "discovery_status", "failure_reason_counts",
+  ];
   if (!isRecord(value) || !hasExactKeys(value, fields) || value.discovery_method !== "dexscreener_latest_token_profiles") {
     throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
   }
-  const numericFields = fields.slice(1);
+  const numericFields = [
+    "seed_count", "pair_requests_succeeded", "pair_requests_failed", "pairs_loaded",
+    "candidates_before_filters", "candidates_after_filters",
+  ];
   if (numericFields.some((field) => !isNonNegativeInteger(value[field]))) {
     throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
   }
   if (
     (value.seed_count as number) < 1 || (value.seed_count as number) > 30
+    || (value.pair_requests_succeeded as number) + (value.pair_requests_failed as number) !== (value.seed_count as number)
+    || (value.pair_requests_succeeded as number) < Math.max(3, Math.ceil((value.seed_count as number) * 0.5))
     || (value.candidates_before_filters as number) < 1
     || (value.candidates_before_filters as number) > (value.pairs_loaded as number)
     || (value.candidates_after_filters as number) > (value.candidates_before_filters as number)
   ) throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
-  return Object.fromEntries(fields.map((field) => [field, value[field]]));
+  if (!isRecord(value.failure_reason_counts)) throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
+  const allowedReasons = new Set([
+    "NETWORK_ERROR", "TIMEOUT", "HTTP_429", "HTTP_4XX", "HTTP_5XX", "INVALID_RESPONSE",
+    "REQUEST_BUDGET_EXHAUSTED",
+  ]);
+  const failureEntries = Object.entries(value.failure_reason_counts);
+  const failed = value.pair_requests_failed as number;
+  if (
+    failureEntries.some(([reason, count]) => !allowedReasons.has(reason) || !isPositiveInteger(count))
+    || failureEntries.reduce((total, [, count]) => total + Number(count), 0) !== failed
+    || !["READY", "DEGRADED"].includes(String(value.discovery_status))
+    || (failed === 0) !== (value.discovery_status === "READY")
+  ) throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
+  return {
+    ...Object.fromEntries(fields.filter((field) => field !== "failure_reason_counts").map((field) => [field, value[field]])),
+    failure_reason_counts: Object.fromEntries(failureEntries.sort(([left], [right]) => left.localeCompare(right))),
+  };
 }
 
 function sanitizeEstablishedMetadata(value: unknown): Record<string, unknown> {
@@ -437,17 +465,18 @@ function sanitizeEstablishedMetadata(value: unknown): Record<string, unknown> {
   return Object.fromEntries(fields.map((field) => [field, value[field]]));
 }
 
-function sanitizeDiscoveryReadiness(value: unknown, universeStatus: string): Record<string, unknown> {
+function sanitizeDiscoveryReadiness(value: unknown, universeStatus: string, discoveryStatus: string): Record<string, unknown> {
   const fields = ["process", "new_emerging", "established", "context"];
   if (
     !isRecord(value) || !hasExactKeys(value, fields)
     || value.process !== "READY"
-    || value.new_emerging !== "READY"
+    || !["READY", "DEGRADED"].includes(String(value.new_emerging))
     || !["READY", "EMPTY_CONFIGURED"].includes(String(value.established))
     || !["READY", "UNAVAILABLE"].includes(String(value.context))
   ) throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
   const expected = universeStatus === "ESTABLISHED_UNIVERSE_EMPTY" ? "EMPTY_CONFIGURED" : "READY";
   if (value.established !== expected) throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
+  if (value.new_emerging !== discoveryStatus) throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
   return Object.fromEntries(fields.map((field) => [field, value[field]]));
 }
 
@@ -458,6 +487,10 @@ function hasExactKeys(value: Record<string, unknown>, fields: string[]): boolean
 
 function isNonNegativeInteger(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value >= 0;
+}
+
+function isPositiveInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value > 0;
 }
 
 function sanitizeScanRun(value: Record<string, unknown>): Record<string, unknown> | null {

@@ -1,4 +1,4 @@
-import { BoundedHttpClient } from "./boundedHttpClient.js";
+import { BoundedHttpClient, BoundedHttpError } from "./boundedHttpClient.js";
 import {
   fetchDexScreenerTokenPairs,
   fetchLatestDexScreenerTokenProfiles,
@@ -9,13 +9,37 @@ import type { CryptoEdgeCandidate, DexScreenerPair, DexScreenerTokenProfile } fr
 export const DEXSCREENER_DISCOVERY_METHOD = "dexscreener_latest_token_profiles";
 export const DEFAULT_DEXSCREENER_SEED_LIMIT = 20;
 export const MAX_DEXSCREENER_SEED_LIMIT = 30;
+export const DEXSCREENER_DISCOVERY_INSUFFICIENT_COVERAGE = "DEXSCREENER_DISCOVERY_INSUFFICIENT_COVERAGE";
+
+export type DexScreenerFailureReason =
+  | "NETWORK_ERROR"
+  | "TIMEOUT"
+  | "HTTP_429"
+  | "HTTP_4XX"
+  | "HTTP_5XX"
+  | "INVALID_RESPONSE"
+  | "REQUEST_BUDGET_EXHAUSTED";
+
+export type DexScreenerDiscoveryFailureDiagnostics = {
+  profiles_request: "READY" | "FAILED";
+  minimum_seed_requests_required: number;
+  seed_count: number;
+  pair_requests_succeeded: number;
+  pair_requests_failed: number;
+  pairs_loaded: number;
+  failure_reason_counts: Partial<Record<DexScreenerFailureReason, number>>;
+};
 
 export type DexScreenerDiscoveryMetadata = {
   discovery_method: typeof DEXSCREENER_DISCOVERY_METHOD;
   seed_count: number;
+  pair_requests_succeeded: number;
+  pair_requests_failed: number;
   pairs_loaded: number;
   candidates_before_filters: number;
   candidates_after_filters: number;
+  discovery_status: "READY" | "DEGRADED";
+  failure_reason_counts: Partial<Record<DexScreenerFailureReason, number>>;
 };
 
 export type DexScreenerDiscoveryResult = {
@@ -32,35 +56,85 @@ export type DexScreenerDiscoveryOptions = {
 
 type Seed = { chainId: string; tokenAddress: string };
 
+export class DexScreenerDiscoveryError extends Error {
+  readonly code: string;
+  readonly diagnostics: DexScreenerDiscoveryFailureDiagnostics;
+
+  constructor(code: string, diagnostics: DexScreenerDiscoveryFailureDiagnostics) {
+    super(code);
+    this.name = "DexScreenerDiscoveryError";
+    this.code = code;
+    this.diagnostics = diagnostics;
+  }
+}
+
+export class DexScreenerProfilesRequestError extends Error {
+  readonly code: DexScreenerFailureReason;
+  readonly sourceId = "dexscreener";
+  readonly diagnostics: DexScreenerDiscoveryFailureDiagnostics;
+
+  constructor(code: DexScreenerFailureReason, diagnostics: DexScreenerDiscoveryFailureDiagnostics) {
+    super(code);
+    this.name = "DexScreenerProfilesRequestError";
+    this.code = code;
+    this.diagnostics = diagnostics;
+  }
+}
+
 export async function collectDexScreenerDiscovery(
   options: DexScreenerDiscoveryOptions,
 ): Promise<DexScreenerDiscoveryResult> {
   const seedLimit = clampSeedLimit(options.seedLimit);
-  const profiles = await fetchLatestDexScreenerTokenProfiles({
-    environment: options.environment,
-    client: options.client,
-  });
+  const minimumRequired = minimumSuccessfulSeedRequests(seedLimit);
+  let profiles: DexScreenerTokenProfile[];
+  try {
+    profiles = await fetchLatestDexScreenerTokenProfiles({
+      environment: options.environment,
+      client: options.client,
+    });
+  } catch (error) {
+    const reason = normalizeDexScreenerFailureReason(error);
+    throw new DexScreenerProfilesRequestError(reason, {
+      profiles_request: "FAILED",
+      minimum_seed_requests_required: minimumRequired,
+      seed_count: 0,
+      pair_requests_succeeded: 0,
+      pair_requests_failed: 0,
+      pairs_loaded: 0,
+      failure_reason_counts: { [reason]: 1 },
+    });
+  }
   const seeds = selectProfileSeeds(profiles, seedLimit);
   if (seeds.length === 0) {
-    throw new Error("DEXSCREENER_SEEDS_UNAVAILABLE");
+    throw new DexScreenerDiscoveryError("DEXSCREENER_SEEDS_UNAVAILABLE", {
+      profiles_request: "READY",
+      minimum_seed_requests_required: minimumRequired,
+      seed_count: 0,
+      pair_requests_succeeded: 0,
+      pair_requests_failed: 0,
+      pairs_loaded: 0,
+      failure_reason_counts: {},
+    });
   }
 
-  const pairGroups = await Promise.all(seeds.map(async (seed) => ({
+  const pairResults = await Promise.allSettled(seeds.map(async (seed) => ({
     seed,
     pairs: await fetchDexScreenerTokenPairs(seed.chainId, seed.tokenAddress, {
       environment: options.environment,
       client: options.client,
     }),
   })));
+  const pairGroups = pairResults.flatMap((result) => result.status === "fulfilled" ? [result.value] : []);
+  const failedResults = pairResults.flatMap((result) => result.status === "rejected" ? [result.reason] : []);
+  const failureReasonCounts = countFailureReasons(failedResults);
+  const pairRequestsSucceeded = pairGroups.length;
+  const pairRequestsFailed = failedResults.length;
 
   const pairsLoaded = pairGroups.reduce((total, group) => total + group.pairs.length, 0);
   const selectedPairs = pairGroups
     .map(({ seed, pairs }) => selectHighestLiquidityPair(seed, pairs))
     .filter((pair): pair is DexScreenerPair => pair !== null);
   const deduplicatedPairs = deduplicatePairs(selectedPairs);
-  if (deduplicatedPairs.length === 0) {
-    throw new Error("DEXSCREENER_PAIRS_UNAVAILABLE");
-  }
   const candidates = normalizeDexScreenerPairs(deduplicatedPairs, options.now ?? new Date()).map((candidate) => ({
     ...candidate,
     discovery_basket: "new_emerging" as const,
@@ -71,17 +145,57 @@ export async function collectDexScreenerDiscovery(
     universe_entry_index: null,
     address_identity_verified: false,
   }));
+  if (pairRequestsSucceeded < minimumRequired || candidates.length === 0) {
+    throw new DexScreenerDiscoveryError(DEXSCREENER_DISCOVERY_INSUFFICIENT_COVERAGE, {
+      profiles_request: "READY",
+      minimum_seed_requests_required: minimumRequired,
+      seed_count: seeds.length,
+      pair_requests_succeeded: pairRequestsSucceeded,
+      pair_requests_failed: pairRequestsFailed,
+      pairs_loaded: pairsLoaded,
+      failure_reason_counts: failureReasonCounts,
+    });
+  }
 
   return {
     candidates,
     metadata: {
       discovery_method: DEXSCREENER_DISCOVERY_METHOD,
       seed_count: seeds.length,
+      pair_requests_succeeded: pairRequestsSucceeded,
+      pair_requests_failed: pairRequestsFailed,
       pairs_loaded: pairsLoaded,
-      candidates_before_filters: deduplicatedPairs.length,
+      candidates_before_filters: candidates.length,
       candidates_after_filters: candidates.filter((candidate) => candidate.status === "passed_basic_filter").length,
+      discovery_status: pairRequestsFailed > 0 ? "DEGRADED" : "READY",
+      failure_reason_counts: failureReasonCounts,
     },
   };
+}
+
+export function minimumSuccessfulSeedRequests(seedLimit: number): number {
+  const normalizedLimit = clampSeedLimit(seedLimit);
+  return Math.max(3, Math.ceil(normalizedLimit * 0.5));
+}
+
+export function normalizeDexScreenerFailureReason(error: unknown): DexScreenerFailureReason {
+  if (!(error instanceof BoundedHttpError)) return "NETWORK_ERROR";
+  if (error.code === "REQUEST_TIMEOUT") return "TIMEOUT";
+  if (error.code === "RATE_LIMITED" || error.status === 429) return "HTTP_429";
+  if (error.code === "INVALID_JSON") return "INVALID_RESPONSE";
+  if (error.code === "REQUEST_BUDGET_EXHAUSTED") return "REQUEST_BUDGET_EXHAUSTED";
+  if (error.status !== null && error.status >= 500) return "HTTP_5XX";
+  if (error.status !== null && error.status >= 400) return "HTTP_4XX";
+  return "NETWORK_ERROR";
+}
+
+function countFailureReasons(errors: unknown[]): Partial<Record<DexScreenerFailureReason, number>> {
+  const counts = new Map<DexScreenerFailureReason, number>();
+  for (const error of errors) {
+    const reason = normalizeDexScreenerFailureReason(error);
+    counts.set(reason, (counts.get(reason) ?? 0) + 1);
+  }
+  return Object.fromEntries([...counts.entries()].sort(([left], [right]) => left.localeCompare(right)));
 }
 
 export function selectProfileSeeds(profiles: DexScreenerTokenProfile[], limit: number): Seed[] {

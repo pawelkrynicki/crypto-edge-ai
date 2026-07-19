@@ -36,7 +36,12 @@ const METADATA_FIELDS = new Set([
   "security_candidate_limit", "security_candidates_requested", "request_counts", "source_health", "attribution",
 ]);
 const NEW_EMERGING_FIELDS = new Set([
-  "discovery_method", "seed_count", "pairs_loaded", "candidates_before_filters", "candidates_after_filters",
+  "discovery_method", "seed_count", "pair_requests_succeeded", "pair_requests_failed", "pairs_loaded",
+  "candidates_before_filters", "candidates_after_filters", "discovery_status", "failure_reason_counts",
+]);
+const DISCOVERY_FAILURE_REASONS = new Set([
+  "NETWORK_ERROR", "TIMEOUT", "HTTP_429", "HTTP_4XX", "HTTP_5XX", "INVALID_RESPONSE",
+  "REQUEST_BUDGET_EXHAUSTED",
 ]);
 const ESTABLISHED_FIELDS = new Set([
   "discovery_method", "universe_version", "universe_status", "entries_total", "entries_enabled",
@@ -174,7 +179,11 @@ function validateScannerMetadata(value: unknown): Record<string, unknown> {
   if (value.discovery_architecture !== "two_basket_discovery_v1") fail("SCANNER_METADATA_INVALID");
   const newEmerging = validateNewEmergingMetadata(value.new_emerging);
   const established = validateEstablishedMetadata(value.established);
-  validateReadinessMetadata(value.readiness, established.universe_status as string);
+  validateReadinessMetadata(
+    value.readiness,
+    established.universe_status as string,
+    newEmerging.discovery_status as string,
+  );
   if (!isNonNegativeInteger(value.security_candidate_limit) || !isNonNegativeInteger(value.security_candidates_requested)) {
     fail("SCANNER_METADATA_INVALID");
   }
@@ -198,7 +207,7 @@ function validateScannerMetadata(value: unknown): Record<string, unknown> {
     + establishedEnabled + Math.min(establishedEnabled, 5);
   const goPlusBudget = securityLimit + Math.min(securityLimit, 3);
   if (
-    (value.request_counts.dexscreener as number) < 1
+    (value.request_counts.dexscreener as number) < 1 + seedCount
     || (value.request_counts.dexscreener as number) > dexBudget
     || (value.request_counts.goplus_security as number) > goPlusBudget
     || (value.request_counts.alternative_me_fng as number) < 1
@@ -213,7 +222,7 @@ function validateScannerMetadata(value: unknown): Record<string, unknown> {
   if (Object.values(value.source_health).some((health) => !healthValues.has(String(health)))) {
     fail("SCANNER_METADATA_INVALID");
   }
-  if (value.source_health.dexscreener !== "READY") fail("SCANNER_METADATA_INVALID");
+  if (value.source_health.dexscreener !== newEmerging.discovery_status) fail("SCANNER_METADATA_INVALID");
 
   const goplusInvoked = (value.request_counts.goplus_security as number) > 0;
   if (goplusInvoked) {
@@ -230,13 +239,30 @@ function validateNewEmergingMetadata(value: unknown): Record<string, unknown> {
   if (!isRecord(value)) fail("SCANNER_METADATA_INVALID");
   assertExactFields(value, NEW_EMERGING_FIELDS);
   if (value.discovery_method !== "dexscreener_latest_token_profiles") fail("SCANNER_METADATA_INVALID");
-  const numericFields = ["seed_count", "pairs_loaded", "candidates_before_filters", "candidates_after_filters"];
+  const numericFields = [
+    "seed_count", "pair_requests_succeeded", "pair_requests_failed", "pairs_loaded",
+    "candidates_before_filters", "candidates_after_filters",
+  ];
   if (numericFields.some((field) => !isNonNegativeInteger(value[field]))) fail("SCANNER_METADATA_INVALID");
+  const seedCount = value.seed_count as number;
+  const succeeded = value.pair_requests_succeeded as number;
+  const failed = value.pair_requests_failed as number;
+  const minimumRequired = Math.max(3, Math.ceil(seedCount * 0.5));
   if (
-    (value.seed_count as number) < 1 || (value.seed_count as number) > 30
+    seedCount < 1 || seedCount > 30
+    || succeeded + failed !== seedCount
+    || succeeded < minimumRequired
     || (value.candidates_before_filters as number) < 1
     || (value.candidates_before_filters as number) > (value.pairs_loaded as number)
     || (value.candidates_after_filters as number) > (value.candidates_before_filters as number)
+  ) fail("SCANNER_METADATA_INVALID");
+  if (!isRecord(value.failure_reason_counts)) fail("SCANNER_METADATA_INVALID");
+  const failureEntries = Object.entries(value.failure_reason_counts);
+  if (
+    failureEntries.some(([reason, count]) => !DISCOVERY_FAILURE_REASONS.has(reason) || !isPositiveInteger(count))
+    || failureEntries.reduce((total, [, count]) => total + Number(count), 0) !== failed
+    || !["READY", "DEGRADED"].includes(String(value.discovery_status))
+    || (failed === 0) !== (value.discovery_status === "READY")
   ) fail("SCANNER_METADATA_INVALID");
   return value;
 }
@@ -271,17 +297,18 @@ function validateEstablishedMetadata(value: unknown): Record<string, unknown> {
   return value;
 }
 
-function validateReadinessMetadata(value: unknown, universeStatus: string): void {
+function validateReadinessMetadata(value: unknown, universeStatus: string, discoveryStatus: string): void {
   if (!isRecord(value)) fail("SCANNER_METADATA_INVALID");
   assertExactFields(value, READINESS_FIELDS);
   if (
     value.process !== "READY"
-    || value.new_emerging !== "READY"
+    || !["READY", "DEGRADED"].includes(String(value.new_emerging))
     || !["READY", "EMPTY_CONFIGURED"].includes(String(value.established))
     || !["READY", "UNAVAILABLE"].includes(String(value.context))
   ) fail("SCANNER_METADATA_INVALID");
   const expectedEstablished = universeStatus === "ESTABLISHED_UNIVERSE_EMPTY" ? "EMPTY_CONFIGURED" : "READY";
   if (value.established !== expectedEstablished) fail("SCANNER_METADATA_INVALID");
+  if (value.new_emerging !== discoveryStatus) fail("SCANNER_METADATA_INVALID");
 }
 
 function validateCandidateDiscoveryMetadata(candidate: Record<string, unknown>, metadata: Record<string, unknown>): void {
@@ -352,6 +379,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isNonNegativeInteger(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value >= 0;
+}
+
+function isPositiveInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value > 0;
 }
 
 function fail(code: string): never {

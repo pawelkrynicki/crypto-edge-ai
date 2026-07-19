@@ -209,12 +209,19 @@ describe("new/emerging separation and archived query plan", () => {
   it("marks latest profiles observation-only and never established-eligible", async () => {
     const client = new BoundedHttpClient({
       sourceId: "dexscreener",
-      maxRequests: 2,
-      fetchImpl: async (input) => String(input).includes("token-profiles")
-        ? Response.json([{ chainId: "base", tokenAddress: EVM_ADDRESS }])
-        : Response.json([pair()]),
+      maxRequests: 4,
+      fetchImpl: async (input) => {
+        if (String(input).includes("token-profiles")) {
+          return Response.json([
+            { chainId: "base", tokenAddress: EVM_ADDRESS },
+            { chainId: "base", tokenAddress: SECOND_EVM_ADDRESS },
+            { chainId: "base", tokenAddress: "0x3333333333333333333333333333333333333333" },
+          ]);
+        }
+        return String(input).includes(EVM_ADDRESS) ? Response.json([pair()]) : Response.json([]);
+      },
     });
-    const result = await collectDexScreenerDiscovery({ environment: "INTERNAL_BETA", seedLimit: 1, now: NOW, client });
+    const result = await collectDexScreenerDiscovery({ environment: "INTERNAL_BETA", seedLimit: 3, now: NOW, client });
     assert.equal(result.candidates[0]?.discovery_basket, "new_emerging");
     assert.equal(result.candidates[0]?.observation_only, true);
     assert.equal(result.candidates[0]?.established_eligible, false);

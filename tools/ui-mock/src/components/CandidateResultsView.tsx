@@ -111,6 +111,7 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
       ) : activeBasket === "new_emerging" ? (
         <NewEmergingBasket
           candidates={newCandidates}
+          metadata={metadata?.new_emerging}
           readiness={readiness}
           onOpenCandidate={onOpenCandidate}
           onOpenExternalChecks={onOpenExternalChecks}
@@ -130,11 +131,13 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
 
 export function NewEmergingBasket({
   candidates,
+  metadata,
   readiness,
   onOpenCandidate,
   onOpenExternalChecks,
 }: {
   candidates: UiTokenCandidate[];
+  metadata?: ScannerDiscoveryMetadata["new_emerging"];
   readiness?: ProductReadinessOutput | null;
   onOpenCandidate?: (candidateId: string) => void;
   onOpenExternalChecks?: (candidate: UiTokenCandidate) => void;
@@ -162,6 +165,15 @@ export function NewEmergingBasket({
 
   return (
     <section className="basket-content" aria-label="Nowe projekty — obserwacja">
+      {metadata?.discovery_status === "DEGRADED" ? (
+        <div className="product-partial-data" role="status">
+          <strong>DEGRADED</strong>
+          <span>Dane częściowe — część par DexScreener była chwilowo niedostępna</span>
+          <small>
+            {metadata.pair_requests_succeeded ?? 0}/{metadata.seed_count ?? 0} zapytań seed zakończonych powodzeniem
+          </small>
+        </div>
+      ) : null}
       <header className="basket-heading">
         <div>
           <span>Nowe / Emerging</span>
@@ -488,6 +500,13 @@ function getFreshness(ageSeconds: number | null, reasonCode?: string | null): { 
 
 function getSourceState(metadata: ScannerDiscoveryMetadata | null | undefined, sourceIds: string[]): { value: string; detail: string; tone: Tone } {
   const health = Object.entries(metadata?.source_health ?? {});
+  if (metadata?.source_health?.dexscreener === "DEGRADED") {
+    return {
+      value: "DEGRADED",
+      detail: "Dane częściowe — część par DexScreener była chwilowo niedostępna",
+      tone: "warning",
+    };
+  }
   const degraded = health.filter(([, state]) => state === "DEGRADED" || state === "UNAVAILABLE");
   if (degraded.length > 0) return { value: "Degradacja", detail: degraded.map(([id, state]) => `${id}: ${state}`).join(", "), tone: "warning" };
   if (sourceIds.length === 0) return { value: "Brak", detail: "SOURCE_IDS_MISSING", tone: "warning" };

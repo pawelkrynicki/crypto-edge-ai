@@ -286,6 +286,10 @@
 .basket-switcher small { grid-column: 1 / -1; color: var(--text-muted); font-size: 10px; }
 
 .basket-content { padding: 16px; }
+.product-partial-data { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; margin-bottom: 14px; padding: 10px 12px; color: var(--amber); border: 1px solid var(--amber-border); border-radius: 6px; background: var(--amber-dim); }
+.product-partial-data strong { font-size: 10px; letter-spacing: 0.08em; }
+.product-partial-data span { color: var(--text-primary); font-size: 12px; font-weight: 700; }
+.product-partial-data small { grid-column: 2; color: var(--text-muted); font-size: 10px; }
 .basket-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
 .basket-heading > div > span { color: var(--accent); font-size: 10px; font-weight: 800; text-transform: uppercase; }
 

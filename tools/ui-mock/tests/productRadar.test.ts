@@ -59,10 +59,14 @@ const emptyMetadata: ScannerDiscoveryMetadata = {
   discovery_architecture: "two_basket_discovery_v1",
   new_emerging: {
     discovery_method: "dexscreener_latest_token_profiles",
-    seed_count: 1,
+    seed_count: 3,
+    pair_requests_succeeded: 3,
+    pair_requests_failed: 0,
     pairs_loaded: 1,
     candidates_before_filters: 1,
     candidates_after_filters: 0,
+    discovery_status: "READY",
+    failure_reason_counts: {},
   },
   established: {
     discovery_method: "address_seeded_universe",
@@ -143,6 +147,41 @@ describe("Product Radar owner acceptance", () => {
     const markup = renderToStaticMarkup(React.createElement(NewEmergingBasket, { candidates: [newCandidate] }));
     assert.match(markup, /observation_only=true/);
     assert.match(markup, /established_eligible=false/);
+  });
+
+  it("shows DEGRADED partial data while preserving real new-emerging candidates", () => {
+    const metadata = structuredClone(emptyMetadata);
+    metadata.new_emerging = {
+      discovery_method: "dexscreener_latest_token_profiles",
+      seed_count: 10,
+      pair_requests_succeeded: 9,
+      pair_requests_failed: 1,
+      pairs_loaded: 9,
+      candidates_before_filters: 9,
+      candidates_after_filters: 9,
+      discovery_status: "DEGRADED",
+      failure_reason_counts: { NETWORK_ERROR: 1 },
+    };
+    metadata.readiness = { ...metadata.readiness, new_emerging: "DEGRADED" };
+    metadata.source_health = { ...metadata.source_health, dexscreener: "DEGRADED" };
+    const readiness = structuredClone(emptyReadiness);
+    readiness.discovery.new_emerging = {
+      ready: true,
+      status: "degraded",
+      reason_code: "DEXSCREENER_PARTIAL_COVERAGE",
+    };
+    const markup = renderToStaticMarkup(React.createElement(CandidateResultsView, {
+      candidates: [newCandidate],
+      metadata,
+      readiness,
+      ageSeconds: 60,
+      sourceIds: ["dexscreener"],
+    }));
+    assert.match(markup, /DEGRADED/);
+    assert.match(markup, /Dane częściowe — część par DexScreener była chwilowo niedostępna/);
+    assert.match(markup, new RegExp(newCandidate.symbol));
+    assert.match(markup, /observation_only=true/);
+    assert.doesNotMatch(markup, /fixture-fallback|Built-in sample|Radar nie może odczytać aktualnego skanu/);
   });
 
   it("renders the dedicated Established empty-universe state", () => {

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { afterEach, describe, it } from "node:test";
@@ -51,7 +51,7 @@ describe("INTERNAL_BETA live collector", () => {
         ALLOW_LIVE_PROVIDER_CALLS: "1",
       },
       outputDir: root,
-      seedLimit: 2,
+      seedLimit: 3,
       securityCandidateLimit: 3,
       now: NOW,
       establishedUniverse: establishedUniverse(),
@@ -62,10 +62,12 @@ describe("INTERNAL_BETA live collector", () => {
           return Response.json([
             { chainId: "base", tokenAddress: "0xpass" },
             { chainId: "base", tokenAddress: "0xreject" },
+            { chainId: "base", tokenAddress: "0xthird" },
           ]);
         }
         if (url.includes("/token-pairs/v1/base/0xpass")) return Response.json([dexPair("0xpass", "pair-pass", 60_000)]);
         if (url.includes("/token-pairs/v1/base/0xreject")) return Response.json([dexPair("0xreject", "pair-reject", 100)]);
+        if (url.includes("/token-pairs/v1/base/0xthird")) return Response.json([dexPair("0xthird", "pair-third", 100)]);
         if (url.includes("/token-pairs/v1/base/0x1111111111111111111111111111111111111111")) {
           return Response.json([dexPair("0x1111111111111111111111111111111111111111", "pair-established", 70_000)]);
         }
@@ -99,8 +101,8 @@ describe("INTERNAL_BETA live collector", () => {
       },
     });
 
-    assert.equal(result.discovery.new_emerging.seed_count, 2);
-    assert.equal(result.discovery.new_emerging.pairs_loaded, 2);
+    assert.equal(result.discovery.new_emerging.seed_count, 3);
+    assert.equal(result.discovery.new_emerging.pairs_loaded, 3);
     assert.equal(result.discovery.new_emerging.candidates_after_filters, 1);
     assert.equal(result.discovery.established.entries_enabled, 1);
     assert.equal(result.discovery.established.candidates_after_filters, 1);
@@ -145,14 +147,21 @@ describe("INTERNAL_BETA live collector", () => {
         ALLOW_LIVE_PROVIDER_CALLS: "1",
       },
       outputDir: root,
-      seedLimit: 1,
+      seedLimit: 3,
       securityCandidateLimit: 1,
       now: NOW,
       establishedUniverse: { ...establishedUniverse(), entries: [] },
       fetchImpl: async (input) => {
         const url = String(input);
-        if (url.endsWith("/token-profiles/latest/v1")) return Response.json([{ chainId: "base", tokenAddress: "0xnew" }]);
-        if (url.includes("/token-pairs/v1/base/0xnew")) return Response.json([dexPair("0xnew", "pair-new", 60_000)]);
+        if (url.endsWith("/token-profiles/latest/v1")) return Response.json([
+          { chainId: "base", tokenAddress: "0xnew1" },
+          { chainId: "base", tokenAddress: "0xnew2" },
+          { chainId: "base", tokenAddress: "0xnew3" },
+        ]);
+        if (url.includes("/token-pairs/v1/base/0xnew")) {
+          const address = decodeURIComponent(url.split("/").at(-1) ?? "");
+          return Response.json([dexPair(address, `pair-${address}`, 60_000)]);
+        }
         if (url === "https://api.alternative.me/fng/?limit=1") {
           return Response.json({ data: [{ value: "40", value_classification: "Fear", timestamp: "1784203200", time_until_update: "3600" }] });
         }
@@ -163,11 +172,110 @@ describe("INTERNAL_BETA live collector", () => {
       },
     });
     assert.equal(result.discovery.established.universe_status, "ESTABLISHED_UNIVERSE_EMPTY");
-    assert.equal(result.discovery.new_emerging.candidates_before_filters, 1);
+    assert.equal(result.discovery.new_emerging.candidates_before_filters, 3);
     assert.equal(result.request_counts.goplus_security, 0);
     assert.equal(result.scanner.provenance?.fixture_used, false);
     assert.equal(result.scanner.provenance?.metadata?.readiness instanceof Object, true);
     assert.equal(result.scanner.candidates.every((candidate) => candidate.discovery_basket === "new_emerging"), true);
+  });
+
+  it("publishes an INTERNAL_BETA live snapshot with DEGRADED DexScreener coverage", async () => {
+    const root = await tempRoot();
+    const profiles = Array.from({ length: 10 }, (_, index) => ({
+      chainId: "base",
+      tokenAddress: `0xpartial${index}`,
+    }));
+    const result = await runInternalBetaCollector({
+      env: {
+        CRYPTO_EDGE_DATA_ENV: "INTERNAL_BETA",
+        CRYPTO_EDGE_RUNTIME_MODE: "INTERNAL_BETA",
+        ALLOW_LIVE_PROVIDER_CALLS: "1",
+      },
+      outputDir: root,
+      seedLimit: 10,
+      securityCandidateLimit: 3,
+      now: NOW,
+      establishedUniverse: { ...establishedUniverse(), entries: [] },
+      fetchImpl: async (input) => {
+        const url = String(input);
+        if (url.endsWith("/token-profiles/latest/v1")) return Response.json(profiles);
+        if (url.includes("/token-pairs/v1/base/0xpartial9")) {
+          throw new Error(`transient secret-token-pairs-url ${url}`);
+        }
+        if (url.includes("/token-pairs/v1/base/0xpartial")) {
+          const address = decodeURIComponent(url.split("/").at(-1) ?? "");
+          return Response.json([dexPair(address, `pair-${address}`, 60_000)]);
+        }
+        if (url === "https://api.alternative.me/fng/?limit=1") {
+          return Response.json({ data: [{ value: "40", value_classification: "Fear", timestamp: "1784203200", time_until_update: "3600" }] });
+        }
+        if (url === "https://api.llama.fi/protocols") {
+          return Response.json([{ name: "Lido", chain: "Ethereum", tvl: 1_000_000, change_1d: 1, change_7d: 2, url: "https://lido.fi" }]);
+        }
+        throw new Error(`unexpected URL ${url}`);
+      },
+    });
+
+    assert.equal(result.discovery.new_emerging.discovery_status, "DEGRADED");
+    assert.equal(result.discovery.new_emerging.pair_requests_succeeded, 9);
+    assert.equal(result.discovery.new_emerging.pair_requests_failed, 1);
+    assert.deepEqual(result.discovery.new_emerging.failure_reason_counts, { NETWORK_ERROR: 1 });
+    assert.equal(result.source_health.dexscreener, "DEGRADED");
+    assert.equal(
+      (result.scanner.provenance?.metadata?.readiness as Record<string, unknown>).new_emerging,
+      "DEGRADED",
+    );
+    assert.equal(result.scanner.provenance?.environment, "INTERNAL_BETA");
+    assert.equal(result.scanner.provenance?.mode, "live");
+    assert.equal(result.scanner.provenance?.fixture_used, false);
+    assert.equal(result.context.provenance.environment, "INTERNAL_BETA");
+    assert.equal(result.context.provenance.mode, "live");
+    assert.equal(result.context.provenance.fixture_used, false);
+    assert.equal(result.request_counts.dexscreener, 12);
+    assert.equal(result.scanner.candidates.length, 9);
+
+    const persisted = await readFile(result.scanner_publish.output_file, "utf8");
+    assert.equal(persisted.includes("secret-token-pairs-url"), false);
+    assert.equal(persisted.includes("token-pairs/v1"), false);
+    assert.doesNotThrow(() => validateDisplayEligibleScannerSnapshot(JSON.parse(persisted)));
+  });
+
+  it("does not publish or destroy the previous snapshot below the coverage threshold", async () => {
+    const root = await tempRoot();
+    const previousDir = resolve(root, "scan_previous");
+    const previousFile = resolve(previousDir, "full_output.json");
+    await mkdir(previousDir, { recursive: true });
+    await writeFile(previousFile, "previous-snapshot-marker", "utf8");
+    const profiles = Array.from({ length: 10 }, (_, index) => ({
+      chainId: "base",
+      tokenAddress: `0xfailclosed${index}`,
+    }));
+
+    await assert.rejects(
+      () => runInternalBetaCollector({
+        env: {
+          CRYPTO_EDGE_DATA_ENV: "INTERNAL_BETA",
+          CRYPTO_EDGE_RUNTIME_MODE: "INTERNAL_BETA",
+          ALLOW_LIVE_PROVIDER_CALLS: "1",
+        },
+        outputDir: root,
+        seedLimit: 10,
+        now: NOW,
+        establishedUniverse: { ...establishedUniverse(), entries: [] },
+        fetchImpl: async (input) => {
+          const url = String(input);
+          if (url.endsWith("/token-profiles/latest/v1")) return Response.json(profiles);
+          const address = decodeURIComponent(url.split("/").at(-1) ?? "");
+          const index = Number(address.replace("0xfailclosed", ""));
+          if (index >= 4) throw new Error(`transient ${url}`);
+          return Response.json([dexPair(address, `pair-${address}`, 60_000)]);
+        },
+      }),
+      /DEXSCREENER_DISCOVERY_INSUFFICIENT_COVERAGE/,
+    );
+
+    assert.equal(await readFile(previousFile, "utf8"), "previous-snapshot-marker");
+    assert.deepEqual(await readdir(root), ["scan_previous"]);
   });
 });
 

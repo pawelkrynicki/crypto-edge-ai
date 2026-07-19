@@ -79,7 +79,12 @@ export function createScannerApiServer(options: ScannerApiServerOptions = {}) {
         new_emerging: discovery.new_emerging,
         established: discovery.established,
         discovery,
-        reason_codes: [scanner.reason_code, context.reason_code].filter(isString),
+        reason_codes: [
+          scanner.reason_code,
+          context.reason_code,
+          discovery.new_emerging.reason_code,
+          discovery.established.reason_code,
+        ].filter(isString),
       }, runtimeMode);
       return;
     }
@@ -268,12 +273,16 @@ function buildDiscoveryReadiness(scanner: ReadinessEntry, context: ReadinessEntr
       established: { ready: false, configured: false, status: "unavailable", reason_code: "SCANNER_METADATA_INVALID" },
     };
   }
+  const newEmergingReady = readiness.new_emerging === "READY";
+  const newEmergingDegraded = readiness.new_emerging === "DEGRADED";
   const establishedEmpty = readiness.established === "EMPTY_CONFIGURED";
   return {
     new_emerging: {
-      ready: readiness.new_emerging === "READY",
-      status: readiness.new_emerging === "READY" ? "ready" : "unavailable",
-      reason_code: readiness.new_emerging === "READY" ? null : "NEW_EMERGING_UNAVAILABLE",
+      ready: newEmergingReady || newEmergingDegraded,
+      status: newEmergingDegraded ? "degraded" : newEmergingReady ? "ready" : "unavailable",
+      reason_code: newEmergingDegraded
+        ? "DEXSCREENER_PARTIAL_COVERAGE"
+        : newEmergingReady ? null : "NEW_EMERGING_UNAVAILABLE",
     },
     established: establishedEmpty
       ? {
