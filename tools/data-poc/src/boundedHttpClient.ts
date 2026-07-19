@@ -2,7 +2,7 @@ export const DEFAULT_HTTP_TIMEOUT_MS = 10_000;
 export const DEFAULT_HTTP_MAX_RETRIES = 1;
 export const DEFAULT_HTTP_CONCURRENCY = 3;
 export const DEFAULT_RETRY_AFTER_CAP_MS = 2_000;
-export const INTERNAL_BETA_USER_AGENT = "Crypto-Edge-AI-INTERNAL_BETA/12R.4";
+export const INTERNAL_BETA_USER_AGENT = "Crypto-Edge-AI-INTERNAL_BETA/12R.5";
 
 export type FetchLike = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 

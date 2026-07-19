@@ -1,5 +1,11 @@
 # 12R.1 — Real Data Readiness Audit
 
+## Aktualizacja readiness 12R.5 — Discovery Closure, 19.07.2026
+
+**DISCOVERY CLOSED FOR CAMP 2026.** Produkcyjnie uczciwy kontrakt discovery ma `new_emerging` jako observation-only DexScreener latest profiles oraz `established` jako owner-maintained address universe. Symbol query plan jest archiwalnym `NO_GO_QUERY_PLAN` i nie jest importowany przez collector. Basic filters, scoring, `final_label` i `WATCHLIST` pozostają zamrożone.
+
+Pusty commitowany universe (0 aktywnych entries) jest jawnym `ESTABLISHED_UNIVERSE_EMPTY`, bez fixture fallback i bez blokowania `new_emerging`. Snapshot oraz API rozróżniają process ready, new/emerging ready, established empty-configured i context ready/unavailable. GoPlus jest wywoływany wyłącznie po basic filters dla established; brak danych to `SECURITY DATA UNAVAILABLE`. VPS pozostaje bez zmian, tester zewnętrzny nadal `NO-GO`. Następny etap: **Product Radar Build & Owner Acceptance**.
+
 ## Metryka etapu
 
 | Pole | Wartość |
@@ -70,7 +76,7 @@ Planowany następny etap: **12R.5 — Product Radar Redesign & Local Owner Revie
 
 Owner-approved `established_basket_v1` został zweryfikowany w dokładnie jednym kontrolowanym live runie oficjalnego DexScreener search API. Wynik: 120 raw pairs, 57 exact anchor matches, 60 unsupported-chain, 56 quote-side kandydatów bez bezpiecznie przypisywalnych danych rynkowych, 1 unikalny normalized candidate i 0 baseline passes. `USDT` zakończyło się `NETWORK_ERROR` po jednym retry; run nie został powtórzony. Request/retry/failure: 7/2/1. GoPlus, Honeypot.is i context sources: 0 wywołań; raw storage i publish: false.
 
-Werdykt readiness: **`NO_GO_QUERY_PLAN`**. Established search zostaje zatrzymany i nie zasili produkcyjnego collectora. Ewentualny następny kierunek wymaga nowej decyzji ownera dla address-seeded universe na oficjalnych DexScreener token/pair endpoints. Baseline, collector, UI, VPS i tester zewnętrzny pozostają bez zmian; `12R.5B` nadal jest wstrzymane. Kanoniczny raport: `docs/established_basket_validation.md`.
+Werdykt readiness: **`NO_GO_QUERY_PLAN`**. Established search zostaje zatrzymany i nie zasili produkcyjnego collectora. Historyczna decyzja o address-seeded universe została rozstrzygnięta przez 12R.5 powyżej. Baseline, VPS i tester zewnętrzny pozostają bez zmian. Kanoniczne raporty: `docs/established_basket_validation.md` i `docs/discovery_closure.md`.
 
 Kalibracja na rzeczywistym snapshotcie wykazała, że `0/7` nie wynika z brakujących danych: 7/7 kandydatów ma komplet wymaganych metryk, 0 używa FDV zamiast market cap, a wszystkie pary mają 0–1 dzień. `STX` spełnia wszystkie hard filters poza `pair_age >7`. Warianty A–E zwracają po 0.
 
@@ -78,7 +84,7 @@ Jedyny diagnostic 30 seedów potwierdził konflikt populacji: 30 profili, 54 par
 
 Readiness filtrów pozostaje bez zmian. Główna luka to reprezentatywność discovery: latest profiles pasuje do `new/emerging`, nie do populacji starszej niż 7 dni. Dodano offline calibration, discovery-only diagnostic i nieaktywny established-small-cap search prototype. Produkcyjny collector i VPS nie zostały zmienione. Szczegóły: `docs/discovery_filter_calibration.md`.
 
-Werdykt: 12R.5A technicznie kompletne; 12R.5B `NO-GO` do owner acceptance strategii dwóch koszy i query planu. Tester zewnętrzny pozostaje `NO-GO`.
+Werdykt historyczny: 12R.5A technicznie kompletne. Bramka dwóch koszy została zamknięta w 12R.5; następny etap to **Product Radar Build & Owner Acceptance**. Tester zewnętrzny pozostaje `NO-GO`.
 
 ## 1. Decyzja audytowa
 

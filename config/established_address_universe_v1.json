@@ -1,0 +1,9 @@
+{
+  "universe_version": "established_address_universe_v1",
+  "status": "OWNER_MAINTAINED",
+  "production_enabled": true,
+  "provider": "dexscreener",
+  "identity_method": "CHAIN_AND_CONTRACT_ADDRESS",
+  "max_entries": 100,
+  "entries": []
+}

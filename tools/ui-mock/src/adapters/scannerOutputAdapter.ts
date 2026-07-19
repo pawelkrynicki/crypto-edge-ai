@@ -95,6 +95,13 @@ export function mapPersistableScannerOutputToUiCandidates(
       contractAddress: safeString(candidate.contract_address),
       pairAddress: safeString(candidate.pair_address),
       sourceUrl: safeString(candidate.source_url),
+      discoveryBasket: candidate.discovery_basket ?? "new_emerging",
+      discoveryMethod: candidate.discovery_method ?? "dexscreener_latest_token_profiles",
+      observationOnly: candidate.observation_only ?? true,
+      establishedEligible: candidate.established_eligible ?? false,
+      universeVersion: candidate.universe_version ?? null,
+      universeEntryIndex: candidate.universe_entry_index ?? null,
+      addressIdentityVerified: candidate.address_identity_verified ?? false,
 
       priceUsd: candidate.price_usd,
       marketCap: candidate.market_cap_usd,

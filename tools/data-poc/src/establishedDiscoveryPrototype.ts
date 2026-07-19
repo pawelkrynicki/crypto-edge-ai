@@ -261,7 +261,8 @@ export async function runEstablishedDiscoveryPrototype(options: EstablishedDisco
   });
 
   return {
-    report_type: "dexscreener_established_basket_validation",
+    report_type: "archived_no_go_dexscreener_established_basket_diagnostic",
+    archived_no_go_diagnostic: true,
     plan_version: plan.plan_version,
     plan_status: plan.status,
     environment: "INTERNAL_BETA",

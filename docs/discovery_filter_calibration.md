@@ -1,10 +1,14 @@
 # 12R.5A — Discovery & Filter Calibration
 
+## Zamknięcie 12R.5 — 19.07.2026
+
+**DISCOVERY CLOSED FOR CAMP 2026.** Owner zamknął discovery na dwóch koszykach: `new_emerging` pozostaje observation-only latest profiles, a `established` używa wersjonowanego `chain+contract_address` universe. Rekomendowany wcześniej symbol query prototype ma finalny status `NO_GO_QUERY_PLAN`, nie jest dalej rozwijany i nie zasila collectora. `dexscreener_basic_filters_v1` pozostaje bez zmian; warianty B–E nie są aktywowane. Następny etap to **Product Radar Build & Owner Acceptance**, nie kolejny etap discovery.
+
 ## Aktualizacja 12R.5A.1 — Established Basket Validation
 
 Owner zatwierdził diagnostyczny query plan `USDC`, `USDT`, `WETH`, `WBNB`, `SOL`. Jedyny kontrolowany run oficjalnego DexScreener search API zwrócił 120 raw pairs, 57 exact anchor matches, 60 unsupported-chain wyników, 56 przypadków bez bezpiecznie przypisywalnych quote-side market data, 1 unikalnego kandydata i 0 baseline passes. `USDT` zakończyło się `NETWORK_ERROR` po jednym retry; run nie został powtórzony.
 
-Werdykt: **`NO_GO_QUERY_PLAN`**. Search-query basket nie daje reprezentatywnej populacji established-small-cap. Aktywny profil `dexscreener_basic_filters_v1`, collector i progi pozostają bez zmian. Kierunek search zostaje zatrzymany; alternatywa do osobnej decyzji ownera to address-seeded universe korzystający wyłącznie z oficjalnych endpointów DexScreener dla znanych adresów. Kanoniczny raport: `docs/established_basket_validation.md`. 12R.5B i tester zewnętrzny pozostają `NO-GO`.
+Werdykt: **`NO_GO_QUERY_PLAN`**. Search-query basket nie daje reprezentatywnej populacji established-small-cap. Aktywny profil `dexscreener_basic_filters_v1`, collector i progi pozostają bez zmian. Kierunek search zostaje zatrzymany; finalna decyzja ownera z 19.07.2026 wdraża address-seeded universe opisany w `docs/discovery_closure.md`. Tester zewnętrzny pozostaje `NO-GO`.
 
 Data analizy: 18.07.2026
 
@@ -24,7 +28,7 @@ Warianty A–E dały `0` kandydatów zarówno dla snapshotu, jak i dla live diag
 
 Rekomendacja: **A — pozostawić filtry i zmienić discovery**. `latest profiles` powinno być koszykiem `new/emerging`. Drugi, diagnostyczny koszyk `established-small-cap` powinien korzystać z jawnych, zaakceptowanych przez ownera zapytań do oficjalnego DexScreener search API. Publiczne API nie oferuje ogólnego endpointu „small caps starsze niż 7 dni”, więc query plan i reprezentatywność wymagają osobnej akceptacji oraz późniejszej walidacji live. Produkcyjny collector nie został zmieniony.
 
-Status przejścia do 12R.5B: **NO-GO do owner acceptance dla strategii discovery i query planu**. Tester zewnętrzny pozostaje `NO-GO`.
+Historyczna bramka owner acceptance została rozstrzygnięta przez 12R.5 Discovery Closure. Następny etap to **Product Radar Build & Owner Acceptance**. Tester zewnętrzny pozostaje `NO-GO`.
 
 ## Zakres i twarde granice
 
@@ -155,25 +159,21 @@ Oficjalna dokumentacja opisuje `latest profiles`, pule/adresy znanych tokenów o
 ## Rekomendowane discovery, progi i ryzyko
 
 1. `new/emerging`: zachować `latest profiles`; brak starszych kandydatów jest prawidłowym wynikiem tego koszyka.
-2. `established-small-cap`: nieaktywny prototyp `npm run discovery:prototype -- --query "<owner-approved-query>"`. Używa oficjalnego search API, wybiera najwyższą liquidity per chain/base token, nie publikuje i nie ma domyślnego query.
-3. Po akceptacji query planu wykonać osobny przyszły bounded validation run. Nie wykonywać go w 12R.5A — limit jednego live diagnostic został wykorzystany.
+2. Historyczny `established-small-cap` symbol prototype pozostaje wyłącznie pod nazwą `npm run discovery:archived-query-plan:diagnostic`; ma `NO_GO_QUERY_PLAN` i nie zasila collectora.
+3. Nie wykonuje się kolejnego query validation run ani dalszego eksperymentu discovery.
 
 Aktywny profil pozostaje `dexscreener_basic_filters_v1`; diagnostyczne warianty mają wersję `filter_calibration_12r5a_v1`. Nie proponuje się calibrated production profile. Obniżenie liquidity/volume i rozszerzenie market cap nie pomaga, a live próbka zawiera 18/20 tokenów poniżej 300k oraz 14/20 z ratio powyżej 100%, więc liberalizacja zwiększałaby udział słabych tokenów.
 
 ## Elementy wymagające owner acceptance
 
-1. Dwa kosze discovery: `new/emerging` i `established-small-cap`.
-2. Jawna lista queries/chains/quote assets dla established prototype.
-3. Zgoda na jeden osobny przyszły bounded live validation run prototypu.
-4. Decyzja, czy rzadkie wyniki przy baseline są akceptowalne; obecne dane nie uzasadniają zmiany progów.
-5. Dopiero po danych z established basket — ewentualna decyzja o wersjonowanym profilu calibrated.
+Punkty owner acceptance tego historycznego etapu zostały rozstrzygnięte 19.07.2026: dwa koszyki są przyjęte, symbol queries są zamknięte, established używa address universe, a baseline pozostaje bez zmian. Nie ma przyszłego discovery run ani calibrated profile.
 
 ## Narzędzia i walidacja
 
 ```powershell
 npm run filters:calibrate -- --snapshot output/scan_20260717201111_bfd5fb1d/full_output.json
 npm run discovery:diagnostic -- --seed-limit 30
-npm run discovery:prototype -- --query "<owner-approved-query>"
+npm run discovery:archived-query-plan:diagnostic
 ```
 
 - Data PoC: `133/133` testy; source registry: valid, `21` źródeł;
@@ -186,7 +186,7 @@ npm run discovery:prototype -- --query "<owner-approved-query>"
 ## Decyzja etapu
 
 - Implementacja 12R.5A: **GO / kompletna**.
-- Przejście do 12R.5B: **NO-GO do owner acceptance**; po akceptacji **GO**.
+- Następny etap: **Product Radar Build & Owner Acceptance**.
 - Aktywny profil filtrów: **niezmieniony**.
 - VPS: **bez zmian**.
 - Tester zewnętrzny: **NO-GO**.

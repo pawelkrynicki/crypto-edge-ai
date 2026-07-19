@@ -1,5 +1,7 @@
 import { applyBasicFilters, calculateVolumeMarketCapRatio } from "./filters.js";
-import type { CryptoEdgeCandidate, DexScreenerPair } from "./types.js";
+import type { CryptoEdgeCandidate, DexScreenerPair, DexScreenerToken } from "./types.js";
+import type { SupportedEstablishedChain } from "./establishedAddressUniverse.js";
+import { isSameContractAddress } from "./establishedAddressUniverse.js";
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -40,6 +42,27 @@ export function normalizeDexScreenerPairs(pairs: DexScreenerPair[], now = new Da
   return pairs.map((pair) => normalizeDexScreenerPair(pair, now));
 }
 
+export function normalizeDexScreenerPairForConfiguredToken(
+  pair: DexScreenerPair,
+  chain: SupportedEstablishedChain,
+  contractAddress: string,
+  now = new Date(),
+): CryptoEdgeCandidate {
+  const baseMatch = isSameContractAddress(chain, pair.baseToken?.address, contractAddress);
+  const quoteMatch = isSameContractAddress(chain, pair.quoteToken?.address, contractAddress);
+  if (baseMatch === quoteMatch) throw new Error("ESTABLISHED_ADDRESS_IDENTITY_AMBIGUOUS");
+
+  if (baseMatch) {
+    return {
+      ...normalizeDexScreenerPair(pair, now),
+      chain,
+      contract_address: contractAddress,
+    };
+  }
+
+  return normalizeQuoteTokenCandidate(pair, pair.quoteToken, chain, contractAddress, now);
+}
+
 export function calculatePairAgeDays(pairCreatedAt: string | null, now = new Date()): number | null {
   if (!pairCreatedAt) {
     return null;
@@ -51,6 +74,41 @@ export function calculatePairAgeDays(pairCreatedAt: string | null, now = new Dat
   }
 
   return Math.floor((now.getTime() - created.getTime()) / MS_PER_DAY);
+}
+
+function normalizeQuoteTokenCandidate(
+  pair: DexScreenerPair,
+  token: DexScreenerToken | undefined,
+  chain: SupportedEstablishedChain,
+  contractAddress: string,
+  now: Date,
+): CryptoEdgeCandidate {
+  const filterReasons: string[] = [];
+  const volume24hUsd = toNullableNumber(pair.volume?.h24);
+  const pairCreatedAt = normalizeTimestamp(pair.pairCreatedAt);
+  const rawCandidate: CryptoEdgeCandidate = {
+    symbol: token?.symbol || "UNKNOWN",
+    name: token?.name ?? null,
+    chain,
+    contract_address: contractAddress,
+    pair_address: pair.pairAddress ?? null,
+    dex: pair.dexId ?? null,
+    source: "dexscreener",
+    source_url: pair.url ?? null,
+    // DexScreener pair valuation and price fields describe baseToken. They must
+    // not be silently attributed to the configured token when it is quoteToken.
+    price_usd: null,
+    market_cap_usd: null,
+    fdv_usd: null,
+    liquidity_usd: toNullableNumber(pair.liquidity?.usd),
+    volume_24h_usd: volume24hUsd,
+    volume_market_cap_ratio: calculateVolumeMarketCapRatio(volume24hUsd, null, null, filterReasons),
+    pair_created_at: pairCreatedAt,
+    pair_age_days: calculatePairAgeDays(pairCreatedAt, now),
+    status: "raw",
+    filter_reasons: filterReasons,
+  };
+  return applyBasicFilters(rawCandidate);
 }
 
 function normalizeTimestamp(timestampMs: number | undefined): string | null {

@@ -1,5 +1,11 @@
 # Crypto Edge AI — Camp BETA UI Mock
 
+## 12R.5 Two-basket Scanner Contract
+
+Reader/API zachowuje allowlisted metadata `new_emerging` i `established`. `new_emerging` jest observation-only; `established` ma address-backed universe identity. `/api/readiness` rozdziela process, new/emerging, established i context. Pusty commitowany universe zwraca `ready_with_empty_established_universe` oraz jawny `ESTABLISHED_UNIVERSE_EMPTY`; nie uruchamia fixture fallback i nie blokuje koszyka obserwacyjnego.
+
+Security output jest dozwolony wyłącznie dla established candidate po basic filters. Symbol-based query plan nie jest używany przez collector. **DISCOVERY CLOSED FOR CAMP 2026.** Następny etap: **Product Radar Build & Owner Acceptance**.
+
 This directory contains the first UI mock / frontend preview for the **Crypto Edge AI Camp BETA**. 
 
 ## 12R.4 Live Snapshot Consumption
@@ -14,7 +20,7 @@ The existing 12R.3 reader consumes canonical local `INTERNAL_BETA` snapshots wit
 
 After the collector and offline validation, start the local API with `CRYPTO_EDGE_RUNTIME_MODE=INTERNAL_BETA` and verify `GET /api/readiness`. The API reader never calls providers.
 
-VPS, scheduler, retention and public deployment remain unchanged/out of scope. Next: **12R.5 — Product Radar Redesign & Local Owner Review**.
+VPS, scheduler, retention and public deployment remain unchanged/out of scope. The superseding next stage is **Product Radar Build & Owner Acceptance**.
 
 ## 12R.3 Fail-Closed Real Data Boundary
 

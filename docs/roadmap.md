@@ -1,5 +1,13 @@
 # Roadmap
 
+## Stage 12R.5: Discovery Closure
+
+Status na 19.07.2026: **DISCOVERY CLOSED FOR CAMP 2026**. Finalna architektura ma dwa koszyki: obserwacyjny `new_emerging` z DexScreener latest profiles oraz `established` z wersjonowanego, owner-maintained `chain+contract_address` universe. Produkcyjny collector używa oficjalnego token-pairs endpointu, niezmienionych filtrów i GoPlus dopiero po basic filters. Pusty universe daje `ESTABLISHED_UNIVERSE_EMPTY` bez fixture fallback i nie blokuje `new_emerging`.
+
+Symbol-based `established_basket_v1` pozostaje `NO_GO_QUERY_PLAN`, `production_enabled=false` i nie jest dostępny dla collectora. Filtry, scoring, `final_label`, `WATCHLIST`, VPS oraz tester zewnętrzny pozostają bez zmian.
+
+Następny etap: **Product Radar Build & Owner Acceptance**, deadline 27.07.2026. Nie planuje się kolejnego etapu discovery.
+
 ## Stage 12R.5A.1: Established Basket Validation
 
 Status: **implemented and validated on 18.07.2026 — `NO_GO_QUERY_PLAN`**.

@@ -1,6 +1,6 @@
 {
   "plan_version": "established_basket_v1",
-  "status": "OWNER_APPROVED_DIAGNOSTIC_ONLY",
+  "status": "NO_GO_QUERY_PLAN",
   "production_enabled": false,
   "provider": "dexscreener",
   "endpoint_type": "search",

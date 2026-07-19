@@ -61,7 +61,16 @@ export async function collectDexScreenerDiscovery(
   if (deduplicatedPairs.length === 0) {
     throw new Error("DEXSCREENER_PAIRS_UNAVAILABLE");
   }
-  const candidates = normalizeDexScreenerPairs(deduplicatedPairs, options.now ?? new Date());
+  const candidates = normalizeDexScreenerPairs(deduplicatedPairs, options.now ?? new Date()).map((candidate) => ({
+    ...candidate,
+    discovery_basket: "new_emerging" as const,
+    discovery_method: DEXSCREENER_DISCOVERY_METHOD as typeof DEXSCREENER_DISCOVERY_METHOD,
+    observation_only: true,
+    established_eligible: false,
+    universe_version: null,
+    universe_entry_index: null,
+    address_identity_verified: false,
+  }));
 
   return {
     candidates,

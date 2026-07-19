@@ -1,5 +1,26 @@
 # Crypto Edge AI Data POC
 
+## 12R.5 Discovery Closure
+
+Discovery jest zamknięte dla CAMP na dwóch koszykach. `new_emerging` używa latest profiles i jest zawsze `observation_only=true`; `established` używa owner-maintained `config/established_address_universe_v1.json` oraz exact chain+contract identity. Address collector obsługuje base/quote orientation, wybiera najwyższą poprawną liquidity, uruchamia niezmienione filtry i dopiero potem GoPlus. Nie ma automatycznego transferu z latest profiles do universe.
+
+Offline universe workflow:
+
+```powershell
+npm run universe:validate
+npm run universe:list
+```
+
+Commitowany config ma 0 aktywnych entries. To poprawny `ESTABLISHED_UNIVERSE_EMPTY`: new/emerging nadal działa, snapshot jest fixture-free, a API pokazuje empty-configured zamiast udawać listę kandydatów. Symbol query plan jest `NO_GO_QUERY_PLAN`; jedyna zachowana komenda ma nazwę `npm run discovery:archived-query-plan:diagnostic` i nie jest częścią collectora.
+
+Kontrolowany technical probe wymaga lokalnego, niecommitowanego pliku z dokładnie dwoma enabled entries oraz trzech flag `INTERNAL_BETA`:
+
+```powershell
+npm run discovery:closure:probe -- --file <local-probe-universe.json>
+```
+
+Probe wywołuje wyłącznie DexScreener dla dwóch adresów i dokładnie jeden GoPlus connectivity check, niczego nie publikuje i nie zapisuje raw payloadów. **DISCOVERY CLOSED FOR CAMP 2026.** Następny etap: **Product Radar Build & Owner Acceptance**.
+
 ## 12R.5A Discovery and Filter Calibration
 
 Offline calibration reads an existing normalized snapshot, never modifies it, makes zero provider calls and prints JSON:
@@ -27,7 +48,7 @@ The versioned `established_basket_v1` diagnostic uses only the owner-approved pl
 $env:CRYPTO_EDGE_DATA_ENV = "INTERNAL_BETA"
 $env:CRYPTO_EDGE_RUNTIME_MODE = "INTERNAL_BETA"
 $env:ALLOW_LIVE_PROVIDER_CALLS = "1"
-npm run discovery:established:validate
+npm run discovery:archived-query-plan:diagnostic
 ```
 
 The command rejects arguments and unknown/additional queries, exits before fetch without all three flags, caps concurrency at 3, uses a 10-second timeout and at most one retry, prints only normalized diagnostics, and has no raw-storage or publish path. The single authorized 18.07.2026 run returned 120 raw pairs, 57 exact anchor matches, 1 unique candidate and 0 baseline passes; verdict: `NO_GO_QUERY_PLAN`. `USDT` failed after one retry and the run was not repeated. The established search direction is not connected to the production collector. Full analysis: `../../docs/established_basket_validation.md`.
@@ -59,7 +80,7 @@ Latest controlled gate (17.07.2026): the full offline RC passed with 123 Data Po
 
 Published outputs: `output/scan_20260717201111_bfd5fb1d/full_output.json` and `output/approved_sources_20260717201111_71b5ca78/approved_sources_output.json`. Scanner provenance declares `source_ids=[dexscreener]`; context provenance declares `source_ids=[alternative_me_fng, defillama_api]`; every published source declares `raw_storage=denied`.
 
-No scheduler, retention, VPS/public deployment, scraping, paid sources, AI KINTEL, scoring or `final_label` changes are included. `WATCHLIST` remains Manual Review Only. Next: **12R.5 — Product Radar Redesign & Local Owner Review**.
+No scheduler, retention, VPS/public deployment, scraping, paid sources, AI KINTEL, scoring or `final_label` changes are included. `WATCHLIST` remains Manual Review Only. The superseding next stage is **Product Radar Build & Owner Acceptance**.
 
 ## Purpose
 

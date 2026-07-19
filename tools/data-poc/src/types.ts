@@ -1,5 +1,8 @@
 export type CandidateStatus = "raw" | "passed_basic_filter" | "rejected_basic_filter";
 
+export type DiscoveryBasket = "new_emerging" | "established";
+export type DiscoveryMethod = "dexscreener_latest_token_profiles" | "address_seeded_universe";
+
 export type DexScreenerPocMode = "live" | "fixture";
 
 export type DexScreenerToken = {
@@ -55,6 +58,13 @@ export type CryptoEdgeCandidate = {
   pair_age_days: number | null;
   status: CandidateStatus;
   filter_reasons: string[];
+  discovery_basket?: DiscoveryBasket;
+  discovery_method?: DiscoveryMethod;
+  observation_only?: boolean;
+  established_eligible?: boolean;
+  universe_version?: string | null;
+  universe_entry_index?: number | null;
+  address_identity_verified?: boolean;
 };
 
 export type PocOutput = {

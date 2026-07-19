@@ -60,6 +60,13 @@ export type PersistableCandidate = {
   final_label: string;
   final_reasons: string[];
   created_at: string;
+  discovery_basket?: "new_emerging" | "established";
+  discovery_method?: "dexscreener_latest_token_profiles" | "address_seeded_universe";
+  observation_only?: boolean;
+  established_eligible?: boolean;
+  universe_version?: string | null;
+  universe_entry_index?: number | null;
+  address_identity_verified?: boolean;
 };
 
 export type PersistableSecurityCheck = {
@@ -149,7 +156,14 @@ export function buildPersistableScannerOutput(input: BuildPersistableScannerInpu
       filter_reasons: item.candidate.filter_reasons,
       final_label: item.decision.final_label,
       final_reasons: item.decision.final_reasons,
-      created_at: finishedAt
+      created_at: finishedAt,
+      discovery_basket: item.candidate.discovery_basket ?? "new_emerging",
+      discovery_method: item.candidate.discovery_method ?? "dexscreener_latest_token_profiles",
+      observation_only: item.candidate.observation_only ?? true,
+      established_eligible: item.candidate.established_eligible ?? false,
+      universe_version: item.candidate.universe_version ?? null,
+      universe_entry_index: item.candidate.universe_entry_index ?? null,
+      address_identity_verified: item.candidate.address_identity_verified ?? false,
     };
   });
 
