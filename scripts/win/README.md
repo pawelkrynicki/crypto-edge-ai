@@ -2,6 +2,24 @@
 
 These scripts are developer tooling for Windows CMD. Run them from the repo root or any other current directory; each script resolves the repo root from its own location.
 
+## Product Radar owner review
+
+Kanoniczny launcher lokalnej oceny ownera:
+
+```cmd
+scripts\win\start-product-radar-review.cmd
+```
+
+Uruchamia Scanner API na `127.0.0.1:5177` i UI `INTERNAL_BETA` na `127.0.0.1:5173`, po uprzednim zwolnieniu wyłącznie tych portów. Otwiera `#candidate-results`, nie uruchamia `DEVELOPMENT_DEMO`, nie używa fixture i nie modyfikuje VPS. Brak scanner output jest wykrywany i zgłaszany; aplikacja pokazuje wtedy fail-closed error state.
+
+Smoke-check bez startowania procesów/przeglądarki:
+
+```cmd
+scripts\win\start-product-radar-review.cmd --check
+```
+
+Zatrzymanie sesji: `scripts\win\kill-local-ports.cmd`. Flow i checklista akceptacji: `docs\product_radar_owner_review.md`. Następny etap po jawnym owner `ACCEPT`: **VPS Deployment & Automation**.
+
 ## 12R.4 Manual Collector and Offline Validation
 
 12R.4 adds no scheduler or automatic launcher. Run the single controlled smoke manually from `tools\data-poc` only after offline tests pass:

@@ -13,7 +13,7 @@ const forbiddenText = [
   "LOWLIQTOKEN111",
   "FDVFALLBACKTOKEN111",
 ];
-const requiredText = ["Radar", "Szczegóły", "Weryfikacja", "Metodologia", "API only"];
+const requiredText = ["Radar", "Szczegóły", "Weryfikacja", "Metodologia", "API / readiness", "INTERNAL_BETA"];
 const files = listFiles(distDir);
 const serialized = files
   .filter((file) => /\.(?:html|js|css|json)$/i.test(file))

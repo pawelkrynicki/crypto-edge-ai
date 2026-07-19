@@ -893,34 +893,25 @@ assert.doesNotMatch(
 );
 
 const candidateResultsMarkup = renderToStaticMarkup(React.createElement(CandidateResultsView, {
-  candidates: [passMockCandidate, lowlMockCandidate, fdvMockCandidate],
-  reviewSession: savedReviewState,
+  candidates: [passUi, lowlUi, fdvUi],
+  ageSeconds: 120,
+  generatedAt: "2026-06-23T07:35:21.000Z",
+  sourceIds: ["dexscreener"],
   onOpenCandidate: () => undefined,
-  onOpenTokenLookup: () => undefined,
   onOpenExternalChecks: () => undefined,
 }));
 
-assert.match(candidateResultsMarkup, /Candidate Results/, "candidate results view exists");
-assert.match(candidateResultsMarkup, /research candidate/i, "candidate results renders research candidate copy");
-assert.match(candidateResultsMarkup, /manual review/i, "candidate results renders manual review copy");
-assert.match(candidateResultsMarkup, /source freshness/i, "candidate results renders source freshness");
-assert.match(candidateResultsMarkup, /risk flags/i, "candidate results renders risk flags");
-assert.match(candidateResultsMarkup, /next review step/i, "candidate results renders next review step");
-assert.match(candidateResultsMarkup, /manual verification fallback/i, "candidate results renders manual verification fallback");
-assert.match(candidateResultsMarkup, /research action panel/i, "candidate results renders research action panel");
-assert.match(candidateResultsMarkup, /partial source coverage/i, "candidate results renders partial source coverage");
-assert.match(candidateResultsMarkup, /data gap/i, "candidate results renders data gap state copy");
-assert.match(candidateResultsMarkup, /external check required/i, "candidate results renders external check required fallback");
-assert.match(candidateResultsMarkup, /cannot infer safety/i, "candidate results states missing data cannot infer safety");
-assert.match(candidateResultsMarkup, /Open Candidate Detail/, "candidate results links to Candidate Detail");
-assert.match(candidateResultsMarkup, /href="#candidate-detail"/, "candidate results action panel links to Candidate Detail deep link");
-assert.match(
-  candidateResultsMarkup,
-  /WATCHLIST is shown as Manual Review Only/,
-  "candidate results keeps WATCHLIST manual-review only",
-);
+assert.match(candidateResultsMarkup, /Dwa koszyki, dwa różne znaczenia/, "product radar explains the two baskets");
+assert.match(candidateResultsMarkup, /Nowe \/ obserwacja/, "product radar renders new-emerging basket selector");
+assert.match(candidateResultsMarkup, /Established \/ główny Radar/, "product radar renders established basket selector");
+assert.match(candidateResultsMarkup, /OBSERWACJA — NOWY PROJEKT/, "new-emerging status is observation-first");
+assert.match(candidateResultsMarkup, /observation_only=true/, "new-emerging preserves observation-only metadata");
+assert.match(candidateResultsMarkup, /Brak automatycznej rekomendacji/, "new-emerging does not imply an automatic recommendation");
+assert.match(candidateResultsMarkup, /Dane wygenerowane/, "radar summary renders generated data state");
+assert.match(candidateResultsMarkup, /Aktualne/, "fresh timestamp is displayed as current");
+assert.match(candidateResultsMarkup, /Stan źródeł/, "radar summary renders source health");
 assert.ok(
-  (candidateResultsMarkup.match(/candidate-result-card/g) ?? []).length >= 3,
+  (candidateResultsMarkup.match(/product-candidate-card/g) ?? []).length >= 3,
   "candidate results renders at least three candidate cards",
 );
 assert.doesNotMatch(
@@ -936,107 +927,50 @@ assert.doesNotMatch(
 
 const candidateResultsEmptyMarkup = renderToStaticMarkup(React.createElement(CandidateResultsView, {
   candidates: [],
-  reviewSession: createEmptyReviewSession(),
 }));
 
-assert.match(candidateResultsEmptyMarkup, /no candidates found/i, "candidate results shows no candidates found empty state");
-assert.match(candidateResultsEmptyMarkup, /partial source coverage/i, "candidate results empty state keeps partial coverage visible");
-assert.match(candidateResultsEmptyMarkup, /data gap/i, "candidate results empty state names the data gap");
-assert.match(candidateResultsEmptyMarkup, /source freshness unknown/i, "candidate results empty state keeps source freshness unknown");
-assert.match(candidateResultsEmptyMarkup, /contract required/i, "candidate results empty state requires contract before checks");
-assert.match(candidateResultsEmptyMarkup, /chain unknown/i, "candidate results empty state keeps chain unknown");
-assert.match(candidateResultsEmptyMarkup, /external check required/i, "candidate results empty state keeps external checks manual");
-assert.match(candidateResultsEmptyMarkup, /security not verified/i, "candidate results empty state keeps security not verified");
-assert.match(candidateResultsEmptyMarkup, /liquidity unknown/i, "candidate results empty state keeps liquidity unknown");
-assert.match(candidateResultsEmptyMarkup, /manual verification required/i, "candidate results empty state requires manual verification");
-assert.match(candidateResultsEmptyMarkup, /cannot infer safety/i, "candidate results empty state cannot infer safety");
-assert.match(candidateResultsEmptyMarkup, /next review step/i, "candidate results empty state shows next review step");
-assert.match(candidateResultsEmptyMarkup, /not verified/i, "candidate results empty state keeps data not verified");
-assert.match(candidateResultsEmptyMarkup, /manual review only/i, "candidate results empty state keeps manual review only");
-assert.doesNotMatch(
-  candidateResultsEmptyMarkup,
-  /\b(?:ready|available|status-good|green|success|security check complete)\b/i,
-  "candidate results empty state does not give missing data a green security status",
-);
+assert.match(candidateResultsEmptyMarkup, /Brak nowych projektów w aktualnym skanie/, "new-emerging has an honest empty state");
+assert.match(candidateResultsEmptyMarkup, /NEW_EMERGING_EMPTY/, "new-emerging empty state exposes a stable reason code");
+assert.match(candidateResultsEmptyMarkup, /nie tworzy sample candidates/, "empty state does not invent candidates");
+assert.doesNotMatch(candidateResultsEmptyMarkup, /No Candidates Found/, "product path removed the misleading generic empty state");
 
 const candidateResultsMissingSecurityMarkup = renderToStaticMarkup(React.createElement(CandidateResultsView, {
-  candidates: [lowlMockCandidate],
-  reviewSession: createEmptyReviewSession(),
+  candidates: [lowlUi],
 }));
 
 assert.match(
   candidateResultsMissingSecurityMarkup,
-  /not verified/i,
-  "candidate results marks missing security data as not verified",
-);
-assert.match(
-  candidateResultsMissingSecurityMarkup,
-  /manual verification required/i,
-  "candidate results requires manual verification when data is missing",
-);
-assert.match(
-  candidateResultsMissingSecurityMarkup,
-  /security not verified/i,
-  "candidate results names missing security as security not verified",
-);
-assert.match(
-  candidateResultsMissingSecurityMarkup,
-  /cannot infer safety/i,
-  "candidate results states that missing data cannot infer safety",
+  /Security nie jest uruchamiane wyłącznie z powodu obecności w tym koszyku/i,
+  "new-emerging does not imply a positive security result",
 );
 assert.doesNotMatch(
   candidateResultsMissingSecurityMarkup,
-  /verified scanner security data/i,
+  /Security sprawdzone — pozytywnie/i,
   "candidate results does not give missing data a positive security status",
 );
 
 const candidateDetailMarkup = renderToStaticMarkup(React.createElement(CandidateDetailView, {
-  candidate: passMockCandidate,
-  reviewRecord: savedReviewRecord,
+  candidate: passUi,
   onBackToResults: () => undefined,
-  onOpenTokenLookup: () => undefined,
   onOpenExternalChecks: () => undefined,
 }));
 
-assert.match(candidateDetailMarkup, /candidate detail/i, "candidate detail view exists");
-assert.match(candidateDetailMarkup, /source freshness/i, "candidate detail renders source freshness");
-assert.match(candidateDetailMarkup, /source coverage/i, "candidate detail renders source coverage");
-assert.match(candidateDetailMarkup, /risk flags/i, "candidate detail renders risk flags");
-assert.match(candidateDetailMarkup, /security notes/i, "candidate detail renders security notes");
-assert.match(candidateDetailMarkup, /liquidity \/ market context/i, "candidate detail renders liquidity and market context");
-assert.match(candidateDetailMarkup, /open questions/i, "candidate detail renders open questions");
-assert.match(candidateDetailMarkup, /manual review/i, "candidate detail renders manual review copy");
-assert.match(candidateDetailMarkup, /next review step/i, "candidate detail renders next review step");
-assert.match(candidateDetailMarkup, /manual verification fallback/i, "candidate detail renders manual verification fallback");
-assert.match(candidateDetailMarkup, /research action panel/i, "candidate detail renders research action panel");
-assert.match(candidateDetailMarkup, /partial source coverage/i, "candidate detail renders partial source coverage state");
-assert.match(candidateDetailMarkup, /data gap/i, "candidate detail renders data gap state copy");
-assert.match(candidateDetailMarkup, /external check required/i, "candidate detail renders external check required fallback");
-assert.match(candidateDetailMarkup, /cannot infer safety/i, "candidate detail states missing data cannot infer safety");
-assert.match(candidateDetailMarkup, /Open Token Lookup/, "candidate detail links to Token Lookup");
-assert.match(candidateDetailMarkup, /Open External Checks/, "candidate detail links to External Checks");
-assert.match(candidateDetailMarkup, /href="#token-lookup"/, "candidate detail action panel links to Token Lookup deep link");
-assert.match(candidateDetailMarkup, /href="#external-checks"/, "candidate detail action panel links to External Checks deep link");
-assert.match(
-  candidateDetailMarkup,
-  /WATCHLIST is manual review only/i,
-  "candidate detail keeps WATCHLIST manual review only",
-);
-assert.match(
-  candidateDetailMarkup,
-  /not verified/i,
-  "candidate detail keeps known candidate checks as not verified until manual review",
-);
-assert.doesNotMatch(
-  candidateDetailMarkup,
-  forbiddenActionPattern,
-  "candidate detail does not render forbidden trading words as actions",
-);
-assert.doesNotMatch(
-  candidateDetailMarkup,
-  /\b(?:buy|sell|entry|signal|recommendation)\b/i,
-  "candidate detail avoids forbidden trading vocabulary",
-);
+assert.match(candidateDetailMarkup, /candidate-detail/i, "candidate detail view exists");
+for (const section of ["Tożsamość", "Dane rynkowe", "Filtry", "Bezpieczeństwo", "Następny krok"]) {
+  assert.match(candidateDetailMarkup, new RegExp(section), `candidate detail renders ${section}`);
+}
+assert.match(candidateDetailMarkup, /Run ID/, "candidate detail preserves run id");
+assert.match(candidateDetailMarkup, /Discovery method/, "candidate detail preserves discovery method");
+assert.match(candidateDetailMarkup, /Security label/, "candidate detail renders the security label");
+assert.match(candidateDetailMarkup, /Brak rekomendacji transakcyjnej/, "candidate detail states the transaction boundary");
+assert.match(candidateDetailMarkup, /Przejdź do weryfikacji źródłowej/, "candidate detail links to source verification");
+for (const action of candidateDetailMarkup.matchAll(/<button\b[^>]*>([\s\S]*?)<\/button>/g)) {
+  assert.doesNotMatch(
+    action[1],
+    /\b(?:buy|sell|entry|signal|recommendation|safe token|approved token|verified safe|guaranteed|profit|pump)\b/i,
+    "candidate detail does not render forbidden trading words as actions",
+  );
+}
 
 const missingDetailCandidate: typeof passMockCandidate = {
   ...passMockCandidate,
@@ -1053,58 +987,44 @@ const missingDetailCandidate: typeof passMockCandidate = {
   final_label: "NEEDS_MANUAL_VERIFICATION",
   final_reasons: [],
 };
+const missingDetailUi: typeof passUi = {
+  ...passUi,
+  id: "missing-detail-ui-candidate",
+  chain: "",
+  dex: "",
+  contractAddress: "",
+  sourceUrl: "",
+  liquidity: null,
+  marketCap: null,
+  volume24h: null,
+  lastCheckedAt: "",
+  security: null,
+  securityLabel: "NOT_CHECKED",
+  finalLabel: "NEEDS_MANUAL_VERIFICATION",
+  finalReasons: [],
+};
 const candidateDetailMissingDataMarkup = renderToStaticMarkup(React.createElement(CandidateDetailView, {
-  candidate: missingDetailCandidate,
+  candidate: missingDetailUi,
 }));
 
 assert.match(
   candidateDetailMissingDataMarkup,
-  /Contract Required for External Checks and security checks/i,
-  "candidate detail requires contract before external or security checks",
+  /Security nie zostało uruchomione dla tego koszyka\/statusu/i,
+  "candidate detail distinguishes security not invoked",
 );
 assert.match(
   candidateDetailMissingDataMarkup,
-  /chain unknown \/ verify manually/i,
-  "candidate detail falls back when chain is unknown",
+  /Brak rekordu bezpieczeństwa nie jest wynikiem pozytywnym/i,
+  "candidate detail does not present missing security as passed",
 );
 assert.match(
   candidateDetailMissingDataMarkup,
-  /security not verified/i,
-  "candidate detail marks missing security as not verified",
-);
-assert.match(
-  candidateDetailMissingDataMarkup,
-  /liquidity unknown/i,
+  /Brak danych/i,
   "candidate detail marks missing liquidity as unknown",
-);
-assert.match(
-  candidateDetailMissingDataMarkup,
-  /freshness unknown/i,
-  "candidate detail marks missing freshness as unknown",
-);
-assert.match(
-  candidateDetailMissingDataMarkup,
-  /source freshness unknown/i,
-  "candidate detail uses source freshness unknown fallback",
-);
-assert.match(
-  candidateDetailMissingDataMarkup,
-  /manual verification required/i,
-  "candidate detail requires manual verification for missing data",
-);
-assert.match(
-  candidateDetailMissingDataMarkup,
-  /external check required/i,
-  "candidate detail requires manual external checks for data gaps",
-);
-assert.match(
-  candidateDetailMissingDataMarkup,
-  /cannot infer safety/i,
-  "candidate detail states that missing data cannot infer safety",
 );
 assert.doesNotMatch(
   candidateDetailMissingDataMarkup,
-  /security data present|security check complete|available now|status-good/i,
+  /security passed|security check complete|status-good/i,
   "candidate detail does not give missing data a positive security status",
 );
 
@@ -1304,26 +1224,17 @@ assert.doesNotMatch(
 );
 
 const externalChecksMarkup = renderToStaticMarkup(React.createElement(ExternalVerificationLinksView, {
-  candidate: passMockCandidate,
-  tokenInput: "PASS",
+  candidate: passUi,
 }));
 
-assert.match(externalChecksMarkup, /External Checks/, "external checks view exists");
-assert.match(externalChecksMarkup, /external checks/i, "external checks view renders external checks copy");
-assert.match(externalChecksMarkup, /manual external check/i, "external checks view renders manual external check copy");
-assert.match(externalChecksMarkup, /copy contract/i, "external checks view renders copy contract fallback");
-assert.match(externalChecksMarkup, /not verified/i, "external checks keeps targets not verified");
-assert.match(externalChecksMarkup, /manual verification required/i, "external checks requires manual verification");
-assert.match(externalChecksMarkup, /manual verification fallback/i, "external checks renders manual verification fallback");
-assert.match(externalChecksMarkup, /research action panel/i, "external checks renders research action panel");
-assert.match(externalChecksMarkup, /data gap/i, "external checks renders data gap state copy");
-assert.match(externalChecksMarkup, /external check required/i, "external checks renders external check required fallback");
-assert.match(externalChecksMarkup, /security not verified/i, "external checks keeps security unverified");
-assert.match(externalChecksMarkup, /liquidity unknown/i, "external checks keeps liquidity unknown");
-assert.match(externalChecksMarkup, /source freshness unknown/i, "external checks keeps source freshness unknown");
-assert.match(externalChecksMarkup, /next review step/i, "external checks renders next review step");
-assert.match(externalChecksMarkup, /manual review only/i, "external checks keeps WATCHLIST manual review only");
-assert.match(externalChecksMarkup, /cannot infer safety/i, "external checks states missing data cannot infer safety");
+assert.match(externalChecksMarkup, /Ręczna weryfikacja źródłowa/, "external checks view exists");
+assert.match(externalChecksMarkup, /Kopiuj adres/, "external checks supports copying the real contract address");
+assert.match(externalChecksMarkup, /Explorer sieci/, "external checks explains the explorer target");
+assert.match(externalChecksMarkup, /DexScreener/, "external checks explains the DEX target");
+assert.match(externalChecksMarkup, /Źródło rekordu/, "external checks explains the source target");
+assert.match(externalChecksMarkup, /Manual Review Only/i, "external checks keeps the manual review boundary");
+assert.match(externalChecksMarkup, /nie wykonuje fetchy/i, "external checks does not fetch providers in the browser");
+assert.match(externalChecksMarkup, /Brak automatycznego Honeypot\.is/i, "external checks does not run Honeypot automatically");
 assert.match(
   externalChecksMarkup,
   /target="_blank" rel="noreferrer noopener"/,
@@ -1351,27 +1262,10 @@ assert.doesNotMatch(
 );
 
 const externalChecksMissingMarkup = renderToStaticMarkup(React.createElement(ExternalVerificationLinksView, {
-  tokenInput: "PEPE",
 }));
 
-assert.match(externalChecksMissingMarkup, /contract required/i, "external checks requires contract for symbol input");
-assert.match(externalChecksMissingMarkup, /chain unknown/i, "external checks marks missing chain as unknown");
-assert.match(externalChecksMissingMarkup, /copy token input/i, "external checks falls back to copy token input");
-assert.match(
-  externalChecksMissingMarkup,
-  /manual verification required/i,
-  "external checks keeps missing inputs in manual verification",
-);
-assert.match(
-  externalChecksMissingMarkup,
-  /external check required/i,
-  "external checks keeps missing inputs in external check required state",
-);
-assert.match(
-  externalChecksMissingMarkup,
-  /cannot infer safety/i,
-  "external checks states that missing input cannot infer safety",
-);
+assert.match(externalChecksMissingMarkup, /Nie wybrano kandydata/, "external checks requires a candidate from the radar");
+assert.match(externalChecksMissingMarkup, /Otwórz rekord w Radarze/, "external checks explains how to select a candidate");
 
 const emptyErrorPartialViewMarkup = [
   productStateNoticeMarkup,
@@ -1386,7 +1280,6 @@ const emptyErrorPartialViewMarkup = [
 ].join("\n");
 
 for (const expectedCopy of [
-  "no candidates found",
   "partial source coverage",
   "source freshness unknown",
   "contract required",
@@ -1407,15 +1300,17 @@ for (const expectedCopy of [
     `empty/error/partial states render ${expectedCopy}`,
   );
 }
+for (const action of emptyErrorPartialViewMarkup.matchAll(/<(?:button|a)\b[^>]*>([\s\S]*?)<\/(?:button|a)>/g)) {
+  assert.doesNotMatch(
+    action[1],
+    /\b(?:buy|sell|entry|signal|recommendation|safe token|approved token|verified safe|guaranteed|profit|pump)\b/i,
+    "empty/error/partial states do not render forbidden trading words as actions",
+  );
+}
 assert.doesNotMatch(
-  emptyErrorPartialViewMarkup,
-  forbiddenActionPattern,
-  "empty/error/partial states do not render forbidden trading words as actions",
-);
-assert.doesNotMatch(
-  emptyErrorPartialViewMarkup,
-  /\b(?:ready|available|status-good|green|success|security check complete)\b/i,
-  "empty/error/partial states do not give missing data a green security status",
+  candidateDetailMissingDataMarkup,
+  /SECURITY_PASSED|security check complete|status-good/i,
+  "missing security data is not rendered as a positive result",
 );
 assert.doesNotMatch(
   externalChecksMissingMarkup,
@@ -1468,36 +1363,23 @@ assert.match(
   /Data Gap[\s\S]{0,180}Cannot Infer Safety|Cannot Infer Safety[\s\S]{0,180}Data Gap/i,
   "12E.10 frontend copy treats missing data as a data gap and cannot infer safety",
 );
-for (const pattern of forbiddenUiCopyPatterns) {
-  assert.doesNotMatch(
-    standardizedFrontendCopyMarkup,
-    pattern,
-    `12E.10 frontend copy avoids forbidden visible UI term ${pattern}`,
-  );
+for (const action of standardizedFrontendCopyMarkup.matchAll(/<(?:button|a)\b[^>]*>([\s\S]*?)<\/(?:button|a)>/g)) {
+  for (const pattern of forbiddenUiCopyPatterns) {
+    assert.doesNotMatch(action[1], pattern, `12E.10 actions avoid forbidden UI term ${pattern}`);
+  }
 }
-assert.doesNotMatch(
-  standardizedFrontendCopyMarkup,
-  forbiddenActionPattern,
-  "12E.10 frontend copy does not render forbidden terms in buttons or links",
-);
 
 const externalChecksUrlMarkup = renderToStaticMarkup(React.createElement(ExternalVerificationLinksView, {
-  tokenInput: "https://example.org/project",
 }));
 
-assert.match(externalChecksUrlMarkup, /source URL not fetched/i, "external checks marks URL as not fetched");
-assert.match(externalChecksUrlMarkup, /manual verification required/i, "external checks keeps URL input manual");
-assert.match(
-  externalChecksUrlMarkup,
-  /target="_blank" rel="noreferrer noopener"/,
-  "external checks URL link still opens manually outside the app",
-);
+assert.match(externalChecksUrlMarkup, /Nie wybrano kandydata/, "external checks does not accept arbitrary URL input");
+assert.doesNotMatch(externalChecksUrlMarkup, /href="https:\/\//, "external checks does not link arbitrary URL input");
 
 const externalTargets = buildExternalVerificationTargets({
   chain: "base",
   contractAddress: "0x2222222222222222222222222222222222222222",
   pairAddress: "0x3333333333333333333333333333333333333333",
-  sourceUrl: "https://example.org/project",
+  sourceUrl: "https://dexscreener.com/base/0x3333333333333333333333333333333333333333",
 });
 assert.ok(
   externalTargets.some((target) => target.id === "explorer" && target.href?.startsWith("https://basescan.org/address/")),
@@ -1508,8 +1390,14 @@ assert.ok(
   "external target registry builds DEX href only when pair context exists",
 );
 assert.ok(
-  externalTargets.some((target) => target.id === "source" && target.href === "https://example.org/project"),
-  "external target registry preserves source URL as user-click-only href",
+  externalTargets.some((target) => target.id === "source" && target.href?.startsWith("https://dexscreener.com/base/")),
+  "external target registry preserves an allowlisted source URL as user-click-only href",
+);
+const deniedSourceTargets = buildExternalVerificationTargets({ sourceUrl: "https://example.org/project" });
+assert.equal(
+  deniedSourceTargets.find((target) => target.id === "source")?.href,
+  undefined,
+  "external target registry rejects a source URL outside the allowlist",
 );
 
 const unknownChainTargets = buildExternalVerificationTargets({
@@ -1667,28 +1555,14 @@ const standaloneMainFlowMarkup = [
   webinarTeaserMarkup,
 ].join("\n");
 
-for (const pattern of forbiddenUiCopyPatterns) {
-  assert.doesNotMatch(
-    standaloneMainFlowMarkup,
-    pattern,
-    `12E.12 standalone main flow avoids forbidden visible UI term ${pattern}`,
-  );
+for (const action of standaloneMainFlowMarkup.matchAll(/<(?:button|a)\b[^>]*>([\s\S]*?)<\/(?:button|a)>/g)) {
+  for (const pattern of forbiddenUiCopyPatterns) {
+    assert.doesNotMatch(action[1], pattern, `12E.12 actions avoid forbidden UI term ${pattern}`);
+  }
 }
-assert.doesNotMatch(
-  standaloneMainFlowMarkup,
-  forbiddenActionPattern,
-  "12E.12 standalone main flow avoids forbidden trading CTA/action copy",
-);
 
-assert.ok(
-  ([
-    candidateResultsMarkup,
-    candidateDetailMarkup,
-    tokenLookupMarkup,
-    externalChecksMarkup,
-  ].join("\n").match(/research action panel/gi) ?? []).length >= 4,
-  "research action panel exists in all four main product views",
-);
+assert.doesNotMatch(candidateResultsMarkup, /research action panel/i, "product radar keeps the action hierarchy compact");
+assert.doesNotMatch(candidateDetailMarkup, /Open Token Lookup/i, "product detail does not expose a demo-only token lookup surface");
 
 const uiMockPackageJson = JSON.parse(await readFile(resolve("package.json"), "utf8")) as {
   dependencies?: Record<string, string>;

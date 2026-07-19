@@ -126,6 +126,39 @@ export type PersistableScorecard = {
   created_at: string;
 };
 
+export type ScannerDiscoveryMetadata = {
+  discovery_architecture?: "two_basket_discovery_v1";
+  new_emerging?: {
+    discovery_method?: "dexscreener_latest_token_profiles";
+    seed_count?: number;
+    pairs_loaded?: number;
+    candidates_before_filters?: number;
+    candidates_after_filters?: number;
+  };
+  established?: {
+    discovery_method?: "address_seeded_universe";
+    universe_version?: string;
+    universe_status?: "ESTABLISHED_UNIVERSE_READY" | "ESTABLISHED_UNIVERSE_EMPTY";
+    entries_total?: number;
+    entries_enabled?: number;
+    pairs_loaded?: number;
+    candidates_before_filters?: number;
+    candidates_after_filters?: number;
+    base_token_candidates?: number;
+    quote_token_candidates?: number;
+  };
+  readiness?: {
+    process?: string;
+    new_emerging?: string;
+    established?: string;
+    context?: string;
+  };
+  security_candidate_limit?: number;
+  security_candidates_requested?: number;
+  request_counts?: Record<string, number>;
+  source_health?: Record<string, string>;
+};
+
 export type PersistableScannerOutput = {
   provenance?: {
     schema_version: string;
@@ -139,7 +172,7 @@ export type PersistableScannerOutput = {
     finished_at: string;
     source_ids: string[];
     policy_decisions: Record<string, Record<string, "allowed" | "denied">>;
-    metadata?: unknown;
+    metadata?: ScannerDiscoveryMetadata;
   };
   scan_run: PersistableScanRun;
   candidates: PersistableCandidate[];
@@ -160,6 +193,33 @@ export type ScannerSourceMeta = {
 
 export type ScannerApiOutput = PersistableScannerOutput & {
   _source_meta?: ScannerSourceMeta;
+};
+
+export type ProductReadinessEntry = {
+  ready: boolean;
+  reason_code: string | null;
+};
+
+export type ProductBasketReadiness = ProductReadinessEntry & {
+  configured?: boolean;
+  status: "ready" | "empty_configured" | "unavailable";
+};
+
+export type ProductReadinessOutput = {
+  status: "ready" | "ready_with_empty_established_universe" | "not_ready";
+  ready: boolean;
+  runtime_mode?: "DEVELOPMENT_DEMO" | "INTERNAL_BETA" | "UNCONFIGURED";
+  process?: ProductReadinessEntry;
+  scanner: ProductReadinessEntry;
+  context: ProductReadinessEntry;
+  new_emerging?: ProductBasketReadiness;
+  established?: ProductBasketReadiness;
+  discovery: {
+    new_emerging: ProductBasketReadiness;
+    established: ProductBasketReadiness;
+    context?: ProductReadinessEntry;
+  };
+  reason_codes: string[];
 };
 
 export interface UiTokenCandidate {

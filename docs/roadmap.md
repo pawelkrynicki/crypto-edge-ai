@@ -1,5 +1,11 @@
 # Roadmap
 
+## Current stage: Product Radar Build & Owner Acceptance
+
+Product Radar jest zbudowany na real-data `INTERNAL_BETA` i oczekuje na lokalny verdict ownera. Product path używa pełnego `UiTokenCandidate`, rozdziela `new_emerging` od `established`, obsługuje `ESTABLISHED_UNIVERSE_EMPTY` bez globalnego błędu i nie wstawia sample candidates.
+
+Kanoniczny flow oceny oraz checklista znajdują się w `docs/product_radar_owner_review.md`. Po jawnym `ACCEPT` następnym etapem jest **VPS Deployment & Automation**. Nie planuje się osobnego kolejnego etapu UI; ewentualne poprawki po owner review pozostają w tym samym obszarze. Tester zewnętrzny nadal jest `NO-GO`.
+
 ## Stage 12R.5: Discovery Closure
 
 Status na 19.07.2026: **DISCOVERY CLOSED FOR CAMP 2026**. Finalna architektura ma dwa koszyki: obserwacyjny `new_emerging` z DexScreener latest profiles oraz `established` z wersjonowanego, owner-maintained `chain+contract_address` universe. Produkcyjny collector używa oficjalnego token-pairs endpointu, niezmienionych filtrów i GoPlus dopiero po basic filters. Pusty universe daje `ESTABLISHED_UNIVERSE_EMPTY` bez fixture fallback i nie blokuje `new_emerging`.

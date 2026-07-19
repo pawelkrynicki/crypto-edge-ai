@@ -22,6 +22,11 @@ call node --import tsx tests\contract.test.ts
 if errorlevel 1 exit /b %ERRORLEVEL%
 
 echo.
+echo === Run Product Radar owner acceptance tests ===
+call node --import tsx --test tests\productRadar.test.ts
+if errorlevel 1 exit /b %ERRORLEVEL%
+
+echo.
 echo === Run fail-closed real-data boundary tests ===
 call node --import tsx --test tests\realDataBoundary.test.ts
 if errorlevel 1 exit /b %ERRORLEVEL%

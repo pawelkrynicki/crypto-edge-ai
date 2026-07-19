@@ -31,6 +31,17 @@ interface ExplorerTarget {
 }
 
 const EVM_ADDRESS_PATTERN = /0x[a-fA-F0-9]{40}/;
+const ALLOWLISTED_SOURCE_HOSTS = new Set([
+  "dexscreener.com",
+  "www.dexscreener.com",
+  "etherscan.io",
+  "basescan.org",
+  "bscscan.com",
+  "polygonscan.com",
+  "arbiscan.io",
+  "optimistic.etherscan.io",
+  "solscan.io",
+]);
 
 const EXPLORER_TARGETS: Record<string, ExplorerTarget> = {
   ethereum: {
@@ -212,7 +223,7 @@ function buildSourceTarget(
   copyValue: string,
   copyLabel: "Copy Contract" | "Copy Token Input",
 ): ExternalVerificationTarget {
-  const href = normalizeHttpUrl(input.sourceUrl);
+  const href = normalizeAllowlistedHttpUrl(input.sourceUrl);
 
   if (href) {
     return {
@@ -278,4 +289,12 @@ function normalizeHttpUrl(value: string): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+function normalizeAllowlistedHttpUrl(value: string): string | undefined {
+  const normalized = normalizeHttpUrl(value);
+  if (!normalized) return undefined;
+
+  const url = new URL(normalized);
+  return ALLOWLISTED_SOURCE_HOSTS.has(url.hostname.toLowerCase()) ? url.toString() : undefined;
 }

@@ -1,5 +1,30 @@
 # 12R.1 — Real Data Readiness Audit
 
+## Product Radar Build & Owner Acceptance — stan bieżący
+
+Zaimplementowane i objęte testami offline:
+
+- [x] Product path nie używa `MockCandidate` ani fixture fallback.
+- [x] Metadane koszyka, adresu, runu, filtrów, ryzyk, braków i security nie są gubione.
+- [x] `new_emerging` oraz `established` są rozdzielone w UI.
+- [x] `ESTABLISHED_UNIVERSE_EMPTY` jest dedykowanym empty state, nie globalnym błędem.
+- [x] Fresh/stale oraz exact reason codes są widoczne.
+- [x] Security not invoked nie wygląda jak security passed.
+- [x] `WATCHLIST` oznacza wyłącznie ręczną analizę.
+- [x] INTERNAL_BETA build odrzuca demo/sample surfaces.
+- [x] Owner review launcher używa `INTERNAL_BETA`, nie fixture.
+- [ ] Owner przeszedł lokalny flow i wpisał jawny verdict w `docs/product_radar_owner_review.md`.
+
+Do czasu jawnego `ACCEPT`: VPS pozostaje bez zmian, następny etap **VPS Deployment & Automation** nie jest rozpoczęty, a tester zewnętrzny pozostaje `NO-GO`.
+
+### Dowód lokalnej gotowości — 19.07.2026
+
+Pełna walidacja offline zakończyła się jako `LOCAL MVP RC CHECK OK`: registry 21 źródeł, 169 testów data-poc, oba storage smoke, workflow/report smoke, 18 testów Product Radar, 37 testów real-data boundary, typecheck i build `INTERNAL_BETA`. Provider calls były wyłączone w całej tej walidacji.
+
+Po zakończeniu wszystkich checków wykonano dokładnie jeden ograniczony collector run (`seed-limit=10`, `security-limit=3`): `scan_20260719120242_313033a3`. Snapshot jest fixture-free (`mode=live`, `environment=INTERNAL_BETA`), a request counts wynoszą: DexScreener 11, GoPlus 0, Alternative.me 1, DefiLlama 1. Discovery zwróciło 10 seedów, 15 par, 7 kandydatów `new_emerging` przed filtrami i 0 po filtrach. Security ma `NOT_INVOKED`, ponieważ żaden kandydat nie przeszedł basic filters. DefiLlama jest `DEGRADED` z powodu jawnego limitu znormalizowanego kontekstu, bez hard failure.
+
+`snapshot:validate:latest` zwrócił `valid=true`. Lokalne `/api/readiness` zwróciło HTTP 200 i `ready_with_empty_established_universe`: process, scanner, context i `new_emerging` są ready; Established jest skonfigurowane jako `empty_configured` z kodem `ESTABLISHED_UNIVERSE_EMPTY`. Opublikowany context ma run `approved_sources_20260719120242_f34c9740`. Run nie został i nie będzie powtarzany w tym etapie.
+
 ## Aktualizacja readiness 12R.5 — Discovery Closure, 19.07.2026
 
 **DISCOVERY CLOSED FOR CAMP 2026.** Produkcyjnie uczciwy kontrakt discovery ma `new_emerging` jako observation-only DexScreener latest profiles oraz `established` jako owner-maintained address universe. Symbol query plan jest archiwalnym `NO_GO_QUERY_PLAN` i nie jest importowany przez collector. Basic filters, scoring, `final_label` i `WATCHLIST` pozostają zamrożone.

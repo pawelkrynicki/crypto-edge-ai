@@ -72,11 +72,13 @@ export function createScannerApiServer(options: ScannerApiServerOptions = {}) {
           ? discovery.established.status === "empty_configured" ? "ready_with_empty_established_universe" : "ready"
           : "not_ready",
         runtime_mode: runtimeMode,
+        ready,
         process: { ready: true, reason_code: null },
         scanner: publicReadinessEntry(scanner),
         context: publicReadinessEntry(context),
         new_emerging: discovery.new_emerging,
         established: discovery.established,
+        discovery,
         reason_codes: [scanner.reason_code, context.reason_code].filter(isString),
       }, runtimeMode);
       return;

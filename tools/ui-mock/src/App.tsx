@@ -25,7 +25,6 @@ import {
   loadScannerDataSourceResult,
   type DataSourceKey,
   type ResolvedScannerSource,
-  type ScannerDataSourceResult,
 } from "./services/scannerDataSource";
 import { loadLatestMarketContext } from "./services/contextDataSource";
 import {
@@ -36,7 +35,6 @@ import {
 import {
   clearReviewRecord,
   createEmptyReviewSession,
-  getCandidateReview,
   loadReviewSession,
   saveReviewRecord,
   saveReviewSessionState,
@@ -57,11 +55,7 @@ import {
   sectionToHash,
 } from "./workspaceNavigation";
 import type { CandidateReviewInput, ReviewSessionState } from "./types/reviewSessionTypes";
-
-function buildMockCandidates(result: ScannerDataSourceResult): MockCandidate[] {
-  const uiCandidates = mapPersistableScannerOutputToUiCandidates(result.output);
-  return uiCandidates.map(toMockCandidate);
-}
+import type { UiTokenCandidate } from "./types/scannerTypes";
 
 function buildSummary(candidates: MockCandidate[]) {
   return {
@@ -181,12 +175,12 @@ export default function App() {
   const [scannerAgeSeconds, setScannerAgeSeconds] = useState<number | null>(null);
   const [scannerSources, setScannerSources] = useState<string[]>([]);
   const [candidates, setCandidates] = useState<MockCandidate[]>([]);
+  const [uiCandidates, setUiCandidates] = useState<UiTokenCandidate[]>([]);
   const [loading, setLoading] = useState(false);
   const [fallbackMsg, setFallbackMsg] = useState<string | null>(null);
   const [dataUnavailableReasonCode, setDataUnavailableReasonCode] = useState<string | null>(null);
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null | undefined>(undefined);
   const [tokenLookupInput, setTokenLookupInput] = useState("");
-  const [externalChecksInput, setExternalChecksInput] = useState("");
   const [externalChecksCandidateId, setExternalChecksCandidateId] = useState<string | null | undefined>(undefined);
   const [reviewSession, setReviewSession] = useState<ReviewSessionState>(() => loadReviewSession());
   const [reviewStorageStatus, setReviewStorageStatus] = useState<ReviewStorageStatus>(INITIAL_REVIEW_STORAGE_STATUS);
@@ -204,18 +198,15 @@ export default function App() {
   );
   const contextSourceStatus = getContextSourceStatus(marketContextState);
   const selectedDetailCandidate =
-    candidates.find((candidate) => candidate.id === selectedCandidateId) ??
-    candidates.find((candidate) => candidate.final_label === "WATCHLIST") ??
-    candidates[0] ??
+    uiCandidates.find((candidate) => candidate.id === selectedCandidateId) ??
+    uiCandidates.find((candidate) => candidate.finalLabel === "WATCHLIST") ??
+    uiCandidates[0] ??
     null;
-  const selectedDetailReviewRecord = selectedDetailCandidate
-    ? getCandidateReview(selectedDetailCandidate.id, reviewSession)
-    : null;
   const externalChecksCandidate =
     externalChecksCandidateId === null
       ? null
       : externalChecksCandidateId
-        ? candidates.find((candidate) => candidate.id === externalChecksCandidateId) ?? selectedDetailCandidate
+        ? uiCandidates.find((candidate) => candidate.id === externalChecksCandidateId) ?? selectedDetailCandidate
         : selectedDetailCandidate;
 
   const loadData = useCallback(async (source: DataSourceKey) => {
@@ -226,6 +217,7 @@ export default function App() {
       const result = await loadScannerDataSourceResult(source, { runtimeMode });
       if (result.status === "error") {
         setCandidates([]);
+        setUiCandidates([]);
         setResolvedSource("unavailable");
         setScannerGeneratedAt(null);
         setScannerMode(null);
@@ -236,8 +228,10 @@ export default function App() {
         setFallbackMsg(`Data Unavailable — ${result.reasonCode}: ${result.error}`);
         return;
       }
-      const built = buildMockCandidates(result);
+      const builtUi = mapPersistableScannerOutputToUiCandidates(result.output);
+      const built = builtUi.map(toMockCandidate);
       setCandidates(built);
+      setUiCandidates(builtUi);
       setResolvedSource(result.resolvedSource);
       setScannerGeneratedAt(result.output.scan_run.finished_at ?? result.output.scan_run.started_at ?? null);
       setScannerMode(result.output.scan_run.mode ?? null);
@@ -250,6 +244,7 @@ export default function App() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setCandidates([]);
+      setUiCandidates([]);
       setResolvedSource("unavailable");
       setScannerGeneratedAt(null);
       setScannerMode(null);
@@ -399,26 +394,17 @@ export default function App() {
     handleWorkspaceSectionChange("candidate-detail");
   }, [handleWorkspaceSectionChange]);
 
-  const handleOpenTokenLookup = useCallback((candidate?: MockCandidate) => {
-    if (candidate) {
-      setTokenLookupInput(formatTokenLookupInput(candidate));
-    }
-
-    handleWorkspaceSectionChange("token-lookup");
-  }, [handleWorkspaceSectionChange]);
-
-  const handleOpenExternalChecks = useCallback((candidate?: MockCandidate | null, tokenInput?: string) => {
+  const handleOpenExternalChecks = useCallback((candidate?: UiTokenCandidate | null, tokenInput?: string) => {
     if (candidate) {
       setSelectedCandidateId(candidate.id);
       setExternalChecksCandidateId(candidate.id);
-      setExternalChecksInput(formatTokenLookupInput(candidate));
     } else {
       setExternalChecksCandidateId(null);
-      setExternalChecksInput(tokenInput ?? tokenLookupInput);
+      if (tokenInput) setTokenLookupInput(tokenInput);
     }
 
     handleWorkspaceSectionChange("external-checks");
-  }, [handleWorkspaceSectionChange, tokenLookupInput]);
+  }, [handleWorkspaceSectionChange]);
 
   const renderLoadingSection = (sectionId: WorkspaceSectionId) => {
     const copy = SECTION_COPY[sectionId];
@@ -478,10 +464,8 @@ export default function App() {
         return (
           <WorkspaceSection {...SECTION_COPY["candidate-results"]}>
             <CandidateResultsView
-              candidates={candidates}
-              reviewSession={reviewSession}
+              candidates={uiCandidates}
               onOpenCandidate={handleOpenCandidate}
-              onOpenTokenLookup={handleOpenTokenLookup}
               onOpenExternalChecks={handleOpenExternalChecks}
             />
           </WorkspaceSection>
@@ -491,9 +475,7 @@ export default function App() {
           <WorkspaceSection {...SECTION_COPY["candidate-detail"]}>
             <CandidateDetailView
               candidate={selectedDetailCandidate}
-              reviewRecord={selectedDetailReviewRecord}
               onBackToResults={() => handleWorkspaceSectionChange("candidate-results")}
-              onOpenTokenLookup={handleOpenTokenLookup}
               onOpenExternalChecks={handleOpenExternalChecks}
             />
           </WorkspaceSection>
@@ -512,7 +494,6 @@ export default function App() {
           <WorkspaceSection {...SECTION_COPY["external-checks"]}>
             <ExternalVerificationLinksView
               candidate={externalChecksCandidate}
-              tokenInput={externalChecksInput}
             />
           </WorkspaceSection>
         );
@@ -640,15 +621,6 @@ function getFallbackReviewStorageStatus(result: Exclude<ReviewSessionApiResult, 
     text: "Review storage: local API error, using browser localStorage fallback",
     detail: result.error,
   };
-}
-
-function formatTokenLookupInput(candidate: MockCandidate): string {
-  const contract = candidate.contract_address.trim();
-  const chain = candidate.chain.trim();
-
-  if (contract && chain) return `${chain}: ${contract}`;
-  if (contract) return contract;
-  return candidate.symbol || candidate.name || "";
 }
 
 function getContextSourceStatus(state: MarketContextPanelState): { text: string; detail?: string } {

@@ -1,4 +1,4 @@
-import type { ScannerApiOutput } from "../types/scannerTypes";
+import type { ProductReadinessOutput, ScannerApiOutput } from "../types/scannerTypes";
 import {
   getProductRuntimeMode,
   type ResolvedProductRuntimeMode,
@@ -36,6 +36,10 @@ export type ScannerDataSourceLoadResult = ScannerDataSourceResult | ScannerDataS
 export type ScannerDataSourceOptions = {
   runtimeMode?: ResolvedProductRuntimeMode;
 };
+
+export type ScannerReadinessResult =
+  | { status: "ready"; output: ProductReadinessOutput }
+  | { status: "error"; reasonCode: string; error: string; output: null };
 
 type ViteImportMeta = ImportMeta & {
   env?: {
@@ -174,6 +178,43 @@ export async function loadScannerApiDataSourceResult(
   }
 }
 
+export async function loadScannerReadinessResult(
+  options: ScannerDataSourceOptions = {},
+): Promise<ScannerReadinessResult> {
+  const runtimeMode = options.runtimeMode ?? getProductRuntimeMode();
+
+  if (runtimeMode !== "DEVELOPMENT_DEMO" && runtimeMode !== "INTERNAL_BETA") {
+    return {
+      status: "error",
+      reasonCode: "SCANNER_RUNTIME_MODE_UNCONFIGURED",
+      error: "A recognized product runtime mode is required before readiness can be loaded.",
+      output: null,
+    };
+  }
+
+  try {
+    const response = await fetch(`${getApiBaseUrl()}/api/readiness`);
+    const body = await parseJsonResponse(response);
+    if (!isProductReadinessOutput(body)) {
+      return {
+        status: "error",
+        reasonCode: "READINESS_RESPONSE_INVALID",
+        error: "Readiness API response was not a valid product readiness object.",
+        output: null,
+      };
+    }
+
+    return { status: "ready", output: body };
+  } catch (error) {
+    return {
+      status: "error",
+      reasonCode: "READINESS_API_UNAVAILABLE",
+      error: error instanceof Error ? error.message : String(error),
+      output: null,
+    };
+  }
+}
+
 function errorResult(source: DataSourceKey, reasonCode: string, error: string): ScannerDataSourceErrorResult {
   return {
     status: "error",
@@ -196,6 +237,17 @@ async function parseJsonResponse(response: Response): Promise<unknown> {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function isProductReadinessOutput(value: unknown): value is ProductReadinessOutput {
+  return isRecord(value)
+    && typeof value.ready === "boolean"
+    && isRecord(value.scanner)
+    && isRecord(value.context)
+    && isRecord(value.discovery)
+    && isRecord(value.discovery.new_emerging)
+    && isRecord(value.discovery.established)
+    && Array.isArray(value.reason_codes);
 }
 
 function getApiBaseUrl(): string {

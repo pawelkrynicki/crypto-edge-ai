@@ -1,5 +1,18 @@
 # Crypto Edge AI — Camp BETA UI Mock
 
+## Product Radar Build & Owner Acceptance
+
+`INTERNAL_BETA` uruchamia osobny `ProductApp` z nawigacją ograniczoną do Radar / Szczegóły / Weryfikacja / Metodologia. Product path używa bezpośrednio `UiTokenCandidate`; `MockCandidate`, fixture i demo/preview surfaces pozostają wyłącznie w `DEVELOPMENT_DEMO` oraz testach.
+
+Radar pokazuje `new_emerging` jako observation-only oraz address-backed `established`. Pusty, commitowany universe ma dedykowany `ESTABLISHED_UNIVERSE_EMPTY`, nie jest globalnym błędem i nigdy nie tworzy sample candidates. UI pobiera również `/api/readiness`, dzięki czemu context unavailable nie ukrywa działającego skanera, a stale/policy/provider reason codes pozostają jawne.
+
+```cmd
+scripts\win\start-product-radar-review.cmd
+scripts\win\start-product-radar-review.cmd --check
+```
+
+Pełna checklista: `../../docs/product_radar_owner_review.md`. Po jawnym owner `ACCEPT` następny etap to **VPS Deployment & Automation**. Tester zewnętrzny pozostaje `NO-GO`.
+
 ## 12R.5 Two-basket Scanner Contract
 
 Reader/API zachowuje allowlisted metadata `new_emerging` i `established`. `new_emerging` jest observation-only; `established` ma address-backed universe identity. `/api/readiness` rozdziela process, new/emerging, established i context. Pusty commitowany universe zwraca `ready_with_empty_established_universe` oraz jawny `ESTABLISHED_UNIVERSE_EMPTY`; nie uruchamia fixture fallback i nie blokuje koszyka obserwacyjnego.

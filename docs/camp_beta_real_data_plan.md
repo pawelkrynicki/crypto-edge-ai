@@ -1,5 +1,11 @@
 # Camp BETA Real Data Plan
 
+## Product Radar owner acceptance gate
+
+Discovery jest zamknięte. Aktualny product path `INTERNAL_BETA` czyta `UiTokenCandidate` bez konwersji do `MockCandidate`, pokazuje dwa odrębne koszyki i respektuje address-backed identity Established. Commitowany universe z `0` aktywnych wpisów daje dedykowany `ESTABLISHED_UNIVERSE_EMPTY`; nie uruchamia fixture ani ogólnego „No Candidates Found”.
+
+Lokalna ocena ownera korzysta wyłącznie z `scripts\win\start-product-radar-review.cmd` i checklisty `docs/product_radar_owner_review.md`. Po jawnym owner `ACCEPT` następny etap to **VPS Deployment & Automation**. VPS, scheduler i tester zewnętrzny pozostają poza tym etapem.
+
 ## 12R.5 Discovery Closure — 19.07.2026
 
 **DISCOVERY CLOSED FOR CAMP 2026.** Finalny kontrakt to dwa koszyki: `new_emerging` z DexScreener latest profiles (`observation_only=true`) oraz `established` z `config/established_address_universe_v1.json`, identyfikowany wyłącznie przez chain i contract address. Address universe korzysta z oficjalnego token-pairs endpointu, najwyższej poprawnej liquidity, niezmienionych basic filters i candidate-scoped GoPlus po filtrach.

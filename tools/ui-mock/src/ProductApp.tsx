@@ -10,38 +10,41 @@ import {
   type ProductNavItem,
   type ProductSectionId,
 } from "./components/ProductWorkspaceShell";
-import { toMockCandidate, type MockCandidate } from "./mockData";
 import { getProductRuntimeMode } from "./runtimeMode";
-import { getCandidateReview, loadReviewSession } from "./services/reviewSessionStore";
 import {
   loadScannerApiDataSourceResult,
+  loadScannerReadinessResult,
   type ResolvedScannerSource,
 } from "./services/scannerDataSource";
-import type { ReviewSessionState } from "./types/reviewSessionTypes";
+import type {
+  ProductReadinessOutput,
+  ScannerDiscoveryMetadata,
+  UiTokenCandidate,
+} from "./types/scannerTypes";
 
 const PRODUCT_NAV_ITEMS: ProductNavItem[] = [
-  { id: "candidate-results", label: "Radar", icon: "R", description: "Rzeczywiste kandydatury" },
-  { id: "candidate-detail", label: "Szczegóły", icon: "S", description: "Szczegóły kandydata" },
-  { id: "external-checks", label: "Weryfikacja", icon: "W", description: "Manualna weryfikacja" },
-  { id: "methodology", label: "Metodologia", icon: "M", description: "Kontrakt i metodologia" },
+  { id: "candidate-results", label: "Radar", icon: "R", description: "Dwa koszyki danych" },
+  { id: "candidate-detail", label: "Szczegóły", icon: "S", description: "Pełny obraz kandydata" },
+  { id: "external-checks", label: "Weryfikacja", icon: "W", description: "Źródła zewnętrzne" },
+  { id: "methodology", label: "Metodologia", icon: "M", description: "Zasady i ograniczenia" },
 ];
 
 const SECTION_COPY: Record<ProductSectionId, { title: string; description: string }> = {
   "candidate-results": {
     title: "Radar",
-    description: "Kandydatury dopuszczone przez kontrakt real-data do ręcznej analizy.",
+    description: "Nowe projekty obserwacyjne i kandydaci Established są rozdzieleni zgodnie z kontraktem real-data.",
   },
   "candidate-detail": {
     title: "Szczegóły",
-    description: "Znormalizowane dane kandydata i jawne luki wymagające weryfikacji.",
+    description: "Tożsamość, rynek, filtry i bezpieczeństwo bez ukrywania brakujących danych.",
   },
   "external-checks": {
     title: "Weryfikacja",
-    description: "Manualne kroki weryfikacyjne; brak automatycznej deklaracji bezpieczeństwa.",
+    description: "Bezpieczne linki do ręcznej kontroli źródeł; aplikacja nie uruchamia providerów.",
   },
   methodology: {
     title: "Metodologia",
-    description: "Kontrakt danych, etykiety i granice Manual Review Only.",
+    description: "Krótki opis dwóch koszyków, filtrów, etykiet i granic produktu.",
   },
 };
 
@@ -62,56 +65,71 @@ const SECTION_TO_HASH: Record<ProductSectionId, string> = {
 export default function ProductApp() {
   const runtimeMode = getProductRuntimeMode();
   const [activeSection, setActiveSection] = useState<ProductSectionId>(() => resolveSection());
-  const [candidates, setCandidates] = useState<MockCandidate[]>([]);
+  const [candidates, setCandidates] = useState<UiTokenCandidate[]>([]);
   const [loading, setLoading] = useState(true);
   const [resolvedSource, setResolvedSource] = useState<ResolvedScannerSource>("unavailable");
   const [runId, setRunId] = useState<string | null>(null);
   const [generatedAt, setGeneratedAt] = useState<string | null>(null);
   const [ageSeconds, setAgeSeconds] = useState<number | null>(null);
   const [sourceIds, setSourceIds] = useState<string[]>([]);
+  const [metadata, setMetadata] = useState<ScannerDiscoveryMetadata | null>(null);
+  const [readiness, setReadiness] = useState<ProductReadinessOutput | null>(null);
+  const [readinessReasonCode, setReadinessReasonCode] = useState<string | null>(null);
   const [reasonCode, setReasonCode] = useState<string | null>(null);
   const [unavailableMessage, setUnavailableMessage] = useState<string | null>(null);
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
   const [verificationCandidateId, setVerificationCandidateId] = useState<string | null>(null);
-  const [reviewSession] = useState<ReviewSessionState>(() => loadReviewSession());
 
   const selectedCandidate =
     candidates.find((candidate) => candidate.id === selectedCandidateId)
-    ?? candidates.find((candidate) => candidate.final_label === "WATCHLIST")
+    ?? candidates.find((candidate) => candidate.discoveryBasket === "established" && candidate.finalLabel === "WATCHLIST")
+    ?? candidates.find((candidate) => candidate.discoveryBasket === "established")
     ?? candidates[0]
     ?? null;
   const verificationCandidate =
     candidates.find((candidate) => candidate.id === verificationCandidateId)
     ?? selectedCandidate;
-  const reviewRecord = selectedCandidate
-    ? getCandidateReview(selectedCandidate.id, reviewSession)
-    : null;
 
   const loadData = useCallback(async () => {
     setLoading(true);
     setReasonCode(null);
+    setReadinessReasonCode(null);
     setUnavailableMessage(null);
 
-    const result = await loadScannerApiDataSourceResult({ runtimeMode });
-    if (result.status === "error") {
+    const [scannerResult, readinessResult] = await Promise.all([
+      loadScannerApiDataSourceResult({ runtimeMode }),
+      loadScannerReadinessResult({ runtimeMode }),
+    ]);
+
+    if (readinessResult.status === "ready") {
+      setReadiness(readinessResult.output);
+    } else {
+      setReadiness(null);
+      setReadinessReasonCode(readinessResult.reasonCode);
+    }
+
+    if (scannerResult.status === "error") {
       setCandidates([]);
       setResolvedSource("unavailable");
       setRunId(null);
       setGeneratedAt(null);
       setAgeSeconds(null);
       setSourceIds([]);
-      setReasonCode(result.reasonCode);
-      setUnavailableMessage(result.error);
+      setMetadata(null);
+      setReasonCode(scannerResult.reasonCode);
+      setUnavailableMessage(scannerResult.error);
       setLoading(false);
       return;
     }
 
-    setCandidates(mapPersistableScannerOutputToUiCandidates(result.output).map(toMockCandidate));
-    setResolvedSource(result.resolvedSource);
-    setRunId(result.output.scan_run.run_id ?? null);
-    setGeneratedAt(result.output.scan_run.finished_at ?? result.output.scan_run.started_at ?? null);
-    setAgeSeconds(result.output._source_meta?.age_seconds ?? null);
-    setSourceIds(result.output._source_meta?.source_ids ?? []);
+    const output = scannerResult.output;
+    setCandidates(mapPersistableScannerOutputToUiCandidates(output));
+    setResolvedSource(scannerResult.resolvedSource);
+    setRunId(output.scan_run.run_id ?? null);
+    setGeneratedAt(output.provenance?.generated_at ?? output.scan_run.finished_at ?? output.scan_run.started_at ?? null);
+    setAgeSeconds(output._source_meta?.age_seconds ?? null);
+    setSourceIds(output._source_meta?.source_ids ?? output.provenance?.source_ids ?? []);
+    setMetadata(output.provenance?.metadata ?? null);
     setLoading(false);
   }, [runtimeMode]);
 
@@ -137,7 +155,7 @@ export default function ProductApp() {
     navigate("candidate-detail");
   }, [navigate]);
 
-  const openVerification = useCallback((candidate: MockCandidate) => {
+  const openVerification = useCallback((candidate: UiTokenCandidate) => {
     setSelectedCandidateId(candidate.id);
     setVerificationCandidateId(candidate.id);
     navigate("external-checks");
@@ -148,9 +166,7 @@ export default function ProductApp() {
     if (loading) {
       return (
         <ProductWorkspaceSection {...copy}>
-          <div className="flex items-center justify-center h-40">
-            <span className="text-secondary text-sm">Loading data...</span>
-          </div>
+          <div className="product-loading" role="status">Ładowanie aktualnego obrazu Radaru…</div>
         </ProductWorkspaceSection>
       );
     }
@@ -160,9 +176,13 @@ export default function ProductApp() {
         <ProductWorkspaceSection {...copy}>
           <CandidateResultsView
             candidates={candidates}
-            reviewSession={reviewSession}
+            metadata={metadata}
+            readiness={readiness}
+            generatedAt={generatedAt}
+            ageSeconds={ageSeconds}
+            sourceIds={sourceIds}
+            scannerUnavailableReasonCode={reasonCode}
             onOpenCandidate={openCandidate}
-            onOpenTokenLookup={openVerification}
             onOpenExternalChecks={openVerification}
           />
         </ProductWorkspaceSection>
@@ -174,9 +194,7 @@ export default function ProductApp() {
         <ProductWorkspaceSection {...copy}>
           <CandidateDetailView
             candidate={selectedCandidate}
-            reviewRecord={reviewRecord}
             onBackToResults={() => navigate("candidate-results")}
-            onOpenTokenLookup={openVerification}
             onOpenExternalChecks={openVerification}
           />
         </ProductWorkspaceSection>
@@ -204,10 +222,16 @@ export default function ProductApp() {
       activeSection={activeSection}
       onSectionChange={navigate}
       loading={loading}
-      sourceStatusText={formatSourceStatus(resolvedSource, runId, generatedAt, ageSeconds, sourceIds)}
+      runtimeMode={runtimeMode}
+      resolvedSource={resolvedSource}
+      runId={runId}
+      generatedAt={generatedAt}
+      ageSeconds={ageSeconds}
+      sourceIds={sourceIds}
+      readiness={readiness}
+      readinessReasonCode={readinessReasonCode}
       dataUnavailableMessage={unavailableMessage}
       dataUnavailableReasonCode={reasonCode}
-      runtimeMode={runtimeMode}
     >
       {renderSection()}
     </ProductWorkspaceShell>
@@ -217,29 +241,4 @@ export default function ProductApp() {
 function resolveSection(): ProductSectionId {
   if (typeof window === "undefined") return "candidate-results";
   return HASH_TO_SECTION[window.location.hash.trim().toLowerCase()] ?? "candidate-results";
-}
-
-function formatSourceStatus(
-  source: ResolvedScannerSource,
-  runId: string | null,
-  generatedAt: string | null,
-  ageSeconds: number | null,
-  sourceIds: string[],
-): string {
-  if (source === "unavailable") return "Data Unavailable";
-
-  const parts = [
-    runId ? `run ${runId}` : null,
-    generatedAt ? `generated ${generatedAt}` : null,
-    ageSeconds == null ? null : `age ${formatAge(ageSeconds)}`,
-    sourceIds.length > 0 ? sourceIds.join(", ") : null,
-  ].filter((value): value is string => Boolean(value));
-
-  return parts.join(" · ");
-}
-
-function formatAge(seconds: number): string {
-  if (seconds < 60) return `${seconds}s`;
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
-  return `${Math.floor(seconds / 3600)}h`;
 }
