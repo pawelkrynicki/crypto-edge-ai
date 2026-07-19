@@ -10,12 +10,18 @@ Kanoniczny launcher lokalnej oceny ownera:
 scripts\win\start-product-radar-review.cmd
 ```
 
-Uruchamia Scanner API na `127.0.0.1:5177` i UI `INTERNAL_BETA` na `127.0.0.1:5173`, po uprzednim zwolnieniu wyłącznie tych portów. Otwiera `#candidate-results`, nie uruchamia `DEVELOPMENT_DEMO`, nie używa fixture i nie modyfikuje VPS. Brak scanner output jest wykrywany i zgłaszany; aplikacja pokazuje wtedy fail-closed error state.
+Uruchamia Scanner API na `127.0.0.1:5177` i UI `INTERNAL_BETA` na `127.0.0.1:5173`, po uprzednim zwolnieniu wyłącznie tych portów. Dedykowany `start-product-radar-api.cmd` ustawia `CRYPTO_EDGE_RUNTIME_MODE=INTERNAL_BETA` i `SCANNER_API_PORT=5177` we własnym procesie przed startem serwera. Otwiera `#candidate-results`, nie uruchamia `DEVELOPMENT_DEMO`, nie używa fixture i nie modyfikuje VPS. Brak scanner output jest wykrywany i zgłaszany; aplikacja pokazuje wtedy fail-closed error state.
 
-Smoke-check bez startowania procesów/przeglądarki:
+Rzeczywisty runtime smoke (start API, bounded wait do 20 sekund, health/readiness/scanner i cleanup portów):
 
 ```cmd
 scripts\win\start-product-radar-review.cmd --check
+```
+
+Można go również wywołać bezpośrednio:
+
+```cmd
+scripts\win\check-product-radar-review.cmd
 ```
 
 Zatrzymanie sesji: `scripts\win\kill-local-ports.cmd`. Flow i checklista akceptacji: `docs\product_radar_owner_review.md`. Następny etap po jawnym owner `ACCEPT`: **VPS Deployment & Automation**.

@@ -7,6 +7,8 @@ set "UI_DIR=%REPO_ROOT%\tools\ui-mock"
 set "OUTPUT_DIR=%REPO_ROOT%\tools\data-poc\output"
 set "RADAR_URL=http://127.0.0.1:5173/#candidate-results"
 set "HAS_SCANNER_OUTPUT=0"
+set "CRYPTO_EDGE_RUNTIME_MODE=INTERNAL_BETA"
+set "SCANNER_API_PORT=5177"
 
 echo.
 echo === Crypto Edge AI: Product Radar owner review ===
@@ -23,6 +25,11 @@ if not exist "%UI_DIR%\node_modules\.bin\vite.cmd" (
   exit /b 1
 )
 
+if not exist "%REPO_ROOT%\scripts\win\start-product-radar-api.cmd" (
+  echo ERROR: Brak scripts\win\start-product-radar-api.cmd.
+  exit /b 1
+)
+
 if exist "%OUTPUT_DIR%" (
   for /r "%OUTPUT_DIR%" %%F in (full_output.json) do set "HAS_SCANNER_OUTPUT=1"
 )
@@ -36,8 +43,8 @@ if "!HAS_SCANNER_OUTPUT!"=="0" (
 
 if /i "%~1"=="--check" (
   echo.
-  echo OWNER REVIEW LAUNCHER CHECK OK
-  exit /b 0
+  call "%REPO_ROOT%\scripts\win\check-product-radar-review.cmd"
+  exit /b %ERRORLEVEL%
 )
 
 echo.
@@ -47,10 +54,10 @@ if errorlevel 1 exit /b %ERRORLEVEL%
 
 echo.
 echo === Uruchamianie Scanner API na 5177 ===
-start "Crypto Edge Product Radar API 5177" cmd /k "cd /d ""%UI_DIR%"" && set ""CRYPTO_EDGE_RUNTIME_MODE=INTERNAL_BETA"" && set ""SCANNER_API_PORT=5177"" && call node_modules\.bin\tsx.cmd server\scannerApiServer.ts"
+start "Crypto Edge Product Radar API 5177" cmd /k call "%REPO_ROOT%\scripts\win\start-product-radar-api.cmd"
 
 echo === Uruchamianie INTERNAL_BETA UI na 5173 ===
-start "Crypto Edge Product Radar UI 5173" cmd /k "cd /d ""%UI_DIR%"" && set ""CRYPTO_EDGE_RUNTIME_MODE=INTERNAL_BETA"" && call node_modules\.bin\vite.cmd --mode internal-beta --host 127.0.0.1 --port 5173"
+start "Crypto Edge Product Radar UI 5173" cmd /k "cd /d ""%UI_DIR%"" && call node_modules\.bin\vite.cmd --mode internal-beta --host 127.0.0.1 --port 5173"
 
 echo.
 echo Radar: %RADAR_URL%

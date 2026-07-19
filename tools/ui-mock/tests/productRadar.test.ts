@@ -14,6 +14,7 @@ import {
   resolveInitialBasket,
 } from "../src/components/CandidateResultsView.js";
 import { ExternalVerificationLinksView } from "../src/components/ExternalVerificationLinksView.js";
+import { getApiReadinessPresentation } from "../src/components/ProductWorkspaceShell.js";
 import { PERSISTABLE_SCANNER_SAMPLE } from "../src/fixtures/persistableScannerSample.js";
 import type {
   PersistableScannerOutput,
@@ -219,11 +220,48 @@ describe("Product Radar owner acceptance", () => {
 
   it("uses INTERNAL_BETA in the canonical owner-review launcher", async () => {
     const source = await readFile(resolve(repoRoot, "scripts", "win", "start-product-radar-review.cmd"), "utf8");
+    const apiWrapper = await readFile(resolve(repoRoot, "scripts", "win", "start-product-radar-api.cmd"), "utf8");
     assert.match(source, /CRYPTO_EDGE_RUNTIME_MODE=INTERNAL_BETA/);
+    assert.match(source, /SCANNER_API_PORT=5177/);
     assert.match(source, /--mode internal-beta/);
     assert.match(source, /kill-local-ports\.cmd/);
     assert.match(source, /--check/);
+    assert.match(source, /start-product-radar-api\.cmd/);
+    assert.doesNotMatch(source, /start[^\r\n]*set ""CRYPTO_EDGE_RUNTIME_MODE/);
+    assert.match(apiWrapper, /set "CRYPTO_EDGE_RUNTIME_MODE=INTERNAL_BETA"/);
+    assert.match(apiWrapper, /set "SCANNER_API_PORT=5177"/);
     assert.doesNotMatch(source, /DEVELOPMENT_DEMO|fixtures|persistableScannerSample/);
+    assert.doesNotMatch(apiWrapper, /DEVELOPMENT_DEMO|fixtures|persistableScannerSample/);
+  });
+
+  it("has a bounded real runtime smoke for the owner launcher", async () => {
+    const command = await readFile(resolve(repoRoot, "scripts", "win", "check-product-radar-review.cmd"), "utf8");
+    const runtimeCheck = await readFile(resolve(productRoot, "scripts", "checkProductRadarReviewRuntime.ts"), "utf8");
+    assert.match(command, /kill-local-ports\.cmd/g);
+    assert.match(command, /start-product-radar-api\.cmd/);
+    assert.match(runtimeCheck, /STARTUP_TIMEOUT_MS\s*=\s*20_000/);
+    for (const endpoint of ["/api/health", "/api/readiness", "/api/scanner/latest"]) assert.match(runtimeCheck, new RegExp(endpoint.replaceAll("/", "\\/")));
+    assert.match(runtimeCheck, /runtime_mode/);
+    assert.match(runtimeCheck, /INTERNAL_BETA/);
+    assert.match(runtimeCheck, /RUNTIME_MODE_UNCONFIGURED/);
+    assert.match(runtimeCheck, /scanner\.status !== 200 && scanner\.status !== 503/);
+  });
+
+  it("distinguishes a reachable API with stale data from an unavailable API", () => {
+    const staleReadiness = structuredClone(emptyReadiness);
+    staleReadiness.status = "not_ready";
+    staleReadiness.ready = false;
+    staleReadiness.scanner = { ready: false, reason_code: "SCANNER_SNAPSHOT_STALE" };
+    staleReadiness.context = { ready: false, reason_code: "CONTEXT_ENVIRONMENT_INVALID" };
+    staleReadiness.reason_codes = ["SCANNER_SNAPSHOT_STALE", "CONTEXT_ENVIRONMENT_INVALID"];
+    assert.deepEqual(
+      getApiReadinessPresentation(false, "unavailable", staleReadiness),
+      { value: "Połączone", tone: "warning" },
+    );
+    assert.deepEqual(
+      getApiReadinessPresentation(false, "unavailable", null),
+      { value: "Niedostępne", tone: "error" },
+    );
   });
 
   it("keeps context unavailability local when scanner data is usable", () => {

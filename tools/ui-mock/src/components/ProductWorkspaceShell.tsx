@@ -58,6 +58,7 @@ export function ProductWorkspaceShell({
   children,
 }: ProductWorkspaceShellProps) {
   const apiReady = resolvedSource === "real-output";
+  const apiPresentation = getApiReadinessPresentation(loading, resolvedSource, readiness);
   const contextReady = readiness?.context.ready ?? false;
   const readinessCode = readinessReasonCode
     ?? readiness?.reason_codes[0]
@@ -78,9 +79,9 @@ export function ProductWorkspaceShell({
           <HeaderFact label="Środowisko" value={runtimeMode} tone="accent" />
           <HeaderFact
             label="API / readiness"
-            value={loading ? "Ładowanie" : apiReady ? "Dostępne" : "Niedostępne"}
+            value={apiPresentation.value}
             detail={readinessCode ?? undefined}
-            tone={apiReady ? "ready" : "error"}
+            tone={apiPresentation.tone}
           />
           <HeaderFact
             label="Dane wygenerowane"
@@ -149,6 +150,17 @@ export function ProductWorkspaceShell({
       </footer>
     </div>
   );
+}
+
+export function getApiReadinessPresentation(
+  loading: boolean,
+  resolvedSource: ResolvedScannerSource,
+  readiness: ProductReadinessOutput | null,
+): { value: string; tone: "neutral" | "ready" | "warning" | "error" } {
+  if (loading) return { value: "Ładowanie", tone: "neutral" };
+  if (resolvedSource === "real-output") return { value: "Dostępne", tone: "ready" };
+  if (readiness !== null) return { value: "Połączone", tone: "warning" };
+  return { value: "Niedostępne", tone: "error" };
 }
 
 function HeaderFact({

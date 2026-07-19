@@ -15,6 +15,7 @@ Launcher:
 - sprawdza lokalne zależności UI i obecność scanner output;
 - zwalnia wyłącznie kanoniczne porty `5173` i `5177`, aby nie pozostawić konkurencyjnych procesów;
 - uruchamia Scanner API i UI z `CRYPTO_EDGE_RUNTIME_MODE=INTERNAL_BETA`;
+- uruchamia API przez dedykowany wrapper ustawiający również `SCANNER_API_PORT=5177`, bez zagnieżdżonych poleceń `set` w `start ... cmd /k`;
 - otwiera `http://127.0.0.1:5173/#candidate-results`;
 - nie używa fixture, `DEVELOPMENT_DEMO` ani połączeń z VPS.
 
@@ -26,10 +27,16 @@ Zatrzymanie:
 scripts\win\kill-local-ports.cmd
 ```
 
-Sam test launchera, bez uruchamiania procesów i przeglądarki:
+Rzeczywisty runtime smoke launchera uruchamia API, czeka maksymalnie 20 sekund, sprawdza health/readiness/scanner i zawsze zwalnia porty:
 
 ```cmd
 scripts\win\start-product-radar-review.cmd --check
+```
+
+Bezpośrednia komenda smoke:
+
+```cmd
+scripts\win\check-product-radar-review.cmd
 ```
 
 ## Oczekiwany flow ownera

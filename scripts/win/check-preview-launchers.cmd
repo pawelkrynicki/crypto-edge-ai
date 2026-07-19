@@ -22,7 +22,9 @@ for %%F in (
   "scripts\win\preview-control-center.cmd"
   "scripts\win\start-trusted-preview-session.cmd"
   "scripts\win\start-feedback-notes-session.cmd"
+  "scripts\win\start-product-radar-api.cmd"
   "scripts\win\start-product-radar-review.cmd"
+  "scripts\win\check-product-radar-review.cmd"
 ) do (
   if not exist "%REPO_ROOT%\%%~F" (
     echo ERROR: missing %%~F
@@ -38,7 +40,7 @@ if not exist "%REPO_ROOT%\tools\ui-mock\package.json" (
 )
 
 echo.
-echo === Check Product Radar owner review launcher ===
+echo === Check Product Radar owner review launcher and real runtime ===
 call "%REPO_ROOT%\scripts\win\start-product-radar-review.cmd" --check
 if errorlevel 1 exit /b %ERRORLEVEL%
 
