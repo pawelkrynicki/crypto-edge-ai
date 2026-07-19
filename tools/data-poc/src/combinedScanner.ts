@@ -23,12 +23,16 @@ export type BuildCombinedScannerInput = {
   candidates: CryptoEdgeCandidate[];
   maxCandidates: number;
   securityRawProvider: SecurityRawProvider;
+  securityEligibility?: (candidate: CryptoEdgeCandidate) => boolean;
   now?: Date;
 };
 
 export async function buildCombinedScannerOutput(input: BuildCombinedScannerInput): Promise<CombinedScannerOutput> {
   const now = input.now ?? new Date();
-  const passedCandidates = input.candidates.filter((candidate) => candidate.status === "passed_basic_filter");
+  const passedCandidates = input.candidates.filter((candidate) => (
+    candidate.status === "passed_basic_filter"
+    && (input.securityEligibility?.(candidate) ?? true)
+  ));
   const candidatesToCheck = passedCandidates.slice(0, input.maxCandidates);
   const securityByCandidateKey = new Map<string, { security: NormalizedSecurity; decision: SecurityDecision }>();
 

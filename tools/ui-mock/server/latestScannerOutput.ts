@@ -246,6 +246,12 @@ function sanitizeInternalBetaScannerOutput(value: unknown, now: Date): ScannerOu
   ])) {
     throw new RealDataBoundaryError("SCANNER_FIXTURE_MARKER_DETECTED");
   }
+  if (
+    scanRun.query !== "two_basket_discovery"
+    || !isRecord(scanRun.filters)
+    || !hasExactKeys(scanRun.filters, ["basic_filters"])
+    || scanRun.filters.basic_filters !== "dexscreener_basic_filters_v1"
+  ) throw new RealDataBoundaryError(INVALID_SCANNER_OUTPUT);
 
   const freshness = requireFreshTimestamp(manifest.generated_at, now, SCANNER_MAX_AGE_MS, {
     missing: "SCANNER_TIMESTAMP_MISSING",
@@ -273,6 +279,7 @@ function sanitizeInternalBetaScannerOutput(value: unknown, now: Date): ScannerOu
   if (candidates.some((candidate) => candidate === null)) {
     throw new RealDataBoundaryError(INVALID_SCANNER_OUTPUT);
   }
+  validateSanitizedBasketCounts(candidates as Record<string, unknown>[], scannerMetadata);
 
   const securityChecks = sanitizeSecurityChecks(
     value.security_checks,
@@ -301,23 +308,23 @@ function sanitizeInternalBetaScannerOutput(value: unknown, now: Date): ScannerOu
 function sanitizeScannerMetadata(value: unknown, sourceIds: string[]): Record<string, unknown> {
   if (!isRecord(value)) throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
   const allowedFields = [
-    "discovery_method", "seed_count", "pairs_loaded", "candidates_before_filters", "candidates_after_filters",
+    "discovery_architecture", "new_emerging", "established", "readiness",
     "security_candidate_limit", "security_candidates_requested", "request_counts", "source_health", "attribution",
   ];
   if (Object.keys(value).some((key) => !allowedFields.includes(key))) {
     throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
   }
 
-  const numericFields = [
-    "seed_count", "pairs_loaded", "candidates_before_filters", "candidates_after_filters",
-    "security_candidate_limit", "security_candidates_requested",
-  ] as const;
   if (
-    value.discovery_method !== "dexscreener_latest_token_profiles"
-    || numericFields.some((field) => !isNonNegativeInteger(value[field]))
+    value.discovery_architecture !== "two_basket_discovery_v1"
+    || !isNonNegativeInteger(value.security_candidate_limit)
+    || !isNonNegativeInteger(value.security_candidates_requested)
     || !isRecord(value.request_counts)
     || !isRecord(value.source_health)
   ) throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
+  const newEmerging = sanitizeNewEmergingMetadata(value.new_emerging);
+  const established = sanitizeEstablishedMetadata(value.established);
+  const readiness = sanitizeDiscoveryReadiness(value.readiness, established.universe_status as string);
   const requestCounts = value.request_counts;
   const sourceHealth = value.source_health;
 
@@ -330,21 +337,17 @@ function sanitizeScannerMetadata(value: unknown, sourceIds: string[]): Record<st
     || Object.values(sourceHealth).some((health) => !["READY", "DEGRADED", "UNAVAILABLE", "NOT_INVOKED"].includes(String(health)))
   ) throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
 
-  const seedCount = value.seed_count as number;
-  const pairsLoaded = value.pairs_loaded as number;
-  const candidatesBefore = value.candidates_before_filters as number;
-  const candidatesAfter = value.candidates_after_filters as number;
+  const seedCount = newEmerging.seed_count as number;
   const securityLimit = value.security_candidate_limit as number;
   const securityRequested = value.security_candidates_requested as number;
   const dexCount = requestCounts.dexscreener as number;
   const goPlusCount = requestCounts.goplus_security as number;
+  const establishedEnabled = established.entries_enabled as number;
   if (
-    seedCount < 1 || seedCount > 30
-    || candidatesBefore < 1 || candidatesBefore > pairsLoaded
-    || candidatesAfter > candidatesBefore
-    || securityLimit < 1 || securityLimit > 20
-    || securityRequested > securityLimit || securityRequested > candidatesAfter
+    securityLimit < 1 || securityLimit > 20
+    || securityRequested > securityLimit || securityRequested > (established.candidates_after_filters as number)
     || dexCount < 1 || dexCount > 1 + seedCount + Math.min(seedCount, 5)
+      + establishedEnabled + Math.min(establishedEnabled, 5)
     || goPlusCount > securityLimit + Math.min(securityLimit, 3)
     || (requestCounts.alternative_me_fng as number) < 1
     || (requestCounts.alternative_me_fng as number) > 2
@@ -368,17 +371,84 @@ function sanitizeScannerMetadata(value: unknown, sourceIds: string[]): Record<st
   }
 
   return {
-    discovery_method: "dexscreener_latest_token_profiles",
-    seed_count: seedCount,
-    pairs_loaded: pairsLoaded,
-    candidates_before_filters: candidatesBefore,
-    candidates_after_filters: candidatesAfter,
+    discovery_architecture: "two_basket_discovery_v1",
+    new_emerging: newEmerging,
+    established,
+    readiness,
     security_candidate_limit: securityLimit,
     security_candidates_requested: securityRequested,
     request_counts: Object.fromEntries(requestFields.map((field) => [field, requestCounts[field]])),
     source_health: Object.fromEntries(healthFields.map((field) => [field, sourceHealth[field]])),
     ...(attribution ? { attribution } : {}),
   };
+}
+
+function sanitizeNewEmergingMetadata(value: unknown): Record<string, unknown> {
+  const fields = ["discovery_method", "seed_count", "pairs_loaded", "candidates_before_filters", "candidates_after_filters"];
+  if (!isRecord(value) || !hasExactKeys(value, fields) || value.discovery_method !== "dexscreener_latest_token_profiles") {
+    throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
+  }
+  const numericFields = fields.slice(1);
+  if (numericFields.some((field) => !isNonNegativeInteger(value[field]))) {
+    throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
+  }
+  if (
+    (value.seed_count as number) < 1 || (value.seed_count as number) > 30
+    || (value.candidates_before_filters as number) < 1
+    || (value.candidates_before_filters as number) > (value.pairs_loaded as number)
+    || (value.candidates_after_filters as number) > (value.candidates_before_filters as number)
+  ) throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
+  return Object.fromEntries(fields.map((field) => [field, value[field]]));
+}
+
+function sanitizeEstablishedMetadata(value: unknown): Record<string, unknown> {
+  const fields = [
+    "discovery_method", "universe_version", "universe_status", "entries_total", "entries_enabled",
+    "pairs_loaded", "candidates_before_filters", "candidates_after_filters", "base_token_candidates",
+    "quote_token_candidates",
+  ];
+  if (
+    !isRecord(value)
+    || !hasExactKeys(value, fields)
+    || value.discovery_method !== "address_seeded_universe"
+    || value.universe_version !== "established_address_universe_v1"
+    || !["ESTABLISHED_UNIVERSE_EMPTY", "ESTABLISHED_UNIVERSE_READY"].includes(String(value.universe_status))
+  ) throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
+  const numericFields = fields.slice(3);
+  if (numericFields.some((field) => !isNonNegativeInteger(value[field]))) {
+    throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
+  }
+  const total = value.entries_total as number;
+  const enabled = value.entries_enabled as number;
+  const pairs = value.pairs_loaded as number;
+  const candidates = value.candidates_before_filters as number;
+  const passed = value.candidates_after_filters as number;
+  if (
+    total > 100 || enabled > total || candidates > pairs || passed > candidates
+    || (value.base_token_candidates as number) + (value.quote_token_candidates as number) !== candidates
+  ) throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
+  if (value.universe_status === "ESTABLISHED_UNIVERSE_EMPTY") {
+    if (enabled !== 0 || pairs !== 0 || candidates !== 0 || passed !== 0) {
+      throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
+    }
+  } else if (enabled < 1 || candidates < 1) {
+    throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
+  }
+  return Object.fromEntries(fields.map((field) => [field, value[field]]));
+}
+
+function sanitizeDiscoveryReadiness(value: unknown, universeStatus: string): Record<string, unknown> {
+  const fields = ["process", "new_emerging", "established", "context"];
+  if (
+    !isRecord(value) || !hasExactKeys(value, fields)
+    || value.process !== "READY"
+    || value.new_emerging !== "READY"
+    || !["READY", "EMPTY_CONFIGURED"].includes(String(value.established))
+    || !["READY", "UNAVAILABLE"].includes(String(value.context))
+  ) throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
+  const expected = universeStatus === "ESTABLISHED_UNIVERSE_EMPTY" ? "EMPTY_CONFIGURED" : "READY";
+  if (value.established !== expected) throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
+  return Object.fromEntries(fields.map((field) => [field, value[field]]));
 }
 
 function hasExactKeys(value: Record<string, unknown>, fields: string[]): boolean {
@@ -455,6 +525,13 @@ function sanitizeCandidate(
     || !FINAL_LABELS.includes(value.final_label as (typeof FINAL_LABELS)[number])
     || !isStringArray(value.final_reasons)
     || typeof value.created_at !== "string"
+    || !["new_emerging", "established"].includes(String(value.discovery_basket))
+    || !["dexscreener_latest_token_profiles", "address_seeded_universe"].includes(String(value.discovery_method))
+    || typeof value.observation_only !== "boolean"
+    || typeof value.established_eligible !== "boolean"
+    || !isNullableString(value.universe_version)
+    || !(value.universe_entry_index === null || isNonNegativeInteger(value.universe_entry_index))
+    || typeof value.address_identity_verified !== "boolean"
   ) {
     return null;
   }
@@ -465,6 +542,25 @@ function sanitizeCandidate(
 
   const sourceUrl = sanitizeDexScreenerUrl(value.source_url);
   if (value.source_url !== null && sourceUrl === null) {
+    throw new RealDataBoundaryError(INVALID_SCANNER_OUTPUT);
+  }
+  if (value.discovery_basket === "new_emerging") {
+    if (
+      value.discovery_method !== "dexscreener_latest_token_profiles"
+      || value.observation_only !== true
+      || value.established_eligible !== false
+      || value.universe_version !== null
+      || value.universe_entry_index !== null
+      || value.address_identity_verified !== false
+    ) throw new RealDataBoundaryError(INVALID_SCANNER_OUTPUT);
+  } else if (
+    value.discovery_method !== "address_seeded_universe"
+    || value.observation_only !== false
+    || value.established_eligible !== (value.basic_filter_status === "passed_basic_filter")
+    || value.universe_version !== "established_address_universe_v1"
+    || !isNonNegativeInteger(value.universe_entry_index)
+    || value.address_identity_verified !== true
+  ) {
     throw new RealDataBoundaryError(INVALID_SCANNER_OUTPUT);
   }
 
@@ -492,6 +588,13 @@ function sanitizeCandidate(
     final_label: value.final_label,
     final_reasons: value.final_reasons,
     created_at: value.created_at,
+    discovery_basket: value.discovery_basket,
+    discovery_method: value.discovery_method,
+    observation_only: value.observation_only,
+    established_eligible: value.established_eligible,
+    universe_version: value.universe_version,
+    universe_entry_index: value.universe_entry_index,
+    address_identity_verified: value.address_identity_verified,
   };
 }
 
@@ -516,10 +619,39 @@ function sanitizeSecurityChecks(
   return candidates.map((candidate) => {
     const candidateId = candidate.candidate_id as string;
     const security = byCandidate.get(candidateId);
+    if (security && (
+      candidate.discovery_basket !== "established"
+      || candidate.basic_filter_status !== "passed_basic_filter"
+    )) throw new RealDataBoundaryError(INVALID_SCANNER_OUTPUT);
     return security
       ? sanitizeSecurityCheck(security, candidateId, manifest, now)
       : unavailableSecurityCheck(manifest.run_id, candidateId, null);
   });
+}
+
+function validateSanitizedBasketCounts(
+  candidates: Record<string, unknown>[],
+  metadata: Record<string, unknown>,
+): void {
+  if (!isRecord(metadata.new_emerging) || !isRecord(metadata.established)) {
+    throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
+  }
+  const newEmerging = candidates.filter((candidate) => candidate.discovery_basket === "new_emerging");
+  const established = candidates.filter((candidate) => candidate.discovery_basket === "established");
+  const entriesTotal = metadata.established.entries_total;
+  if (!isNonNegativeInteger(entriesTotal)) throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
+  if (
+    newEmerging.length !== metadata.new_emerging.candidates_before_filters
+    || established.length !== metadata.established.candidates_before_filters
+    || newEmerging.filter((candidate) => candidate.basic_filter_status === "passed_basic_filter").length
+      !== metadata.new_emerging.candidates_after_filters
+    || established.filter((candidate) => candidate.basic_filter_status === "passed_basic_filter").length
+      !== metadata.established.candidates_after_filters
+    || established.some((candidate) => (
+      !isNonNegativeInteger(candidate.universe_entry_index)
+      || (candidate.universe_entry_index as number) >= entriesTotal
+    ))
+  ) throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
 }
 
 function sanitizeSecurityCheck(

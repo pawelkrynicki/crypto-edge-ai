@@ -21,10 +21,8 @@ async function main(): Promise<void> {
     source_health: result.source_health,
     request_counts: result.request_counts,
     candidate_counts: {
-      seed_count: result.discovery.seed_count,
-      pairs_loaded: result.discovery.pairs_loaded,
-      candidates_before_filters: result.discovery.candidates_before_filters,
-      candidates_after_filters: result.discovery.candidates_after_filters,
+      new_emerging: result.discovery.new_emerging,
+      established: result.discovery.established,
       security_candidates_requested: result.security.candidates_requested,
       security_candidates_available: result.security.candidates_available,
     },

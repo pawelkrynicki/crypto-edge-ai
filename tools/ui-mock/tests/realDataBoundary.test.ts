@@ -197,6 +197,26 @@ describe("INTERNAL_BETA scanner provenance boundary", () => {
       await close(server);
     }
   });
+
+  it("preserves allowlisted two-basket identity metadata", async () => {
+    const result = await readScanner(makeScannerOutput());
+    const candidates = asRecords(result.candidates);
+    assert.equal(candidates[0]?.discovery_basket, "established");
+    assert.equal(candidates[0]?.discovery_method, "address_seeded_universe");
+    assert.equal(candidates[0]?.address_identity_verified, true);
+    assert.equal(candidates[1]?.discovery_basket, "new_emerging");
+    assert.equal(candidates[1]?.observation_only, true);
+    const provenance = result.provenance;
+    assert.ok(isRecord(provenance) && isRecord(provenance.metadata));
+    assert.equal(provenance.metadata.discovery_architecture, "two_basket_discovery_v1");
+  });
+
+  it("accepts an explicit empty established universe without fixture fallback", async () => {
+    const result = await readScanner(makeEmptyEstablishedScannerOutput());
+    assert.equal(result._source_meta instanceof Object, true);
+    assert.equal(asRecords(result.candidates).every((candidate) => candidate.discovery_basket === "new_emerging"), true);
+    assert.equal(JSON.stringify(result).includes("fixture-fallback"), false);
+  });
 });
 
 describe("API and frontend fail-closed behavior", () => {
@@ -250,6 +270,34 @@ describe("API and frontend fail-closed behavior", () => {
       assert.equal(readiness.status, 503);
       const body = await readiness.json() as Record<string, unknown>;
       assert.equal(body.status, "not_ready");
+    } finally {
+      await close(server);
+    }
+  });
+
+  it("reports process/new/context ready and established empty but configured", async () => {
+    const scannerDir = await writeScanner(makeEmptyEstablishedScannerOutput());
+    const contextDir = await writeContext(makeContextOutput());
+    const server = createScannerApiServer({
+      runtimeMode: "INTERNAL_BETA",
+      scanner: { outputDirPath: scannerDir, now: NOW },
+      context: { outputDirPath: contextDir, now: NOW },
+    });
+    await listen(server);
+    try {
+      const address = server.address() as AddressInfo;
+      const response = await fetch(`http://127.0.0.1:${address.port}/api/readiness`);
+      const body = await response.json() as Record<string, unknown>;
+      assert.equal(response.status, 200);
+      assert.equal(body.status, "ready_with_empty_established_universe");
+      assert.deepEqual(body.process, { ready: true, reason_code: null });
+      assert.deepEqual(body.new_emerging, { ready: true, status: "ready", reason_code: null });
+      assert.deepEqual(body.established, {
+        ready: false,
+        configured: true,
+        status: "empty_configured",
+        reason_code: "ESTABLISHED_UNIVERSE_EMPTY",
+      });
     } finally {
       await close(server);
     }
@@ -398,6 +446,14 @@ async function writeScanner(output: unknown): Promise<string> {
   return outputDir;
 }
 
+async function writeContext(output: ContextFactoryOutput): Promise<string> {
+  const outputDir = resolve(tempRoot, `context-${crypto.randomUUID()}`);
+  const runDir = resolve(outputDir, output.run_id);
+  await mkdir(runDir, { recursive: true });
+  await writeFile(resolve(runDir, "approved_sources_output.json"), JSON.stringify(output), "utf8");
+  return outputDir;
+}
+
 async function expectContextCode(output: ContextFactoryOutput, code: string): Promise<void> {
   await assert.rejects(
     () => readContext(output),
@@ -422,7 +478,7 @@ function makeScannerOutput(): ScannerFactoryOutput {
   const runId = "scan_20260716120000";
   output.scan_run.run_id = runId;
   output.scan_run.mode = "live";
-  output.scan_run.query = "dexscreener_latest_token_profiles";
+  output.scan_run.query = "two_basket_discovery";
   output.scan_run.started_at = "2026-07-16T11:58:00.000Z";
   output.scan_run.finished_at = NOW.toISOString();
   output.scan_run.errors = [];
@@ -435,12 +491,22 @@ function makeScannerOutput(): ScannerFactoryOutput {
     pair_address: `0x${String(index + 4).repeat(40)}`,
     source_url: `https://dexscreener.com/ethereum/pair-${index + 1}`,
     created_at: NOW.toISOString(),
+    discovery_basket: index === 1 ? "new_emerging" : "established",
+    discovery_method: index === 1 ? "dexscreener_latest_token_profiles" : "address_seeded_universe",
+    observation_only: index === 1,
+    established_eligible: index !== 1 && candidate.basic_filter_status === "passed_basic_filter",
+    universe_version: index === 1 ? null : "established_address_universe_v1",
+    universe_entry_index: index === 1 ? null : index === 0 ? 0 : 1,
+    address_identity_verified: index !== 1,
   }));
   const candidateIds = output.candidates.map((candidate) => candidate.candidate_id);
+  const establishedPassedIds = output.candidates
+    .filter((candidate) => candidate.discovery_basket === "established" && candidate.basic_filter_status === "passed_basic_filter")
+    .map((candidate) => candidate.candidate_id);
   output.security_checks = output.security_checks.map((security, index) => ({
     ...security,
     run_id: runId,
-    candidate_id: candidateIds[index] ?? candidateIds[0],
+    candidate_id: establishedPassedIds[index] ?? establishedPassedIds[0],
     checked_at: NOW.toISOString(),
     sources: ["goplus"],
   }));
@@ -466,15 +532,36 @@ function makeScannerOutput(): ScannerFactoryOutput {
       goplus_security: allowedPolicy(),
     },
     metadata: {
-      discovery_method: "dexscreener_latest_token_profiles",
-      seed_count: output.candidates.length,
-      pairs_loaded: output.candidates.length,
-      candidates_before_filters: output.candidates.length,
-      candidates_after_filters: output.candidates.filter((candidate) => candidate.basic_filter_status === "passed_basic_filter").length,
+      discovery_architecture: "two_basket_discovery_v1",
+      new_emerging: {
+        discovery_method: "dexscreener_latest_token_profiles",
+        seed_count: 1,
+        pairs_loaded: 1,
+        candidates_before_filters: 1,
+        candidates_after_filters: output.candidates.filter((candidate) => candidate.discovery_basket === "new_emerging" && candidate.basic_filter_status === "passed_basic_filter").length,
+      },
+      established: {
+        discovery_method: "address_seeded_universe",
+        universe_version: "established_address_universe_v1",
+        universe_status: "ESTABLISHED_UNIVERSE_READY",
+        entries_total: 2,
+        entries_enabled: 2,
+        pairs_loaded: 2,
+        candidates_before_filters: 2,
+        candidates_after_filters: output.candidates.filter((candidate) => candidate.discovery_basket === "established" && candidate.basic_filter_status === "passed_basic_filter").length,
+        base_token_candidates: 2,
+        quote_token_candidates: 0,
+      },
+      readiness: {
+        process: "READY",
+        new_emerging: "READY",
+        established: "READY",
+        context: "READY",
+      },
       security_candidate_limit: 3,
       security_candidates_requested: Math.min(
         3,
-        output.candidates.filter((candidate) => candidate.basic_filter_status === "passed_basic_filter").length,
+        output.candidates.filter((candidate) => candidate.discovery_basket === "established" && candidate.basic_filter_status === "passed_basic_filter").length,
       ),
       request_counts: {
         dexscreener: output.candidates.length + 1,
@@ -491,6 +578,48 @@ function makeScannerOutput(): ScannerFactoryOutput {
       attribution: { provider: "GoPlus Security" },
     },
   };
+  return output;
+}
+
+function makeEmptyEstablishedScannerOutput(): ScannerFactoryOutput {
+  const output = makeScannerOutput();
+  const observation = output.candidates.find((candidate) => candidate.discovery_basket === "new_emerging");
+  assert.ok(observation);
+  output.candidates = [observation];
+  output.security_checks = [];
+  output.scorecards = [];
+  output.provenance.source_ids = ["dexscreener"];
+  delete output.provenance.policy_decisions.goplus_security;
+  output.provenance.metadata.new_emerging = {
+    discovery_method: "dexscreener_latest_token_profiles",
+    seed_count: 1,
+    pairs_loaded: 1,
+    candidates_before_filters: 1,
+    candidates_after_filters: observation.basic_filter_status === "passed_basic_filter" ? 1 : 0,
+  };
+  output.provenance.metadata.established = {
+    discovery_method: "address_seeded_universe",
+    universe_version: "established_address_universe_v1",
+    universe_status: "ESTABLISHED_UNIVERSE_EMPTY",
+    entries_total: 0,
+    entries_enabled: 0,
+    pairs_loaded: 0,
+    candidates_before_filters: 0,
+    candidates_after_filters: 0,
+    base_token_candidates: 0,
+    quote_token_candidates: 0,
+  };
+  output.provenance.metadata.readiness = {
+    process: "READY",
+    new_emerging: "READY",
+    established: "EMPTY_CONFIGURED",
+    context: "READY",
+  };
+  output.provenance.metadata.security_candidates_requested = 0;
+  output.provenance.metadata.request_counts.dexscreener = 2;
+  output.provenance.metadata.request_counts.goplus_security = 0;
+  output.provenance.metadata.source_health.goplus_security = "NOT_INVOKED";
+  delete (output.provenance.metadata as Record<string, unknown>).attribution;
   return output;
 }
 
@@ -649,11 +778,10 @@ type ScannerFactoryOutput = PersistableScannerOutput & {
     source_ids: string[];
     policy_decisions: Record<string, ReturnType<typeof allowedPolicy>>;
     metadata: {
-      discovery_method: string;
-      seed_count: number;
-      pairs_loaded: number;
-      candidates_before_filters: number;
-      candidates_after_filters: number;
+      discovery_architecture: string;
+      new_emerging: Record<string, unknown>;
+      established: Record<string, unknown>;
+      readiness: Record<string, unknown>;
       security_candidate_limit: number;
       security_candidates_requested: number;
       request_counts: Record<string, number>;

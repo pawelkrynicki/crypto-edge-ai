@@ -1,5 +1,13 @@
 # 12R.3 — Fail-Closed Real Data API Contract
 
+## Aktualizacja kontraktu 12R.5 — dwa koszyki discovery
+
+Scanner publikuje `query=two_basket_discovery` i allowlisted candidate metadata: `discovery_basket`, `discovery_method`, `observation_only`, `established_eligible`, `universe_version`, `universe_entry_index`, `address_identity_verified`. Dozwolone koszyki to `new_emerging` i `established`.
+
+Manifest metadata zawiera `discovery_architecture=two_basket_discovery_v1`, osobne statystyki `new_emerging`/`established` oraz readiness procesu, obu koszyków i contextu. Pusty established universe ma `ESTABLISHED_UNIVERSE_EMPTY` / `EMPTY_CONFIGURED`; jest poprawnym empty state, nie uruchamia fixture i nie blokuje gotowego `new_emerging`. `/api/readiness` może zwrócić HTTP 200 ze statusem `ready_with_empty_established_universe`, jednocześnie raportując established `ready=false`, `configured=true` i reason code `ESTABLISHED_UNIVERSE_EMPTY`.
+
+Security checks mogą należeć wyłącznie do established candidate po `dexscreener_basic_filters_v1`. Unknown/raw fields, scorecards, fixture i niezgodne lineage nadal są odrzucane fail-closed.
+
 ## Zakres
 
 Ten kontrakt opisuje wyłącznie lokalną granicę odczytu i publikacji danych dla `INTERNAL_BETA`. Etap 12R.3 nie uruchamia collectorów, nie wykonuje provider calls, nie wdraża niczego na VPS i nie wystawia nowego portu publicznego.
@@ -16,7 +24,7 @@ Publikacja jest atomiczna: pełna walidacja, plik tymczasowy w katalogu docelowy
 
 Collector wymaga równocześnie `CRYPTO_EDGE_DATA_ENV=INTERNAL_BETA`, `CRYPTO_EDGE_RUNTIME_MODE=INTERNAL_BETA` i `ALLOW_LIVE_PROVIDER_CALLS=1`; brak zgody kończy proces przed pierwszym fetch. Komenda offline to `npm run snapshot:validate:latest`.
 
-12R.4 nie obejmuje schedulera, retention, deploymentu ani zmian VPS. Następny etap: **12R.5 — Product Radar Redesign & Local Owner Review**.
+12R.4 nie obejmuje schedulera, retention, deploymentu ani zmian VPS. Historyczny hand-off został domknięty przez 12R.5; następny etap to **Product Radar Build & Owner Acceptance**.
 
 ## Runtime mode
 

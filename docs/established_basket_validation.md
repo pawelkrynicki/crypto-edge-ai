@@ -1,5 +1,9 @@
 # 12R.5A.1 — Established Basket Validation
 
+## Finalne zamknięcie — 19.07.2026
+
+Symbol-based plan pozostaje historycznym **`NO_GO_QUERY_PLAN`**, ma `production_enabled=false` i nie jest używany przez collector. Finalny mechanizm established dla CAMP to `config/established_address_universe_v1.json` z identity `CHAIN_AND_CONTRACT_ADDRESS` i oficjalnym DexScreener token-pairs endpointem. Nie wykonuje się dalszego query refinement ani kolejnego discovery experiment. **DISCOVERY CLOSED FOR CAMP 2026.**
+
 Data walidacji: 18.07.2026
 
 Bazowy `main`: `4dafda353456c8eea83f8a8e2db1a87197129b68`
@@ -20,7 +24,7 @@ Query plan nie tworzy reprezentatywnej populacji established-small-cap i nie kwa
 
 Kanoniczny config to `config/established_discovery_query_plan_v1.json`:
 
-- status: `OWNER_APPROVED_DIAGNOSTIC_ONLY`;
+- status: `NO_GO_QUERY_PLAN`;
 - `production_enabled=false`;
 - provider/endpoint: `dexscreener` / `search`;
 - limit i queries: dokładnie 5 — `USDC`, `USDT`, `WETH`, `WBNB`, `SOL`;
@@ -52,7 +56,7 @@ Komenda:
 $env:CRYPTO_EDGE_DATA_ENV = "INTERNAL_BETA"
 $env:CRYPTO_EDGE_RUNTIME_MODE = "INTERNAL_BETA"
 $env:ALLOW_LIVE_PROVIDER_CALLS = "1"
-npm run discovery:established:validate
+npm run discovery:archived-query-plan:diagnostic
 ```
 
 Limity: 10 s timeout, concurrency 3, najwyżej jeden retry na request, globalny budżet 10 requestów. Wykonano dokładnie jeden run. Jedynym providerem był DexScreener; security/context calls, raw storage, snapshot publish i atomic publish wyniosły 0.
@@ -128,7 +132,7 @@ Unsupported-chain distribution: HyperEVM 9, PulseChain 8, Celo 5, Cronos 4, Apto
 
 Kierunek established search zostaje zatrzymany. Rekomendowana alternatywa do osobnej akceptacji ownera: **address-seeded established universe** oparty nadal wyłącznie o oficjalne DexScreener API (`/tokens/v1/{chainId}/{tokenAddresses}` lub `/token-pairs/v1/{chainId}/{tokenAddress}`), z wersjonowaną allowlistą jawnych adresów tokenów i adresami anchorów. Źródło adresów musi zostać osobno zatwierdzone; ten etap nie dodaje providera ani nie integruje collectora.
 
-`12R.5B` pozostaje wstrzymane. VPS pozostaje bez zmian. Tester zewnętrzny pozostaje `NO-GO`.
+Historyczna bramka została zamknięta przez `docs/discovery_closure.md`. Następny etap to **Product Radar Build & Owner Acceptance**. VPS pozostaje bez zmian. Tester zewnętrzny pozostaje `NO-GO`.
 
 ## Walidacja
 

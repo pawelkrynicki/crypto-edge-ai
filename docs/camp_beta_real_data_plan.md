@@ -1,5 +1,11 @@
 # Camp BETA Real Data Plan
 
+## 12R.5 Discovery Closure — 19.07.2026
+
+**DISCOVERY CLOSED FOR CAMP 2026.** Finalny kontrakt to dwa koszyki: `new_emerging` z DexScreener latest profiles (`observation_only=true`) oraz `established` z `config/established_address_universe_v1.json`, identyfikowany wyłącznie przez chain i contract address. Address universe korzysta z oficjalnego token-pairs endpointu, najwyższej poprawnej liquidity, niezmienionych basic filters i candidate-scoped GoPlus po filtrach.
+
+Commitowany universe jest pusty i daje jawny `ESTABLISHED_UNIVERSE_EMPTY`; nie powoduje fixture fallback ani awarii `new_emerging`. Snapshot/API zachowują allowlisted basket metadata i rozdzielają readiness procesu, obu koszyków i contextu. Symbol query plan pozostaje `NO_GO_QUERY_PLAN`, `production_enabled=false` oraz archived diagnostic only. Następny etap: **Product Radar Build & Owner Acceptance**, deadline 27.07.2026. VPS bez zmian, tester zewnętrzny `NO-GO`.
+
 ## Purpose
 
 Camp BETA should be a working Crypto Edge AI tool on real data in a limited, stable pipeline.
@@ -94,7 +100,7 @@ Output: `tools/data-poc/output/scan_20260717201111_bfd5fb1d/full_output.json` or
 
 Owner-approved plan `established_basket_v1` objął dokładnie `USDC`, `USDT`, `WETH`, `WBNB`, `SOL` na oficjalnym DexScreener search API. Jedyny live run zwrócił 120 raw pairs i 57 exact anchor matches. Odrzucono 60 wyników z unsupported chains, 3 ambiguous-anchor oraz 56 kandydatów quote-side, którym nie można bezpiecznie przypisać base-scoped market data. Pozostał 1 unikalny kandydat na Solanie, wiek 89 dni, lecz 0 kandydatów przeszło niezmieniony baseline. `USDT` zakończyło się `NETWORK_ERROR` po jednym dozwolonym retry; run nie został powtórzony.
 
-Klasyfikacja: **`NO_GO_QUERY_PLAN`**. Established search-query basket nie będzie integrowany z collectorem. Rekomendowana alternatywa do osobnej akceptacji ownera to address-seeded established universe używający wyłącznie oficjalnych endpointów DexScreener dla znanych adresów i address-backed anchor identity. Nie dodano providera, raw storage, security/context calls ani publish. `12R.5B`, VPS i tester zewnętrzny pozostają bez zmian / `NO-GO`. Szczegóły: `docs/established_basket_validation.md`.
+Klasyfikacja: **`NO_GO_QUERY_PLAN`**. Established search-query basket nie będzie integrowany z collectorem. Historyczna rekomendacja address-seeded universe została rozstrzygnięta i wdrożona w 12R.5 powyżej. Nie dodano providera ani raw storage. VPS i tester zewnętrzny pozostają bez zmian / `NO-GO`. Szczegóły: `docs/established_basket_validation.md` i `docs/discovery_closure.md`.
 
 Analiza `scan_20260717201111_bfd5fb1d` potwierdziła komplet wymaganych danych dla 7/7 kandydatów i brak użycia FDV jako fallback. Wszystkie pary miały 0–1 dzień i wszystkie odpadły przez `pair_age_not_above_7_days`; `STX` odpadł wyłącznie przez wiek. Warianty A–E dały po 0.
 
@@ -102,7 +108,7 @@ Jedyny bounded discovery-only run dla 30 seedów zwrócił 30 profili, 54 pary, 
 
 Decyzja techniczna: aktywny `dexscreener_basic_filters_v1` pozostaje bez zmian. `latest profiles` ma być koszykiem `new/emerging`; prototyp drugiego koszyka `established-small-cap` używa wyłącznie jawnych, owner-approved queries do oficjalnego DexScreener search API i pozostaje nieaktywny do osobnej decyzji. Kanoniczna analiza: `docs/discovery_filter_calibration.md`.
 
-12R.5B — Product Radar Redesign & Local Owner Review — pozostaje `NO-GO` do owner acceptance strategii discovery/query planu. VPS i tester zewnętrzny pozostają bez zmian / `NO-GO`.
+Historyczna bramka strategii discovery została zamknięta w 12R.5. Następny etap to **Product Radar Build & Owner Acceptance**. VPS i tester zewnętrzny pozostają bez zmian / `NO-GO`.
 
 ## 12A Standalone Trusted Tester Strategy Correction
 

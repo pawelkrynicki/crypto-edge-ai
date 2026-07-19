@@ -9,7 +9,7 @@ export const ESTABLISHED_ANCHOR_IDENTITY_CONFIDENCE = "SYMBOL_EXACT_DIAGNOSTIC_O
 
 export type EstablishedDiscoveryQueryPlan = {
   plan_version: typeof ESTABLISHED_DISCOVERY_PLAN_VERSION;
-  status: "OWNER_APPROVED_DIAGNOSTIC_ONLY";
+  status: "NO_GO_QUERY_PLAN";
   production_enabled: false;
   provider: "dexscreener";
   endpoint_type: "search";
@@ -39,7 +39,7 @@ export function validateEstablishedDiscoveryQueryPlan(value: unknown): Establish
   if (value.plan_version !== ESTABLISHED_DISCOVERY_PLAN_VERSION) {
     throw new Error("ESTABLISHED_DISCOVERY_CONFIG_VERSION_UNSUPPORTED");
   }
-  if (value.status !== "OWNER_APPROVED_DIAGNOSTIC_ONLY") {
+  if (value.status !== "NO_GO_QUERY_PLAN") {
     throw new Error("ESTABLISHED_DISCOVERY_CONFIG_STATUS_INVALID");
   }
   if (value.production_enabled !== false) throw new Error("ESTABLISHED_DISCOVERY_CONFIG_PRODUCTION_MUST_BE_DISABLED");

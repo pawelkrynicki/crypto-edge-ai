@@ -10,6 +10,14 @@ import {
   DEFAULT_DEXSCREENER_SEED_LIMIT,
   type DexScreenerDiscoveryMetadata,
 } from "./dexscreenerDiscovery.js";
+import {
+  collectEstablishedAddressUniverse,
+  type EstablishedAddressDiscoveryMetadata,
+} from "./establishedAddressDiscovery.js";
+import {
+  loadEstablishedAddressUniverse,
+  validateEstablishedAddressUniverse,
+} from "./establishedAddressUniverse.js";
 import { validateDisplayEligibleScannerSnapshot } from "./displaySnapshotValidator.js";
 import {
   fetchGoPlusSecurityResult,
@@ -46,12 +54,17 @@ export type InternalBetaCollectorOptions = {
   concurrency?: number;
   now?: Date;
   goplusApiToken?: string;
+  establishedUniverse?: unknown;
+  establishedUniversePath?: string;
 };
 
 export type InternalBetaCollectorResult = {
   run_id: string;
   context_run_id: string;
-  discovery: DexScreenerDiscoveryMetadata;
+  discovery: {
+    new_emerging: DexScreenerDiscoveryMetadata;
+    established: EstablishedAddressDiscoveryMetadata;
+  };
   security: {
     candidates_requested: number;
     candidates_available: number;
@@ -74,6 +87,10 @@ export async function runInternalBetaCollector(
   const now = options.now ?? new Date();
   const seedLimit = clamp(options.seedLimit, DEFAULT_DEXSCREENER_SEED_LIMIT, 1, 30);
   const securityLimit = clamp(options.securityCandidateLimit, DEFAULT_SECURITY_CANDIDATE_LIMIT, 1, MAX_SECURITY_CANDIDATE_LIMIT);
+  const universe = options.establishedUniverse === undefined
+    ? loadEstablishedAddressUniverse(options.establishedUniversePath)
+    : validateEstablishedAddressUniverse(options.establishedUniverse);
+  const enabledUniverseEntries = universe.entries.filter((entry) => entry.enabled).length;
   const common = {
     fetchImpl: options.fetchImpl,
     timeoutMs: options.timeoutMs,
@@ -83,7 +100,8 @@ export async function runInternalBetaCollector(
     dexscreener: new BoundedHttpClient({
       ...common,
       sourceId: "dexscreener",
-      maxRequests: 1 + seedLimit + Math.min(seedLimit, 5),
+      maxRequests: 1 + seedLimit + Math.min(seedLimit, 5)
+        + enabledUniverseEntries + Math.min(enabledUniverseEntries, 5),
     }),
     goplus_security: new BoundedHttpClient({
       ...common,
@@ -95,20 +113,28 @@ export async function runInternalBetaCollector(
   };
 
   const startedAt = now.toISOString();
-  const discovery = await collectDexScreenerDiscovery({
+  const newEmerging = await collectDexScreenerDiscovery({
     environment: "INTERNAL_BETA",
     seedLimit,
     now,
     client: clients.dexscreener,
   });
+  const established = await collectEstablishedAddressUniverse({
+    env: options.env ?? process.env,
+    universe,
+    now,
+    client: clients.dexscreener,
+  });
+  const discovery = { new_emerging: newEmerging.metadata, established: established.metadata };
 
   const securityResults = new Map<string, GoPlusSecurityResult>();
   const combined = await buildCombinedScannerOutput({
     mode: "live",
-    query: discovery.metadata.discovery_method,
-    candidates: discovery.candidates,
+    query: "two_basket_discovery",
+    candidates: [...newEmerging.candidates, ...established.candidates],
     maxCandidates: securityLimit,
     now,
+    securityEligibility: (candidate) => candidate.discovery_basket === "established",
     securityRawProvider: async (candidate) => {
       const result = await fetchCandidateSecurity(candidate, clients.goplus_security, options.goplusApiToken);
       securityResults.set(candidateKey(candidate), result);
@@ -173,7 +199,10 @@ export async function runInternalBetaCollector(
     ],
     publishScorecards: false,
     metadata: {
-      ...discovery.metadata,
+      discovery_architecture: "two_basket_discovery_v1",
+      new_emerging: discovery.new_emerging,
+      established: discovery.established,
+      readiness: buildDiscoveryReadiness(discovery.established, sourceHealth),
       security_candidate_limit: securityLimit,
       security_candidates_requested: securityRequested,
       request_counts: requestCounts,
@@ -204,7 +233,7 @@ export async function runInternalBetaCollector(
   return {
     run_id: runId,
     context_run_id: contextRunId,
-    discovery: discovery.metadata,
+    discovery,
     security: {
       candidates_requested: securityRequested,
       candidates_available: securityAvailable,
@@ -217,6 +246,20 @@ export async function runInternalBetaCollector(
     context,
     scanner_publish: scannerPublish,
     context_publish: contextPublish,
+  };
+}
+
+function buildDiscoveryReadiness(
+  established: EstablishedAddressDiscoveryMetadata,
+  sourceHealth: InternalBetaCollectorResult["source_health"],
+): Record<string, string> {
+  return {
+    process: "READY",
+    new_emerging: "READY",
+    established: established.universe_status === "ESTABLISHED_UNIVERSE_EMPTY" ? "EMPTY_CONFIGURED" : "READY",
+    context: sourceHealth.alternative_me_fng === "UNAVAILABLE" || sourceHealth.defillama_api === "UNAVAILABLE"
+      ? "UNAVAILABLE"
+      : "READY",
   };
 }
 

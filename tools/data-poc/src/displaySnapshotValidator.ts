@@ -11,6 +11,8 @@ const CANDIDATE_FIELDS = new Set([
   "source", "source_url", "price_usd", "market_cap_usd", "fdv_usd", "liquidity_usd",
   "volume_24h_usd", "volume_market_cap_ratio", "pair_created_at", "pair_age_days",
   "basic_filter_status", "filter_reasons", "final_label", "final_reasons", "created_at",
+  "discovery_basket", "discovery_method", "observation_only", "established_eligible",
+  "universe_version", "universe_entry_index", "address_identity_verified",
 ]);
 const SECURITY_FIELDS = new Set([
   "run_id", "candidate_id", "sources", "honeypot_status", "buy_tax", "sell_tax", "contract_verified",
@@ -30,9 +32,18 @@ const SCAN_RUN_FIELDS = new Set([
   "needs_manual_verification", "critical_risk", "watchlist_candidates", "errors",
 ]);
 const METADATA_FIELDS = new Set([
-  "discovery_method", "seed_count", "pairs_loaded", "candidates_before_filters", "candidates_after_filters",
+  "discovery_architecture", "new_emerging", "established", "readiness",
   "security_candidate_limit", "security_candidates_requested", "request_counts", "source_health", "attribution",
 ]);
+const NEW_EMERGING_FIELDS = new Set([
+  "discovery_method", "seed_count", "pairs_loaded", "candidates_before_filters", "candidates_after_filters",
+]);
+const ESTABLISHED_FIELDS = new Set([
+  "discovery_method", "universe_version", "universe_status", "entries_total", "entries_enabled",
+  "pairs_loaded", "candidates_before_filters", "candidates_after_filters", "base_token_candidates",
+  "quote_token_candidates",
+]);
+const READINESS_FIELDS = new Set(["process", "new_emerging", "established", "context"]);
 const REQUEST_COUNT_FIELDS = new Set([
   "dexscreener", "goplus_security", "alternative_me_fng", "defillama_api",
 ]);
@@ -90,6 +101,7 @@ export function validateDisplayEligibleScannerSnapshot(output: PersistableScanne
     if (decisions.raw_storage !== "denied") fail("SCANNER_RAW_STORAGE_ALLOWED");
   }
 
+  if (!isRecord(manifest.metadata)) fail("SCANNER_METADATA_INVALID");
   const metadata = manifest.metadata;
   const requestCounts = validateScannerMetadata(metadata);
   const goplusInvoked = isNonNegativeInteger(requestCounts.goplus_security) && requestCounts.goplus_security > 0;
@@ -98,7 +110,7 @@ export function validateDisplayEligibleScannerSnapshot(output: PersistableScanne
   assertExactFields(output.scan_run, SCAN_RUN_FIELDS);
   if (
     output.scan_run.source !== "combined-scanner-poc"
-    || output.scan_run.query !== "dexscreener_latest_token_profiles"
+    || output.scan_run.query !== "two_basket_discovery"
     || !isRecord(output.scan_run.filters)
     || Object.keys(output.scan_run.filters).length !== 1
     || output.scan_run.filters.basic_filters !== "dexscreener_basic_filters_v1"
@@ -121,16 +133,24 @@ export function validateDisplayEligibleScannerSnapshot(output: PersistableScanne
       || typeof candidate.chain !== "string"
       || (candidate.contract_address !== null && typeof candidate.contract_address !== "string")
     ) fail("SCANNER_SCHEMA_INVALID");
+    validateCandidateDiscoveryMetadata(candidate, metadata);
     if (candidate.source_url !== null) assertDexScreenerUrl(candidate.source_url);
   }
+  validateCandidateBasketCounts(output.candidates, metadata);
 
   const candidateIds = new Set(output.candidates.map((candidate) => candidate.candidate_id));
+  const candidateById = new Map(output.candidates.map((candidate) => [candidate.candidate_id, candidate]));
   for (const security of output.security_checks) {
     assertExactFields(security, SECURITY_FIELDS);
     if (
       security.run_id !== manifest.run_id
       || !candidateIds.has(security.candidate_id)
       || security.sources.some((source) => source !== "goplus")
+    ) fail("SCANNER_SCHEMA_INVALID");
+    const securedCandidate = candidateById.get(security.candidate_id);
+    if (
+      securedCandidate?.discovery_basket !== "established"
+      || securedCandidate.basic_filter_status !== "passed_basic_filter"
     ) fail("SCANNER_SCHEMA_INVALID");
     if (security.sources.includes("goplus") && !sourceIds.includes("goplus_security")) {
       fail("SCANNER_LINEAGE_MISMATCH");
@@ -151,26 +171,21 @@ export function validateDisplayEligibleScannerSnapshot(output: PersistableScanne
 function validateScannerMetadata(value: unknown): Record<string, unknown> {
   if (!isRecord(value)) fail("SCANNER_METADATA_INVALID");
   assertExactFields(value, METADATA_FIELDS);
-  if (value.discovery_method !== "dexscreener_latest_token_profiles") fail("SCANNER_METADATA_INVALID");
+  if (value.discovery_architecture !== "two_basket_discovery_v1") fail("SCANNER_METADATA_INVALID");
+  const newEmerging = validateNewEmergingMetadata(value.new_emerging);
+  const established = validateEstablishedMetadata(value.established);
+  validateReadinessMetadata(value.readiness, established.universe_status as string);
+  if (!isNonNegativeInteger(value.security_candidate_limit) || !isNonNegativeInteger(value.security_candidates_requested)) {
+    fail("SCANNER_METADATA_INVALID");
+  }
 
-  const numericFields = [
-    "seed_count", "pairs_loaded", "candidates_before_filters", "candidates_after_filters",
-    "security_candidate_limit", "security_candidates_requested",
-  ] as const;
-  if (numericFields.some((field) => !isNonNegativeInteger(value[field]))) fail("SCANNER_METADATA_INVALID");
-
-  const seedCount = value.seed_count as number;
-  const pairsLoaded = value.pairs_loaded as number;
-  const candidatesBefore = value.candidates_before_filters as number;
-  const candidatesAfter = value.candidates_after_filters as number;
+  const seedCount = newEmerging.seed_count as number;
   const securityLimit = value.security_candidate_limit as number;
   const securityRequested = value.security_candidates_requested as number;
   if (
-    seedCount < 1 || seedCount > 30
-    || candidatesBefore < 1 || candidatesBefore > pairsLoaded
-    || candidatesAfter > candidatesBefore
-    || securityLimit < 1 || securityLimit > 20
-    || securityRequested > securityLimit || securityRequested > candidatesAfter
+    securityLimit < 1 || securityLimit > 20
+    || securityRequested > securityLimit
+    || securityRequested > (established.candidates_after_filters as number)
   ) fail("SCANNER_METADATA_INVALID");
 
   if (!isRecord(value.request_counts)) fail("SCANNER_METADATA_INVALID");
@@ -178,7 +193,9 @@ function validateScannerMetadata(value: unknown): Record<string, unknown> {
   if (Object.values(value.request_counts).some((count) => !isNonNegativeInteger(count))) {
     fail("SCANNER_METADATA_INVALID");
   }
-  const dexBudget = 1 + seedCount + Math.min(seedCount, 5);
+  const establishedEnabled = established.entries_enabled as number;
+  const dexBudget = 1 + seedCount + Math.min(seedCount, 5)
+    + establishedEnabled + Math.min(establishedEnabled, 5);
   const goPlusBudget = securityLimit + Math.min(securityLimit, 3);
   if (
     (value.request_counts.dexscreener as number) < 1
@@ -207,6 +224,103 @@ function validateScannerMetadata(value: unknown): Record<string, unknown> {
     fail("SCANNER_METADATA_INVALID");
   }
   return value.request_counts;
+}
+
+function validateNewEmergingMetadata(value: unknown): Record<string, unknown> {
+  if (!isRecord(value)) fail("SCANNER_METADATA_INVALID");
+  assertExactFields(value, NEW_EMERGING_FIELDS);
+  if (value.discovery_method !== "dexscreener_latest_token_profiles") fail("SCANNER_METADATA_INVALID");
+  const numericFields = ["seed_count", "pairs_loaded", "candidates_before_filters", "candidates_after_filters"];
+  if (numericFields.some((field) => !isNonNegativeInteger(value[field]))) fail("SCANNER_METADATA_INVALID");
+  if (
+    (value.seed_count as number) < 1 || (value.seed_count as number) > 30
+    || (value.candidates_before_filters as number) < 1
+    || (value.candidates_before_filters as number) > (value.pairs_loaded as number)
+    || (value.candidates_after_filters as number) > (value.candidates_before_filters as number)
+  ) fail("SCANNER_METADATA_INVALID");
+  return value;
+}
+
+function validateEstablishedMetadata(value: unknown): Record<string, unknown> {
+  if (!isRecord(value)) fail("SCANNER_METADATA_INVALID");
+  assertExactFields(value, ESTABLISHED_FIELDS);
+  if (
+    value.discovery_method !== "address_seeded_universe"
+    || value.universe_version !== "established_address_universe_v1"
+    || !["ESTABLISHED_UNIVERSE_EMPTY", "ESTABLISHED_UNIVERSE_READY"].includes(String(value.universe_status))
+  ) fail("SCANNER_METADATA_INVALID");
+  const numericFields = [
+    "entries_total", "entries_enabled", "pairs_loaded", "candidates_before_filters", "candidates_after_filters",
+    "base_token_candidates", "quote_token_candidates",
+  ];
+  if (numericFields.some((field) => !isNonNegativeInteger(value[field]))) fail("SCANNER_METADATA_INVALID");
+  const total = value.entries_total as number;
+  const enabled = value.entries_enabled as number;
+  const pairs = value.pairs_loaded as number;
+  const candidates = value.candidates_before_filters as number;
+  const passed = value.candidates_after_filters as number;
+  if (
+    total > 100 || enabled > total || candidates > pairs || passed > candidates
+    || (value.base_token_candidates as number) + (value.quote_token_candidates as number) !== candidates
+  ) fail("SCANNER_METADATA_INVALID");
+  if (value.universe_status === "ESTABLISHED_UNIVERSE_EMPTY") {
+    if (enabled !== 0 || pairs !== 0 || candidates !== 0 || passed !== 0) fail("SCANNER_METADATA_INVALID");
+  } else if (enabled < 1 || candidates < 1) {
+    fail("SCANNER_METADATA_INVALID");
+  }
+  return value;
+}
+
+function validateReadinessMetadata(value: unknown, universeStatus: string): void {
+  if (!isRecord(value)) fail("SCANNER_METADATA_INVALID");
+  assertExactFields(value, READINESS_FIELDS);
+  if (
+    value.process !== "READY"
+    || value.new_emerging !== "READY"
+    || !["READY", "EMPTY_CONFIGURED"].includes(String(value.established))
+    || !["READY", "UNAVAILABLE"].includes(String(value.context))
+  ) fail("SCANNER_METADATA_INVALID");
+  const expectedEstablished = universeStatus === "ESTABLISHED_UNIVERSE_EMPTY" ? "EMPTY_CONFIGURED" : "READY";
+  if (value.established !== expectedEstablished) fail("SCANNER_METADATA_INVALID");
+}
+
+function validateCandidateDiscoveryMetadata(candidate: Record<string, unknown>, metadata: Record<string, unknown>): void {
+  if (!isRecord(metadata.established)) fail("SCANNER_METADATA_INVALID");
+  if (candidate.discovery_basket === "new_emerging") {
+    if (
+      candidate.discovery_method !== "dexscreener_latest_token_profiles"
+      || candidate.observation_only !== true
+      || candidate.established_eligible !== false
+      || candidate.universe_version !== null
+      || candidate.universe_entry_index !== null
+      || candidate.address_identity_verified !== false
+    ) fail("SCANNER_SCHEMA_INVALID");
+    return;
+  }
+  if (
+    candidate.discovery_basket !== "established"
+    || candidate.discovery_method !== "address_seeded_universe"
+    || candidate.observation_only !== false
+    || candidate.established_eligible !== (candidate.basic_filter_status === "passed_basic_filter")
+    || candidate.universe_version !== metadata.established.universe_version
+    || !isNonNegativeInteger(candidate.universe_entry_index)
+    || (candidate.universe_entry_index as number) >= (metadata.established.entries_total as number)
+    || candidate.address_identity_verified !== true
+  ) fail("SCANNER_SCHEMA_INVALID");
+}
+
+function validateCandidateBasketCounts(candidates: Array<Record<string, unknown>>, metadata: Record<string, unknown>): void {
+  if (!isRecord(metadata.new_emerging) || !isRecord(metadata.established)) fail("SCANNER_METADATA_INVALID");
+  const newEmerging = candidates.filter((candidate) => candidate.discovery_basket === "new_emerging");
+  const established = candidates.filter((candidate) => candidate.discovery_basket === "established");
+  if (
+    newEmerging.length !== metadata.new_emerging.candidates_before_filters
+    || established.length !== metadata.established.candidates_before_filters
+    || newEmerging.filter((candidate) => candidate.basic_filter_status === "passed_basic_filter").length
+      !== metadata.new_emerging.candidates_after_filters
+    || established.filter((candidate) => candidate.basic_filter_status === "passed_basic_filter").length
+      !== metadata.established.candidates_after_filters
+  ) fail("SCANNER_METADATA_INVALID");
 }
 
 function assertExactFields(value: object, allowlist: Set<string>): void {

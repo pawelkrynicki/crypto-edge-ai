@@ -69,6 +69,13 @@ export type PersistableCandidate = {
   final_label: string;
   final_reasons: string[];
   created_at: string;
+  discovery_basket?: "new_emerging" | "established";
+  discovery_method?: "dexscreener_latest_token_profiles" | "address_seeded_universe";
+  observation_only?: boolean;
+  established_eligible?: boolean;
+  universe_version?: string | null;
+  universe_entry_index?: number | null;
+  address_identity_verified?: boolean;
 };
 
 export type PersistableSecurityCheck = {
@@ -132,6 +139,7 @@ export type PersistableScannerOutput = {
     finished_at: string;
     source_ids: string[];
     policy_decisions: Record<string, Record<string, "allowed" | "denied">>;
+    metadata?: unknown;
   };
   scan_run: PersistableScanRun;
   candidates: PersistableCandidate[];
@@ -165,6 +173,13 @@ export interface UiTokenCandidate {
   contractAddress: string;
   pairAddress: string;
   sourceUrl: string;
+  discoveryBasket: "new_emerging" | "established";
+  discoveryMethod: "dexscreener_latest_token_profiles" | "address_seeded_universe";
+  observationOnly: boolean;
+  establishedEligible: boolean;
+  universeVersion: string | null;
+  universeEntryIndex: number | null;
+  addressIdentityVerified: boolean;
 
   priceUsd: number | null;
   marketCap: number | null;

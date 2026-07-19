@@ -54,6 +54,7 @@ describe("INTERNAL_BETA live collector", () => {
       seedLimit: 2,
       securityCandidateLimit: 3,
       now: NOW,
+      establishedUniverse: establishedUniverse(),
       fetchImpl: async (input) => {
         const url = String(input);
         fetchedUrls.push(url);
@@ -65,10 +66,13 @@ describe("INTERNAL_BETA live collector", () => {
         }
         if (url.includes("/token-pairs/v1/base/0xpass")) return Response.json([dexPair("0xpass", "pair-pass", 60_000)]);
         if (url.includes("/token-pairs/v1/base/0xreject")) return Response.json([dexPair("0xreject", "pair-reject", 100)]);
+        if (url.includes("/token-pairs/v1/base/0x1111111111111111111111111111111111111111")) {
+          return Response.json([dexPair("0x1111111111111111111111111111111111111111", "pair-established", 70_000)]);
+        }
         if (url.includes("gopluslabs.io/api/v1/token_security/8453")) {
           return Response.json({
             result: {
-              "0xpass": {
+              "0x1111111111111111111111111111111111111111": {
                 is_honeypot: "0",
                 buy_tax: "0.01",
                 sell_tax: "0.02",
@@ -95,9 +99,11 @@ describe("INTERNAL_BETA live collector", () => {
       },
     });
 
-    assert.equal(result.discovery.seed_count, 2);
-    assert.equal(result.discovery.pairs_loaded, 2);
-    assert.equal(result.discovery.candidates_after_filters, 1);
+    assert.equal(result.discovery.new_emerging.seed_count, 2);
+    assert.equal(result.discovery.new_emerging.pairs_loaded, 2);
+    assert.equal(result.discovery.new_emerging.candidates_after_filters, 1);
+    assert.equal(result.discovery.established.entries_enabled, 1);
+    assert.equal(result.discovery.established.candidates_after_filters, 1);
     assert.equal(result.security.candidates_requested, 1);
     assert.equal(result.request_counts.goplus_security, 1);
     assert.equal(fetchedUrls.some((url) => url.includes("honeypot.is")), false);
@@ -106,6 +112,8 @@ describe("INTERNAL_BETA live collector", () => {
     assert.equal(result.scanner.scorecards.length, 0);
     assert.equal(result.context.sources.every((source) => source.mode === "live" && source.records.length > 0), true);
     assert.deepEqual(result.scanner.provenance?.metadata?.attribution, { provider: "GoPlus Security" });
+    assert.equal(result.scanner.candidates.find((candidate) => candidate.symbol === "REAL")?.observation_only, true);
+    assert.equal(result.scanner.candidates.find((candidate) => candidate.pair_address === "pair-established")?.discovery_basket, "established");
     assert.deepEqual(
       result.context.sources.map((source) => source.attribution.provider),
       ["Alternative.me", "DefiLlama"],
@@ -127,7 +135,59 @@ describe("INTERNAL_BETA live collector", () => {
     unsafeContext.sources[0].raw_payload = { secret: true };
     assert.throws(() => validateDisplayEligibleContextSnapshot(unsafeContext), /CONTEXT_UNKNOWN_FIELD/);
   });
+
+  it("keeps new/emerging operational when the established universe is empty", async () => {
+    const root = await tempRoot();
+    const result = await runInternalBetaCollector({
+      env: {
+        CRYPTO_EDGE_DATA_ENV: "INTERNAL_BETA",
+        CRYPTO_EDGE_RUNTIME_MODE: "INTERNAL_BETA",
+        ALLOW_LIVE_PROVIDER_CALLS: "1",
+      },
+      outputDir: root,
+      seedLimit: 1,
+      securityCandidateLimit: 1,
+      now: NOW,
+      establishedUniverse: { ...establishedUniverse(), entries: [] },
+      fetchImpl: async (input) => {
+        const url = String(input);
+        if (url.endsWith("/token-profiles/latest/v1")) return Response.json([{ chainId: "base", tokenAddress: "0xnew" }]);
+        if (url.includes("/token-pairs/v1/base/0xnew")) return Response.json([dexPair("0xnew", "pair-new", 60_000)]);
+        if (url === "https://api.alternative.me/fng/?limit=1") {
+          return Response.json({ data: [{ value: "40", value_classification: "Fear", timestamp: "1784203200", time_until_update: "3600" }] });
+        }
+        if (url === "https://api.llama.fi/protocols") {
+          return Response.json([{ name: "Lido", chain: "Ethereum", tvl: 1_000_000, change_1d: 1, change_7d: 2, url: "https://lido.fi" }]);
+        }
+        throw new Error(`unexpected URL ${url}`);
+      },
+    });
+    assert.equal(result.discovery.established.universe_status, "ESTABLISHED_UNIVERSE_EMPTY");
+    assert.equal(result.discovery.new_emerging.candidates_before_filters, 1);
+    assert.equal(result.request_counts.goplus_security, 0);
+    assert.equal(result.scanner.provenance?.fixture_used, false);
+    assert.equal(result.scanner.provenance?.metadata?.readiness instanceof Object, true);
+    assert.equal(result.scanner.candidates.every((candidate) => candidate.discovery_basket === "new_emerging"), true);
+  });
 });
+
+function establishedUniverse() {
+  return {
+    universe_version: "established_address_universe_v1",
+    status: "OWNER_MAINTAINED",
+    production_enabled: true,
+    provider: "dexscreener",
+    identity_method: "CHAIN_AND_CONTRACT_ADDRESS",
+    max_entries: 100,
+    entries: [{
+      chain: "base",
+      contract_address: "0x1111111111111111111111111111111111111111",
+      enabled: true,
+      added_at: "2026-07-19T00:00:00.000Z",
+      added_by: "owner",
+    }],
+  };
+}
 
 function dexPair(address: string, pairAddress: string, liquidity: number) {
   return {

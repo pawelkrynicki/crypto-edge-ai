@@ -66,11 +66,17 @@ export function createScannerApiServer(options: ScannerApiServerOptions = {}) {
         getReadinessEntry(() => readLatestContextOutput(contextOptions)),
       ]);
       const ready = scanner.ready && context.ready;
+      const discovery = buildDiscoveryReadiness(scanner, context);
       sendJson(req, res, ready ? 200 : 503, {
-        status: ready ? "ready" : "not_ready",
+        status: ready
+          ? discovery.established.status === "empty_configured" ? "ready_with_empty_established_universe" : "ready"
+          : "not_ready",
         runtime_mode: runtimeMode,
-        scanner,
-        context,
+        process: { ready: true, reason_code: null },
+        scanner: publicReadinessEntry(scanner),
+        context: publicReadinessEntry(context),
+        new_emerging: discovery.new_emerging,
+        established: discovery.established,
         reason_codes: [scanner.reason_code, context.reason_code].filter(isString),
       }, runtimeMode);
       return;
@@ -228,13 +234,60 @@ function sendReviewSessionJson(
 async function getReadinessEntry(read: () => Promise<unknown>): Promise<{
   ready: boolean;
   reason_code: string | null;
+  value?: unknown;
 }> {
   try {
-    await read();
-    return { ready: true, reason_code: null };
+    return { ready: true, reason_code: null, value: await read() };
   } catch (error) {
     return { ready: false, reason_code: errorCode(error, "DATA_UNAVAILABLE") };
   }
+}
+
+type ReadinessEntry = Awaited<ReturnType<typeof getReadinessEntry>>;
+
+function publicReadinessEntry(entry: ReadinessEntry): { ready: boolean; reason_code: string | null } {
+  return { ready: entry.ready, reason_code: entry.reason_code };
+}
+
+function buildDiscoveryReadiness(scanner: ReadinessEntry, context: ReadinessEntry) {
+  if (!scanner.ready || !isRecord(scanner.value)) {
+    const reasonCode = scanner.reason_code ?? "SCANNER_OUTPUT_UNAVAILABLE";
+    return {
+      new_emerging: { ready: false, status: "unavailable", reason_code: reasonCode },
+      established: { ready: false, configured: false, status: "unavailable", reason_code: reasonCode },
+    };
+  }
+  const provenance = isRecord(scanner.value.provenance) ? scanner.value.provenance : null;
+  const metadata = provenance && isRecord(provenance.metadata) ? provenance.metadata : null;
+  const readiness = metadata && isRecord(metadata.readiness) ? metadata.readiness : null;
+  if (!readiness) {
+    return {
+      new_emerging: { ready: false, status: "unavailable", reason_code: "SCANNER_METADATA_INVALID" },
+      established: { ready: false, configured: false, status: "unavailable", reason_code: "SCANNER_METADATA_INVALID" },
+    };
+  }
+  const establishedEmpty = readiness.established === "EMPTY_CONFIGURED";
+  return {
+    new_emerging: {
+      ready: readiness.new_emerging === "READY",
+      status: readiness.new_emerging === "READY" ? "ready" : "unavailable",
+      reason_code: readiness.new_emerging === "READY" ? null : "NEW_EMERGING_UNAVAILABLE",
+    },
+    established: establishedEmpty
+      ? {
+        ready: false,
+        configured: true,
+        status: "empty_configured",
+        reason_code: "ESTABLISHED_UNIVERSE_EMPTY",
+      }
+      : {
+        ready: readiness.established === "READY",
+        configured: true,
+        status: readiness.established === "READY" ? "ready" : "unavailable",
+        reason_code: readiness.established === "READY" ? null : "ESTABLISHED_UNAVAILABLE",
+      },
+    context: publicReadinessEntry(context),
+  };
 }
 
 function errorCode(error: unknown, fallback: string): string {
@@ -248,6 +301,10 @@ function getRequestPath(url: string | undefined): string {
 
 function isString(value: unknown): value is string {
   return typeof value === "string";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 class RequestBodyError extends Error {
