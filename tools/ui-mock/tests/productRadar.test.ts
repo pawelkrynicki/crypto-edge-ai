@@ -18,6 +18,7 @@ import { Methodology } from "../src/components/Methodology.js";
 import {
   ProductWorkspaceShell,
   getApiReadinessPresentation,
+  getFreshnessPresentation,
 } from "../src/components/ProductWorkspaceShell.js";
 import {
   getAcceptedProductRefreshTimestamps,
@@ -36,6 +37,7 @@ import {
   type ProductLocale,
 } from "../src/productI18n.js";
 import { formatFilterReason, SUPPORTED_FILTER_REASONS } from "../src/productPresentation.js";
+import { resolveProductSourceHealth } from "../src/productSourceHealth.js";
 import type {
   PersistableScannerOutput,
   ProductReadinessOutput,
@@ -213,6 +215,154 @@ describe("Product Radar owner acceptance", () => {
     assert.doesNotMatch(markup, /fixture-fallback|Built-in sample|Radar cannot read a valid scan/);
   });
 
+  it("uses one canonical source-health resolution in the header and Radar summary", () => {
+    const readyMetadata = structuredClone(emptyMetadata);
+    readyMetadata.source_health = {
+      dexscreener: "READY",
+      goplus_security: "NOT_INVOKED",
+      alternative_me_fng: "READY",
+      defillama_api: "READY",
+    };
+    const defillamaDegraded = structuredClone(readyMetadata);
+    defillamaDegraded.source_health = { ...defillamaDegraded.source_health, defillama_api: "DEGRADED" };
+    const optionalUnavailable = structuredClone(readyMetadata);
+    optionalUnavailable.source_health = { ...optionalUnavailable.source_health, alternative_me_fng: "UNAVAILABLE" };
+    const allUnavailable = structuredClone(readyMetadata);
+    allUnavailable.source_health = {
+      dexscreener: "UNAVAILABLE",
+      goplus_security: "NOT_INVOKED",
+      alternative_me_fng: "UNAVAILABLE",
+      defillama_api: "UNAVAILABLE",
+    };
+    const sourceIds = ["dexscreener"];
+
+    assert.deepEqual(resolveProductSourceHealth({ metadata: readyMetadata, readiness: emptyReadiness, sourceIds }), {
+      status: "available",
+      detailSourceIds: ["dexscreener", "alternative_me_fng", "defillama_api"],
+      basis: "metadata",
+    });
+    assert.deepEqual(resolveProductSourceHealth({ metadata: defillamaDegraded, readiness: emptyReadiness, sourceIds }), {
+      status: "partial",
+      detailSourceIds: ["defillama_api"],
+      basis: "metadata",
+    });
+    assert.equal(
+      resolveProductSourceHealth({ metadata: optionalUnavailable, readiness: emptyReadiness, sourceIds }).status,
+      "partial",
+    );
+    assert.equal(
+      resolveProductSourceHealth({ metadata: allUnavailable, readiness: emptyReadiness, sourceIds }).status,
+      "unavailable",
+    );
+
+    const staleReadiness = structuredClone(emptyReadiness);
+    staleReadiness.status = "degraded";
+    staleReadiness.scanner = {
+      ready: true,
+      status: "stale",
+      freshness_status: "STALE",
+      reason_code: "SCANNER_SNAPSHOT_STALE",
+    };
+    staleReadiness.reason_codes = ["SCANNER_SNAPSHOT_STALE"];
+    assert.equal(
+      resolveProductSourceHealth({ metadata: readyMetadata, readiness: staleReadiness, sourceIds }).status,
+      "available",
+    );
+    assert.equal(getFreshnessPresentation(7200, "STALE").value, "Delayed");
+    assert.equal(
+      resolveProductSourceHealth({ metadata: defillamaDegraded, readiness: emptyReadiness, sourceIds }).status,
+      "partial",
+    );
+    assert.equal(getFreshnessPresentation(60, "FRESH").value, "Current");
+
+    const fallbackPartialReadiness = structuredClone(emptyReadiness);
+    fallbackPartialReadiness.status = "degraded";
+    fallbackPartialReadiness.context = { ready: false, reason_code: "CONTEXT_OUTPUT_UNAVAILABLE" };
+    fallbackPartialReadiness.discovery.context = { ready: false, reason_code: "CONTEXT_OUTPUT_UNAVAILABLE" };
+    fallbackPartialReadiness.reason_codes = ["CONTEXT_OUTPUT_UNAVAILABLE"];
+    assert.deepEqual(resolveProductSourceHealth({ metadata: null, readiness: fallbackPartialReadiness, sourceIds }), {
+      status: "partial",
+      detailSourceIds: [],
+      basis: "readiness",
+    });
+    assert.equal(
+      resolveProductSourceHealth({ metadata: null, readiness: emptyReadiness, sourceIds }).status,
+      "available",
+    );
+    assert.equal(
+      resolveProductSourceHealth({ metadata: null, readiness: null, sourceIds: [] }).status,
+      "unavailable",
+    );
+
+    const renderSurfaces = (
+      locale: ProductLocale,
+      sourceHealth: ReturnType<typeof resolveProductSourceHealth>,
+      metadata: ScannerDiscoveryMetadata,
+      readiness: ProductReadinessOutput,
+      ageSeconds: number,
+      freshnessStatus: "FRESH" | "STALE",
+    ) => ({
+      header: renderWithLocale(locale, React.createElement(ProductWorkspaceShell, {
+        navItems: [],
+        activeSection: "candidate-results",
+        onSectionChange: () => undefined,
+        loading: false,
+        runtimeMode: "INTERNAL_BETA",
+        resolvedSource: "real-output",
+        runId: "source-health-run",
+        generatedAt: "2026-07-20T10:00:00.000Z",
+        ageSeconds,
+        freshnessStatus,
+        viewRefreshedAt: "2026-07-20T12:00:00.000Z",
+        sourceIds,
+        sourceHealth,
+        readiness,
+        onRefresh: () => undefined,
+        children: React.createElement("div"),
+      })),
+      summary: renderWithLocale(locale, React.createElement(CandidateResultsView, {
+        candidates: [newCandidate],
+        metadata,
+        readiness,
+        ageSeconds,
+        freshnessStatus,
+        sourceIds,
+        sourceHealth,
+      })),
+    });
+
+    const readyResolution = resolveProductSourceHealth({ metadata: readyMetadata, readiness: emptyReadiness, sourceIds });
+    const partialResolution = resolveProductSourceHealth({ metadata: defillamaDegraded, readiness: staleReadiness, sourceIds });
+    const fallbackResolution = resolveProductSourceHealth({ metadata: null, readiness: fallbackPartialReadiness, sourceIds });
+    const noDetailedMetadata = structuredClone(emptyMetadata);
+    delete noDetailedMetadata.source_health;
+    for (const locale of ["en", "pl"] as const) {
+      const ready = renderSurfaces(locale, readyResolution, readyMetadata, emptyReadiness, 60, "FRESH");
+      const partialHeader = renderSurfaces(locale, partialResolution, defillamaDegraded, staleReadiness, 7200, "STALE");
+      const partialSummary = renderSurfaces(locale, partialResolution, defillamaDegraded, emptyReadiness, 60, "FRESH");
+      const fallback = renderSurfaces(locale, fallbackResolution, noDetailedMetadata, fallbackPartialReadiness, 60, "FRESH");
+      if (locale === "en") {
+        assert.match(ready.header, /<span>Sources<\/span><strong>Available<\/strong>/);
+        assert.match(ready.summary, /<span>Source status<\/span><strong>Available<\/strong>/);
+        assert.match(partialHeader.header, /<span>Sources<\/span><strong>Partially available<\/strong>/);
+        assert.match(partialSummary.summary, /<span>Source status<\/span><strong>Source partially available<\/strong><p>defillama_api<\/p>/);
+        assert.match(partialHeader.header, /Snapshot freshness<\/span><strong>Delayed<\/strong>/);
+        assert.match(partialSummary.summary, /<span>Data<\/span><strong>Current<\/strong>/);
+        assert.match(fallback.header, /<span>Sources<\/span><strong>Partially available<\/strong>/);
+        assert.match(fallback.summary, /<span>Source status<\/span><strong>Source partially available<\/strong><p>Source details unavailable<\/p>/);
+      } else {
+        assert.match(ready.header, /<span>Źródła<\/span><strong>Dostępne<\/strong>/);
+        assert.match(ready.summary, /<span>Stan źródeł<\/span><strong>Dostępne<\/strong>/);
+        assert.match(partialHeader.header, /<span>Źródła<\/span><strong>Częściowo dostępne<\/strong>/);
+        assert.match(partialSummary.summary, /<span>Stan źródeł<\/span><strong>Źródło częściowo dostępne<\/strong><p>defillama_api<\/p>/);
+        assert.match(partialHeader.header, /Aktualność danych<\/span><strong>Opóźnione<\/strong>/);
+        assert.match(partialSummary.summary, /<span>Dane<\/span><strong>Aktualne<\/strong>/);
+        assert.match(fallback.header, /<span>Źródła<\/span><strong>Częściowo dostępne<\/strong>/);
+        assert.match(fallback.summary, /<span>Stan źródeł<\/span><strong>Źródło częściowo dostępne<\/strong><p>Brak szczegółów źródeł<\/p>/);
+      }
+    }
+  });
+
   it("renders the dedicated Established empty-universe state", () => {
     const markup = renderToStaticMarkup(React.createElement(EstablishedBasket, { candidates: [], metadata: emptyMetadata, readiness: emptyReadiness }));
     assert.match(markup, /The Established basket is empty/);
@@ -299,6 +449,7 @@ describe("Product Radar owner acceptance", () => {
         freshnessStatus: "STALE",
         viewRefreshedAt: timestamps.viewRefreshedAt,
         sourceIds: ["dexscreener"],
+        sourceHealth: resolveProductSourceHealth({ metadata: emptyMetadata, readiness: emptyReadiness, sourceIds: ["dexscreener"] }),
         readiness: emptyReadiness,
         onRefresh: () => undefined,
         children: React.createElement("div"),

@@ -43,7 +43,7 @@ scripts\win\check-product-radar-review.cmd
 
 1. Otwórz `Radar` i potwierdź, że domyślny język to English.
 2. Przełącz `EN / PL`, potwierdź natychmiastową zmianę tekstu, odśwież przeglądarkę i sprawdź zapamiętanie wyboru.
-3. Sprawdź górny status: połączenie z API, aktualność snapshotu, stan źródeł, `Last updated` i osobny `View refreshed`. `Last updated` jest zawsze czasem `generated_at` (albo `finished_at`) przyjętego snapshotu skanera; status `Current` / `Delayed` jest pokazany osobno.
+3. Sprawdź górny status: połączenie z API, aktualność snapshotu, stan źródeł, `Last updated` i osobny `View refreshed`. `Last updated` jest zawsze czasem `generated_at` (albo `finished_at`) przyjętego snapshotu skanera; status `Current` / `Delayed` jest pokazany osobno. Nagłówek i kafel `Source status` korzystają z jednego rozstrzygnięcia source health i muszą przekazywać ten sam stan semantyczny.
 4. Kliknij `Refresh view` / `Odśwież widok` i potwierdź, że przycisk wyłącznie ponownie odczytuje lokalne API; nie tworzy nowych danych, nie uruchamia collectora ani providerów. Zmienia się czas `View refreshed`, natomiast `Last updated` zmienia się tylko wtedy, gdy API zwróci nowszy przyjęty snapshot.
 5. Przejdź między `New / observation` i `Established / main Radar`.
 6. Otwórz dowolny dostępny rekord przez `Open details`.
@@ -84,6 +84,7 @@ scripts\win\check-product-radar-review.cmd
 - [ ] English jest językiem domyślnym niezależnie od języka przeglądarki.
 - [ ] Przełącznik EN / PL zmienia cały Product Radar bez przeładowania i zapamiętuje wybór po refreshu przeglądarki.
 - [ ] Nagłówek rozdziela połączenie z API, aktualność snapshotu, stan źródeł, `Last updated` i `View refreshed`; `Last updated` pokazuje timestamp snapshotu jako wartość główną, a `Delayed` / `Opóźnione` jest osobnym statusem.
+- [ ] Nagłówek `Sources` i kafel `Source status` są spójne: szczegółowe `metadata.source_health` mają pierwszeństwo, a readiness jest fallbackiem. Opcjonalne źródło context w stanie degraded daje `Partially available` / `Częściowo dostępne`, ale nie ukrywa używalnego Radaru.
 - [ ] `Refresh view` / `Odśwież widok` jest zablokowany podczas trwającego odczytu, zmienia wyłącznie czas odczytu widoku i nie uruchamia providera ani collectora.
 - [ ] Przy snapshotcie starszym niż 30 minut żółte ostrzeżenie jest widoczne, a kandydaci, szczegóły, weryfikacja i metodologia pozostają dostępne.
 - [ ] HTTP 503 występuje tylko wtedy, gdy nie ma prawidłowego real snapshotu lub granica fail-closed go odrzuca.
@@ -104,6 +105,7 @@ scripts\win\check-product-radar-review.cmd
 - Commitowany universe Established ma obecnie `0` aktywnych wpisów.
 - UI nie zawiera edytora universe.
 - Snapshot starszy niż 30 minut jest oznaczony jako opóźniony i pozostaje dostępny jako last-known-good, o ile nadal przechodzi schema, lineage, policy, environment i fixture checks.
+- Freshness i source health są niezależne: stary snapshot nie pogarsza automatycznie stanu źródeł, a częściowa dostępność źródła nie oznacza automatycznie opóźnionego snapshotu.
 - Opóźniony lokalny snapshot pozostaje opóźniony aż do opublikowania nowego wyniku collectora. Na tym etapie nie istnieje scheduler, a odświeżenie widoku nie generuje nowego snapshotu.
 - Context może być niedostępny niezależnie od działającego skanera.
 - Brak schedulera, automatyzacji VPS, AI KINTEL, auto-tradingu i rekomendacji inwestycyjnych.

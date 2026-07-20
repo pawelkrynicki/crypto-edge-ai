@@ -9,6 +9,10 @@ import {
   type ProductLocale,
 } from "../productI18n";
 import { formatStatusReason } from "../productPresentation";
+import {
+  presentProductSourceHealth,
+  type ProductSourceHealthResolution,
+} from "../productSourceHealth";
 import type { ResolvedProductRuntimeMode } from "../runtimeMode";
 import type { ResolvedScannerSource } from "../services/scannerDataSource";
 import type { ProductReadinessOutput } from "../types/scannerTypes";
@@ -39,6 +43,7 @@ type ProductWorkspaceShellProps = {
   freshnessStatus: "FRESH" | "STALE" | null;
   viewRefreshedAt: string | null;
   sourceIds: string[];
+  sourceHealth: ProductSourceHealthResolution;
   readiness: ProductReadinessOutput | null;
   readinessReasonCode?: string | null;
   dataUnavailableMessage?: string | null;
@@ -66,6 +71,7 @@ export function ProductWorkspaceShell({
   freshnessStatus,
   viewRefreshedAt,
   sourceIds,
+  sourceHealth,
   readiness,
   readinessReasonCode,
   dataUnavailableMessage,
@@ -76,7 +82,7 @@ export function ProductWorkspaceShell({
   const { locale, setLocale, t } = useProductLocale();
   const apiPresentation = getApiReadinessPresentation(loading, resolvedSource, readiness, locale);
   const freshnessPresentation = getFreshnessPresentation(ageSeconds, freshnessStatus, locale);
-  const sourcePresentation = getSourcePresentation(readiness, locale);
+  const sourcePresentation = presentProductSourceHealth(sourceHealth, locale, "header");
   const technicalCodes = unique([
     readinessReasonCode,
     dataUnavailableReasonCode,
@@ -225,21 +231,6 @@ export function getFreshnessPresentation(
     return { value: copy["status.current"], tone: "ready" };
   }
   return { value: copy["status.unavailable"], tone: "warning" };
-}
-
-function getSourcePresentation(
-  readiness: ProductReadinessOutput | null,
-  locale: ProductLocale,
-): { value: string; tone: "ready" | "warning" } {
-  const copy = PRODUCT_TRANSLATIONS[locale];
-  if (readiness === null) {
-    return { value: copy["status.unavailable"], tone: "warning" };
-  }
-  const partial = readiness?.context.ready === false
-    || readiness?.discovery.new_emerging.status === "degraded";
-  return partial
-    ? { value: copy["status.partial"], tone: "warning" }
-    : { value: copy["status.available"], tone: "ready" };
 }
 
 function HeaderFact({

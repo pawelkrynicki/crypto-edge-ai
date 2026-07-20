@@ -8,6 +8,11 @@ import {
   type ProductLocale,
 } from "../productI18n";
 import { formatFilterReason, formatStatusReason } from "../productPresentation";
+import {
+  presentProductSourceHealth,
+  resolveProductSourceHealth,
+  type ProductSourceHealthResolution,
+} from "../productSourceHealth";
 import type {
   ProductReadinessOutput,
   ScannerDiscoveryMetadata,
@@ -25,6 +30,7 @@ interface CandidateResultsViewProps {
   ageSeconds?: number | null;
   freshnessStatus?: "FRESH" | "STALE" | null;
   sourceIds?: string[];
+  sourceHealth?: ProductSourceHealthResolution;
   scannerUnavailableReasonCode?: string | null;
   onOpenCandidate?: (candidateId: string) => void;
   onOpenExternalChecks?: (candidate: UiTokenCandidate) => void;
@@ -38,6 +44,7 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
   ageSeconds = null,
   freshnessStatus = null,
   sourceIds = [],
+  sourceHealth,
   scannerUnavailableReasonCode = null,
   onOpenCandidate,
   onOpenExternalChecks,
@@ -62,7 +69,9 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
     ?? establishedCandidates.filter((candidate) => candidate.basicFilterStatus === "passed_basic_filter").length;
   const securityChecked = establishedCandidates.filter((candidate) => candidate.security !== null).length;
   const freshness = getFreshness(ageSeconds, freshnessStatus, locale);
-  const sourceState = getSourceState(metadata, sourceIds, locale);
+  const resolvedSourceHealth = sourceHealth
+    ?? resolveProductSourceHealth({ metadata, readiness, sourceIds });
+  const sourceState = presentProductSourceHealth(resolvedSourceHealth, locale, "summary");
   const stale = freshnessStatus === "STALE" || (ageSeconds !== null && ageSeconds > 1800);
 
   return (
@@ -553,26 +562,6 @@ function getFreshness(
     return { value: importTranslation(locale, "status.delayed"), detail: importTranslation(locale, "status.waiting"), tone: "warning" };
   }
   return { value: importTranslation(locale, "status.current"), detail: formatProductAge(ageSeconds, locale), tone: "ready" };
-}
-
-function getSourceState(
-  metadata: ScannerDiscoveryMetadata | null | undefined,
-  sourceIds: string[],
-  locale: ProductLocale,
-): { value: string; detail: string; tone: Tone } {
-  const health = Object.entries(metadata?.source_health ?? {});
-  const degraded = health.filter(([, state]) => state === "DEGRADED" || state === "UNAVAILABLE");
-  if (degraded.length > 0) {
-    return {
-      value: importTranslation(locale, "status.partial"),
-      detail: degraded.map(([id]) => id).join(", "),
-      tone: "warning",
-    };
-  }
-  if (sourceIds.length === 0) {
-    return { value: importTranslation(locale, "status.unavailable"), detail: importTranslation(locale, "status.noTimestamp"), tone: "warning" };
-  }
-  return { value: importTranslation(locale, "status.available"), detail: sourceIds.join(", "), tone: "ready" };
 }
 
 function formatSecurityLabel(label: string, invoked: boolean, locale: ProductLocale): string {

@@ -13,6 +13,7 @@ import {
   type ProductSectionId,
 } from "./components/ProductWorkspaceShell";
 import { ProductLocaleProvider, useProductLocale } from "./productI18n";
+import { resolveProductSourceHealth } from "./productSourceHealth";
 import { getProductRuntimeMode } from "./runtimeMode";
 import {
   loadScannerApiDataSourceResult,
@@ -93,6 +94,10 @@ export function ProductAppContent() {
   const verificationCandidate =
     candidates.find((candidate) => candidate.id === verificationCandidateId)
     ?? selectedCandidate;
+  const sourceHealth = useMemo(
+    () => resolveProductSourceHealth({ metadata, readiness, sourceIds }),
+    [metadata, readiness, sourceIds],
+  );
 
   const loadData = useCallback((): Promise<void> => {
     if (refreshPromiseRef.current) return refreshPromiseRef.current;
@@ -198,6 +203,7 @@ export function ProductAppContent() {
             ageSeconds={ageSeconds}
             freshnessStatus={freshnessStatus}
             sourceIds={sourceIds}
+            sourceHealth={sourceHealth}
             scannerUnavailableReasonCode={reasonCode}
             onOpenCandidate={openCandidate}
             onOpenExternalChecks={openVerification}
@@ -247,6 +253,7 @@ export function ProductAppContent() {
       freshnessStatus={freshnessStatus}
       viewRefreshedAt={viewRefreshedAt}
       sourceIds={sourceIds}
+      sourceHealth={sourceHealth}
       readiness={readiness}
       readinessReasonCode={readinessReasonCode}
       dataUnavailableMessage={unavailableMessage}
