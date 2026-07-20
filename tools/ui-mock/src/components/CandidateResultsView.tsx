@@ -1,4 +1,14 @@
 import React, { useEffect, useMemo, useState } from "react";
+import {
+  formatProductAge,
+  formatProductDateTime,
+  formatProductTime,
+  formatProductUsd,
+  PRODUCT_TRANSLATIONS,
+  useProductLocale,
+  type ProductLocale,
+} from "../productI18n";
+import { formatFilterReason, formatStatusReason } from "../productPresentation";
 import type {
   ProductReadinessOutput,
   ScannerDiscoveryMetadata,
@@ -14,6 +24,7 @@ interface CandidateResultsViewProps {
   readiness?: ProductReadinessOutput | null;
   generatedAt?: string | null;
   ageSeconds?: number | null;
+  freshnessStatus?: "FRESH" | "STALE" | null;
   sourceIds?: string[];
   scannerUnavailableReasonCode?: string | null;
   onOpenCandidate?: (candidateId: string) => void;
@@ -26,11 +37,13 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
   readiness,
   generatedAt = null,
   ageSeconds = null,
+  freshnessStatus = null,
   sourceIds = [],
   scannerUnavailableReasonCode = null,
   onOpenCandidate,
   onOpenExternalChecks,
 }) => {
+  const { locale, t } = useProductLocale();
   const newCandidates = useMemo(
     () => candidates.filter((candidate) => candidate.discoveryBasket === "new_emerging"),
     [candidates],
@@ -49,46 +62,57 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
   const establishedAfterFilters = metadata?.established?.candidates_after_filters
     ?? establishedCandidates.filter((candidate) => candidate.basicFilterStatus === "passed_basic_filter").length;
   const securityChecked = establishedCandidates.filter((candidate) => candidate.security !== null).length;
-  const freshness = getFreshness(ageSeconds, readiness?.scanner.reason_code ?? scannerUnavailableReasonCode);
-  const sourceState = getSourceState(metadata, sourceIds);
+  const freshness = getFreshness(ageSeconds, freshnessStatus, locale);
+  const sourceState = getSourceState(metadata, sourceIds, locale);
+  const stale = freshnessStatus === "STALE" || (ageSeconds !== null && ageSeconds > 1800);
 
   return (
     <div className="candidate-results-view product-radar">
+      {stale && generatedAt && (
+        <section className="product-stale-warning" role="status">
+          <strong>{t("status.delayed")}</strong>
+          <p>{t("radar.staleWarning", { time: formatProductTime(generatedAt, locale) })}</p>
+          {ageSeconds !== null && <small>{t("radar.staleAge", { age: formatProductAge(ageSeconds, locale) })}</small>}
+        </section>
+      )}
+
       <section className="product-radar-intro">
         <div>
-          <span className="candidate-results-eyebrow">INTERNAL_BETA · real-data</span>
-          <h3>Dwa koszyki, dwa różne znaczenia</h3>
-          <p>
-            Nowe projekty służą obserwacji. Established to osobna, utrzymywana przez ownera lista adresów
-            i jedyny koszyk głównego Radaru.
-          </p>
+          <span className="candidate-results-eyebrow">{t("radar.eyebrow")}</span>
+          <h3>{t("radar.title")}</h3>
+          <p>{t("radar.intro")}</p>
         </div>
         <div className={`product-freshness ${freshness.tone}`}>
-          <span>Dane</span>
+          <span>{t("radar.data")}</span>
           <strong>{freshness.value}</strong>
           <small>{freshness.detail}</small>
         </div>
       </section>
 
-      <section className="product-summary-grid" aria-label="Podsumowanie Radaru">
-        <SummaryCard label="Nowe projekty" value={String(newCandidates.length)} detail="wyłącznie obserwacja" />
-        <SummaryCard label="Established entries" value={String(establishedEntries)} detail="aktywne adresy w universe" />
-        <SummaryCard label="Established po filtrach" value={String(establishedAfterFilters)} detail="kandydaci do analizy" />
-        <SummaryCard label="Security sprawdzone" value={String(securityChecked)} detail="GoPlus po filtrach" />
-        <SummaryCard label="Dane wygenerowane" value={freshness.value} detail={generatedAt ? formatTimestamp(generatedAt) : freshness.detail} tone={freshness.tone} />
-        <SummaryCard label="Stan źródeł" value={sourceState.value} detail={sourceState.detail} tone={sourceState.tone} />
+      <section className="product-summary-grid" aria-label={t("radar.summary")}>
+        <SummaryCard label={t("radar.newProjects")} value={String(newCandidates.length)} detail={t("radar.observationOnly")} />
+        <SummaryCard label={t("radar.establishedEntries")} value={String(establishedEntries)} detail={t("radar.activeUniverseAddresses")} />
+        <SummaryCard label={t("radar.establishedAfterFilters")} value={String(establishedAfterFilters)} detail={t("radar.candidatesForReview")} />
+        <SummaryCard label={t("radar.securityChecked")} value={String(securityChecked)} detail={t("radar.goPlusAfterFilters")} />
+        <SummaryCard
+          label={t("app.generated")}
+          value={freshness.value}
+          detail={generatedAt ? formatProductDateTime(generatedAt, locale) : freshness.detail}
+          tone={freshness.tone}
+        />
+        <SummaryCard label={t("radar.sourceState")} value={sourceState.value} detail={sourceState.detail} tone={sourceState.tone} />
       </section>
 
-      <section className="basket-switcher" aria-label="Wybór koszyka">
+      <section className="basket-switcher" aria-label={t("radar.basketSelection")}>
         <button
           type="button"
           className={activeBasket === "new_emerging" ? "active" : ""}
           onClick={() => setActiveBasket("new_emerging")}
           aria-pressed={activeBasket === "new_emerging"}
         >
-          <span>Nowe / obserwacja</span>
+          <span>{t("radar.newBasket")}</span>
           <strong>{newCandidates.length}</strong>
-          <small>Bardzo nowe projekty, bez automatycznego awansu</small>
+          <small>{t("radar.newBasketDescription")}</small>
         </button>
         <button
           type="button"
@@ -96,17 +120,17 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
           onClick={() => setActiveBasket("established")}
           aria-pressed={activeBasket === "established"}
         >
-          <span>Established / główny Radar</span>
+          <span>{t("radar.establishedBasket")}</span>
           <strong>{establishedCandidates.length}</strong>
-          <small>{getEstablishedTabStatus(metadata, readiness)}</small>
+          <small>{getEstablishedTabStatus(metadata, readiness, locale)}</small>
         </button>
       </section>
 
       {scannerUnavailableReasonCode ? (
         <BasketUnavailable
-          title="Radar nie może odczytać aktualnego skanu"
+          title={t("radar.unavailableTitle")}
           reasonCode={scannerUnavailableReasonCode}
-          detail="Nie utworzono danych przykładowych. Sprawdź output i readiness lokalnego Scanner API."
+          detail={t("radar.unavailableDetail")}
         />
       ) : activeBasket === "new_emerging" ? (
         <NewEmergingBasket
@@ -142,13 +166,14 @@ export function NewEmergingBasket({
   onOpenCandidate?: (candidateId: string) => void;
   onOpenExternalChecks?: (candidate: UiTokenCandidate) => void;
 }) {
+  const { t } = useProductLocale();
   const state = readiness?.discovery.new_emerging;
   if (state && !state.ready) {
     return (
       <BasketUnavailable
-        title="Koszyk Nowe / obserwacja jest niedostępny"
+        title={t("radar.newUnavailableTitle")}
         reasonCode={state.reason_code ?? "NEW_EMERGING_UNAVAILABLE"}
-        detail="Pozostałe części produktu mogą nadal działać. Brak danych nie jest uzupełniany przykładem."
+        detail={t("radar.newUnavailableDetail")}
       />
     );
   }
@@ -156,31 +181,32 @@ export function NewEmergingBasket({
   if (candidates.length === 0) {
     return (
       <BasketEmpty
-        title="Brak nowych projektów w aktualnym skanie"
-        detail="To uczciwy wynik bieżącego źródła. System nie tworzy sample candidates."
+        title={t("radar.newEmptyTitle")}
+        detail={t("radar.newEmptyDetail")}
         code="NEW_EMERGING_EMPTY"
       />
     );
   }
 
   return (
-    <section className="basket-content" aria-label="Nowe projekty — obserwacja">
-      {metadata?.discovery_status === "DEGRADED" ? (
+    <section className="basket-content" aria-label={t("radar.newBasket")}>
+      {metadata?.discovery_status === "DEGRADED" && (
         <div className="product-partial-data" role="status">
-          <strong>DEGRADED</strong>
-          <span>Dane częściowe — część par DexScreener była chwilowo niedostępna</span>
-          <small>
-            {metadata.pair_requests_succeeded ?? 0}/{metadata.seed_count ?? 0} zapytań seed zakończonych powodzeniem
-          </small>
+          <strong>{t("radar.partialTitle")}</strong>
+          <span>{t("radar.partialDetail")}</span>
+          <small>{t("radar.partialRequests", {
+            succeeded: metadata.pair_requests_succeeded ?? 0,
+            total: metadata.seed_count ?? 0,
+          })}</small>
         </div>
-      ) : null}
+      )}
       <header className="basket-heading">
         <div>
-          <span>Nowe / Emerging</span>
-          <h3>Obserwacja bardzo nowych projektów</h3>
-          <p>Obecność w tym koszyku nie oznacza statusu Established ani uruchomienia kontroli GoPlus.</p>
+          <span>{t("radar.newHeadingEyebrow")}</span>
+          <h3>{t("radar.newHeading")}</h3>
+          <p>{t("radar.newHeadingDetail")}</p>
         </div>
-        <strong className="basket-status observation">OBSERWACJA — NOWY PROJEKT</strong>
+        <strong className="basket-status observation">{t("radar.observationLabel")}</strong>
       </header>
       <div className="product-candidate-list">
         {candidates.map((candidate) => (
@@ -205,56 +231,55 @@ function NewCandidateCard({
   onOpenCandidate?: (candidateId: string) => void;
   onOpenExternalChecks?: (candidate: UiTokenCandidate) => void;
 }) {
+  const { locale, t } = useProductLocale();
   const reasons = candidate.filterReasons.slice(0, 3);
   return (
     <article className="product-candidate-card observation">
       <header className="product-candidate-topline">
         <div>
-          <span className="candidate-results-eyebrow">Nowy projekt — obserwacja</span>
+          <span className="candidate-results-eyebrow">{t("radar.newProjectEyebrow")}</span>
           <h4>{candidate.symbol} <small>{candidate.name}</small></h4>
-          <p>{formatChain(candidate.chain)} · {candidate.dex || "DEX niepodany"} · {candidate.source}</p>
+          <p>{formatChain(candidate.chain, t("radar.networkMissing"))} · {candidate.dex || t("radar.dexMissing")} · {candidate.source}</p>
         </div>
-        <strong className="basket-status observation">OBSERWACJA — NOWY PROJEKT</strong>
+        <strong className="basket-status observation">{t("radar.observationLabel")}</strong>
       </header>
 
       <div className="product-metrics-grid">
-        <Metric label="Wiek pary" value={formatDays(candidate.pairAgeDays)} />
-        <Metric label="Cena" value={formatPrice(candidate.priceUsd)} />
-        <Metric label={candidate.marketCap == null ? "FDV" : "Market cap"} value={formatUsd(candidate.marketCap ?? candidate.fdvUsd)} />
-        <Metric label="Liquidity" value={formatUsd(candidate.liquidity)} />
-        <Metric label="Volume 24h" value={formatUsd(candidate.volume24h)} />
-        <Metric label="Ratio" value={formatRatio(candidate.volumeMarketCapRatio)} />
+        <Metric label={t("radar.pairAge")} value={formatDays(candidate.pairAgeDays, locale, t("radar.missingData"))} />
+        <Metric label={t("radar.price")} value={formatPrice(candidate.priceUsd, t("radar.missingData"))} />
+        <Metric label={candidate.marketCap == null ? "FDV" : t("radar.marketCap")} value={formatProductUsd(candidate.marketCap ?? candidate.fdvUsd, locale, t("radar.missingData"))} />
+        <Metric label={t("radar.liquidity")} value={formatProductUsd(candidate.liquidity, locale, t("radar.missingData"))} />
+        <Metric label={t("radar.volume24h")} value={formatProductUsd(candidate.volume24h, locale, t("radar.missingData"))} />
+        <Metric label={t("radar.ratio")} value={formatRatio(candidate.volumeMarketCapRatio, t("radar.missingData"))} />
       </div>
 
       <div className="candidate-explanation-grid">
-        <Explanation
-          label="Dlaczego jest tutaj"
-          value="Profil z najnowszego strumienia DexScreener; projekt jest obserwacyjny."
-        />
-        <Explanation
-          label="Dlaczego nie jest Established"
-          value="Nie pochodzi z wersjonowanej listy adresów i nie ma automatycznego awansu."
-        />
-        <Explanation
-          label="Status operacyjny"
-          value={`observation_only=${String(candidate.observationOnly)} · established_eligible=${String(candidate.establishedEligible)}`}
-        />
+        <Explanation label={t("radar.whyHere")} value={t("radar.whyHereDetail")} />
+        <Explanation label={t("radar.whyNotEstablished")} value={t("radar.whyNotEstablishedDetail")} />
+        <div>
+          <span>{t("radar.operationalStatus")}</span>
+          <p>{t("radar.observationOnly")}</p>
+          <details>
+            <summary>{t("app.technicalDetails")}</summary>
+            <code>observation_only={String(candidate.observationOnly)} · established_eligible={String(candidate.establishedEligible)}</code>
+          </details>
+        </div>
       </div>
 
       {reasons.length > 0 && candidate.basicFilterStatus === "rejected_basic_filter" && (
         <div className="product-reason-panel warning">
-          <span>Główne powody odrzucenia przez filtry</span>
-          <ul>{reasons.map((reason) => <li key={reason}>{formatReason(reason)}</li>)}</ul>
+          <span>{t("radar.filterRejectionReasons")}</span>
+          <ul>{reasons.map((reason) => <li key={reason}><FilterReason reason={reason} /></li>)}</ul>
         </div>
       )}
 
       <footer className="product-candidate-footer">
         <div>
-          <span>Źródło i kontrola</span>
+          <span>{t("radar.sourceAndCheck")}</span>
           <strong>{candidate.source}</strong>
-          <small>{formatTimestamp(candidate.lastCheckedAt)}</small>
+          <small>{formatProductDateTime(candidate.lastCheckedAt, locale)}</small>
         </div>
-        <p>Brak automatycznej rekomendacji. Security nie jest uruchamiane wyłącznie z powodu obecności w tym koszyku.</p>
+        <p>{t("radar.newBoundary")}</p>
         <CandidateActions candidate={candidate} onOpenCandidate={onOpenCandidate} onOpenExternalChecks={onOpenExternalChecks} />
       </footer>
     </article>
@@ -274,26 +299,28 @@ export function EstablishedBasket({
   onOpenCandidate?: (candidateId: string) => void;
   onOpenExternalChecks?: (candidate: UiTokenCandidate) => void;
 }) {
+  const { t } = useProductLocale();
   const state = getEstablishedState(metadata, readiness, candidates);
   if (state === "empty") {
     const universe = metadata?.established;
     return (
-      <section className="established-empty" aria-label="Pusty koszyk Established">
-        <span className="candidate-results-eyebrow">Konfiguracja gotowa</span>
-        <h3>Koszyk Established jest pusty</h3>
-        <p>
-          To nie jest błąd systemu. Wersjonowana lista adresów kontraktów nie została jeszcze uzupełniona.
-          Dane New / Emerging mogą nadal być aktualne, a system nie zastępuje braku wpisów przykładowymi tokenami.
-        </p>
+      <section className="established-empty" aria-label={t("radar.establishedEmptyTitle")}>
+        <span className="candidate-results-eyebrow">{t("radar.establishedEmptyEyebrow")}</span>
+        <h3>{t("radar.establishedEmptyTitle")}</h3>
+        <p>{t("radar.establishedEmptyDetail")}</p>
         <div className="empty-state-facts">
-          <Metric label="Stan" value="ESTABLISHED_UNIVERSE_EMPTY" tone="warning" />
-          <Metric label="Wersja universe" value={universe?.universe_version ?? "established_address_universe_v1"} />
-          <Metric label="Aktywne wpisy" value="0" />
+          <div className="product-metric warning">
+            <span>{t("radar.state")}</span>
+            <strong>{t("radar.establishedEmptyEyebrow")}</strong>
+            <details><summary>{t("app.technicalDetails")}</summary><code>ESTABLISHED_UNIVERSE_EMPTY</code></details>
+          </div>
+          <Metric label={t("radar.universeVersion")} value={universe?.universe_version ?? "established_address_universe_v1"} />
+          <Metric label={t("radar.activeEntries")} value="0" />
         </div>
         <div className="empty-state-next-step">
-          <span>Instrukcja operacyjna</span>
-          <strong>Uzupełnij wersjonowaną listę adresów kontraktów</strong>
-          <small>Ten etap nie udostępnia interfejsu edycji i nie kieruje do danych demo.</small>
+          <span>{t("radar.operationalInstruction")}</span>
+          <strong>{t("radar.populateUniverse")}</strong>
+          <small>{t("radar.noEditor")}</small>
         </div>
       </section>
     );
@@ -302,22 +329,22 @@ export function EstablishedBasket({
   if (state === "unavailable") {
     return (
       <BasketUnavailable
-        title="Koszyk Established jest niedostępny"
+        title={t("radar.establishedUnavailableTitle")}
         reasonCode={readiness?.discovery.established.reason_code ?? "ESTABLISHED_UNAVAILABLE"}
-        detail="Nie oznacza to pustego universe. Sprawdź readiness i aktualny snapshot."
+        detail={t("radar.establishedUnavailableDetail")}
       />
     );
   }
 
   return (
-    <section className="basket-content" aria-label="Established — główny Radar">
+    <section className="basket-content" aria-label={t("radar.establishedBasket")}>
       <header className="basket-heading">
         <div>
           <span>Established</span>
-          <h3>Główny Radar oparty na adresach</h3>
-          <p>Tożsamość jest ustalana przez chain + contract address. GoPlus pojawia się dopiero po filtrach.</p>
+          <h3>{t("radar.establishedHeading")}</h3>
+          <p>{t("radar.establishedHeadingDetail")}</p>
         </div>
-        <strong className="basket-status established">GŁÓWNY RADAR</strong>
+        <strong className="basket-status established">{t("radar.mainRadar")}</strong>
       </header>
       <div className="product-candidate-list">
         {candidates.map((candidate) => (
@@ -342,53 +369,54 @@ function EstablishedCandidateCard({
   onOpenCandidate?: (candidateId: string) => void;
   onOpenExternalChecks?: (candidate: UiTokenCandidate) => void;
 }) {
-  const status = getEstablishedCandidateStatus(candidate);
+  const { locale, t } = useProductLocale();
+  const status = getEstablishedCandidateStatus(candidate, locale);
   const riskFlags = candidate.riskFlags.slice(0, 3);
   return (
     <article className={`product-candidate-card ${status.tone}`}>
       <header className="product-candidate-topline">
         <div>
-          <span className="candidate-results-eyebrow">Established · {formatChain(candidate.chain)}</span>
+          <span className="candidate-results-eyebrow">Established · {formatChain(candidate.chain, t("radar.networkMissing"))}</span>
           <h4>{candidate.symbol} <small>{candidate.name}</small></h4>
           <div className="contract-line">
-            <code title={candidate.contractAddress}>{shortenAddress(candidate.contractAddress)}</code>
-            <button type="button" onClick={() => copyValue(candidate.contractAddress)} aria-label={`Kopiuj adres kontraktu ${candidate.symbol}`}>Kopiuj</button>
+            <code title={candidate.contractAddress}>{shortenAddress(candidate.contractAddress, t("radar.missingData"))}</code>
+            <button type="button" onClick={() => copyValue(candidate.contractAddress)} aria-label={t("radar.copyContract", { symbol: candidate.symbol })}>{t("radar.copy")}</button>
           </div>
         </div>
         <div className="candidate-status-stack">
           <strong className={`basket-status ${status.tone}`}>{status.label}</strong>
-          {candidate.finalLabel === "WATCHLIST" && <small>WATCHLIST — wyłącznie ręczna analiza</small>}
+          {candidate.finalLabel === "WATCHLIST" && <small>{t("radar.manualReviewOnly")}</small>}
         </div>
       </header>
 
       <div className="product-metrics-grid established">
-        <Metric label="Address identity" value={candidate.addressIdentityVerified ? "Zweryfikowana" : "Wymaga weryfikacji"} tone={candidate.addressIdentityVerified ? "ready" : "warning"} />
-        <Metric label="Market cap" value={formatUsd(candidate.marketCap ?? candidate.fdvUsd)} />
-        <Metric label="Liquidity" value={formatUsd(candidate.liquidity)} />
-        <Metric label="Volume 24h" value={formatUsd(candidate.volume24h)} />
-        <Metric label="Ratio" value={formatRatio(candidate.volumeMarketCapRatio)} />
-        <Metric label="Wiek pary" value={formatDays(candidate.pairAgeDays)} />
-        <Metric label="Basic filters" value={candidate.basicFilterStatus === "passed_basic_filter" ? "Spełnione" : "Odrzucone"} tone={candidate.basicFilterStatus === "passed_basic_filter" ? "ready" : "warning"} />
-        <Metric label="Security" value={formatSecurityLabel(candidate.securityLabel, candidate.security !== null)} tone={candidate.security ? status.tone : "warning"} />
+        <Metric label={t("radar.addressIdentity")} value={candidate.addressIdentityVerified ? t("radar.verified") : t("radar.needsVerification")} tone={candidate.addressIdentityVerified ? "ready" : "warning"} />
+        <Metric label={t("radar.marketCap")} value={formatProductUsd(candidate.marketCap ?? candidate.fdvUsd, locale, t("radar.missingData"))} />
+        <Metric label={t("radar.liquidity")} value={formatProductUsd(candidate.liquidity, locale, t("radar.missingData"))} />
+        <Metric label={t("radar.volume24h")} value={formatProductUsd(candidate.volume24h, locale, t("radar.missingData"))} />
+        <Metric label={t("radar.ratio")} value={formatRatio(candidate.volumeMarketCapRatio, t("radar.missingData"))} />
+        <Metric label={t("radar.pairAge")} value={formatDays(candidate.pairAgeDays, locale, t("radar.missingData"))} />
+        <Metric label={t("radar.basicFilters")} value={candidate.basicFilterStatus === "passed_basic_filter" ? t("radar.conditionsMet") : t("radar.conditionsRejected")} tone={candidate.basicFilterStatus === "passed_basic_filter" ? "ready" : "warning"} />
+        <Metric label={t("radar.security")} value={formatSecurityLabel(candidate.securityLabel, candidate.security !== null, locale)} tone={candidate.security ? status.tone : "warning"} />
       </div>
 
       <div className="product-reason-panel">
-        <span>Najważniejsze ryzyka i braki</span>
+        <span>{t("radar.risksAndGaps")}</span>
         <div className="candidate-risk-chips">
           {(riskFlags.length > 0 ? riskFlags : candidate.missingData.slice(0, 3)).map((flag) => (
-            <small key={flag}>{formatReason(flag)}</small>
+            <small key={flag}>{humanizeReason(flag)}</small>
           ))}
-          {riskFlags.length === 0 && candidate.missingData.length === 0 && <small>Brak zgłoszonych flag w aktualnym snapshotcie</small>}
+          {riskFlags.length === 0 && candidate.missingData.length === 0 && <small>{t("radar.noReportedFlags")}</small>}
         </div>
       </div>
 
       <footer className="product-candidate-footer">
         <div>
-          <span>Ostatnia kontrola</span>
-          <strong>{formatTimestamp(candidate.lastCheckedAt)}</strong>
+          <span>{t("radar.lastCheck")}</span>
+          <strong>{formatProductDateTime(candidate.lastCheckedAt, locale)}</strong>
           <small>{candidate.security?.sources.join(", ") || candidate.source}</small>
         </div>
-        <p>Universe: {candidate.universeVersion ?? "brak"} · wpis {candidate.universeEntryIndex ?? "brak"}</p>
+        <p>Universe: {candidate.universeVersion ?? t("radar.none")} · {t("radar.activeEntries")}: {candidate.universeEntryIndex ?? t("radar.none")}</p>
         <CandidateActions candidate={candidate} onOpenCandidate={onOpenCandidate} onOpenExternalChecks={onOpenExternalChecks} />
       </footer>
     </article>
@@ -404,31 +432,37 @@ function CandidateActions({
   onOpenCandidate?: (candidateId: string) => void;
   onOpenExternalChecks?: (candidate: UiTokenCandidate) => void;
 }) {
+  const { t } = useProductLocale();
   return (
     <div className="product-card-actions">
-      {onOpenCandidate && <button type="button" onClick={() => onOpenCandidate(candidate.id)}>Otwórz szczegóły</button>}
-      {onOpenExternalChecks && <button type="button" className="secondary" onClick={() => onOpenExternalChecks(candidate)}>Weryfikacja źródłowa</button>}
+      {onOpenCandidate && <button type="button" onClick={() => onOpenCandidate(candidate.id)}>{t("radar.openDetails")}</button>}
+      {onOpenExternalChecks && <button type="button" className="secondary" onClick={() => onOpenExternalChecks(candidate)}>{t("radar.sourceVerification")}</button>}
     </div>
+  );
+}
+
+function FilterReason({ reason }: { reason: string }) {
+  const { locale, t } = useProductLocale();
+  const presentation = formatFilterReason(reason, locale);
+  return (
+    <span className="filter-reason-copy">
+      {presentation.summary}
+      {!presentation.known && (
+        <details>
+          <summary>{t("app.technicalDetails")}</summary>
+          <code>{presentation.rawReason}</code>
+        </details>
+      )}
+    </span>
   );
 }
 
 function SummaryCard({ label, value, detail, tone = "neutral" }: { label: string; value: string; detail: string; tone?: Tone }) {
-  return (
-    <div className={`product-summary-card ${tone}`}>
-      <span>{label}</span>
-      <strong>{value}</strong>
-      <p>{detail}</p>
-    </div>
-  );
+  return <div className={`product-summary-card ${tone}`}><span>{label}</span><strong>{value}</strong><p>{detail}</p></div>;
 }
 
 function Metric({ label, value, tone = "neutral" }: { label: string; value: string; tone?: Tone }) {
-  return (
-    <div className={`product-metric ${tone}`}>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  );
+  return <div className={`product-metric ${tone}`}><span>{label}</span><strong>{value}</strong></div>;
 }
 
 function Explanation({ label, value }: { label: string; value: string }) {
@@ -436,23 +470,32 @@ function Explanation({ label, value }: { label: string; value: string }) {
 }
 
 function BasketUnavailable({ title, reasonCode, detail }: { title: string; reasonCode: string; detail: string }) {
+  const { locale, t } = useProductLocale();
   return (
     <section className="basket-state unavailable" role="status">
-      <span>Niedostępne</span>
+      <span>{t("status.unavailable")}</span>
       <h3>{title}</h3>
-      <code>{reasonCode}</code>
+      <p>{formatStatusReason(reasonCode, locale)}</p>
       <p>{detail}</p>
+      <details>
+        <summary>{t("app.technicalDetails")}</summary>
+        <code>{reasonCode}</code>
+      </details>
     </section>
   );
 }
 
 function BasketEmpty({ title, detail, code }: { title: string; detail: string; code: string }) {
+  const { t } = useProductLocale();
   return (
     <section className="basket-state empty" role="status">
-      <span>Pusty wynik</span>
+      <span>{t("radar.emptyResult")}</span>
       <h3>{title}</h3>
-      <code>{code}</code>
       <p>{detail}</p>
+      <details>
+        <summary>{t("app.technicalDetails")}</summary>
+        <code>{code}</code>
+      </details>
     </section>
   );
 }
@@ -477,101 +520,100 @@ export function getEstablishedState(
   return "ready";
 }
 
-function getEstablishedTabStatus(metadata?: ScannerDiscoveryMetadata | null, readiness?: ProductReadinessOutput | null): string {
+function getEstablishedTabStatus(
+  metadata: ScannerDiscoveryMetadata | null | undefined,
+  readiness: ProductReadinessOutput | null | undefined,
+  locale: ProductLocale,
+): string {
+  const t = (key: keyof typeof PRODUCT_TRANSLATIONS.en) => importTranslation(locale, key);
   if (readiness?.discovery.established.status === "empty_configured" || metadata?.established?.universe_status === "ESTABLISHED_UNIVERSE_EMPTY") {
-    return "Universe skonfigurowany, 0 aktywnych wpisów";
+    return t("radar.establishedTabEmpty");
   }
-  if (readiness?.discovery.established.status === "unavailable") return readiness.discovery.established.reason_code ?? "Niedostępny";
-  return "Adresy, filtry i bezpieczeństwo";
+  if (readiness?.discovery.established.status === "unavailable") return t("radar.establishedTabUnavailable");
+  return t("radar.establishedTabReady");
 }
 
-function getEstablishedCandidateStatus(candidate: UiTokenCandidate): { label: string; tone: Tone } {
-  if (candidate.finalLabel === "CRITICAL_RISK") return { label: "Krytyczne ryzyko", tone: "critical" };
-  if (candidate.basicFilterStatus === "rejected_basic_filter" || candidate.finalLabel === "REJECT") return { label: "Odrzucony przez filtry", tone: "warning" };
-  if (!candidate.security || candidate.finalLabel === "NEEDS_MANUAL_VERIFICATION") return { label: "Wymaga weryfikacji", tone: "warning" };
-  return { label: "Kandydat do ręcznej analizy", tone: "accent" };
+function getEstablishedCandidateStatus(candidate: UiTokenCandidate, locale: ProductLocale): { label: string; tone: Tone } {
+  if (candidate.finalLabel === "CRITICAL_RISK") return { label: importTranslation(locale, "radar.criticalRisk"), tone: "critical" };
+  if (candidate.basicFilterStatus === "rejected_basic_filter" || candidate.finalLabel === "REJECT") {
+    return { label: importTranslation(locale, "radar.rejectedByFilters"), tone: "warning" };
+  }
+  if (!candidate.security || candidate.finalLabel === "NEEDS_MANUAL_VERIFICATION") {
+    return { label: importTranslation(locale, "radar.needsVerification"), tone: "warning" };
+  }
+  return { label: importTranslation(locale, "radar.candidateManualReview"), tone: "accent" };
 }
 
-function getFreshness(ageSeconds: number | null, reasonCode?: string | null): { value: string; detail: string; tone: Tone } {
-  if (ageSeconds == null) return { value: "Niedostępne", detail: reasonCode ?? "SCANNER_TIMESTAMP_MISSING", tone: "warning" };
-  if (ageSeconds <= 1800) return { value: "Aktualne", detail: `${formatAge(ageSeconds)} temu`, tone: "ready" };
-  return { value: "Nieaktualne", detail: reasonCode ?? "SCANNER_SNAPSHOT_STALE", tone: "critical" };
+function getFreshness(
+  ageSeconds: number | null,
+  freshnessStatus: "FRESH" | "STALE" | null,
+  locale: ProductLocale,
+): { value: string; detail: string; tone: Tone } {
+  if (ageSeconds == null) return { value: importTranslation(locale, "status.unavailable"), detail: importTranslation(locale, "status.noTimestamp"), tone: "warning" };
+  if (freshnessStatus === "STALE" || ageSeconds > 1800) {
+    return { value: importTranslation(locale, "status.delayed"), detail: importTranslation(locale, "status.waiting"), tone: "warning" };
+  }
+  return { value: importTranslation(locale, "status.current"), detail: formatProductAge(ageSeconds, locale), tone: "ready" };
 }
 
-function getSourceState(metadata: ScannerDiscoveryMetadata | null | undefined, sourceIds: string[]): { value: string; detail: string; tone: Tone } {
+function getSourceState(
+  metadata: ScannerDiscoveryMetadata | null | undefined,
+  sourceIds: string[],
+  locale: ProductLocale,
+): { value: string; detail: string; tone: Tone } {
   const health = Object.entries(metadata?.source_health ?? {});
-  if (metadata?.source_health?.dexscreener === "DEGRADED") {
+  const degraded = health.filter(([, state]) => state === "DEGRADED" || state === "UNAVAILABLE");
+  if (degraded.length > 0) {
     return {
-      value: "DEGRADED",
-      detail: "Dane częściowe — część par DexScreener była chwilowo niedostępna",
+      value: importTranslation(locale, "status.partial"),
+      detail: degraded.map(([id]) => id).join(", "),
       tone: "warning",
     };
   }
-  const degraded = health.filter(([, state]) => state === "DEGRADED" || state === "UNAVAILABLE");
-  if (degraded.length > 0) return { value: "Degradacja", detail: degraded.map(([id, state]) => `${id}: ${state}`).join(", "), tone: "warning" };
-  if (sourceIds.length === 0) return { value: "Brak", detail: "SOURCE_IDS_MISSING", tone: "warning" };
-  return { value: "Dostępne", detail: sourceIds.join(", "), tone: "ready" };
+  if (sourceIds.length === 0) {
+    return { value: importTranslation(locale, "status.unavailable"), detail: importTranslation(locale, "status.noTimestamp"), tone: "warning" };
+  }
+  return { value: importTranslation(locale, "status.available"), detail: sourceIds.join(", "), tone: "ready" };
 }
 
-function formatSecurityLabel(label: string, invoked: boolean): string {
-  if (!invoked || label === "NOT_CHECKED") return "Nie uruchomiono";
-  if (label === "SECURITY_PASSED") return "Sprawdzone — wymaga analizy";
-  if (label.includes("CRITICAL")) return "Krytyczne ryzyko";
-  return "Wymaga weryfikacji";
+function formatSecurityLabel(label: string, invoked: boolean, locale: ProductLocale): string {
+  if (!invoked || label === "NOT_CHECKED") return importTranslation(locale, "radar.securityNotRun");
+  if (label === "SECURITY_PASSED") return importTranslation(locale, "radar.securityCheckedManual");
+  if (label.includes("CRITICAL")) return importTranslation(locale, "radar.criticalRisk");
+  return importTranslation(locale, "radar.needsVerification");
 }
 
-const REASON_COPY: Record<string, string> = {
-  market_cap_below_min: "Market cap poniżej 300 tys. USD",
-  market_cap_above_max: "Market cap powyżej 10 mln USD",
-  volume_24h_below_min: "Volume 24h poniżej 30 tys. USD",
-  liquidity_below_min: "Liquidity poniżej 30 tys. USD",
-  volume_market_cap_ratio_below_min: "Ratio poniżej 0,01",
-  volume_market_cap_ratio_above_max: "Ratio powyżej 1",
-  pair_age_below_min: "Para ma nie więcej niż 7 dni",
-};
-
-function formatReason(value: string): string {
-  return REASON_COPY[value] ?? value.replaceAll("_", " ");
+function importTranslation(locale: ProductLocale, key: keyof typeof PRODUCT_TRANSLATIONS.en): string {
+  return PRODUCT_TRANSLATIONS[locale][key];
 }
 
-function formatChain(value: string): string {
-  return value ? value.toUpperCase() : "SIEĆ NIEPODANA";
+function formatChain(value: string, missing: string): string {
+  return value ? value.toUpperCase() : missing;
 }
 
-function formatUsd(value: number | null): string {
-  if (value == null) return "Brak danych";
-  return new Intl.NumberFormat("pl-PL", { style: "currency", currency: "USD", maximumFractionDigits: value < 1 ? 6 : 0 }).format(value);
+function formatPrice(value: number | null, missing: string): string {
+  return value == null ? missing : `$${value.toLocaleString("en-US", { maximumSignificantDigits: 6 })}`;
 }
 
-function formatPrice(value: number | null): string {
-  if (value == null) return "Brak danych";
-  return `$${value.toLocaleString("en-US", { maximumSignificantDigits: 6 })}`;
+function formatRatio(value: number | null, missing: string): string {
+  return value == null ? missing : value.toFixed(4);
 }
 
-function formatRatio(value: number | null): string {
-  return value == null ? "Brak danych" : value.toFixed(4);
+function formatDays(value: number | null, locale: ProductLocale, missing: string): string {
+  if (value == null) return missing;
+  const formatted = value.toLocaleString(locale === "pl" ? "pl-PL" : "en-US", { maximumFractionDigits: value < 10 ? 1 : 0 });
+  return locale === "pl" ? `${formatted} dni` : `${formatted} days`;
 }
 
-function formatDays(value: number | null): string {
-  return value == null ? "Brak danych" : `${value.toFixed(value < 10 ? 1 : 0)} dni`;
-}
-
-function formatTimestamp(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value || "Brak danych";
-  return date.toLocaleString("pl-PL", { dateStyle: "short", timeStyle: "short" });
-}
-
-function formatAge(seconds: number): string {
-  if (seconds < 60) return `${Math.floor(seconds)} s`;
-  if (seconds < 3600) return `${Math.floor(seconds / 60)} min`;
-  return `${Math.floor(seconds / 3600)} godz.`;
-}
-
-function shortenAddress(value: string): string {
-  if (!value) return "Brak adresu";
+function shortenAddress(value: string, missing: string): string {
+  if (!value) return missing;
   if (value.length <= 20) return value;
   return `${value.slice(0, 10)}…${value.slice(-8)}`;
+}
+
+function humanizeReason(value: string): string {
+  const normalized = value.replaceAll("_", " ").trim();
+  return normalized.length === 0 ? value : normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
 function copyValue(value: string): void {

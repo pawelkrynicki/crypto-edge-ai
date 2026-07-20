@@ -5,6 +5,7 @@ import {
   type ExternalVerificationInput,
   type ExternalVerificationTarget,
 } from "../externalVerificationTargets";
+import { useProductLocale } from "../productI18n";
 import type { UiTokenCandidate } from "../types/scannerTypes";
 
 interface ExternalVerificationLinksViewProps {
@@ -12,12 +13,13 @@ interface ExternalVerificationLinksViewProps {
 }
 
 export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksViewProps> = ({ candidate }) => {
+  const { t } = useProductLocale();
   if (!candidate) {
     return (
       <section className="basket-state empty">
-        <span>Weryfikacja</span>
-        <h3>Nie wybrano kandydata</h3>
-        <p>Otwórz rekord w Radarze, a następnie wybierz weryfikację źródłową.</p>
+        <span>{t("verification.eyebrow")}</span>
+        <h3>{t("verification.noneTitle")}</h3>
+        <p>{t("verification.noneDetail")}</p>
       </section>
     );
   }
@@ -30,51 +32,48 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
     <div className="external-checks-view product-verification">
       <section className="external-checks-hero">
         <div className="external-checks-hero-copy">
-          <span className="external-checks-eyebrow">Ręczna weryfikacja źródłowa</span>
+          <span className="external-checks-eyebrow">{t("verification.manualEyebrow")}</span>
           <h3>{candidate.symbol} <small>{candidate.name}</small></h3>
-          <p>
-            Linki są tworzone wyłącznie z prawdziwego chain i contract address. Otwierają źródło dopiero po kliknięciu;
-            aplikacja nie wykonuje fetchy w przeglądarce i nie uruchamia providera automatycznie.
-          </p>
+          <p>{t("verification.intro")}</p>
         </div>
         <div className="external-checks-boundary">
-          <strong>Manual Review Only</strong>
-          <span>Brak automatycznego Honeypot.is i brak rekomendacji transakcyjnej.</span>
+          <strong>{t("detail.boundaryManual")}</strong>
+          <span>{t("verification.boundary")}</span>
         </div>
       </section>
 
-      <section className="verification-identity" aria-label="Tożsamość do weryfikacji">
-        <div><span>Sieć</span><strong>{normalizedInput.chain || "Brak danych"}</strong></div>
+      <section className="verification-identity" aria-label={t("verification.identity")}>
+        <div><span>{t("verification.network")}</span><strong>{normalizedInput.chain || t("radar.missingData")}</strong></div>
         <div className="verification-contract">
-          <span>Contract address</span>
-          <code title={normalizedInput.contractAddress}>{normalizedInput.contractAddress || "Brak danych"}</code>
+          <span>{t("verification.contractAddress")}</span>
+          <code title={normalizedInput.contractAddress}>{normalizedInput.contractAddress || t("radar.missingData")}</code>
           {normalizedInput.contractAddress && (
-            <button type="button" onClick={() => copyManualValue(normalizedInput.contractAddress)} aria-label="Kopiuj contract address">Kopiuj adres</button>
+            <button type="button" onClick={() => copyManualValue(normalizedInput.contractAddress)} aria-label={t("verification.copyContract")}>{t("verification.copyAddress")}</button>
           )}
         </div>
-        <div><span>Pair address</span><code title={normalizedInput.pairAddress}>{normalizedInput.pairAddress || "Brak danych"}</code></div>
-        <div><span>Źródło rekordu</span><strong>{candidate.source}</strong></div>
+        <div><span>{t("verification.pairAddress")}</span><code title={normalizedInput.pairAddress}>{normalizedInput.pairAddress || t("radar.missingData")}</code></div>
+        <div><span>{t("verification.recordSource")}</span><strong>{candidate.source}</strong></div>
       </section>
 
       <section className="verification-guidance">
-        <strong>Co zostanie otwarte?</strong>
-        <p>Explorer służy do kontroli adresu, DexScreener do danych pary, a źródło rekordu do porównania aktualnego wpisu. Niedostępne cele pozostają jawnie oznaczone.</p>
+        <strong>{t("verification.whatOpens")}</strong>
+        <p>{t("verification.whatOpensDetail")}</p>
       </section>
 
-      <section className="external-checks-list" aria-label="Lista bezpiecznych źródeł weryfikacyjnych">
+      <section className="external-checks-list" aria-label={t("verification.safeSources")}>
         {targets.map((target) => <ExternalCheckCard key={target.id} target={target} />)}
       </section>
 
       <section className="external-checks-review-panel">
         <div>
-          <span className="external-checks-eyebrow">Następny krok</span>
-          <h3>Porównaj dane ręcznie</h3>
-          <p>Zapisz rozbieżności poza tym ekranem. Samo otwarcie linku nie zmienia `final_label`, statusu filtrów ani bezpieczeństwa.</p>
+          <span className="external-checks-eyebrow">{t("verification.nextStep")}</span>
+          <h3>{t("verification.compareTitle")}</h3>
+          <p>{t("verification.compareDetail")}</p>
         </div>
         <div className="external-checks-review-grid">
-          <VerificationMetric label="Tożsamość" value={candidate.addressIdentityVerified ? "Zgodna ze snapshotem" : "Wymaga kontroli"} />
-          <VerificationMetric label="Security" value={candidate.security ? "Dane obecne — zweryfikuj" : "Nie uruchomiono"} />
-          <VerificationMetric label="Decyzja" value="Wyłącznie ręczna analiza" />
+          <VerificationMetric label={t("verification.identityMetric")} value={candidate.addressIdentityVerified ? t("verification.identityMatches") : t("verification.identityNeedsCheck")} />
+          <VerificationMetric label={t("verification.securityMetric")} value={candidate.security ? t("verification.securityPresent") : t("verification.securityNotRun")} />
+          <VerificationMetric label={t("verification.decision")} value={t("verification.manualOnly")} />
         </div>
       </section>
     </div>
@@ -82,28 +81,52 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
 };
 
 function ExternalCheckCard({ target }: { target: ExternalVerificationTarget }) {
+  const { t } = useProductLocale();
   const copyValue = target.copyValue ?? "";
+  const labelKey = target.id === "explorer"
+    ? "verification.networkExplorer"
+    : target.id === "dex"
+      ? "verification.dexScreener"
+      : target.id === "source"
+        ? "verification.recordSourceLabel"
+        : "verification.securityManual";
+  const titleKey = target.id === "explorer"
+    ? "verification.explorerTitle"
+    : target.id === "dex"
+      ? "verification.dexTitle"
+      : target.id === "source"
+        ? "verification.sourceTitle"
+        : "verification.securityTitle";
+  const explanationKey = target.id === "explorer"
+    ? "verification.explorerExplanation"
+    : target.id === "dex"
+      ? "verification.dexExplanation"
+      : target.id === "source"
+        ? "verification.sourceExplanation"
+        : "verification.securityExplanation";
+  const title = t(titleKey);
+
   return (
     <article className={`external-check-card ${target.state === "manual" ? "manual" : ""}`}>
       <div className="external-check-card-main">
-        <span className="external-checks-eyebrow">{translateTargetLabel(target.id)}</span>
-        <h4>{translateTargetTitle(target.id)}</h4>
-        <p>{target.state === "link" ? explainTarget(target.id) : target.reason ?? "Brak wymaganego kontekstu."}</p>
+        <span className="external-checks-eyebrow">{t(labelKey)}</span>
+        <h4>{title}</h4>
+        <p>{target.state === "link" ? t(explanationKey) : translateStatus(target.status, t)}</p>
       </div>
       <div className="external-check-card-status">
-        <span>Status</span>
-        <strong>{target.state === "link" ? "Link allowlistowany" : translateStatus(target.status)}</strong>
-        {target.state === "manual" && <p>Jawny brak — nic nie zostanie otwarte automatycznie.</p>}
+        <span>{t("verification.status")}</span>
+        <strong>{target.state === "link" ? t("verification.allowlisted") : translateStatus(target.status, t)}</strong>
+        {target.state === "manual" && <p>{t("verification.manualMissing")}</p>}
       </div>
       <div className="external-check-actions">
         {target.href ? (
-          <a className="external-check-link" href={target.href} target="_blank" rel="noreferrer noopener" aria-label={`Otwórz ${translateTargetTitle(target.id)}`}>
-            Otwórz źródło
+          <a className="external-check-link" href={target.href} target="_blank" rel="noreferrer noopener" aria-label={t("verification.openSourceLabel", { source: title })}>
+            {t("verification.openSource")}
           </a>
         ) : (
-          <span className="external-check-disabled" aria-disabled="true">Źródło niedostępne</span>
+          <span className="external-check-disabled" aria-disabled="true">{t("verification.sourceUnavailable")}</span>
         )}
-        {copyValue && <button type="button" className="external-check-copy-button" onClick={() => copyManualValue(copyValue)}>Kopiuj adres</button>}
+        {copyValue && <button type="button" className="external-check-copy-button" onClick={() => copyManualValue(copyValue)}>{t("verification.copyAddress")}</button>}
       </div>
     </article>
   );
@@ -125,32 +148,14 @@ function buildInput(candidate: UiTokenCandidate): ExternalVerificationInput {
   };
 }
 
-function translateTargetLabel(id: ExternalVerificationTarget["id"]): string {
-  if (id === "explorer") return "Explorer sieci";
-  if (id === "dex") return "DexScreener";
-  if (id === "source") return "Źródło rekordu";
-  return "Security — kontrola ręczna";
-}
-
-function translateTargetTitle(id: ExternalVerificationTarget["id"]): string {
-  if (id === "explorer") return "Zweryfikuj contract address";
-  if (id === "dex") return "Zweryfikuj parę i płynność";
-  if (id === "source") return "Otwórz źródło kandydata";
-  return "Zweryfikuj bezpieczeństwo ręcznie";
-}
-
-function explainTarget(id: ExternalVerificationTarget["id"]): string {
-  if (id === "explorer") return "Otworzy stronę adresu kontraktu w explorerze właściwym dla sieci.";
-  if (id === "dex") return "Otworzy konkretną parę w DexScreener na podstawie chain i pair address.";
-  if (id === "source") return "Otworzy allowlistowany URL zapisany w snapshotcie kandydata.";
-  return "Security pozostaje krokiem ręcznym; provider nie zostanie uruchomiony.";
-}
-
-function translateStatus(value: string): string {
-  if (value === "Contract Required") return "Brak contract address";
-  if (value === "Chain Unknown") return "Brak obsługiwanego explorera";
-  if (value === "Liquidity Unknown") return "Brak pair address";
-  return value;
+function translateStatus(
+  value: string,
+  t: ReturnType<typeof useProductLocale>["t"],
+): string {
+  if (value === "Contract Required") return t("verification.contractRequired");
+  if (value === "Chain Unknown") return t("verification.chainUnknown");
+  if (value === "Liquidity Unknown") return t("verification.liquidityUnknown");
+  return t("verification.missingContext");
 }
 
 function copyManualValue(value: string): void {

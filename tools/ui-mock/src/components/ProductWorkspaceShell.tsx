@@ -1,4 +1,14 @@
-import type { ReactNode } from "react";
+import React, { type ReactNode } from "react";
+
+void React; // Required by the Node TSX test runtime's classic JSX transform.
+import {
+  formatProductAge,
+  formatProductDateTime,
+  PRODUCT_TRANSLATIONS,
+  useProductLocale,
+  type ProductLocale,
+} from "../productI18n";
+import { formatStatusReason } from "../productPresentation";
 import type { ResolvedProductRuntimeMode } from "../runtimeMode";
 import type { ResolvedScannerSource } from "../services/scannerDataSource";
 import type { ProductReadinessOutput } from "../types/scannerTypes";
@@ -26,11 +36,14 @@ type ProductWorkspaceShellProps = {
   runId: string | null;
   generatedAt: string | null;
   ageSeconds: number | null;
+  freshnessStatus: "FRESH" | "STALE" | null;
+  viewRefreshedAt: string | null;
   sourceIds: string[];
   readiness: ProductReadinessOutput | null;
   readinessReasonCode?: string | null;
   dataUnavailableMessage?: string | null;
   dataUnavailableReasonCode?: string | null;
+  onRefresh: () => void;
   children: ReactNode;
 };
 
@@ -50,19 +63,25 @@ export function ProductWorkspaceShell({
   runId,
   generatedAt,
   ageSeconds,
+  freshnessStatus,
+  viewRefreshedAt,
   sourceIds,
   readiness,
   readinessReasonCode,
   dataUnavailableMessage,
   dataUnavailableReasonCode,
+  onRefresh,
   children,
 }: ProductWorkspaceShellProps) {
-  const apiReady = resolvedSource === "real-output";
-  const apiPresentation = getApiReadinessPresentation(loading, resolvedSource, readiness);
-  const contextReady = readiness?.context.ready ?? false;
-  const readinessCode = readinessReasonCode
-    ?? readiness?.reason_codes[0]
-    ?? (apiReady ? null : dataUnavailableReasonCode);
+  const { locale, setLocale, t } = useProductLocale();
+  const apiPresentation = getApiReadinessPresentation(loading, resolvedSource, readiness, locale);
+  const freshnessPresentation = getFreshnessPresentation(ageSeconds, freshnessStatus, locale);
+  const sourcePresentation = getSourcePresentation(readiness, locale);
+  const technicalCodes = unique([
+    readinessReasonCode,
+    dataUnavailableReasonCode,
+    ...(readiness?.reason_codes ?? []),
+  ].filter((value): value is string => Boolean(value)));
 
   return (
     <div className="app-shell product-shell">
@@ -71,45 +90,66 @@ export function ProductWorkspaceShell({
           <div className="product-logo" aria-hidden="true">CE</div>
           <div className="min-w-0">
             <h1>Crypto Edge AI</h1>
-            <p>Product Radar · bez rekomendacji inwestycyjnych</p>
+            <p>{t("app.tagline")}</p>
           </div>
         </div>
 
-        <div className="product-header-status" aria-label="Status danych Product Radar">
-          <HeaderFact label="Środowisko" value={runtimeMode} tone="accent" />
+        <div className="product-header-status" aria-label={t("app.statusLabel")}>
+          <HeaderFact label={t("app.api")} value={apiPresentation.value} tone={apiPresentation.tone} />
           <HeaderFact
-            label="API / readiness"
-            value={apiPresentation.value}
-            detail={readinessCode ?? undefined}
-            tone={apiPresentation.tone}
+            label={t("app.freshness")}
+            value={freshnessPresentation.value}
+            detail={ageSeconds == null ? undefined : formatProductAge(ageSeconds, locale)}
+            tone={freshnessPresentation.tone}
+          />
+          <HeaderFact label={t("app.sources")} value={sourcePresentation.value} tone={sourcePresentation.tone} />
+          <HeaderFact
+            label={t("app.generated")}
+            value={generatedAt ? formatProductDateTime(generatedAt, locale) : t("app.noData")}
+            tone={freshnessPresentation.tone}
           />
           <HeaderFact
-            label="Dane wygenerowane"
-            value={generatedAt ? formatTimestamp(generatedAt) : "Brak"}
-            detail={ageSeconds == null ? undefined : `${formatAge(ageSeconds)} temu`}
-            tone={ageSeconds != null && ageSeconds <= 1800 ? "ready" : "warning"}
+            label={t("app.viewRefreshed")}
+            value={viewRefreshedAt ? formatProductDateTime(viewRefreshedAt, locale) : t("app.noData")}
           />
-          <HeaderFact
-            label="Run ID"
-            value={runId ? shortenRunId(runId) : "Brak"}
-            detail={runId ?? undefined}
-          />
-          <HeaderFact
-            label="Źródła"
-            value={sourceIds.length > 0 ? sourceIds.join(", ") : "Brak"}
-            detail={contextReady ? "Context dostępny" : readiness?.context.reason_code ?? "Context niedostępny"}
-            tone={contextReady ? "neutral" : "warning"}
-          />
+        </div>
+
+        <div className="product-header-actions">
+          <div className="product-locale-switch" role="group" aria-label={t("app.language")}>
+            {(["en", "pl"] as const).map((option) => (
+              <button
+                key={option}
+                type="button"
+                className={locale === option ? "active" : ""}
+                aria-pressed={locale === option}
+                onClick={() => setLocale(option)}
+              >
+                {option.toUpperCase()}
+              </button>
+            ))}
+          </div>
+          <button type="button" className="product-refresh-button" onClick={onRefresh} disabled={loading}>
+            {loading ? t("app.refreshing") : t("app.refresh")}
+          </button>
+          <details className="product-header-technical">
+            <summary>{t("app.technicalDetails")}</summary>
+            <dl>
+              <div><dt>{t("app.environment")}</dt><dd>{runtimeMode}</dd></div>
+              <div><dt>{t("app.runId")}</dt><dd>{runId ?? t("app.noData")}</dd></div>
+              <div><dt>{t("app.sources")}</dt><dd>{sourceIds.length > 0 ? sourceIds.join(", ") : t("app.noData")}</dd></div>
+              {technicalCodes.length > 0 && <div><dt>{t("app.codes")}</dt><dd>{technicalCodes.join(", ")}</dd></div>}
+            </dl>
+          </details>
         </div>
       </header>
 
       <div className="workspace-shell-body product-shell-body">
-        <aside className="workspace-sidebar product-sidebar" aria-label="Nawigacja Product Radar">
+        <aside className="workspace-sidebar product-sidebar" aria-label={t("app.navigation")}>
           <nav className="workspace-nav">
             <section className="workspace-nav-group" aria-label="Crypto Edge AI">
               <div className="workspace-nav-group-header">
                 <span>Product Radar</span>
-                <small>Real-data · Manual Review Only</small>
+                <small>{t("app.realData")}</small>
               </div>
 
               {navItems.map((item) => (
@@ -134,9 +174,16 @@ export function ProductWorkspaceShell({
         <div className="workspace-main">
           {dataUnavailableMessage && (
             <div className="product-global-error" role="alert">
-              <strong>Radar jest obecnie niedostępny</strong>
-              <span>{dataUnavailableReasonCode ?? "SCANNER_OUTPUT_UNAVAILABLE"}</span>
-              <p>{dataUnavailableMessage}</p>
+              <div>
+                <strong>{t("app.unavailableTitle")}</strong>
+                <p>{formatStatusReason(dataUnavailableReasonCode, locale)}</p>
+              </div>
+              <p>{t("app.unavailableMessage")}</p>
+              <details>
+                <summary>{t("app.technicalDetails")}</summary>
+                <code>{dataUnavailableReasonCode ?? "SCANNER_OUTPUT_UNAVAILABLE"}</code>
+                <p>{dataUnavailableMessage}</p>
+              </details>
             </div>
           )}
 
@@ -145,8 +192,8 @@ export function ProductWorkspaceShell({
       </div>
 
       <footer className="app-footer product-footer">
-        <p>Narzędzie badawcze. Brak automatycznych rekomendacji i działań transakcyjnych.</p>
-        <span>WATCHLIST — wyłącznie ręczna analiza.</span>
+        <p>{t("app.researchBoundary")}</p>
+        <span>{t("app.watchlistBoundary")}</span>
       </footer>
     </div>
   );
@@ -156,11 +203,43 @@ export function getApiReadinessPresentation(
   loading: boolean,
   resolvedSource: ResolvedScannerSource,
   readiness: ProductReadinessOutput | null,
+  locale: ProductLocale = "en",
 ): { value: string; tone: "neutral" | "ready" | "warning" | "error" } {
-  if (loading) return { value: "Ładowanie", tone: "neutral" };
-  if (resolvedSource === "real-output") return { value: "Dostępne", tone: "ready" };
-  if (readiness !== null) return { value: "Połączone", tone: "warning" };
-  return { value: "Niedostępne", tone: "error" };
+  const copy = PRODUCT_TRANSLATIONS[locale];
+  if (loading && resolvedSource !== "real-output") return { value: copy["status.loading"], tone: "neutral" };
+  if (resolvedSource === "real-output") return { value: copy["status.connected"], tone: "ready" };
+  if (readiness !== null) return { value: copy["status.connected"], tone: "warning" };
+  return { value: copy["status.unavailable"], tone: "error" };
+}
+
+export function getFreshnessPresentation(
+  ageSeconds: number | null,
+  freshnessStatus: "FRESH" | "STALE" | null,
+  locale: ProductLocale = "en",
+): { value: string; tone: "ready" | "warning" } {
+  const copy = PRODUCT_TRANSLATIONS[locale];
+  if (freshnessStatus === "STALE" || (ageSeconds !== null && ageSeconds > 1800)) {
+    return { value: copy["status.delayed"], tone: "warning" };
+  }
+  if (freshnessStatus === "FRESH" || ageSeconds !== null) {
+    return { value: copy["status.current"], tone: "ready" };
+  }
+  return { value: copy["status.unavailable"], tone: "warning" };
+}
+
+function getSourcePresentation(
+  readiness: ProductReadinessOutput | null,
+  locale: ProductLocale,
+): { value: string; tone: "ready" | "warning" } {
+  const copy = PRODUCT_TRANSLATIONS[locale];
+  if (readiness === null) {
+    return { value: copy["status.unavailable"], tone: "warning" };
+  }
+  const partial = readiness?.context.ready === false
+    || readiness?.discovery.new_emerging.status === "degraded";
+  return partial
+    ? { value: copy["status.partial"], tone: "warning" }
+    : { value: copy["status.available"], tone: "ready" };
 }
 
 function HeaderFact({
@@ -200,19 +279,6 @@ export function ProductWorkspaceSection({
   );
 }
 
-function shortenRunId(runId: string): string {
-  if (runId.length <= 18) return runId;
-  return `${runId.slice(0, 9)}…${runId.slice(-6)}`;
-}
-
-function formatTimestamp(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString("pl-PL", { dateStyle: "short", timeStyle: "short" });
-}
-
-function formatAge(seconds: number): string {
-  if (seconds < 60) return `${Math.max(0, Math.floor(seconds))} s`;
-  if (seconds < 3600) return `${Math.floor(seconds / 60)} min`;
-  return `${Math.floor(seconds / 3600)} godz.`;
+function unique(values: string[]): string[] {
+  return [...new Set(values)];
 }

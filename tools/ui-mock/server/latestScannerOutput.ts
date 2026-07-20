@@ -6,7 +6,7 @@ import {
   containsFixtureMarker,
   isRecord,
   isStringArray,
-  requireFreshTimestamp,
+  requireValidTimestamp,
   validateProvenanceManifest,
   type RealDataProvenanceManifest,
 } from "./realDataBoundary.js";
@@ -38,6 +38,7 @@ export type ScannerSourceMeta = {
   runtime_mode: ResolvedProductRuntimeMode;
   age_seconds: number | null;
   source_ids: string[];
+  freshness_status: "FRESH" | "STALE" | null;
 };
 
 export type ScannerOutputWithMeta = Record<string, unknown> & {
@@ -115,6 +116,7 @@ export async function readLatestScannerOutput(
         runtime_mode: runtimeMode,
         age_seconds: calculateOptionalAgeSeconds(latestValid.finished_at, now),
         source_ids: extractDemoSourceIds(latestValid.output),
+        freshness_status: calculateOptionalFreshnessStatus(latestValid.finished_at, now),
       });
     }
 
@@ -129,19 +131,19 @@ export async function readLatestScannerOutput(
     throw new ScannerOutputError("SCANNER_OUTPUT_DIRECTORY_MISSING");
   }
 
-  const latest = candidates[0];
-  if (!latest?.output) {
-    throw new ScannerOutputError(latest?.read_error ? "SCANNER_OUTPUT_INVALID_JSON" : SCANNER_OUTPUT_UNAVAILABLE);
-  }
-
-  try {
-    return sanitizeInternalBetaScannerOutput(latest.output, now);
-  } catch (error) {
-    if (error instanceof RealDataBoundaryError) {
-      throw new ScannerOutputError(error.code);
+  let latestFailureCode: string | null = null;
+  for (const candidate of candidates) {
+    if (!candidate.output) {
+      latestFailureCode ??= candidate.read_error ? "SCANNER_OUTPUT_INVALID_JSON" : SCANNER_OUTPUT_UNAVAILABLE;
+      continue;
     }
-    throw new ScannerOutputError(INVALID_SCANNER_OUTPUT);
+    try {
+      return sanitizeInternalBetaScannerOutput(candidate.output, now);
+    } catch (error) {
+      latestFailureCode ??= error instanceof RealDataBoundaryError ? error.code : INVALID_SCANNER_OUTPUT;
+    }
   }
+  throw new ScannerOutputError(latestFailureCode ?? SCANNER_OUTPUT_UNAVAILABLE);
 }
 
 export async function getScannerSourcesDiagnostics(
@@ -253,18 +255,21 @@ function sanitizeInternalBetaScannerOutput(value: unknown, now: Date): ScannerOu
     || scanRun.filters.basic_filters !== "dexscreener_basic_filters_v1"
   ) throw new RealDataBoundaryError(INVALID_SCANNER_OUTPUT);
 
-  const freshness = requireFreshTimestamp(manifest.generated_at, now, SCANNER_MAX_AGE_MS, {
+  const freshness = requireValidTimestamp(manifest.generated_at, now, SCANNER_MAX_AGE_MS, {
     missing: "SCANNER_TIMESTAMP_MISSING",
     invalid: "SCANNER_TIMESTAMP_INVALID",
     future: "SCANNER_TIMESTAMP_FUTURE",
     stale: "SCANNER_SNAPSHOT_STALE",
-  });
-  requireFreshTimestamp(manifest.finished_at, now, SCANNER_MAX_AGE_MS, {
+  }, { allowStale: true });
+  const finishedFreshness = requireValidTimestamp(manifest.finished_at, now, SCANNER_MAX_AGE_MS, {
     missing: "SCANNER_TIMESTAMP_MISSING",
     invalid: "SCANNER_TIMESTAMP_INVALID",
     future: "SCANNER_TIMESTAMP_FUTURE",
     stale: "SCANNER_SNAPSHOT_STALE",
-  });
+  }, { allowStale: true });
+  const freshnessStatus = freshness.freshnessStatus === "STALE" || finishedFreshness.freshnessStatus === "STALE"
+    ? "STALE"
+    : "FRESH";
 
   const sanitizedScanRun = sanitizeScanRun(scanRun);
   if (!sanitizedScanRun) {
@@ -285,7 +290,7 @@ function sanitizeInternalBetaScannerOutput(value: unknown, now: Date): ScannerOu
     value.security_checks,
     candidates as Record<string, unknown>[],
     manifest,
-    now,
+    freshnessStatus === "STALE" ? new Date(freshness.timestamp) : now,
   );
 
   return withSourceMeta({
@@ -296,12 +301,15 @@ function sanitizeInternalBetaScannerOutput(value: unknown, now: Date): ScannerOu
     scorecards: [],
   }, {
     source: "real-output",
-    reason: "display-eligible INTERNAL_BETA snapshot",
+    reason: freshnessStatus === "STALE"
+      ? "last-known-good INTERNAL_BETA snapshot"
+      : "display-eligible INTERNAL_BETA snapshot",
     selected_run_id: manifest.run_id,
     loaded_at: now.toISOString(),
     runtime_mode: "INTERNAL_BETA",
     age_seconds: freshness.ageSeconds,
     source_ids: manifest.source_ids,
+    freshness_status: freshnessStatus,
   });
 }
 
@@ -840,6 +848,7 @@ async function readFixtureOutput(path: string, reason: string, now: Date): Promi
       runtime_mode: "DEVELOPMENT_DEMO",
       age_seconds: null,
       source_ids: extractDemoSourceIds(output),
+      freshness_status: null,
     });
   } catch (error) {
     if (error instanceof ScannerOutputError) throw error;
@@ -947,6 +956,12 @@ function calculateOptionalAgeSeconds(value: string | null, now: Date): number | 
   if (!value) return null;
   const parsed = Date.parse(value);
   return Number.isNaN(parsed) ? null : Math.max(0, Math.floor((now.getTime() - parsed) / 1000));
+}
+
+function calculateOptionalFreshnessStatus(value: string | null, now: Date): "FRESH" | "STALE" | null {
+  const ageSeconds = calculateOptionalAgeSeconds(value, now);
+  if (ageSeconds === null) return null;
+  return ageSeconds * 1000 > SCANNER_MAX_AGE_MS ? "STALE" : "FRESH";
 }
 
 function hasCandidateId(value: unknown): boolean {

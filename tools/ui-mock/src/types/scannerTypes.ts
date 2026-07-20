@@ -202,6 +202,7 @@ export type ScannerSourceMeta = {
   runtime_mode?: "DEVELOPMENT_DEMO" | "INTERNAL_BETA" | "UNCONFIGURED";
   age_seconds?: number | null;
   source_ids?: string[];
+  freshness_status?: "FRESH" | "STALE";
 };
 
 export type ScannerApiOutput = PersistableScannerOutput & {
@@ -213,17 +214,24 @@ export type ProductReadinessEntry = {
   reason_code: string | null;
 };
 
+export type ProductScannerReadiness = ProductReadinessEntry & {
+  status?: "ready" | "stale" | "unavailable";
+  freshness_status?: "FRESH" | "STALE";
+  generated_at?: string | null;
+  age_seconds?: number | null;
+};
+
 export type ProductBasketReadiness = ProductReadinessEntry & {
   configured?: boolean;
   status: "ready" | "degraded" | "empty_configured" | "unavailable";
 };
 
 export type ProductReadinessOutput = {
-  status: "ready" | "ready_with_empty_established_universe" | "not_ready";
+  status: "ready" | "degraded" | "ready_with_empty_established_universe" | "not_ready";
   ready: boolean;
   runtime_mode?: "DEVELOPMENT_DEMO" | "INTERNAL_BETA" | "UNCONFIGURED";
   process?: ProductReadinessEntry;
-  scanner: ProductReadinessEntry;
+  scanner: ProductScannerReadiness;
   context: ProductReadinessEntry;
   new_emerging?: ProductBasketReadiness;
   established?: ProductBasketReadiness;

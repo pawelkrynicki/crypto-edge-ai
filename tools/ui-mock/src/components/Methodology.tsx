@@ -1,61 +1,65 @@
 import React from "react";
+import { useProductLocale } from "../productI18n";
 
-const FILTERS = [
-  "Market cap 300 tys.–10 mln USD",
-  "Volume 24h minimum 30 tys. USD",
-  "Liquidity minimum 30 tys. USD",
-  "Volume / market cap ratio 0,01–1",
-  "Wiek pary ponad 7 dni",
-];
+export const Methodology: React.FC = () => {
+  const { t } = useProductLocale();
+  const filters = [
+    t("filter.marketCapRange"),
+    t("filter.volumeMinimum"),
+    t("filter.liquidityMinimum"),
+    t("filter.ratioRange"),
+    t("filter.pairAgeMinimum"),
+  ];
 
-export const Methodology: React.FC = () => (
-  <div className="product-methodology">
-    <section className="methodology-lead">
-      <span className="candidate-results-eyebrow">Jak czytać Radar</span>
-      <h3>Obserwacja nie jest rekomendacją</h3>
-      <p>Crypto Edge AI porządkuje dane do ręcznej analizy. Nie zatwierdza tokenów i nie wykonuje działań transakcyjnych.</p>
-    </section>
+  return (
+    <div className="product-methodology">
+      <section className="methodology-lead">
+        <span className="candidate-results-eyebrow">{t("method.eyebrow")}</span>
+        <h3>{t("method.title")}</h3>
+        <p>{t("method.intro")}</p>
+      </section>
 
-    <section className="methodology-baskets">
-      <article>
-        <span>01</span>
-        <h4>New / Emerging</h4>
-        <p>Najnowsze profile DexScreener. Projekty są bardzo nowe, mają `observation_only=true` i nie awansują automatycznie do Established.</p>
-      </article>
-      <article>
-        <span>02</span>
-        <h4>Established</h4>
-        <p>Utrzymywana przez ownera, wersjonowana lista `chain + contract address`. GoPlus jest uruchamiany dopiero po przejściu filtrów.</p>
-      </article>
-    </section>
+      <section className="methodology-baskets">
+        <article>
+          <span>01</span>
+          <h4>{t("method.newTitle")}</h4>
+          <p>{t("method.newDetail")}</p>
+        </article>
+        <article>
+          <span>02</span>
+          <h4>{t("method.establishedTitle")}</h4>
+          <p>{t("method.establishedDetail")}</p>
+        </article>
+      </section>
 
-    <section className="methodology-grid">
-      <article>
-        <h4>Źródła danych</h4>
-        <p>Rynek i discovery: DexScreener. Bezpieczeństwo kwalifikujących się rekordów Established: GoPlus. UI czyta tylko lokalny, zwalidowany snapshot.</p>
-      </article>
-      <article>
-        <h4>Zamrożone filtry</h4>
-        <ul>{FILTERS.map((filter) => <li key={filter}>{filter}</li>)}</ul>
-      </article>
-      <article>
-        <h4>WATCHLIST</h4>
-        <p>WATCHLIST — wyłącznie ręczna analiza. Nie oznacza „safe”, zatwierdzenia ani rekomendacji.</p>
-      </article>
-      <article>
-        <h4>Brak danych</h4>
-        <p>Braki i puste koszyki pozostają widoczne. INTERNAL_BETA nie wstawia fixture, sample candidates ani fikcyjnych wartości.</p>
-      </article>
-    </section>
+      <section className="methodology-grid">
+        <article>
+          <h4>{t("method.sources")}</h4>
+          <p>{t("method.sourcesDetail")}</p>
+        </article>
+        <article>
+          <h4>{t("method.filters")}</h4>
+          <ul>{filters.map((filter) => <li key={filter}>{filter}</li>)}</ul>
+        </article>
+        <article>
+          <h4>{t("method.watchlist")}</h4>
+          <p>{t("method.watchlistDetail")}</p>
+        </article>
+        <article>
+          <h4>{t("method.missingData")}</h4>
+          <p>{t("method.missingDataDetail")}</p>
+        </article>
+      </section>
 
-    <section className="methodology-limitations">
-      <h4>Ograniczenia systemu</h4>
-      <ul>
-        <li>Manual Review Only — wynik nie zastępuje własnej weryfikacji.</li>
-        <li>Dane mogą stać się nieaktualne lub chwilowo niedostępne; reason code pozostaje jawny.</li>
-        <li>Brak automatycznego Honeypot.is, scrapingu, auto-tradingu i rekomendacji inwestycyjnych.</li>
-        <li>Established zależy od ręcznego uzupełnienia wersjonowanego universe adresów.</li>
-      </ul>
-    </section>
-  </div>
-);
+      <section className="methodology-limitations">
+        <h4>{t("method.limitations")}</h4>
+        <ul>
+          <li>{t("method.limitationManual")}</li>
+          <li>{t("method.limitationStale")}</li>
+          <li>{t("method.limitationAutomation")}</li>
+          <li>{t("method.limitationUniverse")}</li>
+        </ul>
+      </section>
+    </div>
+  );
+};

@@ -19,7 +19,7 @@ Launcher:
 - otwiera `http://127.0.0.1:5173/#candidate-results`;
 - nie używa fixture, `DEVELOPMENT_DEMO` ani połączeń z VPS.
 
-Jeżeli nie ma aktualnego `full_output.json`, launcher pokazuje ostrzeżenie, a Radar prezentuje uczciwy stan `Data Unavailable` zamiast danych przykładowych.
+Jeżeli istnieje prawidłowy, lecz starszy `full_output.json`, Radar zachowuje kandydatów i pokazuje żółty stan `Delayed` / `Opóźnione`. HTTP 503 pozostaje zarezerwowane dla braku prawidłowego snapshotu lub naruszenia granicy real-data.
 
 Zatrzymanie:
 
@@ -41,12 +41,15 @@ scripts\win\check-product-radar-review.cmd
 
 ## Oczekiwany flow ownera
 
-1. Otwórz `Radar` i sprawdź górny status: środowisko, API/readiness, timestamp, wiek danych, skrócony `run_id` i źródła.
-2. Przejdź między `Nowe / obserwacja` i `Established / główny Radar`.
-3. Otwórz dowolny dostępny rekord przez `Otwórz szczegóły`.
-4. Sprawdź sekcje: Tożsamość, Dane rynkowe, Filtry, Bezpieczeństwo i Następny krok.
-5. Przejdź do `Weryfikacja`, skopiuj contract address i otwórz wybrane allowlistowane źródło.
-6. Przeczytaj `Metodologia` i potwierdź znaczenie WATCHLIST oraz Manual Review Only.
+1. Otwórz `Radar` i potwierdź, że domyślny język to English.
+2. Przełącz `EN / PL`, potwierdź natychmiastową zmianę tekstu, odśwież przeglądarkę i sprawdź zapamiętanie wyboru.
+3. Sprawdź górny status: połączenie z API, aktualność snapshotu, stan źródeł, `Last updated` i osobny `View refreshed`.
+4. Kliknij `Refresh` / `Odśwież` i potwierdź, że przycisk wyłącznie ponownie odczytuje lokalne API; nie uruchamia collectora ani providerów.
+5. Przejdź między `New / observation` i `Established / main Radar`.
+6. Otwórz dowolny dostępny rekord przez `Open details`.
+7. Sprawdź sekcje: Identity, Market data, Filters, Security i Next step.
+8. Przejdź do `Verification`, skopiuj contract address i otwórz wybrane allowlistowane źródło.
+9. Przeczytaj `Methodology` i potwierdź znaczenie WATCHLIST oraz Manual Review Only.
 
 ## Dwa koszyki
 
@@ -71,14 +74,20 @@ scripts\win\check-product-radar-review.cmd
 - `ESTABLISHED_UNIVERSE_EMPTY`: poprawny, skonfigurowany pusty koszyk; nie jest globalnym błędem.
 - `NEW_EMERGING_EMPTY`: aktualny skan nie zwrócił rekordów obserwacyjnych.
 - `NEW_EMERGING_UNAVAILABLE` / `ESTABLISHED_UNAVAILABLE`: niedostępność konkretnego koszyka.
-- `SCANNER_SNAPSHOT_STALE`: dane są nieaktualne i reason code pozostaje widoczny.
+- `SCANNER_SNAPSHOT_STALE`: prawidłowy snapshot pozostaje widoczny jako `Delayed` / `Opóźnione`; dokładny reason code jest tylko w szczegółach technicznych.
 - scanner unavailable / invalid snapshot / policy denied: globalny błąd, zero sample candidates.
 - context unavailable: nie ukrywa Radaru, jeżeli scanner działa.
 
 ## Lista elementów do akceptacji
 
 - [ ] Radar jest domyślną stroną i jest czytelny bez pomocy technicznej.
-- [ ] Nagłówek pozwala ocenić źródło, timestamp, wiek danych, `run_id` i readiness.
+- [ ] English jest językiem domyślnym niezależnie od języka przeglądarki.
+- [ ] Przełącznik EN / PL zmienia cały Product Radar bez przeładowania i zapamiętuje wybór po refreshu przeglądarki.
+- [ ] Nagłówek rozdziela połączenie z API, aktualność snapshotu, stan źródeł, `Last updated` i `View refreshed`.
+- [ ] `Refresh` / `Odśwież` jest zablokowany podczas trwającego odczytu i nie uruchamia providera ani collectora.
+- [ ] Przy snapshotcie starszym niż 30 minut żółte ostrzeżenie jest widoczne, a kandydaci, szczegóły, weryfikacja i metodologia pozostają dostępne.
+- [ ] HTTP 503 występuje tylko wtedy, gdy nie ma prawidłowego real snapshotu lub granica fail-closed go odrzuca.
+- [ ] Powody filtrów są naturalnie opisane po angielsku i polsku; nieznany kod ma neutralny fallback i pozostaje w szczegółach technicznych.
 - [ ] Znaczenie dwóch koszyków jest jednoznaczne.
 - [ ] New / Emerging nie wygląda jak rekomendacja ani Established.
 - [ ] Pusty Established wyjaśnia `ESTABLISHED_UNIVERSE_EMPTY` i nie pokazuje fikcyjnych tokenów.
@@ -94,7 +103,7 @@ scripts\win\check-product-radar-review.cmd
 
 - Commitowany universe Established ma obecnie `0` aktywnych wpisów.
 - UI nie zawiera edytora universe.
-- Snapshot musi mieścić się w 30-minutowym SLA; inaczej API odrzuca go fail-closed.
+- Snapshot starszy niż 30 minut jest oznaczony jako opóźniony i pozostaje dostępny jako last-known-good, o ile nadal przechodzi schema, lineage, policy, environment i fixture checks.
 - Context może być niedostępny niezależnie od działającego skanera.
 - Brak schedulera, automatyzacji VPS, AI KINTEL, auto-tradingu i rekomendacji inwestycyjnych.
 - Weryfikacja źródłowa jest link-only i nie zapisuje werdyktu ownera w aplikacji.

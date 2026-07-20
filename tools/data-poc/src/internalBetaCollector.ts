@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { publishAtomicJson, type AtomicPublishResult } from "./atomicPublish.js";
 import { BoundedHttpClient, type FetchLike } from "./boundedHttpClient.js";
 import { buildCombinedScannerOutput } from "./combinedScanner.js";
+import { configureCollectorNetwork } from "./collectorNetworkBootstrap.js";
 import { validateDisplayEligibleContextSnapshot } from "./contextSnapshotValidator.js";
 import {
   collectDexScreenerDiscovery,
@@ -83,6 +84,7 @@ export async function runInternalBetaCollector(
   options: InternalBetaCollectorOptions = {},
 ): Promise<InternalBetaCollectorResult> {
   assertInternalBetaCollectorEnvironment(options.env ?? process.env);
+  configureCollectorNetwork();
 
   const now = options.now ?? new Date();
   const seedLimit = clamp(options.seedLimit, DEFAULT_DEXSCREENER_SEED_LIMIT, 1, 30);

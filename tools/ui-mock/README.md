@@ -65,7 +65,7 @@ $env:CRYPTO_EDGE_RUNTIME_MODE = "INTERNAL_BETA"
 pnpm run api
 ```
 
-Without a display-eligible live snapshot, `INTERNAL_BETA` intentionally returns HTTP 503. It never calls a provider from the API read path.
+`INTERNAL_BETA` returns the latest valid real scanner snapshot even after the 30-minute freshness SLA: `/api/scanner/latest` stays HTTP 200, `_source_meta.freshness_status=STALE`, and readiness is degraded but usable. HTTP 503 is reserved for cases where no valid real snapshot survives schema, lineage, environment, policy, fixture and file-integrity checks. The API read path never calls a provider.
 
 Endpoints:
 
@@ -77,7 +77,7 @@ Endpoints:
 
 The product build uses a separate `ProductApp` entrypoint with API-only data selection and navigation limited to Radar / Szczegóły / Weryfikacja / Metodologia. Development sample controls and demo/preview components remain available only in `DEVELOPMENT_DEMO`. The internal build does not copy `public/fixtures` into `dist`, and `assertInternalBetaBuild.ts` fails the build if fixture paths or demo/sample surface markers are bundled.
 
-API responses use `Cache-Control: no-store, max-age=0`; `INTERNAL_BETA` does not emit wildcard CORS. Data errors use `503` and a stable `reason_code`. Full manifest, allowlist, freshness and reason-code details are in `../../docs/real_data_api_contract.md`.
+API responses use `Cache-Control: no-store, max-age=0`; `INTERNAL_BETA` does not emit wildcard CORS. Hard data errors use `503` and a stable `reason_code`; stale valid scanner data uses HTTP 200 and keeps the full allowlisted candidate snapshot. Full manifest, allowlist, freshness and reason-code details are in `../../docs/real_data_api_contract.md`.
 
 Offline verification:
 

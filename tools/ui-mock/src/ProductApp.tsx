@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+void React; // Required by the Node TSX test runtime's classic JSX transform.
 import { mapPersistableScannerOutputToUiCandidates } from "./adapters/scannerOutputAdapter";
 import { CandidateDetailView } from "./components/CandidateDetailView";
 import { CandidateResultsView } from "./components/CandidateResultsView";
@@ -10,6 +12,7 @@ import {
   type ProductNavItem,
   type ProductSectionId,
 } from "./components/ProductWorkspaceShell";
+import { ProductLocaleProvider, useProductLocale } from "./productI18n";
 import { getProductRuntimeMode } from "./runtimeMode";
 import {
   loadScannerApiDataSourceResult,
@@ -21,32 +24,6 @@ import type {
   ScannerDiscoveryMetadata,
   UiTokenCandidate,
 } from "./types/scannerTypes";
-
-const PRODUCT_NAV_ITEMS: ProductNavItem[] = [
-  { id: "candidate-results", label: "Radar", icon: "R", description: "Dwa koszyki danych" },
-  { id: "candidate-detail", label: "Szczegóły", icon: "S", description: "Pełny obraz kandydata" },
-  { id: "external-checks", label: "Weryfikacja", icon: "W", description: "Źródła zewnętrzne" },
-  { id: "methodology", label: "Metodologia", icon: "M", description: "Zasady i ograniczenia" },
-];
-
-const SECTION_COPY: Record<ProductSectionId, { title: string; description: string }> = {
-  "candidate-results": {
-    title: "Radar",
-    description: "Nowe projekty obserwacyjne i kandydaci Established są rozdzieleni zgodnie z kontraktem real-data.",
-  },
-  "candidate-detail": {
-    title: "Szczegóły",
-    description: "Tożsamość, rynek, filtry i bezpieczeństwo bez ukrywania brakujących danych.",
-  },
-  "external-checks": {
-    title: "Weryfikacja",
-    description: "Bezpieczne linki do ręcznej kontroli źródeł; aplikacja nie uruchamia providerów.",
-  },
-  methodology: {
-    title: "Metodologia",
-    description: "Krótki opis dwóch koszyków, filtrów, etykiet i granic produktu.",
-  },
-};
 
 const HASH_TO_SECTION: Record<string, ProductSectionId> = {
   "#candidate-results": "candidate-results",
@@ -63,6 +40,15 @@ const SECTION_TO_HASH: Record<ProductSectionId, string> = {
 };
 
 export default function ProductApp() {
+  return (
+    <ProductLocaleProvider>
+      <ProductAppContent />
+    </ProductLocaleProvider>
+  );
+}
+
+export function ProductAppContent() {
+  const { t } = useProductLocale();
   const runtimeMode = getProductRuntimeMode();
   const [activeSection, setActiveSection] = useState<ProductSectionId>(() => resolveSection());
   const [candidates, setCandidates] = useState<UiTokenCandidate[]>([]);
@@ -71,6 +57,8 @@ export default function ProductApp() {
   const [runId, setRunId] = useState<string | null>(null);
   const [generatedAt, setGeneratedAt] = useState<string | null>(null);
   const [ageSeconds, setAgeSeconds] = useState<number | null>(null);
+  const [freshnessStatus, setFreshnessStatus] = useState<"FRESH" | "STALE" | null>(null);
+  const [viewRefreshedAt, setViewRefreshedAt] = useState<string | null>(null);
   const [sourceIds, setSourceIds] = useState<string[]>([]);
   const [metadata, setMetadata] = useState<ScannerDiscoveryMetadata | null>(null);
   const [readiness, setReadiness] = useState<ProductReadinessOutput | null>(null);
@@ -79,6 +67,21 @@ export default function ProductApp() {
   const [unavailableMessage, setUnavailableMessage] = useState<string | null>(null);
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
   const [verificationCandidateId, setVerificationCandidateId] = useState<string | null>(null);
+  const refreshPromiseRef = useRef<Promise<void> | null>(null);
+
+  const navItems = useMemo<ProductNavItem[]>(() => [
+    { id: "candidate-results", label: t("nav.radar"), icon: "R", description: t("nav.radarDescription") },
+    { id: "candidate-detail", label: t("nav.details"), icon: "D", description: t("nav.detailsDescription") },
+    { id: "external-checks", label: t("nav.verification"), icon: "V", description: t("nav.verificationDescription") },
+    { id: "methodology", label: t("nav.methodology"), icon: "M", description: t("nav.methodologyDescription") },
+  ], [t]);
+
+  const sectionCopy = useMemo<Record<ProductSectionId, { title: string; description: string }>>(() => ({
+    "candidate-results": { title: t("nav.radar"), description: t("section.radarDescription") },
+    "candidate-detail": { title: t("nav.details"), description: t("section.detailsDescription") },
+    "external-checks": { title: t("nav.verification"), description: t("section.verificationDescription") },
+    methodology: { title: t("nav.methodology"), description: t("section.methodologyDescription") },
+  }), [t]);
 
   const selectedCandidate =
     candidates.find((candidate) => candidate.id === selectedCandidateId)
@@ -90,47 +93,58 @@ export default function ProductApp() {
     candidates.find((candidate) => candidate.id === verificationCandidateId)
     ?? selectedCandidate;
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    setReasonCode(null);
-    setReadinessReasonCode(null);
-    setUnavailableMessage(null);
+  const loadData = useCallback((): Promise<void> => {
+    if (refreshPromiseRef.current) return refreshPromiseRef.current;
 
-    const [scannerResult, readinessResult] = await Promise.all([
-      loadScannerApiDataSourceResult({ runtimeMode }),
-      loadScannerReadinessResult({ runtimeMode }),
-    ]);
+    const refresh = (async () => {
+      setLoading(true);
+      setReasonCode(null);
+      setReadinessReasonCode(null);
+      setUnavailableMessage(null);
 
-    if (readinessResult.status === "ready") {
-      setReadiness(readinessResult.output);
-    } else {
-      setReadiness(null);
-      setReadinessReasonCode(readinessResult.reasonCode);
-    }
+      const [scannerResult, readinessResult] = await Promise.all([
+        loadScannerApiDataSourceResult({ runtimeMode }),
+        loadScannerReadinessResult({ runtimeMode }),
+      ]);
 
-    if (scannerResult.status === "error") {
-      setCandidates([]);
-      setResolvedSource("unavailable");
-      setRunId(null);
-      setGeneratedAt(null);
-      setAgeSeconds(null);
-      setSourceIds([]);
-      setMetadata(null);
-      setReasonCode(scannerResult.reasonCode);
-      setUnavailableMessage(scannerResult.error);
+      if (readinessResult.status === "ready") {
+        setReadiness(readinessResult.output);
+      } else {
+        setReadiness(null);
+        setReadinessReasonCode(readinessResult.reasonCode);
+      }
+
+      if (scannerResult.status === "error") {
+        setCandidates([]);
+        setResolvedSource("unavailable");
+        setRunId(null);
+        setGeneratedAt(null);
+        setAgeSeconds(null);
+        setFreshnessStatus(null);
+        setSourceIds([]);
+        setMetadata(null);
+        setReasonCode(scannerResult.reasonCode);
+        setUnavailableMessage(scannerResult.error);
+        return;
+      }
+
+      const output = scannerResult.output;
+      setCandidates(mapPersistableScannerOutputToUiCandidates(output));
+      setResolvedSource(scannerResult.resolvedSource);
+      setRunId(output.scan_run.run_id ?? null);
+      setGeneratedAt(output.provenance?.generated_at ?? output.scan_run.finished_at ?? output.scan_run.started_at ?? null);
+      setAgeSeconds(output._source_meta?.age_seconds ?? null);
+      setFreshnessStatus(output._source_meta?.freshness_status ?? null);
+      setSourceIds(output._source_meta?.source_ids ?? output.provenance?.source_ids ?? []);
+      setMetadata(output.provenance?.metadata ?? null);
+    })().finally(() => {
       setLoading(false);
-      return;
-    }
+      setViewRefreshedAt(new Date().toISOString());
+      refreshPromiseRef.current = null;
+    });
 
-    const output = scannerResult.output;
-    setCandidates(mapPersistableScannerOutputToUiCandidates(output));
-    setResolvedSource(scannerResult.resolvedSource);
-    setRunId(output.scan_run.run_id ?? null);
-    setGeneratedAt(output.provenance?.generated_at ?? output.scan_run.finished_at ?? output.scan_run.started_at ?? null);
-    setAgeSeconds(output._source_meta?.age_seconds ?? null);
-    setSourceIds(output._source_meta?.source_ids ?? output.provenance?.source_ids ?? []);
-    setMetadata(output.provenance?.metadata ?? null);
-    setLoading(false);
+    refreshPromiseRef.current = refresh;
+    return refresh;
   }, [runtimeMode]);
 
   useEffect(() => {
@@ -162,11 +176,11 @@ export default function ProductApp() {
   }, [navigate]);
 
   const renderSection = () => {
-    const copy = SECTION_COPY[activeSection];
-    if (loading) {
+    const copy = sectionCopy[activeSection];
+    if (loading && candidates.length === 0) {
       return (
         <ProductWorkspaceSection {...copy}>
-          <div className="product-loading" role="status">Ładowanie aktualnego obrazu Radaru…</div>
+          <div className="product-loading" role="status">{t("app.loading")}</div>
         </ProductWorkspaceSection>
       );
     }
@@ -180,6 +194,7 @@ export default function ProductApp() {
             readiness={readiness}
             generatedAt={generatedAt}
             ageSeconds={ageSeconds}
+            freshnessStatus={freshnessStatus}
             sourceIds={sourceIds}
             scannerUnavailableReasonCode={reasonCode}
             onOpenCandidate={openCandidate}
@@ -218,7 +233,7 @@ export default function ProductApp() {
 
   return (
     <ProductWorkspaceShell
-      navItems={PRODUCT_NAV_ITEMS}
+      navItems={navItems}
       activeSection={activeSection}
       onSectionChange={navigate}
       loading={loading}
@@ -227,11 +242,14 @@ export default function ProductApp() {
       runId={runId}
       generatedAt={generatedAt}
       ageSeconds={ageSeconds}
+      freshnessStatus={freshnessStatus}
+      viewRefreshedAt={viewRefreshedAt}
       sourceIds={sourceIds}
       readiness={readiness}
       readinessReasonCode={readinessReasonCode}
       dataUnavailableMessage={unavailableMessage}
       dataUnavailableReasonCode={reasonCode}
+      onRefresh={() => void loadData()}
     >
       {renderSection()}
     </ProductWorkspaceShell>

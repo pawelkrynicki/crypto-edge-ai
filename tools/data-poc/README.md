@@ -66,7 +66,7 @@ npm run collect:internal-beta -- --seed-limit 10 --security-limit 3
 
 Without all three flags it exits before the first fetch. It prints only run/source health, request/candidate counts, repo-relative paths, security coverage and manifest summary.
 
-Discovery uses DexScreener latest token profiles and bounded per-token pairs, selects highest valid liquidity, deduplicates and runs existing basic filters before GoPlus. Defaults/hard limits: 20/30 seeds and 10/20 security candidates. Request budgets default/hard: DexScreener 26/36, GoPlus 13/23, Alternative.me 2/2 and DefiLlama 2/2. Network defaults are timeout 10 s, concurrency 3 and at most one retry.
+Discovery uses DexScreener latest token profiles and bounded per-token pairs, selects highest valid liquidity, deduplicates and runs existing basic filters before GoPlus. Defaults/hard limits: 20/30 seeds and 10/20 security candidates. Request budgets default/hard: DexScreener 26/36, GoPlus 13/23, Alternative.me 2/2 and DefiLlama 2/2. Network defaults are timeout 10 s, concurrency 3 and at most one retry. The canonical collector applies Node `dns.setDefaultResultOrder("ipv4first")` before constructing clients, so local Windows execution and the later Linux VPS scheduler use the same IPv4-first bootstrap.
 
 GoPlus is the only active automated security source. EVM uses an explicit allowlist; Solana uses its separate endpoint and optional `GOPLUS_API_TOKEN`. Unavailable data retains the candidate and reports `SECURITY DATA UNAVAILABLE`. Attribution is `provider: GoPlus Security`.
 

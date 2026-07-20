@@ -85,13 +85,13 @@ Security publikuje wyłącznie znormalizowane pola podatków, flag ryzyka, cover
 
 ## Freshness
 
-- scanner `generated_at`/`finished_at`: maksymalnie 30 minut;
+- scanner `generated_at`/`finished_at`: do 30 minut ma status `FRESH`; starszy prawidłowy snapshot ma status `STALE` i pozostaje last-known-good;
 - GoPlus `checked_at`: maksymalnie 30 minut;
 - Alternative.me `fetched_at`: maksymalnie 30 godzin;
 - DefiLlama `fetched_at`: maksymalnie 6 godzin;
 - tolerancja zegara w przyszłość: 5 minut.
 
-Brakujący, nieparsowalny albo zbyt przyszły timestamp jest invalid. Stary scanner/context daje 503. Stary security check traci swoje pola interpretacyjne i staje się `SECURITY DATA UNAVAILABLE`. Świeży wynik GoPlus stanowi pełne pokrycie aktualnego aktywnego kontraktu; brak GoPlus daje `SECURITY DATA UNAVAILABLE`.
+Brakujący, nieparsowalny albo zbyt przyszły timestamp jest invalid. Stary, lecz poza tym prawidłowy scanner zwraca HTTP 200 z `_source_meta.freshness_status=STALE`, `age_seconds` i pełnym allowlistowanym snapshotem. Readiness zwraca stan `degraded`, scanner pozostaje `ready=true`, a `SCANNER_SNAPSHOT_STALE` jest diagnostyką techniczną. Stary context nadal podlega własnym SLA. Security jest walidowane względem czasu publikacji last-known-good, aby odczyt nie przepisywał historycznego snapshotu; brak prawidłowego GoPlus nadal daje `SECURITY DATA UNAVAILABLE`.
 
 Context last-known-good jest dopuszczalny tylko wewnątrz SLA, z rekordami oraz jawnym `DEGRADED`. Po SLA endpoint zwraca 503.
 
@@ -101,16 +101,16 @@ Context last-known-good jest dopuszczalny tylko wewnątrz SLA, z rekordami oraz 
 |---|---|
 | `GET /api/health` | wyłącznie stan procesu; może zwrócić 200 przy data readiness 503 |
 | `GET /api/readiness` | osobna gotowość scanner/context i tablica `reason_codes` |
-| `GET /api/scanner/latest` | allowlisted live scanner snapshot albo 503 |
+| `GET /api/scanner/latest` | najnowszy prawidłowy allowlisted live scanner snapshot; fresh lub stale, HTTP 200 |
 | `GET /api/context/latest` | allowlisted live context snapshot albo 503 |
 | `GET /api/scanner/sources` | bezpieczna diagnostyka bez absolutnych ścieżek |
 
-Błąd danych ma stabilny kształt:
+Hard failure, gdy nie istnieje żaden prawidłowy snapshot, ma stabilny kształt:
 
 ```json
 {
   "status": "data_unavailable",
-  "reason_code": "SCANNER_SNAPSHOT_STALE",
+  "reason_code": "SCANNER_SCHEMA_INVALID",
   "message": "Data Unavailable"
 }
 ```

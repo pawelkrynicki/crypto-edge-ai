@@ -14,8 +14,20 @@ import {
   resolveInitialBasket,
 } from "../src/components/CandidateResultsView.js";
 import { ExternalVerificationLinksView } from "../src/components/ExternalVerificationLinksView.js";
+import { Methodology } from "../src/components/Methodology.js";
 import { getApiReadinessPresentation } from "../src/components/ProductWorkspaceShell.js";
 import { PERSISTABLE_SCANNER_SAMPLE } from "../src/fixtures/persistableScannerSample.js";
+import {
+  applyProductLocale,
+  DEFAULT_PRODUCT_LOCALE,
+  PRODUCT_LOCALE_STORAGE_KEY,
+  PRODUCT_TRANSLATION_KEYS,
+  PRODUCT_TRANSLATIONS,
+  ProductLocaleProvider,
+  readStoredProductLocale,
+  type ProductLocale,
+} from "../src/productI18n.js";
+import { formatFilterReason, SUPPORTED_FILTER_REASONS } from "../src/productPresentation.js";
 import type {
   PersistableScannerOutput,
   ProductReadinessOutput,
@@ -25,6 +37,10 @@ import type {
 
 const productRoot = resolve(process.cwd());
 const repoRoot = resolve(productRoot, "..", "..");
+
+function renderWithLocale(locale: ProductLocale, element: React.ReactElement): string {
+  return renderToStaticMarkup(React.createElement(ProductLocaleProvider, { initialLocale: locale }, element));
+}
 
 const newCandidate: UiTokenCandidate = {
   ...mapPersistableScannerOutputToUiCandidates(PERSISTABLE_SCANNER_SAMPLE)[0],
@@ -139,8 +155,8 @@ describe("Product Radar owner acceptance", () => {
     assert.equal(resolveInitialBasket([newCandidate, establishedCandidate]), "established");
     const newMarkup = renderToStaticMarkup(React.createElement(NewEmergingBasket, { candidates: [newCandidate] }));
     const establishedMarkup = renderToStaticMarkup(React.createElement(EstablishedBasket, { candidates: [establishedCandidate] }));
-    assert.match(newMarkup, /OBSERWACJA — NOWY PROJEKT/);
-    assert.match(establishedMarkup, /Główny Radar oparty na adresach/);
+    assert.match(newMarkup, /OBSERVATION — NEW PROJECT/);
+    assert.match(establishedMarkup, /Main address-based Radar/);
   });
 
   it("shows observation_only for every new-emerging record", () => {
@@ -177,61 +193,66 @@ describe("Product Radar owner acceptance", () => {
       ageSeconds: 60,
       sourceIds: ["dexscreener"],
     }));
-    assert.match(markup, /DEGRADED/);
-    assert.match(markup, /Dane częściowe — część par DexScreener była chwilowo niedostępna/);
+    assert.match(markup, /Source partially available/);
+    assert.match(markup, /Some DexScreener pairs were temporarily unavailable/);
     assert.match(markup, new RegExp(newCandidate.symbol));
     assert.match(markup, /observation_only=true/);
-    assert.doesNotMatch(markup, /fixture-fallback|Built-in sample|Radar nie może odczytać aktualnego skanu/);
+    assert.doesNotMatch(markup, /fixture-fallback|Built-in sample|Radar cannot read a valid scan/);
   });
 
   it("renders the dedicated Established empty-universe state", () => {
     const markup = renderToStaticMarkup(React.createElement(EstablishedBasket, { candidates: [], metadata: emptyMetadata, readiness: emptyReadiness }));
-    assert.match(markup, /Koszyk Established jest pusty/);
+    assert.match(markup, /The Established basket is empty/);
     assert.match(markup, /ESTABLISHED_UNIVERSE_EMPTY/);
-    assert.match(markup, /Aktywne wpisy/);
+    assert.match(markup, /Active entries/);
     assert.match(markup, />0</);
   });
 
   it("does not turn configured Established empty into a global error", () => {
     const markup = renderToStaticMarkup(React.createElement(EstablishedBasket, { candidates: [], metadata: emptyMetadata, readiness: emptyReadiness }));
     assert.equal(getEstablishedState(emptyMetadata, emptyReadiness, []), "empty");
-    assert.doesNotMatch(markup, /role="alert"|Radar jest obecnie niedostępny/);
+    assert.doesNotMatch(markup, /role="alert"|Radar is currently unavailable/);
   });
 
   it("does not use fixture or demo candidates for Established empty", () => {
     const markup = renderToStaticMarkup(React.createElement(EstablishedBasket, { candidates: [], metadata: emptyMetadata, readiness: emptyReadiness }));
     assert.doesNotMatch(markup, /PASSTOKEN|LOWLIQTOKEN|FDVFALLBACKTOKEN|Built-in sample|DEVELOPMENT_DEMO/);
-    assert.match(markup, /nie zastępuje braku wpisów przykładowymi tokenami/);
+    assert.match(markup, /never replaced with sample tokens/);
   });
 
   it("shows a fresh timestamp as current", () => {
     const markup = renderToStaticMarkup(React.createElement(CandidateResultsView, {
       candidates: [newCandidate], metadata: emptyMetadata, readiness: emptyReadiness, ageSeconds: 90, generatedAt: "2026-07-19T10:00:00.000Z", sourceIds: ["dexscreener"],
     }));
-    assert.match(markup, /Aktualne/);
-    assert.match(markup, /1 min temu/);
+    assert.match(markup, /Current/);
+    assert.match(markup, /1 min/);
   });
 
-  it("shows the exact stale reason code", () => {
+  it("keeps stale candidates visible behind a non-blocking warning", () => {
     const staleReadiness = structuredClone(emptyReadiness);
-    staleReadiness.scanner = { ready: false, reason_code: "SCANNER_SNAPSHOT_STALE" };
+    staleReadiness.status = "degraded";
+    staleReadiness.scanner = { ready: true, status: "stale", freshness_status: "STALE", reason_code: "SCANNER_SNAPSHOT_STALE" };
     const markup = renderToStaticMarkup(React.createElement(CandidateResultsView, {
-      candidates: [newCandidate], metadata: emptyMetadata, readiness: staleReadiness, ageSeconds: 7200, sourceIds: ["dexscreener"],
+      candidates: [newCandidate], metadata: emptyMetadata, readiness: staleReadiness, ageSeconds: 7200,
+      generatedAt: "2026-07-19T10:19:00.000Z", freshnessStatus: "STALE", sourceIds: ["dexscreener"],
     }));
-    assert.match(markup, /Nieaktualne/);
-    assert.match(markup, /SCANNER_SNAPSHOT_STALE/);
+    assert.match(markup, /product-stale-warning/);
+    assert.match(markup, /Data was last updated at/);
+    assert.match(markup, /Waiting for the next scheduled update/);
+    assert.match(markup, new RegExp(newCandidate.symbol));
+    assert.doesNotMatch(markup, /Radar cannot read a valid scan/);
   });
 
   it("does not present security-not-invoked as security passed", () => {
     const markup = renderToStaticMarkup(React.createElement(CandidateDetailView, { candidate: newCandidate }));
-    assert.match(markup, /Security nie zostało uruchomione dla tego koszyka\/statusu/);
-    assert.match(markup, /nie jest wynikiem pozytywnym/);
+    assert.match(markup, /Security was not run for this basket or status/);
+    assert.match(markup, /not a positive result/);
     assert.doesNotMatch(markup, /SECURITY_PASSED/);
   });
 
   it("describes WATCHLIST as Manual Review Only", () => {
     const markup = renderToStaticMarkup(React.createElement(EstablishedBasket, { candidates: [establishedCandidate] }));
-    assert.match(markup, /WATCHLIST — wyłącznie ręczna analiza/);
+    assert.match(markup, /WATCHLIST — manual review only/);
   });
 
   it("protects the layout from long contract addresses", async () => {
@@ -242,13 +263,13 @@ describe("Product Radar owner acceptance", () => {
 
   it("never creates sample candidates for an empty scanner result", () => {
     const markup = renderToStaticMarkup(React.createElement(CandidateResultsView, { candidates: [] }));
-    assert.match(markup, /system nie tworzy sample candidates/i);
+    assert.match(markup, /system does not create sample candidates/i);
     assert.doesNotMatch(markup, /PASSTOKEN|LOWLIQTOKEN|FDVFALLBACKTOKEN/);
   });
 
   it("limits product navigation to Radar, Details, Verification and Methodology", async () => {
     const source = await readFile(resolve(productRoot, "src", "ProductApp.tsx"), "utf8");
-    for (const label of ["Radar", "Szczegóły", "Weryfikacja", "Metodologia"]) assert.match(source, new RegExp(`label: "${label}"`));
+    for (const key of ["nav.radar", "nav.details", "nav.verification", "nav.methodology"]) assert.match(source, new RegExp(key.replace(".", "\\.")));
     assert.doesNotMatch(source, /label: "(?:Token Lookup|Trusted Preview|Webinar Teaser|Control Center|Feedback Notes)"/);
   });
 
@@ -288,18 +309,18 @@ describe("Product Radar owner acceptance", () => {
 
   it("distinguishes a reachable API with stale data from an unavailable API", () => {
     const staleReadiness = structuredClone(emptyReadiness);
-    staleReadiness.status = "not_ready";
-    staleReadiness.ready = false;
-    staleReadiness.scanner = { ready: false, reason_code: "SCANNER_SNAPSHOT_STALE" };
+    staleReadiness.status = "degraded";
+    staleReadiness.ready = true;
+    staleReadiness.scanner = { ready: true, status: "stale", freshness_status: "STALE", reason_code: "SCANNER_SNAPSHOT_STALE" };
     staleReadiness.context = { ready: false, reason_code: "CONTEXT_ENVIRONMENT_INVALID" };
     staleReadiness.reason_codes = ["SCANNER_SNAPSHOT_STALE", "CONTEXT_ENVIRONMENT_INVALID"];
     assert.deepEqual(
       getApiReadinessPresentation(false, "unavailable", staleReadiness),
-      { value: "Połączone", tone: "warning" },
+      { value: "Connected", tone: "warning" },
     );
     assert.deepEqual(
       getApiReadinessPresentation(false, "unavailable", null),
-      { value: "Niedostępne", tone: "error" },
+      { value: "Unavailable", tone: "error" },
     );
   });
 
@@ -312,15 +333,81 @@ describe("Product Radar owner acceptance", () => {
     const markup = renderToStaticMarkup(React.createElement(CandidateResultsView, {
       candidates: [newCandidate], metadata: emptyMetadata, readiness, ageSeconds: 60, sourceIds: ["dexscreener"],
     }));
-    assert.match(markup, /OBSERWACJA — NOWY PROJEKT/);
-    assert.doesNotMatch(markup, /Radar nie może odczytać aktualnego skanu/);
+    assert.match(markup, /OBSERVATION — NEW PROJECT/);
+    assert.doesNotMatch(markup, /Radar cannot read a valid scan/);
   });
 
   it("builds verification links only from the selected real candidate", () => {
     const markup = renderToStaticMarkup(React.createElement(ExternalVerificationLinksView, { candidate: establishedCandidate }));
     assert.match(markup, new RegExp(establishedCandidate.contractAddress));
     assert.match(markup, /target="_blank" rel="noreferrer noopener"/);
-    assert.match(markup, /Brak automatycznego Honeypot\.is/);
+    assert.match(markup, /No automated Honeypot\.is/);
     assert.doesNotMatch(markup, /\bfetch\s*\(/);
+  });
+
+  it("defaults to English and persists the one-click locale selection", () => {
+    const values = new Map<string, string>();
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => { values.set(key, value); },
+    };
+    const documentElement = { lang: "" };
+    assert.equal(DEFAULT_PRODUCT_LOCALE, "en");
+    assert.equal(readStoredProductLocale(storage), "en");
+    applyProductLocale("pl", storage, documentElement);
+    assert.equal(values.get(PRODUCT_LOCALE_STORAGE_KEY), "pl");
+    assert.equal(readStoredProductLocale(storage), "pl");
+    assert.equal(documentElement.lang, "pl");
+  });
+
+  it("renders important Radar views completely in English and Polish", () => {
+    const english = [
+      renderWithLocale("en", React.createElement(CandidateResultsView, { candidates: [newCandidate], ageSeconds: 60 })),
+      renderWithLocale("en", React.createElement(CandidateDetailView, { candidate: newCandidate })),
+      renderWithLocale("en", React.createElement(ExternalVerificationLinksView, { candidate: establishedCandidate })),
+      renderWithLocale("en", React.createElement(Methodology)),
+    ].join(" ");
+    const polish = [
+      renderWithLocale("pl", React.createElement(CandidateResultsView, { candidates: [newCandidate], ageSeconds: 60 })),
+      renderWithLocale("pl", React.createElement(CandidateDetailView, { candidate: newCandidate })),
+      renderWithLocale("pl", React.createElement(ExternalVerificationLinksView, { candidate: establishedCandidate })),
+      renderWithLocale("pl", React.createElement(Methodology)),
+    ].join(" ");
+    assert.match(english, /Two baskets with two different meanings/);
+    assert.match(english, /Manual source verification/);
+    assert.match(english, /How to read the Radar/);
+    assert.match(polish, /Dwa koszyki, dwa różne znaczenia/);
+    assert.match(polish, /Ręczna weryfikacja źródłowa/);
+    assert.match(polish, /Jak czytać Radar/);
+    assert.equal(PRODUCT_TRANSLATION_KEYS.length, Object.keys(PRODUCT_TRANSLATIONS.pl).length);
+  });
+
+  it("formats every supported filter reason in both languages and fails safely", () => {
+    for (const reason of SUPPORTED_FILTER_REASONS) {
+      const en = formatFilterReason(reason, "en");
+      const pl = formatFilterReason(reason, "pl");
+      assert.equal(en.known, true, reason);
+      assert.equal(pl.known, true, reason);
+      assert.notEqual(en.summary, reason);
+      assert.notEqual(pl.summary, reason);
+    }
+    assert.equal(formatFilterReason("future_filter_reason", "en").summary, "A filter condition needs review");
+    assert.equal(formatFilterReason("future_filter_reason", "pl").summary, "Warunek filtra wymaga sprawdzenia");
+    assert.equal(formatFilterReason("future_filter_reason", "en").rawReason, "future_filter_reason");
+  });
+
+  it("keeps locale switching fetch-free and refresh first-party only", async () => {
+    const localeSource = await readFile(resolve(productRoot, "src", "productI18n.tsx"), "utf8");
+    const appSource = await readFile(resolve(productRoot, "src", "ProductApp.tsx"), "utf8");
+    const scannerSource = await readFile(resolve(productRoot, "src", "services", "scannerDataSource.ts"), "utf8");
+    const apiSource = await readFile(resolve(productRoot, "server", "scannerApiServer.ts"), "utf8");
+    assert.doesNotMatch(localeSource, /\bfetch\s*\(/);
+    assert.match(appSource, /refreshPromiseRef\.current/);
+    assert.doesNotMatch(appSource, /dexscreenerClient|goplusClient|internalBetaCollector/);
+    assert.match(scannerSource, /\/api\/scanner\/latest/);
+    assert.match(scannerSource, /\/api\/readiness/);
+    assert.doesNotMatch(scannerSource, /https?:\/\//);
+    assert.doesNotMatch(apiSource, /internalBetaCollector|dexscreenerClient|goplusClient|collect:/);
+    assert.doesNotMatch(apiSource, /\/api\/scanner\/(?:scan|collect|refresh)/);
   });
 });
