@@ -21,6 +21,7 @@ import {
 } from "./services/scannerDataSource";
 import type {
   ProductReadinessOutput,
+  ScannerApiOutput,
   ScannerDiscoveryMetadata,
   UiTokenCandidate,
 } from "./types/scannerTypes";
@@ -129,17 +130,18 @@ export function ProductAppContent() {
       }
 
       const output = scannerResult.output;
+      const acceptedTimestamps = getAcceptedProductRefreshTimestamps(output, new Date().toISOString());
       setCandidates(mapPersistableScannerOutputToUiCandidates(output));
       setResolvedSource(scannerResult.resolvedSource);
       setRunId(output.scan_run.run_id ?? null);
-      setGeneratedAt(output.provenance?.generated_at ?? output.scan_run.finished_at ?? output.scan_run.started_at ?? null);
+      setGeneratedAt(acceptedTimestamps.generatedAt);
+      setViewRefreshedAt(acceptedTimestamps.viewRefreshedAt);
       setAgeSeconds(output._source_meta?.age_seconds ?? null);
       setFreshnessStatus(output._source_meta?.freshness_status ?? null);
       setSourceIds(output._source_meta?.source_ids ?? output.provenance?.source_ids ?? []);
       setMetadata(output.provenance?.metadata ?? null);
     })().finally(() => {
       setLoading(false);
-      setViewRefreshedAt(new Date().toISOString());
       refreshPromiseRef.current = null;
     });
 
@@ -259,4 +261,18 @@ export function ProductAppContent() {
 function resolveSection(): ProductSectionId {
   if (typeof window === "undefined") return "candidate-results";
   return HASH_TO_SECTION[window.location.hash.trim().toLowerCase()] ?? "candidate-results";
+}
+
+export function resolveScannerSnapshotTimestamp(output: ScannerApiOutput): string | null {
+  return output.provenance?.generated_at ?? output.scan_run.finished_at ?? null;
+}
+
+export function getAcceptedProductRefreshTimestamps(
+  output: ScannerApiOutput,
+  viewRefreshedAt: string,
+): { generatedAt: string | null; viewRefreshedAt: string } {
+  return {
+    generatedAt: resolveScannerSnapshotTimestamp(output),
+    viewRefreshedAt,
+  };
 }

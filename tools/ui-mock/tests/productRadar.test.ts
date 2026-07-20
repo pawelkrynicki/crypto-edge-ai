@@ -15,11 +15,19 @@ import {
 } from "../src/components/CandidateResultsView.js";
 import { ExternalVerificationLinksView } from "../src/components/ExternalVerificationLinksView.js";
 import { Methodology } from "../src/components/Methodology.js";
-import { getApiReadinessPresentation } from "../src/components/ProductWorkspaceShell.js";
+import {
+  ProductWorkspaceShell,
+  getApiReadinessPresentation,
+} from "../src/components/ProductWorkspaceShell.js";
+import {
+  getAcceptedProductRefreshTimestamps,
+  resolveScannerSnapshotTimestamp,
+} from "../src/ProductApp.js";
 import { PERSISTABLE_SCANNER_SAMPLE } from "../src/fixtures/persistableScannerSample.js";
 import {
   applyProductLocale,
   DEFAULT_PRODUCT_LOCALE,
+  formatProductDateTime,
   PRODUCT_LOCALE_STORAGE_KEY,
   PRODUCT_TRANSLATION_KEYS,
   PRODUCT_TRANSLATIONS,
@@ -31,12 +39,17 @@ import { formatFilterReason, SUPPORTED_FILTER_REASONS } from "../src/productPres
 import type {
   PersistableScannerOutput,
   ProductReadinessOutput,
+  ScannerApiOutput,
   ScannerDiscoveryMetadata,
   UiTokenCandidate,
 } from "../src/types/scannerTypes.js";
 
 const productRoot = resolve(process.cwd());
 const repoRoot = resolve(productRoot, "..", "..");
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 
 function renderWithLocale(locale: ProductLocale, element: React.ReactElement): string {
   return renderToStaticMarkup(React.createElement(ProductLocaleProvider, { initialLocale: locale }, element));
@@ -228,19 +241,77 @@ describe("Product Radar owner acceptance", () => {
     assert.match(markup, /1 min/);
   });
 
-  it("keeps stale candidates visible behind a non-blocking warning", () => {
+  it("keeps stale candidates visible with timestamp-first EN and PL semantics", () => {
     const staleReadiness = structuredClone(emptyReadiness);
     staleReadiness.status = "degraded";
     staleReadiness.scanner = { ready: true, status: "stale", freshness_status: "STALE", reason_code: "SCANNER_SNAPSHOT_STALE" };
-    const markup = renderToStaticMarkup(React.createElement(CandidateResultsView, {
-      candidates: [newCandidate], metadata: emptyMetadata, readiness: staleReadiness, ageSeconds: 7200,
-      generatedAt: "2026-07-19T10:19:00.000Z", freshnessStatus: "STALE", sourceIds: ["dexscreener"],
-    }));
-    assert.match(markup, /product-stale-warning/);
-    assert.match(markup, /Data was last updated at/);
-    assert.match(markup, /Waiting for the next scheduled update/);
-    assert.match(markup, new RegExp(newCandidate.symbol));
-    assert.doesNotMatch(markup, /Radar cannot read a valid scan/);
+    const generatedAt = "2026-07-19T10:19:00.000Z";
+    for (const locale of ["en", "pl"] as const) {
+      const markup = renderWithLocale(locale, React.createElement(CandidateResultsView, {
+        candidates: [newCandidate], metadata: emptyMetadata, readiness: staleReadiness, ageSeconds: 7200,
+        generatedAt, freshnessStatus: "STALE", sourceIds: ["dexscreener"],
+      }));
+      const label = locale === "en" ? "Last updated" : "Ostatnia aktualizacja";
+      const delayed = locale === "en" ? "Delayed" : "Opóźnione";
+      const timestamp = formatProductDateTime(generatedAt, locale);
+      assert.match(markup, /product-stale-warning/);
+      assert.match(markup, new RegExp(`<span>${label}</span><strong>${escapeRegExp(timestamp)}</strong><p>Status: ${delayed}</p>`));
+      assert.match(markup, locale === "en"
+        ? /Data is older than the freshness limit\. The last valid snapshot remains available\./
+        : /Dane są starsze niż limit świeżości\. Ostatnia prawidłowa migawka pozostaje dostępna\./);
+      assert.doesNotMatch(markup, /scheduled update|zaplanowaną aktualizację/i);
+      assert.match(markup, new RegExp(newCandidate.symbol));
+      assert.doesNotMatch(markup, /Radar cannot read a valid scan/);
+    }
+  });
+
+  it("keeps snapshot time stable across rereads and advances only for a newer accepted snapshot", () => {
+    const firstOutput = structuredClone(PERSISTABLE_SCANNER_SAMPLE) as ScannerApiOutput;
+    const first = getAcceptedProductRefreshTimestamps(firstOutput, "2026-07-20T10:30:00.000Z");
+    const sameSnapshot = getAcceptedProductRefreshTimestamps(firstOutput, "2026-07-20T10:31:00.000Z");
+    assert.equal(sameSnapshot.generatedAt, first.generatedAt);
+    assert.notEqual(sameSnapshot.viewRefreshedAt, first.viewRefreshedAt);
+
+    const newerOutput = structuredClone(firstOutput);
+    newerOutput.scan_run.finished_at = "2026-07-20T10:32:00.000Z";
+    const newerSnapshot = getAcceptedProductRefreshTimestamps(newerOutput, "2026-07-20T10:33:00.000Z");
+    assert.notEqual(newerSnapshot.generatedAt, first.generatedAt);
+    assert.equal(newerSnapshot.generatedAt, newerOutput.scan_run.finished_at);
+
+    const generatedAt = "2026-07-20T10:34:00.000Z";
+    const provenanceOutput = {
+      ...newerOutput,
+      provenance: { generated_at: generatedAt },
+    } as ScannerApiOutput;
+    assert.equal(resolveScannerSnapshotTimestamp(provenanceOutput), generatedAt);
+
+    for (const locale of ["en", "pl"] as const) {
+      const renderShell = (timestamps: typeof first) => renderWithLocale(locale, React.createElement(ProductWorkspaceShell, {
+        navItems: [],
+        activeSection: "candidate-results",
+        onSectionChange: () => undefined,
+        loading: false,
+        runtimeMode: "INTERNAL_BETA",
+        resolvedSource: "real-output",
+        runId: firstOutput.scan_run.run_id,
+        generatedAt: timestamps.generatedAt,
+        ageSeconds: 7200,
+        freshnessStatus: "STALE",
+        viewRefreshedAt: timestamps.viewRefreshedAt,
+        sourceIds: ["dexscreener"],
+        readiness: emptyReadiness,
+        onRefresh: () => undefined,
+        children: React.createElement("div"),
+      }));
+      const firstMarkup = renderShell(first);
+      const rereadMarkup = renderShell(sameSnapshot);
+      const snapshotTime = formatProductDateTime(first.generatedAt!, locale);
+      assert.match(firstMarkup, new RegExp(escapeRegExp(snapshotTime)));
+      assert.match(rereadMarkup, new RegExp(escapeRegExp(snapshotTime)));
+      assert.match(firstMarkup, new RegExp(escapeRegExp(formatProductDateTime(first.viewRefreshedAt, locale))));
+      assert.match(rereadMarkup, new RegExp(escapeRegExp(formatProductDateTime(sameSnapshot.viewRefreshedAt, locale))));
+      assert.match(rereadMarkup, locale === "en" ? /Refresh view/ : /Odśwież widok/);
+    }
   });
 
   it("does not present security-not-invoked as security passed", () => {
@@ -402,7 +473,11 @@ describe("Product Radar owner acceptance", () => {
     const scannerSource = await readFile(resolve(productRoot, "src", "services", "scannerDataSource.ts"), "utf8");
     const apiSource = await readFile(resolve(productRoot, "server", "scannerApiServer.ts"), "utf8");
     assert.doesNotMatch(localeSource, /\bfetch\s*\(/);
+    assert.equal(PRODUCT_TRANSLATIONS.en["app.refresh"], "Refresh view");
+    assert.equal(PRODUCT_TRANSLATIONS.pl["app.refresh"], "Odśwież widok");
     assert.match(appSource, /refreshPromiseRef\.current/);
+    assert.match(appSource, /getAcceptedProductRefreshTimestamps\(output, new Date\(\)\.toISOString\(\)\)/);
+    assert.doesNotMatch(appSource, /finally\(\(\) => \{[\s\S]*?setViewRefreshedAt/);
     assert.doesNotMatch(appSource, /dexscreenerClient|goplusClient|internalBetaCollector/);
     assert.match(scannerSource, /\/api\/scanner\/latest/);
     assert.match(scannerSource, /\/api\/readiness/);

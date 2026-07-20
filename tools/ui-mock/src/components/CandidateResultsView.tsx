@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   formatProductAge,
   formatProductDateTime,
-  formatProductTime,
   formatProductUsd,
   PRODUCT_TRANSLATIONS,
   useProductLocale,
@@ -71,7 +70,7 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
       {stale && generatedAt && (
         <section className="product-stale-warning" role="status">
           <strong>{t("status.delayed")}</strong>
-          <p>{t("radar.staleWarning", { time: formatProductTime(generatedAt, locale) })}</p>
+          <p>{t("radar.staleWarning")}</p>
           {ageSeconds !== null && <small>{t("radar.staleAge", { age: formatProductAge(ageSeconds, locale) })}</small>}
         </section>
       )}
@@ -96,8 +95,8 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
         <SummaryCard label={t("radar.securityChecked")} value={String(securityChecked)} detail={t("radar.goPlusAfterFilters")} />
         <SummaryCard
           label={t("app.generated")}
-          value={freshness.value}
-          detail={generatedAt ? formatProductDateTime(generatedAt, locale) : freshness.detail}
+          value={generatedAt ? formatProductDateTime(generatedAt, locale) : t("status.noTimestamp")}
+          detail={`${t("detail.status")}: ${freshness.value}`}
           tone={freshness.tone}
         />
         <SummaryCard label={t("radar.sourceState")} value={sourceState.value} detail={sourceState.detail} tone={sourceState.tone} />
