@@ -126,6 +126,52 @@ export type PersistableScorecard = {
   created_at: string;
 };
 
+export type ScannerDiscoveryMetadata = {
+  discovery_architecture?: "two_basket_discovery_v1";
+  new_emerging?: {
+    discovery_method?: "dexscreener_latest_token_profiles";
+    seed_count?: number;
+    pair_requests_succeeded?: number;
+    pair_requests_failed?: number;
+    pairs_loaded?: number;
+    candidates_before_filters?: number;
+    candidates_after_filters?: number;
+    discovery_status?: "READY" | "DEGRADED";
+    failure_reason_counts?: Partial<Record<
+      | "NETWORK_ERROR"
+      | "TIMEOUT"
+      | "HTTP_429"
+      | "HTTP_4XX"
+      | "HTTP_5XX"
+      | "INVALID_RESPONSE"
+      | "REQUEST_BUDGET_EXHAUSTED",
+      number
+    >>;
+  };
+  established?: {
+    discovery_method?: "address_seeded_universe";
+    universe_version?: string;
+    universe_status?: "ESTABLISHED_UNIVERSE_READY" | "ESTABLISHED_UNIVERSE_EMPTY";
+    entries_total?: number;
+    entries_enabled?: number;
+    pairs_loaded?: number;
+    candidates_before_filters?: number;
+    candidates_after_filters?: number;
+    base_token_candidates?: number;
+    quote_token_candidates?: number;
+  };
+  readiness?: {
+    process?: string;
+    new_emerging?: string;
+    established?: string;
+    context?: string;
+  };
+  security_candidate_limit?: number;
+  security_candidates_requested?: number;
+  request_counts?: Record<string, number>;
+  source_health?: Record<string, string>;
+};
+
 export type PersistableScannerOutput = {
   provenance?: {
     schema_version: string;
@@ -139,7 +185,7 @@ export type PersistableScannerOutput = {
     finished_at: string;
     source_ids: string[];
     policy_decisions: Record<string, Record<string, "allowed" | "denied">>;
-    metadata?: unknown;
+    metadata?: ScannerDiscoveryMetadata;
   };
   scan_run: PersistableScanRun;
   candidates: PersistableCandidate[];
@@ -156,10 +202,45 @@ export type ScannerSourceMeta = {
   runtime_mode?: "DEVELOPMENT_DEMO" | "INTERNAL_BETA" | "UNCONFIGURED";
   age_seconds?: number | null;
   source_ids?: string[];
+  freshness_status?: "FRESH" | "STALE";
 };
 
 export type ScannerApiOutput = PersistableScannerOutput & {
   _source_meta?: ScannerSourceMeta;
+};
+
+export type ProductReadinessEntry = {
+  ready: boolean;
+  reason_code: string | null;
+};
+
+export type ProductScannerReadiness = ProductReadinessEntry & {
+  status?: "ready" | "stale" | "unavailable";
+  freshness_status?: "FRESH" | "STALE";
+  generated_at?: string | null;
+  age_seconds?: number | null;
+};
+
+export type ProductBasketReadiness = ProductReadinessEntry & {
+  configured?: boolean;
+  status: "ready" | "degraded" | "empty_configured" | "unavailable";
+};
+
+export type ProductReadinessOutput = {
+  status: "ready" | "degraded" | "ready_with_empty_established_universe" | "not_ready";
+  ready: boolean;
+  runtime_mode?: "DEVELOPMENT_DEMO" | "INTERNAL_BETA" | "UNCONFIGURED";
+  process?: ProductReadinessEntry;
+  scanner: ProductScannerReadiness;
+  context: ProductReadinessEntry;
+  new_emerging?: ProductBasketReadiness;
+  established?: ProductBasketReadiness;
+  discovery: {
+    new_emerging: ProductBasketReadiness;
+    established: ProductBasketReadiness;
+    context?: ProductReadinessEntry;
+  };
+  reason_codes: string[];
 };
 
 export interface UiTokenCandidate {
@@ -204,6 +285,7 @@ export interface UiTokenCandidate {
   riskFlags: string[];
   security: {
     sources: string[];
+    coverageStatus: "SECURITY DATA UNAVAILABLE" | "PARTIAL SECURITY COVERAGE" | null;
     honeypotStatus: string;
     buyTax: number | null;
     sellTax: number | null;
@@ -218,7 +300,7 @@ export interface UiTokenCandidate {
     proxyRisk: boolean | null;
     topWalletPct: number | null;
     top10WalletsPct: number | null;
-    checkedAt: string;
+    checkedAt: string | null;
   } | null;
 
   scorecard: {

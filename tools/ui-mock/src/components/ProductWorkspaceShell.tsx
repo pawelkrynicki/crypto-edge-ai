@@ -1,5 +1,21 @@
-import type { ReactNode } from "react";
+import React, { type ReactNode } from "react";
+
+void React; // Required by the Node TSX test runtime's classic JSX transform.
+import {
+  formatProductAge,
+  formatProductDateTime,
+  PRODUCT_TRANSLATIONS,
+  useProductLocale,
+  type ProductLocale,
+} from "../productI18n";
+import { formatStatusReason } from "../productPresentation";
+import {
+  presentProductSourceHealth,
+  type ProductSourceHealthResolution,
+} from "../productSourceHealth";
 import type { ResolvedProductRuntimeMode } from "../runtimeMode";
+import type { ResolvedScannerSource } from "../services/scannerDataSource";
+import type { ProductReadinessOutput } from "../types/scannerTypes";
 
 export type ProductSectionId =
   | "candidate-results"
@@ -19,10 +35,20 @@ type ProductWorkspaceShellProps = {
   activeSection: ProductSectionId;
   onSectionChange: (sectionId: ProductSectionId) => void;
   loading: boolean;
-  sourceStatusText: string;
+  runtimeMode: ResolvedProductRuntimeMode;
+  resolvedSource: ResolvedScannerSource;
+  runId: string | null;
+  generatedAt: string | null;
+  ageSeconds: number | null;
+  freshnessStatus: "FRESH" | "STALE" | null;
+  viewRefreshedAt: string | null;
+  sourceIds: string[];
+  sourceHealth: ProductSourceHealthResolution;
+  readiness: ProductReadinessOutput | null;
+  readinessReasonCode?: string | null;
   dataUnavailableMessage?: string | null;
   dataUnavailableReasonCode?: string | null;
-  runtimeMode: ResolvedProductRuntimeMode;
+  onRefresh: () => void;
   children: ReactNode;
 };
 
@@ -37,43 +63,99 @@ export function ProductWorkspaceShell({
   activeSection,
   onSectionChange,
   loading,
-  sourceStatusText,
+  runtimeMode,
+  resolvedSource,
+  runId,
+  generatedAt,
+  ageSeconds,
+  freshnessStatus,
+  viewRefreshedAt,
+  sourceIds,
+  sourceHealth,
+  readiness,
+  readinessReasonCode,
   dataUnavailableMessage,
   dataUnavailableReasonCode,
-  runtimeMode,
+  onRefresh,
   children,
 }: ProductWorkspaceShellProps) {
+  const { locale, setLocale, t } = useProductLocale();
+  const apiPresentation = getApiReadinessPresentation(loading, resolvedSource, readiness, locale);
+  const freshnessPresentation = getFreshnessPresentation(ageSeconds, freshnessStatus, locale);
+  const sourcePresentation = presentProductSourceHealth(sourceHealth, locale, "header");
+  const technicalCodes = unique([
+    readinessReasonCode,
+    dataUnavailableReasonCode,
+    ...(readiness?.reason_codes ?? []),
+  ].filter((value): value is string => Boolean(value)));
+
   return (
-    <div className="app-shell">
-      <header className="app-header workspace-header">
+    <div className="app-shell product-shell">
+      <header className="app-header workspace-header product-header">
         <div className="product-mark">
-          <div className="product-logo">CE</div>
+          <div className="product-logo" aria-hidden="true">CE</div>
           <div className="min-w-0">
             <h1>Crypto Edge AI</h1>
-            <p>Internal research workspace</p>
+            <p>{t("app.tagline")}</p>
           </div>
         </div>
 
-        <div className="header-actions">
-          <span className="source-status">API only · fail-closed</span>
-          <span className="badge badge-context">{runtimeMode}</span>
-          <span className="badge badge-context">Research only</span>
-          <span className="source-status">{sourceStatusText}</span>
-          {loading && <em>loading...</em>}
+        <div className="product-header-status" aria-label={t("app.statusLabel")}>
+          <HeaderFact label={t("app.api")} value={apiPresentation.value} tone={apiPresentation.tone} />
+          <HeaderFact
+            label={t("app.freshness")}
+            value={freshnessPresentation.value}
+            detail={ageSeconds == null ? undefined : formatProductAge(ageSeconds, locale)}
+            tone={freshnessPresentation.tone}
+          />
+          <HeaderFact label={t("app.sources")} value={sourcePresentation.value} tone={sourcePresentation.tone} />
+          <HeaderFact
+            label={t("app.generated")}
+            value={generatedAt ? formatProductDateTime(generatedAt, locale) : t("app.noData")}
+            tone={freshnessPresentation.tone}
+          />
+          <HeaderFact
+            label={t("app.viewRefreshed")}
+            value={viewRefreshedAt ? formatProductDateTime(viewRefreshedAt, locale) : t("app.noData")}
+          />
+        </div>
+
+        <div className="product-header-actions">
+          <div className="product-locale-switch" role="group" aria-label={t("app.language")}>
+            {(["en", "pl"] as const).map((option) => (
+              <button
+                key={option}
+                type="button"
+                className={locale === option ? "active" : ""}
+                aria-pressed={locale === option}
+                onClick={() => setLocale(option)}
+              >
+                {option.toUpperCase()}
+              </button>
+            ))}
+          </div>
+          <button type="button" className="product-refresh-button" onClick={onRefresh} disabled={loading}>
+            {loading ? t("app.refreshing") : t("app.refresh")}
+          </button>
+          <details className="product-header-technical">
+            <summary>{t("app.technicalDetails")}</summary>
+            <dl>
+              <div><dt>{t("app.environment")}</dt><dd>{runtimeMode}</dd></div>
+              <div><dt>{t("app.runId")}</dt><dd>{runId ?? t("app.noData")}</dd></div>
+              <div><dt>{t("app.sources")}</dt><dd>{sourceIds.length > 0 ? sourceIds.join(", ") : t("app.noData")}</dd></div>
+              {technicalCodes.length > 0 && <div><dt>{t("app.codes")}</dt><dd>{technicalCodes.join(", ")}</dd></div>}
+            </dl>
+          </details>
         </div>
       </header>
 
-      <div className="workspace-shell-body">
-        <aside className="workspace-sidebar" aria-label="Workspace navigation">
+      <div className="workspace-shell-body product-shell-body">
+        <aside className="workspace-sidebar product-sidebar" aria-label={t("app.navigation")}>
           <nav className="workspace-nav">
-            <section
-              className="workspace-nav-group"
-              data-nav-group="Crypto Edge AI"
-              aria-label="Crypto Edge AI"
-            >
+            <section className="workspace-nav-group" aria-label="Crypto Edge AI">
               <div className="workspace-nav-group-header">
-                <span>Crypto Edge AI</span>
-                <small>Fail-closed real-data workspace.</small>
+                <span>Product Radar</span>
+                <small>{t("app.realData")}</small>
               </div>
 
               {navItems.map((item) => (
@@ -82,8 +164,9 @@ export function ProductWorkspaceShell({
                   key={item.id}
                   onClick={() => onSectionChange(item.id)}
                   className={`workspace-nav-item ${activeSection === item.id ? "active" : ""}`}
+                  aria-current={activeSection === item.id ? "page" : undefined}
                 >
-                  <span className="workspace-nav-icon">{item.icon}</span>
+                  <span className="workspace-nav-icon" aria-hidden="true">{item.icon}</span>
                   <span className="workspace-nav-copy">
                     <span>{item.label}</span>
                     <small>{item.description}</small>
@@ -96,9 +179,17 @@ export function ProductWorkspaceShell({
 
         <div className="workspace-main">
           {dataUnavailableMessage && (
-            <div className="app-notice workspace-notice">
-              <span>Data Unavailable · {dataUnavailableReasonCode ?? "UNKNOWN_REASON"}</span>
-              <p>{dataUnavailableMessage}</p>
+            <div className="product-global-error" role="alert">
+              <div>
+                <strong>{t("app.unavailableTitle")}</strong>
+                <p>{formatStatusReason(dataUnavailableReasonCode, locale)}</p>
+              </div>
+              <p>{t("app.unavailableMessage")}</p>
+              <details>
+                <summary>{t("app.technicalDetails")}</summary>
+                <code>{dataUnavailableReasonCode ?? "SCANNER_OUTPUT_UNAVAILABLE"}</code>
+                <p>{dataUnavailableMessage}</p>
+              </details>
             </div>
           )}
 
@@ -106,10 +197,57 @@ export function ProductWorkspaceShell({
         </div>
       </div>
 
-      <footer className="app-footer">
-        <p>Research workspace only. Published data must pass provenance, policy, allowlist and freshness checks.</p>
-        <span>WATCHLIST means Manual Review Only.</span>
+      <footer className="app-footer product-footer">
+        <p>{t("app.researchBoundary")}</p>
+        <span>{t("app.watchlistBoundary")}</span>
       </footer>
+    </div>
+  );
+}
+
+export function getApiReadinessPresentation(
+  loading: boolean,
+  resolvedSource: ResolvedScannerSource,
+  readiness: ProductReadinessOutput | null,
+  locale: ProductLocale = "en",
+): { value: string; tone: "neutral" | "ready" | "warning" | "error" } {
+  const copy = PRODUCT_TRANSLATIONS[locale];
+  if (loading && resolvedSource !== "real-output") return { value: copy["status.loading"], tone: "neutral" };
+  if (resolvedSource === "real-output") return { value: copy["status.connected"], tone: "ready" };
+  if (readiness !== null) return { value: copy["status.connected"], tone: "warning" };
+  return { value: copy["status.unavailable"], tone: "error" };
+}
+
+export function getFreshnessPresentation(
+  ageSeconds: number | null,
+  freshnessStatus: "FRESH" | "STALE" | null,
+  locale: ProductLocale = "en",
+): { value: string; tone: "ready" | "warning" } {
+  const copy = PRODUCT_TRANSLATIONS[locale];
+  if (freshnessStatus === "STALE" || (ageSeconds !== null && ageSeconds > 1800)) {
+    return { value: copy["status.delayed"], tone: "warning" };
+  }
+  if (freshnessStatus === "FRESH" || ageSeconds !== null) {
+    return { value: copy["status.current"], tone: "ready" };
+  }
+  return { value: copy["status.unavailable"], tone: "warning" };
+}
+
+function HeaderFact({
+  label,
+  value,
+  detail,
+  tone = "neutral",
+}: {
+  label: string;
+  value: string;
+  detail?: string;
+  tone?: "neutral" | "accent" | "ready" | "warning" | "error";
+}) {
+  return (
+    <div className={`product-header-fact ${tone}`} title={detail}>
+      <span>{label}</span>
+      <strong>{value}</strong>
     </div>
   );
 }
@@ -130,4 +268,8 @@ export function ProductWorkspaceSection({
       <div className="workspace-section-body">{children}</div>
     </section>
   );
+}
+
+function unique(values: string[]): string[] {
+  return [...new Set(values)];
 }

@@ -65,19 +65,34 @@ export function createScannerApiServer(options: ScannerApiServerOptions = {}) {
         getReadinessEntry(() => readLatestScannerOutput(scannerOptions)),
         getReadinessEntry(() => readLatestContextOutput(contextOptions)),
       ]);
-      const ready = scanner.ready && context.ready;
       const discovery = buildDiscoveryReadiness(scanner, context);
+      const scannerReadiness = publicScannerReadinessEntry(scanner);
+      const ready = scanner.ready;
+      const degraded = ready && (
+        scannerReadiness.freshness_status === "STALE"
+        || !context.ready
+        || discovery.new_emerging.status === "degraded"
+      );
       sendJson(req, res, ready ? 200 : 503, {
-        status: ready
-          ? discovery.established.status === "empty_configured" ? "ready_with_empty_established_universe" : "ready"
-          : "not_ready",
+        status: !ready
+          ? "not_ready"
+          : degraded
+            ? "degraded"
+            : discovery.established.status === "empty_configured" ? "ready_with_empty_established_universe" : "ready",
         runtime_mode: runtimeMode,
+        ready,
         process: { ready: true, reason_code: null },
-        scanner: publicReadinessEntry(scanner),
+        scanner: scannerReadiness,
         context: publicReadinessEntry(context),
         new_emerging: discovery.new_emerging,
         established: discovery.established,
-        reason_codes: [scanner.reason_code, context.reason_code].filter(isString),
+        discovery,
+        reason_codes: [
+          scannerReadiness.reason_code,
+          context.reason_code,
+          discovery.new_emerging.reason_code,
+          discovery.established.reason_code,
+        ].filter(isString),
       }, runtimeMode);
       return;
     }
@@ -249,6 +264,37 @@ function publicReadinessEntry(entry: ReadinessEntry): { ready: boolean; reason_c
   return { ready: entry.ready, reason_code: entry.reason_code };
 }
 
+function publicScannerReadinessEntry(entry: ReadinessEntry): {
+  ready: boolean;
+  status: "ready" | "stale" | "unavailable";
+  reason_code: string | null;
+  freshness_status: "FRESH" | "STALE" | null;
+  generated_at: string | null;
+  age_seconds: number | null;
+} {
+  if (!entry.ready || !isRecord(entry.value)) {
+    return {
+      ready: false,
+      status: "unavailable",
+      reason_code: entry.reason_code,
+      freshness_status: null,
+      generated_at: null,
+      age_seconds: null,
+    };
+  }
+  const meta = isRecord(entry.value._source_meta) ? entry.value._source_meta : null;
+  const provenance = isRecord(entry.value.provenance) ? entry.value.provenance : null;
+  const freshnessStatus = meta?.freshness_status === "STALE" ? "STALE" : "FRESH";
+  return {
+    ready: true,
+    status: freshnessStatus === "STALE" ? "stale" : "ready",
+    reason_code: freshnessStatus === "STALE" ? "SCANNER_SNAPSHOT_STALE" : null,
+    freshness_status: freshnessStatus,
+    generated_at: typeof provenance?.generated_at === "string" ? provenance.generated_at : null,
+    age_seconds: typeof meta?.age_seconds === "number" ? meta.age_seconds : null,
+  };
+}
+
 function buildDiscoveryReadiness(scanner: ReadinessEntry, context: ReadinessEntry) {
   if (!scanner.ready || !isRecord(scanner.value)) {
     const reasonCode = scanner.reason_code ?? "SCANNER_OUTPUT_UNAVAILABLE";
@@ -266,12 +312,16 @@ function buildDiscoveryReadiness(scanner: ReadinessEntry, context: ReadinessEntr
       established: { ready: false, configured: false, status: "unavailable", reason_code: "SCANNER_METADATA_INVALID" },
     };
   }
+  const newEmergingReady = readiness.new_emerging === "READY";
+  const newEmergingDegraded = readiness.new_emerging === "DEGRADED";
   const establishedEmpty = readiness.established === "EMPTY_CONFIGURED";
   return {
     new_emerging: {
-      ready: readiness.new_emerging === "READY",
-      status: readiness.new_emerging === "READY" ? "ready" : "unavailable",
-      reason_code: readiness.new_emerging === "READY" ? null : "NEW_EMERGING_UNAVAILABLE",
+      ready: newEmergingReady || newEmergingDegraded,
+      status: newEmergingDegraded ? "degraded" : newEmergingReady ? "ready" : "unavailable",
+      reason_code: newEmergingDegraded
+        ? "DEXSCREENER_PARTIAL_COVERAGE"
+        : newEmergingReady ? null : "NEW_EMERGING_UNAVAILABLE",
     },
     established: establishedEmpty
       ? {

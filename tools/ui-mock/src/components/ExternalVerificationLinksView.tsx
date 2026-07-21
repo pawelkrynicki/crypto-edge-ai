@@ -1,147 +1,81 @@
 import React from "react";
-import type { MockCandidate } from "../mockData";
 import {
   buildExternalVerificationTargets,
   normalizeExternalVerificationInput,
   type ExternalVerificationInput,
   type ExternalVerificationTarget,
 } from "../externalVerificationTargets";
-import {
-  ManualVerificationFallback,
-  buildExternalVerificationGaps,
-} from "./ManualVerificationFallback";
-import { ProductStateNotice } from "./ProductStateNotice";
-import { ResearchActionPanel } from "./ResearchActionPanel";
+import { useProductLocale } from "../productI18n";
+import { resolveProductSecurityState, type ProductSecurityState } from "../productSecurityResolver";
+import type { UiTokenCandidate } from "../types/scannerTypes";
 
 interface ExternalVerificationLinksViewProps {
-  candidate?: MockCandidate | null;
-  tokenInput?: string;
+  candidate?: UiTokenCandidate | null;
 }
 
-type ExternalCheckTone = "neutral" | "manual";
+export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksViewProps> = ({ candidate }) => {
+  const { t } = useProductLocale();
+  if (!candidate) {
+    return (
+      <section className="basket-state empty">
+        <span>{t("verification.eyebrow")}</span>
+        <h3>{t("verification.noneTitle")}</h3>
+        <p>{t("verification.noneDetail")}</p>
+      </section>
+    );
+  }
 
-export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksViewProps> = ({
-  candidate,
-  tokenInput = "",
-}) => {
-  const input = buildInput(candidate, tokenInput);
+  const input = buildInput(candidate);
   const normalizedInput = normalizeExternalVerificationInput(input);
   const targets = buildExternalVerificationTargets(input);
-  const displayName =
-    candidate?.name ||
-    candidate?.symbol ||
-    normalizedInput.tokenInput ||
-    "token input";
-  const fallbackGaps = buildExternalVerificationGaps({
-    hasContract: Boolean(normalizedInput.contractAddress),
-    hasChain: Boolean(normalizedInput.chain),
-    isWatchlist: candidate?.final_label === "WATCHLIST",
-  });
-  const hasContract = Boolean(normalizedInput.contractAddress);
-  const hasChain = Boolean(normalizedInput.chain);
+  const securityResolution = resolveProductSecurityState(candidate);
 
   return (
-    <div className="external-checks-view">
+    <div className="external-checks-view product-verification">
       <section className="external-checks-hero">
         <div className="external-checks-hero-copy">
-          <span className="external-checks-eyebrow">External Checks</span>
-          <h3>External Checks</h3>
-          <p>
-            Manual External Check only. Links open outside the app by user click, and every security,
-            liquidity and Source Freshness state remains Not Verified until Manual Review.
-          </p>
+          <span className="external-checks-eyebrow">{t("verification.manualEyebrow")}</span>
+          <h3>{candidate.symbol} <small>{candidate.name}</small></h3>
+          <p>{t("verification.intro")}</p>
         </div>
         <div className="external-checks-boundary">
-          <strong>Not Verified</strong>
-          <span>Manual Verification Required</span>
+          <strong>{t("detail.boundaryManual")}</strong>
+          <span>{t("verification.boundary")}</span>
         </div>
       </section>
 
-      <section className="external-checks-summary-grid" aria-label="External Checks summary">
-        <ExternalCheckMetric
-          label="Token Input"
-          value={displayName}
-          detail={normalizedInput.contractAddress ? "Copy Contract" : "Copy Token Input"}
-        />
-        <ExternalCheckMetric
-          label="Contract Address"
-          value={normalizedInput.contractAddress ? "Not Verified" : "Contract Required"}
-          detail={normalizedInput.contractAddress || "Manual Verification Required"}
-          tone="manual"
-        />
-        <ExternalCheckMetric
-          label="Chain"
-          value={normalizedInput.chain || "Chain Unknown"}
-          detail={normalizedInput.chain ? "Not Verified" : "Chain Unknown / verify manually"}
-          tone="manual"
-        />
-        <ExternalCheckMetric
-          label="Next Review Step"
-          value="External Check Required"
-          detail="Manual Review Only"
-          tone="manual"
-        />
+      <section className="verification-identity" aria-label={t("verification.identity")}>
+        <div><span>{t("verification.network")}</span><strong>{normalizedInput.chain || t("radar.missingData")}</strong></div>
+        <div className="verification-contract">
+          <span>{t("verification.contractAddress")}</span>
+          <code title={normalizedInput.contractAddress}>{normalizedInput.contractAddress || t("radar.missingData")}</code>
+          {normalizedInput.contractAddress && (
+            <button type="button" onClick={() => copyManualValue(normalizedInput.contractAddress)} aria-label={t("verification.copyContract")}>{t("verification.copyAddress")}</button>
+          )}
+        </div>
+        <div><span>{t("verification.pairAddress")}</span><code title={normalizedInput.pairAddress}>{normalizedInput.pairAddress || t("radar.missingData")}</code></div>
+        <div><span>{t("verification.recordSource")}</span><strong>{candidate.source}</strong></div>
       </section>
 
-      <ProductStateNotice
-        variant={hasContract && hasChain ? "partial" : "error"}
-        title="External Check Required"
-        status="External Check Required"
-        detail="Data Gap: External Checks are link-only, Security Not Verified and Liquidity Unknown remain Manual Review Only, and missing contract or chain keeps checks Not Verified."
-        nextReviewStep={hasContract && hasChain
-          ? "Open the user-clicked External Checks and record Manual Verification separately"
-          : "Add contract and chain manually before relying on any External Check"}
-        items={[
-          { label: "Contract", value: hasContract ? "Not Verified" : "Contract Required", detail: "Manual Verification Required" },
-          { label: "Chain", value: hasChain ? normalizedInput.chain : "Chain Unknown", detail: "Not Verified" },
-          { label: "Security", value: "Security Not Verified", detail: "Cannot Infer Safety" },
-          { label: "Liquidity", value: "Liquidity Unknown", detail: "Source Freshness Unknown" },
-        ]}
-      />
+      <section className="verification-guidance">
+        <strong>{t("verification.whatOpens")}</strong>
+        <p>{t("verification.whatOpensDetail")}</p>
+      </section>
 
-      <ManualVerificationFallback
-        title="Manual Verification Required"
-        gaps={fallbackGaps}
-      />
-
-      <ResearchActionPanel
-        candidate={candidate}
-        tokenInput={tokenInput}
-      />
-
-      <section className="external-checks-list" aria-label="Manual External Check list">
-        {targets.map((target) => (
-          <ExternalCheckCard key={target.id} target={target} />
-        ))}
+      <section className="external-checks-list" aria-label={t("verification.safeSources")}>
+        {targets.map((target) => <ExternalCheckCard key={target.id} target={target} />)}
       </section>
 
       <section className="external-checks-review-panel">
         <div>
-          <span className="external-checks-eyebrow">Next Review Step</span>
-          <h3>Manual External Check</h3>
-          <p>
-            Security Not Verified. Liquidity Unknown. Source Freshness Unknown. WATCHLIST remains Manual Review Only.
-          </p>
+          <span className="external-checks-eyebrow">{t("verification.nextStep")}</span>
+          <h3>{t("verification.compareTitle")}</h3>
+          <p>{t("verification.compareDetail")}</p>
         </div>
         <div className="external-checks-review-grid">
-          <ExternalCheckMetric
-            label="Security"
-            value="Security Not Verified"
-            detail="Manual Verification Required"
-            tone="manual"
-          />
-          <ExternalCheckMetric
-            label="Liquidity"
-            value="Liquidity Unknown"
-            detail="Manual External Check"
-            tone="manual"
-          />
-          <ExternalCheckMetric
-            label="Source Freshness"
-            value="Source Freshness Unknown"
-            detail="source URL not fetched"
-            tone="manual"
-          />
+          <VerificationMetric label={t("verification.identityMetric")} value={candidate.addressIdentityVerified ? t("verification.identityMatches") : t("verification.identityNeedsCheck")} />
+          <VerificationMetric label={t("verification.securityMetric")} value={presentVerificationSecurityState(securityResolution.state, t)} />
+          <VerificationMetric label={t("verification.decision")} value={t("verification.manualOnly")} />
         </div>
       </section>
     </div>
@@ -149,88 +83,96 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
 };
 
 function ExternalCheckCard({ target }: { target: ExternalVerificationTarget }) {
+  const { t } = useProductLocale();
+  const copyValue = target.copyValue ?? "";
+  const labelKey = target.id === "explorer"
+    ? "verification.networkExplorer"
+    : target.id === "dex"
+      ? "verification.dexScreener"
+      : target.id === "source"
+        ? "verification.recordSourceLabel"
+        : "verification.securityManual";
+  const titleKey = target.id === "explorer"
+    ? "verification.explorerTitle"
+    : target.id === "dex"
+      ? "verification.dexTitle"
+      : target.id === "source"
+        ? "verification.sourceTitle"
+        : "verification.securityTitle";
+  const explanationKey = target.id === "explorer"
+    ? "verification.explorerExplanation"
+    : target.id === "dex"
+      ? "verification.dexExplanation"
+      : target.id === "source"
+        ? "verification.sourceExplanation"
+        : "verification.securityExplanation";
+  const title = t(titleKey);
+
   return (
     <article className={`external-check-card ${target.state === "manual" ? "manual" : ""}`}>
       <div className="external-check-card-main">
-        <span className="external-checks-eyebrow">{target.label}</span>
-        <h4>{target.title}</h4>
-        <p>{target.detail}</p>
+        <span className="external-checks-eyebrow">{t(labelKey)}</span>
+        <h4>{title}</h4>
+        <p>{target.state === "link" ? t(explanationKey) : translateStatus(target.status, t)}</p>
       </div>
-
       <div className="external-check-card-status">
-        <span>Not Verified</span>
-        <strong>{target.status}</strong>
-        {target.reason && <p>{target.reason}</p>}
+        <span>{t("verification.status")}</span>
+        <strong>{target.state === "link" ? t("verification.allowlisted") : translateStatus(target.status, t)}</strong>
+        {target.state === "manual" && <p>{t("verification.manualMissing")}</p>}
       </div>
-
       <div className="external-check-actions">
         {target.href ? (
-          <a
-            className="external-check-link"
-            href={target.href}
-            target="_blank"
-            rel="noreferrer noopener"
-          >
-            Open External Check
+          <a className="external-check-link" href={target.href} target="_blank" rel="noreferrer noopener" aria-label={t("verification.openSourceLabel", { source: title })}>
+            {t("verification.openSource")}
           </a>
         ) : (
-          <span className="external-check-disabled" aria-disabled="true">
-            Manual External Check
-          </span>
+          <span className="external-check-disabled" aria-disabled="true">{t("verification.sourceUnavailable")}</span>
         )}
-        {target.copyValue && (
-          <button
-            type="button"
-            className="external-check-copy-button"
-            onClick={() => copyManualValue(target.copyValue ?? "")}
-          >
-            {target.copyLabel}
-          </button>
-        )}
+        {copyValue && <button type="button" className="external-check-copy-button" onClick={() => copyManualValue(copyValue)}>{t("verification.copyAddress")}</button>}
       </div>
     </article>
   );
 }
 
-function ExternalCheckMetric({
-  label,
-  value,
-  detail,
-  tone = "neutral",
-}: {
-  label: string;
-  value: string;
-  detail: string;
-  tone?: ExternalCheckTone;
-}) {
-  return (
-    <div className={`external-check-metric ${tone}`}>
-      <span>{label}</span>
-      <strong>{value}</strong>
-      <p>{detail}</p>
-    </div>
-  );
+function VerificationMetric({ label, value }: { label: string; value: string }) {
+  return <div className="external-check-metric manual"><span>{label}</span><strong>{value}</strong></div>;
 }
 
-function buildInput(candidate: MockCandidate | null | undefined, tokenInput: string): ExternalVerificationInput {
-  if (!candidate) {
-    return { tokenInput };
-  }
+function presentVerificationSecurityState(
+  state: ProductSecurityState,
+  t: ReturnType<typeof useProductLocale>["t"],
+): string {
+  if (state === "not_invoked") return t("verification.securityStateNotInvoked");
+  if (state === "unavailable") return t("verification.securityStateUnavailable");
+  if (state === "partial") return t("verification.securityStatePartial");
+  if (state === "checked_needs_manual_review") return t("verification.securityStateNeedsReview");
+  if (state === "checked_critical") return t("verification.securityStateCritical");
+  return t("verification.securityStateChecked");
+}
 
+function buildInput(candidate: UiTokenCandidate): ExternalVerificationInput {
   return {
     symbol: candidate.symbol,
     projectName: candidate.name,
     chain: candidate.chain,
-    contractAddress: candidate.contract_address,
-    pairAddress: candidate.pair_address,
-    sourceUrl: candidate.source_url,
-    tokenInput: tokenInput || candidate.symbol || candidate.name,
+    contractAddress: candidate.contractAddress,
+    pairAddress: candidate.pairAddress,
+    sourceUrl: candidate.sourceUrl,
+    tokenInput: candidate.contractAddress,
   };
 }
 
-function copyManualValue(value: string): void {
-  if (!value) return;
-  if (typeof navigator === "undefined" || !navigator.clipboard) return;
+function translateStatus(
+  value: string,
+  t: ReturnType<typeof useProductLocale>["t"],
+): string {
+  if (value === "Contract Required") return t("verification.contractRequired");
+  if (value === "Chain Unknown") return t("verification.chainUnknown");
+  if (value === "Liquidity Unknown") return t("verification.liquidityUnknown");
+  return t("verification.missingContext");
+}
 
+function copyManualValue(value: string): void {
+  if (!value || typeof navigator === "undefined" || !navigator.clipboard) return;
   void navigator.clipboard.writeText(value);
 }

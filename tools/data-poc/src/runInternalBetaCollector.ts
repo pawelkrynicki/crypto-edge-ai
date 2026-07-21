@@ -1,6 +1,7 @@
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInternalBetaCollector } from "./internalBetaCollector.js";
+import type { DexScreenerDiscoveryFailureDiagnostics } from "./dexscreenerDiscovery.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, "../../../..");
@@ -77,6 +78,14 @@ main().catch((error: unknown) => {
     : error instanceof Error
       ? error.message
       : "COLLECTOR_FAILED";
-  console.error(JSON.stringify({ error: code }));
+  const diagnostics = readDiscoveryDiagnostics(error);
+  console.error(JSON.stringify({ error: code, ...(diagnostics ? { discovery: diagnostics } : {}) }));
   process.exit(1);
 });
+
+function readDiscoveryDiagnostics(error: unknown): DexScreenerDiscoveryFailureDiagnostics | null {
+  if (!error || typeof error !== "object" || !("diagnostics" in error)) return null;
+  const diagnostics = error.diagnostics;
+  if (!diagnostics || typeof diagnostics !== "object" || Array.isArray(diagnostics)) return null;
+  return diagnostics as DexScreenerDiscoveryFailureDiagnostics;
+}

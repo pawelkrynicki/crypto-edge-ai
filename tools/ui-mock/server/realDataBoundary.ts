@@ -151,6 +151,17 @@ export function requireFreshTimestamp(
   maxAgeMs: number,
   codes: { missing: string; invalid: string; future: string; stale: string },
 ): { timestamp: string; ageSeconds: number } {
+  const result = requireValidTimestamp(value, now, maxAgeMs, codes, { allowStale: false });
+  return { timestamp: result.timestamp, ageSeconds: result.ageSeconds };
+}
+
+export function requireValidTimestamp(
+  value: unknown,
+  now: Date,
+  maxAgeMs: number,
+  codes: { missing: string; invalid: string; future: string; stale: string },
+  options: { allowStale: boolean },
+): { timestamp: string; ageSeconds: number; freshnessStatus: "FRESH" | "STALE" } {
   if (typeof value !== "string" || value.trim().length === 0) {
     throw new RealDataBoundaryError(codes.missing);
   }
@@ -165,13 +176,14 @@ export function requireFreshTimestamp(
     throw new RealDataBoundaryError(codes.future);
   }
 
-  if (ageMs > maxAgeMs) {
+  if (ageMs > maxAgeMs && !options.allowStale) {
     throw new RealDataBoundaryError(codes.stale);
   }
 
   return {
     timestamp: value,
     ageSeconds: Math.max(0, Math.floor(ageMs / 1000)),
+    freshnessStatus: ageMs > maxAgeMs ? "STALE" : "FRESH",
   };
 }
 

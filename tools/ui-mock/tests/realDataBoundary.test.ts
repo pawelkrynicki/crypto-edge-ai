@@ -120,10 +120,13 @@ describe("INTERNAL_BETA scanner provenance boundary", () => {
     await expectScannerCode(output, "SCANNER_SCHEMA_INVALID");
   });
 
-  it("rejects a stale scanner timestamp", async () => {
+  it("returns a stale valid scanner snapshot as last-known-good", async () => {
     const output = makeScannerOutput();
     setScannerTime(output, "2026-07-16T11:29:00.000Z");
-    await expectScannerCode(output, "SCANNER_SNAPSHOT_STALE");
+    const result = await readScanner(output);
+    assert.equal(isRecord(result._source_meta) && result._source_meta.freshness_status, "STALE");
+    assert.equal(isRecord(result._source_meta) && result._source_meta.age_seconds, 1860);
+    assert.equal(asRecords(result.candidates).length, output.candidates.length);
   });
 
   it("rejects a future scanner timestamp", async () => {
@@ -220,6 +223,105 @@ describe("INTERNAL_BETA scanner provenance boundary", () => {
 });
 
 describe("API and frontend fail-closed behavior", () => {
+  it("returns stale valid candidates with HTTP 200 and degraded readiness", async () => {
+    const scanner = makeScannerOutput();
+    setScannerTime(scanner, "2026-07-16T10:00:00.000Z");
+    const scannerDir = await writeScanner(scanner);
+    const contextDir = await writeContext(makeContextOutput());
+    const server = createScannerApiServer({
+      runtimeMode: "INTERNAL_BETA",
+      scanner: { outputDirPath: scannerDir, now: NOW },
+      context: { outputDirPath: contextDir, now: NOW },
+    });
+    await listen(server);
+    try {
+      const address = server.address() as AddressInfo;
+      const base = `http://127.0.0.1:${address.port}`;
+      const latestResponse = await fetch(`${base}/api/scanner/latest`);
+      const latest = await latestResponse.json() as Record<string, unknown>;
+      assert.equal(latestResponse.status, 200);
+      assert.equal(asRecords(latest.candidates).length, scanner.candidates.length);
+      assert.equal(isRecord(latest._source_meta) && latest._source_meta.freshness_status, "STALE");
+      assert.equal(isRecord(latest._source_meta) && latest._source_meta.age_seconds, 7200);
+
+      const readinessResponse = await fetch(`${base}/api/readiness`);
+      const readiness = await readinessResponse.json() as Record<string, unknown>;
+      assert.equal(readinessResponse.status, 200);
+      assert.equal(readiness.status, "degraded");
+      assert.equal(isRecord(readiness.scanner) && readiness.scanner.ready, true);
+      assert.equal(isRecord(readiness.scanner) && readiness.scanner.reason_code, "SCANNER_SNAPSHOT_STALE");
+      assert.equal(isRecord(readiness.scanner) && readiness.scanner.freshness_status, "STALE");
+    } finally {
+      await close(server);
+    }
+  });
+
+  it("keeps the previous valid snapshot when a newer collector artifact is rejected", async () => {
+    const outputDir = resolve(tempRoot, `scanner-last-known-good-${crypto.randomUUID()}`);
+    const older = makeScannerOutput();
+    setScannerRunId(older, "scan_20260716100000_valid");
+    setScannerTime(older, "2026-07-16T10:00:00.000Z");
+    for (const security of older.security_checks) security.checked_at = "2026-07-16T10:00:00.000Z";
+    const newerInvalid = makeScannerOutput();
+    setScannerRunId(newerInvalid, "scan_20260716120000_invalid");
+    newerInvalid.provenance.environment = "PUBLIC_BETA";
+
+    for (const output of [older, newerInvalid]) {
+      const runDir = resolve(outputDir, output.scan_run.run_id);
+      await mkdir(runDir, { recursive: true });
+      await writeFile(resolve(runDir, "full_output.json"), JSON.stringify(output), "utf8");
+    }
+
+    const result = await readLatestScannerOutput({ runtimeMode: "INTERNAL_BETA", outputDirPath: outputDir, now: NOW });
+    assert.equal(isRecord(result._source_meta) && result._source_meta.selected_run_id, older.scan_run.run_id);
+    assert.equal(isRecord(result._source_meta) && result._source_meta.freshness_status, "STALE");
+    assert.equal(asRecords(result.candidates).length, older.candidates.length);
+  });
+
+  it("keeps scanner readiness usable when non-critical context is unavailable", async () => {
+    const scannerDir = await writeScanner(makeScannerOutput());
+    const server = createScannerApiServer({
+      runtimeMode: "INTERNAL_BETA",
+      scanner: { outputDirPath: scannerDir, now: NOW },
+      context: { outputDirPath: resolve(tempRoot, "missing-non-critical-context"), now: NOW },
+    });
+    await listen(server);
+    try {
+      const address = server.address() as AddressInfo;
+      const response = await fetch(`http://127.0.0.1:${address.port}/api/readiness`);
+      const body = await response.json() as Record<string, unknown>;
+      assert.equal(response.status, 200);
+      assert.equal(body.status, "degraded");
+      assert.equal(body.ready, true);
+      assert.equal(isRecord(body.scanner) && body.scanner.ready, true);
+      assert.equal(isRecord(body.context) && body.context.ready, false);
+    } finally {
+      await close(server);
+    }
+  });
+
+  it("returns HTTP 503 for a corrupt scanner snapshot", async () => {
+    const outputDir = resolve(tempRoot, `scanner-corrupt-${crypto.randomUUID()}`);
+    const runDir = resolve(outputDir, "scan_corrupt");
+    await mkdir(runDir, { recursive: true });
+    await writeFile(resolve(runDir, "full_output.json"), "{not-json", "utf8");
+    const server = createScannerApiServer({
+      runtimeMode: "INTERNAL_BETA",
+      scanner: { outputDirPath: outputDir, now: NOW },
+      context: { outputDirPath: resolve(tempRoot, "missing-corrupt-context"), now: NOW },
+    });
+    await listen(server);
+    try {
+      const address = server.address() as AddressInfo;
+      const response = await fetch(`http://127.0.0.1:${address.port}/api/scanner/latest`);
+      const body = await response.json() as Record<string, unknown>;
+      assert.equal(response.status, 503);
+      assert.equal(body.reason_code, "SCANNER_OUTPUT_INVALID_JSON");
+    } finally {
+      await close(server);
+    }
+  });
+
   it("returns 503 without an output directory and never returns a fixture", async () => {
     const server = createScannerApiServer({
       runtimeMode: "INTERNAL_BETA",
@@ -298,6 +400,53 @@ describe("API and frontend fail-closed behavior", () => {
         status: "empty_configured",
         reason_code: "ESTABLISHED_UNIVERSE_EMPTY",
       });
+    } finally {
+      await close(server);
+    }
+  });
+
+  it("keeps degraded DexScreener candidates available through readiness and latest", async () => {
+    const scanner = makeEmptyEstablishedScannerOutput();
+    Object.assign(scanner.provenance.metadata.new_emerging, {
+      seed_count: 10,
+      pair_requests_succeeded: 9,
+      pair_requests_failed: 1,
+      pairs_loaded: 9,
+      candidates_before_filters: 1,
+      candidates_after_filters: scanner.candidates[0]?.basic_filter_status === "passed_basic_filter" ? 1 : 0,
+      discovery_status: "DEGRADED",
+      failure_reason_counts: { NETWORK_ERROR: 1 },
+    });
+    scanner.provenance.metadata.readiness.new_emerging = "DEGRADED";
+    scanner.provenance.metadata.source_health.dexscreener = "DEGRADED";
+    scanner.provenance.metadata.request_counts.dexscreener = 12;
+    const scannerDir = await writeScanner(scanner);
+    const contextDir = await writeContext(makeContextOutput());
+    const server = createScannerApiServer({
+      runtimeMode: "INTERNAL_BETA",
+      scanner: { outputDirPath: scannerDir, now: NOW },
+      context: { outputDirPath: contextDir, now: NOW },
+    });
+    await listen(server);
+    try {
+      const address = server.address() as AddressInfo;
+      const base = `http://127.0.0.1:${address.port}`;
+      const readinessResponse = await fetch(`${base}/api/readiness`);
+      const readiness = await readinessResponse.json() as Record<string, unknown>;
+      assert.equal(readinessResponse.status, 200);
+      assert.deepEqual(readiness.new_emerging, {
+        ready: true,
+        status: "degraded",
+        reason_code: "DEXSCREENER_PARTIAL_COVERAGE",
+      });
+      assert.equal(JSON.stringify(readiness.reason_codes).includes("DEXSCREENER_PARTIAL_COVERAGE"), true);
+
+      const latestResponse = await fetch(`${base}/api/scanner/latest`);
+      const latest = await latestResponse.json() as Record<string, unknown>;
+      assert.equal(latestResponse.status, 200);
+      assert.equal(asRecords(latest.candidates).length, 1);
+      assert.equal(JSON.stringify(latest).includes("fixture-fallback"), false);
+      assert.equal(JSON.stringify(latest).includes("NETWORK_ERROR"), true);
     } finally {
       await close(server);
     }
@@ -535,10 +684,14 @@ function makeScannerOutput(): ScannerFactoryOutput {
       discovery_architecture: "two_basket_discovery_v1",
       new_emerging: {
         discovery_method: "dexscreener_latest_token_profiles",
-        seed_count: 1,
+        seed_count: 3,
+        pair_requests_succeeded: 3,
+        pair_requests_failed: 0,
         pairs_loaded: 1,
         candidates_before_filters: 1,
         candidates_after_filters: output.candidates.filter((candidate) => candidate.discovery_basket === "new_emerging" && candidate.basic_filter_status === "passed_basic_filter").length,
+        discovery_status: "READY",
+        failure_reason_counts: {},
       },
       established: {
         discovery_method: "address_seeded_universe",
@@ -592,10 +745,14 @@ function makeEmptyEstablishedScannerOutput(): ScannerFactoryOutput {
   delete output.provenance.policy_decisions.goplus_security;
   output.provenance.metadata.new_emerging = {
     discovery_method: "dexscreener_latest_token_profiles",
-    seed_count: 1,
+    seed_count: 3,
+    pair_requests_succeeded: 3,
+    pair_requests_failed: 0,
     pairs_loaded: 1,
     candidates_before_filters: 1,
     candidates_after_filters: observation.basic_filter_status === "passed_basic_filter" ? 1 : 0,
+    discovery_status: "READY",
+    failure_reason_counts: {},
   };
   output.provenance.metadata.established = {
     discovery_method: "address_seeded_universe",
@@ -616,7 +773,7 @@ function makeEmptyEstablishedScannerOutput(): ScannerFactoryOutput {
     context: "READY",
   };
   output.provenance.metadata.security_candidates_requested = 0;
-  output.provenance.metadata.request_counts.dexscreener = 2;
+  output.provenance.metadata.request_counts.dexscreener = 4;
   output.provenance.metadata.request_counts.goplus_security = 0;
   output.provenance.metadata.source_health.goplus_security = "NOT_INVOKED";
   delete (output.provenance.metadata as Record<string, unknown>).attribution;
@@ -627,6 +784,14 @@ function setScannerTime(output: ScannerFactoryOutput, timestamp: string): void {
   output.provenance.generated_at = timestamp;
   output.provenance.finished_at = timestamp;
   output.scan_run.finished_at = timestamp;
+}
+
+function setScannerRunId(output: ScannerFactoryOutput, runId: string): void {
+  output.scan_run.run_id = runId;
+  output.provenance.run_id = runId;
+  for (const candidate of output.candidates) candidate.run_id = runId;
+  for (const security of output.security_checks) security.run_id = runId;
+  for (const scorecard of output.scorecards) scorecard.run_id = runId;
 }
 
 function makeContextOutput(): ContextFactoryOutput {

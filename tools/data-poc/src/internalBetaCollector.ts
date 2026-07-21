@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { publishAtomicJson, type AtomicPublishResult } from "./atomicPublish.js";
 import { BoundedHttpClient, type FetchLike } from "./boundedHttpClient.js";
 import { buildCombinedScannerOutput } from "./combinedScanner.js";
+import { configureCollectorNetwork } from "./collectorNetworkBootstrap.js";
 import { validateDisplayEligibleContextSnapshot } from "./contextSnapshotValidator.js";
 import {
   collectDexScreenerDiscovery,
@@ -83,6 +84,7 @@ export async function runInternalBetaCollector(
   options: InternalBetaCollectorOptions = {},
 ): Promise<InternalBetaCollectorResult> {
   assertInternalBetaCollectorEnvironment(options.env ?? process.env);
+  configureCollectorNetwork();
 
   const now = options.now ?? new Date();
   const seedLimit = clamp(options.seedLimit, DEFAULT_DEXSCREENER_SEED_LIMIT, 1, 30);
@@ -181,6 +183,7 @@ export async function runInternalBetaCollector(
     .filter((reason): reason is string => Boolean(reason)))];
   const sourceHealth = buildSourceHealth(
     requestCounts,
+    discovery.new_emerging,
     securityRequested,
     securityAvailable,
     context,
@@ -255,7 +258,7 @@ function buildDiscoveryReadiness(
 ): Record<string, string> {
   return {
     process: "READY",
-    new_emerging: "READY",
+    new_emerging: sourceHealth.dexscreener === "DEGRADED" ? "DEGRADED" : "READY",
     established: established.universe_status === "ESTABLISHED_UNIVERSE_EMPTY" ? "EMPTY_CONFIGURED" : "READY",
     context: sourceHealth.alternative_me_fng === "UNAVAILABLE" || sourceHealth.defillama_api === "UNAVAILABLE"
       ? "UNAVAILABLE"
@@ -302,6 +305,7 @@ function fetchCandidateSecurity(
 
 function buildSourceHealth(
   requestCounts: Record<string, number>,
+  newEmerging: DexScreenerDiscoveryMetadata,
   securityRequested: number,
   securityAvailable: number,
   context: ApprovedSourcesRunOutput,
@@ -313,7 +317,7 @@ function buildSourceHealth(
     return "READY" as const;
   };
   return {
-    dexscreener: requestCounts.dexscreener > 0 ? "READY" : "UNAVAILABLE",
+    dexscreener: requestCounts.dexscreener > 0 ? newEmerging.discovery_status : "UNAVAILABLE",
     goplus_security: securityRequested === 0
       ? "NOT_INVOKED"
       : securityAvailable === 0

@@ -6,7 +6,7 @@ import {
   containsFixtureMarker,
   isRecord,
   isStringArray,
-  requireFreshTimestamp,
+  requireValidTimestamp,
   validateProvenanceManifest,
   type RealDataProvenanceManifest,
 } from "./realDataBoundary.js";
@@ -38,6 +38,7 @@ export type ScannerSourceMeta = {
   runtime_mode: ResolvedProductRuntimeMode;
   age_seconds: number | null;
   source_ids: string[];
+  freshness_status: "FRESH" | "STALE" | null;
 };
 
 export type ScannerOutputWithMeta = Record<string, unknown> & {
@@ -115,6 +116,7 @@ export async function readLatestScannerOutput(
         runtime_mode: runtimeMode,
         age_seconds: calculateOptionalAgeSeconds(latestValid.finished_at, now),
         source_ids: extractDemoSourceIds(latestValid.output),
+        freshness_status: calculateOptionalFreshnessStatus(latestValid.finished_at, now),
       });
     }
 
@@ -129,19 +131,19 @@ export async function readLatestScannerOutput(
     throw new ScannerOutputError("SCANNER_OUTPUT_DIRECTORY_MISSING");
   }
 
-  const latest = candidates[0];
-  if (!latest?.output) {
-    throw new ScannerOutputError(latest?.read_error ? "SCANNER_OUTPUT_INVALID_JSON" : SCANNER_OUTPUT_UNAVAILABLE);
-  }
-
-  try {
-    return sanitizeInternalBetaScannerOutput(latest.output, now);
-  } catch (error) {
-    if (error instanceof RealDataBoundaryError) {
-      throw new ScannerOutputError(error.code);
+  let latestFailureCode: string | null = null;
+  for (const candidate of candidates) {
+    if (!candidate.output) {
+      latestFailureCode ??= candidate.read_error ? "SCANNER_OUTPUT_INVALID_JSON" : SCANNER_OUTPUT_UNAVAILABLE;
+      continue;
     }
-    throw new ScannerOutputError(INVALID_SCANNER_OUTPUT);
+    try {
+      return sanitizeInternalBetaScannerOutput(candidate.output, now);
+    } catch (error) {
+      latestFailureCode ??= error instanceof RealDataBoundaryError ? error.code : INVALID_SCANNER_OUTPUT;
+    }
   }
+  throw new ScannerOutputError(latestFailureCode ?? SCANNER_OUTPUT_UNAVAILABLE);
 }
 
 export async function getScannerSourcesDiagnostics(
@@ -253,18 +255,21 @@ function sanitizeInternalBetaScannerOutput(value: unknown, now: Date): ScannerOu
     || scanRun.filters.basic_filters !== "dexscreener_basic_filters_v1"
   ) throw new RealDataBoundaryError(INVALID_SCANNER_OUTPUT);
 
-  const freshness = requireFreshTimestamp(manifest.generated_at, now, SCANNER_MAX_AGE_MS, {
+  const freshness = requireValidTimestamp(manifest.generated_at, now, SCANNER_MAX_AGE_MS, {
     missing: "SCANNER_TIMESTAMP_MISSING",
     invalid: "SCANNER_TIMESTAMP_INVALID",
     future: "SCANNER_TIMESTAMP_FUTURE",
     stale: "SCANNER_SNAPSHOT_STALE",
-  });
-  requireFreshTimestamp(manifest.finished_at, now, SCANNER_MAX_AGE_MS, {
+  }, { allowStale: true });
+  const finishedFreshness = requireValidTimestamp(manifest.finished_at, now, SCANNER_MAX_AGE_MS, {
     missing: "SCANNER_TIMESTAMP_MISSING",
     invalid: "SCANNER_TIMESTAMP_INVALID",
     future: "SCANNER_TIMESTAMP_FUTURE",
     stale: "SCANNER_SNAPSHOT_STALE",
-  });
+  }, { allowStale: true });
+  const freshnessStatus = freshness.freshnessStatus === "STALE" || finishedFreshness.freshnessStatus === "STALE"
+    ? "STALE"
+    : "FRESH";
 
   const sanitizedScanRun = sanitizeScanRun(scanRun);
   if (!sanitizedScanRun) {
@@ -285,7 +290,7 @@ function sanitizeInternalBetaScannerOutput(value: unknown, now: Date): ScannerOu
     value.security_checks,
     candidates as Record<string, unknown>[],
     manifest,
-    now,
+    freshnessStatus === "STALE" ? new Date(freshness.timestamp) : now,
   );
 
   return withSourceMeta({
@@ -296,12 +301,15 @@ function sanitizeInternalBetaScannerOutput(value: unknown, now: Date): ScannerOu
     scorecards: [],
   }, {
     source: "real-output",
-    reason: "display-eligible INTERNAL_BETA snapshot",
+    reason: freshnessStatus === "STALE"
+      ? "last-known-good INTERNAL_BETA snapshot"
+      : "display-eligible INTERNAL_BETA snapshot",
     selected_run_id: manifest.run_id,
     loaded_at: now.toISOString(),
     runtime_mode: "INTERNAL_BETA",
     age_seconds: freshness.ageSeconds,
     source_ids: manifest.source_ids,
+    freshness_status: freshnessStatus,
   });
 }
 
@@ -324,7 +332,11 @@ function sanitizeScannerMetadata(value: unknown, sourceIds: string[]): Record<st
   ) throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
   const newEmerging = sanitizeNewEmergingMetadata(value.new_emerging);
   const established = sanitizeEstablishedMetadata(value.established);
-  const readiness = sanitizeDiscoveryReadiness(value.readiness, established.universe_status as string);
+  const readiness = sanitizeDiscoveryReadiness(
+    value.readiness,
+    established.universe_status as string,
+    newEmerging.discovery_status as string,
+  );
   const requestCounts = value.request_counts;
   const sourceHealth = value.source_health;
 
@@ -346,14 +358,14 @@ function sanitizeScannerMetadata(value: unknown, sourceIds: string[]): Record<st
   if (
     securityLimit < 1 || securityLimit > 20
     || securityRequested > securityLimit || securityRequested > (established.candidates_after_filters as number)
-    || dexCount < 1 || dexCount > 1 + seedCount + Math.min(seedCount, 5)
+    || dexCount < 1 + seedCount || dexCount > 1 + seedCount + Math.min(seedCount, 5)
       + establishedEnabled + Math.min(establishedEnabled, 5)
     || goPlusCount > securityLimit + Math.min(securityLimit, 3)
     || (requestCounts.alternative_me_fng as number) < 1
     || (requestCounts.alternative_me_fng as number) > 2
     || (requestCounts.defillama_api as number) < 1
     || (requestCounts.defillama_api as number) > 2
-    || sourceHealth.dexscreener !== "READY"
+    || sourceHealth.dexscreener !== newEmerging.discovery_status
   ) throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
 
   const goplusInvoked = goPlusCount > 0;
@@ -384,21 +396,45 @@ function sanitizeScannerMetadata(value: unknown, sourceIds: string[]): Record<st
 }
 
 function sanitizeNewEmergingMetadata(value: unknown): Record<string, unknown> {
-  const fields = ["discovery_method", "seed_count", "pairs_loaded", "candidates_before_filters", "candidates_after_filters"];
+  const fields = [
+    "discovery_method", "seed_count", "pair_requests_succeeded", "pair_requests_failed", "pairs_loaded",
+    "candidates_before_filters", "candidates_after_filters", "discovery_status", "failure_reason_counts",
+  ];
   if (!isRecord(value) || !hasExactKeys(value, fields) || value.discovery_method !== "dexscreener_latest_token_profiles") {
     throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
   }
-  const numericFields = fields.slice(1);
+  const numericFields = [
+    "seed_count", "pair_requests_succeeded", "pair_requests_failed", "pairs_loaded",
+    "candidates_before_filters", "candidates_after_filters",
+  ];
   if (numericFields.some((field) => !isNonNegativeInteger(value[field]))) {
     throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
   }
   if (
     (value.seed_count as number) < 1 || (value.seed_count as number) > 30
+    || (value.pair_requests_succeeded as number) + (value.pair_requests_failed as number) !== (value.seed_count as number)
+    || (value.pair_requests_succeeded as number) < Math.max(3, Math.ceil((value.seed_count as number) * 0.5))
     || (value.candidates_before_filters as number) < 1
     || (value.candidates_before_filters as number) > (value.pairs_loaded as number)
     || (value.candidates_after_filters as number) > (value.candidates_before_filters as number)
   ) throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
-  return Object.fromEntries(fields.map((field) => [field, value[field]]));
+  if (!isRecord(value.failure_reason_counts)) throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
+  const allowedReasons = new Set([
+    "NETWORK_ERROR", "TIMEOUT", "HTTP_429", "HTTP_4XX", "HTTP_5XX", "INVALID_RESPONSE",
+    "REQUEST_BUDGET_EXHAUSTED",
+  ]);
+  const failureEntries = Object.entries(value.failure_reason_counts);
+  const failed = value.pair_requests_failed as number;
+  if (
+    failureEntries.some(([reason, count]) => !allowedReasons.has(reason) || !isPositiveInteger(count))
+    || failureEntries.reduce((total, [, count]) => total + Number(count), 0) !== failed
+    || !["READY", "DEGRADED"].includes(String(value.discovery_status))
+    || (failed === 0) !== (value.discovery_status === "READY")
+  ) throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
+  return {
+    ...Object.fromEntries(fields.filter((field) => field !== "failure_reason_counts").map((field) => [field, value[field]])),
+    failure_reason_counts: Object.fromEntries(failureEntries.sort(([left], [right]) => left.localeCompare(right))),
+  };
 }
 
 function sanitizeEstablishedMetadata(value: unknown): Record<string, unknown> {
@@ -437,17 +473,18 @@ function sanitizeEstablishedMetadata(value: unknown): Record<string, unknown> {
   return Object.fromEntries(fields.map((field) => [field, value[field]]));
 }
 
-function sanitizeDiscoveryReadiness(value: unknown, universeStatus: string): Record<string, unknown> {
+function sanitizeDiscoveryReadiness(value: unknown, universeStatus: string, discoveryStatus: string): Record<string, unknown> {
   const fields = ["process", "new_emerging", "established", "context"];
   if (
     !isRecord(value) || !hasExactKeys(value, fields)
     || value.process !== "READY"
-    || value.new_emerging !== "READY"
+    || !["READY", "DEGRADED"].includes(String(value.new_emerging))
     || !["READY", "EMPTY_CONFIGURED"].includes(String(value.established))
     || !["READY", "UNAVAILABLE"].includes(String(value.context))
   ) throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
   const expected = universeStatus === "ESTABLISHED_UNIVERSE_EMPTY" ? "EMPTY_CONFIGURED" : "READY";
   if (value.established !== expected) throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
+  if (value.new_emerging !== discoveryStatus) throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
   return Object.fromEntries(fields.map((field) => [field, value[field]]));
 }
 
@@ -458,6 +495,10 @@ function hasExactKeys(value: Record<string, unknown>, fields: string[]): boolean
 
 function isNonNegativeInteger(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value >= 0;
+}
+
+function isPositiveInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value > 0;
 }
 
 function sanitizeScanRun(value: Record<string, unknown>): Record<string, unknown> | null {
@@ -807,6 +848,7 @@ async function readFixtureOutput(path: string, reason: string, now: Date): Promi
       runtime_mode: "DEVELOPMENT_DEMO",
       age_seconds: null,
       source_ids: extractDemoSourceIds(output),
+      freshness_status: null,
     });
   } catch (error) {
     if (error instanceof ScannerOutputError) throw error;
@@ -914,6 +956,12 @@ function calculateOptionalAgeSeconds(value: string | null, now: Date): number | 
   if (!value) return null;
   const parsed = Date.parse(value);
   return Number.isNaN(parsed) ? null : Math.max(0, Math.floor((now.getTime() - parsed) / 1000));
+}
+
+function calculateOptionalFreshnessStatus(value: string | null, now: Date): "FRESH" | "STALE" | null {
+  const ageSeconds = calculateOptionalAgeSeconds(value, now);
+  if (ageSeconds === null) return null;
+  return ageSeconds * 1000 > SCANNER_MAX_AGE_MS ? "STALE" : "FRESH";
 }
 
 function hasCandidateId(value: unknown): boolean {

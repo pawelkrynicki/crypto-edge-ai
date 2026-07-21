@@ -34,6 +34,7 @@ function resolveLastCheckedAt(
 function mapSecurity(security: PersistableSecurityCheck): UiTokenCandidate["security"] {
   return {
     sources: security.sources,
+    coverageStatus: security.coverage_status ?? null,
     honeypotStatus: security.honeypot_status,
     buyTax: security.buy_tax,
     sellTax: security.sell_tax,
@@ -48,7 +49,7 @@ function mapSecurity(security: PersistableSecurityCheck): UiTokenCandidate["secu
     proxyRisk: security.proxy_risk,
     topWalletPct: security.top_wallet_pct,
     top10WalletsPct: security.top_10_wallets_pct,
-    checkedAt: security.checked_at ?? "",
+    checkedAt: security.checked_at,
   };
 }
 

@@ -1,399 +1,647 @@
-import React from "react";
-import type { FinalLabel, MockCandidate } from "../mockData";
-import { getCandidateReview } from "../services/reviewSessionStore";
-import type { CandidateReviewRecord, ReviewSessionState } from "../types/reviewSessionTypes";
-import { formatReasonText, formatSecurityFlag } from "../utils/displayText";
-import { ReviewStatusBadge } from "./CandidateReviewControls";
-import { LabelBadge } from "./LabelBadge";
+import React, { useEffect, useMemo, useState } from "react";
 import {
-  ManualVerificationFallback,
-  buildCandidateVerificationGaps,
-} from "./ManualVerificationFallback";
-import { ProductStateNotice, type ProductStateNoticeItem } from "./ProductStateNotice";
-import { ResearchActionPanel } from "./ResearchActionPanel";
+  formatProductAge,
+  formatProductDateTime,
+  formatProductUsd,
+  PRODUCT_TRANSLATIONS,
+  useProductLocale,
+  type ProductLocale,
+} from "../productI18n";
+import { formatFilterReason, formatStatusReason } from "../productPresentation";
+import {
+  presentProductSourceHealth,
+  resolveProductSourceHealth,
+  type ProductSourceHealthResolution,
+} from "../productSourceHealth";
+import {
+  isCompletedProductSecurityState,
+  resolveProductSecurityState,
+  type ProductSecurityState,
+} from "../productSecurityResolver";
+import type {
+  ProductReadinessOutput,
+  ScannerDiscoveryMetadata,
+  UiTokenCandidate,
+} from "../types/scannerTypes";
+
+type BasketId = "new_emerging" | "established";
+type Tone = "neutral" | "accent" | "warning" | "critical" | "ready";
 
 interface CandidateResultsViewProps {
-  candidates: MockCandidate[];
-  reviewSession: ReviewSessionState;
+  candidates: UiTokenCandidate[];
+  metadata?: ScannerDiscoveryMetadata | null;
+  readiness?: ProductReadinessOutput | null;
+  generatedAt?: string | null;
+  ageSeconds?: number | null;
+  freshnessStatus?: "FRESH" | "STALE" | null;
+  sourceIds?: string[];
+  sourceHealth?: ProductSourceHealthResolution;
+  scannerUnavailableReasonCode?: string | null;
   onOpenCandidate?: (candidateId: string) => void;
-  onOpenTokenLookup?: (candidate: MockCandidate) => void;
-  onOpenExternalChecks?: (candidate: MockCandidate) => void;
+  onOpenExternalChecks?: (candidate: UiTokenCandidate) => void;
 }
-
-type CandidateTone = "review" | "manual" | "critical" | "neutral";
-
-const CHAIN_LABELS: Record<string, string> = {
-  solana: "SOL",
-  ethereum: "ETH",
-  bsc: "BSC",
-  base: "BASE",
-};
-
-const PRIORITY_COPY: Record<FinalLabel, { label: string; detail: string; tone: CandidateTone }> = {
-  WATCHLIST: {
-    label: "Watchlist Candidate",
-    detail: "Watchlist Candidate - Manual Review Only",
-    tone: "review",
-  },
-  CRITICAL_RISK: {
-    label: "Risk Flags Priority",
-    detail: "Manual Review before any Next Review Step",
-    tone: "critical",
-  },
-  NEEDS_MANUAL_VERIFICATION: {
-    label: "Manual Verification Required",
-    detail: "Manual Verification Required",
-    tone: "manual",
-  },
-  REJECT: {
-    label: "Lower Research Priority",
-    detail: "Manual Review only if scope changes",
-    tone: "neutral",
-  },
-};
 
 export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
   candidates,
-  reviewSession,
+  metadata,
+  readiness,
+  generatedAt = null,
+  ageSeconds = null,
+  freshnessStatus = null,
+  sourceIds = [],
+  sourceHealth,
+  scannerUnavailableReasonCode = null,
   onOpenCandidate,
-  onOpenTokenLookup,
   onOpenExternalChecks,
 }) => {
-  const manualReviewCount = candidates.filter((candidate) => requiresManualReview(candidate)).length;
-  const missingFreshnessCount = candidates.filter((candidate) => !hasKnownFreshness(candidate)).length;
-  const riskFlagCount = candidates.reduce((total, candidate) => total + countRiskItems(candidate), 0);
+  const { locale, t } = useProductLocale();
+  const newCandidates = useMemo(
+    () => candidates.filter((candidate) => candidate.discoveryBasket === "new_emerging"),
+    [candidates],
+  );
+  const establishedCandidates = useMemo(
+    () => candidates.filter((candidate) => candidate.discoveryBasket === "established"),
+    [candidates],
+  );
+  const [activeBasket, setActiveBasket] = useState<BasketId>(() => resolveInitialBasket(candidates));
+
+  useEffect(() => {
+    setActiveBasket(resolveInitialBasket(candidates));
+  }, [candidates]);
+
+  const establishedEntries = metadata?.established?.entries_enabled ?? establishedCandidates.length;
+  const establishedAfterFilters = metadata?.established?.candidates_after_filters
+    ?? establishedCandidates.filter((candidate) => candidate.basicFilterStatus === "passed_basic_filter").length;
+  const securityChecked = establishedCandidates.filter((candidate) => (
+    isCompletedProductSecurityState(resolveProductSecurityState(candidate).state)
+  )).length;
+  const freshness = getFreshness(ageSeconds, freshnessStatus, locale);
+  const resolvedSourceHealth = sourceHealth
+    ?? resolveProductSourceHealth({ metadata, readiness, sourceIds });
+  const sourceState = presentProductSourceHealth(resolvedSourceHealth, locale, "summary");
+  const stale = freshnessStatus === "STALE" || (ageSeconds !== null && ageSeconds > 1800);
 
   return (
-    <div className="candidate-results-view">
-      <section className="candidate-results-hero">
-        <div className="candidate-results-hero-copy">
-          <span className="candidate-results-eyebrow">Research Candidate</span>
-          <h3>Candidate Results</h3>
-          <p>
-            Token to verify list for Manual Review. WATCHLIST is shown as Manual Review Only and missing data stays a Data Gap until checked.
-          </p>
-        </div>
-        <div className="candidate-results-boundary">
-          <strong>Manual Review</strong>
-          <span>External Checks and Source Freshness remain human-controlled.</span>
-        </div>
-      </section>
-
-      <section className="candidate-results-summary-grid" aria-label="Candidate Results summary">
-        <SummaryCard label="Research Candidate" value={String(candidates.length)} detail="Tokens to Verify" />
-        <SummaryCard label="Manual Review" value={String(manualReviewCount)} detail="Need review or verification" />
-        <SummaryCard label="Source Freshness" value={missingFreshnessCount === 0 ? "Not Verified" : "Source Freshness Unknown"} detail="Manual Verification Required" />
-        <SummaryCard label="Risk Flags" value={String(riskFlagCount)} detail="Flags or missing checks surfaced" />
-      </section>
-
-      {candidates.length > 0 && (
-        <ProductStateNotice
-          variant="partial"
-          title="Partial Source Coverage"
-          status="Partial Source Coverage"
-          detail="Data Gap: Source Freshness unknown, security not verified, liquidity unknown, and External Check Required states remain Manual Review Only until a human verifies them."
-          nextReviewStep="Open Candidate Detail, then keep Manual Verification Required for every Not Verified field"
-          items={buildCandidateResultsStateItems(missingFreshnessCount, riskFlagCount)}
-        />
+    <div className="candidate-results-view product-radar">
+      {stale && generatedAt && (
+        <section className="product-stale-warning" role="status">
+          <strong>{t("status.delayed")}</strong>
+          <p>{t("radar.staleWarning")}</p>
+          {ageSeconds !== null && <small>{t("radar.staleAge", { age: formatProductAge(ageSeconds, locale) })}</small>}
+        </section>
       )}
 
-      <section className="candidate-results-list" aria-label="Research Candidate list">
-        {candidates.length > 0 ? candidates.map((candidate) => {
-          const reviewRecord = getCandidateReview(candidate.id, reviewSession);
-          const priority = getResearchPriority(candidate);
-          const riskState = getRiskState(candidate);
-          const sourceFreshness = getSourceFreshness(candidate);
-          const nextReviewStep = getNextReviewStep(candidate, reviewRecord);
-
-          return (
-            <article key={candidate.id} className={`candidate-result-card ${priority.tone}`}>
-              <header className="candidate-result-topline">
-                <div className="candidate-result-token">
-                  <span className="candidate-results-eyebrow">Research Candidate</span>
-                  <strong>{candidate.symbol}</strong>
-                  <span>{candidate.name || "unknown project"}</span>
-                </div>
-                <div className="candidate-result-badges">
-                  <span className={`scanner-chain-badge ${getChainClass(candidate.chain)}`}>
-                    {formatChain(candidate.chain)}
-                  </span>
-                  <LabelBadge label={candidate.final_label} />
-                </div>
-              </header>
-
-              <div className="candidate-result-grid">
-                <CandidateField
-                  label="Chain / Network"
-                  value={formatChain(candidate.chain)}
-                  detail={candidate.dex || "unknown"}
-                />
-                <CandidateField
-                  label="Research Priority"
-                  value={priority.label}
-                  detail={priority.detail}
-                  tone={priority.tone}
-                />
-                <CandidateField
-                  label="Source Freshness"
-                  value={sourceFreshness.value}
-                  detail={sourceFreshness.detail}
-                  tone={sourceFreshness.tone}
-                />
-                <CandidateField
-                  label="External Check"
-                  value={candidate.security ? "External Check Required" : "Security Not Verified"}
-                  detail={candidate.security ? "Manual Review Only" : "Cannot Infer Safety"}
-                  tone="manual"
-                />
-              </div>
-
-              <section className="candidate-result-reason">
-                <span>Research Reason</span>
-                <p>{getRadarReason(candidate)}</p>
-              </section>
-
-              <section className="candidate-result-risk-panel">
-                <div className="candidate-result-section-title">
-                  <span>Risk Flags</span>
-                  <small>{riskState.detail}</small>
-                </div>
-                <div className="candidate-result-chip-list">
-                  {riskState.items.map((item) => (
-                    <span key={item} className={`candidate-results-chip ${riskState.tone}`}>
-                      {item}
-                    </span>
-                  ))}
-                </div>
-              </section>
-
-              <ManualVerificationFallback
-                compact
-                title="Manual Verification Required"
-                gaps={buildCandidateVerificationGaps(candidate)}
-              />
-
-              <ResearchActionPanel
-                variant="compact"
-                candidate={candidate}
-                onOpenCandidateDetail={onOpenCandidate ? () => onOpenCandidate(candidate.id) : undefined}
-                onOpenTokenLookup={onOpenTokenLookup ? () => onOpenTokenLookup(candidate) : undefined}
-                onOpenExternalChecks={onOpenExternalChecks ? () => onOpenExternalChecks(candidate) : undefined}
-              />
-
-              <footer className="candidate-result-footer">
-                <div className="candidate-result-review-state">
-                  <span>Manual Review Status</span>
-                  <ReviewStatusBadge status={reviewRecord?.status ?? "not_reviewed"} />
-                </div>
-                <div className="candidate-result-next-step">
-                  <span>Next Review Step</span>
-                  <strong>{nextReviewStep}</strong>
-                </div>
-                {onOpenCandidate && (
-                  <button
-                    type="button"
-                    className="candidate-result-review-button"
-                    onClick={() => onOpenCandidate(candidate.id)}
-                  >
-                    Open Candidate Detail
-                  </button>
-                )}
-              </footer>
-            </article>
-          );
-        }) : (
-          <ProductStateNotice
-            variant="empty"
-            title="No Candidates Found"
-            status="No Candidates Found"
-            detail="Data Gap: no Research Candidate rows are present, so the UI Cannot Infer Safety and cannot mark anything as reviewed."
-            nextReviewStep="Confirm Source Freshness, then continue Manual Review Only when candidates exist"
-            items={[
-              { label: "Source Coverage", value: "Partial Source Coverage", detail: "Source Freshness Unknown" },
-              { label: "Contract", value: "Contract Required", detail: "Chain Unknown / External Check Required" },
-              { label: "Security", value: "Security Not Verified", detail: "Liquidity Unknown" },
-            ]}
-          />
-        )}
+      <section className="product-radar-intro">
+        <div>
+          <span className="candidate-results-eyebrow">{t("radar.eyebrow")}</span>
+          <h3>{t("radar.title")}</h3>
+          <p>{t("radar.intro")}</p>
+        </div>
+        <div className={`product-freshness ${freshness.tone}`}>
+          <span>{t("radar.data")}</span>
+          <strong>{freshness.value}</strong>
+          <small>{freshness.detail}</small>
+        </div>
       </section>
+
+      <section className="product-summary-grid" aria-label={t("radar.summary")}>
+        <SummaryCard label={t("radar.newProjects")} value={String(newCandidates.length)} detail={t("radar.observationOnly")} />
+        <SummaryCard label={t("radar.establishedEntries")} value={String(establishedEntries)} detail={t("radar.activeUniverseAddresses")} />
+        <SummaryCard label={t("radar.establishedAfterFilters")} value={String(establishedAfterFilters)} detail={t("radar.candidatesForReview")} />
+        <SummaryCard label={t("radar.securityChecked")} value={String(securityChecked)} detail={t("radar.goPlusAfterFilters")} />
+        <SummaryCard
+          label={t("app.generated")}
+          value={generatedAt ? formatProductDateTime(generatedAt, locale) : t("status.noTimestamp")}
+          detail={`${t("detail.status")}: ${freshness.value}`}
+          tone={freshness.tone}
+        />
+        <SummaryCard label={t("radar.sourceState")} value={sourceState.value} detail={sourceState.detail} tone={sourceState.tone} />
+      </section>
+
+      <section className="basket-switcher" aria-label={t("radar.basketSelection")}>
+        <button
+          type="button"
+          className={activeBasket === "new_emerging" ? "active" : ""}
+          onClick={() => setActiveBasket("new_emerging")}
+          aria-pressed={activeBasket === "new_emerging"}
+        >
+          <span>{t("radar.newBasket")}</span>
+          <strong>{newCandidates.length}</strong>
+          <small>{t("radar.newBasketDescription")}</small>
+        </button>
+        <button
+          type="button"
+          className={activeBasket === "established" ? "active" : ""}
+          onClick={() => setActiveBasket("established")}
+          aria-pressed={activeBasket === "established"}
+        >
+          <span>{t("radar.establishedBasket")}</span>
+          <strong>{establishedCandidates.length}</strong>
+          <small>{getEstablishedTabStatus(metadata, readiness, locale)}</small>
+        </button>
+      </section>
+
+      {scannerUnavailableReasonCode ? (
+        <BasketUnavailable
+          title={t("radar.unavailableTitle")}
+          reasonCode={scannerUnavailableReasonCode}
+          detail={t("radar.unavailableDetail")}
+        />
+      ) : activeBasket === "new_emerging" ? (
+        <NewEmergingBasket
+          candidates={newCandidates}
+          metadata={metadata?.new_emerging}
+          readiness={readiness}
+          onOpenCandidate={onOpenCandidate}
+          onOpenExternalChecks={onOpenExternalChecks}
+        />
+      ) : (
+        <EstablishedBasket
+          candidates={establishedCandidates}
+          metadata={metadata}
+          readiness={readiness}
+          onOpenCandidate={onOpenCandidate}
+          onOpenExternalChecks={onOpenExternalChecks}
+        />
+      )}
     </div>
   );
 };
 
-function SummaryCard({ label, value, detail }: { label: string; value: string; detail: string }) {
-  return (
-    <div className="candidate-results-summary-card">
-      <span>{label}</span>
-      <strong>{value}</strong>
-      <p>{detail}</p>
-    </div>
-  );
-}
-
-function CandidateField({
-  label,
-  value,
-  detail,
-  tone = "neutral",
+export function NewEmergingBasket({
+  candidates,
+  metadata,
+  readiness,
+  onOpenCandidate,
+  onOpenExternalChecks,
 }: {
-  label: string;
-  value: string;
-  detail: string;
-  tone?: CandidateTone;
+  candidates: UiTokenCandidate[];
+  metadata?: ScannerDiscoveryMetadata["new_emerging"];
+  readiness?: ProductReadinessOutput | null;
+  onOpenCandidate?: (candidateId: string) => void;
+  onOpenExternalChecks?: (candidate: UiTokenCandidate) => void;
 }) {
+  const { t } = useProductLocale();
+  const state = readiness?.discovery.new_emerging;
+  if (state && !state.ready) {
+    return (
+      <BasketUnavailable
+        title={t("radar.newUnavailableTitle")}
+        reasonCode={state.reason_code ?? "NEW_EMERGING_UNAVAILABLE"}
+        detail={t("radar.newUnavailableDetail")}
+      />
+    );
+  }
+
+  if (candidates.length === 0) {
+    return (
+      <BasketEmpty
+        title={t("radar.newEmptyTitle")}
+        detail={t("radar.newEmptyDetail")}
+        code="NEW_EMERGING_EMPTY"
+      />
+    );
+  }
+
   return (
-    <div className={`candidate-result-field ${tone}`}>
-      <span>{label}</span>
-      <strong>{value}</strong>
-      <p>{detail}</p>
+    <section className="basket-content" aria-label={t("radar.newBasket")}>
+      {metadata?.discovery_status === "DEGRADED" && (
+        <div className="product-partial-data" role="status">
+          <strong>{t("radar.partialTitle")}</strong>
+          <span>{t("radar.partialDetail")}</span>
+          <small>{t("radar.partialRequests", {
+            succeeded: metadata.pair_requests_succeeded ?? 0,
+            total: metadata.seed_count ?? 0,
+          })}</small>
+        </div>
+      )}
+      <header className="basket-heading">
+        <div>
+          <span>{t("radar.newHeadingEyebrow")}</span>
+          <h3>{t("radar.newHeading")}</h3>
+          <p>{t("radar.newHeadingDetail")}</p>
+        </div>
+        <strong className="basket-status observation">{t("radar.observationLabel")}</strong>
+      </header>
+      <div className="product-candidate-list">
+        {candidates.map((candidate) => (
+          <NewCandidateCard
+            key={candidate.id}
+            candidate={candidate}
+            onOpenCandidate={onOpenCandidate}
+            onOpenExternalChecks={onOpenExternalChecks}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function NewCandidateCard({
+  candidate,
+  onOpenCandidate,
+  onOpenExternalChecks,
+}: {
+  candidate: UiTokenCandidate;
+  onOpenCandidate?: (candidateId: string) => void;
+  onOpenExternalChecks?: (candidate: UiTokenCandidate) => void;
+}) {
+  const { locale, t } = useProductLocale();
+  const reasons = candidate.filterReasons.slice(0, 3);
+  return (
+    <article className="product-candidate-card observation">
+      <header className="product-candidate-topline">
+        <div>
+          <span className="candidate-results-eyebrow">{t("radar.newProjectEyebrow")}</span>
+          <h4>{candidate.symbol} <small>{candidate.name}</small></h4>
+          <p>{formatChain(candidate.chain, t("radar.networkMissing"))} · {candidate.dex || t("radar.dexMissing")} · {candidate.source}</p>
+        </div>
+        <strong className="basket-status observation">{t("radar.observationLabel")}</strong>
+      </header>
+
+      <div className="product-metrics-grid">
+        <Metric label={t("radar.pairAge")} value={formatDays(candidate.pairAgeDays, locale, t("radar.missingData"))} />
+        <Metric label={t("radar.price")} value={formatPrice(candidate.priceUsd, t("radar.missingData"))} />
+        <Metric label={candidate.marketCap == null ? "FDV" : t("radar.marketCap")} value={formatProductUsd(candidate.marketCap ?? candidate.fdvUsd, locale, t("radar.missingData"))} />
+        <Metric label={t("radar.liquidity")} value={formatProductUsd(candidate.liquidity, locale, t("radar.missingData"))} />
+        <Metric label={t("radar.volume24h")} value={formatProductUsd(candidate.volume24h, locale, t("radar.missingData"))} />
+        <Metric label={t("radar.ratio")} value={formatRatio(candidate.volumeMarketCapRatio, t("radar.missingData"))} />
+      </div>
+
+      <div className="candidate-explanation-grid">
+        <Explanation label={t("radar.whyHere")} value={t("radar.whyHereDetail")} />
+        <Explanation label={t("radar.whyNotEstablished")} value={t("radar.whyNotEstablishedDetail")} />
+        <div>
+          <span>{t("radar.operationalStatus")}</span>
+          <p>{t("radar.observationOnly")}</p>
+          <details>
+            <summary>{t("app.technicalDetails")}</summary>
+            <code>observation_only={String(candidate.observationOnly)} · established_eligible={String(candidate.establishedEligible)}</code>
+          </details>
+        </div>
+      </div>
+
+      {reasons.length > 0 && candidate.basicFilterStatus === "rejected_basic_filter" && (
+        <div className="product-reason-panel warning">
+          <span>{t("radar.filterRejectionReasons")}</span>
+          <ul>{reasons.map((reason) => <li key={reason}><FilterReason reason={reason} /></li>)}</ul>
+        </div>
+      )}
+
+      <footer className="product-candidate-footer">
+        <div>
+          <span>{t("radar.sourceAndCheck")}</span>
+          <strong>{candidate.source}</strong>
+          <small>{formatProductDateTime(candidate.lastCheckedAt, locale)}</small>
+        </div>
+        <p>{t("radar.newBoundary")}</p>
+        <CandidateActions candidate={candidate} onOpenCandidate={onOpenCandidate} onOpenExternalChecks={onOpenExternalChecks} />
+      </footer>
+    </article>
+  );
+}
+
+export function EstablishedBasket({
+  candidates,
+  metadata,
+  readiness,
+  onOpenCandidate,
+  onOpenExternalChecks,
+}: {
+  candidates: UiTokenCandidate[];
+  metadata?: ScannerDiscoveryMetadata | null;
+  readiness?: ProductReadinessOutput | null;
+  onOpenCandidate?: (candidateId: string) => void;
+  onOpenExternalChecks?: (candidate: UiTokenCandidate) => void;
+}) {
+  const { t } = useProductLocale();
+  const state = getEstablishedState(metadata, readiness, candidates);
+  if (state === "empty") {
+    const universe = metadata?.established;
+    return (
+      <section className="established-empty" aria-label={t("radar.establishedEmptyTitle")}>
+        <span className="candidate-results-eyebrow">{t("radar.establishedEmptyEyebrow")}</span>
+        <h3>{t("radar.establishedEmptyTitle")}</h3>
+        <p>{t("radar.establishedEmptyDetail")}</p>
+        <div className="empty-state-facts">
+          <div className="product-metric warning">
+            <span>{t("radar.state")}</span>
+            <strong>{t("radar.establishedEmptyEyebrow")}</strong>
+            <details><summary>{t("app.technicalDetails")}</summary><code>ESTABLISHED_UNIVERSE_EMPTY</code></details>
+          </div>
+          <Metric label={t("radar.universeVersion")} value={universe?.universe_version ?? "established_address_universe_v1"} />
+          <Metric label={t("radar.activeEntries")} value="0" />
+        </div>
+        <div className="empty-state-next-step">
+          <span>{t("radar.operationalInstruction")}</span>
+          <strong>{t("radar.populateUniverse")}</strong>
+          <small>{t("radar.noEditor")}</small>
+        </div>
+      </section>
+    );
+  }
+
+  if (state === "unavailable") {
+    return (
+      <BasketUnavailable
+        title={t("radar.establishedUnavailableTitle")}
+        reasonCode={readiness?.discovery.established.reason_code ?? "ESTABLISHED_UNAVAILABLE"}
+        detail={t("radar.establishedUnavailableDetail")}
+      />
+    );
+  }
+
+  return (
+    <section className="basket-content" aria-label={t("radar.establishedBasket")}>
+      <header className="basket-heading">
+        <div>
+          <span>Established</span>
+          <h3>{t("radar.establishedHeading")}</h3>
+          <p>{t("radar.establishedHeadingDetail")}</p>
+        </div>
+        <strong className="basket-status established">{t("radar.mainRadar")}</strong>
+      </header>
+      <div className="product-candidate-list">
+        {candidates.map((candidate) => (
+          <EstablishedCandidateCard
+            key={candidate.id}
+            candidate={candidate}
+            onOpenCandidate={onOpenCandidate}
+            onOpenExternalChecks={onOpenExternalChecks}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function EstablishedCandidateCard({
+  candidate,
+  onOpenCandidate,
+  onOpenExternalChecks,
+}: {
+  candidate: UiTokenCandidate;
+  onOpenCandidate?: (candidateId: string) => void;
+  onOpenExternalChecks?: (candidate: UiTokenCandidate) => void;
+}) {
+  const { locale, t } = useProductLocale();
+  const status = getEstablishedCandidateStatus(candidate, locale);
+  const securityResolution = resolveProductSecurityState(candidate);
+  const riskFlags = candidate.riskFlags.slice(0, 3);
+  const riskItems = securityResolution.state === "not_invoked"
+    ? [t("detail.riskFlagsNotAssessed")]
+    : securityResolution.state === "unavailable"
+      ? [t("detail.securityUnavailableDetail")]
+      : securityResolution.state === "partial"
+        ? [t("detail.securityPartialDetail")]
+        : riskFlags.length > 0
+          ? riskFlags.map((reason) => presentProductSecurityReason(reason, locale))
+          : candidate.missingData.slice(0, 3).map((reason) => presentProductSecurityReason(reason, locale));
+  const checkSource = securityResolution.state === "not_invoked"
+    ? candidate.source
+    : securityResolution.sources.join(", ") || candidate.source;
+  return (
+    <article className={`product-candidate-card ${status.tone}`}>
+      <header className="product-candidate-topline">
+        <div>
+          <span className="candidate-results-eyebrow">Established · {formatChain(candidate.chain, t("radar.networkMissing"))}</span>
+          <h4>{candidate.symbol} <small>{candidate.name}</small></h4>
+          <div className="contract-line">
+            <code title={candidate.contractAddress}>{shortenAddress(candidate.contractAddress, t("radar.missingData"))}</code>
+            <button type="button" onClick={() => copyValue(candidate.contractAddress)} aria-label={t("radar.copyContract", { symbol: candidate.symbol })}>{t("radar.copy")}</button>
+          </div>
+        </div>
+        <div className="candidate-status-stack">
+          <strong className={`basket-status ${status.tone}`}>{status.label}</strong>
+          {candidate.finalLabel === "WATCHLIST" && <small>{t("radar.manualReviewOnly")}</small>}
+        </div>
+      </header>
+
+      <div className="product-metrics-grid established">
+        <Metric label={t("radar.addressIdentity")} value={candidate.addressIdentityVerified ? t("radar.verified") : t("radar.needsVerification")} tone={candidate.addressIdentityVerified ? "ready" : "warning"} />
+        <Metric label={t("radar.marketCap")} value={formatProductUsd(candidate.marketCap ?? candidate.fdvUsd, locale, t("radar.missingData"))} />
+        <Metric label={t("radar.liquidity")} value={formatProductUsd(candidate.liquidity, locale, t("radar.missingData"))} />
+        <Metric label={t("radar.volume24h")} value={formatProductUsd(candidate.volume24h, locale, t("radar.missingData"))} />
+        <Metric label={t("radar.ratio")} value={formatRatio(candidate.volumeMarketCapRatio, t("radar.missingData"))} />
+        <Metric label={t("radar.pairAge")} value={formatDays(candidate.pairAgeDays, locale, t("radar.missingData"))} />
+        <Metric label={t("radar.basicFilters")} value={candidate.basicFilterStatus === "passed_basic_filter" ? t("radar.conditionsMet") : t("radar.conditionsRejected")} tone={candidate.basicFilterStatus === "passed_basic_filter" ? "ready" : "warning"} />
+        <Metric label={t("radar.security")} value={presentRadarSecurityState(securityResolution.state, locale)} tone={getSecurityStateTone(securityResolution.state)} />
+      </div>
+
+      <div className="product-reason-panel">
+        <span>{t("radar.risksAndGaps")}</span>
+        <div className="candidate-risk-chips">
+          {riskItems.map((flag) => (
+            <small key={flag}>{flag}</small>
+          ))}
+          {riskItems.length === 0 && securityResolution.state === "checked" && <small>{t("radar.noReportedFlags")}</small>}
+          {riskItems.length === 0 && securityResolution.state !== "checked" && <small>{t("detail.riskFlagsRequireReview")}</small>}
+        </div>
+      </div>
+
+      <footer className="product-candidate-footer">
+        <div>
+          <span>{t("radar.lastCheck")}</span>
+          <strong>{formatProductDateTime(candidate.lastCheckedAt, locale)}</strong>
+          <small>{checkSource}</small>
+        </div>
+        <p>Universe: {candidate.universeVersion ?? t("radar.none")} · {t("radar.activeEntries")}: {candidate.universeEntryIndex ?? t("radar.none")}</p>
+        <CandidateActions candidate={candidate} onOpenCandidate={onOpenCandidate} onOpenExternalChecks={onOpenExternalChecks} />
+      </footer>
+    </article>
+  );
+}
+
+function CandidateActions({
+  candidate,
+  onOpenCandidate,
+  onOpenExternalChecks,
+}: {
+  candidate: UiTokenCandidate;
+  onOpenCandidate?: (candidateId: string) => void;
+  onOpenExternalChecks?: (candidate: UiTokenCandidate) => void;
+}) {
+  const { t } = useProductLocale();
+  return (
+    <div className="product-card-actions">
+      {onOpenCandidate && <button type="button" onClick={() => onOpenCandidate(candidate.id)}>{t("radar.openDetails")}</button>}
+      {onOpenExternalChecks && <button type="button" className="secondary" onClick={() => onOpenExternalChecks(candidate)}>{t("radar.sourceVerification")}</button>}
     </div>
   );
 }
 
-function getResearchPriority(candidate: MockCandidate): { label: string; detail: string; tone: CandidateTone } {
-  return PRIORITY_COPY[candidate.final_label] ?? {
-    label: "Manual Review",
-    detail: "Unknown - Manual Verification Required",
-    tone: "manual",
-  };
+function FilterReason({ reason }: { reason: string }) {
+  const { locale, t } = useProductLocale();
+  const presentation = formatFilterReason(reason, locale);
+  return (
+    <span className="filter-reason-copy">
+      {presentation.summary}
+      {!presentation.known && (
+        <details>
+          <summary>{t("app.technicalDetails")}</summary>
+          <code>{presentation.rawReason}</code>
+        </details>
+      )}
+    </span>
+  );
 }
 
-function getRadarReason(candidate: MockCandidate): string {
-  const reason = candidate.final_reasons[0];
-
-  if (!reason) {
-    return "Manual Verification Required because the Research Reason is unknown.";
-  }
-
-  return formatReasonText(reason);
+function SummaryCard({ label, value, detail, tone = "neutral" }: { label: string; value: string; detail: string; tone?: Tone }) {
+  return <div className={`product-summary-card ${tone}`}><span>{label}</span><strong>{value}</strong><p>{detail}</p></div>;
 }
 
-function getSourceFreshness(candidate: MockCandidate): { value: string; detail: string; tone: CandidateTone } {
-  if (!candidate.source_url || !candidate.last_checked) {
-    return {
-      value: "Source Freshness Unknown",
-      detail: "Manual Verification Required",
-      tone: "manual",
-    };
-  }
-
-  const date = new Date(candidate.last_checked);
-
-  if (Number.isNaN(date.getTime())) {
-    return {
-      value: "Source Freshness Unknown",
-      detail: "Manual Verification Required",
-      tone: "manual",
-    };
-  }
-
-  return {
-    value: "Last Local Check",
-    detail: date.toISOString().slice(0, 10),
-    tone: "neutral",
-  };
+function Metric({ label, value, tone = "neutral" }: { label: string; value: string; tone?: Tone }) {
+  return <div className={`product-metric ${tone}`}><span>{label}</span><strong>{value}</strong></div>;
 }
 
-function getRiskState(candidate: MockCandidate): { items: string[]; detail: string; tone: CandidateTone } {
-  if (!candidate.security) {
-    return {
-      items: ["Security Not Verified", "Manual Verification Required", "Cannot Infer Safety"],
-      detail: "Not Verified",
-      tone: "manual",
-    };
-  }
-
-  const riskFlags = candidate.security.risk_flags.map(formatSecurityFlag);
-  const missingData = candidate.security.missing_data.map((item) => `unknown: ${formatReasonText(item)}`);
-  const items = [...riskFlags, ...missingData].slice(0, 4);
-
-  if (items.length === 0) {
-    return {
-      items: ["Risk Flags Not Verified"],
-      detail: "Manual Verification Required",
-      tone: "manual",
-    };
-  }
-
-  return {
-    items,
-    detail: "Review Candidate before External Checks",
-    tone: "neutral",
-  };
+function Explanation({ label, value }: { label: string; value: string }) {
+  return <div><span>{label}</span><p>{value}</p></div>;
 }
 
-function getNextReviewStep(candidate: MockCandidate, reviewRecord?: CandidateReviewRecord | null): string {
-  if (reviewRecord?.status === "waiting_for_more_data") {
-    return "Wait for more data, then Manual Review";
-  }
-
-  if (!candidate.contract_address || !candidate.security) {
-    return "Manual Verification Required";
-  }
-
-  if (candidate.final_label === "WATCHLIST") {
-    return "Manual Review";
-  }
-
-  if (candidate.final_label === "CRITICAL_RISK") {
-    return "Review Candidate Risk Flags";
-  }
-
-  if (candidate.final_label === "NEEDS_MANUAL_VERIFICATION") {
-    return "Manual Verification Required";
-  }
-
-  return "Manual Review Only if revisited";
+function BasketUnavailable({ title, reasonCode, detail }: { title: string; reasonCode: string; detail: string }) {
+  const { locale, t } = useProductLocale();
+  return (
+    <section className="basket-state unavailable" role="status">
+      <span>{t("status.unavailable")}</span>
+      <h3>{title}</h3>
+      <p>{formatStatusReason(reasonCode, locale)}</p>
+      <p>{detail}</p>
+      <details>
+        <summary>{t("app.technicalDetails")}</summary>
+        <code>{reasonCode}</code>
+      </details>
+    </section>
+  );
 }
 
-function requiresManualReview(candidate: MockCandidate): boolean {
-  return candidate.final_label !== "REJECT" || !candidate.security || !candidate.contract_address;
+function BasketEmpty({ title, detail, code }: { title: string; detail: string; code: string }) {
+  const { t } = useProductLocale();
+  return (
+    <section className="basket-state empty" role="status">
+      <span>{t("radar.emptyResult")}</span>
+      <h3>{title}</h3>
+      <p>{detail}</p>
+      <details>
+        <summary>{t("app.technicalDetails")}</summary>
+        <code>{code}</code>
+      </details>
+    </section>
+  );
 }
 
-function hasKnownFreshness(candidate: MockCandidate): boolean {
-  if (!candidate.source_url || !candidate.last_checked) return false;
-  return !Number.isNaN(new Date(candidate.last_checked).getTime());
+export function resolveInitialBasket(candidates: UiTokenCandidate[]): BasketId {
+  return candidates.some((candidate) => candidate.discoveryBasket === "established")
+    ? "established"
+    : "new_emerging";
 }
 
-function countRiskItems(candidate: MockCandidate): number {
-  if (!candidate.security) return 1;
-  return Math.max(1, candidate.security.risk_flags.length + candidate.security.missing_data.length);
+export function getEstablishedState(
+  metadata: ScannerDiscoveryMetadata | null | undefined,
+  readiness: ProductReadinessOutput | null | undefined,
+  candidates: UiTokenCandidate[],
+): "ready" | "empty" | "unavailable" {
+  if (
+    readiness?.discovery.established.status === "empty_configured"
+    || metadata?.established?.universe_status === "ESTABLISHED_UNIVERSE_EMPTY"
+  ) return "empty";
+  if (readiness && readiness.discovery.established.status === "unavailable") return "unavailable";
+  if (candidates.length === 0 && metadata?.established?.entries_enabled === 0) return "empty";
+  return "ready";
 }
 
-function buildCandidateResultsStateItems(missingFreshnessCount: number, riskFlagCount: number): ProductStateNoticeItem[] {
-  return [
-    {
-      label: "Source Freshness",
-      value: missingFreshnessCount > 0 ? "Source Freshness Unknown" : "Not Verified",
-      detail: "Manual Verification Required",
-    },
-    {
-      label: "External Check",
-      value: "External Check Required",
-      detail: "Manual Review Only",
-    },
-    {
-      label: "Risk Flags",
-      value: riskFlagCount > 0 ? "Security Not Verified" : "Cannot Infer Safety",
-      detail: "Missing data stays a Data Gap",
-    },
-    {
-      label: "Market Context",
-      value: "Liquidity Unknown",
-      detail: "Not Verified",
-    },
-  ];
-}
-
-function formatChain(chain: string): string {
-  if (!chain) return "chain unknown";
-  return CHAIN_LABELS[chain] ?? chain.toUpperCase();
-}
-
-function getChainClass(chain: string): string {
-  if (chain === "solana" || chain === "ethereum" || chain === "bsc" || chain === "base") {
-    return chain;
+function getEstablishedTabStatus(
+  metadata: ScannerDiscoveryMetadata | null | undefined,
+  readiness: ProductReadinessOutput | null | undefined,
+  locale: ProductLocale,
+): string {
+  const t = (key: keyof typeof PRODUCT_TRANSLATIONS.en) => importTranslation(locale, key);
+  if (readiness?.discovery.established.status === "empty_configured" || metadata?.established?.universe_status === "ESTABLISHED_UNIVERSE_EMPTY") {
+    return t("radar.establishedTabEmpty");
   }
+  if (readiness?.discovery.established.status === "unavailable") return t("radar.establishedTabUnavailable");
+  return t("radar.establishedTabReady");
+}
 
-  return "unknown";
+function getEstablishedCandidateStatus(candidate: UiTokenCandidate, locale: ProductLocale): { label: string; tone: Tone } {
+  if (candidate.finalLabel === "CRITICAL_RISK") return { label: importTranslation(locale, "radar.criticalRisk"), tone: "critical" };
+  if (candidate.basicFilterStatus === "rejected_basic_filter" || candidate.finalLabel === "REJECT") {
+    return { label: importTranslation(locale, "radar.rejectedByFilters"), tone: "warning" };
+  }
+  if (!isCompletedProductSecurityState(resolveProductSecurityState(candidate).state) || candidate.finalLabel === "NEEDS_MANUAL_VERIFICATION") {
+    return { label: importTranslation(locale, "radar.needsVerification"), tone: "warning" };
+  }
+  return { label: importTranslation(locale, "radar.candidateManualReview"), tone: "accent" };
+}
+
+function getFreshness(
+  ageSeconds: number | null,
+  freshnessStatus: "FRESH" | "STALE" | null,
+  locale: ProductLocale,
+): { value: string; detail: string; tone: Tone } {
+  if (ageSeconds == null) return { value: importTranslation(locale, "status.unavailable"), detail: importTranslation(locale, "status.noTimestamp"), tone: "warning" };
+  if (freshnessStatus === "STALE" || ageSeconds > 1800) {
+    return { value: importTranslation(locale, "status.delayed"), detail: importTranslation(locale, "status.waiting"), tone: "warning" };
+  }
+  return { value: importTranslation(locale, "status.current"), detail: formatProductAge(ageSeconds, locale), tone: "ready" };
+}
+
+function presentRadarSecurityState(state: ProductSecurityState, locale: ProductLocale): string {
+  if (state === "not_invoked") return importTranslation(locale, "radar.securityNotRun");
+  if (state === "unavailable") return importTranslation(locale, "verification.securityStateUnavailable");
+  if (state === "partial") return importTranslation(locale, "verification.securityStatePartial");
+  if (state === "checked_critical") return importTranslation(locale, "radar.criticalRisk");
+  if (state === "checked_needs_manual_review") return importTranslation(locale, "radar.needsVerification");
+  return importTranslation(locale, "radar.securityCheckedManual");
+}
+
+function getSecurityStateTone(state: ProductSecurityState): Tone {
+  if (state === "checked_critical") return "critical";
+  if (state === "checked") return "ready";
+  return "warning";
+}
+
+function presentProductSecurityReason(reason: string, locale: ProductLocale): string {
+  const code = reason.trim().toUpperCase().replaceAll(" ", "_");
+  if (code === "SECURITY_DATA_UNAVAILABLE") return importTranslation(locale, "detail.securityUnavailableDetail");
+  if (code === "PARTIAL_SECURITY_COVERAGE") return importTranslation(locale, "detail.securityPartialDetail");
+  if (code === "NOT_CHECKED" || code === "UNKNOWN") return importTranslation(locale, "detail.riskFlagsNotAssessed");
+  return humanizeReason(reason);
+}
+
+function importTranslation(locale: ProductLocale, key: keyof typeof PRODUCT_TRANSLATIONS.en): string {
+  return PRODUCT_TRANSLATIONS[locale][key];
+}
+
+function formatChain(value: string, missing: string): string {
+  return value ? value.toUpperCase() : missing;
+}
+
+function formatPrice(value: number | null, missing: string): string {
+  return value == null ? missing : `$${value.toLocaleString("en-US", { maximumSignificantDigits: 6 })}`;
+}
+
+function formatRatio(value: number | null, missing: string): string {
+  return value == null ? missing : value.toFixed(4);
+}
+
+function formatDays(value: number | null, locale: ProductLocale, missing: string): string {
+  if (value == null) return missing;
+  const formatted = value.toLocaleString(locale === "pl" ? "pl-PL" : "en-US", { maximumFractionDigits: value < 10 ? 1 : 0 });
+  return locale === "pl" ? `${formatted} dni` : `${formatted} days`;
+}
+
+function shortenAddress(value: string, missing: string): string {
+  if (!value) return missing;
+  if (value.length <= 20) return value;
+  return `${value.slice(0, 10)}…${value.slice(-8)}`;
+}
+
+function humanizeReason(value: string): string {
+  const normalized = value.replaceAll("_", " ").trim();
+  return normalized.length === 0 ? value : normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+function copyValue(value: string): void {
+  if (!value || typeof navigator === "undefined" || !navigator.clipboard) return;
+  void navigator.clipboard.writeText(value);
 }

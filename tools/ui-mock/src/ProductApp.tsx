@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+void React; // Required by the Node TSX test runtime's classic JSX transform.
 import { mapPersistableScannerOutputToUiCandidates } from "./adapters/scannerOutputAdapter";
 import { CandidateDetailView } from "./components/CandidateDetailView";
 import { CandidateResultsView } from "./components/CandidateResultsView";
@@ -10,40 +12,20 @@ import {
   type ProductNavItem,
   type ProductSectionId,
 } from "./components/ProductWorkspaceShell";
-import { toMockCandidate, type MockCandidate } from "./mockData";
+import { ProductLocaleProvider, useProductLocale } from "./productI18n";
+import { resolveProductSourceHealth } from "./productSourceHealth";
 import { getProductRuntimeMode } from "./runtimeMode";
-import { getCandidateReview, loadReviewSession } from "./services/reviewSessionStore";
 import {
   loadScannerApiDataSourceResult,
+  loadScannerReadinessResult,
   type ResolvedScannerSource,
 } from "./services/scannerDataSource";
-import type { ReviewSessionState } from "./types/reviewSessionTypes";
-
-const PRODUCT_NAV_ITEMS: ProductNavItem[] = [
-  { id: "candidate-results", label: "Radar", icon: "R", description: "Rzeczywiste kandydatury" },
-  { id: "candidate-detail", label: "Szczegóły", icon: "S", description: "Szczegóły kandydata" },
-  { id: "external-checks", label: "Weryfikacja", icon: "W", description: "Manualna weryfikacja" },
-  { id: "methodology", label: "Metodologia", icon: "M", description: "Kontrakt i metodologia" },
-];
-
-const SECTION_COPY: Record<ProductSectionId, { title: string; description: string }> = {
-  "candidate-results": {
-    title: "Radar",
-    description: "Kandydatury dopuszczone przez kontrakt real-data do ręcznej analizy.",
-  },
-  "candidate-detail": {
-    title: "Szczegóły",
-    description: "Znormalizowane dane kandydata i jawne luki wymagające weryfikacji.",
-  },
-  "external-checks": {
-    title: "Weryfikacja",
-    description: "Manualne kroki weryfikacyjne; brak automatycznej deklaracji bezpieczeństwa.",
-  },
-  methodology: {
-    title: "Metodologia",
-    description: "Kontrakt danych, etykiety i granice Manual Review Only.",
-  },
-};
+import type {
+  ProductReadinessOutput,
+  ScannerApiOutput,
+  ScannerDiscoveryMetadata,
+  UiTokenCandidate,
+} from "./types/scannerTypes";
 
 const HASH_TO_SECTION: Record<string, ProductSectionId> = {
   "#candidate-results": "candidate-results",
@@ -60,59 +42,116 @@ const SECTION_TO_HASH: Record<ProductSectionId, string> = {
 };
 
 export default function ProductApp() {
+  return (
+    <ProductLocaleProvider>
+      <ProductAppContent />
+    </ProductLocaleProvider>
+  );
+}
+
+export function ProductAppContent() {
+  const { t } = useProductLocale();
   const runtimeMode = getProductRuntimeMode();
   const [activeSection, setActiveSection] = useState<ProductSectionId>(() => resolveSection());
-  const [candidates, setCandidates] = useState<MockCandidate[]>([]);
+  const [candidates, setCandidates] = useState<UiTokenCandidate[]>([]);
   const [loading, setLoading] = useState(true);
   const [resolvedSource, setResolvedSource] = useState<ResolvedScannerSource>("unavailable");
   const [runId, setRunId] = useState<string | null>(null);
   const [generatedAt, setGeneratedAt] = useState<string | null>(null);
   const [ageSeconds, setAgeSeconds] = useState<number | null>(null);
+  const [freshnessStatus, setFreshnessStatus] = useState<"FRESH" | "STALE" | null>(null);
+  const [viewRefreshedAt, setViewRefreshedAt] = useState<string | null>(null);
   const [sourceIds, setSourceIds] = useState<string[]>([]);
+  const [metadata, setMetadata] = useState<ScannerDiscoveryMetadata | null>(null);
+  const [readiness, setReadiness] = useState<ProductReadinessOutput | null>(null);
+  const [readinessReasonCode, setReadinessReasonCode] = useState<string | null>(null);
   const [reasonCode, setReasonCode] = useState<string | null>(null);
   const [unavailableMessage, setUnavailableMessage] = useState<string | null>(null);
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
   const [verificationCandidateId, setVerificationCandidateId] = useState<string | null>(null);
-  const [reviewSession] = useState<ReviewSessionState>(() => loadReviewSession());
+  const refreshPromiseRef = useRef<Promise<void> | null>(null);
+
+  const navItems = useMemo<ProductNavItem[]>(() => [
+    { id: "candidate-results", label: t("nav.radar"), icon: "R", description: t("nav.radarDescription") },
+    { id: "candidate-detail", label: t("nav.details"), icon: "D", description: t("nav.detailsDescription") },
+    { id: "external-checks", label: t("nav.verification"), icon: "V", description: t("nav.verificationDescription") },
+    { id: "methodology", label: t("nav.methodology"), icon: "M", description: t("nav.methodologyDescription") },
+  ], [t]);
+
+  const sectionCopy = useMemo<Record<ProductSectionId, { title: string; description: string }>>(() => ({
+    "candidate-results": { title: t("nav.radar"), description: t("section.radarDescription") },
+    "candidate-detail": { title: t("nav.details"), description: t("section.detailsDescription") },
+    "external-checks": { title: t("nav.verification"), description: t("section.verificationDescription") },
+    methodology: { title: t("nav.methodology"), description: t("section.methodologyDescription") },
+  }), [t]);
 
   const selectedCandidate =
     candidates.find((candidate) => candidate.id === selectedCandidateId)
-    ?? candidates.find((candidate) => candidate.final_label === "WATCHLIST")
+    ?? candidates.find((candidate) => candidate.discoveryBasket === "established" && candidate.finalLabel === "WATCHLIST")
+    ?? candidates.find((candidate) => candidate.discoveryBasket === "established")
     ?? candidates[0]
     ?? null;
   const verificationCandidate =
     candidates.find((candidate) => candidate.id === verificationCandidateId)
     ?? selectedCandidate;
-  const reviewRecord = selectedCandidate
-    ? getCandidateReview(selectedCandidate.id, reviewSession)
-    : null;
+  const sourceHealth = useMemo(
+    () => resolveProductSourceHealth({ metadata, readiness, sourceIds }),
+    [metadata, readiness, sourceIds],
+  );
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    setReasonCode(null);
-    setUnavailableMessage(null);
+  const loadData = useCallback((): Promise<void> => {
+    if (refreshPromiseRef.current) return refreshPromiseRef.current;
 
-    const result = await loadScannerApiDataSourceResult({ runtimeMode });
-    if (result.status === "error") {
-      setCandidates([]);
-      setResolvedSource("unavailable");
-      setRunId(null);
-      setGeneratedAt(null);
-      setAgeSeconds(null);
-      setSourceIds([]);
-      setReasonCode(result.reasonCode);
-      setUnavailableMessage(result.error);
+    const refresh = (async () => {
+      setLoading(true);
+      setReasonCode(null);
+      setReadinessReasonCode(null);
+      setUnavailableMessage(null);
+
+      const [scannerResult, readinessResult] = await Promise.all([
+        loadScannerApiDataSourceResult({ runtimeMode }),
+        loadScannerReadinessResult({ runtimeMode }),
+      ]);
+
+      if (readinessResult.status === "ready") {
+        setReadiness(readinessResult.output);
+      } else {
+        setReadiness(null);
+        setReadinessReasonCode(readinessResult.reasonCode);
+      }
+
+      if (scannerResult.status === "error") {
+        setCandidates([]);
+        setResolvedSource("unavailable");
+        setRunId(null);
+        setGeneratedAt(null);
+        setAgeSeconds(null);
+        setFreshnessStatus(null);
+        setSourceIds([]);
+        setMetadata(null);
+        setReasonCode(scannerResult.reasonCode);
+        setUnavailableMessage(scannerResult.error);
+        return;
+      }
+
+      const output = scannerResult.output;
+      const acceptedTimestamps = getAcceptedProductRefreshTimestamps(output, new Date().toISOString());
+      setCandidates(mapPersistableScannerOutputToUiCandidates(output));
+      setResolvedSource(scannerResult.resolvedSource);
+      setRunId(output.scan_run.run_id ?? null);
+      setGeneratedAt(acceptedTimestamps.generatedAt);
+      setViewRefreshedAt(acceptedTimestamps.viewRefreshedAt);
+      setAgeSeconds(output._source_meta?.age_seconds ?? null);
+      setFreshnessStatus(output._source_meta?.freshness_status ?? null);
+      setSourceIds(output._source_meta?.source_ids ?? output.provenance?.source_ids ?? []);
+      setMetadata(output.provenance?.metadata ?? null);
+    })().finally(() => {
       setLoading(false);
-      return;
-    }
+      refreshPromiseRef.current = null;
+    });
 
-    setCandidates(mapPersistableScannerOutputToUiCandidates(result.output).map(toMockCandidate));
-    setResolvedSource(result.resolvedSource);
-    setRunId(result.output.scan_run.run_id ?? null);
-    setGeneratedAt(result.output.scan_run.finished_at ?? result.output.scan_run.started_at ?? null);
-    setAgeSeconds(result.output._source_meta?.age_seconds ?? null);
-    setSourceIds(result.output._source_meta?.source_ids ?? []);
-    setLoading(false);
+    refreshPromiseRef.current = refresh;
+    return refresh;
   }, [runtimeMode]);
 
   useEffect(() => {
@@ -137,20 +176,18 @@ export default function ProductApp() {
     navigate("candidate-detail");
   }, [navigate]);
 
-  const openVerification = useCallback((candidate: MockCandidate) => {
+  const openVerification = useCallback((candidate: UiTokenCandidate) => {
     setSelectedCandidateId(candidate.id);
     setVerificationCandidateId(candidate.id);
     navigate("external-checks");
   }, [navigate]);
 
   const renderSection = () => {
-    const copy = SECTION_COPY[activeSection];
-    if (loading) {
+    const copy = sectionCopy[activeSection];
+    if (loading && candidates.length === 0) {
       return (
         <ProductWorkspaceSection {...copy}>
-          <div className="flex items-center justify-center h-40">
-            <span className="text-secondary text-sm">Loading data...</span>
-          </div>
+          <div className="product-loading" role="status">{t("app.loading")}</div>
         </ProductWorkspaceSection>
       );
     }
@@ -160,9 +197,15 @@ export default function ProductApp() {
         <ProductWorkspaceSection {...copy}>
           <CandidateResultsView
             candidates={candidates}
-            reviewSession={reviewSession}
+            metadata={metadata}
+            readiness={readiness}
+            generatedAt={generatedAt}
+            ageSeconds={ageSeconds}
+            freshnessStatus={freshnessStatus}
+            sourceIds={sourceIds}
+            sourceHealth={sourceHealth}
+            scannerUnavailableReasonCode={reasonCode}
             onOpenCandidate={openCandidate}
-            onOpenTokenLookup={openVerification}
             onOpenExternalChecks={openVerification}
           />
         </ProductWorkspaceSection>
@@ -174,9 +217,7 @@ export default function ProductApp() {
         <ProductWorkspaceSection {...copy}>
           <CandidateDetailView
             candidate={selectedCandidate}
-            reviewRecord={reviewRecord}
             onBackToResults={() => navigate("candidate-results")}
-            onOpenTokenLookup={openVerification}
             onOpenExternalChecks={openVerification}
           />
         </ProductWorkspaceSection>
@@ -200,14 +241,24 @@ export default function ProductApp() {
 
   return (
     <ProductWorkspaceShell
-      navItems={PRODUCT_NAV_ITEMS}
+      navItems={navItems}
       activeSection={activeSection}
       onSectionChange={navigate}
       loading={loading}
-      sourceStatusText={formatSourceStatus(resolvedSource, runId, generatedAt, ageSeconds, sourceIds)}
+      runtimeMode={runtimeMode}
+      resolvedSource={resolvedSource}
+      runId={runId}
+      generatedAt={generatedAt}
+      ageSeconds={ageSeconds}
+      freshnessStatus={freshnessStatus}
+      viewRefreshedAt={viewRefreshedAt}
+      sourceIds={sourceIds}
+      sourceHealth={sourceHealth}
+      readiness={readiness}
+      readinessReasonCode={readinessReasonCode}
       dataUnavailableMessage={unavailableMessage}
       dataUnavailableReasonCode={reasonCode}
-      runtimeMode={runtimeMode}
+      onRefresh={() => void loadData()}
     >
       {renderSection()}
     </ProductWorkspaceShell>
@@ -219,27 +270,16 @@ function resolveSection(): ProductSectionId {
   return HASH_TO_SECTION[window.location.hash.trim().toLowerCase()] ?? "candidate-results";
 }
 
-function formatSourceStatus(
-  source: ResolvedScannerSource,
-  runId: string | null,
-  generatedAt: string | null,
-  ageSeconds: number | null,
-  sourceIds: string[],
-): string {
-  if (source === "unavailable") return "Data Unavailable";
-
-  const parts = [
-    runId ? `run ${runId}` : null,
-    generatedAt ? `generated ${generatedAt}` : null,
-    ageSeconds == null ? null : `age ${formatAge(ageSeconds)}`,
-    sourceIds.length > 0 ? sourceIds.join(", ") : null,
-  ].filter((value): value is string => Boolean(value));
-
-  return parts.join(" · ");
+export function resolveScannerSnapshotTimestamp(output: ScannerApiOutput): string | null {
+  return output.provenance?.generated_at ?? output.scan_run.finished_at ?? null;
 }
 
-function formatAge(seconds: number): string {
-  if (seconds < 60) return `${seconds}s`;
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
-  return `${Math.floor(seconds / 3600)}h`;
+export function getAcceptedProductRefreshTimestamps(
+  output: ScannerApiOutput,
+  viewRefreshedAt: string,
+): { generatedAt: string | null; viewRefreshedAt: string } {
+  return {
+    generatedAt: resolveScannerSnapshotTimestamp(output),
+    viewRefreshedAt,
+  };
 }

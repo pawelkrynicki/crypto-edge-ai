@@ -1,5 +1,18 @@
 # Crypto Edge AI — Camp BETA UI Mock
 
+## Product Radar Build & Owner Acceptance
+
+`INTERNAL_BETA` uruchamia osobny `ProductApp` z nawigacją ograniczoną do Radar / Szczegóły / Weryfikacja / Metodologia. Product path używa bezpośrednio `UiTokenCandidate`; `MockCandidate`, fixture i demo/preview surfaces pozostają wyłącznie w `DEVELOPMENT_DEMO` oraz testach.
+
+Radar pokazuje `new_emerging` jako observation-only oraz address-backed `established`. Pusty, commitowany universe ma dedykowany `ESTABLISHED_UNIVERSE_EMPTY`, nie jest globalnym błędem i nigdy nie tworzy sample candidates. UI pobiera również `/api/readiness`, dzięki czemu context unavailable nie ukrywa działającego skanera, a stale/policy/provider reason codes pozostają jawne.
+
+```cmd
+scripts\win\start-product-radar-review.cmd
+scripts\win\start-product-radar-review.cmd --check
+```
+
+Pełna checklista: `../../docs/product_radar_owner_review.md`. Po jawnym owner `ACCEPT` następny etap to **VPS Deployment & Automation**. Tester zewnętrzny pozostaje `NO-GO`.
+
 ## 12R.5 Two-basket Scanner Contract
 
 Reader/API zachowuje allowlisted metadata `new_emerging` i `established`. `new_emerging` jest observation-only; `established` ma address-backed universe identity. `/api/readiness` rozdziela process, new/emerging, established i context. Pusty commitowany universe zwraca `ready_with_empty_established_universe` oraz jawny `ESTABLISHED_UNIVERSE_EMPTY`; nie uruchamia fixture fallback i nie blokuje koszyka obserwacyjnego.
@@ -52,7 +65,7 @@ $env:CRYPTO_EDGE_RUNTIME_MODE = "INTERNAL_BETA"
 pnpm run api
 ```
 
-Without a display-eligible live snapshot, `INTERNAL_BETA` intentionally returns HTTP 503. It never calls a provider from the API read path.
+`INTERNAL_BETA` returns the latest valid real scanner snapshot even after the 30-minute freshness SLA: `/api/scanner/latest` stays HTTP 200, `_source_meta.freshness_status=STALE`, and readiness is degraded but usable. HTTP 503 is reserved for cases where no valid real snapshot survives schema, lineage, environment, policy, fixture and file-integrity checks. The API read path never calls a provider.
 
 Endpoints:
 
@@ -64,7 +77,7 @@ Endpoints:
 
 The product build uses a separate `ProductApp` entrypoint with API-only data selection and navigation limited to Radar / Szczegóły / Weryfikacja / Metodologia. Development sample controls and demo/preview components remain available only in `DEVELOPMENT_DEMO`. The internal build does not copy `public/fixtures` into `dist`, and `assertInternalBetaBuild.ts` fails the build if fixture paths or demo/sample surface markers are bundled.
 
-API responses use `Cache-Control: no-store, max-age=0`; `INTERNAL_BETA` does not emit wildcard CORS. Data errors use `503` and a stable `reason_code`. Full manifest, allowlist, freshness and reason-code details are in `../../docs/real_data_api_contract.md`.
+API responses use `Cache-Control: no-store, max-age=0`; `INTERNAL_BETA` does not emit wildcard CORS. Hard data errors use `503` and a stable `reason_code`; stale valid scanner data uses HTTP 200 and keeps the full allowlisted candidate snapshot. Full manifest, allowlist, freshness and reason-code details are in `../../docs/real_data_api_contract.md`.
 
 Offline verification:
 
