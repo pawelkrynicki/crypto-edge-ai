@@ -32,6 +32,11 @@ call node --import tsx --test tests\realDataBoundary.test.ts
 if errorlevel 1 exit /b %ERRORLEVEL%
 
 echo.
+echo === Run production same-origin runtime and import-boundary tests ===
+call pnpm run test:runtime
+if errorlevel 1 exit /b %ERRORLEVEL%
+
+echo.
 echo === Run UI typecheck ===
 call node_modules\.bin\tsc.cmd -b
 if errorlevel 1 exit /b %ERRORLEVEL%

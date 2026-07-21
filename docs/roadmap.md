@@ -1,10 +1,12 @@
 # Roadmap
 
-## Current stage: Product Radar Build & Owner Acceptance
+## Current stage: VPS Deployment & Automation
 
-Product Radar jest zbudowany na real-data `INTERNAL_BETA` i oczekuje na lokalny verdict ownera. Product path używa pełnego `UiTokenCandidate`, rozdziela `new_emerging` od `established`, obsługuje `ESTABLISHED_UNIVERSE_EMPTY` bez globalnego błędu i nie wstawia sample candidates.
+**Product Radar Build & Owner Acceptance** zakończono i zmergowano 21.07.2026. Kanoniczny merge commit: `ccdb5acb855fdfb11e7848af86b30349268e53f5`.
 
-Kanoniczny flow oceny oraz checklista znajdują się w `docs/product_radar_owner_review.md`. Po jawnym `ACCEPT` następnym etapem jest **VPS Deployment & Automation**. Nie planuje się osobnego kolejnego etapu UI; ewentualne poprawki po owner review pozostają w tym samym obszarze. Tester zewnętrzny nadal jest `NO-GO`.
+Pierwszy sprint bieżącego etapu przygotowuje produkcyjny runtime same-origin dla Windows VPS oraz central automation guard: jeden proces produktu na `127.0.0.1:4180`, jeden wspólny handler `/api/*`, międzyprocesowy global lock, heartbeat, bezpieczne stale recovery, atomowy stan oraz coordinator z wstrzykiwanym runnerem. Sprint nie wykonuje deploymentu, nie aktywuje schedulera, nie zmienia Cloudflare Tunnel ani Cloudflare Access i nie wykonuje live provider calls.
+
+Tester zewnętrzny nadal jest `NO-GO`. `PUBLIC_BETA` pozostaje wyłączone, a build VPS działa wyłącznie jako `INTERNAL_BETA` bez fixture fallback.
 
 ## Stage 12R.5: Discovery Closure
 

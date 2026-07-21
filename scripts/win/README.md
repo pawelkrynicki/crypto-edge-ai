@@ -2,6 +2,21 @@
 
 These scripts are developer tooling for Windows CMD. Run them from the repo root or any other current directory; each script resolves the repo root from its own location.
 
+## VPS product runtime and automation guard
+
+Canonical owner commands from the repository root:
+
+```cmd
+scripts\win\build-product-vps.cmd
+scripts\win\check-product-vps-runtime.cmd
+scripts\win\check-automation-single-flight.cmd
+scripts\win\start-product-vps.cmd
+```
+
+`build-product-vps.cmd` synchronizes only the `tools/ui-mock` locked dependencies and builds the fixture-free `INTERNAL_BETA` surface. `start-product-vps.cmd` serves the UI and the existing `/api/*` contract from one Node process on `127.0.0.1:4180`; it does not start the collector, configure Cloudflare, or create a Scheduled Task. `check-product-vps-runtime.cmd` uses a dedicated random high port and always closes its server. `check-automation-single-flight.cmd` runs only offline lock/coordinator tests against isolated temporary files.
+
+Full contract and runbook: `docs/vps_deployment_automation.md`. Deployment, Cloudflare changes, Task Scheduler registration, live provider calls, port `4173`, `PUBLIC_BETA`, and external tester access remain outside this sprint.
+
 ## Product Radar owner review
 
 Kanoniczny launcher lokalnej oceny ownera:
