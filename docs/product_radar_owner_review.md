@@ -120,9 +120,32 @@ scripts\win\check-product-radar-review.cmd
 
 ## Owner verdict
 
-- Data oceny: ____________________
-- Osoba: ____________________
-- Werdykt: `ACCEPT` / `CHANGES REQUIRED`
-- Uwagi: ________________________________________________________________
+- Data oceny: 21.07.2026
+- Osoba: Owner repozytorium
+- Werdykt: `ACCEPT`
+
+### Podsumowanie manualnego owner review
+
+- Radar: PASS.
+- EN/PL: PASS.
+- Last updated i View refreshed: PASS.
+- Stale last-known-good: PASS.
+- Source health: PASS.
+- New / observation i Established: PASS.
+- Szczegóły: PASS.
+- Klasyfikacja filtrów: PASS.
+- Security not invoked: PASS.
+- Weryfikacja źródłowa: PASS.
+- Metodologia: PASS.
+- Brak fixture fallback: PASS.
+- Brak provider calls przez Refresh view: PASS.
+
+### Zaakceptowane ograniczenia
+
+- Established universe ma obecnie 0 aktywnych wpisów.
+- Snapshot może być oznaczony jako opóźniony.
+- Opcjonalny context może być częściowo dostępny.
+- Brak schedulera i wdrożenia VPS w tym PR.
+- Tester zewnętrzny pozostaje poza zakresem PR #68.
 
 Po jawnym `ACCEPT` następnym etapem jest wyłącznie **VPS Deployment & Automation**. Tester zewnętrzny pozostaje `NO-GO` do osobnej zgody.
