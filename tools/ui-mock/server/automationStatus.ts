@@ -10,6 +10,8 @@ export type AutomationStatusOutput = {
   last_attempt_at: string | null;
   last_success_at: string | null;
   last_failure_at: string | null;
+  next_run_at: string | null;
+  next_due_at: string | null;
   next_scanner_run_at: string | null;
   next_context_run_at: string | null;
   last_published_scanner_run_id: string | null;
@@ -41,6 +43,8 @@ export async function readAutomationStatus(options: AutomationStatusOptions = {}
     const nextScanner = nullableIso(state.next_scanner_run_at);
     const nextAlternative = nullableIso(state.next_alternative_me_run_at);
     const nextDefillama = nullableIso(state.next_defillama_run_at);
+    const nextContext = earliestIso(nextAlternative, nextDefillama);
+    const nextDue = earliestIso(nextScanner, nextContext);
     return {
       enabled,
       active_run_id: nullableSafeText(state.active_run_id),
@@ -49,8 +53,10 @@ export async function readAutomationStatus(options: AutomationStatusOptions = {}
       last_attempt_at: nullableIso(state.last_attempt_at),
       last_success_at: nullableIso(state.last_success_at),
       last_failure_at: nullableIso(state.last_failure_at),
+      next_run_at: enabled ? nextDue : null,
+      next_due_at: nextDue,
       next_scanner_run_at: nextScanner,
-      next_context_run_at: earliestIso(nextAlternative, nextDefillama),
+      next_context_run_at: nextContext,
       last_published_scanner_run_id: nullableSafeText(state.last_published_scanner_run_id),
       last_published_context_run_id: nullableSafeText(state.last_published_context_run_id),
       request_counts: safeRequestCounts(state.request_counts),
@@ -79,6 +85,8 @@ function initialStatus(enabled: boolean): AutomationStatusOutput {
     last_attempt_at: null,
     last_success_at: null,
     last_failure_at: null,
+    next_run_at: null,
+    next_due_at: null,
     next_scanner_run_at: null,
     next_context_run_at: null,
     last_published_scanner_run_id: null,

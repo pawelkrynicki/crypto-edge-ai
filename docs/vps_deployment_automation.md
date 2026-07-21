@@ -99,9 +99,9 @@ Czysta decyzja schedulera ma sześć wyników: `RUN_SCANNER_AND_CONTEXT`, `RUN_C
 
 ## Read-only observability
 
-`GET /api/automation/status` jest częścią wspólnego handlera lokalnego i same-origin. Zwraca wyłącznie `enabled`, bezpieczny aktywny run, ostatni wynik/kod i timestamps, następny scanner/context termin, ostatnie opublikowane ID, request counts i `scheduler_status`. Brak pliku daje `NOT_YET_RUN`, a uszkodzony stan `STATE_UNAVAILABLE` z HTTP 200. Endpoint nie zwraca PID, lock metadata, ścieżek, sekretów ani env i nigdy nie uruchamia collectora.
+`GET /api/automation/status` jest częścią wspólnego handlera lokalnego i same-origin. `enabled` oznacza rzeczywiście aktywny cykliczny mechanizm wykonawczy. Produktowe `next_run_at` jest terminem wykonania i dlatego ma wartość wyłącznie przy `enabled=true`; przy nieaktywnej automatyzacji jest `null`. Czyste wyliczenie cadence pozostaje osobno w `next_due_at` i może istnieć także przy `enabled=false`, obok źródłowych `next_scanner_run_at` i `next_context_run_at`. Endpoint zwraca też bezpieczny aktywny run, ostatni wynik/kod i timestamps, ostatnie opublikowane ID, request counts oraz `scheduler_status`. Brak pliku daje `NOT_YET_RUN`, a uszkodzony stan `STATE_UNAVAILABLE` z HTTP 200. Endpoint nie zwraca PID, lock metadata, ścieżek, sekretów ani env i nigdy nie uruchamia collectora.
 
-Mały panel w Technical details jest tylko do odczytu. „Refresh view” ponownie czyta nasze API, lecz nie uruchamia schedulera ani providera. Sto równoległych odczytów jest pokryte testem bez mutacji stanu i z zerową liczbą wywołań runnera.
+Mały panel w Technical details jest tylko do odczytu. Przy `enabled=false` pokazuje „Nie zaplanowano” / „Not scheduled” jako następny run, a `next_due_at` opisuje wyłącznie jako najbliższy termin po aktywacji. Przy `enabled=true` pokazuje `next_run_at` bez dodatkowego tekstu „po aktywacji”. „Refresh view” ponownie czyta nasze API, lecz nie aktywuje automatyzacji ani nie uruchamia schedulera lub providera. Sto równoległych odczytów jest pokryte testem bez mutacji stanu i z zerową liczbą wywołań runnera.
 
 ## Windows Task Scheduler — pakiet nieaktywny
 

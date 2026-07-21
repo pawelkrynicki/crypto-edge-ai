@@ -6,6 +6,8 @@ export type AutomationStatus = {
   last_attempt_at: string | null;
   last_success_at: string | null;
   last_failure_at: string | null;
+  next_run_at: string | null;
+  next_due_at: string | null;
   next_scanner_run_at: string | null;
   next_context_run_at: string | null;
   last_published_scanner_run_id: string | null;
@@ -34,8 +36,14 @@ function isAutomationStatus(value: unknown): value is AutomationStatus {
   return typeof status.enabled === "boolean"
     && (status.active_run_id === null || typeof status.active_run_id === "string")
     && (status.last_result === null || status.last_result === "SUCCESS" || status.last_result === "FAILED")
+    && isNullableString(status.next_run_at)
+    && isNullableString(status.next_due_at)
     && typeof status.scheduler_status === "string"
-    && Boolean(status.request_counts) && typeof status.request_counts === "object";
+    && Boolean(status.request_counts) && typeof status.request_counts === "object" && !Array.isArray(status.request_counts);
+}
+
+function isNullableString(value: unknown): value is string | null {
+  return value === null || typeof value === "string";
 }
 
 function getApiBaseUrl(): string {

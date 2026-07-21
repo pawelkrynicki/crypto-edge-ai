@@ -147,9 +147,15 @@ export function ProductWorkspaceShell({
               <div><dt>{t("app.runId")}</dt><dd>{runId ?? t("app.noData")}</dd></div>
               <div><dt>{t("app.sources")}</dt><dd>{sourceIds.length > 0 ? sourceIds.join(", ") : t("app.noData")}</dd></div>
               {technicalCodes.length > 0 && <div><dt>{t("app.codes")}</dt><dd>{technicalCodes.join(", ")}</dd></div>}
-              <div><dt>{t("automation.title")}</dt><dd>{automationPresentation(automationStatus, locale, t)}</dd></div>
+              <div><dt>{t("automation.title")}</dt><dd>{automationPresentation(automationStatus, t)}</dd></div>
               <div><dt>{t("automation.lastRun")}</dt><dd>{automationStatus?.last_attempt_at ? formatProductDateTime(automationStatus.last_attempt_at, locale) : t("app.noData")}</dd></div>
-              <div><dt>{t("automation.nextRun")}</dt><dd>{nextAutomationRun(automationStatus) ? formatProductDateTime(nextAutomationRun(automationStatus) as string, locale) : t("app.noData")}</dd></div>
+              <div><dt>{t("automation.nextRun")}</dt><dd>{nextAutomationRunPresentation(automationStatus, locale, t)}</dd></div>
+              {automationStatus && !automationStatus.enabled && automationStatus.next_due_at && (
+                <div>
+                  <dt>{t("automation.nextDueAfterActivation")}</dt>
+                  <dd>{formatProductDateTime(automationStatus.next_due_at, locale)}</dd>
+                </div>
+              )}
             </dl>
           </details>
         </div>
@@ -213,7 +219,6 @@ export function ProductWorkspaceShell({
 
 function automationPresentation(
   status: AutomationStatus | null | undefined,
-  _locale: ProductLocale,
   t: (key: keyof typeof PRODUCT_TRANSLATIONS.en) => string,
 ): string {
   if (!status || !status.enabled) return t("automation.disabled");
@@ -222,12 +227,14 @@ function automationPresentation(
   return t("automation.active");
 }
 
-function nextAutomationRun(status: AutomationStatus | null | undefined): string | null {
-  if (!status) return null;
-  const values = [status.next_scanner_run_at, status.next_context_run_at]
-    .filter((value): value is string => value !== null)
-    .sort((left, right) => Date.parse(left) - Date.parse(right));
-  return values[0] ?? null;
+function nextAutomationRunPresentation(
+  status: AutomationStatus | null | undefined,
+  locale: ProductLocale,
+  t: (key: keyof typeof PRODUCT_TRANSLATIONS.en) => string,
+): string {
+  if (!status) return t("app.noData");
+  if (!status.enabled) return t("automation.notScheduled");
+  return status.next_run_at ? formatProductDateTime(status.next_run_at, locale) : t("app.noData");
 }
 
 export function getApiReadinessPresentation(

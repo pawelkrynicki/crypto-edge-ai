@@ -6,7 +6,7 @@ import { describe, it } from "node:test";
 import { createScannerApiServer } from "../server/scannerApiServer.js";
 
 describe("automation status API", () => {
-  it("serves 100 read-only status requests without changing state or invoking a runner", async () => {
+  it("keeps a successful manual run disabled across 100 read-only requests without invoking a runner", async () => {
     let reads = 0;
     let runnerCalls = 0;
     const state = {
@@ -32,7 +32,7 @@ describe("automation status API", () => {
     const server = createScannerApiServer({
       runtimeMode: "INTERNAL_BETA",
       automation: {
-        enabled: true,
+        enabled: false,
         readState: async () => {
           reads += 1;
           return state;
@@ -47,8 +47,16 @@ describe("automation status API", () => {
       const bodies = await Promise.all(responses.map((response) => response.text()));
       assert.equal(new Set(bodies).size, 1);
       const body = JSON.parse(bodies[0]) as Record<string, unknown>;
-      assert.equal(body.enabled, true);
+      assert.equal(body.enabled, false);
+      assert.equal(body.last_result, "SUCCESS");
+      assert.equal(body.last_attempt_at, "2026-07-21T12:00:00.000Z");
+      assert.equal(body.next_run_at, null);
+      assert.equal(body.next_due_at, "2026-07-21T12:16:00.000Z");
+      assert.equal(body.next_scanner_run_at, "2026-07-21T12:16:00.000Z");
       assert.equal(body.next_context_run_at, "2026-07-21T14:01:00.000Z");
+      assert.equal(body.last_published_scanner_run_id, "scan_safe");
+      assert.equal(body.last_published_context_run_id, "context_safe");
+      assert.deepEqual(body.request_counts, { dexscreener: 4, goplus_security: 1 });
       for (const forbidden of ["pid", "storage_path", "secret", "C:\\\\secret", "lock"]) {
         assert.equal(bodies[0].includes(forbidden), false);
       }
@@ -58,6 +66,30 @@ describe("automation status API", () => {
     assert.equal(reads, 100);
     assert.equal(runnerCalls, 0);
     assert.equal(JSON.stringify(state), before);
+  });
+
+  it("exposes the computed due time as an actual next run only when automation is enabled", async () => {
+    const state = {
+      schema_version: "central_automation_state_v1",
+      next_scanner_run_at: "2026-07-21T12:16:00.000Z",
+      next_alternative_me_run_at: "2026-07-21T18:01:00.000Z",
+      next_defillama_run_at: "2026-07-21T14:01:00.000Z",
+    };
+    const server = createScannerApiServer({
+      runtimeMode: "INTERNAL_BETA",
+      automation: { enabled: true, readState: async () => state },
+    });
+    await listen(server);
+    try {
+      const body = await fetchBody(server);
+      assert.equal(body.enabled, true);
+      assert.equal(body.next_run_at, "2026-07-21T12:16:00.000Z");
+      assert.equal(body.next_due_at, "2026-07-21T12:16:00.000Z");
+      assert.equal(body.next_scanner_run_at, "2026-07-21T12:16:00.000Z");
+      assert.equal(body.next_context_run_at, "2026-07-21T14:01:00.000Z");
+    } finally {
+      await close(server);
+    }
   });
 
   it("returns safe initial and unavailable states with HTTP 200", async () => {
@@ -71,6 +103,8 @@ describe("automation status API", () => {
       const body = await fetchBody(missing);
       assert.equal(body.enabled, false);
       assert.equal(body.scheduler_status, "NOT_YET_RUN");
+      assert.equal(body.next_run_at, null);
+      assert.equal(body.next_due_at, null);
     } finally {
       await close(missing);
     }
