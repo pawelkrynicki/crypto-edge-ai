@@ -1,6 +1,10 @@
 import type { IncomingMessage, RequestListener, ServerResponse } from "node:http";
 import { readAutomationStatus, type AutomationStatusOptions } from "./automationStatus.js";
 import {
+  readEstablishedUniverseStatus,
+  type EstablishedUniverseStatusOptions,
+} from "./establishedUniverseStatus.js";
+import {
   ContextOutputError,
   type LatestContextOutputOptions,
   readLatestContextOutput,
@@ -40,6 +44,7 @@ export type ScannerApiHandlerOptions = {
   reviewSessionProvider?: ReviewSessionStorageProvider;
   health?: ScannerApiHealthOptions;
   automation?: AutomationStatusOptions;
+  establishedUniverse?: EstablishedUniverseStatusOptions;
 };
 
 export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}): RequestListener {
@@ -72,6 +77,11 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
 
     if (req.method === "GET" && path === "/api/automation/status") {
       sendJson(req, res, 200, await readAutomationStatus(options.automation), runtimeMode);
+      return;
+    }
+
+    if (req.method === "GET" && path === "/api/established-universe/status") {
+      sendJson(req, res, 200, await readEstablishedUniverseStatus(options.establishedUniverse), runtimeMode);
       return;
     }
 

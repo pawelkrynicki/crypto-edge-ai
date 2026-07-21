@@ -2,6 +2,8 @@ import { BoundedHttpClient, type FetchLike } from "./boundedHttpClient.js";
 import { fetchDexScreenerTokenPairs } from "./dexscreenerClient.js";
 import {
   ESTABLISHED_UNIVERSE_EMPTY,
+  ESTABLISHED_UNIVERSE_INVALID,
+  ESTABLISHED_UNIVERSE_UNAVAILABLE,
   isSameContractAddress,
   loadEstablishedAddressUniverse,
   universeIdentityKey,
@@ -24,7 +26,12 @@ export type EstablishedCollectorEnvironment = {
 export type EstablishedAddressDiscoveryMetadata = {
   discovery_method: typeof ESTABLISHED_DISCOVERY_METHOD;
   universe_version: string;
-  universe_status: typeof ESTABLISHED_UNIVERSE_EMPTY | typeof ESTABLISHED_DISCOVERY_READY;
+  universe_status:
+    | typeof ESTABLISHED_UNIVERSE_EMPTY
+    | typeof ESTABLISHED_DISCOVERY_READY
+    | typeof ESTABLISHED_UNIVERSE_INVALID
+    | typeof ESTABLISHED_UNIVERSE_UNAVAILABLE;
+  validation_status: "valid" | "invalid" | "unavailable";
   entries_total: number;
   entries_enabled: number;
   pairs_loaded: number;
@@ -48,6 +55,20 @@ export type EstablishedAddressDiscoveryOptions = {
   timeoutMs?: number;
   concurrency?: number;
   now?: Date;
+  entryLimit?: number;
+};
+
+export type EstablishedUniversePreview = {
+  mode: "dry-run";
+  provider_calls: 0;
+  snapshot_published: false;
+  automation_state_changed: false;
+  universe_version: string;
+  checksum: string;
+  validation_status: "valid";
+  entries_total: number;
+  entries_enabled: number;
+  selected_entries: Array<Pick<EstablishedAddressUniverseEntry, "entry_id" | "chain" | "contract_address">>;
 };
 
 export type SelectedEstablishedPair = {
@@ -63,11 +84,13 @@ export async function collectEstablishedAddressUniverse(
   const universe = options.universe === undefined
     ? loadEstablishedAddressUniverse(options.universePath)
     : validateEstablishedAddressUniverse(options.universe);
-  if (!universe.production_enabled) throw new Error("ESTABLISHED_UNIVERSE_PRODUCTION_DISABLED");
 
-  const enabled = universe.entries
+  const allEnabled = universe.entries
     .map((entry, index) => ({ entry, index }))
     .filter(({ entry }) => entry.enabled);
+  const enabled = options.entryLimit === undefined
+    ? allEnabled
+    : allEnabled.slice(0, validateEntryLimit(options.entryLimit));
   if (enabled.length === 0) return emptyResult(universe);
 
   const client = options.client ?? new BoundedHttpClient({
@@ -116,6 +139,7 @@ export async function collectEstablishedAddressUniverse(
       discovery_method: ESTABLISHED_DISCOVERY_METHOD,
       universe_version: universe.universe_version,
       universe_status: ESTABLISHED_DISCOVERY_READY,
+      validation_status: "valid",
       entries_total: universe.entries.length,
       entries_enabled: enabled.length,
       pairs_loaded: pairsLoaded,
@@ -123,6 +147,51 @@ export async function collectEstablishedAddressUniverse(
       candidates_after_filters: candidates.filter((candidate) => candidate.status === "passed_basic_filter").length,
       base_token_candidates: deduplicated.filter((record) => configuredTokenSide(record.entry, record.pair) === "baseToken").length,
       quote_token_candidates: deduplicated.filter((record) => configuredTokenSide(record.entry, record.pair) === "quoteToken").length,
+    },
+  };
+}
+
+export function previewEstablishedAddressUniverse(options: {
+  universe?: unknown;
+  universePath?: string;
+  entryLimit?: number;
+} = {}): EstablishedUniversePreview {
+  const universe = options.universe === undefined
+    ? loadEstablishedAddressUniverse(options.universePath)
+    : validateEstablishedAddressUniverse(options.universe);
+  const enabled = universe.entries.filter((entry) => entry.enabled);
+  const selected = options.entryLimit === undefined ? enabled : enabled.slice(0, validateEntryLimit(options.entryLimit));
+  return {
+    mode: "dry-run",
+    provider_calls: 0,
+    snapshot_published: false,
+    automation_state_changed: false,
+    universe_version: universe.universe_version,
+    checksum: universe.checksum,
+    validation_status: "valid",
+    entries_total: universe.entries.length,
+    entries_enabled: enabled.length,
+    selected_entries: selected.map(({ entry_id, chain, contract_address }) => ({ entry_id, chain, contract_address })),
+  };
+}
+
+export function unavailableEstablishedAddressUniverse(
+  status: typeof ESTABLISHED_UNIVERSE_INVALID | typeof ESTABLISHED_UNIVERSE_UNAVAILABLE,
+): EstablishedAddressDiscoveryResult {
+  return {
+    candidates: [],
+    metadata: {
+      discovery_method: ESTABLISHED_DISCOVERY_METHOD,
+      universe_version: "unavailable",
+      universe_status: status,
+      validation_status: status === ESTABLISHED_UNIVERSE_INVALID ? "invalid" : "unavailable",
+      entries_total: 0,
+      entries_enabled: 0,
+      pairs_loaded: 0,
+      candidates_before_filters: 0,
+      candidates_after_filters: 0,
+      base_token_candidates: 0,
+      quote_token_candidates: 0,
     },
   };
 }
@@ -179,6 +248,7 @@ function emptyResult(universe: EstablishedAddressUniverse): EstablishedAddressDi
       discovery_method: ESTABLISHED_DISCOVERY_METHOD,
       universe_version: universe.universe_version,
       universe_status: ESTABLISHED_UNIVERSE_EMPTY,
+      validation_status: "valid",
       entries_total: universe.entries.length,
       entries_enabled: 0,
       pairs_loaded: 0,
@@ -188,6 +258,11 @@ function emptyResult(universe: EstablishedAddressUniverse): EstablishedAddressDi
       quote_token_candidates: 0,
     },
   };
+}
+
+function validateEntryLimit(value: number): number {
+  if (!Number.isSafeInteger(value) || value < 1 || value > 100) throw new Error("ESTABLISHED_ENTRY_LIMIT_INVALID");
+  return value;
 }
 
 function configuredTokenSide(

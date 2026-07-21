@@ -9,6 +9,8 @@ import {
   type SelectedEstablishedPair,
 } from "../src/establishedAddressDiscovery.js";
 import {
+  ESTABLISHED_UNIVERSE_SCHEMA_VERSION,
+  calculateUniverseChecksum,
   loadEstablishedAddressUniverse,
   validateEstablishedAddressUniverse,
   type EstablishedAddressUniverse,
@@ -31,13 +33,13 @@ describe("established address universe validation", () => {
   it("accepts the canonical empty universe", () => {
     const universe = loadEstablishedAddressUniverse();
     assert.equal(universe.entries.length, 0);
-    assert.equal(universe.production_enabled, true);
+    assert.equal(universe.schema_version, ESTABLISHED_UNIVERSE_SCHEMA_VERSION);
   });
 
   it("fails closed for an unknown version", () => {
     assert.throws(
       () => validateEstablishedAddressUniverse({ ...emptyUniverse(), universe_version: "future" }),
-      /ESTABLISHED_UNIVERSE_VERSION_UNSUPPORTED/,
+      /ESTABLISHED_UNIVERSE_VERSION_INVALID/,
     );
   });
 
@@ -46,47 +48,43 @@ describe("established address universe validation", () => {
       contract_address: `0x${(index + 1).toString(16).padStart(40, "0")}`,
     }));
     assert.throws(
-      () => validateEstablishedAddressUniverse({ ...emptyUniverse(), entries }),
+      () => validateEstablishedAddressUniverse(universe(entries)),
       /ESTABLISHED_UNIVERSE_TOO_MANY_ENTRIES/,
     );
   });
 
   it("fails closed for duplicate chain and address", () => {
     assert.throws(
-      () => validateEstablishedAddressUniverse({
-        ...emptyUniverse(),
-        entries: [entry(), entry({ contract_address: EVM_ADDRESS.toUpperCase().replace("0X", "0x") })],
-      }),
+      () => validateEstablishedAddressUniverse(universe([
+        entry(),
+        entry({ contract_address: EVM_ADDRESS.toUpperCase().replace("0X", "0x") }),
+      ])),
       /ESTABLISHED_UNIVERSE_DUPLICATE_IDENTITY/,
     );
   });
 
   it("rejects invalid EVM and Solana addresses", () => {
     assert.throws(
-      () => validateEstablishedAddressUniverse({ ...emptyUniverse(), entries: [entry({ contract_address: "0x123" })] }),
-      /ESTABLISHED_UNIVERSE_EVM_ADDRESS_INVALID/,
+      () => validateEstablishedAddressUniverse(universe([entry({ contract_address: "0x123" })])),
+      /ESTABLISHED_UNIVERSE_ADDRESS_INVALID/,
     );
     assert.throws(
-      () => validateEstablishedAddressUniverse({
-        ...emptyUniverse(),
-        entries: [entry({ chain: "solana", contract_address: "not-a-solana-address" })],
-      }),
-      /ESTABLISHED_UNIVERSE_SOLANA_ADDRESS_INVALID/,
+      () => validateEstablishedAddressUniverse(universe([entry({ chain: "solana", contract_address: "not-a-solana-address" })])),
+      /ESTABLISHED_UNIVERSE_ADDRESS_INVALID/,
     );
-    assert.equal(validateEstablishedAddressUniverse({
-      ...emptyUniverse(),
-      entries: [entry({ chain: "solana", contract_address: SOLANA_ADDRESS })],
-    }).entries.length, 1);
+    assert.equal(validateEstablishedAddressUniverse(universe([
+      entry({ chain: "solana", contract_address: SOLANA_ADDRESS }),
+    ])).entries.length, 1);
   });
 
   it("denies robinhood, unknown chains and secret-shaped unknown fields", () => {
     assert.throws(
-      () => validateEstablishedAddressUniverse({ ...emptyUniverse(), entries: [entry({ chain: "robinhood" as "base" })] }),
-      /ESTABLISHED_UNIVERSE_ROBINHOOD_DENIED/,
+      () => validateEstablishedAddressUniverse(universe([entry({ chain: "robinhood" as "base" })])),
+      /UNSUPPORTED_CHAIN/,
     );
     assert.throws(
-      () => validateEstablishedAddressUniverse({ ...emptyUniverse(), entries: [entry({ chain: "unknown" as "base" })] }),
-      /ESTABLISHED_UNIVERSE_CHAIN_UNSUPPORTED/,
+      () => validateEstablishedAddressUniverse(universe([entry({ chain: "unknown" as "base" })])),
+      /UNSUPPORTED_CHAIN/,
     );
     assert.throws(
       () => validateEstablishedAddressUniverse({ ...emptyUniverse(), api_key: "secret" }),
@@ -100,7 +98,7 @@ describe("address-backed established collector", () => {
     let calls = 0;
     const result = await collectEstablishedAddressUniverse({
       env: ENV,
-      universe: { ...emptyUniverse(), entries: [entry({ enabled: false })] },
+      universe: universe([entry({ enabled: false })]),
       fetchImpl: async () => { calls += 1; return Response.json([]); },
     });
     assert.equal(calls, 0);
@@ -172,6 +170,18 @@ describe("address-backed established collector", () => {
     assert.equal(deduplicateEstablishedPairs([record, structuredClone(record)]).length, 1);
   });
 
+  it("never modifies the owner-maintained universe while collecting", async () => {
+    const configured = universeWithEntry();
+    const before = JSON.stringify(configured);
+    await collectEstablishedAddressUniverse({
+      env: ENV,
+      universe: configured,
+      now: NOW,
+      fetchImpl: async () => Response.json([pair()]),
+    });
+    assert.equal(JSON.stringify(configured), before);
+  });
+
   it("keeps baseline filters unchanged and emits required established metadata", async () => {
     const result = await collectWithPairs([pair()]);
     assert.deepEqual(BASIC_FILTERS, {
@@ -198,7 +208,7 @@ describe("address-backed established collector", () => {
       discovery_basket: "established",
       discovery_method: "address_seeded_universe",
       observation_only: false,
-      universe_version: "established_address_universe_v1",
+      universe_version: "established-universe-v000001",
       universe_entry_index: 0,
       address_identity_verified: true,
     });
@@ -247,19 +257,21 @@ async function collectWithPairs(pairs: DexScreenerPair[]) {
 }
 
 function emptyUniverse(): EstablishedAddressUniverse {
-  return {
-    universe_version: "established_address_universe_v1",
-    status: "OWNER_MAINTAINED",
-    production_enabled: true,
-    provider: "dexscreener",
-    identity_method: "CHAIN_AND_CONTRACT_ADDRESS",
-    max_entries: 100,
-    entries: [],
-  };
+  return universe([]);
 }
 
 function universeWithEntry(): EstablishedAddressUniverse {
-  return { ...emptyUniverse(), entries: [entry()] };
+  return universe([entry()]);
+}
+
+function universe(entries: EstablishedAddressUniverseEntry[]): EstablishedAddressUniverse {
+  const base = {
+    schema_version: ESTABLISHED_UNIVERSE_SCHEMA_VERSION,
+    universe_version: "established-universe-v000001",
+    generated_at: "2026-07-19T00:00:00.000Z",
+    entries,
+  } as const;
+  return { ...base, checksum: calculateUniverseChecksum(base) };
 }
 
 function entry(overrides: Partial<EstablishedAddressUniverseEntry> = {}): EstablishedAddressUniverseEntry {
@@ -267,10 +279,12 @@ function entry(overrides: Partial<EstablishedAddressUniverseEntry> = {}): Establ
     chain: "base",
     contract_address: EVM_ADDRESS,
     enabled: true,
-    display_label: "Configured Token",
+    display_name: "Configured Token",
     added_at: "2026-07-19T00:00:00.000Z",
+    updated_at: "2026-07-19T00:00:00.000Z",
     added_by: "owner",
-    notes: "test only",
+    owner_note: "test only",
+    entry_id: "est_1111111111111111",
     ...overrides,
   };
 }

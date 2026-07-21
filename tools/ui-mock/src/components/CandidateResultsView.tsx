@@ -361,6 +361,12 @@ export function EstablishedBasket({
         </div>
         <strong className="basket-status established">{t("radar.mainRadar")}</strong>
       </header>
+      <div className="product-metrics-grid established">
+        <Metric label={t("radar.activeEntries")} value={String(metadata?.established?.entries_enabled ?? candidates.length)} />
+        <Metric label={t("radar.universeVersion")} value={metadata?.established?.universe_version ?? t("radar.none")} />
+        <Metric label={t("radar.establishedAfterFilters")} value={String(metadata?.established?.candidates_after_filters ?? candidates.length)} />
+        <Metric label={t("radar.validationStatus")} value={metadata?.established?.validation_status ?? "valid"} />
+      </div>
       <div className="product-candidate-list">
         {candidates.map((candidate) => (
           <EstablishedCandidateCard
@@ -541,6 +547,10 @@ export function getEstablishedState(
   candidates: UiTokenCandidate[],
 ): "ready" | "empty" | "unavailable" {
   if (
+    metadata?.established?.universe_status === "ESTABLISHED_UNIVERSE_INVALID"
+    || metadata?.established?.universe_status === "ESTABLISHED_UNIVERSE_UNAVAILABLE"
+  ) return "unavailable";
+  if (
     readiness?.discovery.established.status === "empty_configured"
     || metadata?.established?.universe_status === "ESTABLISHED_UNIVERSE_EMPTY"
   ) return "empty";
@@ -555,6 +565,10 @@ function getEstablishedTabStatus(
   locale: ProductLocale,
 ): string {
   const t = (key: keyof typeof PRODUCT_TRANSLATIONS.en) => importTranslation(locale, key);
+  if (
+    metadata?.established?.universe_status === "ESTABLISHED_UNIVERSE_INVALID"
+    || metadata?.established?.universe_status === "ESTABLISHED_UNIVERSE_UNAVAILABLE"
+  ) return t("radar.establishedTabUnavailable");
   if (readiness?.discovery.established.status === "empty_configured" || metadata?.established?.universe_status === "ESTABLISHED_UNIVERSE_EMPTY") {
     return t("radar.establishedTabEmpty");
   }
