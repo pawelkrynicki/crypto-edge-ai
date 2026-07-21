@@ -8,6 +8,29 @@ Koszyk `New / observation` pozostaje niezależny, pochodzi z DexScreener latest 
 
 Walidacja adresu potwierdza format odpowiedni dla sieci. Nie potwierdza projektu, właściciela kontraktu, płynności ani bezpieczeństwa tokena.
 
+## Local owner review: ACCEPT_LOCAL_CODE — 21.07.2026
+
+- model `chain + contract_address`: **PASS**;
+- walidacja EVM i Solana: **PASS**;
+- wersjonowanie i checksum: **PASS**;
+- historia i audit: **PASS**;
+- dry-run-first CLI: **PASS**;
+- brak automatycznego awansu `New` do `Established`: **PASS**;
+- collector używa wyłącznie `enabled entries`: **PASS**;
+- problem `Established` nie blokuje `New / observation`: **PASS**;
+- read-only status API: **PASS**;
+- Product Radar nie zawiera edytora universe: **PASS**;
+- `universe_version` jest widoczna w szczegółach technicznych: **PASS**;
+- aktywne wpisy: **0**;
+- status walidacji: **valid**;
+- bieżąca wersja: **established-universe-v000000**.
+
+Faktyczny wynik owner check:
+
+- data, collector, CLI i skrypty: **38/38**;
+- status API: **2/2**;
+- łącznie: **40/40**.
+
 ## Kanoniczny model
 
 Każdy wpis zawiera:
