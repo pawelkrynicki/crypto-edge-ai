@@ -9,10 +9,10 @@ import {
 } from "../productI18n";
 import { formatFilterReason, formatStatusReason } from "../productPresentation";
 import {
-  presentProductSourceHealth,
   resolveProductSourceHealth,
   type ProductSourceHealthResolution,
 } from "../productSourceHealth";
+import { presentProductSourceHealth } from "../productSourceHealthPresentation";
 import {
   isCompletedProductSecurityState,
   resolveProductSecurityState,

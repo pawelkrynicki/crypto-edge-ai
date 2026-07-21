@@ -144,6 +144,20 @@ Proposed standalone path:
 - 13A - AI KINTEL Owner Review Packet.
 - 13B+ - AI KINTEL integration after standalone preview feedback.
 
+### Stage 12B.1: Standalone Control Center Shell
+
+12B.1 adds a read-only **Control Center / Preview readiness** tab to the existing EN/PL Product Radar and a same-origin `GET /api/control-center/status` aggregate in the shared API handler.
+
+- The canonical machine statuses are `READY`, `PARTIAL`, `NOT_READY`, and `MANUAL_CHECK_REQUIRED`; translations do not influence resolution.
+- Overall trusted tester readiness remains `NOT_READY` even when local runtime, API, and data are healthy.
+- Reports Library, persistent feedback capture, Trusted Tester Preview Mode, VPS deployment, final Cloudflare Access smoke, rollback proof, and owner approval remain open gates.
+- Stale last-known-good data is `PARTIAL` data readiness and is not presented as a runtime outage.
+- A valid Established Universe with zero enabled entries is contract-compliant.
+- The shell starts no collector, scheduler, provider, command, deployment, or mutation and exposes no Control Center write route.
+- VPS deployment, Cloudflare changes, external tester access, and Windows Task Scheduler activation have not been performed.
+
+Canonical details and owner-review boundaries are documented in `docs/control_center_shell.md`. The next implementation order is Reports Library + Feedback Loop, then 12C Trusted Tester Preview Mode, followed by deployment/access smoke, rollback and owner approval.
+
 ## Stage 11G: AI KINTEL Staging / Deployment Checklist
 
 Close the documentation package for AI KINTEL production planning before real implementation starts in the AI KINTEL repo.
