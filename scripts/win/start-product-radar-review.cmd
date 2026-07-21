@@ -44,7 +44,7 @@ if "!HAS_SCANNER_OUTPUT!"=="0" (
 if /i "%~1"=="--check" (
   echo.
   call "%REPO_ROOT%\scripts\win\check-product-radar-review.cmd"
-  exit /b %ERRORLEVEL%
+  exit /b !ERRORLEVEL!
 )
 
 echo.

@@ -13,6 +13,11 @@ import {
   resolveProductSourceHealth,
   type ProductSourceHealthResolution,
 } from "../productSourceHealth";
+import {
+  isCompletedProductSecurityState,
+  resolveProductSecurityState,
+  type ProductSecurityState,
+} from "../productSecurityResolver";
 import type {
   ProductReadinessOutput,
   ScannerDiscoveryMetadata,
@@ -67,7 +72,9 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
   const establishedEntries = metadata?.established?.entries_enabled ?? establishedCandidates.length;
   const establishedAfterFilters = metadata?.established?.candidates_after_filters
     ?? establishedCandidates.filter((candidate) => candidate.basicFilterStatus === "passed_basic_filter").length;
-  const securityChecked = establishedCandidates.filter((candidate) => candidate.security !== null).length;
+  const securityChecked = establishedCandidates.filter((candidate) => (
+    isCompletedProductSecurityState(resolveProductSecurityState(candidate).state)
+  )).length;
   const freshness = getFreshness(ageSeconds, freshnessStatus, locale);
   const resolvedSourceHealth = sourceHealth
     ?? resolveProductSourceHealth({ metadata, readiness, sourceIds });
@@ -379,7 +386,20 @@ function EstablishedCandidateCard({
 }) {
   const { locale, t } = useProductLocale();
   const status = getEstablishedCandidateStatus(candidate, locale);
+  const securityResolution = resolveProductSecurityState(candidate);
   const riskFlags = candidate.riskFlags.slice(0, 3);
+  const riskItems = securityResolution.state === "not_invoked"
+    ? [t("detail.riskFlagsNotAssessed")]
+    : securityResolution.state === "unavailable"
+      ? [t("detail.securityUnavailableDetail")]
+      : securityResolution.state === "partial"
+        ? [t("detail.securityPartialDetail")]
+        : riskFlags.length > 0
+          ? riskFlags.map((reason) => presentProductSecurityReason(reason, locale))
+          : candidate.missingData.slice(0, 3).map((reason) => presentProductSecurityReason(reason, locale));
+  const checkSource = securityResolution.state === "not_invoked"
+    ? candidate.source
+    : securityResolution.sources.join(", ") || candidate.source;
   return (
     <article className={`product-candidate-card ${status.tone}`}>
       <header className="product-candidate-topline">
@@ -405,16 +425,17 @@ function EstablishedCandidateCard({
         <Metric label={t("radar.ratio")} value={formatRatio(candidate.volumeMarketCapRatio, t("radar.missingData"))} />
         <Metric label={t("radar.pairAge")} value={formatDays(candidate.pairAgeDays, locale, t("radar.missingData"))} />
         <Metric label={t("radar.basicFilters")} value={candidate.basicFilterStatus === "passed_basic_filter" ? t("radar.conditionsMet") : t("radar.conditionsRejected")} tone={candidate.basicFilterStatus === "passed_basic_filter" ? "ready" : "warning"} />
-        <Metric label={t("radar.security")} value={formatSecurityLabel(candidate.securityLabel, candidate.security !== null, locale)} tone={candidate.security ? status.tone : "warning"} />
+        <Metric label={t("radar.security")} value={presentRadarSecurityState(securityResolution.state, locale)} tone={getSecurityStateTone(securityResolution.state)} />
       </div>
 
       <div className="product-reason-panel">
         <span>{t("radar.risksAndGaps")}</span>
         <div className="candidate-risk-chips">
-          {(riskFlags.length > 0 ? riskFlags : candidate.missingData.slice(0, 3)).map((flag) => (
-            <small key={flag}>{humanizeReason(flag)}</small>
+          {riskItems.map((flag) => (
+            <small key={flag}>{flag}</small>
           ))}
-          {riskFlags.length === 0 && candidate.missingData.length === 0 && <small>{t("radar.noReportedFlags")}</small>}
+          {riskItems.length === 0 && securityResolution.state === "checked" && <small>{t("radar.noReportedFlags")}</small>}
+          {riskItems.length === 0 && securityResolution.state !== "checked" && <small>{t("detail.riskFlagsRequireReview")}</small>}
         </div>
       </div>
 
@@ -422,7 +443,7 @@ function EstablishedCandidateCard({
         <div>
           <span>{t("radar.lastCheck")}</span>
           <strong>{formatProductDateTime(candidate.lastCheckedAt, locale)}</strong>
-          <small>{candidate.security?.sources.join(", ") || candidate.source}</small>
+          <small>{checkSource}</small>
         </div>
         <p>Universe: {candidate.universeVersion ?? t("radar.none")} · {t("radar.activeEntries")}: {candidate.universeEntryIndex ?? t("radar.none")}</p>
         <CandidateActions candidate={candidate} onOpenCandidate={onOpenCandidate} onOpenExternalChecks={onOpenExternalChecks} />
@@ -546,7 +567,7 @@ function getEstablishedCandidateStatus(candidate: UiTokenCandidate, locale: Prod
   if (candidate.basicFilterStatus === "rejected_basic_filter" || candidate.finalLabel === "REJECT") {
     return { label: importTranslation(locale, "radar.rejectedByFilters"), tone: "warning" };
   }
-  if (!candidate.security || candidate.finalLabel === "NEEDS_MANUAL_VERIFICATION") {
+  if (!isCompletedProductSecurityState(resolveProductSecurityState(candidate).state) || candidate.finalLabel === "NEEDS_MANUAL_VERIFICATION") {
     return { label: importTranslation(locale, "radar.needsVerification"), tone: "warning" };
   }
   return { label: importTranslation(locale, "radar.candidateManualReview"), tone: "accent" };
@@ -564,11 +585,27 @@ function getFreshness(
   return { value: importTranslation(locale, "status.current"), detail: formatProductAge(ageSeconds, locale), tone: "ready" };
 }
 
-function formatSecurityLabel(label: string, invoked: boolean, locale: ProductLocale): string {
-  if (!invoked || label === "NOT_CHECKED") return importTranslation(locale, "radar.securityNotRun");
-  if (label === "SECURITY_PASSED") return importTranslation(locale, "radar.securityCheckedManual");
-  if (label.includes("CRITICAL")) return importTranslation(locale, "radar.criticalRisk");
-  return importTranslation(locale, "radar.needsVerification");
+function presentRadarSecurityState(state: ProductSecurityState, locale: ProductLocale): string {
+  if (state === "not_invoked") return importTranslation(locale, "radar.securityNotRun");
+  if (state === "unavailable") return importTranslation(locale, "verification.securityStateUnavailable");
+  if (state === "partial") return importTranslation(locale, "verification.securityStatePartial");
+  if (state === "checked_critical") return importTranslation(locale, "radar.criticalRisk");
+  if (state === "checked_needs_manual_review") return importTranslation(locale, "radar.needsVerification");
+  return importTranslation(locale, "radar.securityCheckedManual");
+}
+
+function getSecurityStateTone(state: ProductSecurityState): Tone {
+  if (state === "checked_critical") return "critical";
+  if (state === "checked") return "ready";
+  return "warning";
+}
+
+function presentProductSecurityReason(reason: string, locale: ProductLocale): string {
+  const code = reason.trim().toUpperCase().replaceAll(" ", "_");
+  if (code === "SECURITY_DATA_UNAVAILABLE") return importTranslation(locale, "detail.securityUnavailableDetail");
+  if (code === "PARTIAL_SECURITY_COVERAGE") return importTranslation(locale, "detail.securityPartialDetail");
+  if (code === "NOT_CHECKED" || code === "UNKNOWN") return importTranslation(locale, "detail.riskFlagsNotAssessed");
+  return humanizeReason(reason);
 }
 
 function importTranslation(locale: ProductLocale, key: keyof typeof PRODUCT_TRANSLATIONS.en): string {

@@ -5,7 +5,16 @@ import {
   useProductLocale,
   type ProductLocale,
 } from "../productI18n";
+import {
+  resolveProductFilterConditions,
+  type BasicFilterCategory,
+} from "../productFilterResolver";
 import { formatFilterReason } from "../productPresentation";
+import {
+  isCompletedProductSecurityState,
+  resolveProductSecurityState,
+  type ProductSecurityState,
+} from "../productSecurityResolver";
 import type { UiTokenCandidate } from "../types/scannerTypes";
 
 interface CandidateDetailViewProps {
@@ -35,17 +44,30 @@ export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
     ? "Established"
     : locale === "pl" ? "Nowe / Emerging" : "New / Emerging";
   const status = getCandidateStatus(candidate, locale);
-  const failedFilters = candidate.filterReasons.map((reason) => formatFilterReason(reason, locale));
+  const filterResolution = resolveProductFilterConditions({
+    basicFilterStatus: candidate.basicFilterStatus,
+    filterReasons: candidate.filterReasons,
+  });
+  const securityResolution = resolveProductSecurityState(candidate);
   const filterSummary = candidate.basicFilterStatus === "passed_basic_filter"
     ? t("detail.filterPassedSummary")
     : t("detail.filterRejectedSummary");
-  const basicFilters = [
-    { text: t("filter.marketCapRange"), keyword: "market cap" },
-    { text: t("filter.volumeMinimum"), keyword: "volume" },
-    { text: t("filter.liquidityMinimum"), keyword: "liquidity" },
-    { text: t("filter.ratioRange"), keyword: "ratio" },
-    { text: t("filter.pairAgeMinimum"), keyword: "pair age" },
-  ];
+  const passedFilters = filterResolution.conditions
+    .filter((condition) => condition.state === "passed")
+    .map((condition) => formatBasicFilterCategory(condition.category, t));
+  const failedFilters = filterResolution.conditions
+    .filter((condition) => condition.state === "failed")
+    .map((condition) => {
+      const reasons = condition.failureReasons
+        .map((reason) => formatFilterReason(reason, locale).summary)
+        .join("; ");
+      return `${formatBasicFilterCategory(condition.category, t)} — ${reasons}`;
+    });
+  const unknownFilters = filterResolution.conditions
+    .filter((condition) => condition.state === "unknown")
+    .map((condition) => formatBasicFilterCategory(condition.category, t));
+  const showSecurityDetails = securityResolution.state === "partial"
+    || isCompletedProductSecurityState(securityResolution.state);
 
   return (
     <div className="candidate-detail-view product-candidate-detail">
@@ -111,63 +133,93 @@ export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
         <div className="filter-condition-grid">
           <ConditionList
             title={t("detail.conditionsMet")}
-            items={candidate.basicFilterStatus === "passed_basic_filter"
-              ? basicFilters.map((item) => item.text)
-              : basicFilters.filter((item) => !failedFilters.some((failed) => failed.summary.toLowerCase().includes(item.keyword))).map((item) => item.text)}
+            items={passedFilters}
+            empty={t("detail.noPassedConditions")}
             tone="ready"
           />
-          <div className={`condition-list ${failedFilters.length > 0 ? "warning" : "neutral"}`}>
-            <strong>{t("detail.conditionsNotMet")}</strong>
-            {failedFilters.length > 0 ? (
-              <ul>{failedFilters.map((reason) => (
-                <li key={reason.rawReason}>
-                  {reason.summary}
-                  {!reason.known && (
-                    <details>
-                      <summary>{t("app.technicalDetails")}</summary>
-                      <code>{reason.rawReason}</code>
-                    </details>
-                  )}
-                </li>
-              ))}</ul>
-            ) : <p>{t("detail.noFailedConditions")}</p>}
-          </div>
+          <ConditionList
+            title={t("detail.conditionsNotMet")}
+            items={failedFilters}
+            empty={t("detail.noFailedConditions")}
+            tone={failedFilters.length > 0 ? "warning" : "neutral"}
+          />
+          {unknownFilters.length > 0 && (
+            <ConditionList
+              title={t("detail.conditionsUnknown")}
+              items={unknownFilters}
+              empty={t("detail.noUnknownConditions")}
+              tone="neutral"
+            />
+          )}
         </div>
+        {(filterResolution.preferredRangeNotes.length > 0
+          || filterResolution.informationalReasons.length > 0
+          || filterResolution.unknownReasons.length > 0) && (
+          <div className="filter-additional-notes">
+            {filterResolution.preferredRangeNotes.length > 0 && (
+              <FilterNoteList
+                title={t("detail.preferredRangeNotes")}
+                reasons={filterResolution.preferredRangeNotes}
+                locale={locale}
+              />
+            )}
+            {(filterResolution.informationalReasons.length > 0 || filterResolution.unknownReasons.length > 0) && (
+              <FilterNoteList
+                title={t("detail.additionalFilterInfo")}
+                reasons={[...filterResolution.informationalReasons, ...filterResolution.unknownReasons]}
+                locale={locale}
+                showUnknownCodes
+              />
+            )}
+          </div>
+        )}
       </section>
 
       <section className="product-detail-section" aria-labelledby="security-heading">
         <SectionHeader id="security-heading" index="4" title={t("detail.security")} />
-        {candidate.security ? (
+        <div className={`security-state-panel ${securityResolution.state}`}>
+          <strong>{getSecurityStateTitle(securityResolution.state, t)}</strong>
+          <p>{getSecurityStateDetail(securityResolution.state, candidate.basicFilterStatus, t)}</p>
+          {securityResolution.state === "not_invoked" && <p>{t("detail.riskFlagsNotAssessed")}</p>}
+          <details>
+            <summary>{t("app.technicalDetails")}</summary>
+            <code>
+              security_state={securityResolution.state}; security_label={securityResolution.rawSecurityLabel}; coverage_status={securityResolution.rawCoverageStatus ?? "null"}
+            </code>
+          </details>
+        </div>
+        {showSecurityDetails ? (
           <>
             <div className="product-detail-grid security">
-              <DetailField label={t("detail.source")} value={candidate.security.sources.join(", ") || "GoPlus"} />
-              <DetailField label={t("detail.securityLabel")} value={formatSecurityLabel(candidate.securityLabel, locale)} tone={getSecurityTone(candidate.securityLabel)} />
-              <DetailField label={t("detail.buyTax")} value={formatPercent(candidate.security.buyTax, t("radar.missingData"))} />
-              <DetailField label={t("detail.sellTax")} value={formatPercent(candidate.security.sellTax, t("radar.missingData"))} />
-              <DetailField label={t("detail.ownership")} value={candidate.security.ownershipStatus || t("radar.missingData")} />
-              <DetailField label={t("detail.proxy")} value={formatBooleanRisk(candidate.security.proxyRisk, locale)} />
-              <DetailField label={t("detail.blacklist")} value={formatBooleanRisk(candidate.security.blacklistRisk, locale)} />
-              <DetailField label={t("detail.mint")} value={formatBooleanRisk(candidate.security.mintRisk, locale)} />
+              <DetailField label={t("detail.source")} value={securityResolution.sources.join(", ") || t("radar.missingData")} />
+              <DetailField label={t("detail.securityLabel")} value={getSecurityStateTitle(securityResolution.state, t)} tone={getSecurityTone(securityResolution.state)} />
+              <DetailField label={t("detail.buyTax")} value={formatPercent(candidate.security?.buyTax ?? null, t("radar.missingData"))} />
+              <DetailField label={t("detail.sellTax")} value={formatPercent(candidate.security?.sellTax ?? null, t("radar.missingData"))} />
+              <DetailField label={t("detail.ownership")} value={formatSecurityText(candidate.security?.ownershipStatus, locale, t("radar.missingData"))} />
+              <DetailField label={t("detail.proxy")} value={formatBooleanRisk(candidate.security?.proxyRisk ?? null, locale)} />
+              <DetailField label={t("detail.blacklist")} value={formatBooleanRisk(candidate.security?.blacklistRisk ?? null, locale)} />
+              <DetailField label={t("detail.mint")} value={formatBooleanRisk(candidate.security?.mintRisk ?? null, locale)} />
               <DetailField label={t("detail.liquidityLock")} value={formatLiquidityLock(candidate, locale)} />
-              <DetailField label={t("detail.contractVerified")} value={formatNullableBoolean(candidate.security.contractVerified, locale)} />
-              <DetailField label={t("detail.checkedAt")} value={candidate.security.checkedAt ? formatProductDateTime(candidate.security.checkedAt, locale) : t("radar.missingData")} />
-              <DetailField label={t("detail.honeypotStatus")} value={candidate.security.honeypotStatus || t("detail.honeypotNotRun")} />
+              <DetailField label={t("detail.contractVerified")} value={formatNullableBoolean(candidate.security?.contractVerified ?? null, locale)} />
+              <DetailField label={t("detail.checkedAt")} value={securityResolution.checkedAt ? formatProductDateTime(securityResolution.checkedAt, locale) : t("radar.missingData")} />
+              <DetailField label={t("detail.honeypotStatus")} value={formatSecurityText(candidate.security?.honeypotStatus, locale, t("detail.honeypotNotRun"))} />
             </div>
             <div className="security-lists">
-              <FlagList title={t("detail.riskFlags")} items={candidate.riskFlags} empty={t("detail.noRiskFlags")} tone="critical" />
-              <FlagList title={t("detail.missingData")} items={candidate.missingData} empty={t("detail.noMissingData")} tone="warning" />
+              <FlagList
+                title={t("detail.riskFlags")}
+                items={candidate.riskFlags.map((reason) => formatSecurityReason(reason, locale, t))}
+                empty={getEmptyRiskFlagsText(securityResolution.state, t)}
+                tone="critical"
+              />
+              <FlagList
+                title={t("detail.missingData")}
+                items={candidate.missingData.map((reason) => formatSecurityReason(reason, locale, t))}
+                empty={t("detail.noMissingData")}
+                tone="warning"
+              />
             </div>
           </>
-        ) : (
-          <div className="security-not-invoked">
-            <strong>{t("detail.securityNotRunTitle")}</strong>
-            <p>{t("detail.securityNotRunDetail")}</p>
-            <details>
-              <summary>{t("app.technicalDetails")}</summary>
-              <code>security_label={candidate.securityLabel || "NOT_CHECKED"}</code>
-            </details>
-          </div>
-        )}
+        ) : null}
       </section>
 
       <section className="product-detail-section next-step" aria-labelledby="next-heading">
@@ -209,15 +261,48 @@ function DetailField({
   );
 }
 
-function ConditionList({ title, items, tone }: { title: string; items: string[]; tone: "neutral" | "ready" | "warning" }) {
-  return <div className={`condition-list ${tone}`}><strong>{title}</strong><ul>{items.map((item) => <li key={item}>{item}</li>)}</ul></div>;
+function ConditionList({ title, items, empty, tone }: { title: string; items: string[]; empty: string; tone: "neutral" | "ready" | "warning" }) {
+  return <div className={`condition-list ${tone}`}><strong>{title}</strong>{items.length > 0 ? <ul>{items.map((item) => <li key={item}>{item}</li>)}</ul> : <p>{empty}</p>}</div>;
+}
+
+function FilterNoteList({
+  title,
+  reasons,
+  locale,
+  showUnknownCodes = false,
+}: {
+  title: string;
+  reasons: string[];
+  locale: ProductLocale;
+  showUnknownCodes?: boolean;
+}) {
+  const { t } = useProductLocale();
+  return (
+    <div className="condition-list neutral">
+      <strong>{title}</strong>
+      <ul>{reasons.map((reason) => {
+        const presentation = formatFilterReason(reason, locale);
+        return (
+          <li key={reason}>
+            {presentation.summary}
+            {showUnknownCodes && !presentation.known && (
+              <details>
+                <summary>{t("app.technicalDetails")}</summary>
+                <code>{presentation.rawReason}</code>
+              </details>
+            )}
+          </li>
+        );
+      })}</ul>
+    </div>
+  );
 }
 
 function FlagList({ title, items, empty, tone }: { title: string; items: string[]; empty: string; tone: "warning" | "critical" }) {
   return (
     <div className={`security-flag-list ${tone}`}>
       <strong>{title}</strong>
-      <div>{(items.length > 0 ? items : [empty]).map((item) => <span key={item}>{humanizeReason(item)}</span>)}</div>
+      <div>{(items.length > 0 ? items : [empty]).map((item) => <span key={item}>{item}</span>)}</div>
     </div>
   );
 }
@@ -226,8 +311,69 @@ function getCandidateStatus(candidate: UiTokenCandidate, locale: ProductLocale):
   if (candidate.discoveryBasket === "new_emerging") return locale === "pl" ? "OBSERWACJA — NOWY PROJEKT" : "OBSERVATION — NEW PROJECT";
   if (candidate.finalLabel === "CRITICAL_RISK") return locale === "pl" ? "Krytyczne ryzyko" : "Critical risk";
   if (candidate.basicFilterStatus === "rejected_basic_filter" || candidate.finalLabel === "REJECT") return locale === "pl" ? "Odrzucony przez filtry" : "Rejected by filters";
-  if (!candidate.security || candidate.finalLabel === "NEEDS_MANUAL_VERIFICATION") return locale === "pl" ? "Wymaga weryfikacji" : "Needs verification";
+  if (!isCompletedProductSecurityState(resolveProductSecurityState(candidate).state) || candidate.finalLabel === "NEEDS_MANUAL_VERIFICATION") return locale === "pl" ? "Wymaga weryfikacji" : "Needs verification";
   return locale === "pl" ? "WATCHLIST — wyłącznie ręczna analiza" : "WATCHLIST — manual review only";
+}
+
+type ProductTranslator = ReturnType<typeof useProductLocale>["t"];
+
+function formatBasicFilterCategory(category: BasicFilterCategory, t: ProductTranslator): string {
+  if (category === "market_cap") return t("filter.marketCapRange");
+  if (category === "volume_24h") return t("filter.volumeMinimum");
+  if (category === "liquidity") return t("filter.liquidityMinimum");
+  if (category === "volume_market_cap_ratio") return t("filter.ratioRange");
+  return t("filter.pairAgeMinimum");
+}
+
+function getSecurityStateTitle(state: ProductSecurityState, t: ProductTranslator): string {
+  if (state === "not_invoked") return t("detail.securityNotRunTitle");
+  if (state === "unavailable") return t("detail.securityUnavailableTitle");
+  if (state === "partial") return t("detail.securityPartialTitle");
+  if (state === "checked_needs_manual_review") return t("detail.securityNeedsReviewTitle");
+  if (state === "checked_critical") return t("detail.securityCriticalTitle");
+  return t("detail.securityCheckedTitle");
+}
+
+function getSecurityStateDetail(state: ProductSecurityState, basicFilterStatus: string, t: ProductTranslator): string {
+  if (state === "not_invoked") {
+    return basicFilterStatus === "rejected_basic_filter"
+      ? t("detail.securityNotRunRejectedDetail")
+      : t("detail.securityNotRunDetail");
+  }
+  if (state === "unavailable") return t("detail.securityUnavailableDetail");
+  if (state === "partial") return t("detail.securityPartialDetail");
+  if (state === "checked_needs_manual_review") return t("detail.securityNeedsReviewDetail");
+  if (state === "checked_critical") return t("detail.securityCriticalDetail");
+  return t("detail.securityCheckedDetail");
+}
+
+function getEmptyRiskFlagsText(state: ProductSecurityState, t: ProductTranslator): string {
+  if (state === "checked") return t("detail.noRiskFlags");
+  if (state === "partial") return t("detail.securityPartialDetail");
+  return t("detail.riskFlagsRequireReview");
+}
+
+function formatSecurityReason(value: string, locale: ProductLocale, t: ProductTranslator): string {
+  const normalized = value.trim().toUpperCase().replaceAll(" ", "_");
+  if (normalized === "SECURITY_DATA_UNAVAILABLE") return t("detail.securityUnavailableDetail");
+  if (normalized === "PARTIAL_SECURITY_COVERAGE") return t("detail.securityPartialDetail");
+  if (normalized === "NOT_CHECKED" || normalized === "UNKNOWN") return t("detail.riskFlagsNotAssessed");
+  const humanized = humanizeReason(value);
+  return locale === "pl" && humanized.toLowerCase() === "unknown" ? t("radar.missingData") : humanized;
+}
+
+function formatSecurityText(value: string | null | undefined, locale: ProductLocale, missing: string): string {
+  const normalized = (value ?? "").trim();
+  const code = normalized.toUpperCase().replaceAll(" ", "_");
+  if (!normalized || code.includes("UNKNOWN")) return missing;
+  if (code === "SECURITY_DATA_UNAVAILABLE") return locale === "pl" ? "Dane niedostępne" : "Data unavailable";
+  if (code === "PARTIAL_SECURITY_COVERAGE") return locale === "pl" ? "Dane częściowe" : "Partial data";
+  if (code === "NOT_CHECKED") return locale === "pl" ? "Nie uruchomiono" : "Not run";
+  if (code === "NEEDS_MANUAL_VERIFICATION") return locale === "pl" ? "Wymagana ręczna weryfikacja" : "Manual verification required";
+  if (code === "CRITICAL_RISK") return locale === "pl" ? "Wykryto krytyczne ryzyko" : "Critical risk detected";
+  if (code === "SECURITY_PASSED" || code === "PASSED") return locale === "pl" ? "Kontrola bez wykrytej flagi" : "Check passed without a reported flag";
+  if (code === "FAILED") return locale === "pl" ? "Wykryto problem" : "Issue detected";
+  return humanizeReason(normalized);
 }
 
 function formatDiscoveryMethod(value: UiTokenCandidate["discoveryMethod"], locale: ProductLocale): string {
@@ -235,16 +381,9 @@ function formatDiscoveryMethod(value: UiTokenCandidate["discoveryMethod"], local
   return locale === "pl" ? "Najnowsze profile DexScreener" : "Latest DexScreener profiles";
 }
 
-function formatSecurityLabel(value: string, locale: ProductLocale): string {
-  if (value === "SECURITY_PASSED") return locale === "pl" ? "Sprawdzone — nadal wymaga ręcznej analizy" : "Checked — still requires manual review";
-  if (value.includes("CRITICAL")) return locale === "pl" ? "Krytyczne ryzyko" : "Critical risk";
-  if (value === "NOT_CHECKED") return locale === "pl" ? "Nie sprawdzono" : "Not checked";
-  return locale === "pl" ? "Wymaga weryfikacji" : "Needs verification";
-}
-
-function getSecurityTone(value: string): "ready" | "warning" | "critical" {
-  if (value.includes("CRITICAL")) return "critical";
-  if (value === "SECURITY_PASSED") return "ready";
+function getSecurityTone(state: ProductSecurityState): "ready" | "warning" | "critical" {
+  if (state === "checked_critical") return "critical";
+  if (state === "checked") return "ready";
   return "warning";
 }
 

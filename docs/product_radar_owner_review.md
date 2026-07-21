@@ -89,11 +89,18 @@ scripts\win\check-product-radar-review.cmd
 - [ ] Przy snapshotcie starszym niż 30 minut żółte ostrzeżenie jest widoczne, a kandydaci, szczegóły, weryfikacja i metodologia pozostają dostępne.
 - [ ] HTTP 503 występuje tylko wtedy, gdy nie ma prawidłowego real snapshotu lub granica fail-closed go odrzuca.
 - [ ] Powody filtrów są naturalnie opisane po angielsku i polsku; nieznany kod ma neutralny fallback i pozostaje w szczegółach technicznych.
+- [ ] Klasyfikacja pięciu podstawowych warunków filtrów opiera się wyłącznie na kanonicznych `filter_reasons`, a nie na angielskich ani polskich tłumaczeniach.
+- [ ] Ten sam podstawowy warunek nie jest jednocześnie pokazany jako spełniony i niespełniony; niepewna klasyfikacja ma jawny neutralny stan.
+- [ ] Uwagi o preferowanym zakresie ratio 5–30% i wieku 14–90 dni są oddzielone od twardych podstawowych warunków.
 - [ ] Znaczenie dwóch koszyków jest jednoznaczne.
 - [ ] New / Emerging nie wygląda jak rekomendacja ani Established.
 - [ ] Pusty Established wyjaśnia `ESTABLISHED_UNIVERSE_EMPTY` i nie pokazuje fikcyjnych tokenów.
 - [ ] Rekord Established pokazuje adres, filtry, security i najważniejsze ryzyka.
 - [ ] Szczegóły wyraźnie odróżniają „security nie uruchomiono” od pozytywnego wyniku.
+- [ ] `security not invoked`, `security unavailable` i `partial security coverage` są trzema odrębnymi stanami produktu.
+- [ ] Sama obecność technicznego rekordu security nie oznacza wykonanej kontroli; wymagany jest zgodny kontrakt stanu i prawidłowy `checked_at`.
+- [ ] Szczegóły i Weryfikacja używają jednego kanonicznego rozstrzygnięcia stanu security dla tego samego kandydata.
+- [ ] Brak uruchomionej kontroli jest opisany jako brak oceny, a nie jako brak ryzyka.
 - [ ] Weryfikacja otwiera tylko właściwe, allowlistowane źródła po kliknięciu.
 - [ ] Metodologia jest krótka i zrozumiała.
 - [ ] Layout jest czytelny w 1920×1080 oraz przy szerokości 1280 px.

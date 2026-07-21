@@ -36,7 +36,12 @@ import {
   readStoredProductLocale,
   type ProductLocale,
 } from "../src/productI18n.js";
+import {
+  BASIC_FILTER_CATEGORIES,
+  resolveProductFilterConditions,
+} from "../src/productFilterResolver.js";
 import { formatFilterReason, SUPPORTED_FILTER_REASONS } from "../src/productPresentation.js";
+import { resolveProductSecurityState } from "../src/productSecurityResolver.js";
 import { resolveProductSourceHealth } from "../src/productSourceHealth.js";
 import type {
   PersistableScannerOutput,
@@ -84,6 +89,49 @@ const establishedCandidate: UiTokenCandidate = {
   addressIdentityVerified: true,
   finalLabel: "WATCHLIST",
   basicFilterStatus: "passed_basic_filter",
+};
+
+const beansCandidate: UiTokenCandidate = {
+  ...newCandidate,
+  id: "beans-owner-review",
+  symbol: "BEANS",
+  name: "Beans",
+  marketCap: 7_167,
+  volume24h: 20_109,
+  liquidity: 6_214,
+  volumeMarketCapRatio: 2.8057,
+  pairAgeDays: 0,
+  filterReasons: [
+    "market_cap_below_300000",
+    "volume_24h_below_30000",
+    "liquidity_below_30000",
+    "volume_market_cap_ratio_above_100_percent",
+    "pair_age_not_above_7_days",
+    "volume_market_cap_ratio_outside_sweet_spot_5_30_percent",
+    "pair_age_outside_preferred_14_90_days",
+  ],
+  securityLabel: "SECURITY DATA UNAVAILABLE",
+  security: {
+    sources: [],
+    coverageStatus: "SECURITY DATA UNAVAILABLE",
+    honeypotStatus: "unknown",
+    buyTax: null,
+    sellTax: null,
+    contractVerified: null,
+    ownershipStatus: "unknown",
+    liquidityLocked: null,
+    liquidityLockDays: null,
+    mintRisk: null,
+    blacklistRisk: null,
+    whitelistRisk: null,
+    sellRestrictionRisk: null,
+    proxyRisk: null,
+    topWalletPct: null,
+    top10WalletsPct: null,
+    checkedAt: null,
+  },
+  riskFlags: [],
+  missingData: ["security_data_unavailable"],
 };
 
 const emptyMetadata: ScannerDiscoveryMetadata = {
@@ -163,6 +211,222 @@ describe("Product Radar owner acceptance", () => {
       ["established", "address_seeded_universe", false, true, "established_address_universe_v1", 7, true],
     );
     assert.ok(mapped.runId && mapped.filterReasons && mapped.riskFlags && mapped.missingData && mapped.securityLabel && mapped.lastCheckedAt);
+  });
+
+  it("preserves nullable checked_at and coverage_status in the UI security contract", () => {
+    const output = structuredClone(PERSISTABLE_SCANNER_SAMPLE) as PersistableScannerOutput;
+    const security = output.security_checks[0];
+    assert.ok(security);
+    security.coverage_status = "SECURITY DATA UNAVAILABLE";
+    security.checked_at = null;
+    security.security_label = "SECURITY DATA UNAVAILABLE";
+    const mapped = mapPersistableScannerOutputToUiCandidates(output)
+      .find((candidate) => candidate.id === security.candidate_id);
+    assert.ok(mapped?.security);
+    assert.equal(mapped.security.coverageStatus, "SECURITY DATA UNAVAILABLE");
+    assert.equal(mapped.security.checkedAt, null);
+  });
+
+  it("classifies BEANS filters only from canonical reason codes", () => {
+    const resolution = resolveProductFilterConditions({
+      basicFilterStatus: beansCandidate.basicFilterStatus,
+      filterReasons: beansCandidate.filterReasons,
+    });
+    assert.deepEqual(
+      resolution.conditions.map(({ category, state }) => [category, state]),
+      BASIC_FILTER_CATEGORIES.map((category) => [category, "failed"]),
+    );
+    assert.equal(resolution.conditions.some((condition) => condition.state === "passed"), false);
+    assert.deepEqual(resolution.preferredRangeNotes, [
+      "volume_market_cap_ratio_outside_sweet_spot_5_30_percent",
+      "pair_age_outside_preferred_14_90_days",
+    ]);
+
+    const englishCopy = beansCandidate.filterReasons.map((reason) => formatFilterReason(reason, "en").summary);
+    const polishCopy = beansCandidate.filterReasons.map((reason) => formatFilterReason(reason, "pl").summary);
+    assert.notDeepEqual(englishCopy, polishCopy);
+    assert.deepEqual(
+      resolveProductFilterConditions({ basicFilterStatus: "rejected_basic_filter", filterReasons: beansCandidate.filterReasons }),
+      resolution,
+      "translation is not an input to classification",
+    );
+  });
+
+  it("keeps preferred ranges separate from the five hard filter conditions", () => {
+    const ratio = resolveProductFilterConditions({
+      basicFilterStatus: "passed_basic_filter",
+      filterReasons: ["volume_market_cap_ratio_outside_sweet_spot_5_30_percent"],
+    });
+    const age = resolveProductFilterConditions({
+      basicFilterStatus: "passed_basic_filter",
+      filterReasons: ["pair_age_outside_preferred_14_90_days"],
+    });
+    assert.equal(ratio.conditions.find((condition) => condition.category === "volume_market_cap_ratio")?.state, "passed");
+    assert.deepEqual(ratio.preferredRangeNotes, ["volume_market_cap_ratio_outside_sweet_spot_5_30_percent"]);
+    assert.equal(age.conditions.find((condition) => condition.category === "pair_age")?.state, "passed");
+    assert.deepEqual(age.preferredRangeNotes, ["pair_age_outside_preferred_14_90_days"]);
+  });
+
+  it("keeps FDV fallback and unknown filter codes neutral while supporting legacy codes", () => {
+    const fallback = resolveProductFilterConditions({
+      basicFilterStatus: "passed_basic_filter",
+      filterReasons: ["market_cap_missing_using_fdv"],
+    });
+    assert.equal(fallback.conditions.find((condition) => condition.category === "market_cap")?.state, "passed");
+    assert.deepEqual(fallback.informationalReasons, ["market_cap_missing_using_fdv"]);
+
+    const legacy = resolveProductFilterConditions({
+      basicFilterStatus: "rejected_basic_filter",
+      filterReasons: [
+        "market_cap_below_min",
+        "volume_24h_below_min",
+        "liquidity_below_min",
+        "volume_market_cap_ratio_above_max",
+        "pair_age_below_min",
+      ],
+    });
+    assert.equal(legacy.conditions.every((condition) => condition.state === "failed"), true);
+
+    const unknownOnly = resolveProductFilterConditions({
+      basicFilterStatus: "rejected_basic_filter",
+      filterReasons: ["future_filter_reason"],
+    });
+    assert.equal(unknownOnly.conditions.every((condition) => condition.state === "unknown"), true);
+    assert.deepEqual(unknownOnly.unknownReasons, ["future_filter_reason"]);
+
+    const knownAndUnknown = resolveProductFilterConditions({
+      basicFilterStatus: "rejected_basic_filter",
+      filterReasons: ["liquidity_below_30000", "future_filter_reason"],
+    });
+    assert.equal(knownAndUnknown.conditions.find((condition) => condition.category === "liquidity")?.state, "failed");
+    assert.equal(knownAndUnknown.conditions.filter((condition) => condition.category !== "liquidity").every((condition) => condition.state === "passed"), true);
+    assert.deepEqual(knownAndUnknown.unknownReasons, ["future_filter_reason"]);
+  });
+
+  it("resolves every canonical product security state without guessing from object presence", () => {
+    const checked = structuredClone(establishedCandidate);
+    assert.ok(checked.security);
+    checked.security.coverageStatus = null;
+    checked.security.checkedAt = "2026-07-21T08:00:00.000Z";
+    checked.securityLabel = "SECURITY_PASSED";
+    checked.finalLabel = "WATCHLIST";
+
+    const rejectedPlaceholder = structuredClone(beansCandidate);
+    assert.equal(resolveProductSecurityState(rejectedPlaceholder).state, "not_invoked");
+    assert.equal(resolveProductSecurityState({ ...rejectedPlaceholder, observationOnly: false }).state, "not_invoked");
+    assert.equal(resolveProductSecurityState({ ...checked, securityLabel: "NOT_CHECKED" }).state, "not_invoked");
+
+    const missingTimestamp = structuredClone(checked);
+    assert.ok(missingTimestamp.security);
+    missingTimestamp.security.checkedAt = null;
+    assert.equal(resolveProductSecurityState(missingTimestamp).state, "unavailable");
+
+    const unavailable = structuredClone(checked);
+    assert.ok(unavailable.security);
+    unavailable.security.coverageStatus = "SECURITY DATA UNAVAILABLE";
+    unavailable.securityLabel = "SECURITY DATA UNAVAILABLE";
+    unavailable.security.checkedAt = null;
+    assert.equal(resolveProductSecurityState(unavailable).state, "unavailable");
+
+    const partial = structuredClone(checked);
+    assert.ok(partial.security);
+    partial.security.coverageStatus = "PARTIAL SECURITY COVERAGE";
+    partial.securityLabel = "PARTIAL SECURITY COVERAGE";
+    assert.equal(resolveProductSecurityState(partial).state, "partial");
+
+    const manual = structuredClone(checked);
+    manual.securityLabel = "NEEDS_MANUAL_VERIFICATION";
+    manual.finalLabel = "NEEDS_MANUAL_VERIFICATION";
+    assert.equal(resolveProductSecurityState(manual).state, "checked_needs_manual_review");
+
+    const critical = structuredClone(checked);
+    critical.securityLabel = "CRITICAL_RISK";
+    critical.finalLabel = "CRITICAL_RISK";
+    assert.equal(resolveProductSecurityState(critical).state, "checked_critical");
+    assert.equal(resolveProductSecurityState(checked).state, "checked");
+  });
+
+  it("shows one shared not-invoked security meaning for BEANS in Details and Verification", () => {
+    for (const locale of ["en", "pl"] as const) {
+      const details = renderWithLocale(locale, React.createElement(CandidateDetailView, { candidate: beansCandidate }));
+      const verification = renderWithLocale(locale, React.createElement(ExternalVerificationLinksView, { candidate: beansCandidate }));
+      const detailsWithoutTechnical = details.replace(/<details>[\s\S]*?<\/details>/g, "");
+
+      if (locale === "pl") {
+        assert.match(details, /Kontrola bezpieczeństwa nie została uruchomiona/);
+        assert.match(details, /Projekt nie przeszedł podstawowych filtrów i pozostaje wyłącznie obserwacyjny\. Brak kontroli nie oznacza braku ryzyka\./);
+        assert.match(details, /Flagi ryzyka nie zostały ocenione\./);
+        assert.match(verification, /<span>Bezpieczeństwo<\/span><strong>Kontrola nieuruchomiona<\/strong>/);
+      } else {
+        assert.match(details, /Security check was not run/);
+        assert.match(details, /The project did not pass the basic filters and remains observation-only\. No check does not mean no risk\./);
+        assert.match(details, /Risk flags were not assessed\./);
+        assert.match(verification, /<span>Security<\/span><strong>Check not run<\/strong>/);
+      }
+
+      assert.doesNotMatch(details, /GoPlus|Buy tax|Sell tax|Podatek kupna|Podatek sprzedaży|Brak zgłoszonych flag|No reported flags/);
+      assert.doesNotMatch(verification, /Dane obecne|Security data present|Data present — verify it/);
+      assert.doesNotMatch(detailsWithoutTechnical, /unknown|Security data unavailable|Not checked|Partial security coverage/i);
+      assert.match(details, /<details><summary>(?:Technical details|Szczegóły techniczne)<\/summary><code>security_state=not_invoked; security_label=SECURITY DATA UNAVAILABLE;/);
+      assert.match(verification, locale === "pl" ? /Bezpieczeństwo — kontrola ręczna/ : /Security — manual check/);
+
+      const basicConditionLabels = [
+        PRODUCT_TRANSLATIONS[locale]["filter.marketCapRange"],
+        PRODUCT_TRANSLATIONS[locale]["filter.volumeMinimum"],
+        PRODUCT_TRANSLATIONS[locale]["filter.liquidityMinimum"],
+        PRODUCT_TRANSLATIONS[locale]["filter.ratioRange"],
+        PRODUCT_TRANSLATIONS[locale]["filter.pairAgeMinimum"],
+      ];
+      for (const label of basicConditionLabels) {
+        assert.equal((details.match(new RegExp(escapeRegExp(label), "g")) ?? []).length, 1, `${label} must appear in exactly one condition state`);
+      }
+    }
+  });
+
+  it("translates unavailable and partial security without exposing raw labels as product copy", () => {
+    const base = structuredClone(establishedCandidate);
+    assert.ok(base.security);
+    base.security.checkedAt = "2026-07-21T08:00:00.000Z";
+
+    const unavailable = structuredClone(base);
+    assert.ok(unavailable.security);
+    unavailable.security.coverageStatus = "SECURITY DATA UNAVAILABLE";
+    unavailable.security.checkedAt = null;
+    unavailable.securityLabel = "SECURITY DATA UNAVAILABLE";
+
+    const partial = structuredClone(base);
+    assert.ok(partial.security);
+    partial.security.coverageStatus = "PARTIAL SECURITY COVERAGE";
+    partial.securityLabel = "PARTIAL SECURITY COVERAGE";
+
+    const unavailableDetails = renderWithLocale("pl", React.createElement(CandidateDetailView, { candidate: unavailable }));
+    const unavailableVerification = renderWithLocale("pl", React.createElement(ExternalVerificationLinksView, { candidate: unavailable }));
+    const partialDetails = renderWithLocale("pl", React.createElement(CandidateDetailView, { candidate: partial }));
+    const partialVerification = renderWithLocale("pl", React.createElement(ExternalVerificationLinksView, { candidate: partial }));
+
+    assert.match(unavailableDetails, /Dane bezpieczeństwa są niedostępne\. Wymagana jest ręczna weryfikacja\./);
+    assert.match(unavailableVerification, /Dane niedostępne — wymagana ręczna weryfikacja/);
+    assert.doesNotMatch(unavailableDetails, /<span>Sprawdzono<\/span>/);
+    assert.match(partialDetails, /Dostępna jest tylko część danych bezpieczeństwa\. Wymagana jest ręczna weryfikacja\./);
+    assert.match(partialVerification, /Dane częściowe — wymagana ręczna weryfikacja/);
+
+    for (const markup of [unavailableDetails, unavailableVerification, partialDetails, partialVerification]) {
+      const withoutTechnical = markup.replace(/<details>[\s\S]*?<\/details>/g, "");
+      assert.doesNotMatch(withoutTechnical, /unknown|Security data unavailable|Not checked|Partial security coverage/i);
+    }
+  });
+
+  it("keeps checked SECURITY_PASSED explicitly Manual Review Only", () => {
+    const checked = structuredClone(establishedCandidate);
+    assert.ok(checked.security);
+    checked.security.coverageStatus = null;
+    checked.security.checkedAt = "2026-07-21T08:00:00.000Z";
+    checked.securityLabel = "SECURITY_PASSED";
+    const details = renderWithLocale("en", React.createElement(CandidateDetailView, { candidate: checked }));
+    const verification = renderWithLocale("en", React.createElement(ExternalVerificationLinksView, { candidate: checked }));
+    assert.equal(resolveProductSecurityState(checked).state, "checked");
+    assert.match(details, /Security checked — Manual Review Only/);
+    assert.match(verification, /Checked — Manual Review Only/);
   });
 
   it("separates new-emerging and established baskets", () => {
@@ -467,8 +731,8 @@ describe("Product Radar owner acceptance", () => {
 
   it("does not present security-not-invoked as security passed", () => {
     const markup = renderToStaticMarkup(React.createElement(CandidateDetailView, { candidate: newCandidate }));
-    assert.match(markup, /Security was not run for this basket or status/);
-    assert.match(markup, /not a positive result/);
+    assert.match(markup, /Security check was not run/);
+    assert.match(markup, /No check does not mean no risk/);
     assert.doesNotMatch(markup, /SECURITY_PASSED/);
   });
 

@@ -285,6 +285,7 @@ export interface UiTokenCandidate {
   riskFlags: string[];
   security: {
     sources: string[];
+    coverageStatus: "SECURITY DATA UNAVAILABLE" | "PARTIAL SECURITY COVERAGE" | null;
     honeypotStatus: string;
     buyTax: number | null;
     sellTax: number | null;
@@ -299,7 +300,7 @@ export interface UiTokenCandidate {
     proxyRisk: boolean | null;
     topWalletPct: number | null;
     top10WalletsPct: number | null;
-    checkedAt: string;
+    checkedAt: string | null;
   } | null;
 
   scorecard: {

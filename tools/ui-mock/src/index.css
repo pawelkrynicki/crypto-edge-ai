@@ -211,7 +211,7 @@
 
 .product-global-error details summary,
 .basket-state details summary,
-.security-not-invoked details summary,
+.security-state-panel details summary,
 .filter-reason-copy details summary,
 .condition-list details summary {
   color: var(--text-muted);
@@ -477,22 +477,28 @@
 .product-filter-summary > div:last-child { padding: 10px; border: 1px solid var(--border); border-radius: 6px; }
 .product-filter-summary p { margin-top: 5px; color: var(--text-secondary); font-size: 11px; }
 .filter-condition-grid,
+.filter-additional-notes,
 .security-lists { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
 .condition-list,
 .security-flag-list { padding: 11px; border: 1px solid var(--border); border-radius: 6px; }
 .condition-list > strong,
 .security-flag-list > strong { color: var(--text-primary); font-size: 10px; }
 .condition-list ul { margin: 7px 0 0 17px; color: var(--text-secondary); font-size: 10px; line-height: 1.5; }
+.condition-list p { margin-top: 7px; color: var(--text-muted); font-size: 10px; line-height: 1.5; }
 .condition-list.ready { border-color: rgba(50, 209, 132, 0.3); }
 .condition-list.warning,
 .security-flag-list.warning { border-color: var(--amber-border); }
 .security-flag-list.critical { border-color: var(--red-border); }
 .security-flag-list > div { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
 .security-flag-list span { padding: 4px 7px; color: var(--text-secondary); font-size: 9px; border: 1px solid var(--border); border-radius: 5px; overflow-wrap: anywhere; }
-.security-not-invoked { padding: 14px; border: 1px solid var(--amber-border); border-radius: 7px; background: var(--amber-dim); }
-.security-not-invoked strong { color: var(--amber); font-size: 13px; }
-.security-not-invoked p { margin-top: 5px; color: var(--text-secondary); font-size: 11px; }
-.security-not-invoked code { display: block; margin-top: 8px; color: var(--text-muted); font-size: 9px; }
+.security-state-panel { margin-bottom: 8px; padding: 14px; border: 1px solid var(--amber-border); border-radius: 7px; background: var(--amber-dim); }
+.security-state-panel.checked { border-color: rgba(50, 209, 132, 0.3); background: rgba(50, 209, 132, 0.08); }
+.security-state-panel.checked_critical { border-color: var(--red-border); background: var(--red-dim); }
+.security-state-panel strong { color: var(--amber); font-size: 13px; }
+.security-state-panel.checked strong { color: #66dfa1; }
+.security-state-panel.checked_critical strong { color: var(--red); }
+.security-state-panel p { margin-top: 5px; color: var(--text-secondary); font-size: 11px; }
+.security-state-panel code { display: block; margin-top: 8px; color: var(--text-muted); font-size: 9px; overflow-wrap: anywhere; }
 .product-detail-section.next-step > p { color: var(--text-secondary); font-size: 12px; line-height: 1.55; }
 .product-detail-actions { margin-top: 12px; }
 

@@ -943,8 +943,15 @@ assert.doesNotMatch(
   "candidate results does not give missing data a positive security status",
 );
 
+const checkedDetailUi = {
+  ...passUi,
+  discoveryBasket: "established" as const,
+  discoveryMethod: "address_seeded_universe" as const,
+  observationOnly: false,
+  establishedEligible: true,
+};
 const candidateDetailMarkup = renderToStaticMarkup(React.createElement(CandidateDetailView, {
-  candidate: passUi,
+  candidate: checkedDetailUi,
   onBackToResults: () => undefined,
   onOpenExternalChecks: () => undefined,
 }));
@@ -1003,12 +1010,12 @@ const candidateDetailMissingDataMarkup = renderToStaticMarkup(React.createElemen
 
 assert.match(
   candidateDetailMissingDataMarkup,
-  /Security was not run for this basket or status/i,
+  /Security check was not run/i,
   "candidate detail distinguishes security not invoked",
 );
 assert.match(
   candidateDetailMissingDataMarkup,
-  /missing security record is not a positive result/i,
+  /No check does not mean no risk/i,
   "candidate detail does not present missing security as passed",
 );
 assert.match(

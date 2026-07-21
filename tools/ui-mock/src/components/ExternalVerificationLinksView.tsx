@@ -6,6 +6,7 @@ import {
   type ExternalVerificationTarget,
 } from "../externalVerificationTargets";
 import { useProductLocale } from "../productI18n";
+import { resolveProductSecurityState, type ProductSecurityState } from "../productSecurityResolver";
 import type { UiTokenCandidate } from "../types/scannerTypes";
 
 interface ExternalVerificationLinksViewProps {
@@ -27,6 +28,7 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
   const input = buildInput(candidate);
   const normalizedInput = normalizeExternalVerificationInput(input);
   const targets = buildExternalVerificationTargets(input);
+  const securityResolution = resolveProductSecurityState(candidate);
 
   return (
     <div className="external-checks-view product-verification">
@@ -72,7 +74,7 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
         </div>
         <div className="external-checks-review-grid">
           <VerificationMetric label={t("verification.identityMetric")} value={candidate.addressIdentityVerified ? t("verification.identityMatches") : t("verification.identityNeedsCheck")} />
-          <VerificationMetric label={t("verification.securityMetric")} value={candidate.security ? t("verification.securityPresent") : t("verification.securityNotRun")} />
+          <VerificationMetric label={t("verification.securityMetric")} value={presentVerificationSecurityState(securityResolution.state, t)} />
           <VerificationMetric label={t("verification.decision")} value={t("verification.manualOnly")} />
         </div>
       </section>
@@ -134,6 +136,18 @@ function ExternalCheckCard({ target }: { target: ExternalVerificationTarget }) {
 
 function VerificationMetric({ label, value }: { label: string; value: string }) {
   return <div className="external-check-metric manual"><span>{label}</span><strong>{value}</strong></div>;
+}
+
+function presentVerificationSecurityState(
+  state: ProductSecurityState,
+  t: ReturnType<typeof useProductLocale>["t"],
+): string {
+  if (state === "not_invoked") return t("verification.securityStateNotInvoked");
+  if (state === "unavailable") return t("verification.securityStateUnavailable");
+  if (state === "partial") return t("verification.securityStatePartial");
+  if (state === "checked_needs_manual_review") return t("verification.securityStateNeedsReview");
+  if (state === "checked_critical") return t("verification.securityStateCritical");
+  return t("verification.securityStateChecked");
 }
 
 function buildInput(candidate: UiTokenCandidate): ExternalVerificationInput {
