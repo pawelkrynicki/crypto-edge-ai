@@ -132,7 +132,13 @@ describe("production same-origin VPS runtime", () => {
       process_uptime_seconds: 42,
     });
 
-    for (const path of ["/api/readiness", "/api/scanner/latest", "/api/context/latest", "/api/scanner/sources"]) {
+    for (const path of [
+      "/api/readiness",
+      "/api/scanner/latest",
+      "/api/context/latest",
+      "/api/scanner/sources",
+      "/api/established-universe/status",
+    ]) {
       const [product, scanner] = await Promise.all([
         requestRaw(productBaseUrl, path),
         requestRaw(scannerBaseUrl, path),

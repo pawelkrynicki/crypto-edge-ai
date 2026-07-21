@@ -1,9 +1,7 @@
 {
-  "universe_version": "established_address_universe_v1",
-  "status": "OWNER_MAINTAINED",
-  "production_enabled": true,
-  "provider": "dexscreener",
-  "identity_method": "CHAIN_AND_CONTRACT_ADDRESS",
-  "max_entries": 100,
-  "entries": []
+  "schema_version": "established_universe_schema_v1",
+  "universe_version": "established-universe-v000000",
+  "generated_at": "2026-07-21T00:00:00.000Z",
+  "entries": [],
+  "checksum": "sha256:73dbadd6d8a29f9d398b8d3f08a3476dabf37c3f56a03588ef27f1832bbf1052"
 }

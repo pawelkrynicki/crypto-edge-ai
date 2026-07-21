@@ -151,7 +151,12 @@ export type ScannerDiscoveryMetadata = {
   established?: {
     discovery_method?: "address_seeded_universe";
     universe_version?: string;
-    universe_status?: "ESTABLISHED_UNIVERSE_READY" | "ESTABLISHED_UNIVERSE_EMPTY";
+    validation_status?: "valid" | "invalid" | "unavailable";
+    universe_status?:
+      | "ESTABLISHED_UNIVERSE_READY"
+      | "ESTABLISHED_UNIVERSE_EMPTY"
+      | "ESTABLISHED_UNIVERSE_INVALID"
+      | "ESTABLISHED_UNIVERSE_UNAVAILABLE";
     entries_total?: number;
     entries_enabled?: number;
     pairs_loaded?: number;

@@ -16,6 +16,7 @@ import {
 import type { ResolvedProductRuntimeMode } from "../runtimeMode";
 import type { ResolvedScannerSource } from "../services/scannerDataSource";
 import type { AutomationStatus } from "../services/automationStatusDataSource";
+import type { EstablishedUniverseStatus } from "../services/establishedUniverseStatusDataSource";
 import type { ProductReadinessOutput } from "../types/scannerTypes";
 
 export type ProductSectionId =
@@ -51,6 +52,7 @@ type ProductWorkspaceShellProps = {
   dataUnavailableReasonCode?: string | null;
   onRefresh: () => void;
   automationStatus?: AutomationStatus | null;
+  establishedUniverseStatus?: EstablishedUniverseStatus | null;
   children: ReactNode;
 };
 
@@ -80,6 +82,7 @@ export function ProductWorkspaceShell({
   dataUnavailableReasonCode,
   onRefresh,
   automationStatus,
+  establishedUniverseStatus,
   children,
 }: ProductWorkspaceShellProps) {
   const { locale, setLocale, t } = useProductLocale();
@@ -146,6 +149,9 @@ export function ProductWorkspaceShell({
               <div><dt>{t("app.environment")}</dt><dd>{runtimeMode}</dd></div>
               <div><dt>{t("app.runId")}</dt><dd>{runId ?? t("app.noData")}</dd></div>
               <div><dt>{t("app.sources")}</dt><dd>{sourceIds.length > 0 ? sourceIds.join(", ") : t("app.noData")}</dd></div>
+              <div><dt>{t("radar.universeVersion")}</dt><dd>{establishedUniverseStatus?.universe_version ?? t("app.noData")}</dd></div>
+              <div><dt>{t("radar.activeEntries")}</dt><dd>{establishedUniverseStatus?.entries_enabled ?? t("app.noData")}</dd></div>
+              <div><dt>{t("radar.validationStatus")}</dt><dd>{establishedUniverseStatus?.validation_status ?? t("app.noData")}</dd></div>
               {technicalCodes.length > 0 && <div><dt>{t("app.codes")}</dt><dd>{technicalCodes.join(", ")}</dd></div>}
               <div><dt>{t("automation.title")}</dt><dd>{automationPresentation(automationStatus, t)}</dd></div>
               <div><dt>{t("automation.lastRun")}</dt><dd>{automationStatus?.last_attempt_at ? formatProductDateTime(automationStatus.last_attempt_at, locale) : t("app.noData")}</dd></div>

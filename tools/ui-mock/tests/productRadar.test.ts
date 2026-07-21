@@ -702,6 +702,18 @@ describe("Product Radar owner acceptance", () => {
     assert.doesNotMatch(markup, /role="alert"|Radar is currently unavailable/);
   });
 
+  it("keeps an invalid Established universe unavailable even when readiness is missing", () => {
+    const invalidMetadata: ScannerDiscoveryMetadata = {
+      ...emptyMetadata,
+      established: {
+        ...emptyMetadata.established,
+        universe_status: "ESTABLISHED_UNIVERSE_INVALID",
+        validation_status: "invalid",
+      },
+    };
+    assert.equal(getEstablishedState(invalidMetadata, null, []), "unavailable");
+  });
+
   it("does not use fixture or demo candidates for Established empty", () => {
     const markup = renderToStaticMarkup(React.createElement(EstablishedBasket, { candidates: [], metadata: emptyMetadata, readiness: emptyReadiness }));
     assert.doesNotMatch(markup, /PASSTOKEN|LOWLIQTOKEN|FDVFALLBACKTOKEN|Built-in sample|DEVELOPMENT_DEMO/);

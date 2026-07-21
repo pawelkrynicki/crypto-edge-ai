@@ -2,6 +2,27 @@
 
 These scripts are developer tooling for Windows CMD. Run them from the repo root or any other current directory; each script resolves the repo root from its own location.
 
+## Established universe owner workflow
+
+Read-only commands:
+
+```cmd
+scripts\win\established-universe-list.cmd --json
+scripts\win\established-universe-validate.cmd --json
+scripts\win\established-universe-history.cmd --json
+```
+
+State-changing helpers print the plan and remain dry-run without `--apply`:
+
+```cmd
+scripts\win\established-universe-add.cmd --chain base --contract 0x1111111111111111111111111111111111111111 --display-name "Projekt"
+scripts\win\established-universe-disable.cmd --chain base --contract 0x1111111111111111111111111111111111111111
+scripts\win\established-universe-enable.cmd --chain base --contract 0x1111111111111111111111111111111111111111
+scripts\win\established-universe-remove.cmd --chain base --contract 0x1111111111111111111111111111111111111111
+```
+
+Po review powtórz wybraną komendę z `--apply`. Pełny check offline: `scripts\win\check-established-universe.cmd`. Skrypty ustawiają `ALLOW_LIVE_PROVIDER_CALLS=0`, nie uruchamiają collectora, nie publikują snapshotu, nie zmieniają VPS, Cloudflare ani Task Scheduler. Runbook: `docs/established_universe_management.md`.
+
 ## VPS product runtime and automation guard
 
 Canonical owner commands from the repository root:

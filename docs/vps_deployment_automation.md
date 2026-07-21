@@ -2,6 +2,8 @@
 
 ## Status
 
+Established Universe Management działa lokalnie niezależnie od oczekującego deploymentu VPS. Lokalny store ownera pozostaje pod `tools/data-poc/.local`, a API produktu udostępnia wyłącznie bezpieczny status read-only. Zarządzanie universe nie uruchamia collectora, nie zmienia centralnego harmonogramu i nie aktywuje Windows Task Scheduler. Szczegóły: `docs/established_universe_management.md`.
+
 Sprint 1 i Sprint 2 zostały zaakceptowane lokalnie. Aktualny stan to **local code complete, VPS operational deployment pending**. Rzeczywiste wdrożenie nie zostało wykonane, scheduler nie został aktywowany, konfiguracja Cloudflare nie została zmieniona, a tester zewnętrzny pozostaje `NO-GO`.
 
 ## Local owner review: ACCEPT_LOCAL_CODE — 21.07.2026

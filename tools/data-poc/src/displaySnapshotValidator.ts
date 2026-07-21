@@ -44,7 +44,7 @@ const DISCOVERY_FAILURE_REASONS = new Set([
   "REQUEST_BUDGET_EXHAUSTED",
 ]);
 const ESTABLISHED_FIELDS = new Set([
-  "discovery_method", "universe_version", "universe_status", "entries_total", "entries_enabled",
+  "discovery_method", "universe_version", "universe_status", "validation_status", "entries_total", "entries_enabled",
   "pairs_loaded", "candidates_before_filters", "candidates_after_filters", "base_token_candidates",
   "quote_token_candidates",
 ]);
@@ -270,10 +270,27 @@ function validateNewEmergingMetadata(value: unknown): Record<string, unknown> {
 function validateEstablishedMetadata(value: unknown): Record<string, unknown> {
   if (!isRecord(value)) fail("SCANNER_METADATA_INVALID");
   assertExactFields(value, ESTABLISHED_FIELDS);
+  const universeStatus = String(value.universe_status);
+  const validUniverseStatus = universeStatus === "ESTABLISHED_UNIVERSE_EMPTY"
+    || universeStatus === "ESTABLISHED_UNIVERSE_READY";
+  const legacyUniverse = value.universe_version === "established_address_universe_v1"
+    && value.validation_status === undefined;
   if (
     value.discovery_method !== "address_seeded_universe"
-    || value.universe_version !== "established_address_universe_v1"
-    || !["ESTABLISHED_UNIVERSE_EMPTY", "ESTABLISHED_UNIVERSE_READY"].includes(String(value.universe_status))
+    || ![
+      "ESTABLISHED_UNIVERSE_EMPTY",
+      "ESTABLISHED_UNIVERSE_READY",
+      "ESTABLISHED_UNIVERSE_INVALID",
+      "ESTABLISHED_UNIVERSE_UNAVAILABLE",
+    ].includes(universeStatus)
+    || (validUniverseStatus && !legacyUniverse && (
+      typeof value.universe_version !== "string"
+      || !/^established-universe-v\d{6}$/.test(value.universe_version)
+    ))
+    || (!validUniverseStatus && value.universe_version !== "unavailable")
+    || (validUniverseStatus && !legacyUniverse && value.validation_status !== "valid")
+    || (universeStatus === "ESTABLISHED_UNIVERSE_INVALID" && value.validation_status !== "invalid")
+    || (universeStatus === "ESTABLISHED_UNIVERSE_UNAVAILABLE" && value.validation_status !== "unavailable")
   ) fail("SCANNER_METADATA_INVALID");
   const numericFields = [
     "entries_total", "entries_enabled", "pairs_loaded", "candidates_before_filters", "candidates_after_filters",
@@ -291,7 +308,9 @@ function validateEstablishedMetadata(value: unknown): Record<string, unknown> {
   ) fail("SCANNER_METADATA_INVALID");
   if (value.universe_status === "ESTABLISHED_UNIVERSE_EMPTY") {
     if (enabled !== 0 || pairs !== 0 || candidates !== 0 || passed !== 0) fail("SCANNER_METADATA_INVALID");
-  } else if (enabled < 1 || candidates < 1) {
+  } else if (value.universe_status === "ESTABLISHED_UNIVERSE_READY" && (enabled < 1 || candidates < 1)) {
+    fail("SCANNER_METADATA_INVALID");
+  } else if (!validUniverseStatus && (total !== 0 || enabled !== 0 || pairs !== 0 || candidates !== 0 || passed !== 0)) {
     fail("SCANNER_METADATA_INVALID");
   }
   return value;
@@ -303,10 +322,12 @@ function validateReadinessMetadata(value: unknown, universeStatus: string, disco
   if (
     value.process !== "READY"
     || !["READY", "DEGRADED"].includes(String(value.new_emerging))
-    || !["READY", "EMPTY_CONFIGURED"].includes(String(value.established))
+    || !["READY", "EMPTY_CONFIGURED", "UNAVAILABLE"].includes(String(value.established))
     || !["READY", "UNAVAILABLE"].includes(String(value.context))
   ) fail("SCANNER_METADATA_INVALID");
-  const expectedEstablished = universeStatus === "ESTABLISHED_UNIVERSE_EMPTY" ? "EMPTY_CONFIGURED" : "READY";
+  const expectedEstablished = universeStatus === "ESTABLISHED_UNIVERSE_EMPTY"
+    ? "EMPTY_CONFIGURED"
+    : universeStatus === "ESTABLISHED_UNIVERSE_READY" ? "READY" : "UNAVAILABLE";
   if (value.established !== expectedEstablished) fail("SCANNER_METADATA_INVALID");
   if (value.new_emerging !== discoveryStatus) fail("SCANNER_METADATA_INVALID");
 }

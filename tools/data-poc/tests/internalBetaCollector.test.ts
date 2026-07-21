@@ -9,6 +9,11 @@ import {
 } from "../src/internalBetaCollector.js";
 import { validateDisplayEligibleContextSnapshot } from "../src/contextSnapshotValidator.js";
 import { validateDisplayEligibleScannerSnapshot } from "../src/displaySnapshotValidator.js";
+import {
+  ESTABLISHED_UNIVERSE_SCHEMA_VERSION,
+  calculateUniverseChecksum,
+  type EstablishedAddressUniverseEntry,
+} from "../src/establishedAddressUniverse.js";
 
 const NOW = new Date("2026-07-16T12:00:00.000Z");
 const roots: string[] = [];
@@ -150,7 +155,7 @@ describe("INTERNAL_BETA live collector", () => {
       seedLimit: 3,
       securityCandidateLimit: 1,
       now: NOW,
-      establishedUniverse: { ...establishedUniverse(), entries: [] },
+      establishedUniverse: establishedUniverse([]),
       fetchImpl: async (input) => {
         const url = String(input);
         if (url.endsWith("/token-profiles/latest/v1")) return Response.json([
@@ -179,6 +184,50 @@ describe("INTERNAL_BETA live collector", () => {
     assert.equal(result.scanner.candidates.every((candidate) => candidate.discovery_basket === "new_emerging"), true);
   });
 
+  it("fails Established closed without blocking New when the universe is invalid", async () => {
+    const root = await tempRoot();
+    const result = await runInternalBetaCollector({
+      env: {
+        CRYPTO_EDGE_DATA_ENV: "INTERNAL_BETA",
+        CRYPTO_EDGE_RUNTIME_MODE: "INTERNAL_BETA",
+        ALLOW_LIVE_PROVIDER_CALLS: "1",
+      },
+      outputDir: root,
+      seedLimit: 3,
+      securityCandidateLimit: 1,
+      now: NOW,
+      establishedUniverse: { ...establishedUniverse([]), checksum: "sha256:invalid" },
+      fetchImpl: async (input) => {
+        const url = String(input);
+        if (url.endsWith("/token-profiles/latest/v1")) return Response.json([
+          { chainId: "base", tokenAddress: "0xnew1" },
+          { chainId: "base", tokenAddress: "0xnew2" },
+          { chainId: "base", tokenAddress: "0xnew3" },
+        ]);
+        if (url.includes("/token-pairs/v1/base/0xnew")) {
+          const address = decodeURIComponent(url.split("/").at(-1) ?? "");
+          return Response.json([dexPair(address, `pair-${address}`, 60_000)]);
+        }
+        if (url === "https://api.alternative.me/fng/?limit=1") {
+          return Response.json({ data: [{ value: "40", value_classification: "Fear", timestamp: "1784203200", time_until_update: "3600" }] });
+        }
+        if (url === "https://api.llama.fi/protocols") {
+          return Response.json([{ name: "Lido", chain: "Ethereum", tvl: 1_000_000, change_1d: 1, change_7d: 2, url: "https://lido.fi" }]);
+        }
+        throw new Error(`unexpected URL ${url}`);
+      },
+    });
+    assert.equal(result.discovery.established.universe_status, "ESTABLISHED_UNIVERSE_INVALID");
+    assert.equal(result.discovery.established.validation_status, "invalid");
+    assert.equal(result.discovery.new_emerging.candidates_before_filters, 3);
+    assert.equal(result.scanner.candidates.every((candidate) => candidate.discovery_basket === "new_emerging"), true);
+    assert.equal(result.request_counts.goplus_security, 0);
+    assert.equal(
+      (result.scanner.provenance?.metadata?.readiness as Record<string, unknown>).established,
+      "UNAVAILABLE",
+    );
+  });
+
   it("publishes an INTERNAL_BETA live snapshot with DEGRADED DexScreener coverage", async () => {
     const root = await tempRoot();
     const profiles = Array.from({ length: 10 }, (_, index) => ({
@@ -195,7 +244,7 @@ describe("INTERNAL_BETA live collector", () => {
       seedLimit: 10,
       securityCandidateLimit: 3,
       now: NOW,
-      establishedUniverse: { ...establishedUniverse(), entries: [] },
+      establishedUniverse: establishedUniverse([]),
       fetchImpl: async (input) => {
         const url = String(input);
         if (url.endsWith("/token-profiles/latest/v1")) return Response.json(profiles);
@@ -261,7 +310,7 @@ describe("INTERNAL_BETA live collector", () => {
         outputDir: root,
         seedLimit: 10,
         now: NOW,
-        establishedUniverse: { ...establishedUniverse(), entries: [] },
+        establishedUniverse: establishedUniverse([]),
         fetchImpl: async (input) => {
           const url = String(input);
           if (url.endsWith("/token-profiles/latest/v1")) return Response.json(profiles);
@@ -279,22 +328,22 @@ describe("INTERNAL_BETA live collector", () => {
   });
 });
 
-function establishedUniverse() {
-  return {
-    universe_version: "established_address_universe_v1",
-    status: "OWNER_MAINTAINED",
-    production_enabled: true,
-    provider: "dexscreener",
-    identity_method: "CHAIN_AND_CONTRACT_ADDRESS",
-    max_entries: 100,
-    entries: [{
+function establishedUniverse(entries: EstablishedAddressUniverseEntry[] = [{
       chain: "base",
       contract_address: "0x1111111111111111111111111111111111111111",
       enabled: true,
       added_at: "2026-07-19T00:00:00.000Z",
+      updated_at: "2026-07-19T00:00:00.000Z",
       added_by: "owner",
-    }],
-  };
+      entry_id: "est_1111111111111111",
+    }]) {
+  const base = {
+    schema_version: ESTABLISHED_UNIVERSE_SCHEMA_VERSION,
+    universe_version: "established-universe-v000001",
+    generated_at: "2026-07-19T00:00:00.000Z",
+    entries,
+  } as const;
+  return { ...base, checksum: calculateUniverseChecksum(base) };
 }
 
 function dexPair(address: string, pairAddress: string, liquidity: number) {

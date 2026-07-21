@@ -17,11 +17,15 @@ import {
 } from "./dexscreenerDiscovery.js";
 import {
   collectEstablishedAddressUniverse,
+  unavailableEstablishedAddressUniverse,
   type EstablishedAddressDiscoveryMetadata,
 } from "./establishedAddressDiscovery.js";
 import {
+  ESTABLISHED_UNIVERSE_INVALID,
+  ESTABLISHED_UNIVERSE_UNAVAILABLE,
   loadEstablishedAddressUniverse,
   validateEstablishedAddressUniverse,
+  type EstablishedAddressUniverse,
 } from "./establishedAddressUniverse.js";
 import { validateDisplayEligibleScannerSnapshot } from "./displaySnapshotValidator.js";
 import {
@@ -94,10 +98,18 @@ export async function runInternalBetaCollector(
   const now = options.now ?? new Date();
   const seedLimit = clamp(options.seedLimit, DEFAULT_DEXSCREENER_SEED_LIMIT, 1, 30);
   const securityLimit = clamp(options.securityCandidateLimit, DEFAULT_SECURITY_CANDIDATE_LIMIT, 1, MAX_SECURITY_CANDIDATE_LIMIT);
-  const universe = options.establishedUniverse === undefined
-    ? loadEstablishedAddressUniverse(options.establishedUniversePath)
-    : validateEstablishedAddressUniverse(options.establishedUniverse);
-  const enabledUniverseEntries = universe.entries.filter((entry) => entry.enabled).length;
+  let universe: EstablishedAddressUniverse | null = null;
+  let universeFailure: typeof ESTABLISHED_UNIVERSE_INVALID | typeof ESTABLISHED_UNIVERSE_UNAVAILABLE | null = null;
+  try {
+    universe = options.establishedUniverse === undefined
+      ? loadEstablishedAddressUniverse(options.establishedUniversePath)
+      : validateEstablishedAddressUniverse(options.establishedUniverse);
+  } catch (error) {
+    universeFailure = error instanceof Error && error.message === "ESTABLISHED_UNIVERSE_CONFIG_LOAD_FAILED"
+      ? ESTABLISHED_UNIVERSE_UNAVAILABLE
+      : ESTABLISHED_UNIVERSE_INVALID;
+  }
+  const enabledUniverseEntries = universe?.entries.filter((entry) => entry.enabled).length ?? 0;
   const common = {
     fetchImpl: options.fetchImpl,
     timeoutMs: options.timeoutMs,
@@ -124,12 +136,14 @@ export async function runInternalBetaCollector(
     now,
     client: clients.dexscreener,
   });
-  const established = await collectEstablishedAddressUniverse({
-    env: options.env ?? process.env,
-    universe,
-    now,
-    client: clients.dexscreener,
-  });
+  const established = universe
+    ? await collectEstablishedAddressUniverse({
+      env: options.env ?? process.env,
+      universe,
+      now,
+      client: clients.dexscreener,
+    })
+    : unavailableEstablishedAddressUniverse(universeFailure ?? ESTABLISHED_UNIVERSE_UNAVAILABLE);
   const discovery = { new_emerging: newEmerging.metadata, established: established.metadata };
 
   const securityResults = new Map<string, GoPlusSecurityResult>();
@@ -259,7 +273,11 @@ function buildDiscoveryReadiness(
   return {
     process: "READY",
     new_emerging: sourceHealth.dexscreener === "DEGRADED" ? "DEGRADED" : "READY",
-    established: established.universe_status === "ESTABLISHED_UNIVERSE_EMPTY" ? "EMPTY_CONFIGURED" : "READY",
+    established: established.universe_status === "ESTABLISHED_UNIVERSE_EMPTY"
+      ? "EMPTY_CONFIGURED"
+      : established.universe_status === "ESTABLISHED_UNIVERSE_READY"
+        ? "READY"
+        : "UNAVAILABLE",
     context: sourceHealth.alternative_me_fng === "UNAVAILABLE" || sourceHealth.defillama_api === "UNAVAILABLE"
       ? "UNAVAILABLE"
       : "READY",

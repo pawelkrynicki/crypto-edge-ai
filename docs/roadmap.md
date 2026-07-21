@@ -1,5 +1,13 @@
 # Roadmap
 
+## Established Universe Management
+
+Etap wprowadza bezpieczny, owner-maintained proces dla głównego koszyka Radar: kanoniczny model `chain + contract_address`, jawne sieci, deterministyczny checksum, wersje z ograniczoną historią i audytem, atomowe operacje CLI z dry-run/`--apply`, preview collectora bez provider calls oraz read-only `GET /api/established-universe/status`. `New / observation` pozostaje niezależny i nie ma automatycznego awansu. Filtry, scoring, `final_label` i znaczenie `WATCHLIST` pozostają bez zmian.
+
+Established Universe Management zostało zaakceptowane lokalnie 21.07.2026 z werdyktem `ACCEPT_LOCAL_CODE`.
+
+Runtime ownera jest lokalny i wykluczony z Git. Aktualny universe pozostaje celowo pusty: `established-universe-v000000`, 0 wpisów i 0 aktywnych wpisów. Dodanie prawdziwych wpisów nastąpi później przez owner CLI i będzie wymagało osobnej decyzji biznesowej. VPS deployment nadal oczekuje i nie blokuje lokalnego zarządzania universe. Ten etap nie wdraża VPS, nie zmienia Cloudflare ani nie aktywuje Windows Task Scheduler.
+
 ## Current stage: VPS Deployment & Automation
 
 **Product Radar Build & Owner Acceptance** zakończono i zmergowano 21.07.2026. Kanoniczny merge commit: `ccdb5acb855fdfb11e7848af86b30349268e53f5`.
