@@ -2,7 +2,54 @@
 
 ## Status
 
-Kod sprintu przygotowano w repozytorium. Rzeczywiste wdrożenie nie zostało wykonane. Scheduler nie został aktywowany, konfiguracja Cloudflare nie została zmieniona, a tester zewnętrzny pozostaje `NO-GO`.
+Sprint 1 i Sprint 2 zostały zaakceptowane lokalnie. Aktualny stan to **local code complete, VPS operational deployment pending**. Rzeczywiste wdrożenie nie zostało wykonane, scheduler nie został aktywowany, konfiguracja Cloudflare nie została zmieniona, a tester zewnętrzny pozostaje `NO-GO`.
+
+## Local owner review: ACCEPT_LOCAL_CODE — 21.07.2026
+
+Końcowy lokalny owner review Sprintu 1 i Sprintu 2 zakończył się werdyktem `ACCEPT_LOCAL_CODE`. Akceptacja dotyczy wyłącznie lokalnego kodu i nie oznacza wykonania deploymentu ani uruchomienia automatyzacji operacyjnej.
+
+Manualny owner review potwierdził:
+
+- INTERNAL_BETA same-origin runtime na `127.0.0.1:4180`: **PASS**;
+- UI i `/api/*` na jednym originie: **PASS**;
+- health endpoint i build SHA: **PASS**;
+- brak fixture i demo surfaces: **PASS**;
+- path traversal i CORS boundary: **PASS**;
+- global collector lock między procesami: **PASS**;
+- pięć równoczesnych prób, jeden runner: **PASS**;
+- last-known-good po błędzie: **PASS**;
+- source-aware cadence: **PASS**;
+- `context_only` bez DexScreener i GoPlus: **PASS**;
+- read-only `/api/automation/status`: **PASS**;
+- sto odczytów statusu, zero runner/provider calls: **PASS**;
+- Task Scheduler dry-run: **PASS**;
+- UI status aktywnej i nieaktywnej automatyzacji: **PASS**;
+- `next_run_at` i `next_due_at`: **PASS**;
+- Refresh view nie uruchamia collectora: **PASS**.
+
+Podczas owner review wykonano dokładnie jeden kontrolowany centralny run:
+
+- wynik: `SUCCESS`;
+- scanner run: `scan_20260721140824_b6fb9e54`;
+- context run: `approved_sources_20260721140824_671ade5a`;
+- request counts:
+  - `dexscreener`: `21`;
+  - `goplus_security`: `0`;
+  - `alternative_me_fng`: `1`;
+  - `defillama_api`: `1`;
+- runner zakończył się bez aktywnego locka;
+- opublikowano jeden wspólny snapshot dla wszystkich użytkowników;
+- zwykłe odświeżenie UI nie wykonało provider calls.
+
+Zaakceptowane ograniczenia lokalnego etapu:
+
+- Windows Task Scheduler nie jest aktywny;
+- VPS jest obecnie niedostępny;
+- deployment pod domenę nie został wykonany;
+- Cloudflare Tunnel i Cloudflare Access nie zostały zmienione;
+- port `4173` nie został użyty;
+- tester zewnętrzny pozostaje `NO-GO`;
+- finalna bramka operacyjna wymaga wdrożenia na VPS, aktywacji zadania, smoke przez domenę oraz testu rollbacku.
 
 ## Windows VPS contract
 
@@ -171,10 +218,12 @@ Entry point realnego collectora pozostaje podwójnie opt-in. Nawet ręczne `pnpm
 
 ## Dalsze kroki
 
-1. Owner review lokalnego pakietu Sprint 2.
-2. Osobna, jawna decyzja ownera o `--apply` dla jednego zadania Windows Task Scheduler.
-3. Controlled deployment runtime na VPS.
-4. Runtime smoke przez domenę i istniejący Cloudflare Access/Tunnel.
-5. Sprawdzony rollback do poprzedniego builda oraz last-known-good snapshotu.
+1. Przywrócenie VPS.
+2. Controlled deployment runtime na `127.0.0.1:4180`.
+3. Podpięcie istniejącego Cloudflare Tunnel bez tworzenia drugiego tunelu.
+4. Osobna, jawna aktywacja jednego centralnego zadania Windows Task Scheduler.
+5. Runtime smoke przez domenę i istniejący Cloudflare Access/Tunnel.
+6. Sprawdzony rollback do poprzedniego builda oraz last-known-good snapshotu.
+7. Dopiero po przejściu całej bramki operacyjnej zgoda dla testera zewnętrznego.
 
 Rejestracja zadania, deployment i zmiany Cloudflare nie są wykonywane w tym sprincie. Testy lokalne pozostają możliwe bez dostępu do VPS.
