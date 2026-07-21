@@ -469,7 +469,7 @@ function sanitizeContextMetadata(value: unknown, sources: NormalizedContextSourc
   for (const source of sources) {
     const count = value.request_counts[source.source_id];
     const attribution = sanitizeAttribution(value.attributions[source.source_id], source.source_id);
-    if (!Number.isInteger(count) || Number(count) < 1 || Number(count) > 2 || !attribution || !source.attribution) {
+    if (!Number.isInteger(count) || Number(count) < 0 || Number(count) > 2 || !attribution || !source.attribution) {
       throw new RealDataBoundaryError("CONTEXT_METADATA_INVALID");
     }
     if (JSON.stringify(attribution) !== JSON.stringify(source.attribution)) {

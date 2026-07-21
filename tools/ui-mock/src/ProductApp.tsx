@@ -20,6 +20,7 @@ import {
   loadScannerReadinessResult,
   type ResolvedScannerSource,
 } from "./services/scannerDataSource";
+import { loadAutomationStatus, type AutomationStatus } from "./services/automationStatusDataSource";
 import type {
   ProductReadinessOutput,
   ScannerApiOutput,
@@ -69,6 +70,7 @@ export function ProductAppContent() {
   const [unavailableMessage, setUnavailableMessage] = useState<string | null>(null);
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
   const [verificationCandidateId, setVerificationCandidateId] = useState<string | null>(null);
+  const [automationStatus, setAutomationStatus] = useState<AutomationStatus | null>(null);
   const refreshPromiseRef = useRef<Promise<void> | null>(null);
 
   const navItems = useMemo<ProductNavItem[]>(() => [
@@ -108,10 +110,12 @@ export function ProductAppContent() {
       setReadinessReasonCode(null);
       setUnavailableMessage(null);
 
-      const [scannerResult, readinessResult] = await Promise.all([
+      const [scannerResult, readinessResult, automationResult] = await Promise.all([
         loadScannerApiDataSourceResult({ runtimeMode }),
         loadScannerReadinessResult({ runtimeMode }),
+        loadAutomationStatus(),
       ]);
+      setAutomationStatus(automationResult);
 
       if (readinessResult.status === "ready") {
         setReadiness(readinessResult.output);
@@ -259,6 +263,7 @@ export function ProductAppContent() {
       dataUnavailableMessage={unavailableMessage}
       dataUnavailableReasonCode={reasonCode}
       onRefresh={() => void loadData()}
+      automationStatus={automationStatus}
     >
       {renderSection()}
     </ProductWorkspaceShell>

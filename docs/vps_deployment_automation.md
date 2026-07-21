@@ -79,6 +79,34 @@ Oddzielny `tools/data-poc/.local/automation/automation-state.json` jest zapisywa
 
 Stan nie zawiera raw provider responses, tokenów, sekretów, stack trace, ścieżek użytkownika ani danych osobowych. Błąd runnera zachowuje request counts i identyfikatory ostatniego prawidłowego publish. Coordinator nie usuwa ani nie nadpisuje last-known-good snapshotu na ścieżce błędu i nie wykonuje automatycznego retry całego runu.
 
+Sprint 2 rozszerza ten sam kompatybilny plik o wersję schedulera, ostatnią decyzję i sprawdzenie, osobne znaczniki sukcesu scanner/context, następne terminy, osobne identyfikatory runów oraz `missed_schedule_count`. Zapis nadal używa pliku tymczasowego i atomic rename.
+
+## Source-aware cadence i tryby runnera
+
+Windows Task Scheduler ma jedynie budzić centralny scheduler co 5 minut. To nie jest cadence providerów: czysty planner sprawdza wspólny stan i wykonuje najwyżej jeden należny run. Nie istnieją runy per użytkownik.
+
+| Źródło | Cadence | SLA | Run mode |
+| --- | --- | --- | --- |
+| DexScreener | 15 min | 30 min | `scanner_and_context` |
+| GoPlus | candidate-scoped | 30 min | `scanner_and_context` |
+| Alternative.me | 6 h | 30 h | `context_only` lub `scanner_and_context` |
+| DefiLlama | 2 h | 6 h | `context_only` lub `scanner_and_context` |
+| Honeypot.is | manual only | n/a | never scheduled |
+
+`scanner_and_context` uruchamia istniejący collector bez zmiany filtrów, discovery, budżetów, retry, walidacji i publikacji. GoPlus jest wywoływany wyłącznie dla kandydatów po basic filters w tym runie. Źródła context są odpytywane tylko wtedy, gdy ich własny termin jest due; wpis niedue jest przenoszony z ostatniego zwalidowanego context snapshotu z request count `0`. `context_only` tworzy i publikuje wyłącznie prawidłowy snapshot Alternative.me/DefiLlama; nie importuje ani nie odpytuje DexScreener lub GoPlus i nie zmienia scanner snapshotu.
+
+Czysta decyzja schedulera ma sześć wyników: `RUN_SCANNER_AND_CONTEXT`, `RUN_CONTEXT_ONLY`, `NOTHING_DUE`, `RUN_ALREADY_IN_PROGRESS`, `AUTOMATION_DISABLED` i `STATE_UNAVAILABLE`. Używa wstrzykiwalnego zegara, stanu, aktywnego locka i timestampów ostatnich snapshotów; sama nie wykonuje provider calls.
+
+## Read-only observability
+
+`GET /api/automation/status` jest częścią wspólnego handlera lokalnego i same-origin. Zwraca wyłącznie `enabled`, bezpieczny aktywny run, ostatni wynik/kod i timestamps, następny scanner/context termin, ostatnie opublikowane ID, request counts i `scheduler_status`. Brak pliku daje `NOT_YET_RUN`, a uszkodzony stan `STATE_UNAVAILABLE` z HTTP 200. Endpoint nie zwraca PID, lock metadata, ścieżek, sekretów ani env i nigdy nie uruchamia collectora.
+
+Mały panel w Technical details jest tylko do odczytu. „Refresh view” ponownie czyta nasze API, lecz nie uruchamia schedulera ani providera. Sto równoległych odczytów jest pokryte testem bez mutacji stanu i z zerową liczbą wywołań runnera.
+
+## Windows Task Scheduler — pakiet nieaktywny
+
+Skrypty rejestracji i usunięcia są domyślnie dry-run. Dopiero jawne `--apply` może zmienić dokładnie zadanie `Crypto Edge AI Central Automation`. Plan ma cadence 5 minut, trigger startowy, `MultipleInstances=IgnoreNew`, kanoniczny wrapper, working directory repo i zero sekretów w command line. W tym sprincie nie wykonano `--apply`; Task Scheduler, Cloudflare i VPS pozostają niezmienione.
+
 ## Owner runbook
 
 Wszystkie poniższe komendy należy uruchamiać z katalogu głównego repozytorium.
@@ -101,6 +129,31 @@ Offline test globalnego locka i coordinatora na izolowanych plikach tymczasowych
 scripts\win\check-automation-single-flight.cmd
 ```
 
+Offline cadence, decyzje i Task Scheduler script checks:
+
+```cmd
+scripts\win\check-central-scheduler.cmd
+```
+
+Same-origin status API na losowym porcie: 100 odczytów, brak mutacji i brak provider calls:
+
+```cmd
+scripts\win\check-automation-status-api.cmd
+```
+
+Podgląd planu zadania bez zmiany systemu:
+
+```cmd
+scripts\win\preview-central-automation-task.cmd
+```
+
+Jawne komendy ownera do przyszłej rejestracji lub usunięcia — nie wykonywać podczas offline review:
+
+```cmd
+scripts\win\register-central-automation-task.cmd --apply
+scripts\win\unregister-central-automation-task.cmd --apply
+```
+
 Lokalne uruchomienie przygotowanego runtime na domyślnym loopback `4180` — tylko po upewnieniu się, że port jest przeznaczony na review; ta komenda nie wdraża domeny, nie zmienia Cloudflare i nie tworzy autostartu:
 
 ```cmd
@@ -114,14 +167,14 @@ set CRYPTO_EDGE_BUILD_SHA=<commit-sha>
 scripts\win\start-product-vps.cmd
 ```
 
-Entry point realnego collectora pozostaje nieaktywny. Nawet ręczne `pnpm run automation:run` odmawia działania przed importem collectora, jeśli jednocześnie nie ustawiono `CRYPTO_EDGE_AUTOMATION_ENABLED=1` i `ALLOW_LIVE_PROVIDER_CALLS=1`. W tym sprincie nie należy ustawiać tych flag ani uruchamiać tej komendy.
+Entry point realnego collectora pozostaje podwójnie opt-in. Nawet ręczne `pnpm run automation:run` odmawia działania przed importem collectora, jeśli jednocześnie nie ustawiono `CRYPTO_EDGE_AUTOMATION_ENABLED=1` i `ALLOW_LIVE_PROVIDER_CALLS=1`. Wrapper przyszłego zadania ustawia te flagi, ale nie jest uruchamiany przez walidację ani UI.
 
 ## Dalsze kroki
 
-1. Source-aware cadence.
-2. Rejestracja jednego zadania Windows Task Scheduler dla centralnego coordinatora.
+1. Owner review lokalnego pakietu Sprint 2.
+2. Osobna, jawna decyzja ownera o `--apply` dla jednego zadania Windows Task Scheduler.
 3. Controlled deployment runtime na VPS.
 4. Runtime smoke przez domenę i istniejący Cloudflare Access/Tunnel.
 5. Sprawdzony rollback do poprzedniego builda oraz last-known-good snapshotu.
 
-Żaden z tych kroków nie jest wykonywany w tym sprincie.
+Rejestracja zadania, deployment i zmiany Cloudflare nie są wykonywane w tym sprincie. Testy lokalne pozostają możliwe bez dostępu do VPS.

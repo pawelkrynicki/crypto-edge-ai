@@ -15,6 +15,7 @@ import {
 } from "../productSourceHealth";
 import type { ResolvedProductRuntimeMode } from "../runtimeMode";
 import type { ResolvedScannerSource } from "../services/scannerDataSource";
+import type { AutomationStatus } from "../services/automationStatusDataSource";
 import type { ProductReadinessOutput } from "../types/scannerTypes";
 
 export type ProductSectionId =
@@ -49,6 +50,7 @@ type ProductWorkspaceShellProps = {
   dataUnavailableMessage?: string | null;
   dataUnavailableReasonCode?: string | null;
   onRefresh: () => void;
+  automationStatus?: AutomationStatus | null;
   children: ReactNode;
 };
 
@@ -77,6 +79,7 @@ export function ProductWorkspaceShell({
   dataUnavailableMessage,
   dataUnavailableReasonCode,
   onRefresh,
+  automationStatus,
   children,
 }: ProductWorkspaceShellProps) {
   const { locale, setLocale, t } = useProductLocale();
@@ -144,6 +147,9 @@ export function ProductWorkspaceShell({
               <div><dt>{t("app.runId")}</dt><dd>{runId ?? t("app.noData")}</dd></div>
               <div><dt>{t("app.sources")}</dt><dd>{sourceIds.length > 0 ? sourceIds.join(", ") : t("app.noData")}</dd></div>
               {technicalCodes.length > 0 && <div><dt>{t("app.codes")}</dt><dd>{technicalCodes.join(", ")}</dd></div>}
+              <div><dt>{t("automation.title")}</dt><dd>{automationPresentation(automationStatus, locale, t)}</dd></div>
+              <div><dt>{t("automation.lastRun")}</dt><dd>{automationStatus?.last_attempt_at ? formatProductDateTime(automationStatus.last_attempt_at, locale) : t("app.noData")}</dd></div>
+              <div><dt>{t("automation.nextRun")}</dt><dd>{nextAutomationRun(automationStatus) ? formatProductDateTime(nextAutomationRun(automationStatus) as string, locale) : t("app.noData")}</dd></div>
             </dl>
           </details>
         </div>
@@ -203,6 +209,25 @@ export function ProductWorkspaceShell({
       </footer>
     </div>
   );
+}
+
+function automationPresentation(
+  status: AutomationStatus | null | undefined,
+  _locale: ProductLocale,
+  t: (key: keyof typeof PRODUCT_TRANSLATIONS.en) => string,
+): string {
+  if (!status || !status.enabled) return t("automation.disabled");
+  if (status.active_run_id) return t("automation.inProgress");
+  if (status.last_result === "FAILED" || status.scheduler_status === "STATE_UNAVAILABLE") return t("automation.error");
+  return t("automation.active");
+}
+
+function nextAutomationRun(status: AutomationStatus | null | undefined): string | null {
+  if (!status) return null;
+  const values = [status.next_scanner_run_at, status.next_context_run_at]
+    .filter((value): value is string => value !== null)
+    .sort((left, right) => Date.parse(left) - Date.parse(right));
+  return values[0] ?? null;
 }
 
 export function getApiReadinessPresentation(

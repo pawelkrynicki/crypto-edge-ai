@@ -4,7 +4,11 @@
 
 **Product Radar Build & Owner Acceptance** zakończono i zmergowano 21.07.2026. Kanoniczny merge commit: `ccdb5acb855fdfb11e7848af86b30349268e53f5`.
 
-Pierwszy sprint bieżącego etapu przygotowuje produkcyjny runtime same-origin dla Windows VPS oraz central automation guard: jeden proces produktu na `127.0.0.1:4180`, jeden wspólny handler `/api/*`, międzyprocesowy global lock, heartbeat, bezpieczne stale recovery, atomowy stan oraz coordinator z wstrzykiwanym runnerem. Sprint nie wykonuje deploymentu, nie aktywuje schedulera, nie zmienia Cloudflare Tunnel ani Cloudflare Access i nie wykonuje live provider calls.
+Pierwszy sprint bieżącego etapu przygotował produkcyjny runtime same-origin dla Windows VPS oraz central automation guard: jeden proces produktu na `127.0.0.1:4180`, jeden wspólny handler `/api/*`, międzyprocesowy global lock, heartbeat, bezpieczne stale recovery, atomowy stan oraz coordinator z wstrzykiwanym runnerem.
+
+Sprint 2 dodaje kanoniczny source-aware cadence (DexScreener 15 min, Alternative.me 6 h, DefiLlama 2 h; GoPlus tylko candidate-scoped; Honeypot.is nigdy automatycznie), czystą decyzję schedulera, tryby `scanner_and_context` / `context_only`, bezpieczny `GET /api/automation/status`, mały read-only status w Technical details oraz dry-run-first pakiet Windows Task Scheduler. Zadanie jest projektowane na pobudkę co 5 minut, ale provider calls są możliwe tylko, gdy źródło jest due. Jeden collector publikuje jeden wspólny snapshot dla wszystkich użytkowników; Refresh view jest wyłącznie odczytem API.
+
+Sprint 2 nie wykonuje deploymentu, nie aktywuje Windows Task Scheduler, nie zmienia Cloudflare Tunnel ani Cloudflare Access i podczas walidacji nie wykonuje live provider calls. Lokalne testy pozostają możliwe bez VPS.
 
 Tester zewnętrzny nadal jest `NO-GO`. `PUBLIC_BETA` pozostaje wyłączone, a build VPS działa wyłącznie jako `INTERNAL_BETA` bez fixture fallback.
 

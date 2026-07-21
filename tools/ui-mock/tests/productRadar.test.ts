@@ -635,6 +635,51 @@ describe("Product Radar owner acceptance", () => {
     assert.match(markup, />0</);
   });
 
+  it("keeps automation observability small, read-only and bilingual in Technical details", () => {
+    const render = (locale: ProductLocale) => renderWithLocale(locale, React.createElement(ProductWorkspaceShell, {
+      navItems: [],
+      activeSection: "candidate-results",
+      onSectionChange: () => undefined,
+      loading: false,
+      runtimeMode: "INTERNAL_BETA",
+      resolvedSource: "unavailable",
+      runId: null,
+      generatedAt: null,
+      ageSeconds: null,
+      freshnessStatus: null,
+      viewRefreshedAt: null,
+      sourceIds: [],
+      sourceHealth: resolveProductSourceHealth({ metadata: null, readiness: null, sourceIds: [] }),
+      readiness: null,
+      automationStatus: {
+        enabled: true,
+        active_run_id: "automation_active",
+        last_result: "SUCCESS",
+        last_error_code: null,
+        last_attempt_at: "2026-07-21T12:00:00.000Z",
+        last_success_at: "2026-07-21T12:01:00.000Z",
+        last_failure_at: null,
+        next_scanner_run_at: "2026-07-21T12:16:00.000Z",
+        next_context_run_at: "2026-07-21T14:01:00.000Z",
+        last_published_scanner_run_id: "scan_safe",
+        last_published_context_run_id: "context_safe",
+        request_counts: {},
+        scheduler_status: "RUN_ALREADY_IN_PROGRESS",
+      },
+      onRefresh: () => undefined,
+      children: React.createElement("div"),
+    }));
+    const english = render("en");
+    const polish = render("pl");
+    assert.match(english, /Automation<\/dt><dd>Run in progress/);
+    assert.match(english, /Last run<\/dt>/);
+    assert.match(english, /Next run<\/dt>/);
+    assert.match(polish, /Automatyzacja<\/dt><dd>Run w toku/);
+    assert.match(polish, /Ostatni run<\/dt>/);
+    assert.match(polish, /Następny run<\/dt>/);
+    assert.doesNotMatch(english, /Run collector|Start collector/);
+  });
+
   it("does not turn configured Established empty into a global error", () => {
     const markup = renderToStaticMarkup(React.createElement(EstablishedBasket, { candidates: [], metadata: emptyMetadata, readiness: emptyReadiness }));
     assert.equal(getEstablishedState(emptyMetadata, emptyReadiness, []), "empty");

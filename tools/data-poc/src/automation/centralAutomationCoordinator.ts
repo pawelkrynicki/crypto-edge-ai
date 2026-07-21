@@ -10,11 +10,15 @@ import {
   DEFAULT_COLLECTOR_LOCK_TTL_MS,
   type GlobalCollectorLockOptions,
 } from "./globalCollectorLock.js";
+import { nextRunAt, SOURCE_CADENCE_MS } from "./sourceCadence.js";
+
+export type CentralAutomationRunMode = "scanner_and_context" | "context_only";
 
 export type CentralAutomationRunnerResult = {
   request_counts?: AutomationRequestCounts;
   scanner_run_id?: string | null;
   context_run_id?: string | null;
+  context_sources_refreshed?: string[];
 };
 
 export type CentralAutomationOptions<T extends CentralAutomationRunnerResult> = {
@@ -25,6 +29,7 @@ export type CentralAutomationOptions<T extends CentralAutomationRunnerResult> = 
   runIdFactory?: () => string;
   now?: () => Date;
   heartbeatIntervalMs?: number;
+  mode?: CentralAutomationRunMode;
 };
 
 export type CentralAutomationResult<T extends CentralAutomationRunnerResult> =
@@ -101,7 +106,14 @@ export async function runCentralAutomation<T extends CentralAutomationRunnerResu
       return { status: "FAILED", run_id: runId, error_code: errorCode };
     }
 
-    await writeStateFailClosed(stateStore, buildSuccessState(previous, runId, attemptAt, now(), result));
+    await writeStateFailClosed(stateStore, buildSuccessState(
+      previous,
+      runId,
+      attemptAt,
+      now(),
+      result,
+      options.mode ?? "scanner_and_context",
+    ));
     return { status: "SUCCESS", run_id: runId, result };
   } finally {
     if (heartbeatTimer) clearInterval(heartbeatTimer);
@@ -115,11 +127,17 @@ function buildSuccessState<T extends CentralAutomationRunnerResult>(
   attemptAt: string,
   finishedAt: Date,
   result: T,
+  mode: CentralAutomationRunMode,
 ): AutomationState {
+  const successAt = finishedAt.toISOString();
+  const scannerSuccessAt = mode === "scanner_and_context" ? successAt : previous.last_scanner_success_at;
+  const refreshed = normalizeContextSources(result.context_sources_refreshed);
+  const refreshedAlternative = refreshed === null || refreshed.has("alternative_me_fng");
+  const refreshedDefillama = refreshed === null || refreshed.has("defillama_api");
   return {
     ...previous,
     last_attempt_at: attemptAt,
-    last_success_at: finishedAt.toISOString(),
+    last_success_at: successAt,
     last_run_id: runId,
     active_run_id: null,
     last_result: "SUCCESS",
@@ -127,7 +145,25 @@ function buildSuccessState<T extends CentralAutomationRunnerResult>(
     request_counts: normalizeRunnerRequestCounts(result.request_counts),
     last_published_scanner_run_id: safeOptionalRunId(result.scanner_run_id) ?? previous.last_published_scanner_run_id,
     last_published_context_run_id: safeOptionalRunId(result.context_run_id) ?? previous.last_published_context_run_id,
+    last_scanner_success_at: scannerSuccessAt,
+    last_context_success_at: successAt,
+    last_scanner_run_id: mode === "scanner_and_context"
+      ? safeOptionalRunId(result.scanner_run_id) ?? previous.last_scanner_run_id
+      : previous.last_scanner_run_id,
+    last_context_run_id: safeOptionalRunId(result.context_run_id) ?? previous.last_context_run_id,
+    next_scanner_run_at: nextRunAt(scannerSuccessAt, SOURCE_CADENCE_MS.dexscreener),
+    next_alternative_me_run_at: refreshedAlternative
+      ? nextRunAt(successAt, SOURCE_CADENCE_MS.alternative_me_fng)
+      : previous.next_alternative_me_run_at,
+    next_defillama_run_at: refreshedDefillama
+      ? nextRunAt(successAt, SOURCE_CADENCE_MS.defillama_api)
+      : previous.next_defillama_run_at,
   };
+}
+
+function normalizeContextSources(value: string[] | undefined): Set<string> | null {
+  if (value === undefined) return null;
+  return new Set(value.filter((sourceId) => sourceId === "alternative_me_fng" || sourceId === "defillama_api"));
 }
 
 async function readStateFailClosed(stateStore: AutomationStateStore): Promise<AutomationState> {

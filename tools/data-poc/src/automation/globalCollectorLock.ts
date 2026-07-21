@@ -92,6 +92,19 @@ export async function acquireGlobalCollectorLock(
   throw new CollectorLockError("COLLECTOR_LOCK_ACQUIRE_FAILED");
 }
 
+export async function inspectActiveGlobalCollectorLock(
+  options: GlobalCollectorLockOptions = {},
+): Promise<string | null> {
+  const directoryPath = resolve(options.directoryPath ?? getDefaultAutomationDirectory());
+  const metadata = await readLockMetadataWithRetry(resolve(directoryPath, "collector.lock.json"));
+  if (!metadata) return null;
+  const now = options.now ?? (() => new Date());
+  const isProcessAlive = options.isProcessAlive ?? defaultIsProcessAlive;
+  const alive = await safelyCheckProcess(isProcessAlive, metadata.pid);
+  const expired = Date.parse(metadata.expires_at) <= now().getTime();
+  return alive || !expired ? metadata.run_id : null;
+}
+
 function createAcquiredLock(
   lockPath: string,
   initialMetadata: CollectorLockMetadata,

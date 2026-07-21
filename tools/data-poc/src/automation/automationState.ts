@@ -4,6 +4,15 @@ import { dirname, resolve } from "node:path";
 import { getDefaultAutomationDirectory } from "./automationPaths.js";
 
 export const AUTOMATION_STATE_SCHEMA_VERSION = "central_automation_state_v1";
+export const AUTOMATION_SCHEDULER_SCHEMA_VERSION = "central_source_scheduler_v1";
+
+export type AutomationSchedulerDecision =
+  | "RUN_SCANNER_AND_CONTEXT"
+  | "RUN_CONTEXT_ONLY"
+  | "NOTHING_DUE"
+  | "RUN_ALREADY_IN_PROGRESS"
+  | "AUTOMATION_DISABLED"
+  | "STATE_UNAVAILABLE";
 
 export type AutomationRequestCounts = Record<string, number>;
 
@@ -19,6 +28,17 @@ export type AutomationState = {
   request_counts: AutomationRequestCounts;
   last_published_scanner_run_id: string | null;
   last_published_context_run_id: string | null;
+  scheduler_schema_version: typeof AUTOMATION_SCHEDULER_SCHEMA_VERSION;
+  last_scheduler_check_at: string | null;
+  last_decision: AutomationSchedulerDecision | null;
+  next_scanner_run_at: string | null;
+  next_alternative_me_run_at: string | null;
+  next_defillama_run_at: string | null;
+  last_scanner_success_at: string | null;
+  last_context_success_at: string | null;
+  last_scanner_run_id: string | null;
+  last_context_run_id: string | null;
+  missed_schedule_count: number;
 };
 
 export type AutomationStateStore = {
@@ -49,6 +69,17 @@ export function createInitialAutomationState(): AutomationState {
     request_counts: {},
     last_published_scanner_run_id: null,
     last_published_context_run_id: null,
+    scheduler_schema_version: AUTOMATION_SCHEDULER_SCHEMA_VERSION,
+    last_scheduler_check_at: null,
+    last_decision: null,
+    next_scanner_run_at: null,
+    next_alternative_me_run_at: null,
+    next_defillama_run_at: null,
+    last_scanner_success_at: null,
+    last_context_success_at: null,
+    last_scanner_run_id: null,
+    last_context_run_id: null,
+    missed_schedule_count: 0,
   };
 }
 
@@ -113,8 +144,47 @@ export function normalizeAutomationState(value: unknown): AutomationState {
     request_counts: normalizeRequestCounts(record.request_counts),
     last_published_scanner_run_id: nullableSafeText(record.last_published_scanner_run_id),
     last_published_context_run_id: nullableSafeText(record.last_published_context_run_id),
+    scheduler_schema_version: optionalSchedulerVersion(record.scheduler_schema_version),
+    last_scheduler_check_at: optionalNullableIso(record.last_scheduler_check_at),
+    last_decision: optionalDecision(record.last_decision),
+    next_scanner_run_at: optionalNullableIso(record.next_scanner_run_at),
+    next_alternative_me_run_at: optionalNullableIso(record.next_alternative_me_run_at),
+    next_defillama_run_at: optionalNullableIso(record.next_defillama_run_at),
+    last_scanner_success_at: optionalNullableIso(record.last_scanner_success_at),
+    last_context_success_at: optionalNullableIso(record.last_context_success_at),
+    last_scanner_run_id: optionalNullableSafeText(record.last_scanner_run_id),
+    last_context_run_id: optionalNullableSafeText(record.last_context_run_id),
+    missed_schedule_count: optionalNonNegativeInteger(record.missed_schedule_count),
   };
   return state;
+}
+
+function optionalSchedulerVersion(value: unknown): typeof AUTOMATION_SCHEDULER_SCHEMA_VERSION {
+  if (value === undefined || value === AUTOMATION_SCHEDULER_SCHEMA_VERSION) return AUTOMATION_SCHEDULER_SCHEMA_VERSION;
+  return invalidState();
+}
+
+function optionalDecision(value: unknown): AutomationSchedulerDecision | null {
+  if (value === undefined || value === null) return null;
+  if ([
+    "RUN_SCANNER_AND_CONTEXT", "RUN_CONTEXT_ONLY", "NOTHING_DUE",
+    "RUN_ALREADY_IN_PROGRESS", "AUTOMATION_DISABLED", "STATE_UNAVAILABLE",
+  ].includes(String(value))) return value as AutomationSchedulerDecision;
+  return invalidState();
+}
+
+function optionalNullableIso(value: unknown): string | null {
+  return value === undefined ? null : nullableIso(value);
+}
+
+function optionalNullableSafeText(value: unknown): string | null {
+  return value === undefined ? null : nullableSafeText(value);
+}
+
+function optionalNonNegativeInteger(value: unknown): number {
+  if (value === undefined) return 0;
+  if (Number.isSafeInteger(value) && Number(value) >= 0) return Number(value);
+  return invalidState();
 }
 
 function normalizeRequestCounts(value: unknown): AutomationRequestCounts {

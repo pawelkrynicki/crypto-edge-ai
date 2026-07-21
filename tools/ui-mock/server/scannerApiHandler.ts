@@ -1,4 +1,5 @@
 import type { IncomingMessage, RequestListener, ServerResponse } from "node:http";
+import { readAutomationStatus, type AutomationStatusOptions } from "./automationStatus.js";
 import {
   ContextOutputError,
   type LatestContextOutputOptions,
@@ -38,6 +39,7 @@ export type ScannerApiHandlerOptions = {
   reviewSession?: ReviewSessionFileStoreOptions;
   reviewSessionProvider?: ReviewSessionStorageProvider;
   health?: ScannerApiHealthOptions;
+  automation?: AutomationStatusOptions;
 };
 
 export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}): RequestListener {
@@ -65,6 +67,11 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
           ? { process_uptime_seconds: Math.max(0, Math.floor(options.health.uptimeSeconds())) }
           : {}),
       }, runtimeMode);
+      return;
+    }
+
+    if (req.method === "GET" && path === "/api/automation/status") {
+      sendJson(req, res, 200, await readAutomationStatus(options.automation), runtimeMode);
       return;
     }
 
