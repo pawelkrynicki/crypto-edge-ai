@@ -15,6 +15,7 @@ import {
 } from "../productSourceHealth";
 import type { ResolvedProductRuntimeMode } from "../runtimeMode";
 import type { ResolvedScannerSource } from "../services/scannerDataSource";
+import type { AutomationStatus } from "../services/automationStatusDataSource";
 import type { ProductReadinessOutput } from "../types/scannerTypes";
 
 export type ProductSectionId =
@@ -49,6 +50,7 @@ type ProductWorkspaceShellProps = {
   dataUnavailableMessage?: string | null;
   dataUnavailableReasonCode?: string | null;
   onRefresh: () => void;
+  automationStatus?: AutomationStatus | null;
   children: ReactNode;
 };
 
@@ -77,6 +79,7 @@ export function ProductWorkspaceShell({
   dataUnavailableMessage,
   dataUnavailableReasonCode,
   onRefresh,
+  automationStatus,
   children,
 }: ProductWorkspaceShellProps) {
   const { locale, setLocale, t } = useProductLocale();
@@ -144,6 +147,15 @@ export function ProductWorkspaceShell({
               <div><dt>{t("app.runId")}</dt><dd>{runId ?? t("app.noData")}</dd></div>
               <div><dt>{t("app.sources")}</dt><dd>{sourceIds.length > 0 ? sourceIds.join(", ") : t("app.noData")}</dd></div>
               {technicalCodes.length > 0 && <div><dt>{t("app.codes")}</dt><dd>{technicalCodes.join(", ")}</dd></div>}
+              <div><dt>{t("automation.title")}</dt><dd>{automationPresentation(automationStatus, t)}</dd></div>
+              <div><dt>{t("automation.lastRun")}</dt><dd>{automationStatus?.last_attempt_at ? formatProductDateTime(automationStatus.last_attempt_at, locale) : t("app.noData")}</dd></div>
+              <div><dt>{t("automation.nextRun")}</dt><dd>{nextAutomationRunPresentation(automationStatus, locale, t)}</dd></div>
+              {automationStatus && !automationStatus.enabled && automationStatus.next_due_at && (
+                <div>
+                  <dt>{t("automation.nextDueAfterActivation")}</dt>
+                  <dd>{formatProductDateTime(automationStatus.next_due_at, locale)}</dd>
+                </div>
+              )}
             </dl>
           </details>
         </div>
@@ -203,6 +215,26 @@ export function ProductWorkspaceShell({
       </footer>
     </div>
   );
+}
+
+function automationPresentation(
+  status: AutomationStatus | null | undefined,
+  t: (key: keyof typeof PRODUCT_TRANSLATIONS.en) => string,
+): string {
+  if (!status || !status.enabled) return t("automation.disabled");
+  if (status.active_run_id) return t("automation.inProgress");
+  if (status.last_result === "FAILED" || status.scheduler_status === "STATE_UNAVAILABLE") return t("automation.error");
+  return t("automation.active");
+}
+
+function nextAutomationRunPresentation(
+  status: AutomationStatus | null | undefined,
+  locale: ProductLocale,
+  t: (key: keyof typeof PRODUCT_TRANSLATIONS.en) => string,
+): string {
+  if (!status) return t("app.noData");
+  if (!status.enabled) return t("automation.notScheduled");
+  return status.next_run_at ? formatProductDateTime(status.next_run_at, locale) : t("app.noData");
 }
 
 export function getApiReadinessPresentation(

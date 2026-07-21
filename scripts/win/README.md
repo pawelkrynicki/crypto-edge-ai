@@ -2,6 +2,52 @@
 
 These scripts are developer tooling for Windows CMD. Run them from the repo root or any other current directory; each script resolves the repo root from its own location.
 
+## VPS product runtime and automation guard
+
+Canonical owner commands from the repository root:
+
+```cmd
+scripts\win\build-product-vps.cmd
+scripts\win\check-product-vps-runtime.cmd
+scripts\win\check-automation-single-flight.cmd
+scripts\win\start-product-vps.cmd
+scripts\win\check-central-scheduler.cmd
+scripts\win\check-automation-status-api.cmd
+scripts\win\preview-central-automation-task.cmd
+```
+
+`build-product-vps.cmd` synchronizes only the `tools/ui-mock` locked dependencies and builds the fixture-free `INTERNAL_BETA` surface. `start-product-vps.cmd` serves the UI and the existing `/api/*` contract from one Node process on `127.0.0.1:4180`; it does not start the collector, configure Cloudflare, or create a Scheduled Task. `check-product-vps-runtime.cmd` uses a dedicated random high port and always closes its server. `check-automation-single-flight.cmd` runs only offline lock/coordinator tests against isolated temporary files.
+
+`check-central-scheduler.cmd` uses injected clocks/runners and includes cadence, decision, lock, coordinator and Task Scheduler source checks offline. `check-automation-status-api.cmd` starts the same-origin product runtime on a random local port, performs 100 read-only status requests, verifies unchanged state and zero runner/provider calls, then closes the process. `preview-central-automation-task.cmd` prints the fixed task plan without changing Windows.
+
+Source schedule:
+
+| Source | Cadence | SLA | Run mode |
+| --- | --- | --- | --- |
+| DexScreener | 15 min | 30 min | `scanner_and_context` |
+| GoPlus | candidate-scoped | 30 min | `scanner_and_context` |
+| Alternative.me | 6 h | 30 h | `context_only` or `scanner_and_context` |
+| DefiLlama | 2 h | 6 h | `context_only` or `scanner_and_context` |
+| Honeypot.is | manual only | n/a | never scheduled |
+
+The planned task wakes every five minutes, while the source-aware decision layer performs at most one due run. User count and Refresh view never affect provider calls. One collector publishes one shared snapshot.
+
+Dry-run is the default:
+
+```cmd
+scripts\win\register-central-automation-task.cmd
+scripts\win\unregister-central-automation-task.cmd
+```
+
+Future explicit owner-only changes require `--apply`:
+
+```cmd
+scripts\win\register-central-automation-task.cmd --apply
+scripts\win\unregister-central-automation-task.cmd --apply
+```
+
+Neither `--apply` command is part of automated validation. Full contract and runbook: `docs/vps_deployment_automation.md`. VPS deployment, Cloudflare changes, Task Scheduler activation, live provider calls, port `4173`, `PUBLIC_BETA`, and external tester access remain outside this sprint. Local checks do not require VPS access.
+
 ## Product Radar owner review
 
 Kanoniczny launcher lokalnej oceny ownera:

@@ -167,7 +167,7 @@ function validateMetadata(value: unknown, output: ApprovedSourcesRunOutput): voi
   assertExactFields(value.attributions, expectedKeys);
   for (const source of output.sources) {
     const count = value.request_counts[source.source_id];
-    if (!Number.isInteger(count) || Number(count) < 1 || Number(count) > 2) fail("CONTEXT_METADATA_INVALID");
+    if (!Number.isInteger(count) || Number(count) < 0 || Number(count) > 2) fail("CONTEXT_METADATA_INVALID");
     if (JSON.stringify(value.attributions[source.source_id]) !== JSON.stringify(source.attribution)) {
       fail("CONTEXT_METADATA_INVALID");
     }

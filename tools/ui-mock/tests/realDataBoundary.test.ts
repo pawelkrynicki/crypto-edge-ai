@@ -534,6 +534,14 @@ describe("INTERNAL_BETA context freshness boundary", () => {
     assert.deepEqual(result.sources.map((source) => source.attribution?.provider), ["Alternative.me", "DefiLlama"]);
   });
 
+  it("accepts a validated carried-forward non-due context source with zero provider requests", async () => {
+    const output = makeContextOutput();
+    output.provenance.metadata.request_counts.alternative_me_fng = 0;
+    const result = await readContext(output);
+    assert.equal(result.provenance?.metadata?.request_counts?.alternative_me_fng, 0);
+    assert.equal(result.sources[0].fetched_at, output.sources[0].fetched_at);
+  });
+
   it("rejects context metadata that could carry raw provider data", async () => {
     const output = makeContextOutput();
     output.provenance.metadata.raw_payload = { secret: true };

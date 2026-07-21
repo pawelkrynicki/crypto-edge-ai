@@ -1,10 +1,30 @@
 # Roadmap
 
-## Current stage: Product Radar Build & Owner Acceptance
+## Current stage: VPS Deployment & Automation
 
-Product Radar jest zbudowany na real-data `INTERNAL_BETA` i oczekuje na lokalny verdict ownera. Product path używa pełnego `UiTokenCandidate`, rozdziela `new_emerging` od `established`, obsługuje `ESTABLISHED_UNIVERSE_EMPTY` bez globalnego błędu i nie wstawia sample candidates.
+**Product Radar Build & Owner Acceptance** zakończono i zmergowano 21.07.2026. Kanoniczny merge commit: `ccdb5acb855fdfb11e7848af86b30349268e53f5`.
 
-Kanoniczny flow oceny oraz checklista znajdują się w `docs/product_radar_owner_review.md`. Po jawnym `ACCEPT` następnym etapem jest **VPS Deployment & Automation**. Nie planuje się osobnego kolejnego etapu UI; ewentualne poprawki po owner review pozostają w tym samym obszarze. Tester zewnętrzny nadal jest `NO-GO`.
+Sprint 1 i Sprint 2 etapu **VPS Deployment & Automation** zostały zaakceptowane lokalnie 21.07.2026 z werdyktem `ACCEPT_LOCAL_CODE`.
+
+Aktualny stan: **local code complete, VPS operational deployment pending**. Akceptacja lokalnego kodu nie oznacza wykonanego deploymentu, aktywnego Windows Task Scheduler ani zgody dla testera zewnętrznego.
+
+Pierwszy sprint bieżącego etapu przygotował produkcyjny runtime same-origin dla Windows VPS oraz central automation guard: jeden proces produktu na `127.0.0.1:4180`, jeden wspólny handler `/api/*`, międzyprocesowy global lock, heartbeat, bezpieczne stale recovery, atomowy stan oraz coordinator z wstrzykiwanym runnerem.
+
+Sprint 2 dodaje kanoniczny source-aware cadence (DexScreener 15 min, Alternative.me 6 h, DefiLlama 2 h; GoPlus tylko candidate-scoped; Honeypot.is nigdy automatycznie), czystą decyzję schedulera, tryby `scanner_and_context` / `context_only`, bezpieczny `GET /api/automation/status`, mały read-only status w Technical details oraz dry-run-first pakiet Windows Task Scheduler. Zadanie jest projektowane na pobudkę co 5 minut, ale provider calls są możliwe tylko, gdy źródło jest due. Jeden collector publikuje jeden wspólny snapshot dla wszystkich użytkowników; Refresh view jest wyłącznie odczytem API.
+
+Sprint 2 nie wykonuje deploymentu, nie aktywuje Windows Task Scheduler, nie zmienia Cloudflare Tunnel ani Cloudflare Access i podczas walidacji nie wykonuje live provider calls. Lokalne testy pozostają możliwe bez VPS.
+
+Tester zewnętrzny nadal jest `NO-GO`. `PUBLIC_BETA` pozostaje wyłączone, a build VPS działa wyłącznie jako `INTERNAL_BETA` bez fixture fallback.
+
+Następna bramka operacyjna:
+
+1. Przywrócenie VPS.
+2. Controlled deployment na `127.0.0.1:4180`.
+3. Podpięcie istniejącego Cloudflare Tunnel.
+4. Aktywacja jednego centralnego zadania Windows Task Scheduler.
+5. Smoke przez domenę.
+6. Rollback test.
+7. Dopiero potem zgoda dla testera zewnętrznego.
 
 ## Stage 12R.5: Discovery Closure
 

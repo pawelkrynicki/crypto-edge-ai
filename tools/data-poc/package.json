@@ -24,6 +24,7 @@
     "sources:approved:fixture": "tsc && node dist/src/sources/runApprovedSourcesPoc.js --mode fixture",
     "sources:approved:live": "tsc && node dist/src/sources/runApprovedSourcesPoc.js --mode live",
     "collect:internal-beta": "tsc && node dist/src/runInternalBetaCollector.js",
+    "automation:run": "tsc && node dist/src/automation/runCentralAutomation.js",
     "discovery:diagnostic": "tsc && node dist/src/runDiscoveryDiagnostic.js",
     "discovery:archived-query-plan:diagnostic": "tsc && node dist/src/runEstablishedDiscoveryPrototype.js",
     "universe:validate": "tsc && node dist/src/runEstablishedUniverse.js validate",
@@ -32,6 +33,7 @@
     "filters:calibrate": "tsc && node dist/src/runFilterCalibration.js",
     "snapshot:validate:latest": "tsc && node dist/src/runValidateLatestSnapshot.js",
     "test": "tsc && node --test dist/tests/*.js",
+    "test:automation": "tsc && node --test dist/tests/automationLock.test.js dist/tests/centralAutomationCoordinator.test.js dist/tests/schedulerCadence.test.js dist/tests/taskSchedulerScripts.test.js",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

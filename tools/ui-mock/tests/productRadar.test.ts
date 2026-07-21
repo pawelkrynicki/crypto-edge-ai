@@ -635,6 +635,67 @@ describe("Product Radar owner acceptance", () => {
     assert.match(markup, />0</);
   });
 
+  it("separates inactive cadence from a scheduled run in EN and PL Technical details", () => {
+    const lastRunAt = "2026-07-21T12:00:00.000Z";
+    const nextDueAt = "2026-07-21T12:16:00.000Z";
+    const render = (locale: ProductLocale, enabled: boolean) => renderWithLocale(locale, React.createElement(ProductWorkspaceShell, {
+      navItems: [],
+      activeSection: "candidate-results",
+      onSectionChange: () => undefined,
+      loading: false,
+      runtimeMode: "INTERNAL_BETA",
+      resolvedSource: "unavailable",
+      runId: null,
+      generatedAt: null,
+      ageSeconds: null,
+      freshnessStatus: null,
+      viewRefreshedAt: null,
+      sourceIds: [],
+      sourceHealth: resolveProductSourceHealth({ metadata: null, readiness: null, sourceIds: [] }),
+      readiness: null,
+      automationStatus: {
+        enabled,
+        active_run_id: null,
+        last_result: "SUCCESS",
+        last_error_code: null,
+        last_attempt_at: lastRunAt,
+        last_success_at: "2026-07-21T12:01:00.000Z",
+        last_failure_at: null,
+        next_run_at: enabled ? nextDueAt : null,
+        next_due_at: nextDueAt,
+        next_scanner_run_at: nextDueAt,
+        next_context_run_at: "2026-07-21T14:01:00.000Z",
+        last_published_scanner_run_id: "scan_safe",
+        last_published_context_run_id: "context_safe",
+        request_counts: {},
+        scheduler_status: "NOTHING_DUE",
+      },
+      onRefresh: () => undefined,
+      children: React.createElement("div"),
+    }));
+    const disabledEnglish = render("en", false);
+    const disabledPolish = render("pl", false);
+    const enabledEnglish = render("en", true);
+    const enabledPolish = render("pl", true);
+
+    assert.match(disabledEnglish, /Automation<\/dt><dd>Disabled/);
+    assert.match(disabledEnglish, /Next run<\/dt><dd>Not scheduled/);
+    assert.match(disabledEnglish, new RegExp(`Last run<\\/dt><dd>${escapeRegExp(formatProductDateTime(lastRunAt, "en"))}`));
+    assert.match(disabledEnglish, new RegExp(`Next due after activation<\\/dt><dd>${escapeRegExp(formatProductDateTime(nextDueAt, "en"))}`));
+    assert.match(disabledPolish, /Automatyzacja<\/dt><dd>Nieaktywna/);
+    assert.match(disabledPolish, /Następny run<\/dt><dd>Nie zaplanowano/);
+    assert.match(disabledPolish, new RegExp(`Ostatni run<\\/dt><dd>${escapeRegExp(formatProductDateTime(lastRunAt, "pl"))}`));
+    assert.match(disabledPolish, new RegExp(`Najbliższy termin po aktywacji<\\/dt><dd>${escapeRegExp(formatProductDateTime(nextDueAt, "pl"))}`));
+
+    assert.match(enabledEnglish, /Automation<\/dt><dd>Active/);
+    assert.match(enabledEnglish, new RegExp(`Next run<\\/dt><dd>${escapeRegExp(formatProductDateTime(nextDueAt, "en"))}`));
+    assert.doesNotMatch(enabledEnglish, /Next due after activation/);
+    assert.match(enabledPolish, /Automatyzacja<\/dt><dd>Aktywna/);
+    assert.match(enabledPolish, new RegExp(`Następny run<\\/dt><dd>${escapeRegExp(formatProductDateTime(nextDueAt, "pl"))}`));
+    assert.doesNotMatch(enabledPolish, /Najbliższy termin po aktywacji/);
+    assert.doesNotMatch(disabledEnglish, /Run collector|Start collector/);
+  });
+
   it("does not turn configured Established empty into a global error", () => {
     const markup = renderToStaticMarkup(React.createElement(EstablishedBasket, { candidates: [], metadata: emptyMetadata, readiness: emptyReadiness }));
     assert.equal(getEstablishedState(emptyMetadata, emptyReadiness, []), "empty");
@@ -886,6 +947,7 @@ describe("Product Radar owner acceptance", () => {
     const localeSource = await readFile(resolve(productRoot, "src", "productI18n.tsx"), "utf8");
     const appSource = await readFile(resolve(productRoot, "src", "ProductApp.tsx"), "utf8");
     const scannerSource = await readFile(resolve(productRoot, "src", "services", "scannerDataSource.ts"), "utf8");
+    const automationSource = await readFile(resolve(productRoot, "src", "services", "automationStatusDataSource.ts"), "utf8");
     const apiSource = await readFile(resolve(productRoot, "server", "scannerApiServer.ts"), "utf8");
     assert.doesNotMatch(localeSource, /\bfetch\s*\(/);
     assert.equal(PRODUCT_TRANSLATIONS.en["app.refresh"], "Refresh view");
@@ -894,9 +956,14 @@ describe("Product Radar owner acceptance", () => {
     assert.match(appSource, /getAcceptedProductRefreshTimestamps\(output, new Date\(\)\.toISOString\(\)\)/);
     assert.doesNotMatch(appSource, /finally\(\(\) => \{[\s\S]*?setViewRefreshedAt/);
     assert.doesNotMatch(appSource, /dexscreenerClient|goplusClient|internalBetaCollector/);
+    assert.match(appSource, /loadAutomationStatus\(\)/);
+    assert.doesNotMatch(appSource, /CRYPTO_EDGE_AUTOMATION_ENABLED|runCentralAutomation|automation\/(?:run|enable|activate)/);
     assert.match(scannerSource, /\/api\/scanner\/latest/);
     assert.match(scannerSource, /\/api\/readiness/);
     assert.doesNotMatch(scannerSource, /https?:\/\//);
+    assert.match(automationSource, /\/api\/automation\/status/);
+    assert.match(automationSource, /method: "GET"/);
+    assert.doesNotMatch(automationSource, /method: "POST"|runCentralAutomation|provider|activate/i);
     assert.doesNotMatch(apiSource, /internalBetaCollector|dexscreenerClient|goplusClient|collect:/);
     assert.doesNotMatch(apiSource, /\/api\/scanner\/(?:scan|collect|refresh)/);
   });

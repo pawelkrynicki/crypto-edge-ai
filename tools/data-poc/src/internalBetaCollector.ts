@@ -5,6 +5,10 @@ import { publishAtomicJson, type AtomicPublishResult } from "./atomicPublish.js"
 import { BoundedHttpClient, type FetchLike } from "./boundedHttpClient.js";
 import { buildCombinedScannerOutput } from "./combinedScanner.js";
 import { configureCollectorNetwork } from "./collectorNetworkBootstrap.js";
+import {
+  assertInternalBetaCollectorEnvironment,
+  type CollectorEnvironment,
+} from "./collectorEnvironment.js";
 import { validateDisplayEligibleContextSnapshot } from "./contextSnapshotValidator.js";
 import {
   collectDexScreenerDiscovery,
@@ -26,24 +30,21 @@ import {
   type GoPlusSecurityResult,
 } from "./goplusClient.js";
 import { buildPersistableScannerOutput, type PersistableScannerOutput } from "./persistableScannerModel.js";
+import { APPROVED_SOURCES_OUTPUT_FILENAME } from "./sources/runApprovedSourcesPoc.js";
 import {
-  APPROVED_SOURCES_OUTPUT_FILENAME,
-  collectApprovedSourcesOutput,
-} from "./sources/runApprovedSourcesPoc.js";
+  collectInternalBetaContext,
+  type ContextSourceId,
+} from "./internalBetaContextCollection.js";
 import type { ApprovedSourcesRunOutput } from "./sources/sourceAdapterTypes.js";
 import type { CryptoEdgeCandidate } from "./types.js";
+
+export { assertInternalBetaCollectorEnvironment, type CollectorEnvironment } from "./collectorEnvironment.js";
 
 export const DEFAULT_SECURITY_CANDIDATE_LIMIT = 10;
 export const MAX_SECURITY_CANDIDATE_LIMIT = 20;
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_OUTPUT_DIR = resolve(__dirname, "../../output");
-
-export type CollectorEnvironment = {
-  CRYPTO_EDGE_DATA_ENV?: string;
-  CRYPTO_EDGE_RUNTIME_MODE?: string;
-  ALLOW_LIVE_PROVIDER_CALLS?: string;
-};
 
 export type InternalBetaCollectorOptions = {
   env?: CollectorEnvironment;
@@ -57,6 +58,9 @@ export type InternalBetaCollectorOptions = {
   goplusApiToken?: string;
   establishedUniverse?: unknown;
   establishedUniversePath?: string;
+  contextDueSourceIds?: ContextSourceId[];
+  previousContext?: ApprovedSourcesRunOutput;
+  previousContextRunId?: string | null;
 };
 
 export type InternalBetaCollectorResult = {
@@ -74,6 +78,7 @@ export type InternalBetaCollectorResult = {
   };
   source_health: Record<string, "READY" | "DEGRADED" | "UNAVAILABLE" | "NOT_INVOKED">;
   request_counts: Record<string, number>;
+  context_refreshed_source_ids: ContextSourceId[];
   scanner: PersistableScannerOutput;
   context: ApprovedSourcesRunOutput;
   scanner_publish: AtomicPublishResult;
@@ -110,8 +115,6 @@ export async function runInternalBetaCollector(
       sourceId: "goplus_security",
       maxRequests: securityLimit + Math.min(securityLimit, 3),
     }),
-    alternative_me_fng: new BoundedHttpClient({ ...common, sourceId: "alternative_me_fng", maxRequests: 2 }),
-    defillama_api: new BoundedHttpClient({ ...common, sourceId: "defillama_api", maxRequests: 2 }),
   };
 
   const startedAt = now.toISOString();
@@ -152,27 +155,23 @@ export async function runInternalBetaCollector(
   }
 
   const contextRunId = uniqueRunId("approved_sources", now);
-  const context = await collectApprovedSourcesOutput({
-    mode: "live",
-    environment: "INTERNAL_BETA",
+  const contextCollection = await collectInternalBetaContext({
     now,
     runId: contextRunId,
-    requestJsonBySource: {
-      alternative_me_fng: <T>(url: string | URL, init?: RequestInit) => clients.alternative_me_fng.requestJson<T>(url, init),
-      defillama_api: <T>(url: string | URL, init?: RequestInit) => clients.defillama_api.requestJson<T>(url, init),
-    },
+    fetchImpl: options.fetchImpl,
+    timeoutMs: options.timeoutMs,
+    concurrency: options.concurrency,
+    outputDir: options.outputDir,
+    dueSourceIds: options.contextDueSourceIds,
+    previousContext: options.previousContext,
+    previousContextRunId: options.previousContextRunId,
   });
+  const context = contextCollection.context;
 
-  const requestCounts = Object.fromEntries(Object.entries(clients).map(([sourceId, client]) => [
-    sourceId,
-    client.getStats().request_count,
-  ]));
-  context.provenance.metadata = {
-    request_counts: {
-      alternative_me_fng: requestCounts.alternative_me_fng,
-      defillama_api: requestCounts.defillama_api,
-    },
-    attributions: Object.fromEntries(context.sources.map((source) => [source.source_id, source.attribution])),
+  const requestCounts = {
+    dexscreener: clients.dexscreener.getStats().request_count,
+    goplus_security: clients.goplus_security.getStats().request_count,
+    ...contextCollection.request_counts,
   };
   validateDisplayEligibleContextSnapshot(context);
 
@@ -245,6 +244,7 @@ export async function runInternalBetaCollector(
     },
     source_health: sourceHealth,
     request_counts: requestCounts,
+    context_refreshed_source_ids: contextCollection.refreshed_source_ids,
     scanner,
     context,
     scanner_publish: scannerPublish,
@@ -264,18 +264,6 @@ function buildDiscoveryReadiness(
       ? "UNAVAILABLE"
       : "READY",
   };
-}
-
-export function assertInternalBetaCollectorEnvironment(env: CollectorEnvironment): void {
-  if (env.CRYPTO_EDGE_DATA_ENV !== "INTERNAL_BETA") {
-    throw new Error("COLLECTOR_DATA_ENV_INVALID");
-  }
-  if (env.CRYPTO_EDGE_RUNTIME_MODE !== "INTERNAL_BETA") {
-    throw new Error("COLLECTOR_RUNTIME_MODE_INVALID");
-  }
-  if (env.ALLOW_LIVE_PROVIDER_CALLS !== "1") {
-    throw new Error("LIVE_PROVIDER_CALLS_NOT_ALLOWED");
-  }
 }
 
 export function clampSecurityCandidateLimit(value = DEFAULT_SECURITY_CANDIDATE_LIMIT): number {
