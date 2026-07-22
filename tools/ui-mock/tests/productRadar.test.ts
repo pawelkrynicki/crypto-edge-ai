@@ -826,10 +826,12 @@ describe("Product Radar owner acceptance", () => {
     assert.doesNotMatch(markup, /PASSTOKEN|LOWLIQTOKEN|FDVFALLBACKTOKEN/);
   });
 
-  it("limits product navigation to Radar, Details, Verification and Methodology", async () => {
+  it("preserves Radar, Details, Verification and Methodology while adding Control Center", async () => {
     const source = await readFile(resolve(productRoot, "src", "ProductApp.tsx"), "utf8");
-    for (const key of ["nav.radar", "nav.details", "nav.verification", "nav.methodology"]) assert.match(source, new RegExp(key.replace(".", "\\.")));
-    assert.doesNotMatch(source, /label: "(?:Token Lookup|Trusted Preview|Webinar Teaser|Control Center|Feedback Notes)"/);
+    for (const key of ["nav.radar", "nav.details", "nav.verification", "nav.methodology", "nav.controlCenter"]) {
+      assert.match(source, new RegExp(key.replace(".", "\\.")));
+    }
+    assert.doesNotMatch(source, /label: "(?:Token Lookup|Trusted Preview|Webinar Teaser|Feedback Notes)"/);
   });
 
   it("keeps demo/sample surfaces out of the INTERNAL_BETA build assertion", async () => {

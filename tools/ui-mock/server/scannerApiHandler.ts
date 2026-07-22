@@ -23,10 +23,20 @@ import {
   type ReviewSessionStorageResult,
 } from "./reviewSessionStorageProvider.js";
 import {
+  resolveControlCenterStatus,
+  type ControlCenterFreshness,
+  type ControlCenterReadinessInput,
+} from "../src/controlCenterStatus.js";
+import { resolveProductSourceHealth } from "../src/productSourceHealth.js";
+import {
   resolveProductRuntimeMode,
   type ProductRuntimeMode,
   type ResolvedProductRuntimeMode,
 } from "../src/runtimeMode.js";
+import type {
+  ProductReadinessOutput,
+  ScannerDiscoveryMetadata,
+} from "../src/types/scannerTypes.js";
 
 const DEMO_CORS_ORIGINS = new Set(["http://127.0.0.1:5173", "http://localhost:5173"]);
 
@@ -75,6 +85,70 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
       return;
     }
 
+    if (req.method === "GET" && path === "/api/control-center/status") {
+      const [scanner, context, automation, establishedUniverse, reviewStorage] = await Promise.all([
+        getReadinessEntry(() => readLatestScannerOutput(scannerOptions)),
+        getReadinessEntry(() => readLatestContextOutput(contextOptions)),
+        readAutomationStatus(options.automation),
+        readEstablishedUniverseStatus(options.establishedUniverse),
+        readReviewStorageStatus(reviewSessionProvider),
+      ]);
+      const readiness = buildProductReadiness(scanner, context, runtimeMode);
+      const scannerFacts = readScannerControlCenterFacts(scanner);
+      const contextFacts = readContextControlCenterFacts(context);
+      const sourceHealth = resolveProductSourceHealth({
+        metadata: scannerFacts.metadata,
+        readiness,
+        sourceIds: scannerFacts.sourceIds,
+      });
+
+      sendJson(req, res, 200, resolveControlCenterStatus({
+        runtime: {
+          runtimeMode,
+          healthAvailable: true,
+          apiConnected: true,
+          sameOriginResponseValid: true,
+          readiness: readiness.status === "not_ready"
+            ? "not_ready"
+            : readiness.status === "degraded" ? "degraded" : "ready",
+          buildSha: safeBuildSha(options.health?.buildSha),
+        },
+        scanner: scannerFacts.publicFacts,
+        context: contextFacts,
+        sources: {
+          availability: sourceHealth.status,
+          sourceIds: scannerFacts.sourceIds,
+          affectedSourceIds: sourceHealth.detailSourceIds,
+        },
+        automation: {
+          enabled: automation.enabled,
+          active: automation.active_run_id !== null,
+          stateAvailable: automation.scheduler_status !== "STATE_UNAVAILABLE",
+          lastRunAt: automation.last_attempt_at,
+          lastResult: automation.last_result,
+          nextRunAt: automation.next_run_at,
+          nextDueAfterActivation: automation.next_due_at,
+        },
+        establishedUniverse: {
+          validationStatus: establishedUniverse.validation_status,
+          universeVersion: establishedUniverse.universe_version,
+          entriesEnabled: establishedUniverse.entries_enabled,
+          lastChangeAt: establishedUniverse.last_change_at,
+        },
+        reviewStorage,
+        gates: {
+          reportsLibraryReady: false,
+          feedbackCaptureReady: false,
+          trustedTesterPreviewModeReady: false,
+          vpsDeploymentConfirmed: false,
+          cloudflareAccessVerified: false,
+          rollbackTested: false,
+          ownerApproved: false,
+        },
+      }), runtimeMode);
+      return;
+    }
+
     if (req.method === "GET" && path === "/api/automation/status") {
       sendJson(req, res, 200, await readAutomationStatus(options.automation), runtimeMode);
       return;
@@ -90,35 +164,8 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
         getReadinessEntry(() => readLatestScannerOutput(scannerOptions)),
         getReadinessEntry(() => readLatestContextOutput(contextOptions)),
       ]);
-      const discovery = buildDiscoveryReadiness(scanner, context);
-      const scannerReadiness = publicScannerReadinessEntry(scanner);
-      const ready = scanner.ready;
-      const degraded = ready && (
-        scannerReadiness.freshness_status === "STALE"
-        || !context.ready
-        || discovery.new_emerging.status === "degraded"
-      );
-      sendJson(req, res, ready ? 200 : 503, {
-        status: !ready
-          ? "not_ready"
-          : degraded
-            ? "degraded"
-            : discovery.established.status === "empty_configured" ? "ready_with_empty_established_universe" : "ready",
-        runtime_mode: runtimeMode,
-        ready,
-        process: { ready: true, reason_code: null },
-        scanner: scannerReadiness,
-        context: publicReadinessEntry(context),
-        new_emerging: discovery.new_emerging,
-        established: discovery.established,
-        discovery,
-        reason_codes: [
-          scannerReadiness.reason_code,
-          context.reason_code,
-          discovery.new_emerging.reason_code,
-          discovery.established.reason_code,
-        ].filter(isString),
-      }, runtimeMode);
+      const readiness = buildProductReadiness(scanner, context, runtimeMode);
+      sendJson(req, res, readiness.ready ? 200 : 503, readiness, runtimeMode);
       return;
     }
 
@@ -277,6 +324,148 @@ async function getReadinessEntry(read: () => Promise<unknown>): Promise<{
 }
 
 type ReadinessEntry = Awaited<ReturnType<typeof getReadinessEntry>>;
+
+function buildProductReadiness(
+  scanner: ReadinessEntry,
+  context: ReadinessEntry,
+  runtimeMode: ResolvedProductRuntimeMode,
+): ProductReadinessOutput {
+  const discovery = buildDiscoveryReadiness(scanner, context);
+  const scannerReadiness = publicScannerReadinessEntry(scanner);
+  const ready = scanner.ready;
+  const degraded = ready && (
+    scannerReadiness.freshness_status === "STALE"
+    || !context.ready
+    || discovery.new_emerging.status === "degraded"
+  );
+
+  return {
+    status: !ready
+      ? "not_ready"
+      : degraded
+        ? "degraded"
+        : discovery.established.status === "empty_configured" ? "ready_with_empty_established_universe" : "ready",
+    runtime_mode: runtimeMode,
+    ready,
+    process: { ready: true, reason_code: null },
+    scanner: scannerReadiness,
+    context: publicReadinessEntry(context),
+    new_emerging: discovery.new_emerging,
+    established: discovery.established,
+    discovery,
+    reason_codes: [
+      scannerReadiness.reason_code,
+      context.reason_code,
+      discovery.new_emerging.reason_code,
+      discovery.established.reason_code,
+    ].filter(isString),
+  } as ProductReadinessOutput;
+}
+
+function readScannerControlCenterFacts(entry: ReadinessEntry): {
+  publicFacts: ControlCenterReadinessInput["scanner"];
+  metadata: ScannerDiscoveryMetadata | null;
+  sourceIds: string[];
+} {
+  if (!entry.ready || !isRecord(entry.value)) {
+    return {
+      publicFacts: {
+        available: false,
+        generatedAt: null,
+        freshness: "UNAVAILABLE",
+        lastKnownGood: false,
+        newObservationCount: 0,
+        establishedAfterFilters: 0,
+      },
+      metadata: null,
+      sourceIds: [],
+    };
+  }
+
+  const meta = isRecord(entry.value._source_meta) ? entry.value._source_meta : null;
+  const provenance = isRecord(entry.value.provenance) ? entry.value.provenance : null;
+  const scanRun = isRecord(entry.value.scan_run) ? entry.value.scan_run : null;
+  const metadata = provenance && isRecord(provenance.metadata)
+    ? provenance.metadata as ScannerDiscoveryMetadata
+    : null;
+  const established = metadata?.established;
+  const candidates = Array.isArray(entry.value.candidates) ? entry.value.candidates : [];
+  const freshness: ControlCenterFreshness = meta?.freshness_status === "STALE" ? "STALE" : "FRESH";
+
+  return {
+    publicFacts: {
+      available: true,
+      generatedAt: typeof provenance?.generated_at === "string"
+        ? provenance.generated_at
+        : typeof scanRun?.finished_at === "string" ? scanRun.finished_at : null,
+      freshness,
+      lastKnownGood: meta?.source === "real-output",
+      newObservationCount: candidates.filter((candidate) => (
+        isRecord(candidate) && candidate.discovery_basket === "new_emerging"
+      )).length,
+      establishedAfterFilters: isNonNegativeInteger(established?.candidates_after_filters)
+        ? Number(established?.candidates_after_filters)
+        : candidates.filter((candidate) => (
+          isRecord(candidate) && candidate.discovery_basket === "established"
+        )).length,
+    },
+    metadata,
+    sourceIds: isStringArray(meta?.source_ids)
+      ? meta.source_ids
+      : isStringArray(provenance?.source_ids) ? provenance.source_ids : [],
+  };
+}
+
+function readContextControlCenterFacts(entry: ReadinessEntry): ControlCenterReadinessInput["context"] {
+  if (!entry.ready || !isRecord(entry.value)) {
+    return {
+      available: false,
+      generatedAt: null,
+      freshness: "UNAVAILABLE",
+      lastKnownGood: false,
+    };
+  }
+  const meta = isRecord(entry.value._source_meta) ? entry.value._source_meta : null;
+  return {
+    available: true,
+    generatedAt: typeof entry.value.generated_at === "string" ? entry.value.generated_at : null,
+    freshness: "FRESH",
+    lastKnownGood: meta?.source_kind === "approved-sources-output",
+  };
+}
+
+async function readReviewStorageStatus(
+  provider: ReviewSessionStorageProvider,
+): Promise<ControlCenterReadinessInput["reviewStorage"]> {
+  try {
+    const result = await provider.read();
+    const entries = Object.values(result.state.entries);
+    const lastSavedAt = entries
+      .map((entry) => entry.updated_at)
+      .filter((value) => !Number.isNaN(Date.parse(value)))
+      .sort((left, right) => Date.parse(right) - Date.parse(left))[0] ?? null;
+    return {
+      available: !result._source_meta.warning,
+      entriesCount: entries.length,
+      lastSavedAt,
+    };
+  } catch {
+    return { available: false, entriesCount: 0, lastSavedAt: null };
+  }
+}
+
+function safeBuildSha(value: string | undefined): string | null {
+  const normalized = value?.trim();
+  return normalized && /^[A-Za-z0-9._-]{1,128}$/.test(normalized) ? normalized : null;
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every(isString);
+}
+
+function isNonNegativeInteger(value: unknown): boolean {
+  return Number.isSafeInteger(value) && Number(value) >= 0;
+}
 
 function publicReadinessEntry(entry: ReadinessEntry): { ready: boolean; reason_code: string | null } {
   return { ready: entry.ready, reason_code: entry.reason_code };

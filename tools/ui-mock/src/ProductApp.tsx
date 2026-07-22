@@ -6,6 +6,7 @@ import { CandidateDetailView } from "./components/CandidateDetailView";
 import { CandidateResultsView } from "./components/CandidateResultsView";
 import { ExternalVerificationLinksView } from "./components/ExternalVerificationLinksView";
 import { Methodology } from "./components/Methodology";
+import { ProductControlCenter } from "./components/ProductControlCenter";
 import {
   ProductWorkspaceSection,
   ProductWorkspaceShell,
@@ -13,6 +14,7 @@ import {
   type ProductSectionId,
 } from "./components/ProductWorkspaceShell";
 import { ProductLocaleProvider, useProductLocale } from "./productI18n";
+import type { ControlCenterStatus } from "./controlCenterStatus";
 import { resolveProductSourceHealth } from "./productSourceHealth";
 import { getProductRuntimeMode } from "./runtimeMode";
 import {
@@ -25,6 +27,7 @@ import {
   loadEstablishedUniverseStatus,
   type EstablishedUniverseStatus,
 } from "./services/establishedUniverseStatusDataSource";
+import { loadControlCenterStatus } from "./services/controlCenterStatusDataSource";
 import type {
   ProductReadinessOutput,
   ScannerApiOutput,
@@ -37,6 +40,7 @@ const HASH_TO_SECTION: Record<string, ProductSectionId> = {
   "#candidate-detail": "candidate-detail",
   "#external-checks": "external-checks",
   "#methodology": "methodology",
+  "#control-center": "control-center",
 };
 
 const SECTION_TO_HASH: Record<ProductSectionId, string> = {
@@ -44,6 +48,7 @@ const SECTION_TO_HASH: Record<ProductSectionId, string> = {
   "candidate-detail": "#candidate-detail",
   "external-checks": "#external-checks",
   methodology: "#methodology",
+  "control-center": "#control-center",
 };
 
 export default function ProductApp() {
@@ -76,6 +81,7 @@ export function ProductAppContent() {
   const [verificationCandidateId, setVerificationCandidateId] = useState<string | null>(null);
   const [automationStatus, setAutomationStatus] = useState<AutomationStatus | null>(null);
   const [establishedUniverseStatus, setEstablishedUniverseStatus] = useState<EstablishedUniverseStatus | null>(null);
+  const [controlCenterStatus, setControlCenterStatus] = useState<ControlCenterStatus | null>(null);
   const refreshPromiseRef = useRef<Promise<void> | null>(null);
 
   const navItems = useMemo<ProductNavItem[]>(() => [
@@ -83,6 +89,7 @@ export function ProductAppContent() {
     { id: "candidate-detail", label: t("nav.details"), icon: "D", description: t("nav.detailsDescription") },
     { id: "external-checks", label: t("nav.verification"), icon: "V", description: t("nav.verificationDescription") },
     { id: "methodology", label: t("nav.methodology"), icon: "M", description: t("nav.methodologyDescription") },
+    { id: "control-center", label: t("nav.controlCenter"), icon: "C", description: t("nav.controlCenterDescription") },
   ], [t]);
 
   const sectionCopy = useMemo<Record<ProductSectionId, { title: string; description: string }>>(() => ({
@@ -90,6 +97,7 @@ export function ProductAppContent() {
     "candidate-detail": { title: t("nav.details"), description: t("section.detailsDescription") },
     "external-checks": { title: t("nav.verification"), description: t("section.verificationDescription") },
     methodology: { title: t("nav.methodology"), description: t("section.methodologyDescription") },
+    "control-center": { title: t("nav.controlCenter"), description: t("section.controlCenterDescription") },
   }), [t]);
 
   const selectedCandidate =
@@ -115,14 +123,16 @@ export function ProductAppContent() {
       setReadinessReasonCode(null);
       setUnavailableMessage(null);
 
-      const [scannerResult, readinessResult, automationResult, universeStatusResult] = await Promise.all([
+      const [scannerResult, readinessResult, automationResult, universeStatusResult, controlCenterResult] = await Promise.all([
         loadScannerApiDataSourceResult({ runtimeMode }),
         loadScannerReadinessResult({ runtimeMode }),
         loadAutomationStatus(),
         loadEstablishedUniverseStatus(),
+        loadControlCenterStatus(),
       ]);
       setAutomationStatus(automationResult);
       setEstablishedUniverseStatus(universeStatusResult);
+      setControlCenterStatus(controlCenterResult);
 
       if (readinessResult.status === "ready") {
         setReadiness(readinessResult.output);
@@ -239,6 +249,14 @@ export function ProductAppContent() {
       return (
         <ProductWorkspaceSection {...copy}>
           <ExternalVerificationLinksView candidate={verificationCandidate} />
+        </ProductWorkspaceSection>
+      );
+    }
+
+    if (activeSection === "control-center") {
+      return (
+        <ProductWorkspaceSection {...copy}>
+          <ProductControlCenter status={controlCenterStatus} />
         </ProductWorkspaceSection>
       );
     }

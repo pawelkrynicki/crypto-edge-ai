@@ -193,6 +193,24 @@ The helper explicitly sets `CRYPTO_EDGE_RUNTIME_MODE=DEVELOPMENT_DEMO` in both p
 
 Record real click-through results in `docs\local_mvp_rc_manual_preview_notes.md`. Do not mark any area as `PASS` unless the preview was actually opened and clicked through.
 
+## 12B.1 Control Center owner review
+
+The canonical Control Center is part of the fail-closed `INTERNAL_BETA` Product Radar. Start the current local Product Radar and open the Control Center directly with one command:
+
+```cmd
+scripts\win\start-product-radar-review.cmd --control-center
+```
+
+This starts only the existing local read-only product/API view. It does not start the collector, enable automation, activate Windows Task Scheduler, call providers, deploy to VPS, or change Cloudflare. The screen must keep overall trusted tester readiness at `NOT_READY` until the external preview gates are completed.
+
+Run its dedicated offline contract check with:
+
+```cmd
+scripts\win\check-control-center.cmd
+```
+
+The check covers the canonical four-status resolver, EN/PL semantic parity, the read-only aggregate endpoint, 100 concurrent reads with no state changes and zero provider calls, absence of Control Center mutation routes, and absence of mutating UI actions. See `docs\control_center_shell.md` for the complete contract.
+
 ## Local production preview
 
 ```cmd

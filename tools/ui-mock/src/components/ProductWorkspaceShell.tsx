@@ -10,9 +10,9 @@ import {
 } from "../productI18n";
 import { formatStatusReason } from "../productPresentation";
 import {
-  presentProductSourceHealth,
   type ProductSourceHealthResolution,
 } from "../productSourceHealth";
+import { presentProductSourceHealth } from "../productSourceHealthPresentation";
 import type { ResolvedProductRuntimeMode } from "../runtimeMode";
 import type { ResolvedScannerSource } from "../services/scannerDataSource";
 import type { AutomationStatus } from "../services/automationStatusDataSource";
@@ -23,7 +23,8 @@ export type ProductSectionId =
   | "candidate-results"
   | "candidate-detail"
   | "external-checks"
-  | "methodology";
+  | "methodology"
+  | "control-center";
 
 export type ProductNavItem = {
   id: ProductSectionId;
