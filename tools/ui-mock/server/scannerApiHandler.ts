@@ -37,6 +37,12 @@ import type {
   ProductReadinessOutput,
   ScannerDiscoveryMetadata,
 } from "../src/types/scannerTypes.js";
+import {
+  createOwnerOperationsService,
+  OWNER_SESSION_HEADER,
+  OwnerOperationsError,
+  type OwnerOperationsOptions,
+} from "./ownerOperations.js";
 
 const DEMO_CORS_ORIGINS = new Set(["http://127.0.0.1:5173", "http://localhost:5173"]);
 
@@ -55,6 +61,7 @@ export type ScannerApiHandlerOptions = {
   health?: ScannerApiHealthOptions;
   automation?: AutomationStatusOptions;
   establishedUniverse?: EstablishedUniverseStatusOptions;
+  ownerOperations?: OwnerOperationsOptions;
 };
 
 export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}): RequestListener {
@@ -63,9 +70,60 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
     ?? createConfiguredReviewSessionStorageProvider({ reviewSession: options.reviewSession });
   const scannerOptions: LatestScannerOutputOptions = { ...options.scanner, runtimeMode };
   const contextOptions: LatestContextOutputOptions = { ...options.context, runtimeMode };
+  const ownerOperations = createOwnerOperationsService({
+    automationEnabled: options.automation?.enabled,
+    ...options.ownerOperations,
+  });
 
   return async (req, res) => {
     const path = getRequestPath(req.url);
+
+    if (req.method === "GET" && path === "/api/owner-operations/status") {
+      const [scanner, context] = await Promise.all([
+        getReadinessEntry(() => readLatestScannerOutput(scannerOptions)),
+        getReadinessEntry(() => readLatestContextOutput(contextOptions)),
+      ]);
+      const scannerFacts = readScannerControlCenterFacts(scanner).publicFacts;
+      const contextFacts = readContextControlCenterFacts(context);
+      sendJson(req, res, 200, await ownerOperations.getStatus({
+        scanner_timestamp: scannerFacts.generatedAt,
+        context_timestamp: contextFacts.generatedAt,
+        last_known_good_available: scannerFacts.lastKnownGood || contextFacts.lastKnownGood,
+      }, isLocalOwnerRequest(req)), runtimeMode);
+      return;
+    }
+
+    if (req.method === "GET" && path === "/api/owner-operations/refresh-preview") {
+      try {
+        sendJson(req, res, 200, await ownerOperations.createRefreshPreview(isLocalOwnerRequest(req)), runtimeMode);
+      } catch (error) {
+        sendOwnerOperationsError(req, res, error, runtimeMode);
+      }
+      return;
+    }
+
+    if (req.method === "POST" && path === "/api/owner-operations/refresh") {
+      try {
+        requireOwnerMutationRequest(req);
+        const body = validateOwnerRefreshBody(await readOwnerJsonBody(req));
+        const sessionHeader = req.headers[OWNER_SESSION_HEADER];
+        if (typeof sessionHeader !== "string") throw new OwnerOperationsError("OWNER_SESSION_REQUIRED", 403);
+        const result = await ownerOperations.refresh(
+          body.preflight_id,
+          sessionHeader,
+          isLocalOwnerRequest(req),
+        );
+        sendJson(req, res, result.status === "FAILED" ? 500 : 200, result, runtimeMode);
+      } catch (error) {
+        sendOwnerOperationsError(req, res, error, runtimeMode);
+      }
+      return;
+    }
+
+    if (path.startsWith("/api/owner-operations/")) {
+      sendJson(req, res, 404, { error: "not_found", message: "Route not found" }, runtimeMode);
+      return;
+    }
 
     if (req.method === "OPTIONS") {
       sendEmpty(req, res, isCorsOriginDenied(req, runtimeMode) ? 403 : 204, runtimeMode);
@@ -309,6 +367,86 @@ function sendReviewSessionJson(
   runtimeMode: ResolvedProductRuntimeMode,
 ): void {
   sendJson(req, res, status, { ...result.state, _source_meta: result._source_meta }, runtimeMode);
+}
+
+function sendOwnerOperationsError(
+  req: IncomingMessage,
+  res: ServerResponse,
+  error: unknown,
+  runtimeMode: ResolvedProductRuntimeMode,
+): void {
+  const ownerError = error instanceof OwnerOperationsError
+    ? error
+    : new OwnerOperationsError("OWNER_REFRESH_REQUEST_REJECTED", 400);
+  if (ownerError.code === "RUN_ALREADY_IN_PROGRESS") {
+    sendJson(req, res, ownerError.httpStatus, {
+      status: "RUN_ALREADY_IN_PROGRESS",
+      error: ownerError.code,
+      message: "Refresh already in progress / Odświeżenie już trwa",
+      last_known_good_preserved: true,
+    }, runtimeMode);
+    return;
+  }
+  sendJson(req, res, ownerError.httpStatus, {
+    error: ownerError.code,
+    message: "Owner refresh request rejected",
+  }, runtimeMode);
+}
+
+function requireOwnerMutationRequest(req: IncomingMessage): void {
+  if (!isLocalOwnerRequest(req)) throw new OwnerOperationsError("LOOPBACK_REQUIRED", 403);
+  const contentType = req.headers["content-type"];
+  if (typeof contentType !== "string" || !/^application\/json(?:\s*;\s*charset=utf-8)?$/i.test(contentType.trim())) {
+    throw new OwnerOperationsError("JSON_CONTENT_TYPE_REQUIRED", 415);
+  }
+  const host = req.headers.host;
+  const origin = req.headers.origin;
+  if (typeof host !== "string" || typeof origin !== "string" || origin.toLowerCase() !== `http://${host}`.toLowerCase()) {
+    throw new OwnerOperationsError("SAME_ORIGIN_REQUIRED", 403);
+  }
+}
+
+function isLocalOwnerRequest(req: IncomingMessage): boolean {
+  const remoteAddress = req.socket.remoteAddress?.toLowerCase();
+  if (remoteAddress !== "127.0.0.1" && remoteAddress !== "::1" && remoteAddress !== "::ffff:127.0.0.1") {
+    return false;
+  }
+  const host = req.headers.host;
+  if (typeof host !== "string") return false;
+  try {
+    const hostname = new URL(`http://${host}`).hostname.toLowerCase().replace(/^\[|\]$/g, "");
+    return hostname === "127.0.0.1" || hostname === "localhost" || hostname === "::1";
+  } catch {
+    return false;
+  }
+}
+
+function validateOwnerRefreshBody(value: unknown): { preflight_id: string; confirmation: true } {
+  if (!isRecord(value)) throw new OwnerOperationsError("OWNER_REFRESH_BODY_INVALID", 400);
+  const keys = Object.keys(value).sort();
+  if (keys.length !== 2 || keys[0] !== "confirmation" || keys[1] !== "preflight_id") {
+    throw new OwnerOperationsError("OWNER_REFRESH_BODY_INVALID", 400);
+  }
+  if (typeof value.preflight_id !== "string" || value.preflight_id.length === 0 || value.confirmation !== true) {
+    throw new OwnerOperationsError("OWNER_REFRESH_BODY_INVALID", 400);
+  }
+  return { preflight_id: value.preflight_id, confirmation: true };
+}
+
+async function readOwnerJsonBody(req: IncomingMessage): Promise<unknown> {
+  const chunks: Buffer[] = [];
+  let totalBytes = 0;
+  for await (const chunk of req) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    totalBytes += buffer.length;
+    if (totalBytes > 4_096) throw new OwnerOperationsError("OWNER_REFRESH_BODY_INVALID", 400);
+    chunks.push(buffer);
+  }
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString("utf8")) as unknown;
+  } catch {
+    throw new OwnerOperationsError("OWNER_REFRESH_BODY_INVALID", 400);
+  }
 }
 
 async function getReadinessEntry(read: () => Promise<unknown>): Promise<{

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 
 void React; // Required by the Node TSX test runtime's classic JSX transform.
 import type {
@@ -11,15 +11,36 @@ import {
   useProductLocale,
   type ProductLocale,
 } from "../productI18n";
+import { loadOwnerOperationsStatus, type OwnerOperationsStatus } from "../services/ownerOperationsDataSource";
+import { OwnerOperationsPanel } from "./OwnerOperationsPanel";
 
 type Translator = (
   key: keyof typeof PRODUCT_TRANSLATIONS.en,
   variables?: Record<string, string | number>,
 ) => string;
 
-export function ProductControlCenter({ status }: { status: ControlCenterStatus | null }) {
+export function ProductControlCenter({
+  status,
+  ownerOperationsStatus: providedOwnerOperationsStatus,
+}: {
+  status: ControlCenterStatus | null;
+  ownerOperationsStatus?: OwnerOperationsStatus | null;
+}) {
   const { locale, t } = useProductLocale();
   const overallStatus = status?.overallStatus ?? "NOT_READY";
+  const [loadedOwnerOperationsStatus, setLoadedOwnerOperationsStatus] = useState<OwnerOperationsStatus | null>(null);
+  const ownerOperationsStatus = providedOwnerOperationsStatus === undefined
+    ? loadedOwnerOperationsStatus
+    : providedOwnerOperationsStatus;
+
+  useEffect(() => {
+    if (providedOwnerOperationsStatus !== undefined) return;
+    let active = true;
+    void loadOwnerOperationsStatus().then((nextStatus) => {
+      if (active && nextStatus?.owner_controls_visible) setLoadedOwnerOperationsStatus(nextStatus);
+    });
+    return () => { active = false; };
+  }, [providedOwnerOperationsStatus]);
 
   return (
     <div className="control-center product-control-center">
@@ -160,6 +181,10 @@ export function ProductControlCenter({ status }: { status: ControlCenterStatus |
           <h3>{t("control.unavailable.title")}</h3>
           <p>{t("control.unavailable.explanation")}</p>
         </section>
+      )}
+
+      {ownerOperationsStatus?.owner_controls_visible && (
+        <OwnerOperationsPanel initialStatus={ownerOperationsStatus} />
       )}
 
       <section className="control-section product-control-blockers">

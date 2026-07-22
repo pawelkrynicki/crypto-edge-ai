@@ -211,6 +211,24 @@ scripts\win\check-control-center.cmd
 
 The check covers the canonical four-status resolver, EN/PL semantic parity, the read-only aggregate endpoint, 100 concurrent reads with no state changes and zero provider calls, absence of Control Center mutation routes, and absence of mutating UI actions. See `docs\control_center_shell.md` for the complete contract.
 
+## 12B.4 Owner No-CMD refresh review
+
+Open the existing Control Center with the owner operations panel in canonical `REVIEW_SAFE` mode:
+
+```cmd
+scripts\win\start-product-radar-review.cmd --control-center --owner-operations-review
+```
+
+This mode shows status and allows only the read-only preflight. The real one-time refresh is disabled, the browser does not contact providers, and the launcher does not change automation state or snapshots. The session secret is generated inside the local API process and is never printed or passed on the command line. There is intentionally no `ENABLED` launcher in this stage.
+
+Run the dedicated offline check with:
+
+```cmd
+scripts\win\check-owner-no-cmd-refresh.cmd
+```
+
+The check covers default/tester invisibility, `REVIEW_SAFE`, canonical cadence reuse, zero-write/zero-provider preflight, strict POST gates, occupied lock behavior, last-known-good preservation and 100 concurrent attempts with at most one accepted injected run. It does not run the real collector or make live provider calls. VPS, Cloudflare, Task Scheduler, `PUBLIC_BETA`, external tester access and overall `NOT_READY` remain unchanged. See `docs\owner_no_cmd_refresh.md`.
+
 ## Local production preview
 
 ```cmd

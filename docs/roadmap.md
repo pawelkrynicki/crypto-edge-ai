@@ -160,6 +160,22 @@ Status: **zaakceptowane lokalnie 22.07.2026 — `ACCEPT_LOCAL_CODE`**.
 
 Canonical details and owner-review boundaries are documented in `docs/control_center_shell.md`. Następny sprint, **12B.2**, dotyczy bezpiecznych operacji No-CMD przeznaczonych wyłącznie dla ownera; operacje te nie będą udostępniane testerowi. VPS deployment pozostaje niepotwierdzony, a external tester pozostaje `NO-GO`. Dalsze bramki nadal obejmują Reports Library + Feedback Loop, 12C Trusted Tester Preview Mode, deployment/access smoke, rollback i zgodę ownera.
 
+### Stage 12B.4: Owner No-CMD Refresh Control
+
+Status: **kod gotowy do lokalnego owner review; prawdziwy tryb `ENABLED` nieaktywny**.
+
+12B.4 dodaje pierwszą, ściśle ograniczoną operację ownera wewnątrz Control Center:
+
+- kanoniczne tryby `DISABLED`, `REVIEW_SAFE`, `ENABLED`, domyślnie `DISABLED`;
+- lokalny panel widoczny wyłącznie przy backend capability `owner_controls_visible = true`;
+- read-only status i dry-run preflight korzystający z istniejącej decyzji source-aware cadence;
+- dokładnie jeden ścisły POST, oparty na świeżym podpisanym preflighcie, loopback, same-origin `Origin`, custom header, jawnym potwierdzeniu, centralnym coordinatorze i globalnym locku;
+- brak dowolnych komend, force refresh, parametrów collectora, bezpośrednich połączeń frontendu z providerami i automatycznego Honeypot.is;
+- 100 równoległych prób daje maksymalnie jeden zaakceptowany run;
+- lokalny launcher udostępnia wyłącznie `REVIEW_SAFE`, więc owner może zobaczyć plan, ale prawdziwa akcja i provider calls pozostają zablokowane.
+
+Funkcja nie jest aktywna na VPS, nie zmienia Cloudflare ani Task Scheduler i nie udostępnia panelu testerowi. Overall Trusted Tester Preview pozostaje `NOT_READY`, external tester pozostaje `NO-GO`, a `PUBLIC_BETA` pozostaje wyłączone. Pełny kontrakt: `docs/owner_no_cmd_refresh.md`.
+
 ## Stage 11G: AI KINTEL Staging / Deployment Checklist
 
 Close the documentation package for AI KINTEL production planning before real implementation starts in the AI KINTEL repo.
