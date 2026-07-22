@@ -112,16 +112,50 @@ describe("Control Center readiness model", () => {
     assert.equal(status.feedback.status, "NOT_READY");
   });
 
+  it("uses canonical Reports Library status and treats an empty available library as READY", () => {
+    const input = baseInput();
+    input.reportsLibrary = {
+      libraryAvailable: true,
+      status: "READY",
+      reportCount: 0,
+      validReportCount: 0,
+      skippedReportCount: 0,
+      latestReportGeneratedAt: null,
+    };
+    const status = resolveControlCenterStatus(input);
+    assert.equal(status.reports.status, "READY");
+    assert.equal(status.reports.libraryReady, true);
+    assert.equal(status.reports.validReportCount, 0);
+    assert.equal(status.overallStatus, "NOT_READY");
+    assert.equal(status.accessDeployment.externalTesterAccess, "NO_GO");
+  });
+
+  it("maps skipped report artifacts to PARTIAL without changing overall NO-GO", () => {
+    const input = baseInput();
+    input.reportsLibrary = {
+      libraryAvailable: true,
+      status: "PARTIAL",
+      reportCount: 2,
+      validReportCount: 1,
+      skippedReportCount: 1,
+      latestReportGeneratedAt: "2026-07-21T12:00:00.000Z",
+    };
+    const status = resolveControlCenterStatus(input);
+    assert.equal(status.reports.status, "PARTIAL");
+    assert.equal(status.reports.skippedReportCount, 1);
+    assert.equal(status.overallStatus, "NOT_READY");
+  });
+
   it("keeps EN and PL presentation semantically identical", () => {
     const status = resolveControlCenterStatus(baseInput());
     const english = renderControlCenter("en", status);
     const polish = renderControlCenter("pl", status);
     assert.match(english, /Trusted tester preview/);
     assert.match(english, /Not ready/);
-    assert.match(english, /Reports Library is not complete yet\./);
+    assert.match(english, /read-only Reports Library uses the canonical local report index\./);
     assert.match(polish, /Podgląd dla zaufanego testera/);
     assert.match(polish, /Niegotowe/);
-    assert.match(polish, /Biblioteka raportów nie została jeszcze ukończona\./);
+    assert.match(polish, /Biblioteka raportów wyłącznie do odczytu korzysta z kanonicznego lokalnego indeksu raportów\./);
     assert.equal(countStatusCards(english), countStatusCards(polish));
     assert.equal(status.overallStatus, "NOT_READY");
   });
@@ -315,8 +349,15 @@ function baseInput(): ControlCenterReadinessInput {
       entriesCount: 0,
       lastSavedAt: null,
     },
+    reportsLibrary: {
+      libraryAvailable: false,
+      status: "NOT_READY",
+      reportCount: 0,
+      validReportCount: 0,
+      skippedReportCount: 0,
+      latestReportGeneratedAt: null,
+    },
     gates: {
-      reportsLibraryReady: false,
       feedbackCaptureReady: false,
       trustedTesterPreviewModeReady: false,
       vpsDeploymentConfirmed: false,

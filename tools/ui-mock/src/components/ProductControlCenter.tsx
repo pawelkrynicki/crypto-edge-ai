@@ -151,7 +151,14 @@ export function ProductControlCenter({
             status={status.reports.status}
             explanation={t("control.reports.explanation")}
             nextStep={t("control.reports.next")}
-            details={[[t("control.field.libraryStatus"), statusLabel(status.reports.status, t)]]}
+            details={[
+              [t("control.field.libraryStatus"), statusLabel(status.reports.status, t)],
+              [t("control.field.reportCount"), String(status.reports.reportCount)],
+              [t("control.field.latestReport"), dateValue(status.reports.latestReportGeneratedAt, locale, t)],
+              ...(status.reports.skippedReportCount > 0
+                ? [[t("control.field.skippedReports"), String(status.reports.skippedReportCount)] as [string, string]]
+                : []),
+            ]}
             t={t}
           />
           <ControlCard

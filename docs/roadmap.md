@@ -162,6 +162,22 @@ Status: **zaakceptowane lokalnie 22.07.2026 — `ACCEPT_LOCAL_CODE`**.
 
 Canonical details and owner-review boundaries are documented in `docs/control_center_shell.md`. Następny sprint, **12B.2**, dotyczy bezpiecznych operacji No-CMD przeznaczonych wyłącznie dla ownera; operacje te nie będą udostępniane testerowi. VPS deployment pozostaje niepotwierdzony, a external tester pozostaje `NO-GO`. Dalsze bramki nadal obejmują Reports Library + Feedback Loop, 12C Trusted Tester Preview Mode, deployment/access smoke, rollback i zgodę ownera.
 
+### Stage 12D.1: Read-Only Reports Library
+
+Status: **kod gotowy do lokalnego owner review 22.07.2026**.
+
+- Istniejący JSON `report_version = 1` jest jedynym kanonicznym źródłem danych UI; Markdown pozostaje nieparsowanym artefaktem dodatkowym.
+- Product Radar ma dwujęzyczny widok `#reports` w grupie Review / Feedback.
+- Same-origin API udostępnia wyłącznie `GET /api/reports/status`, `GET /api/reports` i `GET /api/reports/:report_id`.
+- Ograniczony indeks chroni reports root, odrzuca traversal i symlinki, limituje pliki/rozmiar/struktury oraz nie ujawnia lokalnych ścieżek.
+- `READY` obejmuje poprawny stan 0 raportów; `PARTIAL` oznacza prawidłowe raporty obok pominiętych artefaktów; `NOT_READY` oznacza niedostępny lub niespełnialny kontrakt.
+- Control Center korzysta z kanonicznego statusu biblioteki, ale overall pozostaje `NOT_READY`, a tester `NO-GO` z powodu feedbacku, deployment/access, rollbacku i zgody ownera.
+- Brak generowania z UI, provider calls, zapisów, mutujących endpointów, deploymentu oraz zmian VPS, Cloudflare i Task Scheduler.
+
+Pełny kontrakt: `docs/read_only_reports_library.md`.
+
+Zaakceptowany plan kolejnego osobnego etapu: **Final Frontend Polish / Premium UI Pass**, termin **27–30.07.2026**. Kierunek: profesjonalny terminal badawczy, subtelne mikroanimacje, spójna hierarchia i brak hazardowego stylu. Premium polish nie jest implementowany w 12D.1.
+
 ### Stage 12B.4: Owner No-CMD Refresh Control
 
 Status: **kod gotowy do lokalnego owner review; prawdziwy tryb `ENABLED` nieaktywny**.

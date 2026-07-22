@@ -59,8 +59,15 @@ export type ControlCenterReadinessInput = {
     entriesCount: number;
     lastSavedAt: string | null;
   };
+  reportsLibrary: {
+    libraryAvailable: boolean;
+    status: "READY" | "PARTIAL" | "NOT_READY";
+    reportCount: number;
+    validReportCount: number;
+    skippedReportCount: number;
+    latestReportGeneratedAt: string | null;
+  };
   gates: {
-    reportsLibraryReady: boolean;
     feedbackCaptureReady: boolean;
     trustedTesterPreviewModeReady: boolean;
     vpsDeploymentConfirmed: boolean;
@@ -97,6 +104,11 @@ export type ControlCenterStatus = {
   reports: {
     status: ControlCenterReadinessStatus;
     libraryReady: boolean;
+    libraryAvailable: boolean;
+    reportCount: number;
+    validReportCount: number;
+    skippedReportCount: number;
+    latestReportGeneratedAt: string | null;
   };
   accessDeployment: {
     status: ControlCenterReadinessStatus;
@@ -137,7 +149,7 @@ export function resolveControlCenterStatus(input: ControlCenterReadinessInput): 
     ? "READY"
     : "NOT_READY";
   const reviewStorageStatus = input.reviewStorage.available ? "READY" : "NOT_READY";
-  const reportsStatus = input.gates.reportsLibraryReady ? "READY" : "NOT_READY";
+  const reportsStatus = input.reportsLibrary.status;
   const feedbackStatus = input.gates.feedbackCaptureReady ? "READY" : "NOT_READY";
   const externalTesterReady = input.gates.trustedTesterPreviewModeReady
     && input.gates.vpsDeploymentConfirmed
@@ -176,7 +188,12 @@ export function resolveControlCenterStatus(input: ControlCenterReadinessInput): 
     reviewStorage: { ...input.reviewStorage, status: reviewStorageStatus },
     reports: {
       status: reportsStatus,
-      libraryReady: input.gates.reportsLibraryReady,
+      libraryReady: reportsStatus !== "NOT_READY",
+      libraryAvailable: input.reportsLibrary.libraryAvailable,
+      reportCount: input.reportsLibrary.reportCount,
+      validReportCount: input.reportsLibrary.validReportCount,
+      skippedReportCount: input.reportsLibrary.skippedReportCount,
+      latestReportGeneratedAt: input.reportsLibrary.latestReportGeneratedAt,
     },
     accessDeployment: {
       status: accessStatus,

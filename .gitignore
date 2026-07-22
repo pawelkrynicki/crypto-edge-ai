@@ -45,3 +45,8 @@ htmlcov/
 tools/data-poc/output/
 tools/data-poc/.local/
 tools/ui-mock/.local/
+!tools/ui-mock/.local/
+tools/ui-mock/.local/*
+!tools/ui-mock/.local/reports/
+tools/ui-mock/.local/reports/*
+!tools/ui-mock/.local/reports/.gitkeep
