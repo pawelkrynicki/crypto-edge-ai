@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 
 void React; // Required by the Node TSX test runtime's classic JSX transform.
 import type {
+  ControlCenterBlocker,
   ControlCenterReadinessStatus,
   ControlCenterStatus,
 } from "../controlCenterStatus";
@@ -18,6 +19,19 @@ type Translator = (
   key: keyof typeof PRODUCT_TRANSLATIONS.en,
   variables?: Record<string, string | number>,
 ) => string;
+
+const BLOCKER_TRANSLATION_KEYS: Record<
+  ControlCenterBlocker,
+  keyof typeof PRODUCT_TRANSLATIONS.en
+> = {
+  REPORTS_LIBRARY: "control.blockers.reportsLibrary",
+  PERSISTENT_FEEDBACK_CAPTURE: "control.blockers.persistentFeedback",
+  TRUSTED_TESTER_PREVIEW_MODE: "control.blockers.previewMode",
+  VPS_DEPLOYMENT: "control.blockers.deployment",
+  DOMAIN_ACCESS_SMOKE: "control.blockers.accessSmoke",
+  ROLLBACK_TEST: "control.blockers.rollback",
+  OWNER_TESTER_APPROVAL: "control.blockers.ownerApproval",
+};
 
 export function ProductControlCenter({
   status,
@@ -200,14 +214,9 @@ export function ProductControlCenter({
           <p>{t("control.blockers.explanation")}</p>
         </header>
         <ol>
-          {([
-            "control.blockers.reportsFeedback",
-            "control.blockers.previewMode",
-            "control.blockers.deployment",
-            "control.blockers.accessSmoke",
-            "control.blockers.rollback",
-            "control.blockers.ownerApproval",
-          ] as const).map((key) => <li key={key}>{t(key)}</li>)}
+          {(status?.unmetGates ?? []).map((blocker) => (
+            <li key={blocker}>{t(BLOCKER_TRANSLATION_KEYS[blocker])}</li>
+          ))}
         </ol>
       </section>
     </div>

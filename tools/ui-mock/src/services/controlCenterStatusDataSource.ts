@@ -1,4 +1,5 @@
 import {
+  CONTROL_CENTER_BLOCKERS,
   CONTROL_CENTER_STATUSES,
   type ControlCenterStatus,
 } from "../controlCenterStatus";
@@ -20,6 +21,7 @@ export async function loadControlCenterStatus(): Promise<ControlCenterStatus | n
 function isControlCenterStatus(value: unknown): value is ControlCenterStatus {
   if (!isRecord(value) || value.schemaVersion !== "control_center_status_v1") return false;
   if (!isStatus(value.overallStatus)) return false;
+  if (!Array.isArray(value.unmetGates) || !value.unmetGates.every(isBlocker)) return false;
   const sectionKeys = [
     "runtimeApi",
     "dataSnapshots",
@@ -36,6 +38,10 @@ function isControlCenterStatus(value: unknown): value is ControlCenterStatus {
 
 function isStatus(value: unknown): boolean {
   return typeof value === "string" && (CONTROL_CENTER_STATUSES as readonly string[]).includes(value);
+}
+
+function isBlocker(value: unknown): boolean {
+  return typeof value === "string" && (CONTROL_CENTER_BLOCKERS as readonly string[]).includes(value);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
