@@ -96,6 +96,20 @@ Pierwsza wersja owner review wykryła błędne powiązanie statusu **Runtime i A
 
 Akceptacja lokalnego kodu nie oznacza gotowości całego produktu dla testera zewnętrznego. External tester pozostaje `NO-GO` do czasu zamknięcia pozostałych bramek.
 
+## Owner operations w 12B.4
+
+Etap 12B.4 dodaje wewnątrz Control Center osobną, backend-gated sekcję **Operacje ownera / Owner operations**. Nie zmienia ona read-only kontraktu `/api/control-center/status`: korzysta z osobnych, ściśle nazwanych endpointów `/api/owner-operations/*`.
+
+W domyślnym `DISABLED` sekcja nie renderuje się i nie może zostać włączona hashem ani parametrem URL. `REVIEW_SAFE` pozwala wyłącznie na read-only preflight; prawdziwy POST pozostaje zablokowany. Zwykły `INTERNAL_BETA` i tester nie dostają capability ownera. Overall pozostaje `NOT_READY`, a external tester `NO-GO`. Pełny kontrakt bezpieczeństwa znajduje się w `docs/owner_no_cmd_refresh.md`.
+
+Bezpieczny przegląd panelu 12B.4, bez provider calls i bez prawdziwego odświeżenia:
+
+```cmd
+scripts\win\start-product-radar-review.cmd --control-center --owner-operations-review
+```
+
+Pierwszy panel operacji ownera został zaakceptowany lokalnie 22.07.2026 z werdyktem `ACCEPT_LOCAL_CODE`. Panel pozostaje ukryty dla testera, domyślnie wyłączony w trybie `DISABLED` i dostępny podczas lokalnego owner review wyłącznie jako bezpieczny `REVIEW_SAFE`; tryb `ENABLED` nie został aktywowany.
+
 ## Owner review
 
 Owner ocenia tylko ekran, statusy, EN/PL, brak mutujących akcji i overall `NOT_READY`. Nie musi powtarzać walidacji technicznej.
