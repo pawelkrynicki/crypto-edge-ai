@@ -14,6 +14,8 @@ Runtime ownera jest lokalny i wykluczony z Git. Aktualny universe pozostaje celo
 
 Sprint 1 i Sprint 2 etapu **VPS Deployment & Automation** zostały zaakceptowane lokalnie 21.07.2026 z werdyktem `ACCEPT_LOCAL_CODE`.
 
+Etap **12B.4 Owner No-CMD Refresh Control** został zaakceptowany lokalnie 22.07.2026 z werdyktem `ACCEPT_LOCAL_CODE`. Tryb `ENABLED` wymaga osobnej decyzji ownera i nie jest aktywny na VPS. External tester pozostaje `NO-GO`.
+
 Aktualny stan: **local code complete, VPS operational deployment pending**. Akceptacja lokalnego kodu nie oznacza wykonanego deploymentu, aktywnego Windows Task Scheduler ani zgody dla testera zewnętrznego.
 
 Pierwszy sprint bieżącego etapu przygotował produkcyjny runtime same-origin dla Windows VPS oraz central automation guard: jeden proces produktu na `127.0.0.1:4180`, jeden wspólny handler `/api/*`, międzyprocesowy global lock, heartbeat, bezpieczne stale recovery, atomowy stan oraz coordinator z wstrzykiwanym runnerem.

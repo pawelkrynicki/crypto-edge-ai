@@ -108,6 +108,8 @@ Bezpieczny przegląd panelu 12B.4, bez provider calls i bez prawdziwego odświe�
 scripts\win\start-product-radar-review.cmd --control-center --owner-operations-review
 ```
 
+Pierwszy panel operacji ownera został zaakceptowany lokalnie 22.07.2026 z werdyktem `ACCEPT_LOCAL_CODE`. Panel pozostaje ukryty dla testera, domyślnie wyłączony w trybie `DISABLED` i dostępny podczas lokalnego owner review wyłącznie jako bezpieczny `REVIEW_SAFE`; tryb `ENABLED` nie został aktywowany.
+
 ## Owner review
 
 Owner ocenia tylko ekran, statusy, EN/PL, brak mutujących akcji i overall `NOT_READY`. Nie musi powtarzać walidacji technicznej.

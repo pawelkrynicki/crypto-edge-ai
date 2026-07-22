@@ -104,3 +104,25 @@ Rollback polega na przywróceniu `CRYPTO_EDGE_OWNER_OPERATIONS_MODE=DISABLED` i 
 ## Owner review
 
 Owner sprawdza wyłącznie widoczność panelu w `REVIEW_SAFE`, wersje PL/EN, czytelność planu, jasną blokadę prawdziwej akcji, brak panelu w zwykłym widoku oraz brak technicznych komend i ścieżek. Owner nie uruchamia prawdziwego odświeżenia i nie powtarza testów technicznych.
+
+## Local owner review: ACCEPT_LOCAL_CODE — 22.07.2026
+
+Owner review zaakceptował commit `20786241106deacca29f8e0fd906052c1887d07d` i potwierdził:
+
+- panel ownera jest niewidoczny w zwykłym `INTERNAL_BETA`;
+- panel jest widoczny wyłącznie w `REVIEW_SAFE`;
+- prawdziwe odświeżenie jest zablokowane w `REVIEW_SAFE`;
+- preflight działa i pokazuje plan bez provider calls;
+- plan poprawnie wskazuje `scanner_and_context`;
+- scanner i context są due;
+- globalny lock jest dostępny;
+- lista `sources_may_be_called` jest czytelna;
+- Honeypot.is pozostaje w `sources_not_called`;
+- preflight ma widoczny termin ważności;
+- checkbox i przycisk uruchomienia są nieaktywne w `REVIEW_SAFE`;
+- wersje PL i EN są spójne;
+- UI nie pokazuje komend, ścieżek, sekretów ani technicznego workflow;
+- external tester nadal ma `NO-GO`;
+- overall Trusted Tester Preview pozostaje `NOT_READY`.
+
+`REVIEW_SAFE` pozwala wyłącznie na odczyt statusu i preflight. Mutujący `POST /api/owner-operations/refresh` pozostaje w tym trybie zablokowany, a `ENABLED` nie został aktywowany. Owner review wykonał zero live provider calls oraz nie zmienił snapshotów ani automation state.
