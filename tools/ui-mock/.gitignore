@@ -11,6 +11,11 @@ node_modules
 dist
 dist-ssr
 *.local
+!.local/
+.local/*
+!.local/reports/
+.local/reports/*
+!.local/reports/.gitkeep
 
 # Editor directories and files
 .vscode/*

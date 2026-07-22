@@ -84,6 +84,323 @@
   }
 }
 
+/* Read-only Reports Library */
+.reports-library {
+  display: grid;
+  gap: 1rem;
+}
+
+.reports-library-hero,
+.reports-list,
+.report-detail,
+.report-detail-card {
+  border: 1px solid var(--border, #d8dee8);
+  border-radius: 14px;
+  background: var(--bg-card);
+}
+
+.reports-library-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1.25rem;
+}
+
+.reports-library-hero h3,
+.reports-subheader h4,
+.report-detail-header h4,
+.report-section h5,
+.report-list-card h5 {
+  margin: 0;
+}
+
+.reports-library-hero p,
+.reports-subheader p,
+.report-detail-header p,
+.report-list-card p {
+  margin: 0.4rem 0 0;
+  color: var(--text-secondary);
+}
+
+.reports-library-status {
+  min-width: 9rem;
+  display: grid;
+  justify-items: end;
+  gap: 0.25rem;
+}
+
+.reports-library-status strong {
+  font-size: 1.65rem;
+}
+
+.reports-library-status small {
+  color: var(--text-secondary);
+}
+
+.reports-library-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.reports-library-facts > div {
+  min-width: 0;
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--border, #d8dee8);
+  border-radius: 10px;
+  background: var(--bg-card);
+}
+
+.reports-library-facts span,
+.report-metadata-grid dt,
+.report-inline-facts dt,
+.report-list-card dt {
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+}
+
+.reports-library-facts strong,
+.report-metadata-grid dd,
+.report-inline-facts dd,
+.report-list-card dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.reports-library-notice {
+  margin: 0;
+  padding: 0.85rem 1rem;
+  border-radius: 10px;
+  border: 1px solid var(--border, #d8dee8);
+}
+
+.reports-library-notice.partial {
+  border-color: #b87913;
+  background: color-mix(in srgb, #b87913 10%, transparent);
+}
+
+.reports-library-notice.unavailable {
+  border-color: #b94747;
+  background: color-mix(in srgb, #b94747 10%, transparent);
+}
+
+.reports-library-layout {
+  display: grid;
+  grid-template-columns: minmax(18rem, 0.85fr) minmax(24rem, 1.4fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.reports-list,
+.report-detail {
+  min-width: 0;
+  padding: 1rem;
+}
+
+.reports-subheader,
+.report-detail-header,
+.report-list-title-row,
+.report-detail-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.reports-list-records {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.report-list-card {
+  display: grid;
+  gap: 0.8rem;
+  padding: 0.9rem;
+  border: 1px solid var(--border, #d8dee8);
+  border-radius: 10px;
+  background: var(--bg-raised);
+}
+
+.report-list-card dl,
+.report-metadata-grid,
+.report-inline-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+  margin: 0.75rem 0 0;
+}
+
+.report-list-card dl > div,
+.report-metadata-grid > div,
+.report-inline-facts > div {
+  min-width: 0;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.report-validation-badge {
+  flex: 0 0 auto;
+  padding: 0.2rem 0.45rem;
+  border-radius: 999px;
+  color: #176b4d;
+  background: color-mix(in srgb, #1b8b64 14%, transparent);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.reports-primary-button,
+.reports-secondary-button {
+  min-height: 2.25rem;
+  border: 1px solid var(--border-strong, #9aa5b5);
+  border-radius: 8px;
+  padding: 0.45rem 0.75rem;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.reports-primary-button {
+  border-color: #245dcc;
+  color: #fff;
+  background: #245dcc;
+}
+
+.reports-secondary-button {
+  color: inherit;
+  background: transparent;
+}
+
+.reports-primary-button:focus-visible,
+.reports-secondary-button:focus-visible {
+  outline: 3px solid color-mix(in srgb, #245dcc 35%, transparent);
+  outline-offset: 2px;
+}
+
+.reports-primary-button:disabled,
+.reports-secondary-button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.reports-empty-state {
+  margin: 1rem 0 0;
+  padding: 1rem;
+  border: 1px dashed var(--border, #d8dee8);
+  border-radius: 10px;
+  color: var(--text-secondary);
+}
+
+.report-detail-card {
+  border: 0;
+}
+
+.report-detail-actions {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border, #d8dee8);
+}
+
+.report-section {
+  padding: 1rem 0;
+  border-top: 1px solid var(--border, #d8dee8);
+}
+
+.report-metadata-grid + .report-section {
+  margin-top: 1rem;
+}
+
+.report-section > p {
+  margin: 0.55rem 0 0;
+  color: var(--text-secondary);
+}
+
+.report-plain-list,
+.report-candidate-list,
+.report-chip-list {
+  list-style: none;
+  display: grid;
+  gap: 0.55rem;
+  margin: 0.65rem 0 0;
+  padding: 0;
+}
+
+.report-plain-list li,
+.report-candidate-list li {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.7rem;
+  border-radius: 8px;
+  background: var(--bg-raised);
+}
+
+.report-plain-list span,
+.report-candidate-list span,
+.report-candidate-list p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.report-candidate-list li > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.report-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.report-chip-list li {
+  padding: 0.28rem 0.55rem;
+  border: 1px solid var(--border, #d8dee8);
+  border-radius: 999px;
+  font-size: 0.75rem;
+}
+
+.report-chip-list.warning li {
+  border-color: #b87913;
+}
+
+@media (max-width: 980px) {
+  .reports-library-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .reports-library-hero,
+  .reports-subheader,
+  .report-detail-header {
+    flex-direction: column;
+  }
+
+  .reports-library-status {
+    justify-items: start;
+  }
+
+  .reports-library-facts,
+  .report-list-card dl,
+  .report-metadata-grid,
+  .report-inline-facts {
+    grid-template-columns: 1fr;
+  }
+
+  .report-candidate-list li > div {
+    display: grid;
+  }
+}
+
 /* Product Radar INTERNAL_BETA */
 .product-shell-body {
   grid-template-columns: 220px minmax(0, 1fr);

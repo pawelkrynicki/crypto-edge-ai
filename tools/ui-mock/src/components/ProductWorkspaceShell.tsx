@@ -23,6 +23,7 @@ export type ProductSectionId =
   | "candidate-results"
   | "candidate-detail"
   | "external-checks"
+  | "reports"
   | "methodology"
   | "control-center";
 
@@ -31,6 +32,8 @@ export type ProductNavItem = {
   label: string;
   icon: string;
   description: string;
+  groupLabel?: string;
+  groupDescription?: string;
 };
 
 type ProductWorkspaceShellProps = {
@@ -171,28 +174,30 @@ export function ProductWorkspaceShell({
       <div className="workspace-shell-body product-shell-body">
         <aside className="workspace-sidebar product-sidebar" aria-label={t("app.navigation")}>
           <nav className="workspace-nav">
-            <section className="workspace-nav-group" aria-label="Crypto Edge AI">
-              <div className="workspace-nav-group-header">
-                <span>Product Radar</span>
-                <small>{t("app.realData")}</small>
-              </div>
+            {groupProductNavItems(navItems).map((group) => (
+              <section className="workspace-nav-group" aria-label={group.label} key={group.label}>
+                <div className="workspace-nav-group-header">
+                  <span>{group.label}</span>
+                  <small>{group.description}</small>
+                </div>
 
-              {navItems.map((item) => (
-                <button
-                  type="button"
-                  key={item.id}
-                  onClick={() => onSectionChange(item.id)}
-                  className={`workspace-nav-item ${activeSection === item.id ? "active" : ""}`}
-                  aria-current={activeSection === item.id ? "page" : undefined}
-                >
-                  <span className="workspace-nav-icon" aria-hidden="true">{item.icon}</span>
-                  <span className="workspace-nav-copy">
-                    <span>{item.label}</span>
-                    <small>{item.description}</small>
-                  </span>
-                </button>
-              ))}
-            </section>
+                {group.items.map((item) => (
+                  <button
+                    type="button"
+                    key={item.id}
+                    onClick={() => onSectionChange(item.id)}
+                    className={`workspace-nav-item ${activeSection === item.id ? "active" : ""}`}
+                    aria-current={activeSection === item.id ? "page" : undefined}
+                  >
+                    <span className="workspace-nav-icon" aria-hidden="true">{item.icon}</span>
+                    <span className="workspace-nav-copy">
+                      <span>{item.label}</span>
+                      <small>{item.description}</small>
+                    </span>
+                  </button>
+                ))}
+              </section>
+            ))}
           </nav>
         </aside>
 
@@ -311,4 +316,23 @@ export function ProductWorkspaceSection({
 
 function unique(values: string[]): string[] {
   return [...new Set(values)];
+}
+
+function groupProductNavItems(items: ProductNavItem[]): Array<{
+  label: string;
+  description: string;
+  items: ProductNavItem[];
+}> {
+  const groups = new Map<string, { label: string; description: string; items: ProductNavItem[] }>();
+  for (const item of items) {
+    const label = item.groupLabel ?? "Product Radar";
+    const existing = groups.get(label) ?? {
+      label,
+      description: item.groupDescription ?? "",
+      items: [],
+    };
+    existing.items.push(item);
+    groups.set(label, existing);
+  }
+  return [...groups.values()];
 }

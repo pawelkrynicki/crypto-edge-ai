@@ -13,6 +13,7 @@ describe("production same-origin VPS runtime", () => {
   let distPath: string;
   let outputDirPath: string;
   let contextOutputDirPath: string;
+  let reportsRootPath: string;
   let productServer: ReturnType<typeof createProductVpsServer>;
   let scannerServer: ReturnType<typeof createScannerApiServer>;
   let productBaseUrl: string;
@@ -23,9 +24,11 @@ describe("production same-origin VPS runtime", () => {
     distPath = resolve(tempRoot, "dist");
     outputDirPath = resolve(tempRoot, "scanner-output");
     contextOutputDirPath = resolve(tempRoot, "context-output");
+    reportsRootPath = resolve(tempRoot, "reports");
     await mkdir(resolve(distPath, "assets"), { recursive: true });
     await mkdir(outputDirPath, { recursive: true });
     await mkdir(contextOutputDirPath, { recursive: true });
+    await mkdir(reportsRootPath, { recursive: true });
     await writeFile(resolve(distPath, "index.html"), "<!doctype html><html><body>INTERNAL_BETA PRODUCT</body></html>", "utf8");
     await writeFile(resolve(distPath, "assets", "app-12345678.js"), "globalThis.__PRODUCT_ASSET__ = true;", "utf8");
 
@@ -34,6 +37,7 @@ describe("production same-origin VPS runtime", () => {
       scanner: { outputDirPath },
       context: { outputDirPath: contextOutputDirPath },
       reviewSession: { storageFilePath: resolve(tempRoot, "review-session.json") },
+      reports: { reportsRootPath },
     };
     productServer = createProductVpsServer({
       ...apiOptions,
@@ -138,6 +142,8 @@ describe("production same-origin VPS runtime", () => {
       "/api/context/latest",
       "/api/scanner/sources",
       "/api/established-universe/status",
+      "/api/reports/status",
+      "/api/reports",
     ]) {
       const [product, scanner] = await Promise.all([
         requestRaw(productBaseUrl, path),

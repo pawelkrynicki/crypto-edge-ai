@@ -12,6 +12,7 @@ set "RUN_CHECK=0"
 :parse_args
 if "%~1"=="" goto args_done
 if /i "%~1"=="--control-center" set "RADAR_VIEW=control-center"
+if /i "%~1"=="--reports" set "RADAR_VIEW=reports"
 if /i "%~1"=="--owner-operations-review" set "OWNER_OPERATIONS_REVIEW=1"
 if /i "%~1"=="--check" set "RUN_CHECK=1"
 shift

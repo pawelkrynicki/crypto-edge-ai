@@ -162,6 +162,52 @@ Status: **zaakceptowane lokalnie 22.07.2026 — `ACCEPT_LOCAL_CODE`**.
 
 Canonical details and owner-review boundaries are documented in `docs/control_center_shell.md`. Następny sprint, **12B.2**, dotyczy bezpiecznych operacji No-CMD przeznaczonych wyłącznie dla ownera; operacje te nie będą udostępniane testerowi. VPS deployment pozostaje niepotwierdzony, a external tester pozostaje `NO-GO`. Dalsze bramki nadal obejmują Reports Library + Feedback Loop, 12C Trusted Tester Preview Mode, deployment/access smoke, rollback i zgodę ownera.
 
+### Stage 12D.1: Read-Only Reports Library
+
+Status: **zaakceptowane lokalnie 22.07.2026 — `ACCEPT_LOCAL_CODE`**.
+
+- Istniejący JSON `report_version = 1` jest jedynym kanonicznym źródłem danych UI; Markdown pozostaje nieparsowanym artefaktem dodatkowym.
+- Product Radar ma dwujęzyczny widok `#reports` w grupie Review / Feedback.
+- Same-origin API udostępnia wyłącznie `GET /api/reports/status`, `GET /api/reports` i `GET /api/reports/:report_id`.
+- Ograniczony indeks chroni reports root, odrzuca traversal i symlinki, limituje pliki/rozmiar/struktury oraz nie ujawnia lokalnych ścieżek.
+- `READY` obejmuje poprawny stan 0 raportów; `PARTIAL` oznacza prawidłowe raporty obok pominiętych artefaktów; `NOT_READY` oznacza niedostępny lub niespełnialny kontrakt.
+- Control Center korzysta z kanonicznego statusu biblioteki, ale overall pozostaje `NOT_READY`, a tester `NO-GO` z powodu feedbacku, deployment/access, rollbacku i zgody ownera.
+- Brak generowania z UI, provider calls, zapisów, mutujących endpointów, deploymentu oraz zmian VPS, Cloudflare i Task Scheduler.
+
+Pełny kontrakt: `docs/read_only_reports_library.md`.
+
+Następny główny etap linii 12D to **12D.2 Persistent Feedback Loop**. Przed nim obowiązuje zaakceptowana kolejność dwóch osobnych zadań produktowych; żadne z poniższych zadań nie jest implementowane w PR #73.
+
+#### A. Maturing / Follow-up Basket
+
+- zapis wykrytych tokenów według `chain + contract_address`;
+- dalsze śledzenie po 1, 3, 7, 14 i 30 dniach;
+- przepływ **New → Maturing → Candidate for Established**;
+- brak automatycznego awansu do Established.
+
+#### B. Owner Established Promotion Flow
+
+- akcja ownera w szczegółach tokena: **„Rozważ do Established”**;
+- dry-run-first;
+- walidacja `chain + contract_address`;
+- sprawdzenie duplikatu;
+- osobne potwierdzenie;
+- wykorzystanie istniejącego managera universe;
+- wersja, historia, audit i rollback;
+- brak automatycznego awansu.
+
+Zaakceptowana kolejność dalszych prac:
+
+1. Read-Only Reports Library — zakończone.
+2. Maturing / Follow-up Basket.
+3. Owner Established Promotion Flow.
+4. Persistent Feedback Loop.
+5. VPS i private tester preview.
+6. Final Frontend Polish / Premium UI Pass.
+7. Sesja testera i poprawki P0.
+
+Planowany termin osobnego **Final Frontend Polish / Premium UI Pass** pozostaje **27–30.07.2026**. Kierunek: profesjonalny terminal badawczy, subtelne mikroanimacje, spójna hierarchia i brak hazardowego stylu.
+
 ### Stage 12B.4: Owner No-CMD Refresh Control
 
 Status: **kod gotowy do lokalnego owner review; prawdziwy tryb `ENABLED` nieaktywny**.

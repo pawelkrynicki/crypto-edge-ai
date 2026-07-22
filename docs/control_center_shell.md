@@ -6,7 +6,7 @@ Control Center jest wyłącznie odczytowym ekranem statusu wewnątrz istniejące
 
 Aktualny verdict dla **Trusted tester preview**: **`NOT_READY`**.
 
-Lokalnie działający kod, API lub świeże dane nie oznaczają gotowości do testu zewnętrznego. Nadal niepotwierdzone są wdrożenie VPS, końcowy smoke Cloudflare Access, trwały feedback, Reports Library, rollback i zgoda ownera.
+Lokalnie działający kod, API, świeże dane lub gotowa read-only Reports Library nie oznaczają gotowości do testu zewnętrznego. Nadal niepotwierdzone są wdrożenie VPS, końcowy smoke Cloudflare Access, trwały feedback, rollback i zgoda ownera.
 
 ## Kanoniczny model statusów
 
@@ -42,7 +42,7 @@ Stary, ale prawidłowy last-known-good scanner snapshot daje `PARTIAL` sekcji da
 - **Automatyzacja** — aktywność, ostatni run i wynik, następny run oraz najbliższy termin po aktywacji. Stan nieaktywny nie jest `READY`.
 - **Established Universe** — validation status, wersja, liczba aktywnych wpisów i ostatnia zmiana. Zero wpisów nie jest awarią przy poprawnej walidacji.
 - **Review storage** — dostępność, liczba zapisów i ostatni zapis. Brak zapisów jest neutralny; niedostępny storage daje `NOT_READY`.
-- **Reports** — `NOT_READY`; Reports Library nie została jeszcze ukończona.
+- **Reports** — status pochodzi z kanonicznego indeksu Reports Library: `READY` także przy 0 raportów, `PARTIAL` przy co najmniej jednym prawidłowym i pominiętych artefaktach, `NOT_READY` przy niedostępnym storage lub niespełnialnym kontrakcie. Karta pokazuje liczbę raportów, najnowszy raport i liczbę pominiętych artefaktów.
 - **Dostęp i wdrożenie** — lokalny runtime, niepotwierdzony VPS, wymagany końcowy smoke Cloudflare Access i external tester `NO-GO`.
 - **Feedback** — `NOT_READY`; trwałe zbieranie feedbacku testera nie jest gotowe.
 
@@ -67,7 +67,7 @@ Widoczna granica produktu pozostaje bez zmian: Crypto Edge AI jest narzędziem b
 
 Kolejne prace powinny zachować tę kolejność:
 
-1. 12B.2 — Reports Library i Feedback Loop.
+1. trwały Feedback Loop po ukończonej read-only Reports Library 12D.1.
 2. 12C — Trusted Tester Preview Mode.
 3. Deployment na VPS.
 4. Smoke przez domenę i Cloudflare Access.
@@ -75,6 +75,17 @@ Kolejne prace powinny zachować tę kolejność:
 6. Zgoda ownera dla testera.
 
 12B.1 nie wdraża produktu na VPS, nie zmienia Cloudflare i nie aktywuje Windows Task Scheduler.
+
+## Aktualizacja 12D.1
+
+Od 12D.1 karta Reports nie korzysta ze stałej bramki. `GET /api/control-center/status` wywołuje ten sam bezpieczny `readReportsLibraryStatus`, którego używa `GET /api/reports/status`, więc karta korzysta z kanonicznego statusu biblioteki.
+
+- `READY` przy 0 raportów jest prawidłowym, neutralnym stanem gotowej biblioteki.
+- Reports Library ze statusem `READY` nie występuje na liście blockerów.
+- `PARTIAL` albo `NOT_READY` mogą ponownie dodać Reports Library jako osobny blocker.
+- Trwałe zbieranie feedbacku pozostaje niezależnym blockerem i nie jest łączone z Reports Library.
+
+Overall nadal pozostaje `NOT_READY`, ponieważ feedback i access/deployment pozostają niegotowe. Szczegóły kontraktu znajdują się w `docs/read_only_reports_library.md`.
 
 ## Local owner review: ACCEPT_LOCAL_CODE — 22.07.2026
 

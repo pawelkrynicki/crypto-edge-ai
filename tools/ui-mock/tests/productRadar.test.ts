@@ -826,11 +826,13 @@ describe("Product Radar owner acceptance", () => {
     assert.doesNotMatch(markup, /PASSTOKEN|LOWLIQTOKEN|FDVFALLBACKTOKEN/);
   });
 
-  it("preserves Radar, Details, Verification and Methodology while adding Control Center", async () => {
+  it("preserves Radar, Details, Verification and Methodology while adding Reports and Control Center", async () => {
     const source = await readFile(resolve(productRoot, "src", "ProductApp.tsx"), "utf8");
-    for (const key of ["nav.radar", "nav.details", "nav.verification", "nav.methodology", "nav.controlCenter"]) {
+    for (const key of ["nav.radar", "nav.details", "nav.verification", "nav.reports", "nav.methodology", "nav.controlCenter"]) {
       assert.match(source, new RegExp(key.replace(".", "\\.")));
     }
+    assert.match(source, /"#reports":\s*"reports"/);
+    assert.match(source, /groupLabel:\s*t\("nav\.groupReview"\)/);
     assert.doesNotMatch(source, /label: "(?:Token Lookup|Trusted Preview|Webinar Teaser|Feedback Notes)"/);
   });
 
@@ -847,7 +849,10 @@ describe("Product Radar owner acceptance", () => {
     assert.match(source, /--mode internal-beta/);
     assert.match(source, /kill-local-ports\.cmd/);
     assert.match(source, /--check/);
+    assert.match(source, /--reports/);
+    assert.match(source, /RADAR_VIEW=reports/);
     assert.match(source, /start-product-radar-api\.cmd/);
+    assert.doesNotMatch(source, /generate-analyst-report|report:analyst/);
     assert.doesNotMatch(source, /start[^\r\n]*set ""CRYPTO_EDGE_RUNTIME_MODE/);
     assert.match(apiWrapper, /set "CRYPTO_EDGE_RUNTIME_MODE=INTERNAL_BETA"/);
     assert.match(apiWrapper, /set "SCANNER_API_PORT=5177"/);

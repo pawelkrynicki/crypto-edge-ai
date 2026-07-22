@@ -337,6 +337,18 @@ Acceptance criteria:
 - Tester can leave structured feedback.
 - Owner can triage feedback into blockers, improvements, and later ideas.
 
+### 12D.1 — Read-Only Reports Library
+
+Status: kod gotowy do lokalnego owner review 22.07.2026.
+
+- Istniejący JSON raportu v1 jest kanonicznym źródłem widoku `#reports`; Markdown nie jest parsowany.
+- Bezpieczne API udostępnia wyłącznie status, listę i szczegóły przez same-origin GET.
+- Tester widzi poprawny empty state, stan częściowy lub niedostępny bez lokalnych ścieżek.
+- Control Center korzysta z tego samego statusu biblioteki; overall nadal jest `NOT_READY`, a external tester `NO-GO`.
+- Trwałe zbieranie feedbacku pozostaje kolejnym etapem i nie zostało dodane w 12D.1.
+
+Osobno zaakceptowano plan **Final Frontend Polish / Premium UI Pass** na **27–30.07.2026**: profesjonalny terminal badawczy, subtelne mikroanimacje, spójna hierarchia i brak hazardowego stylu. Ten polish nie należy do 12D.1.
+
 ## 12E - Lightweight Private Preview Deployment
 
 Goal:

@@ -7,6 +7,7 @@ import { CandidateResultsView } from "./components/CandidateResultsView";
 import { ExternalVerificationLinksView } from "./components/ExternalVerificationLinksView";
 import { Methodology } from "./components/Methodology";
 import { ProductControlCenter } from "./components/ProductControlCenter";
+import { ReportsLibrary } from "./components/ReportsLibrary";
 import {
   ProductWorkspaceSection,
   ProductWorkspaceShell,
@@ -39,6 +40,7 @@ const HASH_TO_SECTION: Record<string, ProductSectionId> = {
   "#candidate-results": "candidate-results",
   "#candidate-detail": "candidate-detail",
   "#external-checks": "external-checks",
+  "#reports": "reports",
   "#methodology": "methodology",
   "#control-center": "control-center",
 };
@@ -47,6 +49,7 @@ const SECTION_TO_HASH: Record<ProductSectionId, string> = {
   "candidate-results": "#candidate-results",
   "candidate-detail": "#candidate-detail",
   "external-checks": "#external-checks",
+  reports: "#reports",
   methodology: "#methodology",
   "control-center": "#control-center",
 };
@@ -85,17 +88,19 @@ export function ProductAppContent() {
   const refreshPromiseRef = useRef<Promise<void> | null>(null);
 
   const navItems = useMemo<ProductNavItem[]>(() => [
-    { id: "candidate-results", label: t("nav.radar"), icon: "R", description: t("nav.radarDescription") },
-    { id: "candidate-detail", label: t("nav.details"), icon: "D", description: t("nav.detailsDescription") },
-    { id: "external-checks", label: t("nav.verification"), icon: "V", description: t("nav.verificationDescription") },
-    { id: "methodology", label: t("nav.methodology"), icon: "M", description: t("nav.methodologyDescription") },
-    { id: "control-center", label: t("nav.controlCenter"), icon: "C", description: t("nav.controlCenterDescription") },
+    { id: "candidate-results", label: t("nav.radar"), icon: "R", description: t("nav.radarDescription"), groupLabel: t("nav.groupProductFlow"), groupDescription: t("nav.groupProductFlowDescription") },
+    { id: "candidate-detail", label: t("nav.details"), icon: "D", description: t("nav.detailsDescription"), groupLabel: t("nav.groupProductFlow"), groupDescription: t("nav.groupProductFlowDescription") },
+    { id: "external-checks", label: t("nav.verification"), icon: "V", description: t("nav.verificationDescription"), groupLabel: t("nav.groupReview"), groupDescription: t("nav.groupReviewDescription") },
+    { id: "reports", label: t("nav.reports"), icon: "RP", description: t("nav.reportsDescription"), groupLabel: t("nav.groupReview"), groupDescription: t("nav.groupReviewDescription") },
+    { id: "methodology", label: t("nav.methodology"), icon: "M", description: t("nav.methodologyDescription"), groupLabel: t("nav.groupStatus"), groupDescription: t("nav.groupStatusDescription") },
+    { id: "control-center", label: t("nav.controlCenter"), icon: "C", description: t("nav.controlCenterDescription"), groupLabel: t("nav.groupStatus"), groupDescription: t("nav.groupStatusDescription") },
   ], [t]);
 
   const sectionCopy = useMemo<Record<ProductSectionId, { title: string; description: string }>>(() => ({
     "candidate-results": { title: t("nav.radar"), description: t("section.radarDescription") },
     "candidate-detail": { title: t("nav.details"), description: t("section.detailsDescription") },
     "external-checks": { title: t("nav.verification"), description: t("section.verificationDescription") },
+    reports: { title: t("nav.reports"), description: t("section.reportsDescription") },
     methodology: { title: t("nav.methodology"), description: t("section.methodologyDescription") },
     "control-center": { title: t("nav.controlCenter"), description: t("section.controlCenterDescription") },
   }), [t]);
@@ -205,6 +210,21 @@ export function ProductAppContent() {
 
   const renderSection = () => {
     const copy = sectionCopy[activeSection];
+    if (activeSection === "reports") {
+      return (
+        <ProductWorkspaceSection {...copy}>
+          <ReportsLibrary
+            candidates={candidates}
+            onOpenCandidate={openCandidate}
+            onOpenManualVerification={(candidateId) => {
+              const candidate = candidates.find((entry) => entry.id === candidateId);
+              if (candidate) openVerification(candidate);
+            }}
+          />
+        </ProductWorkspaceSection>
+      );
+    }
+
     if (loading && candidates.length === 0) {
       return (
         <ProductWorkspaceSection {...copy}>

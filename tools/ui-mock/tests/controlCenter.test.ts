@@ -104,12 +104,83 @@ describe("Control Center readiness model", () => {
     assert.equal(resolveControlCenterStatus(input).automation.status, "MANUAL_CHECK_REQUIRED");
   });
 
-  it("keeps Reports Library and persistent feedback capture NOT_READY", () => {
+  it("keeps NOT_READY Reports Library and feedback as separate blockers", () => {
     const status = resolveControlCenterStatus(baseInput());
     assert.equal(status.reports.libraryReady, false);
     assert.equal(status.reports.status, "NOT_READY");
     assert.equal(status.feedback.persistentCaptureReady, false);
     assert.equal(status.feedback.status, "NOT_READY");
+    assert.deepEqual(status.unmetGates.slice(0, 2), [
+      "REPORTS_LIBRARY",
+      "PERSISTENT_FEEDBACK_CAPTURE",
+    ]);
+    assert.deepEqual(blockerItems(renderControlCenter("en", status)).slice(0, 2), [
+      "Reports Library.",
+      "Persistent feedback capture.",
+    ]);
+  });
+
+  it("does not list an empty READY Reports Library as a blocker", () => {
+    const input = baseInput();
+    input.reportsLibrary = {
+      libraryAvailable: true,
+      status: "READY",
+      reportCount: 0,
+      validReportCount: 0,
+      skippedReportCount: 0,
+      latestReportGeneratedAt: null,
+    };
+    const status = resolveControlCenterStatus(input);
+    assert.equal(status.reports.status, "READY");
+    assert.equal(status.reports.libraryReady, true);
+    assert.equal(status.reports.validReportCount, 0);
+    assert.equal(status.unmetGates.includes("REPORTS_LIBRARY"), false);
+    assert.equal(status.unmetGates[0], "PERSISTENT_FEEDBACK_CAPTURE");
+    assert.equal(blockerItems(renderControlCenter("en", status))[0], "Persistent feedback capture.");
+    assert.equal(blockerItems(renderControlCenter("pl", status))[0], "Trwałe zbieranie feedbacku.");
+    assert.equal(status.overallStatus, "NOT_READY");
+    assert.equal(status.accessDeployment.externalTesterAccess, "NO_GO");
+  });
+
+  it("does not list a populated READY Reports Library as a blocker", () => {
+    const input = baseInput();
+    input.reportsLibrary = {
+      libraryAvailable: true,
+      status: "READY",
+      reportCount: 2,
+      validReportCount: 2,
+      skippedReportCount: 0,
+      latestReportGeneratedAt: "2026-07-21T12:00:00.000Z",
+    };
+    const status = resolveControlCenterStatus(input);
+    assert.equal(status.unmetGates.includes("REPORTS_LIBRARY"), false);
+    assert.equal(blockerItems(renderControlCenter("en", status)).includes("Reports Library."), false);
+    assert.equal(status.unmetGates[0], "PERSISTENT_FEEDBACK_CAPTURE");
+    assert.equal(status.overallStatus, "NOT_READY");
+  });
+
+  it("lists PARTIAL Reports Library separately without changing overall NO-GO", () => {
+    const input = baseInput();
+    input.reportsLibrary = {
+      libraryAvailable: true,
+      status: "PARTIAL",
+      reportCount: 2,
+      validReportCount: 1,
+      skippedReportCount: 1,
+      latestReportGeneratedAt: "2026-07-21T12:00:00.000Z",
+    };
+    const status = resolveControlCenterStatus(input);
+    assert.equal(status.reports.status, "PARTIAL");
+    assert.equal(status.reports.skippedReportCount, 1);
+    assert.deepEqual(status.unmetGates.slice(0, 2), [
+      "REPORTS_LIBRARY",
+      "PERSISTENT_FEEDBACK_CAPTURE",
+    ]);
+    assert.deepEqual(blockerItems(renderControlCenter("pl", status)).slice(0, 2), [
+      "Biblioteka raportów.",
+      "Trwałe zbieranie feedbacku.",
+    ]);
+    assert.equal(status.overallStatus, "NOT_READY");
   });
 
   it("keeps EN and PL presentation semantically identical", () => {
@@ -118,11 +189,30 @@ describe("Control Center readiness model", () => {
     const polish = renderControlCenter("pl", status);
     assert.match(english, /Trusted tester preview/);
     assert.match(english, /Not ready/);
-    assert.match(english, /Reports Library is not complete yet\./);
+    assert.match(english, /read-only Reports Library uses the canonical local report index\./);
     assert.match(polish, /Podgląd dla zaufanego testera/);
     assert.match(polish, /Niegotowe/);
-    assert.match(polish, /Biblioteka raportów nie została jeszcze ukończona\./);
+    assert.match(polish, /Biblioteka raportów wyłącznie do odczytu korzysta z kanonicznego lokalnego indeksu raportów\./);
     assert.equal(countStatusCards(english), countStatusCards(polish));
+    assert.deepEqual(blockerItems(english), [
+      "Reports Library.",
+      "Persistent feedback capture.",
+      "Trusted Tester Preview Mode.",
+      "Deployment to the VPS.",
+      "Smoke through the domain and Cloudflare Access.",
+      "Rollback test.",
+      "Owner approval for the tester.",
+    ]);
+    assert.deepEqual(blockerItems(polish), [
+      "Biblioteka raportów.",
+      "Trwałe zbieranie feedbacku.",
+      "Trusted Tester Preview Mode.",
+      "Deployment na VPS.",
+      "Smoke przez domenę i Cloudflare Access.",
+      "Test rollbacku.",
+      "Zgoda ownera dla testera.",
+    ]);
+    assert.equal(blockerItems(english).length, blockerItems(polish).length);
     assert.equal(status.overallStatus, "NOT_READY");
   });
 
@@ -315,8 +405,15 @@ function baseInput(): ControlCenterReadinessInput {
       entriesCount: 0,
       lastSavedAt: null,
     },
+    reportsLibrary: {
+      libraryAvailable: false,
+      status: "NOT_READY",
+      reportCount: 0,
+      validReportCount: 0,
+      skippedReportCount: 0,
+      latestReportGeneratedAt: null,
+    },
     gates: {
-      reportsLibraryReady: false,
       feedbackCaptureReady: false,
       trustedTesterPreviewModeReady: false,
       vpsDeploymentConfirmed: false,
@@ -337,6 +434,12 @@ function renderControlCenter(locale: "en" | "pl", status: ReturnType<typeof reso
 
 function countStatusCards(markup: string): number {
   return (markup.match(/product-control-card/g) ?? []).length;
+}
+
+function blockerItems(markup: string): string[] {
+  const section = markup.match(/<section class="control-section product-control-blockers">([\s\S]*?)<\/section>/);
+  assert.ok(section, "Control Center blocker section is missing");
+  return Array.from(section[1].matchAll(/<li>(.*?)<\/li>/g), (match) => match[1]);
 }
 
 function listen(server: ReturnType<typeof createScannerApiServer>): Promise<void> {

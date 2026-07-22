@@ -43,6 +43,12 @@ import {
   OwnerOperationsError,
   type OwnerOperationsOptions,
 } from "./ownerOperations.js";
+import {
+  readReportDetail,
+  readReportsLibraryStatus,
+  readReportsList,
+  type ReportsLibraryOptions,
+} from "./reportsLibrary.js";
 
 const DEMO_CORS_ORIGINS = new Set(["http://127.0.0.1:5173", "http://localhost:5173"]);
 
@@ -62,6 +68,7 @@ export type ScannerApiHandlerOptions = {
   automation?: AutomationStatusOptions;
   establishedUniverse?: EstablishedUniverseStatusOptions;
   ownerOperations?: OwnerOperationsOptions;
+  reports?: ReportsLibraryOptions;
 };
 
 export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}): RequestListener {
@@ -125,6 +132,36 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
       return;
     }
 
+    if (req.method === "GET" && path === "/api/reports/status") {
+      sendJson(req, res, 200, await readReportsLibraryStatus(options.reports), runtimeMode);
+      return;
+    }
+
+    if (req.method === "GET" && path === "/api/reports") {
+      sendJson(req, res, 200, await readReportsList(options.reports), runtimeMode);
+      return;
+    }
+
+    if (req.method === "GET" && path.startsWith("/api/reports/")) {
+      const reportId = path.slice("/api/reports/".length);
+      const report = await readReportDetail(reportId, options.reports);
+      if (!report) {
+        sendJson(req, res, 404, {
+          error: "report_not_found",
+          message: "Report is unavailable or does not match the current contract",
+        }, runtimeMode);
+        return;
+      }
+      sendJson(req, res, 200, report, runtimeMode);
+      return;
+    }
+
+    if (isReportsApiPath(path)) {
+      res.setHeader("allow", "GET");
+      sendJson(req, res, 405, { error: "method_not_allowed", message: "Method not allowed" }, runtimeMode);
+      return;
+    }
+
     if (req.method === "OPTIONS") {
       sendEmpty(req, res, isCorsOriginDenied(req, runtimeMode) ? 403 : 204, runtimeMode);
       return;
@@ -144,12 +181,13 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
     }
 
     if (req.method === "GET" && path === "/api/control-center/status") {
-      const [scanner, context, automation, establishedUniverse, reviewStorage] = await Promise.all([
+      const [scanner, context, automation, establishedUniverse, reviewStorage, reportsLibrary] = await Promise.all([
         getReadinessEntry(() => readLatestScannerOutput(scannerOptions)),
         getReadinessEntry(() => readLatestContextOutput(contextOptions)),
         readAutomationStatus(options.automation),
         readEstablishedUniverseStatus(options.establishedUniverse),
         readReviewStorageStatus(reviewSessionProvider),
+        readReportsLibraryStatus(options.reports),
       ]);
       const readiness = buildProductReadiness(scanner, context, runtimeMode);
       const scannerFacts = readScannerControlCenterFacts(scanner);
@@ -194,8 +232,15 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
           lastChangeAt: establishedUniverse.last_change_at,
         },
         reviewStorage,
+        reportsLibrary: {
+          libraryAvailable: reportsLibrary.library_available,
+          status: reportsLibrary.library_status,
+          reportCount: reportsLibrary.report_count,
+          validReportCount: reportsLibrary.valid_report_count,
+          skippedReportCount: reportsLibrary.skipped_report_count,
+          latestReportGeneratedAt: reportsLibrary.latest_report_generated_at,
+        },
         gates: {
-          reportsLibraryReady: false,
           feedbackCaptureReady: false,
           trustedTesterPreviewModeReady: false,
           vpsDeploymentConfirmed: false,
@@ -692,6 +737,10 @@ function errorCode(error: unknown, fallback: string): string {
 
 function getRequestPath(url: string | undefined): string {
   return url?.split("?")[0] ?? "/";
+}
+
+function isReportsApiPath(path: string): boolean {
+  return path === "/api/reports" || path === "/api/reports/status" || path.startsWith("/api/reports/");
 }
 
 function isString(value: unknown): value is string {

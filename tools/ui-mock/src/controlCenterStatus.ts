@@ -8,7 +8,18 @@ export const CONTROL_CENTER_STATUSES = [
   "MANUAL_CHECK_REQUIRED",
 ] as const;
 
+export const CONTROL_CENTER_BLOCKERS = [
+  "REPORTS_LIBRARY",
+  "PERSISTENT_FEEDBACK_CAPTURE",
+  "TRUSTED_TESTER_PREVIEW_MODE",
+  "VPS_DEPLOYMENT",
+  "DOMAIN_ACCESS_SMOKE",
+  "ROLLBACK_TEST",
+  "OWNER_TESTER_APPROVAL",
+] as const;
+
 export type ControlCenterReadinessStatus = (typeof CONTROL_CENTER_STATUSES)[number];
+export type ControlCenterBlocker = (typeof CONTROL_CENTER_BLOCKERS)[number];
 export type ControlCenterFreshness = "FRESH" | "STALE" | "UNAVAILABLE";
 
 export type ControlCenterReadinessInput = {
@@ -59,8 +70,15 @@ export type ControlCenterReadinessInput = {
     entriesCount: number;
     lastSavedAt: string | null;
   };
+  reportsLibrary: {
+    libraryAvailable: boolean;
+    status: "READY" | "PARTIAL" | "NOT_READY";
+    reportCount: number;
+    validReportCount: number;
+    skippedReportCount: number;
+    latestReportGeneratedAt: string | null;
+  };
   gates: {
-    reportsLibraryReady: boolean;
     feedbackCaptureReady: boolean;
     trustedTesterPreviewModeReady: boolean;
     vpsDeploymentConfirmed: boolean;
@@ -73,6 +91,7 @@ export type ControlCenterReadinessInput = {
 export type ControlCenterStatus = {
   schemaVersion: "control_center_status_v1";
   overallStatus: ControlCenterReadinessStatus;
+  unmetGates: ControlCenterBlocker[];
   runtimeApi: ControlCenterReadinessInput["runtime"] & {
     status: ControlCenterReadinessStatus;
     dataStatus: ControlCenterReadinessStatus;
@@ -97,6 +116,11 @@ export type ControlCenterStatus = {
   reports: {
     status: ControlCenterReadinessStatus;
     libraryReady: boolean;
+    libraryAvailable: boolean;
+    reportCount: number;
+    validReportCount: number;
+    skippedReportCount: number;
+    latestReportGeneratedAt: string | null;
   };
   accessDeployment: {
     status: ControlCenterReadinessStatus;
@@ -137,7 +161,7 @@ export function resolveControlCenterStatus(input: ControlCenterReadinessInput): 
     ? "READY"
     : "NOT_READY";
   const reviewStorageStatus = input.reviewStorage.available ? "READY" : "NOT_READY";
-  const reportsStatus = input.gates.reportsLibraryReady ? "READY" : "NOT_READY";
+  const reportsStatus = input.reportsLibrary.status;
   const feedbackStatus = input.gates.feedbackCaptureReady ? "READY" : "NOT_READY";
   const externalTesterReady = input.gates.trustedTesterPreviewModeReady
     && input.gates.vpsDeploymentConfirmed
@@ -156,10 +180,19 @@ export function resolveControlCenterStatus(input: ControlCenterReadinessInput): 
     accessStatus,
     feedbackStatus,
   ];
+  const unmetGates: ControlCenterBlocker[] = [];
+  if (reportsStatus !== "READY") unmetGates.push("REPORTS_LIBRARY");
+  if (feedbackStatus !== "READY") unmetGates.push("PERSISTENT_FEEDBACK_CAPTURE");
+  if (!input.gates.trustedTesterPreviewModeReady) unmetGates.push("TRUSTED_TESTER_PREVIEW_MODE");
+  if (!input.gates.vpsDeploymentConfirmed) unmetGates.push("VPS_DEPLOYMENT");
+  if (!input.gates.cloudflareAccessVerified) unmetGates.push("DOMAIN_ACCESS_SMOKE");
+  if (!input.gates.rollbackTested) unmetGates.push("ROLLBACK_TEST");
+  if (!input.gates.ownerApproved) unmetGates.push("OWNER_TESTER_APPROVAL");
 
   return {
     schemaVersion: "control_center_status_v1",
     overallStatus: highestSeverity(sectionStatuses),
+    unmetGates,
     runtimeApi: {
       ...input.runtime,
       status: runtimeStatus,
@@ -176,7 +209,12 @@ export function resolveControlCenterStatus(input: ControlCenterReadinessInput): 
     reviewStorage: { ...input.reviewStorage, status: reviewStorageStatus },
     reports: {
       status: reportsStatus,
-      libraryReady: input.gates.reportsLibraryReady,
+      libraryReady: reportsStatus !== "NOT_READY",
+      libraryAvailable: input.reportsLibrary.libraryAvailable,
+      reportCount: input.reportsLibrary.reportCount,
+      validReportCount: input.reportsLibrary.validReportCount,
+      skippedReportCount: input.reportsLibrary.skippedReportCount,
+      latestReportGeneratedAt: input.reportsLibrary.latestReportGeneratedAt,
     },
     accessDeployment: {
       status: accessStatus,

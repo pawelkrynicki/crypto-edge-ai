@@ -14,6 +14,7 @@
     "test:runtime": "node --import tsx --test tests/productionRuntime.test.ts tests/runtimeImportBoundary.test.ts tests/automationStatus.test.ts tests/controlCenter.test.ts tests/ownerOperations.test.ts",
     "test:product-radar": "node --import tsx --test tests/productRadar.test.ts",
     "test:control-center": "node --import tsx --test tests/controlCenter.test.ts",
+    "test:reports": "node --import tsx --test tests/reportsLibrary.test.ts",
     "test:owner-operations": "node --import tsx --test tests/ownerOperations.test.ts",
     "test:boundary": "node --import tsx --test tests/realDataBoundary.test.ts",
     "workflow:smoke": "tsx scripts/localWorkflowSmoke.ts",

@@ -340,6 +340,19 @@ tools\ui-mock\.local\reports
 
 The report is a local research workflow export only. It reads the existing local API path from scanner latest output, UI candidates, approved market context, review session storage, and review diagnostics. It does not call external networks, add data sources, change scanner output, change market data, change scoring, change `final_label`, change `WATCHLIST` meaning, add auth, add a production backend, or change the completed UX2 local MVP UI pass. The compliance copy remains clear that it is not a recommendation and `This is not a buy/sell signal.`
 
+## Read-Only Reports Library
+
+```cmd
+scripts\win\check-reports-library.cmd
+scripts\win\start-product-radar-review.cmd --reports
+```
+
+`check-reports-library.cmd` runs the offline Reports Library index, API, filesystem-security, UI escaping and 100-concurrent-read tests against injected temporary directories. It performs no live provider calls and does not touch the normal reports directory.
+
+`start-product-radar-review.cmd --reports` starts the ordinary fixture-free `INTERNAL_BETA` Product Radar and opens `#reports`. It does not run `generate-analyst-report.cmd`, does not create a sample report, does not call providers and does not mutate review, automation, Established Universe or snapshots. If no real report exists, the owner reviews the valid empty state.
+
+The canonical root remains `tools\ui-mock\.local\reports`, JSON `report_version = 1` is the UI data source, and Markdown remains an unparsed companion export. Full contract: `docs\read_only_reports_library.md`.
+
 ## Free Local Preview Ports
 
 ```cmd
