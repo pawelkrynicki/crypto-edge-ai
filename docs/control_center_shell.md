@@ -78,7 +78,14 @@ Kolejne prace powinny zachować tę kolejność:
 
 ## Aktualizacja 12D.1
 
-Od 12D.1 karta Reports nie korzysta ze stałej bramki. `GET /api/control-center/status` wywołuje ten sam bezpieczny `readReportsLibraryStatus`, którego używa `GET /api/reports/status`. Status biblioteki może być `READY` lub `PARTIAL`, ale overall nadal pozostaje `NOT_READY`, ponieważ feedback i access/deployment pozostają niegotowe. Szczegóły kontraktu znajdują się w `docs/read_only_reports_library.md`.
+Od 12D.1 karta Reports nie korzysta ze stałej bramki. `GET /api/control-center/status` wywołuje ten sam bezpieczny `readReportsLibraryStatus`, którego używa `GET /api/reports/status`, więc karta korzysta z kanonicznego statusu biblioteki.
+
+- `READY` przy 0 raportów jest prawidłowym, neutralnym stanem gotowej biblioteki.
+- Reports Library ze statusem `READY` nie występuje na liście blockerów.
+- `PARTIAL` albo `NOT_READY` mogą ponownie dodać Reports Library jako osobny blocker.
+- Trwałe zbieranie feedbacku pozostaje niezależnym blockerem i nie jest łączone z Reports Library.
+
+Overall nadal pozostaje `NOT_READY`, ponieważ feedback i access/deployment pozostają niegotowe. Szczegóły kontraktu znajdują się w `docs/read_only_reports_library.md`.
 
 ## Local owner review: ACCEPT_LOCAL_CODE — 22.07.2026
 

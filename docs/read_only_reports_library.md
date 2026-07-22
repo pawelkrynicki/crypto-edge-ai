@@ -97,6 +97,28 @@ Gotowa biblioteka — także pusta — nie zmienia overall Trusted Tester Previe
 
 Status, lista, szczegóły i odświeżenie raportów czytają wyłącznie lokalny reports root. Frontend korzysta tylko z relatywnych same-origin `GET`. Test 100 równoległych odczytów potwierdza 0 provider calls oraz identyczną listę i zawartość plików przed i po teście. Odczyty nie zmieniają review, automation, Established Universe ani snapshotów.
 
+## Local owner review: ACCEPT_LOCAL_CODE — 22.07.2026
+
+Owner review zaakceptował lokalny kod etapu 12D.1 i potwierdził:
+
+- pozycja **Reports / Raporty** jest dostępna w grupie **Review / Feedback**;
+- Reports Library ma status `READY` przy `report_count = 0`;
+- 0 raportów jest neutralnym, prawidłowym empty state gotowej biblioteki;
+- biblioteka nie pokazuje lokalnych ścieżek ani nazw plików;
+- UI nie udostępnia generowania, edycji ani usuwania raportów;
+- wersje PL i EN są czytelne i semantycznie zgodne;
+- karta Reports w Control Center ma status `READY`;
+- Reports Library ze statusem `READY` nie występuje na liście blockerów;
+- pierwszym aktywnym blockerem jest **Persistent feedback capture / Trwałe zbieranie feedbacku**;
+- overall Trusted Tester Preview pozostaje `NOT_READY`;
+- external tester pozostaje `NO-GO`;
+- nie wygenerowano sztucznego raportu;
+- owner review wykonał 0 live provider calls i 0 zapisów.
+
+Pierwszy owner review wykrył niespójność: Reports Library miała status `READY`, ale nadal była wymieniona jako blocker. Commit `cc1e337aedf5a5e4943a9405f4b0e769b5ec7e91` naprawił tę logikę, uzależniając listę blockerów od kanonicznych statusów i pozostawiając feedback jako niezależną bramkę.
+
+Uwaga do przyszłego **Final Frontend Polish / Premium UI Pass**: przy pustej bibliotece panel szczegółów raportu może zostać ukryty albo otrzymać bardziej informacyjny empty state. Zmiana nie jest implementowana w 12D.1.
+
 ## Owner review
 
 Bezpieczny launcher uruchamia zwykły `INTERNAL_BETA` i otwiera `#reports`. Nie generuje raportu i nie wykonuje provider calls:
