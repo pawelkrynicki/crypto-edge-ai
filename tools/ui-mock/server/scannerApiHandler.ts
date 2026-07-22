@@ -105,7 +105,9 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
       sendJson(req, res, 200, resolveControlCenterStatus({
         runtime: {
           runtimeMode,
+          healthAvailable: true,
           apiConnected: true,
+          sameOriginResponseValid: true,
           readiness: readiness.status === "not_ready"
             ? "not_ready"
             : readiness.status === "degraded" ? "degraded" : "ready",

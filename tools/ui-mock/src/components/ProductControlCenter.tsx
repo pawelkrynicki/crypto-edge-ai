@@ -45,10 +45,11 @@ export function ProductControlCenter({ status }: { status: ControlCenterStatus |
             nextStep={t("control.runtime.next")}
             details={[
               [t("control.field.runtimeMode"), status.runtimeApi.runtimeMode],
+              [t("control.field.healthAvailable"), booleanValue(status.runtimeApi.healthAvailable, t)],
               [t("control.field.apiConnected"), booleanValue(status.runtimeApi.apiConnected, t)],
+              [t("control.field.sameOriginResponse"), booleanValue(status.runtimeApi.sameOriginResponseValid, t)],
               [t("control.field.readiness"), readinessValue(status.runtimeApi.readiness, t)],
               [t("control.field.buildSha"), status.runtimeApi.buildSha ?? t("app.noData")],
-              [t("control.field.dataStatus"), statusLabel(status.runtimeApi.dataStatus, t)],
             ]}
             t={t}
           />

@@ -35,12 +35,51 @@ describe("Control Center readiness model", () => {
     assert.equal(status.overallStatus, "NOT_READY");
   });
 
-  it("treats a stale snapshot as PARTIAL data without reporting a runtime failure", () => {
+  it("keeps Runtime and API READY when data readiness is not ready", () => {
     const input = baseInput();
+    input.runtime.readiness = "not_ready";
+    const status = resolveControlCenterStatus(input);
+    assert.equal(status.runtimeApi.status, "READY");
+    assert.equal(status.overallStatus, "NOT_READY");
+  });
+
+  it("treats a stale scanner and missing context as PARTIAL data without reporting a runtime failure", () => {
+    const input = baseInput();
+    input.runtime.readiness = "degraded";
     input.scanner.freshness = "STALE";
+    input.context.available = false;
+    input.context.freshness = "UNAVAILABLE";
     const status = resolveControlCenterStatus(input);
     assert.equal(status.dataSnapshots.status, "PARTIAL");
     assert.equal(status.runtimeApi.status, "READY");
+    assert.equal(status.overallStatus, "NOT_READY");
+  });
+
+  it("requires health, API connectivity, a configured mode and a valid same-origin response", () => {
+    const inputs = [
+      Object.assign(baseInput(), { runtime: { ...baseInput().runtime, healthAvailable: false } }),
+      Object.assign(baseInput(), { runtime: { ...baseInput().runtime, apiConnected: false } }),
+      Object.assign(baseInput(), { runtime: { ...baseInput().runtime, runtimeMode: "UNCONFIGURED" as const } }),
+      Object.assign(baseInput(), { runtime: { ...baseInput().runtime, sameOriginResponseValid: false } }),
+    ];
+    for (const input of inputs) {
+      assert.equal(resolveControlCenterStatus(input).runtimeApi.status, "NOT_READY");
+    }
+  });
+
+  it("labels readiness as data readiness and shows no runtime recovery step while runtime is healthy", () => {
+    const input = baseInput();
+    input.runtime.readiness = "degraded";
+    input.scanner.freshness = "STALE";
+    input.context.available = false;
+    input.context.freshness = "UNAVAILABLE";
+    const status = resolveControlCenterStatus(input);
+    const english = renderControlCenter("en", status);
+    const polish = renderControlCenter("pl", status);
+    assert.match(english, /Data readiness/);
+    assert.match(polish, /Gotowość danych/);
+    assert.doesNotMatch(english, /Restore a valid local runtime and readiness response/);
+    assert.doesNotMatch(polish, /Przywróć prawidłowy lokalny runtime i odpowiedź readiness/);
   });
 
   it("maps partial source health to PARTIAL", () => {
@@ -231,7 +270,9 @@ function baseInput(): ControlCenterReadinessInput {
   return {
     runtime: {
       runtimeMode: "INTERNAL_BETA",
+      healthAvailable: true,
       apiConnected: true,
+      sameOriginResponseValid: true,
       readiness: "ready",
       buildSha: "3f20dc8",
     },

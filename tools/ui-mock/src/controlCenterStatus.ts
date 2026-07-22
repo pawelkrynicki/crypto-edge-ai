@@ -14,7 +14,9 @@ export type ControlCenterFreshness = "FRESH" | "STALE" | "UNAVAILABLE";
 export type ControlCenterReadinessInput = {
   runtime: {
     runtimeMode: ResolvedProductRuntimeMode;
+    healthAvailable: boolean;
     apiConnected: boolean;
+    sameOriginResponseValid: boolean;
     readiness: "ready" | "degraded" | "not_ready";
     buildSha: string | null;
   };
@@ -115,11 +117,12 @@ export type ControlCenterStatus = {
  */
 export function resolveControlCenterStatus(input: ControlCenterReadinessInput): ControlCenterStatus {
   const dataStatus = resolveDataStatus(input.scanner, input.context);
-  const runtimeStatus = !input.runtime.apiConnected || input.runtime.readiness === "not_ready"
-    ? "NOT_READY"
-    : input.runtime.readiness === "degraded"
-      ? "PARTIAL"
-      : "READY";
+  const runtimeStatus = input.runtime.healthAvailable
+    && input.runtime.apiConnected
+    && input.runtime.runtimeMode !== "UNCONFIGURED"
+    && input.runtime.sameOriginResponseValid
+    ? "READY"
+    : "NOT_READY";
   const sourceStatus = input.sources.availability === "available"
     ? "READY"
     : input.sources.availability === "partial"
