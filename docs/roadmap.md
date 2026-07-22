@@ -146,6 +146,8 @@ Proposed standalone path:
 
 ### Stage 12B.1: Standalone Control Center Shell
 
+Status: **zaakceptowane lokalnie 22.07.2026 — `ACCEPT_LOCAL_CODE`**.
+
 12B.1 adds a read-only **Control Center / Preview readiness** tab to the existing EN/PL Product Radar and a same-origin `GET /api/control-center/status` aggregate in the shared API handler.
 
 - The canonical machine statuses are `READY`, `PARTIAL`, `NOT_READY`, and `MANUAL_CHECK_REQUIRED`; translations do not influence resolution.
@@ -156,7 +158,7 @@ Proposed standalone path:
 - The shell starts no collector, scheduler, provider, command, deployment, or mutation and exposes no Control Center write route.
 - VPS deployment, Cloudflare changes, external tester access, and Windows Task Scheduler activation have not been performed.
 
-Canonical details and owner-review boundaries are documented in `docs/control_center_shell.md`. The next implementation order is Reports Library + Feedback Loop, then 12C Trusted Tester Preview Mode, followed by deployment/access smoke, rollback and owner approval.
+Canonical details and owner-review boundaries are documented in `docs/control_center_shell.md`. Następny sprint, **12B.2**, dotyczy bezpiecznych operacji No-CMD przeznaczonych wyłącznie dla ownera; operacje te nie będą udostępniane testerowi. VPS deployment pozostaje niepotwierdzony, a external tester pozostaje `NO-GO`. Dalsze bramki nadal obejmują Reports Library + Feedback Loop, 12C Trusted Tester Preview Mode, deployment/access smoke, rollback i zgodę ownera.
 
 ## Stage 11G: AI KINTEL Staging / Deployment Checklist
 

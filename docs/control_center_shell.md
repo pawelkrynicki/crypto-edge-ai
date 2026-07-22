@@ -36,7 +36,7 @@ Stary, ale prawidłowy last-known-good scanner snapshot daje `PARTIAL` sekcji da
 
 ## Sekcje
 
-- **Runtime i API** — tryb runtime, łączność same-origin API, readiness, opcjonalny build SHA i status danych; uptime nie jest główną informacją produktową.
+- **Runtime i API** — dostępność `/api/health`, łączność same-origin API, poprawny tryb runtime i opcjonalny build SHA. Wynik `/api/readiness` jest pokazany wyłącznie jako informacja „Gotowość danych” i nie steruje statusem tej karty; uptime nie jest główną informacją produktową.
 - **Dane i snapshoty** — ostatnie czasy scannera i kontekstu, freshness, last-known-good oraz liczby New / observation i Established po filtrach.
 - **Źródła danych** — `Available`, `Partially available` lub `Unavailable` z istniejącego resolvera source health Product Radar.
 - **Automatyzacja** — aktywność, ostatni run i wynik, następny run oraz najbliższy termin po aktywacji. Stan nieaktywny nie jest `READY`.
@@ -75,6 +75,26 @@ Kolejne prace powinny zachować tę kolejność:
 6. Zgoda ownera dla testera.
 
 12B.1 nie wdraża produktu na VPS, nie zmienia Cloudflare i nie aktywuje Windows Task Scheduler.
+
+## Local owner review: ACCEPT_LOCAL_CODE — 22.07.2026
+
+Owner review zaakceptował lokalny kod etapu 12B.1 i potwierdził:
+
+- ogólny status Trusted Tester Preview pozostaje `NOT_READY`;
+- **Runtime i API** ma status `READY` przy działającym health, połączonym API i poprawnym `INTERNAL_BETA`;
+- gotowość danych nie steruje statusem runtime;
+- stare lub brakujące snapshoty dają `PARTIAL` wyłącznie w karcie **Dane i snapshoty**;
+- częściowo dostępne źródła dają `PARTIAL`;
+- nieaktywna automatyzacja wymaga ręcznego sprawdzenia;
+- prawidłowy pusty Established Universe ma status `READY`;
+- Review Storage z 0 zapisów ma neutralny status `READY`;
+- Reports, deployment/access i feedback pozostają `NOT_READY`;
+- UI nie zawiera przycisków mutujących ani komend;
+- polska wersja jest czytelna i logiczna.
+
+Pierwsza wersja owner review wykryła błędne powiązanie statusu **Runtime i API** z data readiness. Commit `fc05d0a8c6dba611a26c9babcb1a24ae6bce749f` rozdzielił te dwa obszary: stan danych pozostaje widoczny, ale nie obniża statusu prawidłowo działającego runtime i API.
+
+Akceptacja lokalnego kodu nie oznacza gotowości całego produktu dla testera zewnętrznego. External tester pozostaje `NO-GO` do czasu zamknięcia pozostałych bramek.
 
 ## Owner review
 
