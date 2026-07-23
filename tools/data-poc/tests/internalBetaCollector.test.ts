@@ -184,6 +184,51 @@ describe("INTERNAL_BETA live collector", () => {
     assert.equal(result.scanner.candidates.every((candidate) => candidate.discovery_basket === "new_emerging"), true);
   });
 
+  it("publishes New / observation and reports Follow-up DEGRADED when its store is corrupt", async () => {
+    const root = await tempRoot();
+    const followUpStorePath = resolve(root, "follow-up", "store.json");
+    await mkdir(resolve(root, "follow-up"), { recursive: true });
+    await writeFile(followUpStorePath, "{corrupt", "utf8");
+    const result = await runInternalBetaCollector({
+      env: {
+        CRYPTO_EDGE_DATA_ENV: "INTERNAL_BETA",
+        CRYPTO_EDGE_RUNTIME_MODE: "INTERNAL_BETA",
+        ALLOW_LIVE_PROVIDER_CALLS: "1",
+      },
+      outputDir: root,
+      followUpStorePath,
+      seedLimit: 3,
+      securityCandidateLimit: 1,
+      now: NOW,
+      establishedUniverse: establishedUniverse([]),
+      fetchImpl: async (input) => {
+        const url = String(input);
+        if (url.endsWith("/token-profiles/latest/v1")) return Response.json([
+          { chainId: "base", tokenAddress: "0xnew1" },
+          { chainId: "base", tokenAddress: "0xnew2" },
+          { chainId: "base", tokenAddress: "0xnew3" },
+        ]);
+        if (url.includes("/token-pairs/v1/base/0xnew")) {
+          const address = decodeURIComponent(url.split("/").at(-1) ?? "");
+          return Response.json([dexPair(address, `pair-${address}`, 60_000)]);
+        }
+        if (url === "https://api.alternative.me/fng/?limit=1") {
+          return Response.json({ data: [{ value: "40", value_classification: "Fear", timestamp: "1784203200", time_until_update: "3600" }] });
+        }
+        if (url === "https://api.llama.fi/protocols") {
+          return Response.json([{ name: "Lido", chain: "Ethereum", tvl: 1_000_000, change_1d: 1, change_7d: 2, url: "https://lido.fi" }]);
+        }
+        throw new Error(`unexpected URL ${url}`);
+      },
+    });
+    assert.equal(result.follow_up.status, "DEGRADED");
+    assert.equal(result.follow_up.validation_status, "invalid");
+    assert.equal(result.follow_up.store_updated, false);
+    assert.equal(result.discovery.new_emerging.candidates_before_filters, 3);
+    assert.equal((await readFile(result.scanner_publish.output_file, "utf8")).includes("scanner_snapshot_v1"), true);
+    assert.equal(await readFile(followUpStorePath, "utf8"), "{corrupt");
+  });
+
   it("fails Established closed without blocking New when the universe is invalid", async () => {
     const root = await tempRoot();
     const result = await runInternalBetaCollector({

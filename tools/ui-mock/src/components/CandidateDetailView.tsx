@@ -1,6 +1,8 @@
 import React from "react";
 import {
+  formatFollowUpLifecycleStatus,
   formatProductDateTime,
+  formatProductPairAge,
   formatProductUsd,
   useProductLocale,
   type ProductLocale,
@@ -16,15 +18,18 @@ import {
   type ProductSecurityState,
 } from "../productSecurityResolver";
 import type { UiTokenCandidate } from "../types/scannerTypes";
+import type { FollowUpPublicEntry } from "../types/followUpTypes";
 
 interface CandidateDetailViewProps {
   candidate: UiTokenCandidate | null;
+  followUp?: FollowUpPublicEntry | null;
   onBackToResults?: () => void;
   onOpenExternalChecks?: (candidate: UiTokenCandidate) => void;
 }
 
 export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
   candidate,
+  followUp = null,
   onBackToResults,
   onOpenExternalChecks,
 }) => {
@@ -112,7 +117,7 @@ export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
           <DetailField label={t("radar.liquidity")} value={formatProductUsd(candidate.liquidity, locale, t("radar.missingData"))} />
           <DetailField label={t("radar.volume24h")} value={formatProductUsd(candidate.volume24h, locale, t("radar.missingData"))} />
           <DetailField label={t("radar.ratio")} value={candidate.volumeMarketCapRatio == null ? t("radar.missingData") : candidate.volumeMarketCapRatio.toFixed(4)} />
-          <DetailField label={t("radar.pairAge")} value={formatDays(candidate.pairAgeDays, locale, t("radar.missingData"))} />
+          <DetailField label={t("radar.pairAge")} value={formatProductPairAge(candidate.pairAgeDays, locale, t("radar.missingData"), { pairCreatedAt: candidate.pairCreatedAt })} />
           <DetailField label={t("detail.pairCreated")} value={candidate.pairCreatedAt ? formatProductDateTime(candidate.pairCreatedAt, locale) : t("radar.missingData")} />
         </div>
       </section>
@@ -222,8 +227,24 @@ export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
         ) : null}
       </section>
 
+      {followUp && (
+        <section className="product-detail-section follow-up-detail" aria-labelledby="follow-up-heading">
+          <SectionHeader id="follow-up-heading" index="5" title={t("followUp.detailTitle")} />
+          <p className="follow-up-candidate-boundary">{t("followUp.detailBoundary")}</p>
+          <div className="product-detail-grid">
+            <DetailField label={t("followUp.lifecycle")} value={formatFollowUpLifecycleStatus(followUp.lifecycle_status, locale)} tone={followUp.lifecycle_status === "CANDIDATE_FOR_ESTABLISHED" ? "warning" : "neutral"} />
+            <DetailField label={t("followUp.firstSeen")} value={formatProductDateTime(followUp.first_seen_at, locale)} />
+            <DetailField label={t("followUp.completedCheckpoints")} value={followUp.completed_checkpoints.length > 0 ? followUp.completed_checkpoints.map((day) => `${day}d`).join(" Â· ") : t("followUp.noneCompleted")} />
+            <DetailField label={t("followUp.nextCheckpoint")} value={followUp.next_check_at ? formatProductDateTime(followUp.next_check_at, locale) : t("followUp.noAutomaticCheck")} />
+            <DetailField label={t("followUp.filterStatus")} value={followUp.filter_status} />
+            <DetailField label={t("followUp.establishedMembership")} value={followUp.established_membership ? t("control.value.yes") : t("control.value.no")} />
+            <DetailField label={t("followUp.nextReviewStep")} value={followUp.next_review_step} />
+          </div>
+        </section>
+      )}
+
       <section className="product-detail-section next-step" aria-labelledby="next-heading">
-        <SectionHeader id="next-heading" index="5" title={t("detail.nextStep")} />
+        <SectionHeader id="next-heading" index={followUp ? "6" : "5"} title={t("detail.nextStep")} />
         <p>{t("detail.nextStepText")}</p>
         <div className="product-detail-actions">
           {onBackToResults && <button type="button" className="secondary" onClick={onBackToResults}>{t("detail.back")}</button>}
@@ -389,12 +410,6 @@ function getSecurityTone(state: ProductSecurityState): "ready" | "warning" | "cr
 
 function formatPrice(value: number | null, missing: string): string {
   return value == null ? missing : `$${value.toLocaleString("en-US", { maximumSignificantDigits: 6 })}`;
-}
-
-function formatDays(value: number | null, locale: ProductLocale, missing: string): string {
-  if (value == null) return missing;
-  const amount = value.toLocaleString(locale === "pl" ? "pl-PL" : "en-US", { maximumFractionDigits: 1 });
-  return locale === "pl" ? `${amount} dni` : `${amount} days`;
 }
 
 function formatPercent(value: number | null, missing: string): string {

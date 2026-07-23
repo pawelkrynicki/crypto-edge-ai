@@ -7,6 +7,7 @@ import React, {
   useState,
   type ReactNode,
 } from "react";
+import type { FollowUpLifecycleStatus } from "./types/followUpTypes";
 
 void React; // Required by the Node TSX test runtime's classic JSX transform.
 
@@ -85,6 +86,9 @@ const EN = {
   "control.universe.title": "Established Universe",
   "control.universe.explanation": "A valid empty universe is contract-compliant and is not treated as a failure.",
   "control.universe.next": "Restore a valid versioned universe status.",
+  "control.followUp.title": "Maturing / follow-up",
+  "control.followUp.explanation": "The read-only Follow-up Basket tracks validated identities independently of Runtime and API readiness.",
+  "control.followUp.next": "Restore a valid Follow-up store; the scanner last-known-good remains available.",
   "control.review.title": "Review storage",
   "control.review.explanation": "Review storage is available and existing saves remain readable.",
   "control.review.noSaves": "Review storage is available; no saved reviews is a neutral state.",
@@ -128,6 +132,11 @@ const EN = {
   "control.field.automationState": "Automation state",
   "control.field.lastResult": "Last result",
   "control.field.lastChange": "Last change",
+  "control.field.storeStatus": "Store status",
+  "control.field.activeFollowUp": "Active records",
+  "control.field.dueFollowUp": "Due records",
+  "control.field.candidateFollowUp": "Candidate for Established",
+  "control.field.nextDue": "Next due",
   "control.field.storageAvailable": "Storage available",
   "control.field.savedReviews": "Saved reviews",
   "control.field.lastSaved": "Last save",
@@ -151,7 +160,7 @@ const EN = {
   "control.value.verified": "Verified",
   "control.value.finalSmokeRequired": "Final smoke required",
   "nav.radar": "Radar",
-  "nav.radarDescription": "Two data baskets",
+  "nav.radarDescription": "Three data layers",
   "nav.details": "Details",
   "nav.detailsDescription": "Full candidate context",
   "nav.verification": "Verification",
@@ -168,15 +177,15 @@ const EN = {
   "nav.groupReviewDescription": "Manual review and research",
   "nav.groupStatus": "Status / Reference",
   "nav.groupStatusDescription": "Methodology and readiness",
-  "section.radarDescription": "Observation projects and Established candidates remain separated by the real-data contract.",
+  "section.radarDescription": "New observation, Maturing follow-up, and Established remain separate layers of the real-data contract.",
   "section.detailsDescription": "Identity, market data, filters, and security with missing data made explicit.",
   "section.verificationDescription": "Safe links for manual checks; the application never starts a provider.",
-  "section.methodologyDescription": "A plain-language guide to the two baskets, filters, labels, and product boundaries.",
+  "section.methodologyDescription": "A plain-language guide to the three Radar layers, filters, labels, and product boundaries.",
   "section.controlCenterDescription": "Read-only product status for owner review and trusted tester preparation.",
   "section.reportsDescription": "Read existing research reports without local path knowledge or report-generation actions.",
   "radar.eyebrow": "INTERNAL_BETA · real data",
-  "radar.title": "Two baskets with two different meanings",
-  "radar.intro": "New projects are for observation. Established is a separate owner-maintained address list and the only main Radar basket.",
+  "radar.title": "Three Radar layers with three different meanings",
+  "radar.intro": "New / observation detects projects, Maturing / follow-up keeps their validated identities, and Established / main Radar remains a separate owner-maintained universe.",
   "radar.data": "Data",
   "radar.summary": "Radar summary",
   "radar.newProjects": "New projects",
@@ -191,6 +200,34 @@ const EN = {
   "radar.basketSelection": "Basket selection",
   "radar.newBasket": "New / observation",
   "radar.newBasketDescription": "Very new projects with no automatic promotion",
+  "followUp.basket": "Maturing / follow-up",
+  "followUp.basketDescription": "Checkpoint-based tracking; read-only",
+  "followUp.maturingCount": "Maturing",
+  "followUp.maturingCountDetail": "active continued observation",
+  "followUp.candidateCount": "Candidate for Established",
+  "followUp.candidateCountDetail": "owner decision required",
+  "followUp.unavailableTitle": "The Follow-up Basket is unavailable",
+  "followUp.unavailableDetail": "New / observation and the last valid scanner snapshot remain independent.",
+  "followUp.emptyTitle": "No records in continued observation",
+  "followUp.emptyDetail": "The Follow-up store is valid and empty. Records appear only after a validated New / observation snapshot.",
+  "followUp.headingEyebrow": "Maturing / follow-up",
+  "followUp.heading": "Continued observation at controlled checkpoints",
+  "followUp.headingDetail": "Identity is chain + contract address. Refreshing this view never runs a provider check.",
+  "followUp.readOnly": "READ-ONLY FOLLOW-UP",
+  "followUp.lifecycle": "Lifecycle status",
+  "followUp.candidateBoundary": "Candidate for an owner decision. It has not been added to Established automatically.",
+  "followUp.firstSeen": "First seen",
+  "followUp.lastChecked": "Last checked",
+  "followUp.nextCheckpoint": "Next checkpoint",
+  "followUp.completedCheckpoints": "Completed checkpoints",
+  "followUp.noneCompleted": "No checkpoint completed",
+  "followUp.noAutomaticCheck": "No further automatic check",
+  "followUp.filterStatus": "Current filter outcome",
+  "followUp.securityStatus": "Security status",
+  "followUp.nextReviewStep": "Next review step",
+  "followUp.establishedMembership": "Enabled in Established",
+  "followUp.detailTitle": "Follow-up lifecycle",
+  "followUp.detailBoundary": "Adding this token to Established requires a separate owner decision.",
   "radar.establishedBasket": "Established / main Radar",
   "radar.establishedTabEmpty": "Universe configured, 0 active entries",
   "radar.establishedTabUnavailable": "Established data is unavailable",
@@ -429,6 +466,8 @@ const EN = {
   "method.intro": "Crypto Edge AI organizes data for manual analysis. It does not approve tokens or execute trading actions.",
   "method.newTitle": "New / Emerging",
   "method.newDetail": "The latest DexScreener profiles. Projects are very new, remain observation-only, and never move automatically into Established.",
+  "method.followUpTitle": "Maturing / follow-up",
+  "method.followUpDetail": "Validated chain + contract identities remain under checkpoint-based observation. Candidate for Established means an owner decision, not safety or approval.",
   "method.establishedTitle": "Established",
   "method.establishedDetail": "An owner-maintained, versioned chain + contract address list. GoPlus runs only after the filters pass.",
   "method.sources": "Data sources",
@@ -518,6 +557,9 @@ const PL: TranslationTable = {
   "control.universe.title": "Established Universe",
   "control.universe.explanation": "Prawidłowy pusty universe jest zgodny z kontraktem i nie jest traktowany jako awaria.",
   "control.universe.next": "Przywróć prawidłowy status wersjonowanego universe.",
+  "control.followUp.title": "Dalsza obserwacja / Follow-up",
+  "control.followUp.explanation": "Follow-up wyłącznie do odczytu śledzi zwalidowane tożsamości niezależnie od gotowości Runtime i API.",
+  "control.followUp.next": "Przywróć prawidłowy store Follow-up; last-known-good scannera pozostaje dostępny.",
   "control.review.title": "Review storage",
   "control.review.explanation": "Review storage jest dostępny, a istniejące zapisy pozostają czytelne.",
   "control.review.noSaves": "Review storage jest dostępny; brak zapisanych review jest stanem neutralnym.",
@@ -561,6 +603,11 @@ const PL: TranslationTable = {
   "control.field.automationState": "Stan automatyzacji",
   "control.field.lastResult": "Ostatni wynik",
   "control.field.lastChange": "Ostatnia zmiana",
+  "control.field.storeStatus": "Status store",
+  "control.field.activeFollowUp": "Aktywne rekordy",
+  "control.field.dueFollowUp": "Rekordy due",
+  "control.field.candidateFollowUp": "Candidate for Established",
+  "control.field.nextDue": "Następny due",
   "control.field.storageAvailable": "Storage dostępny",
   "control.field.savedReviews": "Zapisane review",
   "control.field.lastSaved": "Ostatni zapis",
@@ -584,7 +631,7 @@ const PL: TranslationTable = {
   "control.value.verified": "Zweryfikowane",
   "control.value.finalSmokeRequired": "Wymaga końcowego smoke",
   "nav.radar": "Radar",
-  "nav.radarDescription": "Dwa koszyki danych",
+  "nav.radarDescription": "Trzy warstwy danych",
   "nav.details": "Szczegóły",
   "nav.detailsDescription": "Pełny obraz kandydata",
   "nav.verification": "Weryfikacja",
@@ -601,15 +648,15 @@ const PL: TranslationTable = {
   "nav.groupReviewDescription": "Ręczna analiza i badania",
   "nav.groupStatus": "Status / Referencje",
   "nav.groupStatusDescription": "Metodologia i gotowość",
-  "section.radarDescription": "Nowe projekty obserwacyjne i kandydaci Established są rozdzieleni zgodnie z kontraktem danych rzeczywistych.",
+  "section.radarDescription": "Nowe / obserwacja, Dalsza obserwacja i Established pozostają oddzielnymi warstwami kontraktu danych rzeczywistych.",
   "section.detailsDescription": "Tożsamość, rynek, filtry i bezpieczeństwo bez ukrywania brakujących danych.",
   "section.verificationDescription": "Bezpieczne linki do ręcznej kontroli źródeł; aplikacja nie uruchamia dostawców danych.",
-  "section.methodologyDescription": "Prosty opis dwóch koszyków, filtrów, etykiet i granic produktu.",
+  "section.methodologyDescription": "Prosty opis trzech warstw Radaru, filtrów, etykiet i granic produktu.",
   "section.controlCenterDescription": "Wyłącznie odczytowy status produktu do przeglądu ownera i przygotowania zaufanego testera.",
   "section.reportsDescription": "Czytaj istniejące raporty badawcze bez znajomości lokalnych ścieżek i bez akcji generowania.",
   "radar.eyebrow": "INTERNAL_BETA · prawdziwe dane",
-  "radar.title": "Dwa koszyki, dwa różne znaczenia",
-  "radar.intro": "Nowe projekty służą obserwacji. Established to osobna, utrzymywana przez właściciela lista adresów i jedyny koszyk głównego Radaru.",
+  "radar.title": "Trzy warstwy Radaru, trzy różne znaczenia",
+  "radar.intro": "Nowe / obserwacja wykrywa projekty, Dalsza obserwacja zachowuje ich zwalidowane tożsamości, a Established / główny Radar pozostaje osobnym universe utrzymywanym przez ownera.",
   "radar.data": "Dane",
   "radar.summary": "Podsumowanie Radaru",
   "radar.newProjects": "Nowe projekty",
@@ -624,6 +671,34 @@ const PL: TranslationTable = {
   "radar.basketSelection": "Wybór koszyka",
   "radar.newBasket": "Nowe / obserwacja",
   "radar.newBasketDescription": "Bardzo nowe projekty, bez automatycznego awansu",
+  "followUp.basket": "Dalsza obserwacja",
+  "followUp.basketDescription": "Śledzenie przez checkpointy; tylko odczyt",
+  "followUp.maturingCount": "Dalsza obserwacja",
+  "followUp.maturingCountDetail": "aktywna dalsza obserwacja",
+  "followUp.candidateCount": "Kandydaci do Established",
+  "followUp.candidateCountDetail": "wymaga decyzji ownera",
+  "followUp.unavailableTitle": "Follow-up Basket jest niedostępny",
+  "followUp.unavailableDetail": "Nowe / obserwacja i ostatni prawidłowy snapshot scannera pozostają niezależne.",
+  "followUp.emptyTitle": "Brak rekordów w dalszej obserwacji",
+  "followUp.emptyDetail": "Store Follow-up jest prawidłowy i pusty. Rekordy pojawiają się wyłącznie po zwalidowanym snapshotcie Nowe / obserwacja.",
+  "followUp.headingEyebrow": "Dalsza obserwacja / Follow-up",
+  "followUp.heading": "Dalsza obserwacja w kontrolowanych checkpointach",
+  "followUp.headingDetail": "Tożsamość to chain + contract_address. Odświeżenie widoku nigdy nie uruchamia kontroli providera.",
+  "followUp.readOnly": "FOLLOW-UP TYLKO DO ODCZYTU",
+  "followUp.lifecycle": "Status lifecycle",
+  "followUp.candidateBoundary": "Kandydat do ręcznej decyzji ownera. Nie został automatycznie dodany do Established.",
+  "followUp.firstSeen": "Pierwsze wykrycie",
+  "followUp.lastChecked": "Ostatnie sprawdzenie",
+  "followUp.nextCheckpoint": "Następny checkpoint",
+  "followUp.completedCheckpoints": "Ukończone checkpointy",
+  "followUp.noneCompleted": "Brak ukończonych checkpointów",
+  "followUp.noAutomaticCheck": "Brak kolejnego automatycznego sprawdzenia",
+  "followUp.filterStatus": "Obecny wynik filtrów",
+  "followUp.securityStatus": "Status bezpieczeństwa",
+  "followUp.nextReviewStep": "Następny krok analizy",
+  "followUp.establishedMembership": "Aktywny wpis Established",
+  "followUp.detailTitle": "Lifecycle Follow-up",
+  "followUp.detailBoundary": "Dodanie do Established wymaga osobnej, ręcznej decyzji ownera.",
   "radar.establishedBasket": "Established / główny Radar",
   "radar.establishedTabEmpty": "Lista skonfigurowana, 0 aktywnych wpisów",
   "radar.establishedTabUnavailable": "Dane Established są niedostępne",
@@ -862,6 +937,8 @@ const PL: TranslationTable = {
   "method.intro": "Crypto Edge AI porządkuje dane do ręcznej analizy. Nie zatwierdza tokenów i nie wykonuje działań transakcyjnych.",
   "method.newTitle": "Nowe / Emerging",
   "method.newDetail": "Najnowsze profile DexScreener. Projekty są bardzo nowe, pozostają wyłącznie obserwacyjne i nie awansują automatycznie do Established.",
+  "method.followUpTitle": "Dalsza obserwacja / Follow-up",
+  "method.followUpDetail": "Zwalidowane tożsamości chain + contract_address pozostają w obserwacji checkpointowej. Candidate for Established oznacza decyzję ownera, nie bezpieczeństwo ani zatwierdzenie.",
   "method.establishedTitle": "Established",
   "method.establishedDetail": "Utrzymywana przez właściciela, wersjonowana lista sieci i adresów kontraktów. GoPlus uruchamia się dopiero po przejściu filtrów.",
   "method.sources": "Źródła danych",
@@ -964,6 +1041,55 @@ export function formatProductAge(seconds: number, locale: ProductLocale): string
   if (normalized < 3600) return `${Math.floor(normalized / 60)} min`;
   const hours = Math.floor(normalized / 3600);
   return locale === "pl" ? `${hours} godz.` : `${hours} hr`;
+}
+
+export function formatProductPairAge(
+  pairAgeDays: number | null,
+  locale: ProductLocale,
+  missing: string,
+  options: { pairCreatedAt?: string | null; now?: Date } = {},
+): string {
+  const now = options.now ?? new Date();
+  const createdAtMs = options.pairCreatedAt ? Date.parse(options.pairCreatedAt) : Number.NaN;
+  const elapsedHours = Number.isFinite(createdAtMs)
+    ? (now.getTime() - createdAtMs) / (60 * 60 * 1_000)
+    : pairAgeDays !== null && Number.isFinite(pairAgeDays) ? pairAgeDays * 24 : null;
+  return elapsedHours === null ? missing : formatProductAgeHours(elapsedHours, locale);
+}
+
+export function formatProductElapsedSince(
+  value: string,
+  now: Date,
+  locale: ProductLocale,
+  missing: string,
+): string {
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return missing;
+  return formatProductAgeHours((now.getTime() - timestamp) / (60 * 60 * 1_000), locale);
+}
+
+export function formatProductAgeHours(hours: number, locale: ProductLocale): string {
+  const normalized = Math.max(0, hours);
+  if (normalized < 1) return locale === "pl" ? "mniej niż 1 godz." : "less than 1 hour";
+  const fullHours = Math.floor(normalized);
+  if (fullHours < 24) {
+    if (locale === "pl") return `${fullHours} godz.`;
+    return `${fullHours} ${fullHours === 1 ? "hour" : "hours"}`;
+  }
+  const days = Math.floor(fullHours / 24);
+  if (locale === "pl") return `${days} ${days === 1 ? "dzień" : "dni"}`;
+  return `${days} ${days === 1 ? "day" : "days"}`;
+}
+
+export function formatFollowUpLifecycleStatus(value: FollowUpLifecycleStatus, locale: ProductLocale): string {
+  const labels: Record<FollowUpLifecycleStatus, [string, string]> = {
+    NEW: ["New", "Nowe"],
+    MATURING: ["Maturing", "Dalsza obserwacja"],
+    CANDIDATE_FOR_ESTABLISHED: ["Candidate for Established", "Kandydaci do Established"],
+    ESTABLISHED: ["Established", "Established"],
+    ARCHIVED: ["Archived", "Archiwalne"],
+  };
+  return labels[value][locale === "pl" ? 1 : 0];
 }
 
 export function formatProductUsd(value: number | null, locale: ProductLocale, missing: string): string {

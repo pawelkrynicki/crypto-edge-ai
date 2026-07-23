@@ -1,5 +1,23 @@
 # Roadmap
 
+## Maturing / Follow-up Basket
+
+Etap dodaje trzecią warstwę Radaru pomiędzy `New / observation` i `Established / main Radar`. Zwalidowana tożsamość `chain + contract_address` trafia do lokalnego, atomowego Follow-up store i pozostaje obserwowana w checkpointach 1, 3, 7, 14 i 30 dni. Centralny `scanner_and_context` wybiera maksymalnie 5 due records, używa wspólnego locka, bounded transportu, token-pairs, wyboru pary i niezmienionych basic filters. Refresh view i liczba użytkowników nie zwiększają provider calls.
+
+`CANDIDATE_FOR_ESTABLISHED` oznacza wyłącznie ręczną decyzję ownera. Brak security pozostaje Manual Verification Required, Honeypot.is nie jest uruchamiany automatycznie, a system nie zmienia Established Universe. API i UI są read-only. Control Center pokazuje Follow-up niezależnie, a overall Trusted Tester Preview pozostaje `NOT_READY`.
+
+Maturing / Follow-up Basket został zaakceptowany lokalnie 23.07.2026 z werdyktem `ACCEPT_LOCAL_CODE`. Kontrakt: `docs/maturing_follow_up_basket.md`.
+
+Następny etap: **Owner Established Promotion Flow**. Dalsza kolejność:
+
+1. Owner Established Promotion Flow.
+2. Persistent Feedback Loop.
+3. VPS i private tester preview.
+4. Final Frontend Polish / Premium UI Pass.
+5. Sesja testera i poprawki P0.
+
+Termin Premium UI Pass pozostaje bez zmian: **27–30.07.2026**.
+
 ## Established Universe Management
 
 Etap wprowadza bezpieczny, owner-maintained proces dla głównego koszyka Radar: kanoniczny model `chain + contract_address`, jawne sieci, deterministyczny checksum, wersje z ograniczoną historią i audytem, atomowe operacje CLI z dry-run/`--apply`, preview collectora bez provider calls oraz read-only `GET /api/established-universe/status`. `New / observation` pozostaje niezależny i nie ma automatycznego awansu. Filtry, scoring, `final_label` i znaczenie `WATCHLIST` pozostają bez zmian.
@@ -198,13 +216,11 @@ Następny główny etap linii 12D to **12D.2 Persistent Feedback Loop**. Przed n
 
 Zaakceptowana kolejność dalszych prac:
 
-1. Read-Only Reports Library — zakończone.
-2. Maturing / Follow-up Basket.
-3. Owner Established Promotion Flow.
-4. Persistent Feedback Loop.
-5. VPS i private tester preview.
-6. Final Frontend Polish / Premium UI Pass.
-7. Sesja testera i poprawki P0.
+1. Owner Established Promotion Flow.
+2. Persistent Feedback Loop.
+3. VPS i private tester preview.
+4. Final Frontend Polish / Premium UI Pass.
+5. Sesja testera i poprawki P0.
 
 Planowany termin osobnego **Final Frontend Polish / Premium UI Pass** pozostaje **27–30.07.2026**. Kierunek: profesjonalny terminal badawczy, subtelne mikroanimacje, spójna hierarchia i brak hazardowego stylu.
 

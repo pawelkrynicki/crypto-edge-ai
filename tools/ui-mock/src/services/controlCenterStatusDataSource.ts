@@ -30,6 +30,7 @@ function isControlCenterStatus(value: unknown): value is ControlCenterStatus {
     "establishedUniverse",
     "reviewStorage",
     "reports",
+    "followUp",
     "accessDeployment",
     "feedback",
   ];

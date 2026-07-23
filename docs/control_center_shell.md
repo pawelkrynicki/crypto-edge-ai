@@ -41,6 +41,7 @@ Stary, ale prawidłowy last-known-good scanner snapshot daje `PARTIAL` sekcji da
 - **Źródła danych** — `Available`, `Partially available` lub `Unavailable` z istniejącego resolvera source health Product Radar.
 - **Automatyzacja** — aktywność, ostatni run i wynik, następny run oraz najbliższy termin po aktywacji. Stan nieaktywny nie jest `READY`.
 - **Established Universe** — validation status, wersja, liczba aktywnych wpisów i ostatnia zmiana. Zero wpisów nie jest awarią przy poprawnej walidacji.
+- **Maturing / follow-up** — osobny status lokalnego store, aktywne i due records, Candidate for Established oraz najbliższy due. Pusty poprawny store jest `READY`; recovered store jest `PARTIAL`, a invalid/unavailable może być `NOT_READY` bez zmiany statusu działającego Runtime i API.
 - **Review storage** — dostępność, liczba zapisów i ostatni zapis. Brak zapisów jest neutralny; niedostępny storage daje `NOT_READY`.
 - **Reports** — status pochodzi z kanonicznego indeksu Reports Library: `READY` także przy 0 raportów, `PARTIAL` przy co najmniej jednym prawidłowym i pominiętych artefaktach, `NOT_READY` przy niedostępnym storage lub niespełnialnym kontrakcie. Karta pokazuje liczbę raportów, najnowszy raport i liczbę pominiętych artefaktów.
 - **Dostęp i wdrożenie** — lokalny runtime, niepotwierdzony VPS, wymagany końcowy smoke Cloudflare Access i external tester `NO-GO`.
@@ -86,6 +87,10 @@ Od 12D.1 karta Reports nie korzysta ze stałej bramki. `GET /api/control-center/
 - Trwałe zbieranie feedbacku pozostaje niezależnym blockerem i nie jest łączone z Reports Library.
 
 Overall nadal pozostaje `NOT_READY`, ponieważ feedback i access/deployment pozostają niegotowe. Szczegóły kontraktu znajdują się w `docs/read_only_reports_library.md`.
+
+## Aktualizacja: Maturing / Follow-up Basket
+
+`GET /api/control-center/status` korzysta z tego samego bezpiecznego resolvera co `GET /api/follow-up/status`. Karta Follow-up nie uruchamia collectora ani providerów i nie udostępnia mutacji. Błąd store’u jest lokalny dla tej karty: poprawny scanner last-known-good oraz status Runtime i API pozostają niezależne. Overall Trusted Tester Preview nadal jest `NOT_READY`. Pełny kontrakt: `docs/maturing_follow_up_basket.md`.
 
 ## Local owner review: ACCEPT_LOCAL_CODE — 22.07.2026
 

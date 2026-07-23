@@ -21,7 +21,7 @@ afterEach(async () => {
 });
 
 describe("central automation coordinator", () => {
-  it("runs exactly one runner for five concurrent attempts and shares active run_id", async () => {
+  it("runs exactly one shared collector for 100 concurrent users and shares active run_id", async () => {
     const automationDirectoryPath = await tempDirectory();
     let runnerCalls = 0;
     let releaseRunner!: () => void;
@@ -36,7 +36,7 @@ describe("central automation coordinator", () => {
       return { request_counts: { dexscreener: 0 }, scanner_run_id: "scanner_shared", context_run_id: "context_shared" };
     };
 
-    const attempts = Array.from({ length: 5 }, () => runCentralAutomation({
+    const attempts = Array.from({ length: 100 }, () => runCentralAutomation({
       runner,
       automationDirectoryPath,
       runIdFactory: () => `run_parallel_${sequence += 1}`,
@@ -52,7 +52,7 @@ describe("central automation coordinator", () => {
     const success = results.find((result) => result.status === "SUCCESS");
     const blocked = results.filter((result) => result.status === "RUN_ALREADY_IN_PROGRESS");
     assert.ok(success && success.status === "SUCCESS");
-    assert.equal(blocked.length, 4);
+    assert.equal(blocked.length, 99);
     assert.deepEqual(new Set(blocked.map((result) => result.status === "RUN_ALREADY_IN_PROGRESS" ? result.active_run_id : null)), new Set([success.run_id]));
 
     const state = await createAutomationStateStore(automationDirectoryPath).read();

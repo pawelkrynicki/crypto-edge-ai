@@ -901,8 +901,9 @@ const candidateResultsMarkup = renderToStaticMarkup(React.createElement(Candidat
   onOpenExternalChecks: () => undefined,
 }));
 
-assert.match(candidateResultsMarkup, /Two baskets with two different meanings/, "product radar explains the two baskets");
+assert.match(candidateResultsMarkup, /Three Radar layers with three different meanings/, "product radar explains the three layers");
 assert.match(candidateResultsMarkup, /New \/ observation/, "product radar renders new-emerging basket selector");
+assert.match(candidateResultsMarkup, /Maturing \/ follow-up/, "product radar renders follow-up basket selector");
 assert.match(candidateResultsMarkup, /Established \/ main Radar/, "product radar renders established basket selector");
 assert.match(candidateResultsMarkup, /OBSERVATION — NEW PROJECT/, "new-emerging status is observation-first");
 assert.match(candidateResultsMarkup, /observation_only=true/, "new-emerging preserves observation-only metadata");

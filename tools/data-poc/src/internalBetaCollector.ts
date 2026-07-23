@@ -33,6 +33,19 @@ import {
   GOPLUS_ATTRIBUTION_PROVIDER,
   type GoPlusSecurityResult,
 } from "./goplusClient.js";
+import {
+  DEFAULT_FOLLOW_UP_RECHECK_LIMIT,
+  ingestScannerSnapshot,
+  synchronizeFollowUpEstablishedMembership,
+  updateFollowUpStore,
+  type FollowUpSecurityStatus,
+} from "./followUpBasket.js";
+import {
+  applyFollowUpRecheckBatch,
+  collectDueFollowUpRechecks,
+  prepareFollowUpRechecks,
+} from "./followUpCollector.js";
+import { normalizeSecurity } from "./normalizeSecurity.js";
 import { buildPersistableScannerOutput, type PersistableScannerOutput } from "./persistableScannerModel.js";
 import { APPROVED_SOURCES_OUTPUT_FILENAME } from "./sources/runApprovedSourcesPoc.js";
 import {
@@ -65,6 +78,8 @@ export type InternalBetaCollectorOptions = {
   contextDueSourceIds?: ContextSourceId[];
   previousContext?: ApprovedSourcesRunOutput;
   previousContextRunId?: string | null;
+  followUpStorePath?: string;
+  followUpRecheckLimit?: number;
 };
 
 export type InternalBetaCollectorResult = {
@@ -87,6 +102,16 @@ export type InternalBetaCollectorResult = {
   context: ApprovedSourcesRunOutput;
   scanner_publish: AtomicPublishResult;
   context_publish: AtomicPublishResult;
+  follow_up: {
+    status: "READY" | "DEGRADED";
+    validation_status: "valid" | "recovered" | "invalid" | "unavailable";
+    records_due: number;
+    records_selected: number;
+    records_rechecked: number;
+    records_failed: number;
+    store_updated: boolean;
+    error_code: string | null;
+  };
 };
 
 export async function runInternalBetaCollector(
@@ -98,6 +123,10 @@ export async function runInternalBetaCollector(
   const now = options.now ?? new Date();
   const seedLimit = clamp(options.seedLimit, DEFAULT_DEXSCREENER_SEED_LIMIT, 1, 30);
   const securityLimit = clamp(options.securityCandidateLimit, DEFAULT_SECURITY_CANDIDATE_LIMIT, 1, MAX_SECURITY_CANDIDATE_LIMIT);
+  const followUpLimit = clamp(options.followUpRecheckLimit, DEFAULT_FOLLOW_UP_RECHECK_LIMIT, 1, DEFAULT_FOLLOW_UP_RECHECK_LIMIT);
+  const runId = uniqueRunId("scan", now);
+  const followUpStorePath = options.followUpStorePath
+    ?? (options.outputDir ? resolve(options.outputDir, ".follow-up-test", "store.json") : undefined);
   let universe: EstablishedAddressUniverse | null = null;
   let universeFailure: typeof ESTABLISHED_UNIVERSE_INVALID | typeof ESTABLISHED_UNIVERSE_UNAVAILABLE | null = null;
   try {
@@ -110,6 +139,12 @@ export async function runInternalBetaCollector(
       : ESTABLISHED_UNIVERSE_INVALID;
   }
   const enabledUniverseEntries = universe?.entries.filter((entry) => entry.enabled).length ?? 0;
+  const followUpPreparation = await prepareFollowUpRechecks({
+    storePath: followUpStorePath,
+    now,
+    limit: followUpLimit,
+  });
+  const dueFollowUpEntries = followUpPreparation.due_entries;
   const common = {
     fetchImpl: options.fetchImpl,
     timeoutMs: options.timeoutMs,
@@ -120,7 +155,8 @@ export async function runInternalBetaCollector(
       ...common,
       sourceId: "dexscreener",
       maxRequests: 1 + seedLimit + Math.min(seedLimit, 5)
-        + enabledUniverseEntries + Math.min(enabledUniverseEntries, 5),
+        + enabledUniverseEntries + Math.min(enabledUniverseEntries, 5)
+        + dueFollowUpEntries.length + Math.min(dueFollowUpEntries.length, 2),
     }),
     goplus_security: new BoundedHttpClient({
       ...common,
@@ -168,6 +204,20 @@ export async function runInternalBetaCollector(
     }
   }
 
+  let followUpSecurityBudget = Math.max(0, securityLimit - securityResults.size);
+  const followUpRechecks = await collectDueFollowUpRechecks({
+    dueEntries: dueFollowUpEntries,
+    client: clients.dexscreener,
+    now,
+    sourceRunId: runId,
+    securityProvider: async (candidate) => {
+      if (followUpSecurityBudget <= 0) return manualFollowUpSecurity();
+      followUpSecurityBudget -= 1;
+      const result = await fetchCandidateSecurity(candidate, clients.goplus_security, options.goplusApiToken);
+      return followUpSecurityFromGoPlus(candidate, result, now);
+    },
+  });
+
   const contextRunId = uniqueRunId("approved_sources", now);
   const contextCollection = await collectInternalBetaContext({
     now,
@@ -202,7 +252,6 @@ export async function runInternalBetaCollector(
     context,
   );
   const finishedAt = (options.now ?? new Date()).toISOString();
-  const runId = uniqueRunId("scan", now);
   const scanner = buildPersistableScannerOutput({
     combined,
     runId,
@@ -246,6 +295,19 @@ export async function runInternalBetaCollector(
     validate: validateDisplayEligibleScannerSnapshot,
   });
 
+  let followUpStoreUpdated = false;
+  let followUpErrorCode: string | null = null;
+  try {
+    await updateFollowUpStore((current) => {
+      const membershipSynced = synchronizeFollowUpEstablishedMembership(current, universe, finishedAt, runId);
+      const rechecked = applyFollowUpRecheckBatch(membershipSynced, followUpRechecks, universe);
+      return ingestScannerSnapshot(rechecked, scanner, universe);
+    }, { storePath: followUpStorePath, now: new Date(finishedAt) });
+    followUpStoreUpdated = true;
+  } catch (error) {
+    followUpErrorCode = safeFollowUpErrorCode(error);
+  }
+
   return {
     run_id: runId,
     context_run_id: contextRunId,
@@ -263,6 +325,22 @@ export async function runInternalBetaCollector(
     context,
     scanner_publish: scannerPublish,
     context_publish: contextPublish,
+    follow_up: {
+      status: followUpErrorCode ? "DEGRADED" : "READY",
+      validation_status: followUpPreparation.diagnostics.validation_status,
+      records_due: followUpPreparation.diagnostics.store_available
+        ? followUpPreparation.diagnostics.store.entries.filter((entry) => (
+          (entry.lifecycle_status === "NEW" || entry.lifecycle_status === "MATURING")
+          && entry.next_check_at !== null
+          && Date.parse(entry.next_check_at) <= now.getTime()
+        )).length
+        : 0,
+      records_selected: followUpRechecks.records_selected,
+      records_rechecked: followUpRechecks.successes.length,
+      records_failed: followUpRechecks.failed_entry_ids.length,
+      store_updated: followUpStoreUpdated,
+      error_code: followUpErrorCode,
+    },
   };
 }
 
@@ -349,6 +427,59 @@ function uniqueRunId(prefix: string, now: Date): string {
 
 function candidateKey(candidate: CryptoEdgeCandidate): string {
   return `${candidate.chain}:${candidate.contract_address ?? candidate.pair_address ?? candidate.symbol}`.toLowerCase();
+}
+
+function followUpSecurityFromGoPlus(
+  candidate: CryptoEdgeCandidate,
+  result: GoPlusSecurityResult,
+  now: Date,
+): FollowUpSecurityStatus {
+  if (result.availability !== "available" || !result.raw || !candidate.contract_address) {
+    if (result.request_invoked) throw new Error("FOLLOW_UP_SECURITY_PROVIDER_ERROR");
+    return {
+      status: "UNAVAILABLE",
+      source: null,
+      checked_at: null,
+      missing_data: [result.reason_code ?? "security_not_checked"],
+      risk_flags: [],
+    };
+  }
+  const normalized = normalizeSecurity({
+    candidate: {
+      symbol: candidate.symbol,
+      chain: candidate.chain,
+      contract_address: candidate.contract_address,
+    },
+    goplusRaw: result.raw,
+    honeypotRaw: null,
+    mode: "live",
+    now,
+  });
+  return {
+    status: normalized.decision.security_label === "CRITICAL_RISK"
+      ? "CRITICAL_RISK"
+      : normalized.decision.security_label === "SECURITY_PASSED" ? "CHECKED" : "PARTIAL",
+    source: "goplus_security",
+    checked_at: now.toISOString(),
+    missing_data: normalized.security.missing_data,
+    risk_flags: normalized.security.risk_flags,
+  };
+}
+
+function manualFollowUpSecurity(): FollowUpSecurityStatus {
+  return {
+    status: "MANUAL_VERIFICATION_REQUIRED",
+    source: null,
+    checked_at: null,
+    missing_data: ["security_not_checked"],
+    risk_flags: [],
+  };
+}
+
+function safeFollowUpErrorCode(error: unknown): string {
+  const value = error instanceof Error ? error.message : "FOLLOW_UP_STORE_UPDATE_FAILED";
+  const normalized = value.toUpperCase().replace(/[^A-Z0-9_]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 96);
+  return normalized || "FOLLOW_UP_STORE_UPDATE_FAILED";
 }
 
 function clamp(value: number | undefined, fallback: number, min: number, max: number): number {

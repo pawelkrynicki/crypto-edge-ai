@@ -653,7 +653,7 @@
 
 .basket-switcher {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -677,6 +677,10 @@
 .basket-switcher span { color: var(--text-primary); font-size: 13px; font-weight: 750; }
 .basket-switcher strong { color: var(--accent); font-size: 18px; }
 .basket-switcher small { grid-column: 1 / -1; color: var(--text-muted); font-size: 10px; }
+
+.product-candidate-card.follow-up { border-color: rgba(92, 166, 255, 0.28); }
+.basket-status.candidate { color: var(--amber); border-color: var(--amber-border); background: var(--amber-dim); }
+.follow-up-candidate-boundary { margin: 12px 0; padding: 10px 12px; color: var(--text-primary); border-left: 3px solid var(--amber); background: var(--amber-dim); font-size: 11px; line-height: 1.5; }
 
 .basket-content { padding: 16px; }
 .product-partial-data { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; margin-bottom: 14px; padding: 10px 12px; color: var(--amber); border: 1px solid var(--amber-border); border-radius: 6px; background: var(--amber-dim); }
@@ -830,7 +834,7 @@
 .product-methodology { display: grid; max-width: 1100px; gap: 12px; }
 .methodology-lead,
 .methodology-limitations { padding: 18px; }
-.methodology-baskets,
+.methodology-baskets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .methodology-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .methodology-baskets article,
 .methodology-grid article { padding: 15px; }

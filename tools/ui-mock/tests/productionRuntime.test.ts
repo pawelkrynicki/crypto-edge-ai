@@ -37,7 +37,7 @@ describe("production same-origin VPS runtime", () => {
       scanner: { outputDirPath },
       context: { outputDirPath: contextOutputDirPath },
       reviewSession: { storageFilePath: resolve(tempRoot, "review-session.json") },
-      reports: { reportsRootPath },
+      reports: { reportsRootPath, now: new Date("2026-06-23T09:35:00.000Z") },
     };
     productServer = createProductVpsServer({
       ...apiOptions,
@@ -142,6 +142,8 @@ describe("production same-origin VPS runtime", () => {
       "/api/context/latest",
       "/api/scanner/sources",
       "/api/established-universe/status",
+      "/api/follow-up/status",
+      "/api/follow-up",
       "/api/reports/status",
       "/api/reports",
     ]) {

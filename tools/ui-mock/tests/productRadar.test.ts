@@ -29,6 +29,7 @@ import {
   applyProductLocale,
   DEFAULT_PRODUCT_LOCALE,
   formatProductDateTime,
+  formatProductPairAge,
   PRODUCT_LOCALE_STORAGE_KEY,
   PRODUCT_TRANSLATION_KEYS,
   PRODUCT_TRANSLATIONS,
@@ -183,6 +184,30 @@ const emptyReadiness: ProductReadinessOutput = {
 };
 
 describe("Product Radar owner acceptance", () => {
+  it("formats pair age below 24 hours in hours and switches to days at 24 hours", () => {
+    const now = new Date("2026-07-23T12:00:00.000Z");
+    const pairAge = (createdAt: string, locale: ProductLocale) => formatProductPairAge(
+      0,
+      locale,
+      "missing",
+      { pairCreatedAt: createdAt, now },
+    );
+
+    assert.equal(pairAge("2026-07-23T11:30:00.000Z", "pl"), "mniej niż 1 godz.");
+    assert.equal(pairAge("2026-07-23T11:30:00.000Z", "en"), "less than 1 hour");
+    assert.equal(pairAge("2026-07-23T11:00:00.000Z", "pl"), "1 godz.");
+    assert.equal(pairAge("2026-07-23T11:00:00.000Z", "en"), "1 hour");
+    assert.equal(pairAge("2026-07-23T07:00:00.000Z", "pl"), "5 godz.");
+    assert.equal(pairAge("2026-07-23T07:00:00.000Z", "en"), "5 hours");
+    assert.equal(pairAge("2026-07-22T13:00:00.000Z", "pl"), "23 godz.");
+    assert.equal(pairAge("2026-07-22T13:00:00.000Z", "en"), "23 hours");
+    assert.equal(pairAge("2026-07-22T12:00:00.000Z", "pl"), "1 dzień");
+    assert.equal(pairAge("2026-07-22T12:00:00.000Z", "en"), "1 day");
+    assert.equal(pairAge("2026-07-21T12:00:00.000Z", "pl"), "2 dni");
+    assert.equal(pairAge("2026-07-21T12:00:00.000Z", "en"), "2 days");
+    assert.notEqual(pairAge("2026-07-23T11:30:00.000Z", "pl"), "0 dni");
+  });
+
   it("keeps MockCandidate out of the INTERNAL_BETA product path", async () => {
     for (const file of [
       "src/ProductApp.tsx",
@@ -939,10 +964,10 @@ describe("Product Radar owner acceptance", () => {
       renderWithLocale("pl", React.createElement(ExternalVerificationLinksView, { candidate: establishedCandidate })),
       renderWithLocale("pl", React.createElement(Methodology)),
     ].join(" ");
-    assert.match(english, /Two baskets with two different meanings/);
+    assert.match(english, /Three Radar layers with three different meanings/);
     assert.match(english, /Manual source verification/);
     assert.match(english, /How to read the Radar/);
-    assert.match(polish, /Dwa koszyki, dwa różne znaczenia/);
+    assert.match(polish, /Trzy warstwy Radaru, trzy różne znaczenia/);
     assert.match(polish, /Ręczna weryfikacja źródłowa/);
     assert.match(polish, /Jak czytać Radar/);
     assert.equal(PRODUCT_TRANSLATION_KEYS.length, Object.keys(PRODUCT_TRANSLATIONS.pl).length);

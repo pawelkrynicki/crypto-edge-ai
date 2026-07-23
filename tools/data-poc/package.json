@@ -35,6 +35,8 @@
     "discovery:closure:probe": "tsc && node dist/src/runDiscoveryClosureProbe.js",
     "filters:calibrate": "tsc && node dist/src/runFilterCalibration.js",
     "snapshot:validate:latest": "tsc && node dist/src/runValidateLatestSnapshot.js",
+    "follow-up:bootstrap": "tsc && node dist/src/runFollowUpBootstrap.js",
+    "test:follow-up": "tsc && node --test dist/tests/followUpBasket.test.js dist/tests/followUpCollector.test.js",
     "test": "tsc && node --test dist/tests/*.js",
     "test:automation": "tsc && node --test dist/tests/automationLock.test.js dist/tests/centralAutomationCoordinator.test.js dist/tests/schedulerCadence.test.js dist/tests/taskSchedulerScripts.test.js",
     "test:universe": "tsc && node --test dist/tests/establishedAddressUniverse.test.js dist/tests/establishedUniverseManagement.test.js dist/tests/establishedUniverseCli.test.js dist/tests/establishedUniverseScripts.test.js dist/tests/internalBetaCollector.test.js",

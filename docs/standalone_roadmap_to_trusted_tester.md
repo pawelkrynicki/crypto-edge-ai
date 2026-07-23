@@ -8,6 +8,13 @@
 - Frontend productization is now the main axis.
 - Next stage is 12E.2 Candidate Results View.
 - Reports are not the critical path for the next frontend rebuild.
+- Maturing / Follow-up Basket dodaje read-only trzecią warstwę Radaru; Owner Established Promotion Flow i Persistent Feedback Loop pozostają osobnymi następnymi etapami.
+
+## Maturing / Follow-up Basket
+
+Wykryte tokeny są zachowywane według `chain + contract_address` i sprawdzane w checkpointach 1/3/7/14/30 dni przez istniejący centralny collector. `Candidate for Established` wymaga osobnej decyzji ownera i nigdy nie jest automatyczną promocją. Tester widzi lifecycle i statusy, ale nie może uruchamiać providerów ani zmieniać store. Overall preview pozostaje `NOT_READY`.
+
+Kolejność: Follow-up Basket → Owner Established Promotion Flow → Persistent Feedback Loop → VPS/private tester preview. Plan Premium UI Pass 27–30.07 pozostaje bez zmian.
 
 ## Timing Context
 

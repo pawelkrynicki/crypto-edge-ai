@@ -147,6 +147,20 @@ export function ProductControlCenter({
             t={t}
           />
           <ControlCard
+            title={t("control.followUp.title")}
+            status={status.followUp.status}
+            explanation={t("control.followUp.explanation")}
+            nextStep={t("control.followUp.next")}
+            details={[
+              [t("control.field.storeStatus"), statusLabel(status.followUp.status, t)],
+              [t("control.field.activeFollowUp"), String(status.followUp.activeEntries)],
+              [t("control.field.dueFollowUp"), String(status.followUp.dueEntries)],
+              [t("control.field.candidateFollowUp"), String(status.followUp.candidateEntries)],
+              [t("control.field.nextDue"), dateValue(status.followUp.nextDueAt, locale, t)],
+            ]}
+            t={t}
+          />
+          <ControlCard
             title={t("control.review.title")}
             status={status.reviewStorage.status}
             explanation={status.reviewStorage.entriesCount === 0

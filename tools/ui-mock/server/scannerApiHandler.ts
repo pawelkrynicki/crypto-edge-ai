@@ -49,6 +49,12 @@ import {
   readReportsList,
   type ReportsLibraryOptions,
 } from "./reportsLibrary.js";
+import {
+  readFollowUpDetail,
+  readFollowUpList,
+  readFollowUpStatus,
+  type FollowUpApiOptions,
+} from "./followUpApi.js";
 
 const DEMO_CORS_ORIGINS = new Set(["http://127.0.0.1:5173", "http://localhost:5173"]);
 
@@ -69,6 +75,7 @@ export type ScannerApiHandlerOptions = {
   establishedUniverse?: EstablishedUniverseStatusOptions;
   ownerOperations?: OwnerOperationsOptions;
   reports?: ReportsLibraryOptions;
+  followUp?: FollowUpApiOptions;
 };
 
 export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}): RequestListener {
@@ -132,6 +139,33 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
       return;
     }
 
+    if (req.method === "GET" && path === "/api/follow-up/status") {
+      sendJson(req, res, 200, await readFollowUpStatus(options.followUp), runtimeMode);
+      return;
+    }
+
+    if (req.method === "GET" && path === "/api/follow-up") {
+      sendJson(req, res, 200, await readFollowUpList(options.followUp), runtimeMode);
+      return;
+    }
+
+    if (req.method === "GET" && path.startsWith("/api/follow-up/")) {
+      const entryId = path.slice("/api/follow-up/".length);
+      const entry = await readFollowUpDetail(entryId, options.followUp);
+      if (!entry) {
+        sendJson(req, res, 404, { error: "follow_up_entry_not_found", message: "Follow-up entry not found" }, runtimeMode);
+        return;
+      }
+      sendJson(req, res, 200, entry, runtimeMode);
+      return;
+    }
+
+    if (isFollowUpApiPath(path)) {
+      res.setHeader("allow", "GET");
+      sendJson(req, res, 405, { error: "method_not_allowed", message: "Method not allowed" }, runtimeMode);
+      return;
+    }
+
     if (req.method === "GET" && path === "/api/reports/status") {
       sendJson(req, res, 200, await readReportsLibraryStatus(options.reports), runtimeMode);
       return;
@@ -181,13 +215,14 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
     }
 
     if (req.method === "GET" && path === "/api/control-center/status") {
-      const [scanner, context, automation, establishedUniverse, reviewStorage, reportsLibrary] = await Promise.all([
+      const [scanner, context, automation, establishedUniverse, reviewStorage, reportsLibrary, followUp] = await Promise.all([
         getReadinessEntry(() => readLatestScannerOutput(scannerOptions)),
         getReadinessEntry(() => readLatestContextOutput(contextOptions)),
         readAutomationStatus(options.automation),
         readEstablishedUniverseStatus(options.establishedUniverse),
         readReviewStorageStatus(reviewSessionProvider),
         readReportsLibraryStatus(options.reports),
+        readFollowUpStatus(options.followUp),
       ]);
       const readiness = buildProductReadiness(scanner, context, runtimeMode);
       const scannerFacts = readScannerControlCenterFacts(scanner);
@@ -239,6 +274,15 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
           validReportCount: reportsLibrary.valid_report_count,
           skippedReportCount: reportsLibrary.skipped_report_count,
           latestReportGeneratedAt: reportsLibrary.latest_report_generated_at,
+        },
+        followUp: {
+          storeAvailable: followUp.store_available,
+          validationStatus: followUp.validation_status,
+          activeEntries: followUp.entries_total - followUp.archived_count,
+          dueEntries: followUp.due_count,
+          candidateEntries: followUp.candidate_count,
+          nextDueAt: followUp.next_due_at,
+          lastUpdatedAt: followUp.last_updated_at,
         },
         gates: {
           feedbackCaptureReady: false,
@@ -741,6 +785,10 @@ function getRequestPath(url: string | undefined): string {
 
 function isReportsApiPath(path: string): boolean {
   return path === "/api/reports" || path === "/api/reports/status" || path.startsWith("/api/reports/");
+}
+
+function isFollowUpApiPath(path: string): boolean {
+  return path === "/api/follow-up" || path.startsWith("/api/follow-up/");
 }
 
 function isString(value: unknown): value is string {
