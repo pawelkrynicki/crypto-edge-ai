@@ -128,3 +128,5 @@ scripts\win\start-product-radar-review.cmd --reports
 ```
 
 Po 12D.1 dalszym etapem pozostaje trwały feedback. Nie jest częścią tej biblioteki.
+
+12D.2 dostarcza trwały feedback jako osobny subsystem. Bezpieczny `subject_ref` typu `report` jest sprawdzany przez istniejący indeks Reports Library i zapisuje wyłącznie kanoniczne `report_id`; tester nie przesyła ścieżki raportu. Odczyt raportów, odczyt feedbacku i eksport feedbacku pozostają bez provider calls i bez mutacji biblioteki raportów. Pełny kontrakt: `docs/persistent_feedback_loop.md`.

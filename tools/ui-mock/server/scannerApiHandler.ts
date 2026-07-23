@@ -62,6 +62,25 @@ import {
   type FollowUpApiOptions,
 } from "./followUpApi.js";
 import { createOwnerSessionSecret } from "./ownerPreflight.js";
+import {
+  createFeedbackService,
+  createFeedbackSessionManager,
+  FeedbackApiError,
+  feedbackRecordsToCsv,
+  isFeedbackId,
+  parseOwnerFeedbackExportFormat,
+  parseOwnerFeedbackListQuery,
+  readFeedbackJsonBody,
+  requireFeedbackPostRequest,
+  type FeedbackServiceOptions,
+  type FeedbackSubjectRef,
+} from "./feedbackApi.js";
+import {
+  resolveFeedbackStore,
+  type FeedbackStore,
+  type FeedbackStoreOptions,
+  type VerifiedFeedbackSubject,
+} from "./feedbackStore.js";
 
 const DEMO_CORS_ORIGINS = new Set(["http://127.0.0.1:5173", "http://localhost:5173"]);
 
@@ -84,6 +103,16 @@ export type ScannerApiHandlerOptions = {
   ownerOperations?: OwnerOperationsOptions;
   reports?: ReportsLibraryOptions;
   followUp?: FollowUpApiOptions;
+  feedback?: FeedbackStoreOptions & {
+    store?: FeedbackStore;
+    submissionEnabled?: boolean;
+    sessionSecret?: string;
+    now?: () => Date;
+    sessionLimit?: number;
+    globalLimit?: number;
+    rateWindowMs?: number;
+    resolveSubject?: FeedbackServiceOptions["resolveSubject"];
+  };
 };
 
 export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}): RequestListener {
@@ -110,9 +139,118 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
     mode: ownerMode,
     sessionSecret: ownerSessionSecret,
   });
+  const feedbackSessionManager = createFeedbackSessionManager(
+    options.feedback?.sessionSecret ?? process.env.CRYPTO_EDGE_FEEDBACK_SESSION_SECRET,
+  );
+  const feedbackSubmissionEnabled = options.feedback?.submissionEnabled
+    ?? process.env.CRYPTO_EDGE_FEEDBACK_SUBMISSION_ENABLED !== "0";
+  const feedbackStorePromise = resolveFeedbackStore(options.feedback);
+  const feedbackServicePromise = feedbackStorePromise.then((store) => createFeedbackService({
+    store,
+    runtimeMode,
+    buildSha: options.health?.buildSha,
+    submissionEnabled: feedbackSubmissionEnabled,
+    now: options.feedback?.now,
+    sessionLimit: options.feedback?.sessionLimit,
+    globalLimit: options.feedback?.globalLimit,
+    rateWindowMs: options.feedback?.rateWindowMs,
+    resolveSubject: options.feedback?.resolveSubject ?? ((subjectRef) => resolveFeedbackSubject(
+      subjectRef,
+      scannerOptions,
+      options.followUp,
+      options.reports,
+    )),
+  }));
 
   return async (req, res) => {
     const path = getRequestPath(req.url);
+
+    if (req.method === "GET" && path === "/api/feedback/status") {
+      const session = feedbackSessionManager.resolve(req);
+      if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
+      sendJson(req, res, 200, (await feedbackServicePromise).publicStatus(), runtimeMode);
+      return;
+    }
+
+    if (req.method === "POST" && path === "/api/feedback") {
+      try {
+        requireFeedbackPostRequest(req);
+        const session = feedbackSessionManager.resolve(req);
+        if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
+        const receipt = await (await feedbackServicePromise).submit(
+          await readFeedbackJsonBody(req),
+          session.sessionId,
+        );
+        sendJson(req, res, receipt.submission_status === "RECORDED" ? 201 : 200, receipt, runtimeMode);
+      } catch (error) {
+        sendFeedbackError(req, res, error, runtimeMode);
+      }
+      return;
+    }
+
+    if (path === "/api/feedback" || path.startsWith("/api/feedback/")) {
+      res.setHeader("allow", path === "/api/feedback" ? "POST" : "GET");
+      sendJson(req, res, 405, { error: "method_not_allowed", message: "Method not allowed" }, runtimeMode);
+      return;
+    }
+
+    if (req.method === "GET" && path === "/api/owner/feedback/status") {
+      try {
+        requireOwnerFeedbackCapability(req, ownerMode);
+        sendJson(req, res, 200, (await feedbackServicePromise).ownerStatus(), runtimeMode);
+      } catch (error) {
+        sendFeedbackError(req, res, error, runtimeMode);
+      }
+      return;
+    }
+
+    if (req.method === "GET" && path === "/api/owner/feedback") {
+      try {
+        requireOwnerFeedbackCapability(req, ownerMode);
+        sendJson(req, res, 200, (await feedbackServicePromise).list(parseOwnerFeedbackListQuery(req.url)), runtimeMode);
+      } catch (error) {
+        sendFeedbackError(req, res, error, runtimeMode);
+      }
+      return;
+    }
+
+    if (req.method === "GET" && path === "/api/owner/feedback/export") {
+      try {
+        requireOwnerFeedbackCapability(req, ownerMode);
+        const service = await feedbackServicePromise;
+        const format = parseOwnerFeedbackExportFormat(req.url);
+        const records = service.exportRecords();
+        if (format === "csv") {
+          sendText(req, res, 200, feedbackRecordsToCsv(records), "text/csv; charset=utf-8", runtimeMode, {
+            "content-disposition": "attachment; filename=crypto-edge-feedback.csv",
+          });
+        } else {
+          sendJson(req, res, 200, { feedback: records }, runtimeMode);
+        }
+      } catch (error) {
+        sendFeedbackError(req, res, error, runtimeMode);
+      }
+      return;
+    }
+
+    if (req.method === "GET" && path.startsWith("/api/owner/feedback/")) {
+      try {
+        requireOwnerFeedbackCapability(req, ownerMode);
+        const feedbackId = path.slice("/api/owner/feedback/".length);
+        if (!isFeedbackId(feedbackId)) throw new FeedbackApiError("FEEDBACK_NOT_FOUND", 404);
+        const detail = (await feedbackServicePromise).detail(feedbackId);
+        if (!detail) throw new FeedbackApiError("FEEDBACK_NOT_FOUND", 404);
+        sendJson(req, res, 200, detail, runtimeMode);
+      } catch (error) {
+        sendFeedbackError(req, res, error, runtimeMode);
+      }
+      return;
+    }
+
+    if (path === "/api/owner/feedback" || path.startsWith("/api/owner/feedback/")) {
+      sendJson(req, res, 404, { error: "not_found", message: "Route not found" }, runtimeMode);
+      return;
+    }
 
     if (req.method === "GET" && path === "/api/owner-operations/established-promotion/status") {
       try {
@@ -285,7 +423,7 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
     }
 
     if (req.method === "GET" && path === "/api/control-center/status") {
-      const [scanner, context, automation, establishedUniverse, reviewStorage, reportsLibrary, followUp] = await Promise.all([
+      const [scanner, context, automation, establishedUniverse, reviewStorage, reportsLibrary, followUp, feedback] = await Promise.all([
         getReadinessEntry(() => readLatestScannerOutput(scannerOptions)),
         getReadinessEntry(() => readLatestContextOutput(contextOptions)),
         readAutomationStatus(options.automation),
@@ -293,6 +431,7 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
         readReviewStorageStatus(reviewSessionProvider),
         readReportsLibraryStatus(options.reports),
         readFollowUpStatus(options.followUp),
+        feedbackServicePromise.then((service) => service.ownerStatus()),
       ]);
       const readiness = buildProductReadiness(scanner, context, runtimeMode);
       const scannerFacts = readScannerControlCenterFacts(scanner);
@@ -354,8 +493,18 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
           nextDueAt: followUp.next_due_at,
           lastUpdatedAt: followUp.last_updated_at,
         },
+        feedback: {
+          storageAvailable: feedback.storage_available,
+          status: feedback.feedback_status,
+          submissionEnabled: feedbackSubmissionEnabled && feedback.storage_available,
+          ...(isOwnerFeedbackCapable(req, ownerMode) ? {
+            totalCount: feedback.total_count,
+            newCount: feedback.new_count,
+            blockerCount: feedback.blocker_count,
+            latestFeedbackAt: feedback.latest_feedback_at,
+          } : {}),
+        },
         gates: {
-          feedbackCaptureReady: false,
           trustedTesterPreviewModeReady: false,
           vpsDeploymentConfirmed: false,
           cloudflareAccessVerified: false,
@@ -484,6 +633,23 @@ function sendJson(
   res.end(JSON.stringify(body));
 }
 
+function sendText(
+  req: IncomingMessage,
+  res: ServerResponse,
+  status: number,
+  body: string,
+  contentType: string,
+  runtimeMode: ResolvedProductRuntimeMode,
+  additionalHeaders: Record<string, string> = {},
+): void {
+  res.writeHead(status, {
+    ...responseHeaders(req, runtimeMode),
+    "content-type": contentType,
+    ...additionalHeaders,
+  });
+  res.end(body);
+}
+
 function sendEmpty(
   req: IncomingMessage,
   res: ServerResponse,
@@ -567,6 +733,37 @@ function sendEstablishedPromotionError(
     error: promotionError.code,
     message: "Established promotion request rejected",
   }, runtimeMode);
+}
+
+function sendFeedbackError(
+  req: IncomingMessage,
+  res: ServerResponse,
+  error: unknown,
+  runtimeMode: ResolvedProductRuntimeMode,
+): void {
+  const feedbackError = error instanceof FeedbackApiError
+    ? error
+    : new FeedbackApiError("FEEDBACK_UNAVAILABLE", 503);
+  if (feedbackError.retryAfterSeconds !== undefined) {
+    res.setHeader("retry-after", String(feedbackError.retryAfterSeconds));
+  }
+  sendJson(req, res, feedbackError.httpStatus, {
+    error: feedbackError.code.toLowerCase(),
+    message: feedbackError.code === "RATE_LIMITED"
+      ? "Feedback rate limit reached"
+      : feedbackError.httpStatus === 404 ? "Route or feedback not found" : "Feedback request rejected",
+  }, runtimeMode);
+}
+
+function isOwnerFeedbackCapable(req: IncomingMessage, mode: ReturnType<typeof resolveOwnerOperationsMode>): boolean {
+  return mode !== "DISABLED" && isLocalOwnerRequest(req);
+}
+
+function requireOwnerFeedbackCapability(
+  req: IncomingMessage,
+  mode: ReturnType<typeof resolveOwnerOperationsMode>,
+): void {
+  if (!isOwnerFeedbackCapable(req, mode)) throw new FeedbackApiError("NOT_FOUND", 404);
 }
 
 function requireOwnerMutationRequest(req: IncomingMessage): void {
@@ -901,6 +1098,42 @@ function buildDiscoveryReadiness(scanner: ReadinessEntry, context: ReadinessEntr
 function errorCode(error: unknown, fallback: string): string {
   if (error instanceof ScannerOutputError || error instanceof ContextOutputError) return error.code;
   return fallback;
+}
+
+async function resolveFeedbackSubject(
+  subjectRef: FeedbackSubjectRef,
+  scannerOptions: LatestScannerOutputOptions,
+  followUpOptions: FollowUpApiOptions | undefined,
+  reportsOptions: ReportsLibraryOptions | undefined,
+): Promise<VerifiedFeedbackSubject | null> {
+  if (subjectRef.type === "candidate") {
+    const scanner = await readLatestScannerOutput(scannerOptions).catch(() => null);
+    const candidates = scanner && Array.isArray(scanner.candidates) ? scanner.candidates : [];
+    const candidate = candidates.find((entry) => isRecord(entry) && entry.candidate_id === subjectRef.id);
+    if (!isRecord(candidate) || typeof candidate.chain !== "string" || typeof candidate.contract_address !== "string") {
+      return null;
+    }
+    const runId = scanner && isRecord(scanner.scan_run) && typeof scanner.scan_run.run_id === "string"
+      ? scanner.scan_run.run_id
+      : null;
+    return {
+      candidate_identity: {
+        chain: candidate.chain,
+        contract_address: candidate.contract_address,
+      },
+      ...(runId ? { scanner_run_id: runId } : {}),
+    };
+  }
+  if (subjectRef.type === "follow_up") {
+    const entry = await readFollowUpDetail(subjectRef.id, followUpOptions);
+    if (!entry) return null;
+    return {
+      candidate_identity: { chain: entry.chain, contract_address: entry.contract_address },
+      follow_up_entry_id: entry.entry_id,
+    };
+  }
+  const report = await readReportDetail(subjectRef.id, reportsOptions);
+  return report ? { report_id: report.report_id } : null;
 }
 
 function getRequestPath(url: string | undefined): string {

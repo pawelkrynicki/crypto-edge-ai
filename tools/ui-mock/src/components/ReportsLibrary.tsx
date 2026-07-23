@@ -19,6 +19,7 @@ type ReportsLibraryProps = {
   candidates: UiTokenCandidate[];
   onOpenCandidate: (candidateId: string) => void;
   onOpenManualVerification: (candidateId: string) => void;
+  onSelectedReportChange?: (report: ReportDetail | null) => void;
   initialStatus?: ReportsLibraryStatus | null;
   initialReports?: ReportListItem[];
   initialDetail?: ReportDetail | null;
@@ -28,6 +29,7 @@ export function ReportsLibrary({
   candidates,
   onOpenCandidate,
   onOpenManualVerification,
+  onSelectedReportChange,
   initialStatus,
   initialReports,
   initialDetail,
@@ -63,9 +65,10 @@ export function ReportsLibrary({
     setMissingReport(false);
     const detail = await loadReportDetail(reportId);
     setSelectedReport(detail);
+    onSelectedReportChange?.(detail);
     setMissingReport(detail === null);
     setDetailLoading(false);
-  }, []);
+  }, [onSelectedReportChange]);
 
   const linkedCandidate = selectedReport?.candidates.find((candidate) => candidateIds.has(candidate.candidate_id)) ?? null;
 
@@ -149,7 +152,7 @@ export function ReportsLibrary({
               linkedCandidate={linkedCandidate}
               locale={locale}
               copy={copy}
-              onBack={() => { setSelectedReport(null); setMissingReport(false); }}
+              onBack={() => { setSelectedReport(null); setMissingReport(false); onSelectedReportChange?.(null); }}
               onOpenCandidate={onOpenCandidate}
               onOpenManualVerification={onOpenManualVerification}
             />

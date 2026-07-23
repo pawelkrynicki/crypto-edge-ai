@@ -24,6 +24,7 @@ export type ProductSectionId =
   | "candidate-detail"
   | "external-checks"
   | "reports"
+  | "feedback"
   | "methodology"
   | "control-center";
 
@@ -40,6 +41,7 @@ type ProductWorkspaceShellProps = {
   navItems: ProductNavItem[];
   activeSection: ProductSectionId;
   onSectionChange: (sectionId: ProductSectionId) => void;
+  onSendFeedback: () => void;
   loading: boolean;
   runtimeMode: ResolvedProductRuntimeMode;
   resolvedSource: ResolvedScannerSource;
@@ -70,6 +72,7 @@ export function ProductWorkspaceShell({
   navItems,
   activeSection,
   onSectionChange,
+  onSendFeedback,
   loading,
   runtimeMode,
   resolvedSource,
@@ -144,6 +147,9 @@ export function ProductWorkspaceShell({
               </button>
             ))}
           </div>
+          <button type="button" className="product-feedback-button" onClick={onSendFeedback}>
+            {t("feedback.quickAction")}
+          </button>
           <button type="button" className="product-refresh-button" onClick={onRefresh} disabled={loading}>
             {loading ? t("app.refreshing") : t("app.refresh")}
           </button>
