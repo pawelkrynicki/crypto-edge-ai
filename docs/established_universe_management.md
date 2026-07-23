@@ -6,6 +6,8 @@ Candidate Detail udostępnia teraz backend-gated, owner-only decyzję `Consider 
 
 Opcjonalne `expectedCurrentVersion` i `expectedCurrentChecksum` są sprawdzane przez manager pod istniejącym lockiem. Skuteczne `add` nadal używa tego samego atomowego zapisu, tworzy dokładnie jedną wersję, snapshot historii i audit entry. Aktywny duplikat daje no-op, a disabled entry nie jest automatycznie włączany. Szczegóły: `docs/owner_established_promotion_flow.md`.
 
+Owner Established Promotion Flow został zaakceptowany lokalnie 23.07.2026 z werdyktem `ACCEPT_LOCAL_CODE`. Jedyną tożsamością nadal pozostaje `chain + contract_address`, preview jest dry-run, a mutacja może być dostępna wyłącznie w osobno aktywowanym trybie `ENABLED`. `ENABLED` nie jest obecnie aktywny. Nie ma automatycznego awansu, a rzeczywisty Established Universe pozostał podczas owner review bez zmian w wersji `established-universe-v000000`.
+
 ## Definicja i granice
 
 `Established` jest jedynym głównym koszykiem Product Radar. Jego źródłem jest wyłącznie wersjonowana lista utrzymywana przez ownera. Wpis jest identyfikowany przez znormalizowaną parę `chain + contract_address`; symbol i nazwa są tylko podpowiedziami prezentacyjnymi.

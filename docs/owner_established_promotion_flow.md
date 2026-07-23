@@ -84,6 +84,33 @@ Candidate Detail ładuje owner status same-origin i renderuje sekcję **Owner de
 
 Control Center nie ma nowej dużej karty. W istniejącej karcie Established Universe owner widzi tylko dodatkową capability `Disabled`, `Review safe` albo `Enabled`; tester jej nie widzi. Capability nie wpływa na overall readiness, który pozostaje `NOT_READY`. External tester pozostaje `NO-GO`, a `PUBLIC_BETA` wyłączone.
 
+## Local owner review: ACCEPT_LOCAL_CODE — 23.07.2026
+
+Owner zaakceptował lokalny kod przepływu na commitcie `02477bd0499a3b0d5f2f81f88586174ea86ba0e7`.
+
+Review potwierdził, że:
+
+- launcher otwiera bezpośrednio Candidate Detail;
+- owner operations działa w `REVIEW_SAFE`;
+- panel **Decyzja ownera / Rozważ do Established** znajduje się we właściwym miejscu;
+- panel pokazuje kanoniczne `chain + contract_address`;
+- aktualny token ma produktową etykietę **Nowe**;
+- filtry mają etykietę **Filtry niespełnione**;
+- security ma etykietę **Częściowe dane**;
+- membership ma etykietę **Nie znajduje się w Established**;
+- owner mode ma etykietę **Bezpieczny tryb przeglądu**;
+- preview pokazuje czytelne powody blokady bez surowych reason codes w głównym UI;
+- kwalifikacja i plan mają etykietę **Zablokowane**;
+- kontrola duplikatu pokazuje **Nie wykryto duplikatu**;
+- checkbox i przycisk dodania są nieaktywne dla `BLOCKED` i `REVIEW_SAFE`;
+- nie jest wykonywany POST ani automatyczny awans;
+- rzeczywisty Established Universe pozostał bez zmian;
+- review wykonał zero zapisów i zero live provider calls;
+- `ENABLED` nadal nie jest aktywny;
+- overall Trusted Tester Preview pozostaje `NOT_READY`.
+
+Pierwszy owner review zakończył się `CHANGES_REQUIRED` i wykrył launcher otwierający Radar zamiast Candidate Detail, surowe kody maszynowe w polskim UI, surowe reason codes oraz niewystarczająco wyraźne zablokowanie kontrolek. Commit `02477bd0499a3b0d5f2f81f88586174ea86ba0e7` naprawił launcher i warstwę prezentacji bez zmiany API, zasad kwalifikacji, preflightu, Established Universe Managera ani zabezpieczeń POST.
+
 ## Review i walidacja offline
 
 Owner review działa wyłącznie w `REVIEW_SAFE`:

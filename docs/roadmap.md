@@ -2,13 +2,13 @@
 
 ## Owner Established Promotion Flow
 
-Status: **implemented; local owner review pending; `ENABLED` inactive**.
+Status: **local owner review accepted — `ACCEPT_LOCAL_CODE`, 23.07.2026; `ENABLED` inactive**.
 
 Owner-only Candidate Detail flow działa jako status → podpisany read-only preview → jeden strict POST. Reużywa istniejącej walidacji adresów, owner session/preflight oraz Established Universe Managera z lockiem, optimistic version/checksum guards, atomowym zapisem, historią i audytem. `NEW`, `MATURING`, `ARCHIVED` i disabled duplicate są blokowane; aktywny Established daje `NO_ACTION`; nie ma automatycznego awansu ani manual override.
 
 Launcher udostępnia wyłącznie `REVIEW_SAFE`. `ENABLED` nie jest aktywny, external tester pozostaje `NO-GO`, `PUBLIC_BETA` pozostaje wyłączone, a overall Trusted Tester Preview to nadal `NOT_READY`. Kontrakt: `docs/owner_established_promotion_flow.md`.
 
-Następny etap po akceptacji: **Persistent Feedback Loop**. Dalej: VPS/private tester preview, Final Frontend Polish / Premium UI Pass, sesja testera i poprawki P0. Termin Premium UI Pass pozostaje bez zmian: **27–30.07.2026**.
+Zaakceptowany commit kodu: `02477bd0499a3b0d5f2f81f88586174ea86ba0e7`. Następny etap: **Persistent Feedback Loop**. Dalej: VPS/private tester preview, Final Frontend Polish / Premium UI Pass, sesja testera i poprawki P0. Termin Premium UI Pass pozostaje bez zmian: **27–30.07.2026**.
 
 ## Maturing / Follow-up Basket
 
@@ -18,7 +18,7 @@ Etap dodaje trzecią warstwę Radaru pomiędzy `New / observation` i `Establishe
 
 Maturing / Follow-up Basket został zaakceptowany lokalnie 23.07.2026 z werdyktem `ACCEPT_LOCAL_CODE`. Kontrakt: `docs/maturing_follow_up_basket.md`.
 
-Owner Established Promotion Flow jest zaimplementowany i oczekuje na local owner review. Dalsza kolejność:
+Owner Established Promotion Flow został zaakceptowany lokalnie 23.07.2026 z werdyktem `ACCEPT_LOCAL_CODE`. Dalsza kolejność:
 
 1. Persistent Feedback Loop.
 2. VPS i private tester preview.
@@ -214,7 +214,7 @@ Następny główny etap linii 12D po akceptacji Owner Established Promotion Flow
 
 #### B. Owner Established Promotion Flow
 
-Status: **implemented; local owner review pending; `ENABLED` inactive**.
+Status: **local owner review accepted — `ACCEPT_LOCAL_CODE`, 23.07.2026; `ENABLED` inactive**.
 
 - akcja ownera w szczegółach tokena: **„Rozważ do Established”**;
 - dry-run-first;

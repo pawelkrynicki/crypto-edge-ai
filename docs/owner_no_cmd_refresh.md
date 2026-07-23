@@ -4,6 +4,8 @@
 
 Mechanizm HMAC, TTL, constant-time verification i one-time consumption został wydzielony do `tools/ui-mock/server/ownerPreflight.ts`. Owner No-CMD Refresh zachowuje swój kontrakt, a Owner Established Promotion używa dokładnie tego samego mechanizmu podpisu i custom owner session header zamiast drugiego systemu kryptograficznego lub sesyjnego. Szczegóły nowej operacji: `docs/owner_established_promotion_flow.md`.
 
+Local owner review 23.07.2026 potwierdził ponowne wykorzystanie tej samej sesji ownera, trybu `REVIEW_SAFE` oraz podpisanego, wygasającego i jednorazowego preflightu przez Established Promotion Flow. Promocja nie jest aktywna na VPS, a tryb `ENABLED` nie został aktywowany.
+
 ## Cel i zakres
 
 Pierwsza operacja No-CMD pozwala ownerowi zobaczyć plan cadence i, po osobnej przyszłej decyzji aktywacyjnej, uruchomić dokładnie jeden kontrolowany cykl odświeżenia danych. Operacja jest częścią istniejącego Control Center, a nie osobną publiczną zakładką. Nie dodaje edycji Established Universe, raportów, feedbacku, zmiany filtrów, scoringu, `final_label`, `WATCHLIST`, limitów ani konfiguracji providerów.

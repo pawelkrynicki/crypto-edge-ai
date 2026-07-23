@@ -6,6 +6,8 @@ Owner Established Promotion Flow realizuje osobną, dry-run-first decyzję w Can
 
 Po skutecznym dodaniu Follow-up store i checkpointy nie są przepisywane. Istniejący resolver wylicza `ESTABLISHED` z active membership bieżącego universe, dzięki czemu licznik Candidate spada bez drugiego źródła prawdy. Pełny kontrakt: `docs/owner_established_promotion_flow.md`. Następny etap po akceptacji: **Persistent Feedback Loop**.
 
+Owner review 23.07.2026 zaakceptował przygotowany dla `CANDIDATE_FOR_ESTABLISHED` owner-only flow: operacja znajduje się w Candidate Detail, najpierw pokazuje status i read-only preview, a ewentualna przyszła mutacja wymaga oddzielnego potwierdzenia. Status kandydata nigdy nie powoduje automatycznego awansu do Established.
+
 ## Problem i cel
 
 `New / observation` korzysta z najnowszych profili DexScreener. Profil może przestać być „najnowszy”, mimo że wykryty token nadal wymaga obserwacji. Follow-up Basket zachowuje zwalidowaną tożsamość takiego rekordu i sprawdza go ponownie w ograniczonych punktach czasu. Token nie znika tylko dlatego, że wypadł ze strumienia latest profiles.
