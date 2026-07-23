@@ -143,6 +143,12 @@ export function ProductControlCenter({
               [t("radar.universeVersion"), status.establishedUniverse.universeVersion ?? t("app.noData")],
               [t("radar.activeEntries"), String(status.establishedUniverse.entriesEnabled)],
               [t("control.field.lastChange"), dateValue(status.establishedUniverse.lastChangeAt, locale, t)],
+              ...(ownerOperationsStatus?.owner_controls_visible
+                ? [[
+                  locale === "pl" ? "Możliwość promocji ownera" : "Owner promotion capability",
+                  ownerCapabilityValue(ownerOperationsStatus.mode, locale),
+                ] as [string, string]]
+                : []),
             ]}
             t={t}
           />
@@ -335,4 +341,10 @@ function validationValue(value: "valid" | "invalid" | "unavailable", t: Translat
   if (value === "valid") return t("control.value.valid");
   if (value === "invalid") return t("control.value.invalid");
   return t("status.unavailable");
+}
+
+function ownerCapabilityValue(mode: OwnerOperationsStatus["mode"], locale: ProductLocale): string {
+  if (mode === "REVIEW_SAFE") return locale === "pl" ? "Bezpieczny przegląd" : "Review safe";
+  if (mode === "ENABLED") return locale === "pl" ? "Włączona" : "Enabled";
+  return locale === "pl" ? "Wyłączona" : "Disabled";
 }

@@ -12,6 +12,7 @@ import {
   type ControlCenterReadinessInput,
 } from "../src/controlCenterStatus.js";
 import { ProductControlCenter } from "../src/components/ProductControlCenter.js";
+import type { OwnerOperationsStatus } from "../src/services/ownerOperationsDataSource.js";
 import { ProductLocaleProvider } from "../src/productI18n.js";
 import type { ReviewSessionStorageProvider } from "../server/reviewSessionStorageProvider.js";
 
@@ -96,6 +97,16 @@ describe("Control Center readiness model", () => {
     assert.equal(universe.validationStatus, "valid");
     assert.equal(universe.entriesEnabled, 0);
     assert.equal(universe.status, "READY");
+  });
+
+  it("shows Established decision capability only to the backend-confirmed owner", () => {
+    const status = resolveControlCenterStatus(baseInput());
+    const tester = renderControlCenter("en", status, null);
+    const owner = renderControlCenter("en", status, ownerStatus("REVIEW_SAFE"));
+    assert.doesNotMatch(tester, /Owner promotion capability|Review safe/);
+    assert.match(owner, /Owner promotion capability/);
+    assert.match(owner, /Review safe/);
+    assert.equal(status.overallStatus, "NOT_READY");
   });
 
   it("treats a valid empty Follow-up store as READY", () => {
@@ -456,12 +467,36 @@ function baseInput(): ControlCenterReadinessInput {
   };
 }
 
-function renderControlCenter(locale: "en" | "pl", status: ReturnType<typeof resolveControlCenterStatus>): string {
+function renderControlCenter(
+  locale: "en" | "pl",
+  status: ReturnType<typeof resolveControlCenterStatus>,
+  ownerOperationsStatus?: OwnerOperationsStatus | null,
+): string {
   return renderToStaticMarkup(React.createElement(
     ProductLocaleProvider,
     { initialLocale: locale },
-    React.createElement(ProductControlCenter, { status }),
+    React.createElement(ProductControlCenter, { status, ownerOperationsStatus }),
   ));
+}
+
+function ownerStatus(mode: "REVIEW_SAFE" | "ENABLED"): OwnerOperationsStatus {
+  return {
+    mode,
+    owner_controls_visible: true,
+    owner_actions_enabled: mode === "ENABLED",
+    action_in_progress: false,
+    last_action_status: null,
+    last_action_started_at: null,
+    last_action_finished_at: null,
+    scanner_due: false,
+    context_due: false,
+    next_scanner_due_at: null,
+    next_context_due_at: null,
+    automation_enabled: false,
+    current_scanner_snapshot_timestamp: null,
+    current_context_snapshot_timestamp: null,
+    last_known_good_available: true,
+  };
 }
 
 function countStatusCards(markup: string): number {

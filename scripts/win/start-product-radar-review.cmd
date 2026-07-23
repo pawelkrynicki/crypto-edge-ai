@@ -7,13 +7,16 @@ set "UI_DIR=%REPO_ROOT%\tools\ui-mock"
 set "OUTPUT_DIR=%REPO_ROOT%\tools\data-poc\output"
 set "RADAR_VIEW=candidate-results"
 set "OWNER_OPERATIONS_REVIEW=0"
+set "ESTABLISHED_PROMOTION_REVIEW=0"
 set "RUN_CHECK=0"
 
 :parse_args
 if "%~1"=="" goto args_done
 if /i "%~1"=="--control-center" set "RADAR_VIEW=control-center"
 if /i "%~1"=="--reports" set "RADAR_VIEW=reports"
+if /i "%~1"=="--candidate-detail" set "RADAR_VIEW=candidate-detail"
 if /i "%~1"=="--owner-operations-review" set "OWNER_OPERATIONS_REVIEW=1"
+if /i "%~1"=="--established-promotion-review" set "ESTABLISHED_PROMOTION_REVIEW=1"
 if /i "%~1"=="--check" set "RUN_CHECK=1"
 shift
 goto parse_args
@@ -23,12 +26,17 @@ if "%OWNER_OPERATIONS_REVIEW%"=="1" if /i not "%RADAR_VIEW%"=="control-center" (
   echo ERROR: --owner-operations-review wymaga --control-center.
   exit /b 1
 )
+if "%ESTABLISHED_PROMOTION_REVIEW%"=="1" if /i not "%RADAR_VIEW%"=="candidate-detail" (
+  echo ERROR: --established-promotion-review wymaga --candidate-detail.
+  exit /b 1
+)
 set "RADAR_URL=http://127.0.0.1:5173/#%RADAR_VIEW%"
 set "HAS_SCANNER_OUTPUT=0"
 set "CRYPTO_EDGE_RUNTIME_MODE=INTERNAL_BETA"
 set "SCANNER_API_PORT=5177"
 set "CRYPTO_EDGE_OWNER_OPERATIONS_MODE=DISABLED"
 if "%OWNER_OPERATIONS_REVIEW%"=="1" set "CRYPTO_EDGE_OWNER_OPERATIONS_MODE=REVIEW_SAFE"
+if "%ESTABLISHED_PROMOTION_REVIEW%"=="1" set "CRYPTO_EDGE_OWNER_OPERATIONS_MODE=REVIEW_SAFE"
 
 echo.
 echo === Crypto Edge AI: Product Radar owner review ===

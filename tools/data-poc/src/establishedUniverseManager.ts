@@ -15,7 +15,6 @@ import {
   validateEstablishedAddressUniverse,
   type EstablishedAddressUniverse,
   type EstablishedAddressUniverseEntry,
-  type SupportedEstablishedChain,
 } from "./establishedAddressUniverse.js";
 import { resolveRepoFile } from "./sourceRegistryValidator.js";
 
@@ -67,6 +66,8 @@ export type UniverseMutationOptions = {
   apply?: boolean;
   storePath?: string;
   actor?: string;
+  expectedCurrentVersion?: string;
+  expectedCurrentChecksum?: string;
   now?: () => Date;
   atomicWrite?: (path: string, value: EstablishedUniverseStore) => Promise<void>;
 };
@@ -144,17 +145,28 @@ export async function mutateEstablishedUniverse(
   const storePath = resolve(options.storePath ?? getDefaultEstablishedUniverseStorePath());
   if (!options.apply) {
     const store = await readEstablishedUniverseStore(storePath);
+    assertExpectedCurrentUniverse(store, options);
     return buildMutation(store, mutation, options).result;
   }
 
   const lock = await acquireManagementLock(storePath);
   try {
     const store = await readEstablishedUniverseStore(storePath);
+    assertExpectedCurrentUniverse(store, options);
     const planned = buildMutation(store, mutation, options);
     await (options.atomicWrite ?? writeStoreAtomically)(storePath, planned.store);
     return { ...planned.result, applied: true };
   } finally {
     await lock.release();
+  }
+}
+
+function assertExpectedCurrentUniverse(store: EstablishedUniverseStore, options: UniverseMutationOptions): void {
+  if (
+    (options.expectedCurrentVersion !== undefined && store.current.universe_version !== options.expectedCurrentVersion)
+    || (options.expectedCurrentChecksum !== undefined && store.current.checksum !== options.expectedCurrentChecksum)
+  ) {
+    throw new Error("ESTABLISHED_UNIVERSE_STALE");
   }
 }
 

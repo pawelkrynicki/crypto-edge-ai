@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   formatFollowUpLifecycleStatus,
   formatProductDateTime,
@@ -19,12 +19,18 @@ import {
 } from "../productSecurityResolver";
 import type { UiTokenCandidate } from "../types/scannerTypes";
 import type { FollowUpPublicEntry } from "../types/followUpTypes";
+import {
+  loadEstablishedPromotionStatus,
+  type EstablishedPromotionStatus,
+} from "../services/establishedPromotionDataSource";
+import { EstablishedPromotionPanel } from "./EstablishedPromotionPanel";
 
 interface CandidateDetailViewProps {
   candidate: UiTokenCandidate | null;
   followUp?: FollowUpPublicEntry | null;
   onBackToResults?: () => void;
   onOpenExternalChecks?: (candidate: UiTokenCandidate) => void;
+  initialOwnerPromotionStatus?: EstablishedPromotionStatus | null;
 }
 
 export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
@@ -32,8 +38,28 @@ export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
   followUp = null,
   onBackToResults,
   onOpenExternalChecks,
+  initialOwnerPromotionStatus,
 }) => {
   const { locale, t } = useProductLocale();
+  const [ownerPromotionStatus, setOwnerPromotionStatus] = useState<EstablishedPromotionStatus | null>(
+    initialOwnerPromotionStatus ?? null,
+  );
+  useEffect(() => {
+    if (initialOwnerPromotionStatus !== undefined) {
+      setOwnerPromotionStatus(initialOwnerPromotionStatus);
+      return;
+    }
+    if (!candidate?.chain || !candidate.contractAddress) {
+      setOwnerPromotionStatus(null);
+      return;
+    }
+    let cancelled = false;
+    setOwnerPromotionStatus(null);
+    void loadEstablishedPromotionStatus(candidate.chain, candidate.contractAddress).then((status) => {
+      if (!cancelled) setOwnerPromotionStatus(status?.owner_controls_visible ? status : null);
+    });
+    return () => { cancelled = true; };
+  }, [candidate?.chain, candidate?.contractAddress, initialOwnerPromotionStatus]);
   if (!candidate) {
     return (
       <section className="candidate-detail-empty product-detail-empty">
@@ -241,6 +267,10 @@ export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
             <DetailField label={t("followUp.nextReviewStep")} value={followUp.next_review_step} />
           </div>
         </section>
+      )}
+
+      {ownerPromotionStatus?.owner_controls_visible && (
+        <EstablishedPromotionPanel initialStatus={ownerPromotionStatus} />
       )}
 
       <section className="product-detail-section next-step" aria-labelledby="next-heading">

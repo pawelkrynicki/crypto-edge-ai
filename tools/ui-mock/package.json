@@ -16,6 +16,7 @@
     "test:control-center": "node --import tsx --test tests/controlCenter.test.ts",
     "test:reports": "node --import tsx --test tests/reportsLibrary.test.ts",
     "test:owner-operations": "node --import tsx --test tests/ownerOperations.test.ts",
+    "test:established-promotion": "node --import tsx --test tests/establishedPromotion.test.ts tests/establishedPromotionUi.test.tsx",
     "test:boundary": "node --import tsx --test tests/realDataBoundary.test.ts",
     "workflow:smoke": "tsx scripts/localWorkflowSmoke.ts",
     "report:analyst": "tsx scripts/generateAnalystReport.ts",

@@ -1,5 +1,15 @@
 # Roadmap
 
+## Owner Established Promotion Flow
+
+Status: **implemented; local owner review pending; `ENABLED` inactive**.
+
+Owner-only Candidate Detail flow działa jako status → podpisany read-only preview → jeden strict POST. Reużywa istniejącej walidacji adresów, owner session/preflight oraz Established Universe Managera z lockiem, optimistic version/checksum guards, atomowym zapisem, historią i audytem. `NEW`, `MATURING`, `ARCHIVED` i disabled duplicate są blokowane; aktywny Established daje `NO_ACTION`; nie ma automatycznego awansu ani manual override.
+
+Launcher udostępnia wyłącznie `REVIEW_SAFE`. `ENABLED` nie jest aktywny, external tester pozostaje `NO-GO`, `PUBLIC_BETA` pozostaje wyłączone, a overall Trusted Tester Preview to nadal `NOT_READY`. Kontrakt: `docs/owner_established_promotion_flow.md`.
+
+Następny etap po akceptacji: **Persistent Feedback Loop**. Dalej: VPS/private tester preview, Final Frontend Polish / Premium UI Pass, sesja testera i poprawki P0. Termin Premium UI Pass pozostaje bez zmian: **27–30.07.2026**.
+
 ## Maturing / Follow-up Basket
 
 Etap dodaje trzecią warstwę Radaru pomiędzy `New / observation` i `Established / main Radar`. Zwalidowana tożsamość `chain + contract_address` trafia do lokalnego, atomowego Follow-up store i pozostaje obserwowana w checkpointach 1, 3, 7, 14 i 30 dni. Centralny `scanner_and_context` wybiera maksymalnie 5 due records, używa wspólnego locka, bounded transportu, token-pairs, wyboru pary i niezmienionych basic filters. Refresh view i liczba użytkowników nie zwiększają provider calls.
@@ -8,13 +18,12 @@ Etap dodaje trzecią warstwę Radaru pomiędzy `New / observation` i `Establishe
 
 Maturing / Follow-up Basket został zaakceptowany lokalnie 23.07.2026 z werdyktem `ACCEPT_LOCAL_CODE`. Kontrakt: `docs/maturing_follow_up_basket.md`.
 
-Następny etap: **Owner Established Promotion Flow**. Dalsza kolejność:
+Owner Established Promotion Flow jest zaimplementowany i oczekuje na local owner review. Dalsza kolejność:
 
-1. Owner Established Promotion Flow.
-2. Persistent Feedback Loop.
-3. VPS i private tester preview.
-4. Final Frontend Polish / Premium UI Pass.
-5. Sesja testera i poprawki P0.
+1. Persistent Feedback Loop.
+2. VPS i private tester preview.
+3. Final Frontend Polish / Premium UI Pass.
+4. Sesja testera i poprawki P0.
 
 Termin Premium UI Pass pozostaje bez zmian: **27–30.07.2026**.
 
@@ -194,7 +203,7 @@ Status: **zaakceptowane lokalnie 22.07.2026 — `ACCEPT_LOCAL_CODE`**.
 
 Pełny kontrakt: `docs/read_only_reports_library.md`.
 
-Następny główny etap linii 12D to **12D.2 Persistent Feedback Loop**. Przed nim obowiązuje zaakceptowana kolejność dwóch osobnych zadań produktowych; żadne z poniższych zadań nie jest implementowane w PR #73.
+Następny główny etap linii 12D po akceptacji Owner Established Promotion Flow to **12D.2 Persistent Feedback Loop**.
 
 #### A. Maturing / Follow-up Basket
 
@@ -204,6 +213,8 @@ Następny główny etap linii 12D to **12D.2 Persistent Feedback Loop**. Przed n
 - brak automatycznego awansu do Established.
 
 #### B. Owner Established Promotion Flow
+
+Status: **implemented; local owner review pending; `ENABLED` inactive**.
 
 - akcja ownera w szczegółach tokena: **„Rozważ do Established”**;
 - dry-run-first;
@@ -216,11 +227,10 @@ Następny główny etap linii 12D to **12D.2 Persistent Feedback Loop**. Przed n
 
 Zaakceptowana kolejność dalszych prac:
 
-1. Owner Established Promotion Flow.
-2. Persistent Feedback Loop.
-3. VPS i private tester preview.
-4. Final Frontend Polish / Premium UI Pass.
-5. Sesja testera i poprawki P0.
+1. Persistent Feedback Loop.
+2. VPS i private tester preview.
+3. Final Frontend Polish / Premium UI Pass.
+4. Sesja testera i poprawki P0.
 
 Planowany termin osobnego **Final Frontend Polish / Premium UI Pass** pozostaje **27–30.07.2026**. Kierunek: profesjonalny terminal badawczy, subtelne mikroanimacje, spójna hierarchia i brak hazardowego stylu.
 

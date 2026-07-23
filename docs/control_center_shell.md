@@ -1,5 +1,9 @@
 # Control Center shell (12B.1)
 
+## Aktualizacja: owner promotion capability
+
+Istniejąca karta Established Universe pokazuje ownerowi dodatkową capability decyzji: `Disabled`, `Review safe` albo `Enabled`. Pole jest renderowane wyłącznie po backendowym `owner_controls_visible = true`; tester go nie widzi. Nie powstała nowa karta, a tryb promocji nie uczestniczy w resolverze readiness. Overall Trusted Tester Preview pozostaje `NOT_READY`. Flow działa w Candidate Detail i jest opisany w `docs/owner_established_promotion_flow.md`.
+
 ## Cel
 
 Control Center jest wyłącznie odczytowym ekranem statusu wewnątrz istniejącego Product Radar. Ma pozwolić ownerowi w mniej niż minutę odróżnić lokalną sprawność produktu od gotowości wersji dla zewnętrznego testera. Nie jest osobną aplikacją i nie jest panelem operatorskim.
