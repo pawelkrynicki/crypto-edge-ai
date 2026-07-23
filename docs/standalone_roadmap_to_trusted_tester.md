@@ -4,7 +4,7 @@
 
 Candidate Detail ma backend-gated sekcję ownera z read-only statusem i dry-run preview. Jedyny POST przyjmuje tylko podpisany one-time `preview_id` i potwierdzenie, ponownie sprawdza canonical record, lifecycle, basic filters, membership, universe version/checksum i lock, a następnie bezpośrednio używa Established Universe Managera.
 
-Tester nie widzi panelu ani capability. Nie ma automatycznego awansu, live provider calls, aktywacji `ENABLED`, VPS/Cloudflare/Task Scheduler changes. Overall pozostaje `NOT_READY`. Następny etap po akceptacji: **Persistent Feedback Loop**. Premium UI Pass nadal ma termin **27–30.07.2026**.
+Tester nie widzi panelu ani capability. Nie ma automatycznego awansu, live provider calls, aktywacji `ENABLED`, VPS/Cloudflare/Task Scheduler changes. Persistent Feedback Loop został zaakceptowany lokalnie 23.07.2026; overall pozostaje `NOT_READY`, a następnym etapem jest **VPS i private tester preview**. Premium UI Pass nadal ma termin **27–30.07.2026**.
 
 ## Status
 
@@ -14,13 +14,13 @@ Tester nie widzi panelu ani capability. Nie ma automatycznego awansu, live provi
 - Frontend productization is now the main axis.
 - Next stage is 12E.2 Candidate Results View.
 - Reports are not the critical path for the next frontend rebuild.
-- Maturing / Follow-up Basket dodaje read-only trzecią warstwę Radaru; Owner Established Promotion Flow realizuje już bezpieczną decyzję ownera, a Persistent Feedback Loop pozostaje następnym etapem.
+- Maturing / Follow-up Basket dodaje read-only trzecią warstwę Radaru; Owner Established Promotion Flow realizuje bezpieczną decyzję ownera, Persistent Feedback Loop jest gotowy lokalnie i zaakceptowany, a następnym etapem jest VPS/private tester preview.
 
 ## Maturing / Follow-up Basket
 
 Wykryte tokeny są zachowywane według `chain + contract_address` i sprawdzane w checkpointach 1/3/7/14/30 dni przez istniejący centralny collector. `Candidate for Established` wymaga osobnej decyzji ownera i nigdy nie jest automatyczną promocją. Tester widzi lifecycle i statusy, ale nie może uruchamiać providerów ani zmieniać store. Overall preview pozostaje `NOT_READY`.
 
-Kolejność po local owner review: Persistent Feedback Loop → VPS/private tester preview. Plan Premium UI Pass 27–30.07 pozostaje bez zmian.
+Kolejność po local owner review: VPS/private tester preview → Final Frontend Polish / Premium UI Pass → sesja testera i poprawki P0. Plan Premium UI Pass 27–30.07 pozostaje bez zmian.
 
 ## Timing Context
 
@@ -467,11 +467,13 @@ Acceptance criteria:
 
 The previous static `#feedback-notes` worksheet remains demo/reference material. The `INTERNAL_BETA` product now has a separate `#feedback` route with durable SQLite capture, automatic canonical screen context, four tester categories, receipt, pseudonymous rate-limited session and an owner-only read inbox with safe export. Feedback records are not analyst manual reviews and cannot change Radar or lifecycle decisions.
 
-The next sequence is fixed:
+Status: **gotowy lokalnie i zaakceptowany — `ACCEPT_LOCAL_CODE`, 23.07.2026**. Owner review potwierdził trwałość po restarcie, jeden kanoniczny store dla capture/inbox/export/Control Center, bezpieczną prezentację danych oraz usunięcie wyłącznie feedback blockera.
 
-1. Persistent Feedback Loop.
-2. VPS and private tester preview.
-3. Final Frontend Polish / Premium UI Pass (27–30.07 remains unchanged).
-4. Trusted tester session and P0 fixes.
+Pozostałe bramki to Trusted Tester Preview Mode, VPS, Cloudflare Access i domain smoke, rollback oraz owner approval. Dalsza kolejność jest stała:
+
+1. VPS and private tester preview.
+2. Final Frontend Polish / Premium UI Pass (27–30.07 remains unchanged).
+3. Trusted tester session and P0 fixes.
+4. Regression, backup, documentation and freeze.
 
 Feedback `READY` closes only the feedback gate. External tester access remains `NO-GO` and overall remains `NOT_READY` until deployment, access smoke, rollback and owner approval are complete.

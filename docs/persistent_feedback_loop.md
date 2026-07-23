@@ -109,6 +109,29 @@ Control Center korzysta z kanonicznego statusu Feedback Store:
 
 Przy `READY` znika wyłącznie blocker `PERSISTENT_FEEDBACK_CAPTURE`. Overall Trusted Tester Preview pozostaje `NOT_READY`, ponieważ deployment, access smoke, rollback oraz owner approval nie zostały zakończone. `PUBLIC_BETA` pozostaje wyłączone.
 
+## Local owner review: ACCEPT_LOCAL_CODE — 23.07.2026
+
+Owner review zaakceptował lokalny kod na commicie `b20e665948a89e6adaadf214fdcbe02f9394512f` i potwierdził:
+
+- formularz Feedback jest dostępny w PL i EN oraz automatycznie zapisuje bezpieczny kontekst ekranu;
+- zgłoszenie zostało trwale zapisane w izolowanym owner review store, a receipt `FB-413F37B9` został poprawnie zwrócony;
+- rekord przetrwał zamknięcie i ponowne uruchomienie runtime;
+- publiczny POST, owner status, inbox, detail, export i Control Center korzystają z jednego kanonicznego store;
+- inbox pokazuje 1 wpis łącznie, 1 nowy, 1 bloker oraz czas ostatniego zgłoszenia;
+- lista i szczegóły pokazują ten sam rekord wraz z tytułem, opisem, kategorią i kontekstem ekranu;
+- UI pokazuje „Tylko dla ownera” i „Nowe”, pseudonimową grupę sesji jako `SES-47E31D` oraz wersję produktu jako skrócone `c697a1dd`;
+- surowy session ID, lokalne ścieżki i dane osobowe nie są widoczne;
+- karta Feedback w Control Center ma status `READY`, a `PERSISTENT_FEEDBACK_CAPTURE` nie występuje już na liście blockerów;
+- pozostałymi blockerami są Trusted Tester Preview Mode, deployment na VPS, smoke przez domenę i Cloudflare Access, rollback test oraz owner approval;
+- overall Trusted Tester Preview pozostaje `NOT_READY`;
+- nie wykonano live provider calls ani zmian snapshotów, automation, Follow-up, Established Universe lub analyst reviews.
+
+Pierwszy owner review wykrył niewidoczny po POST i restarcie rekord w owner inboxie, różne lub nieprzekazywane instancje Feedback Store, brak ponownego pobrania inboxu, kategorię opartą na domyślnym `BLOCKER` oraz techniczne elementy warstwy prezentacji.
+
+Commit `d32f7cd92de3560b33d60e8239cded15d7e09e3f` naprawił wspólny store, odświeżanie inboxu i kategorię formularza. Commit `b20e665948a89e6adaadf214fdcbe02f9394512f` doszlifował prezentację owner inboxu bez zmiany API i storage.
+
+Dedykowany testowy review store zostanie wyczyszczony skryptem `scripts\win\clear-feedback-loop-review.cmd` dopiero po formalnym zamknięciu PR i przed merge. Do tego czasu rekord akceptacyjny pozostaje zachowany.
+
 ## Izolowany owner review i cleanup
 
 Jedna komenda uruchamia build `INTERNAL_BETA`, same-origin runtime na loopback, `REVIEW_SAFE`, `#feedback` oraz dedykowany store `feedback-loop-review.sqlite`:

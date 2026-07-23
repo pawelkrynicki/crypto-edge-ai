@@ -138,8 +138,13 @@ Owner ocenia tylko ekran, statusy, EN/PL, brak mutujących akcji i overall `NOT_
 scripts\win\start-product-radar-review.cmd --control-center
 ```
 
-## 12D.2 canonical Feedback status
+## 12D.2 — kanoniczny status Feedback
 
-Control Center no longer uses a hard-coded future gate for feedback. It consumes the dedicated Feedback Store status: `READY` when durable capture is available (including zero records), `PARTIAL` when the store is readable but submission is disabled, and `NOT_READY` when schema or durable storage cannot be guaranteed. Owner counts are included only when the backend confirms owner capability; tester responses receive no inbox counts.
+Karta Feedback korzysta z kanonicznego statusu dedykowanego Feedback Store, tego samego co publiczny capture i owner inbox:
 
-`READY` removes `PERSISTENT_FEEDBACK_CAPTURE` from the blocker list. Overall remains `NOT_READY` because deployment, domain/access smoke, rollback and owner approval are independent unfinished gates. See `docs/persistent_feedback_loop.md`.
+- `READY` oznacza dostępny trwały capture, także dla poprawnego pustego store, i usuwa `PERSISTENT_FEEDBACK_CAPTURE` z listy blockerów;
+- `PARTIAL` oznacza czytelny store przy wyłączonym submission i przywraca Feedback jako osobny blocker;
+- `NOT_READY` oznacza brak gwarancji schematu lub trwałego storage i również przywraca osobny blocker;
+- liczniki są zwracane wyłącznie po potwierdzeniu owner capability; tester nie otrzymuje danych inboxu.
+
+Local owner review 23.07.2026 potwierdził status Feedback `READY` i brak feedback blockera. Samo Feedback `READY` nie zmienia overall na `READY`: Trusted Tester Preview Mode, deployment na VPS, domain/Cloudflare Access smoke, rollback test i owner approval pozostają otwartymi bramkami, dlatego external tester nadal jest `NO-GO`, a overall pozostaje `NOT_READY`. Pełny kontrakt i werdykt `ACCEPT_LOCAL_CODE` opisuje `docs/persistent_feedback_loop.md`.

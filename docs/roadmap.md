@@ -8,7 +8,7 @@ Owner-only Candidate Detail flow działa jako status → podpisany read-only pre
 
 Launcher udostępnia wyłącznie `REVIEW_SAFE`. `ENABLED` nie jest aktywny, external tester pozostaje `NO-GO`, `PUBLIC_BETA` pozostaje wyłączone, a overall Trusted Tester Preview to nadal `NOT_READY`. Kontrakt: `docs/owner_established_promotion_flow.md`.
 
-Zaakceptowany commit kodu: `02477bd0499a3b0d5f2f81f88586174ea86ba0e7`. Następny etap: **Persistent Feedback Loop**. Dalej: VPS/private tester preview, Final Frontend Polish / Premium UI Pass, sesja testera i poprawki P0. Termin Premium UI Pass pozostaje bez zmian: **27–30.07.2026**.
+Zaakceptowany commit kodu: `02477bd0499a3b0d5f2f81f88586174ea86ba0e7`. Persistent Feedback Loop również został zaakceptowany lokalnie 23.07.2026. Następny etap: **VPS i private tester preview**. Dalej: Final Frontend Polish / Premium UI Pass, sesja testera i poprawki P0 oraz regresja/backup/dokumentacja/freeze. Termin Premium UI Pass pozostaje bez zmian: **27–30.07.2026**.
 
 ## Maturing / Follow-up Basket
 
@@ -20,10 +20,10 @@ Maturing / Follow-up Basket został zaakceptowany lokalnie 23.07.2026 z werdykte
 
 Owner Established Promotion Flow został zaakceptowany lokalnie 23.07.2026 z werdyktem `ACCEPT_LOCAL_CODE`. Dalsza kolejność:
 
-1. Persistent Feedback Loop.
-2. VPS i private tester preview.
-3. Final Frontend Polish / Premium UI Pass.
-4. Sesja testera i poprawki P0.
+1. VPS i private tester preview.
+2. Final Frontend Polish / Premium UI Pass.
+3. Sesja testera i poprawki P0.
+4. Regresja, backup, dokumentacja i freeze.
 
 Termin Premium UI Pass pozostaje bez zmian: **27–30.07.2026**.
 
@@ -919,15 +919,15 @@ The `tools/ui-mock` frontend now includes a UI Data Adapter layer (`src/adapters
 
 ## Stage 12D.2 — Persistent Feedback Loop
 
-Status: implemented for the Trusted Tester Preview core. `#feedback` now provides durable, same-origin tester capture, pseudonymous sessions, idempotent submission, an owner-only read inbox, JSON/CSV export and canonical Control Center readiness. Feedback uses a dedicated SQLite store and never shares the analyst manual Review Storage contract.
+Status: **local owner review accepted — `ACCEPT_LOCAL_CODE`, 23.07.2026**. Zaakceptowany commit kodu: `b20e665948a89e6adaadf214fdcbe02f9394512f`. `#feedback` provides durable, same-origin tester capture, pseudonymous sessions, idempotent submission, an owner-only read inbox, JSON/CSV export and canonical Control Center readiness. Feedback uses a dedicated SQLite store and never shares the analyst manual Review Storage contract.
 
 An empty valid store is `READY`; `PARTIAL` and `NOT_READY` restore the separate Persistent Feedback blocker. Feedback `READY` removes that blocker, while overall remains `NOT_READY` because VPS deployment, access smoke, rollback and owner approval are still open. No VPS, Cloudflare, Task Scheduler, provider, collector, scoring, lifecycle or Established Universe operation is part of 12D.2.
 
 Required delivery order after this sprint:
 
-1. Persistent Feedback Loop.
-2. VPS and private tester preview.
-3. Final Frontend Polish / Premium UI Pass, unchanged at 27–30.07.
-4. Tester session and P0 fixes.
+1. VPS and private tester preview.
+2. Final Frontend Polish / Premium UI Pass, unchanged at 27–30.07.
+3. Tester session and P0 fixes.
+4. Regression, backup, documentation and freeze.
 
 Canonical contract: `docs/persistent_feedback_loop.md`.
