@@ -7,6 +7,7 @@ import React, {
   useState,
   type ReactNode,
 } from "react";
+import type { FollowUpLifecycleStatus } from "./types/followUpTypes";
 
 void React; // Required by the Node TSX test runtime's classic JSX transform.
 
@@ -672,9 +673,9 @@ const PL: TranslationTable = {
   "radar.newBasketDescription": "Bardzo nowe projekty, bez automatycznego awansu",
   "followUp.basket": "Dalsza obserwacja",
   "followUp.basketDescription": "Śledzenie przez checkpointy; tylko odczyt",
-  "followUp.maturingCount": "Maturing",
+  "followUp.maturingCount": "Dalsza obserwacja",
   "followUp.maturingCountDetail": "aktywna dalsza obserwacja",
-  "followUp.candidateCount": "Candidate for Established",
+  "followUp.candidateCount": "Kandydaci do Established",
   "followUp.candidateCountDetail": "wymaga decyzji ownera",
   "followUp.unavailableTitle": "Follow-up Basket jest niedostępny",
   "followUp.unavailableDetail": "Nowe / obserwacja i ostatni prawidłowy snapshot scannera pozostają niezależne.",
@@ -1040,6 +1041,55 @@ export function formatProductAge(seconds: number, locale: ProductLocale): string
   if (normalized < 3600) return `${Math.floor(normalized / 60)} min`;
   const hours = Math.floor(normalized / 3600);
   return locale === "pl" ? `${hours} godz.` : `${hours} hr`;
+}
+
+export function formatProductPairAge(
+  pairAgeDays: number | null,
+  locale: ProductLocale,
+  missing: string,
+  options: { pairCreatedAt?: string | null; now?: Date } = {},
+): string {
+  const now = options.now ?? new Date();
+  const createdAtMs = options.pairCreatedAt ? Date.parse(options.pairCreatedAt) : Number.NaN;
+  const elapsedHours = Number.isFinite(createdAtMs)
+    ? (now.getTime() - createdAtMs) / (60 * 60 * 1_000)
+    : pairAgeDays !== null && Number.isFinite(pairAgeDays) ? pairAgeDays * 24 : null;
+  return elapsedHours === null ? missing : formatProductAgeHours(elapsedHours, locale);
+}
+
+export function formatProductElapsedSince(
+  value: string,
+  now: Date,
+  locale: ProductLocale,
+  missing: string,
+): string {
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return missing;
+  return formatProductAgeHours((now.getTime() - timestamp) / (60 * 60 * 1_000), locale);
+}
+
+export function formatProductAgeHours(hours: number, locale: ProductLocale): string {
+  const normalized = Math.max(0, hours);
+  if (normalized < 1) return locale === "pl" ? "mniej niż 1 godz." : "less than 1 hour";
+  const fullHours = Math.floor(normalized);
+  if (fullHours < 24) {
+    if (locale === "pl") return `${fullHours} godz.`;
+    return `${fullHours} ${fullHours === 1 ? "hour" : "hours"}`;
+  }
+  const days = Math.floor(fullHours / 24);
+  if (locale === "pl") return `${days} ${days === 1 ? "dzień" : "dni"}`;
+  return `${days} ${days === 1 ? "day" : "days"}`;
+}
+
+export function formatFollowUpLifecycleStatus(value: FollowUpLifecycleStatus, locale: ProductLocale): string {
+  const labels: Record<FollowUpLifecycleStatus, [string, string]> = {
+    NEW: ["New", "Nowe"],
+    MATURING: ["Maturing", "Dalsza obserwacja"],
+    CANDIDATE_FOR_ESTABLISHED: ["Candidate for Established", "Kandydaci do Established"],
+    ESTABLISHED: ["Established", "Established"],
+    ARCHIVED: ["Archived", "Archiwalne"],
+  };
+  return labels[value][locale === "pl" ? 1 : 0];
 }
 
 export function formatProductUsd(value: number | null, locale: ProductLocale, missing: string): string {

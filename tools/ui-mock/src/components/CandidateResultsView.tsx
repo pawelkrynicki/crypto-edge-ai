@@ -1,7 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
+  formatFollowUpLifecycleStatus,
   formatProductAge,
   formatProductDateTime,
+  formatProductElapsedSince,
+  formatProductPairAge,
   formatProductUsd,
   PRODUCT_TRANSLATIONS,
   useProductLocale,
@@ -231,14 +234,15 @@ export function MaturingFollowUpBasket({
                 <p>{entry.chain.toUpperCase()} Â· {shortenAddress(entry.contract_address, t("radar.missingData"))}</p>
               </div>
               <strong className={`basket-status ${entry.lifecycle_status === "CANDIDATE_FOR_ESTABLISHED" ? "candidate" : "observation"}`}>
-                {formatFollowUpLifecycle(entry.lifecycle_status, locale)}
+                {formatFollowUpLifecycleStatus(entry.lifecycle_status, locale)}
               </strong>
             </header>
             {entry.lifecycle_status === "CANDIDATE_FOR_ESTABLISHED" && (
               <p className="follow-up-candidate-boundary">{t("followUp.candidateBoundary")}</p>
             )}
             <div className="product-metrics-grid">
-              <Metric label={t("followUp.firstSeen")} value={formatFollowUpAge(entry.first_seen_at, new Date(), locale)} />
+              <Metric label={t("radar.pairAge")} value={formatProductPairAge(entry.pair_age, locale, t("radar.missingData"))} />
+              <Metric label={t("followUp.firstSeen")} value={formatProductElapsedSince(entry.first_seen_at, new Date(), locale, t("radar.missingData"))} />
               <Metric label={t("followUp.lastChecked")} value={entry.last_checked_at ? formatProductDateTime(entry.last_checked_at, locale) : t("app.noData")} />
               <Metric label={t("followUp.nextCheckpoint")} value={entry.next_check_at ? formatProductDateTime(entry.next_check_at, locale) : t("followUp.noAutomaticCheck")} />
               <Metric label={t("followUp.completedCheckpoints")} value={entry.completed_checkpoints.length > 0 ? entry.completed_checkpoints.map((day) => `${day}d`).join(" Â· ") : t("followUp.noneCompleted")} />
@@ -349,7 +353,7 @@ function NewCandidateCard({
       </header>
 
       <div className="product-metrics-grid">
-        <Metric label={t("radar.pairAge")} value={formatDays(candidate.pairAgeDays, locale, t("radar.missingData"))} />
+        <Metric label={t("radar.pairAge")} value={formatProductPairAge(candidate.pairAgeDays, locale, t("radar.missingData"), { pairCreatedAt: candidate.pairCreatedAt })} />
         <Metric label={t("radar.price")} value={formatPrice(candidate.priceUsd, t("radar.missingData"))} />
         <Metric label={candidate.marketCap == null ? "FDV" : t("radar.marketCap")} value={formatProductUsd(candidate.marketCap ?? candidate.fdvUsd, locale, t("radar.missingData"))} />
         <Metric label={t("radar.liquidity")} value={formatProductUsd(candidate.liquidity, locale, t("radar.missingData"))} />
@@ -518,7 +522,7 @@ function EstablishedCandidateCard({
         <Metric label={t("radar.liquidity")} value={formatProductUsd(candidate.liquidity, locale, t("radar.missingData"))} />
         <Metric label={t("radar.volume24h")} value={formatProductUsd(candidate.volume24h, locale, t("radar.missingData"))} />
         <Metric label={t("radar.ratio")} value={formatRatio(candidate.volumeMarketCapRatio, t("radar.missingData"))} />
-        <Metric label={t("radar.pairAge")} value={formatDays(candidate.pairAgeDays, locale, t("radar.missingData"))} />
+        <Metric label={t("radar.pairAge")} value={formatProductPairAge(candidate.pairAgeDays, locale, t("radar.missingData"), { pairCreatedAt: candidate.pairCreatedAt })} />
         <Metric label={t("radar.basicFilters")} value={candidate.basicFilterStatus === "passed_basic_filter" ? t("radar.conditionsMet") : t("radar.conditionsRejected")} tone={candidate.basicFilterStatus === "passed_basic_filter" ? "ready" : "warning"} />
         <Metric label={t("radar.security")} value={presentRadarSecurityState(securityResolution.state, locale)} tone={getSecurityStateTone(securityResolution.state)} />
       </div>
@@ -725,34 +729,6 @@ function formatPrice(value: number | null, missing: string): string {
 
 function formatRatio(value: number | null, missing: string): string {
   return value == null ? missing : value.toFixed(4);
-}
-
-function formatDays(value: number | null, locale: ProductLocale, missing: string): string {
-  if (value == null) return missing;
-  const formatted = value.toLocaleString(locale === "pl" ? "pl-PL" : "en-US", { maximumFractionDigits: value < 10 ? 1 : 0 });
-  return locale === "pl" ? `${formatted} dni` : `${formatted} days`;
-}
-
-export function formatFollowUpAge(firstSeenAt: string, now: Date, locale: ProductLocale): string {
-  const elapsedHours = Math.max(0, (now.getTime() - Date.parse(firstSeenAt)) / (60 * 60 * 1_000));
-  if (!Number.isFinite(elapsedHours)) return importTranslation(locale, "radar.missingData");
-  if (elapsedHours < 24) {
-    const hours = Math.max(0, Math.floor(elapsedHours));
-    return locale === "pl" ? `${hours} godz.` : `${hours}h`;
-  }
-  const days = Math.floor(elapsedHours / 24);
-  return locale === "pl" ? `${days} dni` : `${days} days`;
-}
-
-function formatFollowUpLifecycle(value: FollowUpPublicEntry["lifecycle_status"], locale: ProductLocale): string {
-  const labels: Record<FollowUpPublicEntry["lifecycle_status"], [string, string]> = {
-    NEW: ["NEW", "NOWY"],
-    MATURING: ["MATURING", "DALSZA OBSERWACJA"],
-    CANDIDATE_FOR_ESTABLISHED: ["CANDIDATE FOR ESTABLISHED", "KANDYDAT DO ESTABLISHED"],
-    ESTABLISHED: ["ESTABLISHED", "ESTABLISHED"],
-    ARCHIVED: ["ARCHIVED", "ZARCHIWIZOWANY"],
-  };
-  return labels[value][locale === "pl" ? 1 : 0];
 }
 
 function formatFollowUpFilter(value: FollowUpPublicEntry["filter_status"], locale: ProductLocale): string {
