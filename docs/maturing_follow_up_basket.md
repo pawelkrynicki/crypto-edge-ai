@@ -83,6 +83,25 @@ Candidate Detail pokazuje Follow-up tylko przy bezpiecznym dopasowaniu `chain + 
 
 Tester może czytać statusy i checkpointy. Nie może edytować store, zmieniać checkpointów, wymuszać rechecku, konfigurować transportu, uruchamiać providerów ani dodawać do Established.
 
+## Local owner review: ACCEPT_LOCAL_CODE — 23.07.2026
+
+Zaakceptowany commit kodu: `80374f1dc7cf2422ca6513f5076809ab637b1727`.
+
+Owner review potwierdził:
+
+- trzy rozłączne warstwy Radaru: `New / observation`, `Maturing / follow-up` i `Established / main Radar`;
+- poprawne polskie etykiety „Dalsza obserwacja” i „Kandydaci do Established”, bez prezentowania surowych identyfikatorów maszynowych jako polskiego copy;
+- prezentację wieku pary w godzinach poniżej 24 godzin oraz w dniach od 24 godzin;
+- poprawne „1 dzień” dla SCOOBERT, którego para miała w chwili review około 42 godzin;
+- jeden wspólny formatter wieku używany przez New, Follow-up i Candidate Detail;
+- brak automatycznego awansu i brak przycisku dodania do Established;
+- wymóg osobnej decyzji ownera przed dodaniem do Established;
+- read-only granicę Follow-up dla testera;
+- niezmieniony overall Trusted Tester Preview: `NOT_READY`;
+- zero live provider calls i zero zapisów podczas owner review.
+
+Pierwszy owner review wykrył prezentację wieku jako „0 dni” oraz surowe angielskie lifecycle labels w polskim widoku. Commit `80374f1dc7cf2422ca6513f5076809ab637b1727` naprawił wspólny formatter wieku i warstwę prezentacji statusów bez zmiany statusów maszynowych, API, lifecycle resolvera ani collectora.
+
 ## Bootstrap dry-run
 
 Preview aktualnego poprawnego scanner snapshotu:

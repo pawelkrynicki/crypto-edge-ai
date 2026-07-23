@@ -6,7 +6,7 @@
 
 Koszyk `New / observation` pozostaje niezależny, pochodzi z DexScreener latest profiles i nie awansuje automatycznie do `Established`. Dodanie do `Established` jest zawsze jawną operacją ownera. GoPlus jest uruchamiany wyłącznie dla wpisów `Established`, które przeszły niezmienione basic filters.
 
-Pomiędzy tymi warstwami działa teraz `Maturing / follow-up`. Współdzieli z Established dokładnie tę samą normalizację i walidację `chain + contract_address`, ale jego `CANDIDATE_FOR_ESTABLISHED` nie dodaje, nie włącza ani nie modyfikuje wpisu universe. Promocja pozostaje zakazana do osobnego sprintu **Owner Established Promotion Flow**. Szczegóły: `docs/maturing_follow_up_basket.md`.
+Pomiędzy tymi warstwami działa teraz `Maturing / follow-up`. Współdzieli z Established dokładnie tę samą normalizację i walidację `chain + contract_address` i może oznaczyć token jako `CANDIDATE_FOR_ESTABLISHED`, ale nie dodaje go automatycznie, nie włącza ani nie modyfikuje wpisu universe. Nadal wymagana jest osobna, ręczna operacja ownera. Następny sprint, **Owner Established Promotion Flow**, doda bezpieczny, dry-run-first flow tej decyzji z użyciem istniejącego managera universe. Szczegóły: `docs/maturing_follow_up_basket.md`.
 
 Walidacja adresu potwierdza format odpowiedni dla sieci. Nie potwierdza projektu, właściciela kontraktu, płynności ani bezpieczeństwa tokena.
 
