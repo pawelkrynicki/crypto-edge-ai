@@ -4,9 +4,20 @@ import { resolve } from "node:path";
 import { describe, it } from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { Feedback, resolveSelectedFeedbackCategory } from "../src/components/Feedback.js";
+import {
+  Feedback,
+  formatOwnerFeedbackStatus,
+  formatProductVersion,
+  formatPseudonymousSessionGroup,
+  OwnerFeedbackDetailPanel,
+  resolveSelectedFeedbackCategory,
+} from "../src/components/Feedback.js";
 import { ProductLocaleProvider } from "../src/productI18n.js";
-import type { FeedbackPublicStatus, OwnerFeedbackStatus } from "../src/services/feedbackDataSource.js";
+import type {
+  FeedbackPublicStatus,
+  OwnerFeedbackDetail,
+  OwnerFeedbackStatus,
+} from "../src/services/feedbackDataSource.js";
 
 const uiRoot = resolve(process.cwd());
 const repoRoot = resolve(uiRoot, "..", "..");
@@ -44,6 +55,36 @@ describe("Persistent Feedback product UI", () => {
     assert.match(owner, /Export JSON/);
     assert.match(owner, /Export CSV/);
     assert.match(owner, /Owner only/);
+  });
+
+  it("localizes owner detail and renders only shortened session and product markers", () => {
+    const rawSessionGroup = "session_47e31dd61473";
+    const fullProductVersion = "c697a1dda372ce508f450389dbd9eb14347ebc3b";
+    const detail = ownerDetail({ session_group: rawSessionGroup, product_version: fullProductVersion });
+    const polishInbox = render("pl", { initialOwnerStatus: ownerStatus() });
+    const englishInbox = render("en", { initialOwnerStatus: ownerStatus() });
+    const polishDetail = renderDetail("pl", detail);
+    const englishDetail = renderDetail("en", detail);
+
+    assert.match(polishInbox, /Tylko dla ownera/);
+    assert.doesNotMatch(polishInbox, /Owner only/);
+    assert.match(englishInbox, /Owner only/);
+    assert.match(polishDetail, />Nowe</);
+    assert.doesNotMatch(polishDetail, />NEW</);
+    assert.match(englishDetail, />New</);
+    assert.match(polishDetail, /Pseudonimowa grupa sesji/);
+    assert.match(englishDetail, /Pseudonymous session group/);
+    assert.match(polishDetail, /SES-47E31D/);
+    assert.doesNotMatch(polishDetail, new RegExp(rawSessionGroup));
+    assert.match(polishDetail, /Wersja produktu/);
+    assert.match(englishDetail, /Product version/);
+    assert.match(polishDetail, /c697a1dd/);
+    assert.doesNotMatch(polishDetail, new RegExp(fullProductVersion));
+    assert.equal(formatOwnerFeedbackStatus("NEW", "pl"), "Nowe");
+    assert.equal(formatOwnerFeedbackStatus("NEW", "en"), "New");
+    assert.equal(formatPseudonymousSessionGroup(rawSessionGroup), "SES-47E31D");
+    assert.equal(formatPseudonymousSessionGroup("unsafe-session-value"), "—");
+    assert.equal(formatProductVersion(fullProductVersion), "c697a1dd");
   });
 
   it("uses React text rendering, guards double submission and contains all success/error/rate-limit copy", async () => {
@@ -140,6 +181,40 @@ function publicStatus(): FeedbackPublicStatus {
     max_title_length: 120,
     max_details_length: 3_000,
     supported_categories: ["BLOCKER", "IMPROVEMENT", "CLARIFICATION", "LATER"],
+  };
+}
+
+function renderDetail(locale: "en" | "pl", detail: OwnerFeedbackDetail): string {
+  return renderToStaticMarkup(React.createElement(
+    ProductLocaleProvider,
+    { initialLocale: locale },
+    React.createElement(OwnerFeedbackDetailPanel, { detail }),
+  ));
+}
+
+function ownerDetail(overrides: Partial<OwnerFeedbackDetail> = {}): OwnerFeedbackDetail {
+  return {
+    feedback_id: "fb_413f37b9-d846-4278-865b-51a36701efba",
+    created_at: "2026-07-23T13:28:26.994Z",
+    updated_at: "2026-07-23T13:28:26.994Z",
+    category: "BLOCKER",
+    status: "NEW",
+    title: "test1234",
+    details: "testwfhwkewfhlwhfweufweswerwr",
+    screen_context: "feedback",
+    locale: "pl",
+    subject_summary: null,
+    build_sha: "c697a1dda372ce508f450389dbd9eb14347ebc3b",
+    viewport_class: null,
+    candidate_identity: null,
+    follow_up_entry_id: null,
+    report_id: null,
+    scanner_run_id: null,
+    route_context: "feedback",
+    session_group: "session_47e31dd61473",
+    product_version: "c697a1dda372ce508f450389dbd9eb14347ebc3b",
+    runtime_mode: "INTERNAL_BETA",
+    ...overrides,
   };
 }
 

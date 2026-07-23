@@ -259,7 +259,7 @@ function OwnerFeedbackInbox({
     <section className="owner-feedback-inbox" aria-label={copy.inboxHeading}>
       <header className="owner-feedback-header">
         <div>
-          <span className="section-label">Owner only</span>
+          <span className="section-label">{copy.ownerOnly}</span>
           <h3>{copy.inboxHeading}</h3>
           <p>{copy.inboxDescription}</p>
         </div>
@@ -317,26 +317,35 @@ function OwnerFeedbackInbox({
           ))}
         </div>
         <article className="owner-feedback-detail">
-          {detail ? (
-            <>
-              <div className="owner-feedback-detail-head">
-                <span className={`feedback-category-pill ${detail.category.toLowerCase()}`}>{categoryCopy[locale][detail.category].label}</span>
-                <span>{detail.status}</span>
-              </div>
-              <h4>{detail.title}</h4>
-              <p className="owner-feedback-details-text">{detail.details}</p>
-              <dl>
-                <div><dt>{copy.receipt}</dt><dd>{shortFeedbackId(detail.feedback_id)}</dd></div>
-                <div><dt>{copy.contextLabel}</dt><dd>{screenLabel(detail.screen_context, locale)}</dd></div>
-                {detail.subject_summary && <div><dt>{copy.subject}</dt><dd>{detail.subject_summary}</dd></div>}
-                <div><dt>{copy.sessionGroup}</dt><dd>{detail.session_group}</dd></div>
-                {detail.build_sha && <div><dt>Build</dt><dd>{detail.build_sha}</dd></div>}
-              </dl>
-            </>
-          ) : <p className="feedback-empty">{copy.selectItem}</p>}
+          <OwnerFeedbackDetailPanel detail={detail} />
         </article>
       </div>
     </section>
+  );
+}
+
+export function OwnerFeedbackDetailPanel({ detail }: { detail: OwnerFeedbackDetail | null }) {
+  const { locale } = useProductLocale();
+  const copy = feedbackCopy(locale);
+  if (!detail) return <p className="feedback-empty">{copy.selectItem}</p>;
+  const productVersion = detail.product_version ?? detail.build_sha;
+
+  return (
+    <>
+      <div className="owner-feedback-detail-head">
+        <span className={`feedback-category-pill ${detail.category.toLowerCase()}`}>{categoryCopy[locale][detail.category].label}</span>
+        <span>{formatOwnerFeedbackStatus(detail.status, locale)}</span>
+      </div>
+      <h4>{detail.title}</h4>
+      <p className="owner-feedback-details-text">{detail.details}</p>
+      <dl>
+        <div><dt>{copy.receipt}</dt><dd>{shortFeedbackId(detail.feedback_id)}</dd></div>
+        <div><dt>{copy.contextLabel}</dt><dd>{screenLabel(detail.screen_context, locale)}</dd></div>
+        {detail.subject_summary && <div><dt>{copy.subject}</dt><dd>{detail.subject_summary}</dd></div>}
+        <div><dt>{copy.sessionGroup}</dt><dd>{formatPseudonymousSessionGroup(detail.session_group)}</dd></div>
+        {productVersion && <div><dt>{copy.productVersion}</dt><dd>{formatProductVersion(productVersion)}</dd></div>}
+      </dl>
+    </>
   );
 }
 
@@ -356,6 +365,20 @@ export function resolveSelectedFeedbackCategory(
     && (FEEDBACK_CATEGORIES as readonly string[]).includes(selectedValue)
     ? selectedValue as FeedbackCategory
     : fallback;
+}
+
+export function formatOwnerFeedbackStatus(status: FeedbackStatus, locale: ProductLocale): string {
+  if (status === "NEW") return locale === "pl" ? "Nowe" : "New";
+  return status;
+}
+
+export function formatPseudonymousSessionGroup(sessionGroup: string): string {
+  const match = /^session_([0-9a-f]{12})$/i.exec(sessionGroup);
+  return match ? `SES-${match[1].slice(0, 6).toUpperCase()}` : "—";
+}
+
+export function formatProductVersion(productVersion: string): string {
+  return /^[0-9a-f]{7,64}$/i.test(productVersion) ? productVersion.slice(0, 8) : "—";
 }
 
 function shortFeedbackId(value: string): string {
@@ -402,6 +425,7 @@ function feedbackCopy(locale: ProductLocale) {
     noPersonalData: "Zapisujemy wyłącznie treść zgłoszenia i pseudonimowy identyfikator sesji.",
     inboxHeading: "Skrzynka feedbacku",
     inboxDescription: "Wyłącznie odczytowy widok ownera. Tester nie widzi tej sekcji.",
+    ownerOnly: "Tylko dla ownera",
     total: "Wszystkie",
     newItems: "Nowe",
     blockers: "Blokery",
@@ -416,7 +440,8 @@ function feedbackCopy(locale: ProductLocale) {
     empty: "Brak zgłoszeń dla wybranych filtrów.",
     selectItem: "Wybierz zgłoszenie, aby zobaczyć szczegóły.",
     subject: "Kontekst produktu",
-    sessionGroup: "Grupa sesji",
+    sessionGroup: "Pseudonimowa grupa sesji",
+    productVersion: "Wersja produktu",
   };
   return {
     heading: "Send feedback",
@@ -443,6 +468,7 @@ function feedbackCopy(locale: ProductLocale) {
     noPersonalData: "Only the report content and a pseudonymous session identifier are stored.",
     inboxHeading: "Feedback inbox",
     inboxDescription: "Read-only owner view. Testers cannot see this section.",
+    ownerOnly: "Owner only",
     total: "Total",
     newItems: "New",
     blockers: "Blockers",
@@ -457,6 +483,7 @@ function feedbackCopy(locale: ProductLocale) {
     empty: "No feedback matches the selected filters.",
     selectItem: "Select feedback to view details.",
     subject: "Product context",
-    sessionGroup: "Session group",
+    sessionGroup: "Pseudonymous session group",
+    productVersion: "Product version",
   };
 }

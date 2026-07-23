@@ -281,7 +281,7 @@ describe("Feedback HTTP and owner boundary", () => {
     }
   });
 
-  it("shares one injected store across POST, owner reads, export and Control Center", async () => {
+  it("shares one injected store across POST, owner detail and export, and Control Center", async () => {
     const { store } = await tempStore();
     const disabled = createServer(createScannerApiHandler({
       runtimeMode: "INTERNAL_BETA",
@@ -327,12 +327,17 @@ describe("Feedback HTTP and owner boundary", () => {
       const detail = await http(owner, "GET", `/api/owner/feedback/${feedbackId}`);
       assert.equal(JSON.parse(detail.body).details, validSubmission("IMPROVEMENT").details);
       assert.equal(JSON.parse(detail.body).category, "IMPROVEMENT");
+      assert.equal(JSON.parse(detail.body).status, "NEW");
+      assert.equal(JSON.parse(detail.body).build_sha, "abcdef1234567");
+      assert.equal(JSON.parse(detail.body).product_version, "abcdef1234567");
       assert.match(JSON.parse(detail.body).session_group, /^session_[0-9a-f]{12}$/);
       assert.equal(JSON.parse(detail.body).pseudonymous_session_id, undefined);
 
       const jsonExport = await http(owner, "GET", "/api/owner/feedback/export?format=json");
       const csvExport = await http(owner, "GET", "/api/owner/feedback/export?format=csv");
       assert.equal(JSON.parse(jsonExport.body).feedback[0].feedback_id, feedbackId);
+      assert.equal(JSON.parse(jsonExport.body).feedback[0].status, "NEW");
+      assert.equal(JSON.parse(jsonExport.body).feedback[0].build_sha, "abcdef1234567");
       assert.match(csvExport.body, /IMPROVEMENT/);
       for (const body of [jsonExport.body, csvExport.body]) {
         assert.doesNotMatch(body, /pseudonymous_session_id|submission_key|storage_file|\.local|secret/i);
