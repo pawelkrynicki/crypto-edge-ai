@@ -1,4 +1,4 @@
-import { createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes } from "node:crypto";
 import {
   createAutomationStateStore,
   type AutomationState,
@@ -16,12 +16,17 @@ import {
   type PublishedSnapshotTimes,
   type SchedulerDecision,
 } from "../../data-poc/src/automation/schedulerDecision.js";
+import {
+  createSignedOwnerPreflight,
+  normalizeOwnerPreflightTtl,
+  OwnerPreflightError,
+  pruneConsumedOwnerPreflights,
+  verifySignedOwnerPreflight,
+} from "./ownerPreflight.js";
 
-export const OWNER_SESSION_HEADER = "x-crypto-edge-owner-session";
+export { OWNER_SESSION_HEADER } from "./ownerPreflight.js";
 export const OWNER_OPERATIONS_MODES = ["DISABLED", "REVIEW_SAFE", "ENABLED"] as const;
-export const DEFAULT_OWNER_PREFLIGHT_TTL_MS = 60_000;
-
-const PREFLIGHT_VERSION = 1;
+export { DEFAULT_OWNER_PREFLIGHT_TTL_MS } from "./ownerPreflight.js";
 const OWNER_SOURCE_IDS = [
   "dexscreener",
   "goplus_security",
@@ -113,14 +118,6 @@ type ScheduleView = {
   no_action_reason: string | null;
 };
 
-type SignedPreflightPayload = {
-  v: typeof PREFLIGHT_VERSION;
-  nonce: string;
-  created_at: string;
-  expires_at: string;
-  fingerprint: string;
-};
-
 export class OwnerOperationsError extends Error {
   readonly code: string;
   readonly httpStatus: number;
@@ -144,7 +141,7 @@ export function resolveOwnerOperationsMode(value: unknown): OwnerOperationsMode 
 export function createOwnerOperationsService(options: OwnerOperationsOptions = {}) {
   const mode = resolveOwnerOperationsMode(options.mode ?? process.env.CRYPTO_EDGE_OWNER_OPERATIONS_MODE);
   const now = options.now ?? (() => new Date());
-  const preflightTtlMs = normalizePreflightTtl(options.preflightTtlMs);
+  const preflightTtlMs = normalizeOwnerPreflightTtl(options.preflightTtlMs);
   const automationEnabled = options.automationEnabled ?? process.env.CRYPTO_EDGE_AUTOMATION_ENABLED === "1";
   const stateStore = options.stateStore ?? createAutomationStateStore(options.automationDirectoryPath);
   const sessionSecret = mode === "DISABLED"
@@ -185,16 +182,16 @@ export function createOwnerOperationsService(options: OwnerOperationsOptions = {
     requireVisible(localOwnerRequest);
     const view = await readSchedule();
     const createdAt = now();
-    const expiresAt = new Date(createdAt.getTime() + preflightTtlMs);
-    const payload: SignedPreflightPayload = {
-      v: PREFLIGHT_VERSION,
-      nonce: randomUUID(),
-      created_at: createdAt.toISOString(),
-      expires_at: expiresAt.toISOString(),
+    const signed = createSignedOwnerPreflight({
+      secret: requireSessionSecret(),
+      now: createdAt,
+      ttlMs: preflightTtlMs,
       fingerprint: scheduleFingerprint(view),
-    };
+      context: null,
+    });
+    const payload = signed.payload;
     return {
-      preflight_id: signPreflight(payload, requireSessionSecret()),
+      preflight_id: signed.preflightId,
       created_at: payload.created_at,
       expires_at: payload.expires_at,
       scanner_due: view.scanner_due,
@@ -217,14 +214,20 @@ export function createOwnerOperationsService(options: OwnerOperationsOptions = {
     if (ownerSessionHeader !== preflightId) {
       throw new OwnerOperationsError("OWNER_SESSION_INVALID", 403);
     }
-    const payload = verifyPreflight(preflightId, requireSessionSecret());
+    let payload;
+    try {
+      payload = verifySignedOwnerPreflight(preflightId, requireSessionSecret(), (value): value is null => value === null);
+    } catch (error) {
+      if (error instanceof OwnerPreflightError) throw new OwnerOperationsError(error.code, 400);
+      throw error;
+    }
     if (Date.parse(payload.expires_at) <= now().getTime()) {
       throw new OwnerOperationsError("PREFLIGHT_STALE", 409);
     }
     if (actionInProgress) {
       throw new OwnerOperationsError("RUN_ALREADY_IN_PROGRESS", 409);
     }
-    pruneConsumedPreflights(consumedPreflights, now().getTime());
+    pruneConsumedOwnerPreflights(consumedPreflights, now().getTime());
     if (consumedPreflights.has(preflightId)) {
       throw new OwnerOperationsError("PREFLIGHT_STALE", 409);
     }
@@ -382,71 +385,15 @@ function scheduleFingerprint(view: ScheduleView): string {
     .digest("base64url");
 }
 
-function signPreflight(payload: SignedPreflightPayload, secret: string): string {
-  const encoded = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
-  const signature = createHmac("sha256", secret).update(encoded).digest("base64url");
-  return `${encoded}.${signature}`;
-}
-
-function verifyPreflight(value: string, secret: string): SignedPreflightPayload {
-  if (typeof value !== "string" || value.length > 2_048) {
-    throw new OwnerOperationsError("PREFLIGHT_INVALID", 400);
-  }
-  const [encoded, signature, extra] = value.split(".");
-  if (!encoded || !signature || extra !== undefined) throw new OwnerOperationsError("PREFLIGHT_INVALID", 400);
-  const expected = createHmac("sha256", secret).update(encoded).digest();
-  let supplied: Buffer;
-  try {
-    supplied = Buffer.from(signature, "base64url");
-  } catch {
-    throw new OwnerOperationsError("PREFLIGHT_INVALID", 400);
-  }
-  if (expected.length !== supplied.length || !timingSafeEqual(expected, supplied)) {
-    throw new OwnerOperationsError("PREFLIGHT_INVALID", 400);
-  }
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8")) as unknown;
-  } catch {
-    throw new OwnerOperationsError("PREFLIGHT_INVALID", 400);
-  }
-  if (!isSignedPreflightPayload(parsed)) throw new OwnerOperationsError("PREFLIGHT_INVALID", 400);
-  return parsed;
-}
-
-function isSignedPreflightPayload(value: unknown): value is SignedPreflightPayload {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
-  const record = value as Record<string, unknown>;
-  return Object.keys(record).length === 5
-    && record.v === PREFLIGHT_VERSION
-    && typeof record.nonce === "string"
-    && /^[0-9a-f-]{36}$/.test(record.nonce)
-    && isIso(record.created_at)
-    && isIso(record.expires_at)
-    && typeof record.fingerprint === "string"
-    && /^[A-Za-z0-9_-]{43}$/.test(record.fingerprint);
-}
-
 function normalizeSessionSecret(value: string | undefined): string | null {
   if (value === undefined) return null;
   return value.length >= 32 && value.length <= 256 ? value : null;
-}
-
-function normalizePreflightTtl(value: number | undefined): number {
-  const ttl = value ?? DEFAULT_OWNER_PREFLIGHT_TTL_MS;
-  return Number.isSafeInteger(ttl) && ttl >= 1_000 && ttl <= 5 * 60_000
-    ? ttl
-    : DEFAULT_OWNER_PREFLIGHT_TTL_MS;
 }
 
 function earliestIso(...values: Array<string | null>): string | null {
   return values
     .filter((value): value is string => value !== null)
     .sort((left, right) => Date.parse(left) - Date.parse(right))[0] ?? null;
-}
-
-function isIso(value: unknown): value is string {
-  return typeof value === "string" && Number.isFinite(Date.parse(value));
 }
 
 function safeErrorCode(value: unknown): string {
@@ -457,10 +404,4 @@ function safeErrorCode(value: unknown): string {
       : "OWNER_REFRESH_FAILED";
   const normalized = candidate.toUpperCase().replace(/[^A-Z0-9_]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 96);
   return normalized || "OWNER_REFRESH_FAILED";
-}
-
-function pruneConsumedPreflights(entries: Map<string, number>, nowMs: number): void {
-  for (const [id, expiresAt] of entries) {
-    if (expiresAt <= nowMs) entries.delete(id);
-  }
 }

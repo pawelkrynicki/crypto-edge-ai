@@ -1,12 +1,20 @@
 # Established Universe Management
 
+## Aktualizacja: Owner Established Promotion Flow
+
+Candidate Detail udostępnia teraz backend-gated, owner-only decyzję `Consider for Established / Rozważ do Established`. Status i preview są wyłącznie do odczytu; jedyny POST przyjmuje podpisany `preview_id` oraz `confirmation = true` i bezpośrednio wywołuje istniejący `mutateEstablishedUniverse`. Nie ma drugiego managera, walidatora adresów, procesu CLI ani pola na dowolny adres.
+
+Opcjonalne `expectedCurrentVersion` i `expectedCurrentChecksum` są sprawdzane przez manager pod istniejącym lockiem. Skuteczne `add` nadal używa tego samego atomowego zapisu, tworzy dokładnie jedną wersję, snapshot historii i audit entry. Aktywny duplikat daje no-op, a disabled entry nie jest automatycznie włączany. Szczegóły: `docs/owner_established_promotion_flow.md`.
+
+Owner Established Promotion Flow został zaakceptowany lokalnie 23.07.2026 z werdyktem `ACCEPT_LOCAL_CODE`. Jedyną tożsamością nadal pozostaje `chain + contract_address`, preview jest dry-run, a mutacja może być dostępna wyłącznie w osobno aktywowanym trybie `ENABLED`. `ENABLED` nie jest obecnie aktywny. Nie ma automatycznego awansu, a rzeczywisty Established Universe pozostał podczas owner review bez zmian w wersji `established-universe-v000000`.
+
 ## Definicja i granice
 
 `Established` jest jedynym głównym koszykiem Product Radar. Jego źródłem jest wyłącznie wersjonowana lista utrzymywana przez ownera. Wpis jest identyfikowany przez znormalizowaną parę `chain + contract_address`; symbol i nazwa są tylko podpowiedziami prezentacyjnymi.
 
 Koszyk `New / observation` pozostaje niezależny, pochodzi z DexScreener latest profiles i nie awansuje automatycznie do `Established`. Dodanie do `Established` jest zawsze jawną operacją ownera. GoPlus jest uruchamiany wyłącznie dla wpisów `Established`, które przeszły niezmienione basic filters.
 
-Pomiędzy tymi warstwami działa teraz `Maturing / follow-up`. Współdzieli z Established dokładnie tę samą normalizację i walidację `chain + contract_address` i może oznaczyć token jako `CANDIDATE_FOR_ESTABLISHED`, ale nie dodaje go automatycznie, nie włącza ani nie modyfikuje wpisu universe. Nadal wymagana jest osobna, ręczna operacja ownera. Następny sprint, **Owner Established Promotion Flow**, doda bezpieczny, dry-run-first flow tej decyzji z użyciem istniejącego managera universe. Szczegóły: `docs/maturing_follow_up_basket.md`.
+Pomiędzy tymi warstwami działa teraz `Maturing / follow-up`. Współdzieli z Established dokładnie tę samą normalizację i walidację `chain + contract_address` i może oznaczyć token jako `CANDIDATE_FOR_ESTABLISHED`, ale nie dodaje go automatycznie. **Owner Established Promotion Flow** udostępnia osobną, dry-run-first decyzję ownera korzystającą z istniejącego managera universe. Szczegóły: `docs/maturing_follow_up_basket.md` i `docs/owner_established_promotion_flow.md`.
 
 Walidacja adresu potwierdza format odpowiedni dla sieci. Nie potwierdza projektu, właściciela kontraktu, płynności ani bezpieczeństwa tokena.
 

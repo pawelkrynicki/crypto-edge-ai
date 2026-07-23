@@ -1,5 +1,13 @@
 # Maturing / Follow-up Basket
 
+## Aktualizacja: decyzja ownera
+
+Owner Established Promotion Flow realizuje osobną, dry-run-first decyzję w Candidate Detail. Zwykły tester nadal nie widzi panelu. `NEW`, `MATURING` i `ARCHIVED` otrzymują wyłącznie powód blokady; plan `ADD` wymaga `CANDIDATE_FOR_ESTABLISHED` i aktualnego `passed_basic_filter`. Brakujące security pozostaje `Manual Verification Required` i nie jest przedstawiane jako bezpieczeństwo.
+
+Po skutecznym dodaniu Follow-up store i checkpointy nie są przepisywane. Istniejący resolver wylicza `ESTABLISHED` z active membership bieżącego universe, dzięki czemu licznik Candidate spada bez drugiego źródła prawdy. Pełny kontrakt: `docs/owner_established_promotion_flow.md`. Następny etap po akceptacji: **Persistent Feedback Loop**.
+
+Owner review 23.07.2026 zaakceptował przygotowany dla `CANDIDATE_FOR_ESTABLISHED` owner-only flow: operacja znajduje się w Candidate Detail, najpierw pokazuje status i read-only preview, a ewentualna przyszła mutacja wymaga oddzielnego potwierdzenia. Status kandydata nigdy nie powoduje automatycznego awansu do Established.
+
 ## Problem i cel
 
 `New / observation` korzysta z najnowszych profili DexScreener. Profil może przestać być „najnowszy”, mimo że wykryty token nadal wymaga obserwacji. Follow-up Basket zachowuje zwalidowaną tożsamość takiego rekordu i sprawdza go ponownie w ograniczonych punktach czasu. Token nie znika tylko dlatego, że wypadł ze strumienia latest profiles.
@@ -79,7 +87,7 @@ Model publiczny zawiera wyłącznie bezpieczne dane znormalizowane, metryki rynk
 
 Radar pokazuje liczniki Maturing i Candidate for Established, trzeci tab, empty/unavailable state, lifecycle, first seen, last checked, next checkpoint, ukończone checkpointy, filtry, security i ręczny następny krok. Wiek poniżej 24 godzin jest pokazywany w godzinach. Candidate ma jawny komunikat, że nie został automatycznie dodany do Established.
 
-Candidate Detail pokazuje Follow-up tylko przy bezpiecznym dopasowaniu `chain + contract_address`. Nie ma przycisku promocji. Control Center pokazuje osobną kartę store/active/due/candidate/next due. Awaria Follow-up nie obniża działającego Runtime i API. Overall Trusted Tester Preview pozostaje `NOT_READY`.
+Candidate Detail pokazuje Follow-up tylko przy bezpiecznym dopasowaniu `chain + contract_address`. Zwykły tester nie widzi decyzji promocji; lokalny owner może zobaczyć backend-gated status i read-only preview. Control Center pokazuje osobną kartę store/active/due/candidate/next due. Awaria Follow-up nie obniża działającego Runtime i API. Overall Trusted Tester Preview pozostaje `NOT_READY`.
 
 Tester może czytać statusy i checkpointy. Nie może edytować store, zmieniać checkpointów, wymuszać rechecku, konfigurować transportu, uruchamiać providerów ani dodawać do Established.
 
@@ -128,4 +136,4 @@ Owner review bez bootstrap `--apply`:
 scripts\win\start-follow-up-basket-review.cmd
 ```
 
-Następny osobny sprint to **Owner Established Promotion Flow**: jawna, dry-run-first i potwierdzana decyzja ownera korzystająca z istniejącego managera Established Universe. Persistent Feedback Loop pozostaje późniejszym etapem.
+**Owner Established Promotion Flow** realizuje jawną, dry-run-first i potwierdzaną decyzję ownera przez istniejący manager Established Universe. Następny etap po akceptacji to **Persistent Feedback Loop**.

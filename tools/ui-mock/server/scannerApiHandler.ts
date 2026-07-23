@@ -5,6 +5,11 @@ import {
   type EstablishedUniverseStatusOptions,
 } from "./establishedUniverseStatus.js";
 import {
+  createEstablishedPromotionService,
+  EstablishedPromotionError,
+  type EstablishedPromotionOptions,
+} from "./establishedPromotion.js";
+import {
   ContextOutputError,
   type LatestContextOutputOptions,
   readLatestContextOutput,
@@ -41,6 +46,7 @@ import {
   createOwnerOperationsService,
   OWNER_SESSION_HEADER,
   OwnerOperationsError,
+  resolveOwnerOperationsMode,
   type OwnerOperationsOptions,
 } from "./ownerOperations.js";
 import {
@@ -55,6 +61,7 @@ import {
   readFollowUpStatus,
   type FollowUpApiOptions,
 } from "./followUpApi.js";
+import { createOwnerSessionSecret } from "./ownerPreflight.js";
 
 const DEMO_CORS_ORIGINS = new Set(["http://127.0.0.1:5173", "http://localhost:5173"]);
 
@@ -73,6 +80,7 @@ export type ScannerApiHandlerOptions = {
   health?: ScannerApiHealthOptions;
   automation?: AutomationStatusOptions;
   establishedUniverse?: EstablishedUniverseStatusOptions;
+  establishedPromotion?: EstablishedPromotionOptions;
   ownerOperations?: OwnerOperationsOptions;
   reports?: ReportsLibraryOptions;
   followUp?: FollowUpApiOptions;
@@ -84,13 +92,75 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
     ?? createConfiguredReviewSessionStorageProvider({ reviewSession: options.reviewSession });
   const scannerOptions: LatestScannerOutputOptions = { ...options.scanner, runtimeMode };
   const contextOptions: LatestContextOutputOptions = { ...options.context, runtimeMode };
+  const ownerMode = resolveOwnerOperationsMode(options.ownerOperations?.mode ?? process.env.CRYPTO_EDGE_OWNER_OPERATIONS_MODE);
+  const ownerSessionSecret = ownerMode === "DISABLED"
+    ? undefined
+    : createOwnerSessionSecret(options.ownerOperations?.sessionSecret);
   const ownerOperations = createOwnerOperationsService({
     automationEnabled: options.automation?.enabled,
     ...options.ownerOperations,
+    mode: ownerMode,
+    sessionSecret: ownerSessionSecret,
+  });
+  const establishedPromotion = createEstablishedPromotionService({
+    scanner: scannerOptions,
+    followUp: options.followUp,
+    storePath: options.establishedUniverse?.storeFilePath,
+    ...options.establishedPromotion,
+    mode: ownerMode,
+    sessionSecret: ownerSessionSecret,
   });
 
   return async (req, res) => {
     const path = getRequestPath(req.url);
+
+    if (req.method === "GET" && path === "/api/owner-operations/established-promotion/status") {
+      try {
+        establishedPromotion.assertVisible(isLocalOwnerRequest(req));
+        const query = validateEstablishedPromotionQuery(req.url);
+        sendJson(req, res, 200, await establishedPromotion.getStatus(
+          query.chain,
+          query.contract_address,
+          isLocalOwnerRequest(req),
+        ), runtimeMode);
+      } catch (error) {
+        sendEstablishedPromotionError(req, res, error, runtimeMode);
+      }
+      return;
+    }
+
+    if (req.method === "GET" && path === "/api/owner-operations/established-promotion-preview") {
+      try {
+        establishedPromotion.assertVisible(isLocalOwnerRequest(req));
+        const query = validateEstablishedPromotionQuery(req.url);
+        sendJson(req, res, 200, await establishedPromotion.createPreview(
+          query.chain,
+          query.contract_address,
+          isLocalOwnerRequest(req),
+        ), runtimeMode);
+      } catch (error) {
+        sendEstablishedPromotionError(req, res, error, runtimeMode);
+      }
+      return;
+    }
+
+    if (req.method === "POST" && path === "/api/owner-operations/established-promotion") {
+      try {
+        requireOwnerMutationRequest(req);
+        const body = validateEstablishedPromotionBody(await readOwnerJsonBody(req));
+        const sessionHeader = req.headers[OWNER_SESSION_HEADER];
+        if (typeof sessionHeader !== "string") throw new EstablishedPromotionError("OWNER_SESSION_REQUIRED", 403);
+        const result = await establishedPromotion.promote(
+          body.preview_id,
+          sessionHeader,
+          isLocalOwnerRequest(req),
+        );
+        sendJson(req, res, 200, result, runtimeMode);
+      } catch (error) {
+        sendEstablishedPromotionError(req, res, error, runtimeMode);
+      }
+      return;
+    }
 
     if (req.method === "GET" && path === "/api/owner-operations/status") {
       const [scanner, context] = await Promise.all([
@@ -482,6 +552,23 @@ function sendOwnerOperationsError(
   }, runtimeMode);
 }
 
+function sendEstablishedPromotionError(
+  req: IncomingMessage,
+  res: ServerResponse,
+  error: unknown,
+  runtimeMode: ResolvedProductRuntimeMode,
+): void {
+  const promotionError = error instanceof EstablishedPromotionError
+    ? error
+    : error instanceof OwnerOperationsError
+      ? new EstablishedPromotionError(error.code, error.httpStatus)
+      : new EstablishedPromotionError("PROMOTION_REQUEST_REJECTED", 400);
+  sendJson(req, res, promotionError.httpStatus, {
+    error: promotionError.code,
+    message: "Established promotion request rejected",
+  }, runtimeMode);
+}
+
 function requireOwnerMutationRequest(req: IncomingMessage): void {
   if (!isLocalOwnerRequest(req)) throw new OwnerOperationsError("LOOPBACK_REQUIRED", 403);
   const contentType = req.headers["content-type"];
@@ -520,6 +607,43 @@ function validateOwnerRefreshBody(value: unknown): { preflight_id: string; confi
     throw new OwnerOperationsError("OWNER_REFRESH_BODY_INVALID", 400);
   }
   return { preflight_id: value.preflight_id, confirmation: true };
+}
+
+function validateEstablishedPromotionBody(value: unknown): { preview_id: string; confirmation: true } {
+  if (!isRecord(value)) throw new EstablishedPromotionError("PROMOTION_BODY_INVALID", 400);
+  const keys = Object.keys(value).sort();
+  if (keys.length !== 2 || keys[0] !== "confirmation" || keys[1] !== "preview_id") {
+    throw new EstablishedPromotionError("PROMOTION_BODY_INVALID", 400);
+  }
+  if (typeof value.preview_id !== "string" || value.preview_id.length === 0 || value.confirmation !== true) {
+    throw new EstablishedPromotionError("PROMOTION_BODY_INVALID", 400);
+  }
+  return { preview_id: value.preview_id, confirmation: true };
+}
+
+function validateEstablishedPromotionQuery(url: string | undefined): { chain: string; contract_address: string } {
+  let parsed: URL;
+  try {
+    parsed = new URL(url ?? "/", "http://owner.local");
+  } catch {
+    throw new EstablishedPromotionError("PROMOTION_QUERY_INVALID", 400);
+  }
+  const keys = [...parsed.searchParams.keys()].sort();
+  if (
+    keys.length !== 2
+    || keys[0] !== "chain"
+    || keys[1] !== "contract_address"
+    || parsed.searchParams.getAll("chain").length !== 1
+    || parsed.searchParams.getAll("contract_address").length !== 1
+  ) {
+    throw new EstablishedPromotionError("PROMOTION_QUERY_INVALID", 400);
+  }
+  const chain = parsed.searchParams.get("chain");
+  const contractAddress = parsed.searchParams.get("contract_address");
+  if (!chain || !contractAddress || chain.length > 32 || contractAddress.length > 128) {
+    throw new EstablishedPromotionError("PROMOTION_QUERY_INVALID", 400);
+  }
+  return { chain, contract_address: contractAddress };
 }
 
 async function readOwnerJsonBody(req: IncomingMessage): Promise<unknown> {

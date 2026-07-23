@@ -157,6 +157,38 @@ describe("established universe owner management", () => {
     assert.equal(await readFile(storePath, "utf8"), before);
   });
 
+  it("checks optional optimistic version and checksum guards before dry-run or write", async () => {
+    const storePath = await newStorePath();
+    const current = await readEstablishedUniverseStore(storePath);
+    const mutation = { operation: "add" as const, chain: "base", contract_address: ADDRESS_A };
+    for (const apply of [false, true]) {
+      await assert.rejects(
+        mutateEstablishedUniverse(mutation, {
+          storePath,
+          apply,
+          now: fixedNow(1),
+          expectedCurrentVersion: "established-universe-v999999",
+          expectedCurrentChecksum: current.current.checksum,
+        }),
+        /ESTABLISHED_UNIVERSE_STALE/,
+      );
+      await assert.rejects(
+        mutateEstablishedUniverse(mutation, {
+          storePath,
+          apply,
+          now: fixedNow(1),
+          expectedCurrentVersion: current.current.universe_version,
+          expectedCurrentChecksum: `sha256:${"0".repeat(64)}`,
+        }),
+        /ESTABLISHED_UNIVERSE_STALE/,
+      );
+    }
+    const after = await readEstablishedUniverseStore(storePath);
+    assert.equal(after.current.universe_version, current.current.universe_version);
+    assert.equal(after.current.checksum, current.current.checksum);
+    assert.equal(after.current.entries.length, current.current.entries.length);
+  });
+
   it("previews only enabled inputs without providers, publishing or automation changes", async () => {
     const storePath = await newStorePath();
     await mutateEstablishedUniverse({ operation: "add", chain: "base", contract_address: ADDRESS_A }, {

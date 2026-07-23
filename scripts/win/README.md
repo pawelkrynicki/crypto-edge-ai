@@ -2,6 +2,22 @@
 
 These scripts are developer tooling for Windows CMD. Run them from the repo root or any other current directory; each script resolves the repo root from its own location.
 
+## Owner Established Promotion Flow
+
+Dedykowany offline check używa injected product data i temporary universe/follow-up stores:
+
+```cmd
+scripts\win\check-owner-established-promotion.cmd
+```
+
+Bezpieczny owner review otwiera Candidate Detail w `INTERNAL_BETA + REVIEW_SAFE`:
+
+```cmd
+scripts\win\start-established-promotion-review.cmd
+```
+
+Review pozwala odczytać status i plan, ale POST pozostaje zablokowany. Nie istnieje launcher `ENABLED`. Skrypty nie tworzą sztucznego Candidate, nie dotykają prawdziwego local universe, nie uruchamiają collectora ani providerów i nie zmieniają VPS, Cloudflare lub Task Scheduler. Pełny kontrakt: `docs/owner_established_promotion_flow.md`.
+
 ## Maturing / Follow-up Basket
 
 Offline check całego kontraktu Follow-up:

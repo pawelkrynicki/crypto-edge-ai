@@ -1,5 +1,11 @@
 # Standalone Roadmap To Trusted Tester
 
+## Owner Established Promotion Flow
+
+Candidate Detail ma backend-gated sekcję ownera z read-only statusem i dry-run preview. Jedyny POST przyjmuje tylko podpisany one-time `preview_id` i potwierdzenie, ponownie sprawdza canonical record, lifecycle, basic filters, membership, universe version/checksum i lock, a następnie bezpośrednio używa Established Universe Managera.
+
+Tester nie widzi panelu ani capability. Nie ma automatycznego awansu, live provider calls, aktywacji `ENABLED`, VPS/Cloudflare/Task Scheduler changes. Overall pozostaje `NOT_READY`. Następny etap po akceptacji: **Persistent Feedback Loop**. Premium UI Pass nadal ma termin **27–30.07.2026**.
+
 ## Status
 
 - Stage 12E.1.
@@ -8,13 +14,13 @@
 - Frontend productization is now the main axis.
 - Next stage is 12E.2 Candidate Results View.
 - Reports are not the critical path for the next frontend rebuild.
-- Maturing / Follow-up Basket dodaje read-only trzecią warstwę Radaru; Owner Established Promotion Flow i Persistent Feedback Loop pozostają osobnymi następnymi etapami.
+- Maturing / Follow-up Basket dodaje read-only trzecią warstwę Radaru; Owner Established Promotion Flow realizuje już bezpieczną decyzję ownera, a Persistent Feedback Loop pozostaje następnym etapem.
 
 ## Maturing / Follow-up Basket
 
 Wykryte tokeny są zachowywane według `chain + contract_address` i sprawdzane w checkpointach 1/3/7/14/30 dni przez istniejący centralny collector. `Candidate for Established` wymaga osobnej decyzji ownera i nigdy nie jest automatyczną promocją. Tester widzi lifecycle i statusy, ale nie może uruchamiać providerów ani zmieniać store. Overall preview pozostaje `NOT_READY`.
 
-Kolejność: Follow-up Basket → Owner Established Promotion Flow → Persistent Feedback Loop → VPS/private tester preview. Plan Premium UI Pass 27–30.07 pozostaje bez zmian.
+Kolejność po local owner review: Persistent Feedback Loop → VPS/private tester preview. Plan Premium UI Pass 27–30.07 pozostaje bez zmian.
 
 ## Timing Context
 
