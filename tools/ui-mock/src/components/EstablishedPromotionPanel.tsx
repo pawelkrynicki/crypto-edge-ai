@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 
 void React;
-import { formatProductDateTime, useProductLocale } from "../productI18n";
+import { formatProductDateTime, useProductLocale, type ProductLocale } from "../productI18n";
 import {
   addToEstablished,
   loadEstablishedPromotionPreview,
@@ -15,7 +15,7 @@ const COPY = {
   en: {
     eyebrow: "Owner decision",
     title: "Consider for Established",
-    candidateBoundary: "Candidate for Established means only that the token is ready for an owner decision.",
+    candidateBoundary: (lifecycle: string) => `Only a token with Candidate for Established status can be considered. This token is currently ${lifecycle}.`,
     createsVersion: "Adding it creates a new Established Universe version and audit entry.",
     noSafety: "This action does not verify token safety and is not an investment recommendation.",
     missingSecurity: "Missing security data requires manual verification.",
@@ -28,9 +28,10 @@ const COPY = {
     membership: "Established membership",
     mode: "Owner operations mode",
     eligibility: "Eligibility",
-    reasons: "Reason codes",
-    currentVersion: "Current universe version",
-    plannedVersion: "Planned universe version",
+    actionPlan: "Addition plan",
+    reasons: "Reasons",
+    currentVersion: "Current Established version",
+    plannedVersion: "Planned Established version",
     addressValidation: "Address validation",
     duplicate: "Duplicate check",
     entries: "Entries total",
@@ -40,6 +41,7 @@ const COPY = {
     previewLoading: "Loading the read-only addition plan…",
     previewUnavailable: "The addition plan is unavailable.",
     reviewSafe: "Review-safe mode: adding to Established remains blocked.",
+    additionUnavailable: "Adding is unavailable because the token does not meet the eligibility requirements.",
     confirm: "I confirm this exact chain and contract address and understand that a new universe version will be created.",
     add: "Add to Established",
     dialog: "Add this exact chain and contract address to a new Established Universe version?",
@@ -52,7 +54,7 @@ const COPY = {
   pl: {
     eyebrow: "Decyzja ownera",
     title: "Rozważ do Established",
-    candidateBoundary: "Status Candidate for Established oznacza wyłącznie kandydata do ręcznej decyzji ownera.",
+    candidateBoundary: (lifecycle: string) => `Do Established można rozważyć wyłącznie token ze statusem Kandydat do Established. Ten token ma obecnie status ${lifecycle}.`,
     createsVersion: "Dodanie tworzy nową wersję Established Universe i wpis audytu.",
     noSafety: "Operacja nie potwierdza bezpieczeństwa tokena ani nie stanowi rekomendacji inwestycyjnej.",
     missingSecurity: "Brakujące dane bezpieczeństwa wymagają ręcznej weryfikacji.",
@@ -65,9 +67,10 @@ const COPY = {
     membership: "Wpis Established",
     mode: "Tryb operacji ownera",
     eligibility: "Kwalifikacja",
-    reasons: "Kody powodów",
-    currentVersion: "Bieżąca wersja universe",
-    plannedVersion: "Planowana wersja universe",
+    actionPlan: "Plan dodania",
+    reasons: "Powody",
+    currentVersion: "Bieżąca wersja Established",
+    plannedVersion: "Planowana wersja Established",
     addressValidation: "Walidacja adresu",
     duplicate: "Kontrola duplikatu",
     entries: "Liczba wpisów",
@@ -77,10 +80,11 @@ const COPY = {
     previewLoading: "Wczytywanie planu dodania tylko do odczytu…",
     previewUnavailable: "Plan dodania jest niedostępny.",
     reviewSafe: "Tryb bezpiecznego przeglądu: dodanie do Established pozostaje zablokowane.",
-    confirm: "Potwierdzam dokładny chain i contract address oraz utworzenie nowej wersji universe.",
+    additionUnavailable: "Dodanie jest niedostępne, ponieważ token nie spełnia warunków kwalifikacji.",
+    confirm: "Potwierdzam dokładny chain i contract address oraz utworzenie nowej wersji Established.",
     add: "Dodaj do Established",
     dialog: "Dodać ten dokładny chain i contract address do nowej wersji Established Universe?",
-    added: "Dodano. Powstała nowa wersja universe, wpis historii i audytu.",
+    added: "Dodano. Powstała nowa wersja Established, wpis historii i audytu.",
     noAction: "Nie wprowadzono zmiany, ponieważ token jest już aktywny w Established.",
     failed: "Kontrolowane dodanie zostało odrzucone. Odśwież plan przed kolejną próbą.",
     unavailable: "Niedostępne",
@@ -88,15 +92,179 @@ const COPY = {
   },
 } as const;
 
+type PromotionValueGroup =
+  | "lifecycle"
+  | "basicFilter"
+  | "security"
+  | "membership"
+  | "mode"
+  | "eligibility"
+  | "actionPlan"
+  | "addressValidation"
+  | "duplicate";
+
+const PRESENTATION_LABELS: Record<ProductLocale, Record<PromotionValueGroup, Record<string, string>>> = {
+  en: {
+    lifecycle: {
+      NEW: "New",
+      MATURING: "Continued observation",
+      CANDIDATE_FOR_ESTABLISHED: "Candidate for Established",
+      ESTABLISHED: "Established",
+      ARCHIVED: "Archived",
+    },
+    basicFilter: {
+      passed_basic_filter: "Filters passed",
+      rejected_basic_filter: "Filters not passed",
+      not_checked: "Not checked",
+    },
+    security: {
+      PARTIAL: "Partial data",
+      AVAILABLE: "Available",
+      COMPLETE: "Available",
+      CHECKED: "Checked data",
+      UNAVAILABLE: "Unavailable",
+      MANUAL_VERIFICATION_REQUIRED: "Manual verification required",
+      CRITICAL_RISK: "Critical risk",
+    },
+    membership: {
+      NOT_ESTABLISHED: "Not in Established",
+      ACTIVE: "Active Established entry",
+      DISABLED: "Inactive Established entry",
+    },
+    mode: {
+      REVIEW_SAFE: "Review-safe mode",
+      DISABLED: "Disabled",
+      ENABLED: "Enabled",
+    },
+    eligibility: {
+      ELIGIBLE: "Eligible",
+      BLOCKED: "Blocked",
+      NO_ACTION: "No action",
+    },
+    actionPlan: {
+      ADD: "Ready to add",
+      BLOCKED: "Blocked",
+      NO_ACTION: "No action",
+    },
+    addressValidation: {
+      VALID: "Valid",
+      INVALID: "Invalid",
+    },
+    duplicate: {
+      NONE: "No duplicate detected",
+      ACTIVE_ENTRY_EXISTS: "Active Established entry already exists",
+      DISABLED_ENTRY_EXISTS: "Inactive Established entry already exists",
+    },
+  },
+  pl: {
+    lifecycle: {
+      NEW: "Nowe",
+      MATURING: "Dalsza obserwacja",
+      CANDIDATE_FOR_ESTABLISHED: "Kandydat do Established",
+      ESTABLISHED: "Established",
+      ARCHIVED: "Archiwalne",
+    },
+    basicFilter: {
+      passed_basic_filter: "Filtry spełnione",
+      rejected_basic_filter: "Filtry niespełnione",
+      not_checked: "Nie sprawdzono",
+    },
+    security: {
+      PARTIAL: "Częściowe dane",
+      AVAILABLE: "Dostępne",
+      COMPLETE: "Dostępne",
+      CHECKED: "Dane sprawdzone",
+      UNAVAILABLE: "Niedostępne",
+      MANUAL_VERIFICATION_REQUIRED: "Wymagana ręczna weryfikacja",
+      CRITICAL_RISK: "Ryzyko krytyczne",
+    },
+    membership: {
+      NOT_ESTABLISHED: "Nie znajduje się w Established",
+      ACTIVE: "Aktywny wpis Established",
+      DISABLED: "Nieaktywny wpis Established",
+    },
+    mode: {
+      REVIEW_SAFE: "Bezpieczny tryb przeglądu",
+      DISABLED: "Wyłączone",
+      ENABLED: "Włączone",
+    },
+    eligibility: {
+      ELIGIBLE: "Spełnia warunki",
+      BLOCKED: "Zablokowane",
+      NO_ACTION: "Brak działania",
+    },
+    actionPlan: {
+      ADD: "Gotowe do dodania",
+      BLOCKED: "Zablokowane",
+      NO_ACTION: "Brak działania",
+    },
+    addressValidation: {
+      VALID: "Prawidłowy",
+      INVALID: "Nieprawidłowy",
+    },
+    duplicate: {
+      NONE: "Nie wykryto duplikatu",
+      ACTIVE_ENTRY_EXISTS: "Aktywny wpis Established już istnieje",
+      DISABLED_ENTRY_EXISTS: "Nieaktywny wpis Established już istnieje",
+    },
+  },
+};
+
+const PROMOTION_REASON_COPY: Record<ProductLocale, Record<string, string>> = {
+  en: {
+    ALREADY_ESTABLISHED: "The token is already an active Established entry.",
+    UNIVERSE_NOT_VALID: "The current Established Universe is unavailable or invalid.",
+    DISABLED_ENTRY_EXISTS: "An inactive Established entry already exists and cannot be enabled by this action.",
+    LIFECYCLE_NEW: "The token remains in the New layer and is not yet a candidate for Established.",
+    LIFECYCLE_MATURING: "The token remains under continued observation and is not yet a candidate for Established.",
+    LIFECYCLE_CANDIDATE_FOR_ESTABLISHED: "The token candidate status does not permit this action in the current state.",
+    LIFECYCLE_ESTABLISHED: "The token is already in Established.",
+    LIFECYCLE_ARCHIVED: "Archived tokens cannot be added to Established through this action.",
+    BASIC_FILTER_NOT_PASSED: "The token did not pass the Radar basic filters.",
+    PROMOTION_ALREADY_IN_PROGRESS: "Another Established Universe operation is currently in progress.",
+  },
+  pl: {
+    ALREADY_ESTABLISHED: "Token jest już aktywnym wpisem Established.",
+    UNIVERSE_NOT_VALID: "Bieżący Established Universe jest niedostępny albo nieprawidłowy.",
+    DISABLED_ENTRY_EXISTS: "Nieaktywny wpis Established już istnieje i nie może zostać włączony przez tę operację.",
+    LIFECYCLE_NEW: "Token pozostaje w warstwie Nowe i nie jest jeszcze kandydatem do Established.",
+    LIFECYCLE_MATURING: "Token pozostaje w dalszej obserwacji i nie jest jeszcze kandydatem do Established.",
+    LIFECYCLE_CANDIDATE_FOR_ESTABLISHED: "Status kandydata nie pozwala na tę operację w bieżącym stanie.",
+    LIFECYCLE_ESTABLISHED: "Token znajduje się już w Established.",
+    LIFECYCLE_ARCHIVED: "Archiwalnego tokena nie można dodać do Established przez tę operację.",
+    BASIC_FILTER_NOT_PASSED: "Token nie przeszedł podstawowych filtrów Radaru.",
+    PROMOTION_ALREADY_IN_PROGRESS: "Inna operacja na Established Universe jest obecnie wykonywana.",
+  },
+};
+
+const UNKNOWN_REASON_COPY: Record<ProductLocale, string> = {
+  en: "The action does not meet the current requirements.",
+  pl: "Operacja nie spełnia aktualnych warunków.",
+};
+
+export function formatEstablishedPromotionValue(
+  group: PromotionValueGroup,
+  value: string,
+  locale: ProductLocale,
+): string {
+  return PRESENTATION_LABELS[locale][group][value] ?? value;
+}
+
+export function formatEstablishedPromotionReason(code: string, locale: ProductLocale): string {
+  return PROMOTION_REASON_COPY[locale][code] ?? UNKNOWN_REASON_COPY[locale];
+}
+
 export function EstablishedPromotionPanel({
   initialStatus,
+  initialPreview = null,
 }: {
   initialStatus: EstablishedPromotionStatus;
+  initialPreview?: EstablishedPromotionPreview | null;
 }) {
   const { locale } = useProductLocale();
   const copy = COPY[locale];
   const [status, setStatus] = useState(initialStatus);
-  const [preview, setPreview] = useState<EstablishedPromotionPreview | null>(null);
+  const [preview, setPreview] = useState<EstablishedPromotionPreview | null>(initialPreview);
   const [confirmed, setConfirmed] = useState(false);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [previewError, setPreviewError] = useState(false);
@@ -114,13 +282,17 @@ export function EstablishedPromotionPanel({
 
   if (!status.owner_controls_visible) return null;
   const previewFresh = preview !== null && Date.parse(preview.expires_at) > currentTime;
-  const canAdd = status.mode === "ENABLED"
+  const canConfirm = status.mode === "ENABLED"
     && status.owner_actions_enabled
     && previewFresh
     && preview.action_plan === "ADD"
+    && preview.eligibility_status !== "BLOCKED"
     && preview.lock_available
-    && confirmed
     && !submitting;
+  const canAdd = canConfirm && confirmed;
+  const previewBlocked = preview !== null
+    && (preview.action_plan !== "ADD" || preview.eligibility_status === "BLOCKED");
+  const lifecycleLabel = formatEstablishedPromotionValue("lifecycle", status.lifecycle_status, locale);
 
   const checkPlan = async () => {
     setLoadingPreview(true);
@@ -157,19 +329,19 @@ export function EstablishedPromotionPanel({
       <header className="promotion-panel-header">
         <span className="candidate-detail-eyebrow">{copy.eyebrow}</span>
         <h3 id="established-promotion-heading">{copy.title}</h3>
-        <p>{copy.candidateBoundary}</p>
+        <p>{copy.candidateBoundary(lifecycleLabel)}</p>
       </header>
 
       {status.mode === "REVIEW_SAFE" && <p className="owner-review-safe" role="status">{copy.reviewSafe}</p>}
 
       <div className="owner-operations-summary">
-        <PromotionFact label={copy.lifecycle} value={status.lifecycle_status} />
+        <PromotionFact label={copy.lifecycle} value={lifecycleLabel} />
         <PromotionFact label={copy.chain} value={status.chain} />
         <PromotionFact label={copy.address} value={status.contract_address} mono />
-        <PromotionFact label={copy.filters} value={status.basic_filter_status} />
-        <PromotionFact label={copy.security} value={status.security_status} />
-        <PromotionFact label={copy.membership} value={status.established_membership} />
-        <PromotionFact label={copy.mode} value={status.mode} />
+        <PromotionFact label={copy.filters} value={formatEstablishedPromotionValue("basicFilter", status.basic_filter_status, locale)} />
+        <PromotionFact label={copy.security} value={formatEstablishedPromotionValue("security", status.security_status, locale)} />
+        <PromotionFact label={copy.membership} value={formatEstablishedPromotionValue("membership", status.established_membership, locale)} />
+        <PromotionFact label={copy.mode} value={formatEstablishedPromotionValue("mode", status.mode, locale)} />
       </div>
 
       <div className="promotion-boundary-copy">
@@ -189,17 +361,24 @@ export function EstablishedPromotionPanel({
 
       {preview && (
         <div className="owner-preflight-summary" data-established-promotion-preview="visible">
-          <PromotionFact label={copy.eligibility} value={preview.eligibility_status} />
-          <PromotionFact label={copy.reasons} value={preview.reason_codes.join(", ") || copy.none} />
+          <PromotionFact label={copy.eligibility} value={formatEstablishedPromotionValue("eligibility", preview.eligibility_status, locale)} />
+          <PromotionFact label={copy.actionPlan} value={formatEstablishedPromotionValue("actionPlan", preview.action_plan, locale)} />
+          {preview.reason_codes.length > 0 && (
+            <div className="owner-operation-fact promotion-reasons">
+              <strong>{copy.reasons}</strong>
+              <ul>{preview.reason_codes.map((reason, index) => <li key={`${reason}-${index}`}>{formatEstablishedPromotionReason(reason, locale)}</li>)}</ul>
+            </div>
+          )}
           <PromotionFact label={copy.currentVersion} value={preview.current_universe_version ?? copy.unavailable} />
           {preview.action_plan === "ADD" && <PromotionFact label={copy.plannedVersion} value={preview.planned_universe_version ?? copy.unavailable} />}
-          <PromotionFact label={copy.addressValidation} value={preview.address_validation_status} />
-          <PromotionFact label={copy.duplicate} value={preview.duplicate_status} />
+          <PromotionFact label={copy.addressValidation} value={formatEstablishedPromotionValue("addressValidation", preview.address_validation_status, locale)} />
+          <PromotionFact label={copy.duplicate} value={formatEstablishedPromotionValue("duplicate", preview.duplicate_status, locale)} />
           <PromotionFact label={copy.entries} value={changeValue(preview.current_entries_total, preview.planned_entries_total, preview.action_plan, copy.unavailable)} />
           <PromotionFact label={copy.enabledEntries} value={changeValue(preview.current_entries_enabled, preview.planned_entries_enabled, preview.action_plan, copy.unavailable)} />
           <PromotionFact label={copy.expires} value={formatProductDateTime(preview.expires_at, locale)} />
           <p>{copy.createsVersion}</p>
           {preview.manual_verification_required && <p className="warning">{copy.missingSecurity}</p>}
+          {previewBlocked && <p className="warning promotion-unavailable">{copy.additionUnavailable}</p>}
         </div>
       )}
 
@@ -208,7 +387,7 @@ export function EstablishedPromotionPanel({
           type="checkbox"
           checked={confirmed}
           onChange={(event) => setConfirmed(event.target.checked)}
-          disabled={status.mode !== "ENABLED" || !previewFresh || preview?.action_plan !== "ADD" || !preview?.lock_available || submitting}
+          disabled={!canConfirm}
         />
         <span>{copy.confirm}</span>
       </label>

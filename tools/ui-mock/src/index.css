@@ -4685,3 +4685,16 @@
   overflow-wrap: anywhere;
   word-break: break-word;
 }
+
+.promotion-reasons {
+  grid-column: 1 / -1;
+}
+
+.promotion-reasons ul {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--text-primary);
+  font-size: 11px;
+}

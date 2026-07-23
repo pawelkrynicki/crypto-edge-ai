@@ -22,6 +22,7 @@ shift
 goto parse_args
 
 :args_done
+if "%ESTABLISHED_PROMOTION_REVIEW%"=="1" set "RADAR_VIEW=candidate-detail"
 if "%OWNER_OPERATIONS_REVIEW%"=="1" if /i not "%RADAR_VIEW%"=="control-center" (
   echo ERROR: --owner-operations-review wymaga --control-center.
   exit /b 1
@@ -30,7 +31,7 @@ if "%ESTABLISHED_PROMOTION_REVIEW%"=="1" if /i not "%RADAR_VIEW%"=="candidate-de
   echo ERROR: --established-promotion-review wymaga --candidate-detail.
   exit /b 1
 )
-set "RADAR_URL=http://127.0.0.1:5173/#%RADAR_VIEW%"
+set "RADAR_URL=http://127.0.0.1:5173/#!RADAR_VIEW!"
 set "HAS_SCANNER_OUTPUT=0"
 set "CRYPTO_EDGE_RUNTIME_MODE=INTERNAL_BETA"
 set "SCANNER_API_PORT=5177"
@@ -89,9 +90,9 @@ echo === Uruchamianie INTERNAL_BETA UI na 5173 ===
 start "Crypto Edge Product Radar UI 5173" cmd /k "cd /d ""%UI_DIR%"" && call node_modules\.bin\vite.cmd --mode internal-beta --host 127.0.0.1 --port 5173"
 
 echo.
-echo Radar: %RADAR_URL%
+echo Radar: !RADAR_URL!
 echo Zatrzymanie: scripts\win\kill-local-ports.cmd
 echo Zamknij dwa okna procesu dopiero po zakonczeniu oceny ownera.
 
-start "" "%RADAR_URL%"
+start "" "!RADAR_URL!"
 exit /b 0
