@@ -76,7 +76,7 @@ import {
   type FeedbackSubjectRef,
 } from "./feedbackApi.js";
 import {
-  createFeedbackStore,
+  resolveFeedbackStore,
   type FeedbackStore,
   type FeedbackStoreOptions,
   type VerifiedFeedbackSubject,
@@ -144,13 +144,7 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
   );
   const feedbackSubmissionEnabled = options.feedback?.submissionEnabled
     ?? process.env.CRYPTO_EDGE_FEEDBACK_SUBMISSION_ENABLED !== "0";
-  const feedbackStorePromise = options.feedback?.store
-    ? Promise.resolve(options.feedback.store)
-    : createFeedbackStore({
-      databaseFilePath: options.feedback?.databaseFilePath ?? process.env.CRYPTO_EDGE_FEEDBACK_SQLITE_PATH,
-      maxRecords: options.feedback?.maxRecords,
-      busyTimeoutMs: options.feedback?.busyTimeoutMs,
-    });
+  const feedbackStorePromise = resolveFeedbackStore(options.feedback);
   const feedbackServicePromise = feedbackStorePromise.then((store) => createFeedbackService({
     store,
     runtimeMode,

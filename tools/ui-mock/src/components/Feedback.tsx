@@ -29,6 +29,8 @@ type FeedbackProps = {
   subjectLabel?: string;
   initialPublicStatus?: FeedbackPublicStatus | null;
   initialOwnerStatus?: OwnerFeedbackStatus | null;
+  refreshRevision?: number;
+  onFeedbackRecorded?: () => void | Promise<void>;
 };
 
 const categoryCopy: Record<ProductLocale, Record<FeedbackCategory, { label: string; description: string }>> = {
@@ -52,6 +54,8 @@ export function Feedback({
   subjectLabel,
   initialPublicStatus,
   initialOwnerStatus,
+  refreshRevision = 0,
+  onFeedbackRecorded,
 }: FeedbackProps) {
   const { locale } = useProductLocale();
   const copy = feedbackCopy(locale);
@@ -62,6 +66,7 @@ export function Feedback({
   const [submissionKey, setSubmissionKey] = useState(createSubmissionKey);
   const [state, setState] = useState<"idle" | "submitting" | "error" | "rate_limited" | "success">("idle");
   const [receipt, setReceipt] = useState<FeedbackReceipt | null>(null);
+  const [ownerInboxRevision, setOwnerInboxRevision] = useState(0);
   const submittingRef = useRef(false);
 
   useEffect(() => {
@@ -71,15 +76,19 @@ export function Feedback({
     return () => { active = false; };
   }, [initialPublicStatus]);
 
-  const submit = async (event: React.FormEvent) => {
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (submittingRef.current || !publicStatus?.submission_enabled) return;
+    const selectedCategory = resolveSelectedFeedbackCategory(
+      new FormData(event.currentTarget).get("feedback-category"),
+      category,
+    );
     submittingRef.current = true;
     setState("submitting");
     try {
       const result = await submitFeedback({
         submission_key: submissionKey,
-        category,
+        category: selectedCategory,
         title,
         details,
         screen_context: screenContext,
@@ -88,6 +97,8 @@ export function Feedback({
       });
       setReceipt(result);
       setState("success");
+      setOwnerInboxRevision((value) => value + 1);
+      void onFeedbackRecorded?.();
     } catch (error) {
       setState(error instanceof FeedbackSubmissionError && error.status === 429 ? "rate_limited" : "error");
     } finally {
@@ -197,12 +208,21 @@ export function Feedback({
         </aside>
       </div>
 
-      <OwnerFeedbackInbox initialStatus={initialOwnerStatus} />
+      <OwnerFeedbackInbox
+        initialStatus={initialOwnerStatus}
+        refreshRevision={refreshRevision + ownerInboxRevision}
+      />
     </div>
   );
 }
 
-function OwnerFeedbackInbox({ initialStatus }: { initialStatus?: OwnerFeedbackStatus | null }) {
+function OwnerFeedbackInbox({
+  initialStatus,
+  refreshRevision,
+}: {
+  initialStatus?: OwnerFeedbackStatus | null;
+  refreshRevision: number;
+}) {
   const { locale } = useProductLocale();
   const copy = feedbackCopy(locale);
   const [status, setStatus] = useState<OwnerFeedbackStatus | null>(initialStatus ?? null);
@@ -214,22 +234,19 @@ function OwnerFeedbackInbox({ initialStatus }: { initialStatus?: OwnerFeedbackSt
   useEffect(() => {
     if (initialStatus !== undefined) return;
     let active = true;
-    void loadOwnerFeedbackStatus().then((value) => {
-      if (!active || !value) return;
-      setStatus(value);
-      void loadOwnerFeedbackList().then((list) => { if (active && list) setItems(list); });
+    void Promise.all([
+      loadOwnerFeedbackStatus(),
+      loadOwnerFeedbackList({
+        ...(category ? { category } : {}),
+        ...(feedbackStatus ? { status: feedbackStatus } : {}),
+      }),
+    ]).then(([nextStatus, nextItems]) => {
+      if (!active) return;
+      if (nextStatus) setStatus(nextStatus);
+      if (nextItems) setItems(nextItems);
     });
     return () => { active = false; };
-  }, [initialStatus]);
-
-  const applyFilters = async (nextCategory = category, nextStatus = feedbackStatus) => {
-    const list = await loadOwnerFeedbackList({
-      ...(nextCategory ? { category: nextCategory } : {}),
-      ...(nextStatus ? { status: nextStatus } : {}),
-    });
-    if (list) setItems(list);
-    setDetail(null);
-  };
+  }, [category, feedbackStatus, initialStatus, refreshRevision]);
 
   const openDetail = async (feedbackId: string) => {
     const value = await loadOwnerFeedbackDetail(feedbackId);
@@ -255,6 +272,9 @@ function OwnerFeedbackInbox({ initialStatus }: { initialStatus?: OwnerFeedbackSt
         <FeedbackStat label={copy.total} value={status.total_count} />
         <FeedbackStat label={copy.newItems} value={status.new_count} />
         <FeedbackStat label={copy.blockers} value={status.blocker_count} />
+        <FeedbackStat label={copy.improvements} value={status.improvement_count} />
+        <FeedbackStat label={copy.clarifications} value={status.clarification_count} />
+        <FeedbackStat label={copy.laterItems} value={status.later_count} />
         <FeedbackStat label={copy.latest} value={status.latest_feedback_at ? formatProductDateTime(status.latest_feedback_at, locale) : "—"} />
       </div>
 
@@ -263,7 +283,7 @@ function OwnerFeedbackInbox({ initialStatus }: { initialStatus?: OwnerFeedbackSt
           <select value={category} onChange={(event) => {
             const next = event.target.value as FeedbackCategory | "";
             setCategory(next);
-            void applyFilters(next, feedbackStatus);
+            setDetail(null);
           }}>
             <option value="">{copy.all}</option>
             {FEEDBACK_CATEGORIES.map((value) => <option value={value} key={value}>{categoryCopy[locale][value].label}</option>)}
@@ -273,7 +293,7 @@ function OwnerFeedbackInbox({ initialStatus }: { initialStatus?: OwnerFeedbackSt
           <select value={feedbackStatus} onChange={(event) => {
             const next = event.target.value as FeedbackStatus | "";
             setFeedbackStatus(next);
-            void applyFilters(category, next);
+            setDetail(null);
           }}>
             <option value="">{copy.all}</option>
             {FEEDBACK_STATUSES.map((value) => <option value={value} key={value}>{value}</option>)}
@@ -328,6 +348,16 @@ function createSubmissionKey(): string {
   return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}0000-4000-8000-000000000000`.slice(-36);
 }
 
+export function resolveSelectedFeedbackCategory(
+  selectedValue: FormDataEntryValue | null,
+  fallback: FeedbackCategory,
+): FeedbackCategory {
+  return typeof selectedValue === "string"
+    && (FEEDBACK_CATEGORIES as readonly string[]).includes(selectedValue)
+    ? selectedValue as FeedbackCategory
+    : fallback;
+}
+
 function shortFeedbackId(value: string): string {
   return value.startsWith("fb_") ? `FB-${value.slice(3, 11).toUpperCase()}` : value;
 }
@@ -375,6 +405,9 @@ function feedbackCopy(locale: ProductLocale) {
     total: "Wszystkie",
     newItems: "Nowe",
     blockers: "Blokery",
+    improvements: "Ulepszenia",
+    clarifications: "Pytania i niejasności",
+    laterItems: "Pomysły na później",
     latest: "Ostatnie zgłoszenie",
     all: "Wszystkie",
     status: "Status",
@@ -413,6 +446,9 @@ function feedbackCopy(locale: ProductLocale) {
     total: "Total",
     newItems: "New",
     blockers: "Blockers",
+    improvements: "Improvements",
+    clarifications: "Questions and clarifications",
+    laterItems: "Ideas for later",
     latest: "Latest feedback",
     all: "All",
     status: "Status",

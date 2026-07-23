@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 
@@ -98,9 +98,9 @@ type SqliteDatabase = {
 };
 type SqliteModule = { DatabaseSync: new (filename: string) => SqliteDatabase };
 
+const FEEDBACK_RUNTIME_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_DATABASE_PATH = resolve(
-  dirname(fileURLToPath(import.meta.url)),
-  "..",
+  FEEDBACK_RUNTIME_ROOT,
   ".local",
   "tester-feedback.sqlite",
 );
@@ -126,12 +126,20 @@ export function getDefaultFeedbackStorePath(): string {
   return DEFAULT_DATABASE_PATH;
 }
 
+export function resolveFeedbackDatabasePath(databaseFilePath?: string): string {
+  const configuredPath = databaseFilePath?.trim();
+  if (configuredPath) {
+    return isAbsolute(configuredPath)
+      ? resolve(configuredPath)
+      : resolve(FEEDBACK_RUNTIME_ROOT, configuredPath);
+  }
+  return process.env.NODE_TEST_CONTEXT
+    ? resolve(tmpdir(), `crypto-edge-feedback-test-${process.pid}-${randomUUID()}.sqlite`)
+    : DEFAULT_DATABASE_PATH;
+}
+
 export async function createFeedbackStore(options: FeedbackStoreOptions = {}) {
-  const databasePath = resolve(options.databaseFilePath ?? (
-    process.env.NODE_TEST_CONTEXT
-      ? resolve(tmpdir(), `crypto-edge-feedback-test-${process.pid}-${randomUUID()}.sqlite`)
-      : DEFAULT_DATABASE_PATH
-  ));
+  const databasePath = resolveFeedbackDatabasePath(options.databaseFilePath);
   const maxRecords = normalizePositiveInteger(options.maxRecords, DEFAULT_MAX_RECORDS, 100_000);
   const busyTimeoutMs = normalizePositiveInteger(options.busyTimeoutMs, DEFAULT_BUSY_TIMEOUT_MS, 60_000);
   let database: SqliteDatabase | null = null;
@@ -155,6 +163,7 @@ export async function createFeedbackStore(options: FeedbackStoreOptions = {}) {
   };
 
   return {
+    databaseFilePath: databasePath,
     maxRecords,
 
     health(submissionEnabled = true): FeedbackStoreSummary {
@@ -281,6 +290,22 @@ LIMIT ?
       try { database?.close(); } finally { database = null; }
     },
   };
+}
+
+export type FeedbackStoreResolverOptions = FeedbackStoreOptions & {
+  store?: FeedbackStore;
+};
+
+export function resolveFeedbackStore(
+  options: FeedbackStoreResolverOptions = {},
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<FeedbackStore> {
+  if (options.store) return Promise.resolve(options.store);
+  return createFeedbackStore({
+    databaseFilePath: options.databaseFilePath ?? env.CRYPTO_EDGE_FEEDBACK_SQLITE_PATH,
+    maxRecords: options.maxRecords,
+    busyTimeoutMs: options.busyTimeoutMs,
+  });
 }
 
 async function loadNodeSqlite(): Promise<SqliteModule> {

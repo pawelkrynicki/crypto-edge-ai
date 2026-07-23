@@ -98,6 +98,7 @@ export function createProductVpsServer(options: ProductVpsServerOptions): Server
     establishedPromotion: options.establishedPromotion,
     followUp: options.followUp,
     reports: options.reports,
+    feedback: options.feedback,
     ownerOperations: options.ownerOperations,
     health: {
       service: "crypto-edge-ai-product",

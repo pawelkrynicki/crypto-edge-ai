@@ -99,6 +99,7 @@ export function ProductAppContent() {
   ));
   const [feedbackSubject, setFeedbackSubject] = useState<FeedbackSubjectRef | undefined>();
   const [feedbackSubjectLabel, setFeedbackSubjectLabel] = useState<string | undefined>();
+  const [feedbackRefreshRevision, setFeedbackRefreshRevision] = useState(0);
   const [selectedReportContext, setSelectedReportContext] = useState<ReportDetail | null>(null);
   const refreshPromiseRef = useRef<Promise<void> | null>(null);
 
@@ -160,6 +161,7 @@ export function ProductAppContent() {
       setAutomationStatus(automationResult);
       setEstablishedUniverseStatus(universeStatusResult);
       setControlCenterStatus(controlCenterResult);
+      setFeedbackRefreshRevision((value) => value + 1);
       setFollowUpStatus(followUpStatusResult);
       setFollowUpEntries(followUpListResult?.entries ?? []);
 
@@ -203,6 +205,12 @@ export function ProductAppContent() {
     refreshPromiseRef.current = refresh;
     return refresh;
   }, [runtimeMode]);
+
+  const refreshControlCenterAfterFeedback = useCallback(() => {
+    void loadControlCenterStatus().then((value) => {
+      if (value) setControlCenterStatus(value);
+    });
+  }, []);
 
   useEffect(() => {
     void loadData();
@@ -257,6 +265,8 @@ export function ProductAppContent() {
             screenContext={feedbackContext}
             subjectRef={feedbackSubject}
             subjectLabel={feedbackSubjectLabel}
+            refreshRevision={feedbackRefreshRevision}
+            onFeedbackRecorded={refreshControlCenterAfterFeedback}
           />
         </ProductWorkspaceSection>
       );

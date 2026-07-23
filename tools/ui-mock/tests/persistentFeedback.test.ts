@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer, request } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { afterEach, describe, it } from "node:test";
 import { randomUUID } from "node:crypto";
 import {
@@ -13,7 +13,14 @@ import {
   FeedbackApiError,
   type FeedbackSubmission,
 } from "../server/feedbackApi.js";
-import { createFeedbackStore, type FeedbackStore } from "../server/feedbackStore.js";
+import {
+  createFeedbackStore,
+  getDefaultFeedbackStorePath,
+  resolveFeedbackDatabasePath,
+  resolveFeedbackStore,
+  type FeedbackStore,
+} from "../server/feedbackStore.js";
+import { createProductVpsServer } from "../server/productVpsServer.js";
 import { createScannerApiHandler } from "../server/scannerApiHandler.js";
 
 const roots: string[] = [];
@@ -26,6 +33,26 @@ afterEach(async () => {
 });
 
 describe("Persistent Feedback SQLite store", () => {
+  it("uses one canonical path for a relative review store regardless of the working directory", async () => {
+    const originalWorkingDirectory = process.cwd();
+    const otherWorkingDirectory = await tempRoot();
+    const relativePath = ".local/canonical-feedback-review.sqlite";
+    const before = resolveFeedbackDatabasePath(relativePath);
+    try {
+      process.chdir(otherWorkingDirectory);
+      assert.equal(resolveFeedbackDatabasePath(relativePath), before);
+    } finally {
+      process.chdir(originalWorkingDirectory);
+    }
+    const feedbackRuntimeRoot = resolve(dirname(getDefaultFeedbackStorePath()), "..");
+    assert.equal(before, resolve(feedbackRuntimeRoot, relativePath));
+  });
+
+  it("returns the exact injected store instead of creating another runtime singleton", async () => {
+    const { store } = await tempStore();
+    assert.equal(await resolveFeedbackStore({ store }), store);
+  });
+
   it("creates a valid empty READY store and keeps migration idempotent", async () => {
     const { store, databasePath } = await tempStore();
     assert.deepEqual(store.health(true), {
@@ -254,7 +281,7 @@ describe("Feedback HTTP and owner boundary", () => {
     }
   });
 
-  it("keeps the owner inbox hidden by default and exposes read-only list/detail/export in REVIEW_SAFE", async () => {
+  it("shares one injected store across POST, owner reads, export and Control Center", async () => {
     const { store } = await tempStore();
     const disabled = createServer(createScannerApiHandler({
       runtimeMode: "INTERNAL_BETA",
@@ -280,30 +307,84 @@ describe("Feedback HTTP and owner boundary", () => {
     try {
       const statusResponse = await http(owner, "GET", "/api/feedback/status");
       const cookie = cookieHeader(statusResponse.headers["set-cookie"]);
-      const posted = await http(owner, "POST", "/api/feedback", { ...feedbackHeaders(origin), cookie }, JSON.stringify(validSubmission("BLOCKER")));
+      const posted = await http(owner, "POST", "/api/feedback", { ...feedbackHeaders(origin), cookie }, JSON.stringify(validSubmission("IMPROVEMENT")));
       assert.equal(posted.status, 201);
-      const feedbackId = JSON.parse(posted.body).feedback_id as string;
+      const receipt = JSON.parse(posted.body) as { feedback_id: string; category: string };
+      const feedbackId = receipt.feedback_id;
+      assert.equal(receipt.category, "IMPROVEMENT");
 
       const status = await http(owner, "GET", "/api/owner/feedback/status");
-      assert.equal(JSON.parse(status.body).total_count, 1);
-      const list = await http(owner, "GET", "/api/owner/feedback?category=BLOCKER&status=NEW&limit=100");
-      assert.equal(JSON.parse(list.body).feedback.length, 1);
-      assert.equal(JSON.parse(list.body).feedback[0].details, undefined);
+      assert.deepEqual(
+        pickFeedbackCounts(JSON.parse(status.body)),
+        { total_count: 1, new_count: 1, blocker_count: 0, improvement_count: 1 },
+      );
+      const list = await http(owner, "GET", "/api/owner/feedback?category=IMPROVEMENT&status=NEW&limit=100");
+      const listBody = JSON.parse(list.body) as { feedback: Array<Record<string, unknown>> };
+      assert.equal(listBody.feedback.length, 1);
+      assert.equal(listBody.feedback[0]?.feedback_id, feedbackId);
+      assert.equal(listBody.feedback[0]?.category, "IMPROVEMENT");
+      assert.equal(listBody.feedback[0]?.details, undefined);
       const detail = await http(owner, "GET", `/api/owner/feedback/${feedbackId}`);
-      assert.equal(JSON.parse(detail.body).details, validSubmission("BLOCKER").details);
+      assert.equal(JSON.parse(detail.body).details, validSubmission("IMPROVEMENT").details);
+      assert.equal(JSON.parse(detail.body).category, "IMPROVEMENT");
       assert.match(JSON.parse(detail.body).session_group, /^session_[0-9a-f]{12}$/);
       assert.equal(JSON.parse(detail.body).pseudonymous_session_id, undefined);
 
       const jsonExport = await http(owner, "GET", "/api/owner/feedback/export?format=json");
       const csvExport = await http(owner, "GET", "/api/owner/feedback/export?format=csv");
+      assert.equal(JSON.parse(jsonExport.body).feedback[0].feedback_id, feedbackId);
+      assert.match(csvExport.body, /IMPROVEMENT/);
       for (const body of [jsonExport.body, csvExport.body]) {
         assert.doesNotMatch(body, /pseudonymous_session_id|submission_key|storage_file|\.local|secret/i);
       }
+
+      const refreshedStatus = await http(owner, "GET", "/api/owner/feedback/status");
+      const refreshedList = await http(owner, "GET", "/api/owner/feedback?limit=100");
+      assert.equal(JSON.parse(refreshedStatus.body).total_count, 1);
+      assert.equal(JSON.parse(refreshedList.body).feedback[0].feedback_id, feedbackId);
+
+      const controlCenter = JSON.parse((await http(owner, "GET", "/api/control-center/status")).body);
+      assert.equal(controlCenter.feedback.totalCount, 1);
+      assert.equal(controlCenter.feedback.newCount, 1);
+      assert.equal(controlCenter.feedback.blockerCount, 0);
+      assert.equal(controlCenter.feedback.status, "READY");
+      assert.equal(controlCenter.overallStatus, "NOT_READY");
       for (const method of ["POST", "PUT", "DELETE"]) {
         assert.equal((await http(owner, method, `/api/owner/feedback/${feedbackId}`)).status, 404);
       }
     } finally {
       await close(owner);
+    }
+  });
+
+  it("forwards the review launcher's injected store through the integrated product runtime", async () => {
+    const { store } = await tempStore();
+    const distPath = resolve(await tempRoot(), "dist");
+    await mkdir(distPath);
+    await writeFile(resolve(distPath, "index.html"), "<!doctype html><title>feedback review</title>", "utf8");
+    const server = createProductVpsServer({
+      runtimeMode: "INTERNAL_BETA",
+      distPath,
+      ownerOperations: { mode: "REVIEW_SAFE", sessionSecret: "z".repeat(32) },
+      feedback: { store, sessionLimit: 20, globalLimit: 20 },
+    });
+    await listen(server);
+    const origin = serverUrl(server);
+    try {
+      const statusResponse = await http(server, "GET", "/api/feedback/status");
+      const cookie = cookieHeader(statusResponse.headers["set-cookie"]);
+      const posted = await http(
+        server,
+        "POST",
+        "/api/feedback",
+        { ...feedbackHeaders(origin), cookie },
+        JSON.stringify(validSubmission("IMPROVEMENT")),
+      );
+      assert.equal(posted.status, 201);
+      assert.equal(store.health(true).total_count, 1);
+      assert.equal(JSON.parse((await http(server, "GET", "/api/owner/feedback/status")).body).total_count, 1);
+    } finally {
+      await close(server);
     }
   });
 
@@ -418,6 +499,15 @@ function feedbackHeaders(origin: string): Record<string, string> {
 function cookieHeader(value: string | string[] | undefined): string {
   const first = Array.isArray(value) ? value[0] : value;
   return first?.split(";", 1)[0] ?? "";
+}
+
+function pickFeedbackCounts(value: Record<string, number>): Record<string, number> {
+  return {
+    total_count: value.total_count,
+    new_count: value.new_count,
+    blocker_count: value.blocker_count,
+    improvement_count: value.improvement_count,
+  };
 }
 
 function http(

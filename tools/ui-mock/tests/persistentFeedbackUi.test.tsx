@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 import { describe, it } from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { Feedback } from "../src/components/Feedback.js";
+import { Feedback, resolveSelectedFeedbackCategory } from "../src/components/Feedback.js";
 import { ProductLocaleProvider } from "../src/productI18n.js";
 import type { FeedbackPublicStatus, OwnerFeedbackStatus } from "../src/services/feedbackDataSource.js";
 
@@ -57,6 +57,30 @@ describe("Persistent Feedback product UI", () => {
     assert.doesNotMatch(component, /marked|markdown-to-jsx|react-markdown/i);
   });
 
+  it("submits the currently selected category, preserves it across locale renders and refreshes owner data", async () => {
+    assert.equal(resolveSelectedFeedbackCategory("IMPROVEMENT", "BLOCKER"), "IMPROVEMENT");
+    assert.equal(resolveSelectedFeedbackCategory(null, "CLARIFICATION"), "CLARIFICATION");
+
+    const [component, app] = await Promise.all([
+      readFile(resolve(uiRoot, "src", "components", "Feedback.tsx"), "utf8"),
+      readFile(resolve(uiRoot, "src", "ProductApp.tsx"), "utf8"),
+    ]);
+    assert.match(component, /new FormData\(event\.currentTarget\)\.get\("feedback-category"\)/);
+    assert.match(component, /category: selectedCategory/);
+    assert.match(component, /categoryCopy\[locale\]\[receipt\.category\]\.label/);
+    assert.match(component, /setOwnerInboxRevision\(\(value\) => value \+ 1\)/);
+    assert.match(component, /\[category, feedbackStatus, initialStatus, refreshRevision\]/);
+    assert.match(component, /useState<FeedbackCategory>\("BLOCKER"\)/);
+    assert.doesNotMatch(component, /useEffect\([\s\S]{0,300}setCategory/);
+    assert.match(render("pl"), /value="IMPROVEMENT"/);
+    assert.match(render("en"), /value="IMPROVEMENT"/);
+    assert.match(app, /refreshRevision=\{feedbackRefreshRevision\}/);
+    assert.match(app, /onFeedbackRecorded=\{refreshControlCenterAfterFeedback\}/);
+    const owner = render("en", { initialOwnerStatus: { ...ownerStatus(), improvement_count: 1 } });
+    assert.match(owner, /Improvements/);
+    assert.match(owner, /<strong>1<\/strong>/);
+  });
+
   it("adds #feedback navigation and a compact action to the INTERNAL_BETA Product Radar", async () => {
     const [app, shell, i18n] = await Promise.all([
       readFile(resolve(uiRoot, "src", "ProductApp.tsx"), "utf8"),
@@ -72,15 +96,20 @@ describe("Persistent Feedback product UI", () => {
   });
 
   it("keeps owner review and cleanup scoped to the isolated feedback database", async () => {
-    const [start, clear] = await Promise.all([
+    const [start, clear, productServer] = await Promise.all([
       readFile(resolve(repoRoot, "scripts", "win", "start-feedback-loop-review.cmd"), "utf8"),
       readFile(resolve(repoRoot, "scripts", "win", "clear-feedback-loop-review.cmd"), "utf8"),
+      readFile(resolve(uiRoot, "server", "productVpsServer.ts"), "utf8"),
     ]);
     assert.match(start, /CRYPTO_EDGE_RUNTIME_MODE=INTERNAL_BETA/);
     assert.match(start, /CRYPTO_EDGE_OWNER_OPERATIONS_MODE=REVIEW_SAFE/);
     assert.match(start, /feedback-loop-review\.sqlite/);
     assert.match(start, /#feedback/);
     assert.match(start, /CRYPTO_EDGE_AUTOMATION_ENABLED=0/);
+    assert.ok(
+      start.indexOf("CRYPTO_EDGE_FEEDBACK_SQLITE_PATH=") < start.indexOf("start \"Crypto Edge Feedback Review 4181\""),
+    );
+    assert.match(productServer, /feedback: options\.feedback/);
     assert.doesNotMatch(start, /run-central-automation|generate-live-context|collect-scanner|runCentral/i);
     assert.match(clear, /feedback-loop-review\.sqlite/);
     assert.doesNotMatch(clear, /review-session|data-poc|output|established|follow-up/i);
