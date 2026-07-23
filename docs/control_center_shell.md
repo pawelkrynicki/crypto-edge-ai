@@ -137,3 +137,9 @@ Owner ocenia tylko ekran, statusy, EN/PL, brak mutujących akcji i overall `NOT_
 ```cmd
 scripts\win\start-product-radar-review.cmd --control-center
 ```
+
+## 12D.2 canonical Feedback status
+
+Control Center no longer uses a hard-coded future gate for feedback. It consumes the dedicated Feedback Store status: `READY` when durable capture is available (including zero records), `PARTIAL` when the store is readable but submission is disabled, and `NOT_READY` when schema or durable storage cannot be guaranteed. Owner counts are included only when the backend confirms owner capability; tester responses receive no inbox counts.
+
+`READY` removes `PERSISTENT_FEEDBACK_CAPTURE` from the blocker list. Overall remains `NOT_READY` because deployment, domain/access smoke, rollback and owner approval are independent unfinished gates. See `docs/persistent_feedback_loop.md`.

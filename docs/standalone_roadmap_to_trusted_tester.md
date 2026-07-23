@@ -462,3 +462,16 @@ Acceptance criteria:
 - No browser provider calls.
 - Research-only semantics.
 - No scanner scoring, `final_label`, or `WATCHLIST` behavior changes.
+
+## 12D.2 — Persistent Feedback Loop
+
+The previous static `#feedback-notes` worksheet remains demo/reference material. The `INTERNAL_BETA` product now has a separate `#feedback` route with durable SQLite capture, automatic canonical screen context, four tester categories, receipt, pseudonymous rate-limited session and an owner-only read inbox with safe export. Feedback records are not analyst manual reviews and cannot change Radar or lifecycle decisions.
+
+The next sequence is fixed:
+
+1. Persistent Feedback Loop.
+2. VPS and private tester preview.
+3. Final Frontend Polish / Premium UI Pass (27–30.07 remains unchanged).
+4. Trusted tester session and P0 fixes.
+
+Feedback `READY` closes only the feedback gate. External tester access remains `NO-GO` and overall remains `NOT_READY` until deployment, access smoke, rollback and owner approval are complete.

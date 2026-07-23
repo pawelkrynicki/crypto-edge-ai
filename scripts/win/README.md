@@ -402,3 +402,25 @@ This finds listeners on ports `5173` and `5177` and stops them.
 ## UI Mock Check Note
 
 `check-ui-mock.cmd` uses direct binaries from `tools\ui-mock\node_modules\.bin` instead of `pnpm` because Windows can hit a known `node_modules` / `pnpm` `EPERM` issue in this repo.
+
+## Persistent Feedback Loop
+
+Offline validation uses temporary feedback storage and disables provider calls, collector and automation:
+
+```cmd
+scripts\win\check-persistent-feedback-loop.cmd
+```
+
+Owner review builds and opens the same-origin `INTERNAL_BETA + REVIEW_SAFE` product at `#feedback`. It uses only `tools\ui-mock\.local\feedback-loop-review.sqlite`, never the future canonical VPS store or manual Review Storage:
+
+```cmd
+scripts\win\start-feedback-loop-review.cmd
+```
+
+After closing that runtime, one idempotent cleanup command removes only the isolated review database and its SQLite companions:
+
+```cmd
+scripts\win\clear-feedback-loop-review.cmd
+```
+
+These scripts do not deploy to VPS, change Cloudflare or Task Scheduler, call providers, start the collector, mutate snapshots, Follow-up, Established Universe, automation state or analyst reviews. The technical and product contract is in `docs/persistent_feedback_loop.md`.

@@ -916,3 +916,18 @@ The `tools/ui-mock` frontend now includes a UI Data Adapter layer (`src/adapters
 - Keep the bridge read-only: no DB, auth, OpenAI, live token fetch, scanner logic changes, UI redesign, or trading signals.
 - Next stage: **12R.4 — Approved Live Collectors & Normalized Snapshot**.
 - Props-based data flow: App.tsx → StatCards, ScannerRadar, WatchlistTab, RiskAlerts
+
+## Stage 12D.2 — Persistent Feedback Loop
+
+Status: implemented for the Trusted Tester Preview core. `#feedback` now provides durable, same-origin tester capture, pseudonymous sessions, idempotent submission, an owner-only read inbox, JSON/CSV export and canonical Control Center readiness. Feedback uses a dedicated SQLite store and never shares the analyst manual Review Storage contract.
+
+An empty valid store is `READY`; `PARTIAL` and `NOT_READY` restore the separate Persistent Feedback blocker. Feedback `READY` removes that blocker, while overall remains `NOT_READY` because VPS deployment, access smoke, rollback and owner approval are still open. No VPS, Cloudflare, Task Scheduler, provider, collector, scoring, lifecycle or Established Universe operation is part of 12D.2.
+
+Required delivery order after this sprint:
+
+1. Persistent Feedback Loop.
+2. VPS and private tester preview.
+3. Final Frontend Polish / Premium UI Pass, unchanged at 27–30.07.
+4. Tester session and P0 fixes.
+
+Canonical contract: `docs/persistent_feedback_loop.md`.

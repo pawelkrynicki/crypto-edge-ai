@@ -87,8 +87,16 @@ export type ControlCenterReadinessInput = {
     nextDueAt: string | null;
     lastUpdatedAt: string | null;
   };
+  feedback: {
+    storageAvailable: boolean;
+    status: "READY" | "PARTIAL" | "NOT_READY";
+    submissionEnabled: boolean;
+    totalCount?: number | null;
+    newCount?: number | null;
+    blockerCount?: number | null;
+    latestFeedbackAt?: string | null;
+  };
   gates: {
-    feedbackCaptureReady: boolean;
     trustedTesterPreviewModeReady: boolean;
     vpsDeploymentConfirmed: boolean;
     cloudflareAccessVerified: boolean;
@@ -144,6 +152,12 @@ export type ControlCenterStatus = {
   feedback: {
     status: ControlCenterReadinessStatus;
     persistentCaptureReady: boolean;
+    storageAvailable: boolean;
+    submissionEnabled: boolean;
+    totalCount?: number | null;
+    newCount?: number | null;
+    blockerCount?: number | null;
+    latestFeedbackAt?: string | null;
   };
 };
 
@@ -186,7 +200,7 @@ export function resolveControlCenterStatus(input: ControlCenterReadinessInput): 
   const followUpStatus: ControlCenterReadinessStatus = !followUp.storeAvailable
     ? "NOT_READY"
     : followUp.validationStatus === "valid" ? "READY" : "PARTIAL";
-  const feedbackStatus = input.gates.feedbackCaptureReady ? "READY" : "NOT_READY";
+  const feedbackStatus: ControlCenterReadinessStatus = input.feedback.status;
   const externalTesterReady = input.gates.trustedTesterPreviewModeReady
     && input.gates.vpsDeploymentConfirmed
     && input.gates.cloudflareAccessVerified
@@ -251,7 +265,13 @@ export function resolveControlCenterStatus(input: ControlCenterReadinessInput): 
     },
     feedback: {
       status: feedbackStatus,
-      persistentCaptureReady: input.gates.feedbackCaptureReady,
+      persistentCaptureReady: feedbackStatus === "READY",
+      storageAvailable: input.feedback.storageAvailable,
+      submissionEnabled: input.feedback.submissionEnabled,
+      ...(input.feedback.totalCount === undefined ? {} : { totalCount: input.feedback.totalCount }),
+      ...(input.feedback.newCount === undefined ? {} : { newCount: input.feedback.newCount }),
+      ...(input.feedback.blockerCount === undefined ? {} : { blockerCount: input.feedback.blockerCount }),
+      ...(input.feedback.latestFeedbackAt === undefined ? {} : { latestFeedbackAt: input.feedback.latestFeedbackAt }),
     },
   };
 }

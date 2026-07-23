@@ -5,6 +5,7 @@ import { mapPersistableScannerOutputToUiCandidates } from "./adapters/scannerOut
 import { CandidateDetailView } from "./components/CandidateDetailView";
 import { CandidateResultsView } from "./components/CandidateResultsView";
 import { ExternalVerificationLinksView } from "./components/ExternalVerificationLinksView";
+import { Feedback } from "./components/Feedback";
 import { Methodology } from "./components/Methodology";
 import { ProductControlCenter } from "./components/ProductControlCenter";
 import { ReportsLibrary } from "./components/ReportsLibrary";
@@ -31,6 +32,8 @@ import {
 import { loadControlCenterStatus } from "./services/controlCenterStatusDataSource";
 import { loadFollowUpList, loadFollowUpStatus } from "./services/followUpDataSource";
 import type { FollowUpPublicEntry, FollowUpPublicStatus } from "./types/followUpTypes";
+import type { ReportDetail } from "./types/reportTypes";
+import type { FeedbackScreenContext, FeedbackSubjectRef } from "./services/feedbackDataSource";
 import type {
   ProductReadinessOutput,
   ScannerApiOutput,
@@ -42,6 +45,7 @@ const HASH_TO_SECTION: Record<string, ProductSectionId> = {
   "#candidate-results": "candidate-results",
   "#candidate-detail": "candidate-detail",
   "#external-checks": "external-checks",
+  "#feedback": "feedback",
   "#reports": "reports",
   "#methodology": "methodology",
   "#control-center": "control-center",
@@ -51,6 +55,7 @@ const SECTION_TO_HASH: Record<ProductSectionId, string> = {
   "candidate-results": "#candidate-results",
   "candidate-detail": "#candidate-detail",
   "external-checks": "#external-checks",
+  feedback: "#feedback",
   reports: "#reports",
   methodology: "#methodology",
   "control-center": "#control-center",
@@ -89,6 +94,12 @@ export function ProductAppContent() {
   const [controlCenterStatus, setControlCenterStatus] = useState<ControlCenterStatus | null>(null);
   const [followUpStatus, setFollowUpStatus] = useState<FollowUpPublicStatus | null>(null);
   const [followUpEntries, setFollowUpEntries] = useState<FollowUpPublicEntry[]>([]);
+  const [feedbackContext, setFeedbackContext] = useState<FeedbackScreenContext>(() => (
+    resolveSection() === "feedback" ? "feedback" : resolveSection()
+  ));
+  const [feedbackSubject, setFeedbackSubject] = useState<FeedbackSubjectRef | undefined>();
+  const [feedbackSubjectLabel, setFeedbackSubjectLabel] = useState<string | undefined>();
+  const [selectedReportContext, setSelectedReportContext] = useState<ReportDetail | null>(null);
   const refreshPromiseRef = useRef<Promise<void> | null>(null);
 
   const navItems = useMemo<ProductNavItem[]>(() => [
@@ -96,6 +107,7 @@ export function ProductAppContent() {
     { id: "candidate-detail", label: t("nav.details"), icon: "D", description: t("nav.detailsDescription"), groupLabel: t("nav.groupProductFlow"), groupDescription: t("nav.groupProductFlowDescription") },
     { id: "external-checks", label: t("nav.verification"), icon: "V", description: t("nav.verificationDescription"), groupLabel: t("nav.groupReview"), groupDescription: t("nav.groupReviewDescription") },
     { id: "reports", label: t("nav.reports"), icon: "RP", description: t("nav.reportsDescription"), groupLabel: t("nav.groupReview"), groupDescription: t("nav.groupReviewDescription") },
+    { id: "feedback", label: t("nav.feedback"), icon: "F", description: t("nav.feedbackDescription"), groupLabel: t("nav.groupReview"), groupDescription: t("nav.groupReviewDescription") },
     { id: "methodology", label: t("nav.methodology"), icon: "M", description: t("nav.methodologyDescription"), groupLabel: t("nav.groupStatus"), groupDescription: t("nav.groupStatusDescription") },
     { id: "control-center", label: t("nav.controlCenter"), icon: "C", description: t("nav.controlCenterDescription"), groupLabel: t("nav.groupStatus"), groupDescription: t("nav.groupStatusDescription") },
   ], [t]);
@@ -105,6 +117,7 @@ export function ProductAppContent() {
     "candidate-detail": { title: t("nav.details"), description: t("section.detailsDescription") },
     "external-checks": { title: t("nav.verification"), description: t("section.verificationDescription") },
     reports: { title: t("nav.reports"), description: t("section.reportsDescription") },
+    feedback: { title: t("nav.feedback"), description: t("section.feedbackDescription") },
     methodology: { title: t("nav.methodology"), description: t("section.methodologyDescription") },
     "control-center": { title: t("nav.controlCenter"), description: t("section.controlCenterDescription") },
   }), [t]);
@@ -208,6 +221,22 @@ export function ProductAppContent() {
     }
   }, []);
 
+  const openFeedback = useCallback(() => {
+    const context = activeSection === "feedback" ? feedbackContext : activeSection;
+    setFeedbackContext(context);
+    if ((activeSection === "candidate-detail" || activeSection === "external-checks") && selectedCandidate) {
+      setFeedbackSubject({ type: "candidate", id: selectedCandidate.id });
+      setFeedbackSubjectLabel(`${selectedCandidate.symbol} · ${selectedCandidate.chain} · ${selectedCandidate.contractAddress}`);
+    } else if (activeSection === "reports" && selectedReportContext) {
+      setFeedbackSubject({ type: "report", id: selectedReportContext.report_id });
+      setFeedbackSubjectLabel(`${selectedReportContext.title} · ${selectedReportContext.report_id}`);
+    } else {
+      setFeedbackSubject(undefined);
+      setFeedbackSubjectLabel(undefined);
+    }
+    navigate("feedback");
+  }, [activeSection, feedbackContext, navigate, selectedCandidate, selectedReportContext]);
+
   const openCandidate = useCallback((candidateId: string) => {
     setSelectedCandidateId(candidateId);
     navigate("candidate-detail");
@@ -221,11 +250,23 @@ export function ProductAppContent() {
 
   const renderSection = () => {
     const copy = sectionCopy[activeSection];
+    if (activeSection === "feedback") {
+      return (
+        <ProductWorkspaceSection {...copy}>
+          <Feedback
+            screenContext={feedbackContext}
+            subjectRef={feedbackSubject}
+            subjectLabel={feedbackSubjectLabel}
+          />
+        </ProductWorkspaceSection>
+      );
+    }
     if (activeSection === "reports") {
       return (
         <ProductWorkspaceSection {...copy}>
           <ReportsLibrary
             candidates={candidates}
+            onSelectedReportChange={setSelectedReportContext}
             onOpenCandidate={openCandidate}
             onOpenManualVerification={(candidateId) => {
               const candidate = candidates.find((entry) => entry.id === candidateId);
@@ -306,7 +347,8 @@ export function ProductAppContent() {
     <ProductWorkspaceShell
       navItems={navItems}
       activeSection={activeSection}
-      onSectionChange={navigate}
+      onSectionChange={(section) => section === "feedback" ? openFeedback() : navigate(section)}
+      onSendFeedback={openFeedback}
       loading={loading}
       runtimeMode={runtimeMode}
       resolvedSource={resolvedSource}

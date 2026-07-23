@@ -154,6 +154,44 @@ describe("Control Center readiness model", () => {
     ]);
   });
 
+  it("removes only the feedback blocker for an empty durable READY store and keeps overall NOT_READY", () => {
+    const input = baseInput();
+    input.feedback = {
+      storageAvailable: true,
+      status: "READY",
+      submissionEnabled: true,
+      totalCount: 0,
+      newCount: 0,
+      blockerCount: 0,
+      latestFeedbackAt: null,
+    };
+    const status = resolveControlCenterStatus(input);
+    assert.equal(status.feedback.status, "READY");
+    assert.equal(status.feedback.persistentCaptureReady, true);
+    assert.equal(status.unmetGates.includes("PERSISTENT_FEEDBACK_CAPTURE"), false);
+    assert.equal(status.overallStatus, "NOT_READY");
+    assert.equal(status.accessDeployment.externalTesterAccess, "NO_GO");
+  });
+
+  it("restores the feedback blocker for PARTIAL and NOT_READY states", () => {
+    for (const feedbackStatus of ["PARTIAL", "NOT_READY"] as const) {
+      const input = baseInput();
+      input.feedback = {
+        storageAvailable: feedbackStatus === "PARTIAL",
+        status: feedbackStatus,
+        submissionEnabled: false,
+        totalCount: 2,
+        newCount: 1,
+        blockerCount: 1,
+        latestFeedbackAt: "2026-07-21T12:00:00.000Z",
+      };
+      const status = resolveControlCenterStatus(input);
+      assert.equal(status.feedback.status, feedbackStatus);
+      assert.equal(status.unmetGates.includes("PERSISTENT_FEEDBACK_CAPTURE"), true);
+      assert.equal(status.overallStatus, "NOT_READY");
+    }
+  });
+
   it("does not list an empty READY Reports Library as a blocker", () => {
     const input = baseInput();
     input.reportsLibrary = {
@@ -352,7 +390,7 @@ describe("Control Center read-only API", () => {
       for (const response of responses) {
         const body = JSON.parse(response.body) as Record<string, unknown>;
         assert.equal(body.overallStatus, "NOT_READY");
-        for (const forbidden of ["storage_file", "storage_path", "pid", "secret", "C:\\private", "lock"]) {
+        for (const forbidden of ["storage_file", "storage_path", "pid", "secret", "C:\\private", "lock_path", "lock_metadata"]) {
           assert.equal(response.body.toLowerCase().includes(forbidden.toLowerCase()), false, forbidden);
         }
       }
@@ -456,8 +494,16 @@ function baseInput(): ControlCenterReadinessInput {
       nextDueAt: null,
       lastUpdatedAt: null,
     },
+    feedback: {
+      storageAvailable: false,
+      status: "NOT_READY" as const,
+      submissionEnabled: false,
+      totalCount: 0,
+      newCount: 0,
+      blockerCount: 0,
+      latestFeedbackAt: null,
+    },
     gates: {
-      feedbackCaptureReady: false,
       trustedTesterPreviewModeReady: false,
       vpsDeploymentConfirmed: false,
       cloudflareAccessVerified: false,

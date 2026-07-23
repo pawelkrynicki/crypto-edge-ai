@@ -132,3 +132,7 @@ Owner review zaakceptował commit `20786241106deacca29f8e0fd906052c1887d07d` i p
 - overall Trusted Tester Preview pozostaje `NOT_READY`.
 
 `REVIEW_SAFE` pozwala wyłącznie na odczyt statusu i preflight. Mutujący `POST /api/owner-operations/refresh` pozostaje w tym trybie zablokowany, a `ENABLED` nie został aktywowany. Owner review wykonał zero live provider calls oraz nie zmienił snapshotów ani automation state.
+
+## Współdzielenie capability z Feedback Loop
+
+12D.2 wykorzystuje ten sam resolver `DISABLED / REVIEW_SAFE / ENABLED` i tę samą backendową granicę loopback. Nie dodaje drugiej sesji ownera. Przy `REVIEW_SAFE` owner może czytać, filtrować i eksportować feedback, ale nie może zmieniać jego statusu. Te odczyty nie uruchamiają refreshu, collectora ani providerów. Szczegóły: `docs/persistent_feedback_loop.md`.

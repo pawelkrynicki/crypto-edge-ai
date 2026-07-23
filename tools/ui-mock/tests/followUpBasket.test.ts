@@ -220,7 +220,8 @@ function notReadyControlCenterInput(): ControlCenterReadinessInput {
     reviewStorage: { available: true, entriesCount: 0, lastSavedAt: null },
     reportsLibrary: { libraryAvailable: false, status: "NOT_READY", reportCount: 0, validReportCount: 0, skippedReportCount: 0, latestReportGeneratedAt: null },
     followUp: { storeAvailable: true, validationStatus: "valid", activeEntries: 1, dueEntries: 0, candidateEntries: 0, nextDueAt: START, lastUpdatedAt: START },
-    gates: { feedbackCaptureReady: false, trustedTesterPreviewModeReady: false, vpsDeploymentConfirmed: false, cloudflareAccessVerified: false, rollbackTested: false, ownerApproved: false },
+    feedback: { storageAvailable: false, status: "NOT_READY", submissionEnabled: false, totalCount: null, newCount: null, blockerCount: null, latestFeedbackAt: null },
+    gates: { trustedTesterPreviewModeReady: false, vpsDeploymentConfirmed: false, cloudflareAccessVerified: false, rollbackTested: false, ownerApproved: false },
   };
 }
 

@@ -213,7 +213,16 @@ export function ProductControlCenter({
             status={status.feedback.status}
             explanation={t("control.feedback.explanation")}
             nextStep={t("control.feedback.next")}
-            details={[[t("control.field.persistentCapture"), statusLabel(status.feedback.status, t)]]}
+            details={[
+              [t("control.field.persistentCapture"), statusLabel(status.feedback.status, t)],
+              [t("control.field.submissionEnabled"), booleanValue(status.feedback.submissionEnabled, t)],
+              ...(status.feedback.totalCount == null ? [] : [
+                [t("control.field.totalFeedback"), String(status.feedback.totalCount)] as [string, string],
+                [t("control.field.newFeedback"), String(status.feedback.newCount ?? 0)] as [string, string],
+                [t("control.field.blockerFeedback"), String(status.feedback.blockerCount ?? 0)] as [string, string],
+                [t("control.field.latestFeedback"), dateValue(status.feedback.latestFeedbackAt ?? null, locale, t)] as [string, string],
+              ]),
+            ]}
             t={t}
           />
         </section>
