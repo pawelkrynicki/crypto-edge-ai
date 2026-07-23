@@ -16,15 +16,18 @@ import {
   type ProductSecurityState,
 } from "../productSecurityResolver";
 import type { UiTokenCandidate } from "../types/scannerTypes";
+import type { FollowUpPublicEntry } from "../types/followUpTypes";
 
 interface CandidateDetailViewProps {
   candidate: UiTokenCandidate | null;
+  followUp?: FollowUpPublicEntry | null;
   onBackToResults?: () => void;
   onOpenExternalChecks?: (candidate: UiTokenCandidate) => void;
 }
 
 export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
   candidate,
+  followUp = null,
   onBackToResults,
   onOpenExternalChecks,
 }) => {
@@ -222,8 +225,24 @@ export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
         ) : null}
       </section>
 
+      {followUp && (
+        <section className="product-detail-section follow-up-detail" aria-labelledby="follow-up-heading">
+          <SectionHeader id="follow-up-heading" index="5" title={t("followUp.detailTitle")} />
+          <p className="follow-up-candidate-boundary">{t("followUp.detailBoundary")}</p>
+          <div className="product-detail-grid">
+            <DetailField label={t("followUp.lifecycle")} value={followUp.lifecycle_status} tone={followUp.lifecycle_status === "CANDIDATE_FOR_ESTABLISHED" ? "warning" : "neutral"} />
+            <DetailField label={t("followUp.firstSeen")} value={formatProductDateTime(followUp.first_seen_at, locale)} />
+            <DetailField label={t("followUp.completedCheckpoints")} value={followUp.completed_checkpoints.length > 0 ? followUp.completed_checkpoints.map((day) => `${day}d`).join(" Â· ") : t("followUp.noneCompleted")} />
+            <DetailField label={t("followUp.nextCheckpoint")} value={followUp.next_check_at ? formatProductDateTime(followUp.next_check_at, locale) : t("followUp.noAutomaticCheck")} />
+            <DetailField label={t("followUp.filterStatus")} value={followUp.filter_status} />
+            <DetailField label={t("followUp.establishedMembership")} value={followUp.established_membership ? t("control.value.yes") : t("control.value.no")} />
+            <DetailField label={t("followUp.nextReviewStep")} value={followUp.next_review_step} />
+          </div>
+        </section>
+      )}
+
       <section className="product-detail-section next-step" aria-labelledby="next-heading">
-        <SectionHeader id="next-heading" index="5" title={t("detail.nextStep")} />
+        <SectionHeader id="next-heading" index={followUp ? "6" : "5"} title={t("detail.nextStep")} />
         <p>{t("detail.nextStepText")}</p>
         <div className="product-detail-actions">
           {onBackToResults && <button type="button" className="secondary" onClick={onBackToResults}>{t("detail.back")}</button>}

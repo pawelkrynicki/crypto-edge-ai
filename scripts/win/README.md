@@ -2,6 +2,28 @@
 
 These scripts are developer tooling for Windows CMD. Run them from the repo root or any other current directory; each script resolves the repo root from its own location.
 
+## Maturing / Follow-up Basket
+
+Offline check całego kontraktu Follow-up:
+
+```cmd
+scripts\win\check-follow-up-basket.cmd
+```
+
+Dry-run bootstrap istniejącego poprawnego scanner snapshotu, zawsze 0 provider calls i bez zapisu:
+
+```cmd
+scripts\win\follow-up-bootstrap-preview.cmd
+```
+
+Jedna komenda owner review trzech warstw Radaru, EN/PL, checkpointów, Candidate copy i Control Center:
+
+```cmd
+scripts\win\start-follow-up-basket-review.cmd
+```
+
+Owner review nie wymaga `--apply` i nie powtarza testów technicznych. Skrypty nie wdrażają VPS, nie zmieniają Cloudflare, nie aktywują Task Scheduler i nie dodają tokenów do Established. Runbook: `docs/maturing_follow_up_basket.md`.
+
 ## Established universe owner workflow
 
 Read-only commands:

@@ -29,6 +29,8 @@ import {
   type EstablishedUniverseStatus,
 } from "./services/establishedUniverseStatusDataSource";
 import { loadControlCenterStatus } from "./services/controlCenterStatusDataSource";
+import { loadFollowUpList, loadFollowUpStatus } from "./services/followUpDataSource";
+import type { FollowUpPublicEntry, FollowUpPublicStatus } from "./types/followUpTypes";
 import type {
   ProductReadinessOutput,
   ScannerApiOutput,
@@ -85,6 +87,8 @@ export function ProductAppContent() {
   const [automationStatus, setAutomationStatus] = useState<AutomationStatus | null>(null);
   const [establishedUniverseStatus, setEstablishedUniverseStatus] = useState<EstablishedUniverseStatus | null>(null);
   const [controlCenterStatus, setControlCenterStatus] = useState<ControlCenterStatus | null>(null);
+  const [followUpStatus, setFollowUpStatus] = useState<FollowUpPublicStatus | null>(null);
+  const [followUpEntries, setFollowUpEntries] = useState<FollowUpPublicEntry[]>([]);
   const refreshPromiseRef = useRef<Promise<void> | null>(null);
 
   const navItems = useMemo<ProductNavItem[]>(() => [
@@ -114,6 +118,9 @@ export function ProductAppContent() {
   const verificationCandidate =
     candidates.find((candidate) => candidate.id === verificationCandidateId)
     ?? selectedCandidate;
+  const selectedFollowUp = selectedCandidate
+    ? followUpEntries.find((entry) => isSameTokenIdentity(entry, selectedCandidate)) ?? null
+    : null;
   const sourceHealth = useMemo(
     () => resolveProductSourceHealth({ metadata, readiness, sourceIds }),
     [metadata, readiness, sourceIds],
@@ -128,16 +135,20 @@ export function ProductAppContent() {
       setReadinessReasonCode(null);
       setUnavailableMessage(null);
 
-      const [scannerResult, readinessResult, automationResult, universeStatusResult, controlCenterResult] = await Promise.all([
+      const [scannerResult, readinessResult, automationResult, universeStatusResult, controlCenterResult, followUpStatusResult, followUpListResult] = await Promise.all([
         loadScannerApiDataSourceResult({ runtimeMode }),
         loadScannerReadinessResult({ runtimeMode }),
         loadAutomationStatus(),
         loadEstablishedUniverseStatus(),
         loadControlCenterStatus(),
+        loadFollowUpStatus(),
+        loadFollowUpList(),
       ]);
       setAutomationStatus(automationResult);
       setEstablishedUniverseStatus(universeStatusResult);
       setControlCenterStatus(controlCenterResult);
+      setFollowUpStatus(followUpStatusResult);
+      setFollowUpEntries(followUpListResult?.entries ?? []);
 
       if (readinessResult.status === "ready") {
         setReadiness(readinessResult.output);
@@ -246,6 +257,8 @@ export function ProductAppContent() {
             sourceIds={sourceIds}
             sourceHealth={sourceHealth}
             scannerUnavailableReasonCode={reasonCode}
+            followUpStatus={followUpStatus}
+            followUpEntries={followUpEntries}
             onOpenCandidate={openCandidate}
             onOpenExternalChecks={openVerification}
           />
@@ -258,6 +271,7 @@ export function ProductAppContent() {
         <ProductWorkspaceSection {...copy}>
           <CandidateDetailView
             candidate={selectedCandidate}
+            followUp={selectedFollowUp}
             onBackToResults={() => navigate("candidate-results")}
             onOpenExternalChecks={openVerification}
           />
@@ -314,6 +328,13 @@ export function ProductAppContent() {
       {renderSection()}
     </ProductWorkspaceShell>
   );
+}
+
+function isSameTokenIdentity(entry: FollowUpPublicEntry, candidate: UiTokenCandidate): boolean {
+  if (entry.chain.trim().toLowerCase() !== candidate.chain.trim().toLowerCase()) return false;
+  return entry.chain.trim().toLowerCase() === "solana"
+    ? entry.contract_address === candidate.contractAddress
+    : entry.contract_address.toLowerCase() === candidate.contractAddress.toLowerCase();
 }
 
 function resolveSection(): ProductSectionId {

@@ -78,6 +78,15 @@ export type ControlCenterReadinessInput = {
     skippedReportCount: number;
     latestReportGeneratedAt: string | null;
   };
+  followUp?: {
+    storeAvailable: boolean;
+    validationStatus: "valid" | "recovered" | "invalid" | "unavailable";
+    activeEntries: number;
+    dueEntries: number;
+    candidateEntries: number;
+    nextDueAt: string | null;
+    lastUpdatedAt: string | null;
+  };
   gates: {
     feedbackCaptureReady: boolean;
     trustedTesterPreviewModeReady: boolean;
@@ -122,6 +131,9 @@ export type ControlCenterStatus = {
     skippedReportCount: number;
     latestReportGeneratedAt: string | null;
   };
+  followUp: NonNullable<ControlCenterReadinessInput["followUp"]> & {
+    status: ControlCenterReadinessStatus;
+  };
   accessDeployment: {
     status: ControlCenterReadinessStatus;
     localRuntimeAvailable: boolean;
@@ -140,6 +152,15 @@ export type ControlCenterStatus = {
  * translated presentation copy never participate in readiness decisions.
  */
 export function resolveControlCenterStatus(input: ControlCenterReadinessInput): ControlCenterStatus {
+  const followUp = input.followUp ?? {
+    storeAvailable: true,
+    validationStatus: "valid" as const,
+    activeEntries: 0,
+    dueEntries: 0,
+    candidateEntries: 0,
+    nextDueAt: null,
+    lastUpdatedAt: null,
+  };
   const dataStatus = resolveDataStatus(input.scanner, input.context);
   const runtimeStatus = input.runtime.healthAvailable
     && input.runtime.apiConnected
@@ -162,6 +183,9 @@ export function resolveControlCenterStatus(input: ControlCenterReadinessInput): 
     : "NOT_READY";
   const reviewStorageStatus = input.reviewStorage.available ? "READY" : "NOT_READY";
   const reportsStatus = input.reportsLibrary.status;
+  const followUpStatus: ControlCenterReadinessStatus = !followUp.storeAvailable
+    ? "NOT_READY"
+    : followUp.validationStatus === "valid" ? "READY" : "PARTIAL";
   const feedbackStatus = input.gates.feedbackCaptureReady ? "READY" : "NOT_READY";
   const externalTesterReady = input.gates.trustedTesterPreviewModeReady
     && input.gates.vpsDeploymentConfirmed
@@ -177,6 +201,7 @@ export function resolveControlCenterStatus(input: ControlCenterReadinessInput): 
     universeStatus,
     reviewStorageStatus,
     reportsStatus,
+    followUpStatus,
     accessStatus,
     feedbackStatus,
   ];
@@ -216,6 +241,7 @@ export function resolveControlCenterStatus(input: ControlCenterReadinessInput): 
       skippedReportCount: input.reportsLibrary.skippedReportCount,
       latestReportGeneratedAt: input.reportsLibrary.latestReportGeneratedAt,
     },
+    followUp: { ...followUp, status: followUpStatus },
     accessDeployment: {
       status: accessStatus,
       localRuntimeAvailable: input.runtime.apiConnected,

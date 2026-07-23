@@ -1,5 +1,13 @@
 # Roadmap
 
+## Maturing / Follow-up Basket
+
+Etap dodaje trzecią warstwę Radaru pomiędzy `New / observation` i `Established / main Radar`. Zwalidowana tożsamość `chain + contract_address` trafia do lokalnego, atomowego Follow-up store i pozostaje obserwowana w checkpointach 1, 3, 7, 14 i 30 dni. Centralny `scanner_and_context` wybiera maksymalnie 5 due records, używa wspólnego locka, bounded transportu, token-pairs, wyboru pary i niezmienionych basic filters. Refresh view i liczba użytkowników nie zwiększają provider calls.
+
+`CANDIDATE_FOR_ESTABLISHED` oznacza wyłącznie ręczną decyzję ownera. Brak security pozostaje Manual Verification Required, Honeypot.is nie jest uruchamiany automatycznie, a system nie zmienia Established Universe. API i UI są read-only. Control Center pokazuje Follow-up niezależnie, a overall Trusted Tester Preview pozostaje `NOT_READY`.
+
+Kontrakt: `docs/maturing_follow_up_basket.md`. Następny osobny sprint: **Owner Established Promotion Flow**. Kolejność i termin Premium UI Pass 27–30.07 pozostają bez zmian.
+
 ## Established Universe Management
 
 Etap wprowadza bezpieczny, owner-maintained proces dla głównego koszyka Radar: kanoniczny model `chain + contract_address`, jawne sieci, deterministyczny checksum, wersje z ograniczoną historią i audytem, atomowe operacje CLI z dry-run/`--apply`, preview collectora bez provider calls oraz read-only `GET /api/established-universe/status`. `New / observation` pozostaje niezależny i nie ma automatycznego awansu. Filtry, scoring, `final_label` i znaczenie `WATCHLIST` pozostają bez zmian.

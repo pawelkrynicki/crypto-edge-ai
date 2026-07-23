@@ -27,6 +27,11 @@ export const Methodology: React.FC = () => {
         </article>
         <article>
           <span>02</span>
+          <h4>{t("method.followUpTitle")}</h4>
+          <p>{t("method.followUpDetail")}</p>
+        </article>
+        <article>
+          <span>03</span>
           <h4>{t("method.establishedTitle")}</h4>
           <p>{t("method.establishedDetail")}</p>
         </article>

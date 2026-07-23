@@ -98,6 +98,29 @@ describe("Control Center readiness model", () => {
     assert.equal(universe.status, "READY");
   });
 
+  it("treats a valid empty Follow-up store as READY", () => {
+    const input = baseInput();
+    assert.equal(resolveControlCenterStatus(input).followUp.status, "READY");
+    assert.equal(resolveControlCenterStatus(input).followUp.activeEntries, 0);
+  });
+
+  it("keeps Runtime and API READY when Follow-up is independently NOT_READY", () => {
+    const input = baseInput();
+    input.followUp = {
+      storeAvailable: false,
+      validationStatus: "invalid",
+      activeEntries: 0,
+      dueEntries: 0,
+      candidateEntries: 0,
+      nextDueAt: null,
+      lastUpdatedAt: null,
+    };
+    const status = resolveControlCenterStatus(input);
+    assert.equal(status.followUp.status, "NOT_READY");
+    assert.equal(status.runtimeApi.status, "READY");
+    assert.equal(status.overallStatus, "NOT_READY");
+  });
+
   it("never resolves inactive automation as READY", () => {
     const input = baseInput();
     input.automation.enabled = false;
@@ -412,6 +435,15 @@ function baseInput(): ControlCenterReadinessInput {
       validReportCount: 0,
       skippedReportCount: 0,
       latestReportGeneratedAt: null,
+    },
+    followUp: {
+      storeAvailable: true,
+      validationStatus: "valid",
+      activeEntries: 0,
+      dueEntries: 0,
+      candidateEntries: 0,
+      nextDueAt: null,
+      lastUpdatedAt: null,
     },
     gates: {
       feedbackCaptureReady: false,

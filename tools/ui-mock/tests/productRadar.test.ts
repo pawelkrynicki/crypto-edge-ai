@@ -939,10 +939,10 @@ describe("Product Radar owner acceptance", () => {
       renderWithLocale("pl", React.createElement(ExternalVerificationLinksView, { candidate: establishedCandidate })),
       renderWithLocale("pl", React.createElement(Methodology)),
     ].join(" ");
-    assert.match(english, /Two baskets with two different meanings/);
+    assert.match(english, /Three Radar layers with three different meanings/);
     assert.match(english, /Manual source verification/);
     assert.match(english, /How to read the Radar/);
-    assert.match(polish, /Dwa koszyki, dwa różne znaczenia/);
+    assert.match(polish, /Trzy warstwy Radaru, trzy różne znaczenia/);
     assert.match(polish, /Ręczna weryfikacja źródłowa/);
     assert.match(polish, /Jak czytać Radar/);
     assert.equal(PRODUCT_TRANSLATION_KEYS.length, Object.keys(PRODUCT_TRANSLATIONS.pl).length);
