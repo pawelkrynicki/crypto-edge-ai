@@ -522,7 +522,7 @@ function feedbackCopy(locale: ProductLocale) {
     savedAt: "Zapisano",
     addAnother: "Dodaj kolejne zgłoszenie",
     boundaryTitle: "Zakres zgłoszenia",
-    boundaryBody: "Opinia nie zmienia Radaru, scoringu, cyklu obserwacji ani żadnej decyzji analitycznej.",
+    boundaryBody: "Opinia nie zmienia Radaru, oceny, cyklu obserwacji ani żadnej decyzji analitycznej.",
     noPersonalData: "Zapisujemy wyłącznie treść zgłoszenia i pseudonimowy identyfikator sesji.",
     inboxHeading: "Skrzynka opinii",
     inboxDescription: "Wyłącznie odczytowy panel właściciela. Tester nie widzi tej sekcji.",

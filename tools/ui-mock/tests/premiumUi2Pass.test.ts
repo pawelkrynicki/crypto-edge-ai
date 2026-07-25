@@ -29,9 +29,15 @@ describe("Premium UI.2 presentation contracts", () => {
     for (const label of ["Środowisko i API", "Dane i migawki", "Koszyk Established", "Dalsza obserwacja", "Zapis analiz"]) {
       assert.match(i18n, new RegExp(label));
     }
-    const polishCopy = i18n.slice(i18n.indexOf("const PL: TranslationTable"));
+    const polishCopy = i18n.slice(
+      i18n.indexOf("const PL: TranslationTable"),
+      i18n.indexOf("export const PRODUCT_TRANSLATIONS"),
+    );
     assert.match(polishCopy, /Środowisko i API/);
     assert.doesNotMatch(polishCopy, /same-origin API/);
+    assert.match(polishCopy, /do przeglądu właściciela/);
+    assert.match(polishCopy, /reguł stanu źródeł współdzielonych z Radarem/);
+    assert.doesNotMatch(polishCopy, /do przeglądu ownera|reguł source health współdzielonych z Product Radar/);
   });
 
   it("keeps public feedback API categories and a receipt without raw session data", async () => {
@@ -49,6 +55,8 @@ describe("Premium UI.2 presentation contracts", () => {
     assert.match(feedback, /formComplete/);
     assert.match(feedback, /useState<FeedbackCategory \| null>\(null\)/);
     assert.match(feedback, /category !== null/);
+    assert.match(feedback, /Opinia nie zmienia Radaru, oceny, cyklu obserwacji/);
+    assert.doesNotMatch(feedback, /Opinia nie zmienia Radaru, scoringu, cyklu obserwacji/);
     assert.doesNotMatch(feedback, /detail\.session_group\}/);
     assert.doesNotMatch(feedback, /session_id|Raw session/i);
     assert.match(service, /credentials:\s*"same-origin"/);
@@ -128,6 +136,15 @@ describe("Premium UI.2 presentation contracts", () => {
     }
     assert.match(methodology, /Cykl obserwacji/);
     assert.match(methodology, /dostawców danych/);
+    const polishMethodology = methodology.slice(methodology.indexOf("  pl:"), methodology.indexOf("  en:"));
+    const polishMethodCopy = i18n.slice(
+      i18n.indexOf('"method.eyebrow"', i18n.indexOf("const PL: TranslationTable")),
+      i18n.indexOf("export const PRODUCT_TRANSLATIONS"),
+    );
+    for (const forbidden of ["Lifecycle", "Emerging", "Follow-up", "Candidate for Established", "providerzy"]) {
+      assert.equal(polishMethodology.includes(forbidden), false, forbidden);
+      assert.equal(polishMethodCopy.includes(forbidden), false, forbidden);
+    }
   });
 
   it("keeps Run ID in Candidate Detail technical details and renders readable failed-condition rows", async () => {
