@@ -2,7 +2,9 @@
 
 ## Status i zakres
 
-Sprint **UI.1 — Visual Foundation, Product Shell, Radar and Candidate Detail** ustanawia finalny kierunek wizualny produktu przed lokalnym Release Candidate. Zmiana obejmuje wyłącznie warstwę prezentacji i kontrakty UI.
+Sprint **UI.1 — Visual Foundation, Product Shell, Radar and Candidate Detail** ustanowił finalny kierunek wizualny produktu przed lokalnym Release Candidate. Owner zaakceptował UI.1 werdyktem `ACCEPT_LOCAL_CODE`; zaakceptowany commit bazowy to `af0ca670d31527434cdda91910b74741b544cb3f`.
+
+Sprint **UI.2 — Trust, Feedback and Research Surfaces** domyka Control Center, Reports, Feedback, Owner Feedback Inbox, Verification i Methodology. Zmiana nadal obejmuje wyłącznie warstwę prezentacji, copy oraz kontrakty UI; nie zmienia API, danych ani granic operacyjnych.
 
 UI.1 obejmuje:
 
@@ -15,7 +17,7 @@ UI.1 obejmuje:
 - podstawowe empty, partial, stale, unavailable i error states;
 - responsywność i podstawy dostępności.
 
-Control Center, Reports, Feedback, Verification, Methodology i panele ownera dziedziczą tokeny i bazową jakość powierzchni, ale ich pełny polish pozostaje zakresem UI.2.
+UI.2 rozszerza ten sam system tokenów i prymitywów na pozostałe powierzchnie produktu bez tworzenia drugiej generacji stylów.
 
 ## Zaakceptowany kierunek wizualny
 
@@ -187,6 +189,17 @@ Pomiar `INTERNAL_BETA`:
 
 Wzrost CSS wynika z kompletnej warstwy tokenów, pięciu kontraktowych breakpointów, nowego shellu, Radaru, Candidate Detail, focus/reduced-motion i bezpiecznych aliasów dla ekranów UI.2. Nie dodano runtime dependency; wzrost JS ogranicza się do lekkich prymitywów status/copy/loading i mobile menu.
 
+Pomiar UI.2 względem zaakceptowanego commitu UI.1, z finalnego builda `INTERNAL_BETA`:
+
+| Artefakt | UI.1 accepted | UI.2 | Zmiana |
+|---|---:|---:|---:|
+| CSS raw | 168,45 kB | 182,45 kB | +14,00 kB |
+| CSS gzip | 23,78 kB | 25,63 kB | +1,85 kB |
+| JS raw | 410,14 kB | 432,83 kB | +22,69 kB |
+| JS gzip | 115,00 kB | 120,83 kB | +5,83 kB |
+
+Nie dodano zależności runtime, nowej biblioteki wizualnej ani zasobu graficznego. Przyrost obejmuje nowe hierarchie sześciu powierzchni, kompletne stany Feedback/Inbox/Reports, dokument Methodology i kontrakty QA.
+
 ## Kontrola wizualna UI.1
 
 Kontrolę wykonano w lokalnym `INTERNAL_BETA` na prawdziwym snapshotcie/store, bez fixture fallback:
@@ -226,11 +239,21 @@ UI.1 nie zmienia:
 
 Walidacja i owner review mają wykonać zero live provider calls i zero mutacji danych.
 
-## UI.2 i UI.3
+## UI.2 — wynik
 
-UI.2: pełny polish Control Center, Reports, Feedback, owner inbox, Methodology i Verification, z użyciem tych samych tokenów i prymitywów.
+- Control Center pokazuje pięć poziomów decyzji: overall, data, product, access/deployment i owner decisions, a blokery, bezpieczny następny krok i Technical details mają osobną hierarchię.
+- Feedback jest integralnym formularzem z kategoriami, wymaganymi polami, walidacją, disabled state, receipt oraz bezpiecznym stanem `Already recorded`.
+- Owner Feedback Inbox pozostaje backend-gated i read-only, ma liczniki, filtry, naturalne statusy, empty/loading/unavailable states oraz czytelny detal bez surowej sesji.
+- Reports pozostaje biblioteką read-only; pierwsza warstwa pokazuje typ, projekt, datę i wersję, a techniczne identyfikatory są zwinięte.
+- Verification ma siedem numerowanych grup, jawny manual-review boundary i nie uruchamia automatycznie Honeypot.is ani żadnego providera.
+- Methodology jest dokumentem z TOC, trzema warstwami obserwacji, frozen filters, security boundary, ograniczeniami i research-only disclaimerem.
+- Candidate Detail zachowuje lifecycle i dane; Run ID jest wyłącznie w Technical details, a odrzucone warunki są czytelnymi wierszami name / actual / required / description.
 
-UI.3: końcowy accessibility pass, cross-browser review, bardziej szczegółowa walidacja klawiatury/screen readera i finalne poprawki wizualne P0.
+Walidacja UI.2 obejmuje kontrakty UI.1/UI.2, Control Center, Product Radar/Candidate Detail, Reports, Feedback z owner boundary, owner operations, real-data boundary, runtime/import boundary, dwa typechecki oraz build `INTERNAL_BETA`. Kontrola przeglądarkowa obejmuje PL i EN przy 1792, 1440 i 390 px, brak overflow i uciętych akcji, touch targets, focus, reduced motion oraz pusty inbox. Receipt i `Already recorded` są sprawdzane na poziomie kontraktu komponentu bez dodawania rekordu. Kanoniczny store feedbacku pozostaje pusty; podczas kontroli nie wykonuje się submitu.
+
+## UI.3 — następny etap
+
+UI.3 pozostaje końcowym accessibility pass, cross-browser review, bardziej szczegółową walidacją klawiatury/screen readera i finalnymi poprawkami wizualnymi P0. Dopiero po UI.3 wykonywana jest lokalna regresja i Release Candidate; deployment VPS pozostaje późniejszy od lokalnego RC.
 
 ## Kolejność wydania
 
@@ -247,11 +270,12 @@ Owner ocenia tylko wygląd i UX:
 
 - pierwsze wrażenie i brak efektu crypto casino;
 - jakość shellu, marki i nawigacji;
-- Radar oraz rozróżnienie trzech warstw;
-- karty New, Maturing i Established;
-- Candidate Detail i hierarchię sekcji;
+- Control Center i jego pięć poziomów decyzji;
+- Reports, Feedback i pusty Owner Feedback Inbox;
+- Verification i Methodology;
+- dziedziczone poprawki Radaru oraz Candidate Detail;
 - PL i EN;
-- desktop 1440 px, tablet 768 px i mobile 390 px;
+- desktop 1792 i 1440 px oraz mobile 390 px;
 - focus klawiatury i reduced motion;
 - brak technicznego/mockowego wyglądu;
 - brak regresji istniejących akcji.
@@ -261,5 +285,5 @@ Owner nie wykonuje mutujących operacji i nie powtarza testów technicznych.
 Komenda:
 
 ```cmd
-scripts\win\start-premium-ui-review.cmd --radar --mobile-guide
+scripts\win\start-premium-ui-review.cmd --ui2
 ```

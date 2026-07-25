@@ -429,12 +429,13 @@ These scripts do not deploy to VPS, change Cloudflare or Task Scheduler, call pr
 
 ```cmd
 scripts\win\check-premium-ui-pass.cmd
+scripts\win\start-premium-ui-review.cmd --ui2
 scripts\win\start-premium-ui-review.cmd --radar --mobile-guide
 scripts\win\start-premium-ui-review.cmd --detail
 ```
 
-`check-premium-ui-pass.cmd` is an offline UI.1 gate. It clears every live-source and automation opt-in, keeps owner operations `DISABLED`, runs the Premium UI contracts, Product Radar/Candidate Detail tests, UI typecheck and the fixture-free `INTERNAL_BETA` build assertion.
+`check-premium-ui-pass.cmd` is the offline UI.1 + UI.2 gate. It clears every live-source and automation opt-in, keeps owner operations `DISABLED`, runs the Premium UI contracts, Control Center, Reports, Feedback, Product Radar/Candidate Detail tests, UI typecheck and the fixture-free `INTERNAL_BETA` build assertion.
 
-`start-premium-ui-review.cmd` reuses the ordinary real local Product Radar snapshot/store path. `--radar` opens the main Radar, `--detail` opens Candidate Detail and `--mobile-guide` prints the recommended 1440/1280/1024/768/390 viewport sizes. It does not add a fixture fallback, activate `ENABLED`, call providers, run the collector or mutate snapshots/stores.
+`start-premium-ui-review.cmd` reuses the ordinary real local Product Radar snapshot/store path. `--ui2` prints the required order — Control Center, Reports, Feedback, Owner Feedback Inbox, Verification, Methodology — and opens the existing `INTERNAL_BETA + REVIEW_SAFE` review path. `--radar` opens the main Radar, `--detail` opens Candidate Detail and `--mobile-guide` prints the recommended viewport sizes. It does not add a fixture fallback, activate `ENABLED`, call providers, run the collector, submit feedback or mutate snapshots/stores.
 
 Canonical design and owner checklist: `docs/final_frontend_premium_ui_pass.md`.

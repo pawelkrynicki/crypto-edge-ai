@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 
 void React; // Required by the Node TSX test runtime's classic JSX transform.
 import { formatProductDateTime, useProductLocale, type ProductLocale } from "../productI18n";
+import { formatProductSourceLabel } from "../productPresentation";
 import {
   loadOwnerOperationsStatus,
   loadOwnerRefreshPreview,
@@ -53,13 +54,13 @@ const COPY = {
     missing: "Not available",
   },
   pl: {
-    eyebrow: "Operacje ownera",
+    eyebrow: "Operacje właściciela",
     title: "Jednorazowe odświeżenie danych",
-    intro: "Przed uruchomieniem jednego kontrolowanego cyklu sprawdź aktualny plan cadence.",
-    browserBoundary: "Przeglądarka nie łączy się bezpośrednio z providerami danych.",
+    intro: "Przed uruchomieniem jednego kontrolowanego cyklu sprawdź aktualny harmonogram.",
+    browserBoundary: "Przeglądarka nie łączy się bezpośrednio ze źródłami danych.",
     currentStatus: "Bieżący status",
-    mode: "Tryb operacji ownera",
-    scannerDue: "Scanner do odświeżenia",
+    mode: "Tryb operacji właściciela",
+    scannerDue: "Skaner do odświeżenia",
     contextDue: "Kontekst do odświeżenia",
     scope: "Planowany zakres",
     lock: "Globalna blokada odświeżenia",
@@ -72,24 +73,24 @@ const COPY = {
     previewUnavailable: "Nie udało się pobrać planu odświeżenia.",
     mayCall: "Źródła, które mogą zostać wywołane",
     willNotCall: "Źródła, które nie zostaną wywołane",
-    expires: "Preflight ważny do",
-    noAction: "Zgodnie z aktualnym cadence nic nie wymaga odświeżenia.",
-    confirm: "Potwierdzam jeden cykl odświeżenia kontrolowany przez cadence.",
+    expires: "Plan ważny do",
+    noAction: "Zgodnie z aktualnym harmonogramem nic nie wymaga odświeżenia.",
+    confirm: "Potwierdzam jeden cykl odświeżenia zgodny z harmonogramem.",
     run: "Uruchom jednorazowe odświeżenie",
-    dialog: "Uruchomić jeden kontrolowany cykl odświeżenia według aktualnego preflightu?",
+    dialog: "Uruchomić jeden kontrolowany cykl odświeżenia według aktualnego planu?",
     success: "Jednorazowe odświeżenie zakończyło się powodzeniem.",
-    noActionResult: "Nie było nic do zrobienia. Nie wywołano żadnego providera.",
+    noActionResult: "Nie było nic do zrobienia. Nie wywołano żadnego źródła danych.",
     failed: "Odświeżenie nie powiodło się. Zachowano ostatnią prawidłową migawkę.",
     inProgress: "Odświeżenie już trwa.",
-    preserved: "Zachowano last-known-good.",
-    scannerAndContext: "Scanner i kontekst",
+    preserved: "Zachowano ostatnią prawidłową migawkę.",
+    scannerAndContext: "Skaner i kontekst",
     contextOnly: "Tylko kontekst",
     none: "Brak działania",
     lastAction: "Ostatnie działanie",
-    snapshotScanner: "Bieżąca migawka scannera",
+    snapshotScanner: "Bieżąca migawka skanera",
     snapshotContext: "Bieżąca migawka kontekstu",
     automation: "Automatyzacja włączona",
-    lastKnownGood: "Last-known-good dostępny",
+    lastKnownGood: "Ostatnia prawidłowa migawka dostępna",
     missing: "Niedostępne",
   },
 } as const;
@@ -166,7 +167,7 @@ export function OwnerOperationsPanel({ initialStatus }: { initialStatus: OwnerOp
       {status.mode === "REVIEW_SAFE" && <p className="owner-review-safe" role="status">{copy.reviewOnly}</p>}
 
       <div className="owner-operations-summary" aria-label={copy.currentStatus}>
-        <OwnerFact label={copy.mode} value={status.mode} />
+        <OwnerFact label={copy.mode} value={ownerModeLabel(status.mode, locale)} />
         <OwnerFact label={copy.scannerDue} value={yesNo(status.scanner_due, copy)} />
         <OwnerFact label={copy.contextDue} value={yesNo(status.context_due, copy)} />
         <OwnerFact label={copy.lock} value={status.action_in_progress ? copy.busy : copy.available} />
@@ -174,7 +175,7 @@ export function OwnerOperationsPanel({ initialStatus }: { initialStatus: OwnerOp
         <OwnerFact label={copy.snapshotContext} value={dateValue(status.current_context_snapshot_timestamp, locale, copy.missing)} />
         <OwnerFact label={copy.automation} value={yesNo(status.automation_enabled, copy)} />
         <OwnerFact label={copy.lastKnownGood} value={yesNo(status.last_known_good_available, copy)} />
-        <OwnerFact label={copy.lastAction} value={status.last_action_status ?? copy.missing} />
+        <OwnerFact label={copy.lastAction} value={status.last_action_status ? resultStatusLabel(status.last_action_status, locale) : copy.missing} />
       </div>
 
       <button type="button" className="secondary-button owner-preview-button" onClick={() => void checkPlan()} disabled={loadingPreview}>
@@ -249,5 +250,18 @@ function planLabel(preview: OwnerRefreshPreview, copy: typeof COPY.en | typeof C
 }
 
 function sourceList(values: string[], empty: string): string {
-  return values.join(", ") || empty;
+  return values.map(formatProductSourceLabel).join(", ") || empty;
+}
+
+function ownerModeLabel(mode: OwnerOperationsStatus["mode"], locale: ProductLocale): string {
+  if (mode === "REVIEW_SAFE") return locale === "pl" ? "Bezpieczny przegląd" : "Review safe";
+  if (mode === "ENABLED") return locale === "pl" ? "Włączony" : "Enabled";
+  return locale === "pl" ? "Wyłączony" : "Disabled";
+}
+
+function resultStatusLabel(value: string, locale: ProductLocale): string {
+  if (value === "SUCCESS") return locale === "pl" ? "Powodzenie" : "Success";
+  if (value === "NO_ACTION") return locale === "pl" ? "Bez działania" : "No action";
+  if (value === "RUN_ALREADY_IN_PROGRESS") return locale === "pl" ? "Odświeżenie już trwa" : "Refresh in progress";
+  return locale === "pl" ? "Niepowodzenie" : "Failed";
 }

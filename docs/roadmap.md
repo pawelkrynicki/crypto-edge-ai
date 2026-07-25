@@ -8,7 +8,7 @@ Owner-only Candidate Detail flow działa jako status → podpisany read-only pre
 
 Launcher udostępnia wyłącznie `REVIEW_SAFE`. `ENABLED` nie jest aktywny, external tester pozostaje `NO-GO`, `PUBLIC_BETA` pozostaje wyłączone, a overall Trusted Tester Preview to nadal `NOT_READY`. Kontrakt: `docs/owner_established_promotion_flow.md`.
 
-Zaakceptowany commit kodu: `02477bd0499a3b0d5f2f81f88586174ea86ba0e7`. Persistent Feedback Loop również został zaakceptowany lokalnie 23.07.2026. Bieżący etap P0 przed lokalnym Release Candidate to **Final Frontend Polish / Premium UI Pass — UI.1**. VPS, Cloudflare i Task Scheduler pozostają bez zmian do zamknięcia polishu i lokalnej regresji.
+Zaakceptowany commit kodu: `02477bd0499a3b0d5f2f81f88586174ea86ba0e7`. Persistent Feedback Loop również został zaakceptowany lokalnie 23.07.2026. **Premium UI.1** został zaakceptowany przez ownera (`ACCEPT_LOCAL_CODE`, commit `af0ca670d31527434cdda91910b74741b544cb3f`), a **Premium UI.2** domyka powierzchnie trust/feedback/research. Następny etap P0 to UI.3. VPS, Cloudflare i Task Scheduler pozostają bez zmian do zamknięcia UI.3 i lokalnej regresji.
 
 ## Maturing / Follow-up Basket
 
@@ -37,7 +37,7 @@ Runtime ownera jest lokalny i wykluczony z Git. Aktualny universe pozostaje celo
 
 ## Current stage: Final Frontend Polish / Premium UI Pass
 
-UI.1 ustanawia system wizualny, Product Shell, Radar, karty New/Maturing/Established oraz Candidate Detail. Jest to P0 przed lokalnym Release Candidate i jakimkolwiek finalnym deploymentem. Kanoniczny opis: `docs/final_frontend_premium_ui_pass.md`.
+UI.1 ustanowił system wizualny, Product Shell, Radar, karty New/Maturing/Established oraz Candidate Detail i został zaakceptowany przez ownera. UI.2 rozszerza ten sam system na Control Center, Reports, Feedback, Owner Feedback Inbox, Verification i Methodology, bez zmian API, danych, lifecycle, providerów lub owner gating. Następny jest UI.3, a dopiero po nim lokalna regresja i Release Candidate. Kanoniczny opis: `docs/final_frontend_premium_ui_pass.md`.
 
 Przygotowany wcześniej kod VPS i automatyzacji pozostaje lokalnie zaakceptowany, ale nie jest bieżącym etapem operacyjnym. Nie wykonuje się deploymentu, zmian Cloudflare ani Task Scheduler przed zakończeniem Premium UI i lokalnej regresji.
 

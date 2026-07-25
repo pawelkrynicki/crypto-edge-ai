@@ -15,6 +15,7 @@ import {
 import { formatProductRuntimeMode, formatProductSourceLabel } from "../productPresentation";
 import { loadOwnerOperationsStatus, type OwnerOperationsStatus } from "../services/ownerOperationsDataSource";
 import { OwnerOperationsPanel } from "./OwnerOperationsPanel";
+import { TechnicalDetails } from "./ProductUi";
 
 type Translator = (
   key: keyof typeof PRODUCT_TRANSLATIONS.en,
@@ -42,6 +43,7 @@ export function ProductControlCenter({
   ownerOperationsStatus?: OwnerOperationsStatus | null;
 }) {
   const { locale, t } = useProductLocale();
+  const ui = CONTROL_UI_COPY[locale];
   const overallStatus = status?.overallStatus ?? "NOT_READY";
   const [loadedOwnerOperationsStatus, setLoadedOwnerOperationsStatus] = useState<OwnerOperationsStatus | null>(null);
   const ownerOperationsStatus = providedOwnerOperationsStatus === undefined
@@ -65,7 +67,11 @@ export function ProductControlCenter({
           <h3>{t("control.trustedTesterPreview")}</h3>
           <p>{t("control.summaryExplanation")}</p>
         </div>
-        <StatusBadge status={overallStatus} t={t} />
+        <div className="product-control-overall">
+          <StatusBadge status={overallStatus} t={t} />
+          <strong>{status?.unmetGates.length ?? 0}</strong>
+          <span>{ui.blockerCount}</span>
+        </div>
       </section>
 
       <p className="control-center-research-note product-control-boundary">
@@ -73,7 +79,8 @@ export function ProductControlCenter({
       </p>
 
       {status ? (
-        <section className="control-card-grid" aria-label={t("control.areas") }>
+        <div className="product-control-groups" aria-label={t("control.areas") }>
+          <ControlGroup number="01" title={ui.dataReadiness} description={ui.dataReadinessHelp}>
           <ControlCard
             title={t("control.runtime.title")}
             status={status.runtimeApi.status}
@@ -120,20 +127,9 @@ export function ProductControlCenter({
             ]}
             t={t}
           />
-          <ControlCard
-            title={t("control.automation.title")}
-            status={status.automation.status}
-            explanation={t("control.automation.explanation")}
-            nextStep={t("control.automation.next")}
-            details={[
-              [t("control.field.automationState"), status.automation.enabled ? t("automation.active") : t("automation.disabled")],
-              [t("automation.lastRun"), dateValue(status.automation.lastRunAt, locale, t)],
-              [t("control.field.lastResult"), resultValue(status.automation.lastResult, t)],
-              [t("automation.nextRun"), dateValue(status.automation.nextRunAt, locale, t)],
-              [t("automation.nextDueAfterActivation"), dateValue(status.automation.nextDueAfterActivation, locale, t)],
-            ]}
-            t={t}
-          />
+          </ControlGroup>
+
+          <ControlGroup number="02" title={ui.productCapabilities} description={ui.productCapabilitiesHelp}>
           <ControlCard
             title={t("control.universe.title")}
             status={status.establishedUniverse.status}
@@ -197,19 +193,6 @@ export function ProductControlCenter({
             t={t}
           />
           <ControlCard
-            title={t("control.access.title")}
-            status={status.accessDeployment.status}
-            explanation={t("control.access.explanation")}
-            nextStep={t("control.access.next")}
-            details={[
-              [t("control.field.localRuntime"), availabilityValue(status.accessDeployment.localRuntimeAvailable, t)],
-              [t("control.field.vpsDeployment"), status.accessDeployment.vpsDeployment === "CONFIRMED" ? t("control.value.confirmed") : t("control.value.unconfirmed")],
-              [t("control.field.cloudflareAccess"), status.accessDeployment.cloudflareAccess === "VERIFIED" ? t("control.value.verified") : t("control.value.finalSmokeRequired")],
-              [t("control.field.externalTesterAccess"), status.accessDeployment.externalTesterAccess],
-            ]}
-            t={t}
-          />
-          <ControlCard
             title={t("control.feedback.title")}
             status={status.feedback.status}
             explanation={t("control.feedback.explanation")}
@@ -226,7 +209,38 @@ export function ProductControlCenter({
             ]}
             t={t}
           />
-        </section>
+          </ControlGroup>
+
+          <ControlGroup number="03" title={ui.accessGates} description={ui.accessGatesHelp}>
+            <ControlCard
+              title={t("control.automation.title")}
+              status={status.automation.status}
+              explanation={t("control.automation.explanation")}
+              nextStep={t("control.automation.next")}
+              details={[
+                [t("control.field.automationState"), status.automation.enabled ? t("automation.active") : t("automation.disabled")],
+                [t("automation.lastRun"), dateValue(status.automation.lastRunAt, locale, t)],
+                [t("control.field.lastResult"), resultValue(status.automation.lastResult, t)],
+                [t("automation.nextRun"), dateValue(status.automation.nextRunAt, locale, t)],
+                [t("automation.nextDueAfterActivation"), dateValue(status.automation.nextDueAfterActivation, locale, t)],
+              ]}
+              t={t}
+            />
+            <ControlCard
+              title={t("control.access.title")}
+              status={status.accessDeployment.status}
+              explanation={t("control.access.explanation")}
+              nextStep={t("control.access.next")}
+              details={[
+                [t("control.field.localRuntime"), availabilityValue(status.accessDeployment.localRuntimeAvailable, t)],
+                [t("control.field.vpsDeployment"), status.accessDeployment.vpsDeployment === "CONFIRMED" ? t("control.value.confirmed") : t("control.value.unconfirmed")],
+                [t("control.field.cloudflareAccess"), status.accessDeployment.cloudflareAccess === "VERIFIED" ? t("control.value.verified") : t("control.value.finalSmokeRequired")],
+                [t("control.field.externalTesterAccess"), status.accessDeployment.externalTesterAccess],
+              ]}
+              t={t}
+            />
+          </ControlGroup>
+        </div>
       ) : (
         <section className="control-section product-control-unavailable" role="alert">
           <h3>{t("control.unavailable.title")}</h3>
@@ -240,14 +254,27 @@ export function ProductControlCenter({
 
       <section className="control-section product-control-blockers">
         <header className="control-section-header">
-          <h3>{t("control.blockers.title")}</h3>
+          <span className="product-control-group-number">04</span>
+          <h3 id="owner-decisions-heading">{ui.ownerDecisions}</h3>
           <p>{t("control.blockers.explanation")}</p>
         </header>
-        <ol>
-          {(status?.unmetGates ?? []).map((blocker) => (
-            <li key={blocker}>{t(BLOCKER_TRANSLATION_KEYS[blocker])}</li>
-          ))}
-        </ol>
+        {(status?.unmetGates.length ?? 0) > 0 ? (
+          <ol>
+            {(status?.unmetGates ?? []).map((blocker) => (
+              <li key={blocker}>{t(BLOCKER_TRANSLATION_KEYS[blocker])}</li>
+            ))}
+          </ol>
+        ) : <p className="product-control-clear">{ui.noOwnerDecisions}</p>}
+      </section>
+
+      <section className="control-section product-control-next-step" aria-labelledby="safe-next-step-heading">
+        <span className="product-control-group-number">05</span>
+        <div>
+          <h3 id="safe-next-step-heading">{ui.safeNextStep}</h3>
+          <p>{status?.unmetGates[0]
+            ? t(BLOCKER_TRANSLATION_KEYS[status.unmetGates[0]])
+            : ui.safeNextStepReady}</p>
+        </div>
       </section>
     </div>
   );
@@ -275,18 +302,43 @@ function ControlCard({
         <StatusBadge status={status} t={t} />
       </div>
       <p className="product-control-explanation">{explanation}</p>
-      <dl className="product-control-details">
-        {details.map(([label, value]) => (
-          <div key={label}>
-            <dt>{label}</dt>
-            <dd>{value}</dd>
-          </div>
-        ))}
-      </dl>
       {status !== "READY" && (
         <p className="product-control-next"><strong>{t("control.nextStep")}:</strong> {nextStep}</p>
       )}
+      <TechnicalDetails label={t("app.technicalDetails")}>
+        <dl className="product-control-details">
+          {details.map(([label, value]) => (
+            <div key={label}>
+              <dt>{label}</dt>
+              <dd>{value}</dd>
+            </div>
+          ))}
+        </dl>
+      </TechnicalDetails>
     </article>
+  );
+}
+
+function ControlGroup({
+  number,
+  title,
+  description,
+  children,
+}: {
+  number: string;
+  title: string;
+  description: string;
+  children: React.ReactNode;
+}) {
+  const headingId = `control-group-${number}`;
+  return (
+    <section className="product-control-group" aria-labelledby={headingId}>
+      <header className="product-control-group-header">
+        <span className="product-control-group-number">{number}</span>
+        <div><h3 id={headingId}>{title}</h3><p>{description}</p></div>
+      </header>
+      <div className="control-card-grid">{children}</div>
+    </section>
   );
 }
 
@@ -358,3 +410,32 @@ function ownerCapabilityValue(mode: OwnerOperationsStatus["mode"], locale: Produ
   if (mode === "ENABLED") return locale === "pl" ? "Włączona" : "Enabled";
   return locale === "pl" ? "Wyłączona" : "Disabled";
 }
+
+const CONTROL_UI_COPY = {
+  pl: {
+    blockerCount: "otwartych warunków",
+    dataReadiness: "Gotowość danych",
+    dataReadinessHelp: "Dostępność środowiska, migawek i zatwierdzonych źródeł.",
+    productCapabilities: "Możliwości produktu",
+    productCapabilitiesHelp: "Funkcje działające lokalnie i ich aktualny poziom gotowości.",
+    accessGates: "Dostęp i wdrożenie",
+    accessGatesHelp: "Oddziela lokalną gotowość produktu od dostępu zewnętrznego.",
+    ownerDecisions: "Decyzje ownera i warunki udostępnienia",
+    noOwnerDecisions: "Brak otwartych decyzji ownera.",
+    safeNextStep: "Bezpieczny następny krok",
+    safeNextStepReady: "Kontynuuj lokalny przegląd bez zmiany trybu runtime ani uruchamiania providerów.",
+  },
+  en: {
+    blockerCount: "open conditions",
+    dataReadiness: "Data readiness",
+    dataReadinessHelp: "Runtime, snapshot and approved-source availability.",
+    productCapabilities: "Product capabilities",
+    productCapabilitiesHelp: "Features available locally and their current readiness.",
+    accessGates: "Access and deployment",
+    accessGatesHelp: "Separates local product readiness from external access.",
+    ownerDecisions: "Owner decisions and release conditions",
+    noOwnerDecisions: "No open owner decisions.",
+    safeNextStep: "Safe next step",
+    safeNextStepReady: "Continue local review without changing runtime mode or calling providers.",
+  },
+} as const;

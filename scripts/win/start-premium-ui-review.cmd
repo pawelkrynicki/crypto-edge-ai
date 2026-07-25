@@ -10,10 +10,11 @@ set "SHOW_MOBILE_GUIDE=0"
 if "%~1"=="" goto args_done
 if /i "%~1"=="--radar" set "REVIEW_VIEW=radar"
 if /i "%~1"=="--detail" set "REVIEW_VIEW=detail"
+if /i "%~1"=="--ui2" set "REVIEW_VIEW=ui2"
 if /i "%~1"=="--mobile-guide" set "SHOW_MOBILE_GUIDE=1"
-if /i not "%~1"=="--radar" if /i not "%~1"=="--detail" if /i not "%~1"=="--mobile-guide" (
+if /i not "%~1"=="--radar" if /i not "%~1"=="--detail" if /i not "%~1"=="--ui2" if /i not "%~1"=="--mobile-guide" (
   echo ERROR: Nieznany parametr: %~1
-  echo Uzycie: scripts\win\start-premium-ui-review.cmd [--radar] [--detail] [--mobile-guide]
+  echo Uzycie: scripts\win\start-premium-ui-review.cmd [--radar] [--detail] [--ui2] [--mobile-guide]
   exit /b 1
 )
 shift
@@ -42,6 +43,21 @@ if "%SHOW_MOBILE_GUIDE%"=="1" (
 
 if /i "%REVIEW_VIEW%"=="detail" (
   call "%REPO_ROOT%\scripts\win\start-product-radar-review.cmd" --candidate-detail
+  exit /b %ERRORLEVEL%
+)
+
+if /i "%REVIEW_VIEW%"=="ui2" (
+  echo.
+  echo Kolejnosc owner review UI.2:
+  echo   1. Control Center
+  echo   2. Reports
+  echo   3. Feedback
+  echo   4. Owner Feedback Inbox
+  echo   5. Verification
+  echo   6. Methodology
+  echo.
+  echo Nie wysylaj feedbacku i nie uruchamiaj operacji ownera podczas przegladu wizualnego.
+  call "%REPO_ROOT%\scripts\win\start-product-radar-review.cmd" --control-center --owner-operations-review
   exit /b %ERRORLEVEL%
 )
 

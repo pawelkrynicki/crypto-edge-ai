@@ -4,7 +4,7 @@
 
 Candidate Detail ma backend-gated sekcję ownera z read-only statusem i dry-run preview. Jedyny POST przyjmuje tylko podpisany one-time `preview_id` i potwierdzenie, ponownie sprawdza canonical record, lifecycle, basic filters, membership, universe version/checksum i lock, a następnie bezpośrednio używa Established Universe Managera.
 
-Tester nie widzi panelu ani capability. Nie ma automatycznego awansu, live provider calls, aktywacji `ENABLED`, VPS/Cloudflare/Task Scheduler changes. Persistent Feedback Loop został zaakceptowany lokalnie 23.07.2026; overall pozostaje `NOT_READY`, a bieżącym etapem P0 jest **Final Frontend Polish / Premium UI Pass — UI.1**. Deployment pozostaje późniejszy od polishu i lokalnego Release Candidate.
+Tester nie widzi panelu ani capability. Nie ma automatycznego awansu, live provider calls, aktywacji `ENABLED`, VPS/Cloudflare/Task Scheduler changes. Persistent Feedback Loop został zaakceptowany lokalnie 23.07.2026; Premium UI.1 został zaakceptowany przez ownera (`ACCEPT_LOCAL_CODE`, commit `af0ca670d31527434cdda91910b74741b544cb3f`), UI.2 domyka powierzchnie trust/feedback/research, a następnym etapem P0 jest UI.3. Deployment pozostaje późniejszy od UI.3 i lokalnego Release Candidate.
 
 ## Status
 
@@ -14,7 +14,7 @@ Tester nie widzi panelu ani capability. Nie ma automatycznego awansu, live provi
 - Frontend productization is now the main axis.
 - Next stage is 12E.2 Candidate Results View.
 - Reports are not the critical path for the next frontend rebuild.
-- Maturing / Follow-up Basket dodaje read-only trzecią warstwę Radaru; Owner Established Promotion Flow realizuje bezpieczną decyzję ownera, Persistent Feedback Loop jest gotowy lokalnie i zaakceptowany, a bieżącym etapem jest Final Frontend Polish / Premium UI Pass.
+- Maturing / Follow-up Basket dodaje read-only trzecią warstwę Radaru; Owner Established Promotion Flow realizuje bezpieczną decyzję ownera, Persistent Feedback Loop jest gotowy lokalnie i zaakceptowany, UI.1 jest zaakceptowany, UI.2 domknięty w kodzie, a kolejny etap Premium UI to UI.3.
 
 ## Maturing / Follow-up Basket
 

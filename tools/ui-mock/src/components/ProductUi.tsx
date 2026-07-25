@@ -85,3 +85,26 @@ export function LoadingState({ label }: { label: string }) {
     </div>
   );
 }
+
+export function TechnicalDetails({
+  label,
+  children,
+  className = "",
+}: {
+  label: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <details
+      className={`product-technical-details ${className}`.trim()}
+      open={open}
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+    >
+      <summary aria-expanded={open}>{label}</summary>
+      <div className="product-technical-details-content">{children}</div>
+    </details>
+  );
+}

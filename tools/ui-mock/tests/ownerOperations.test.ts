@@ -51,7 +51,7 @@ describe("owner operations capability and UI boundary", () => {
     assert.match(english, /One-time data refresh/);
     assert.match(english, /Preview refresh plan/);
     assert.match(english, /real refresh remains blocked/);
-    assert.match(polish, /Operacje ownera/);
+    assert.match(polish, /Operacje właściciela/);
     assert.match(polish, /Jednorazowe odświeżenie danych/);
     assert.match(polish, /Sprawdź plan odświeżenia/);
     assert.match(polish, /prawdziwe odświeżenie pozostaje zablokowane/);

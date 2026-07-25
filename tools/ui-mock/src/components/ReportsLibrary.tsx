@@ -14,6 +14,8 @@ import type {
   ReportListItem,
   ReportsLibraryStatus,
 } from "../types/reportTypes";
+import { StatusBadge, TechnicalDetails } from "./ProductUi";
+import { formatProductSourceLabel } from "../productPresentation";
 
 type ReportsLibraryProps = {
   candidates: UiTokenCandidate[];
@@ -125,13 +127,15 @@ export function ReportsLibrary({
                   <div className="report-list-card-main">
                     <div className="report-list-title-row">
                       <h5>{report.title}</h5>
-                      <span className="report-validation-badge">{report.validation_status}</span>
+                      <StatusBadge tone="ready">{copy.available}</StatusBadge>
                     </div>
                     <p>{projectIdentity(report, copy.notAvailable)}</p>
                     <dl>
                       <div><dt>{copy.generatedAt}</dt><dd>{dateValue(report.generated_at, locale, copy.notAvailable)}</dd></div>
+                      <div><dt>{copy.reportVersion}</dt><dd>{report.report_version}</dd></div>
+                      <div><dt>{copy.reportType}</dt><dd>{copy.researchReport}</dd></div>
                       <div><dt>{copy.chain}</dt><dd>{report.chain ?? copy.notAvailable}</dd></div>
-                      {report.basket && <div><dt>{copy.basket}</dt><dd>{report.basket}</dd></div>}
+                      {report.basket && <div><dt>{copy.basket}</dt><dd>{formatBasket(report.basket, locale)}</dd></div>}
                     </dl>
                   </div>
                   <button type="button" className="reports-primary-button" onClick={() => void openReport(report.report_id)}>
@@ -190,7 +194,7 @@ function ReportDetailView({
           <h4>{detail.title}</h4>
           <p>{projectIdentity(detail, copy.notAvailable)}</p>
         </div>
-        <span className="report-validation-badge">{detail.validation_status}</span>
+        <StatusBadge tone="ready">{copy.available}</StatusBadge>
       </header>
 
       <div className="report-detail-actions">
@@ -209,17 +213,25 @@ function ReportDetailView({
       <dl className="report-metadata-grid">
         <div><dt>{copy.generatedAt}</dt><dd>{dateValue(detail.generated_at, locale, copy.notAvailable)}</dd></div>
         <div><dt>{copy.reportVersion}</dt><dd>{detail.report_version}</dd></div>
-        <div><dt>{copy.scannerRun}</dt><dd>{detail.scanner_run_id ?? copy.notAvailable}</dd></div>
+        <div><dt>{copy.reportType}</dt><dd>{copy.researchReport}</dd></div>
         <div><dt>{copy.chain}</dt><dd>{detail.chain ?? copy.notAvailable}</dd></div>
-        {detail.contract_address && <div><dt>{copy.contract}</dt><dd><code>{detail.contract_address}</code></dd></div>}
       </dl>
+
+      <TechnicalDetails label={copy.technicalDetails}>
+        <dl className="report-metadata-grid technical">
+          <div><dt>{copy.reportId}</dt><dd>{detail.report_id}</dd></div>
+          <div><dt>{copy.scannerRun}</dt><dd>{detail.scanner_run_id ?? copy.notAvailable}</dd></div>
+          {detail.contract_address && <div><dt>{copy.contract}</dt><dd><code>{detail.contract_address}</code></dd></div>}
+          <div><dt>{copy.format}</dt><dd>{detail.report_format.toUpperCase()}</dd></div>
+        </dl>
+      </TechnicalDetails>
 
       <ReportSection title={copy.researchSummary}>
         <dl className="report-inline-facts">
           <div><dt>{copy.candidates}</dt><dd>{detail.research_summary.candidates_count}</dd></div>
           <div><dt>{copy.reviewEntries}</dt><dd>{detail.research_summary.review_entries_count}</dd></div>
-          <div><dt>{copy.scannerSource}</dt><dd>{detail.research_summary.scanner_source}</dd></div>
-          <div><dt>{copy.contextSource}</dt><dd>{detail.research_summary.context_source}</dd></div>
+          <div><dt>{copy.scannerSource}</dt><dd>{formatProductSourceLabel(detail.research_summary.scanner_source)}</dd></div>
+          <div><dt>{copy.contextSource}</dt><dd>{formatProductSourceLabel(detail.research_summary.context_source)}</dd></div>
         </dl>
       </ReportSection>
 
@@ -236,7 +248,7 @@ function ReportDetailView({
             {detail.source_coverage.map((source) => (
               <li key={`${source.source_id}:${source.fetched_at}`}>
                 <strong>{source.source_name}</strong>
-                <span>{source.data_category} · {source.records_count} {copy.records} · {source.warnings_count} {copy.warnings}</span>
+                <span>{formatReportStatus(source.data_category, locale)} · {source.records_count} {copy.records} · {source.warnings_count} {copy.warnings}</span>
               </li>
             ))}
           </ul>
@@ -250,7 +262,7 @@ function ReportDetailView({
         </dl>
         {detail.security_observations.by_security_label.length > 0 && (
           <ul className="report-chip-list">
-            {detail.security_observations.by_security_label.map((item) => <li key={item.label}>{item.label}: {item.count}</li>)}
+            {detail.security_observations.by_security_label.map((item) => <li key={item.label}>{formatReportStatus(item.label, locale)}: {item.count}</li>)}
           </ul>
         )}
       </ReportSection>
@@ -258,7 +270,7 @@ function ReportDetailView({
       <ReportSection title={copy.riskFlags}>
         {detail.risk_flags.length > 0 ? (
           <ul className="report-chip-list warning">
-            {detail.risk_flags.map((flag) => <li key={flag.label}>{flag.label}: {flag.count}</li>)}
+            {detail.risk_flags.map((flag) => <li key={flag.label}>{formatReportStatus(flag.label, locale)}: {flag.count}</li>)}
           </ul>
         ) : <p>{copy.cannotInfer}</p>}
       </ReportSection>
@@ -268,7 +280,7 @@ function ReportDetailView({
           <ul className="report-candidate-list">
             {detail.candidates.map((candidate) => (
               <li key={candidate.candidate_id}>
-                <div><strong>{candidate.name} ({candidate.symbol})</strong><span>{candidate.chain} · {candidate.final_label}</span></div>
+                <div><strong>{candidate.name} ({candidate.symbol})</strong><span>{candidate.chain} · {formatReportStatus(candidate.final_label, locale)}</span></div>
                 <p>{candidate.reason}</p>
               </li>
             ))}
@@ -290,7 +302,7 @@ function ReportDetailView({
         {detail.review_notes.length > 0 ? (
           <ul className="report-candidate-list">
             {detail.review_notes.map((note) => (
-              <li key={`${note.candidate_id}:${note.updated_at}`}><div><strong>{note.name} ({note.symbol})</strong><span>{note.review_status}</span></div><p>{note.note}</p></li>
+              <li key={`${note.candidate_id}:${note.updated_at}`}><div><strong>{note.name} ({note.symbol})</strong><span>{formatReportStatus(note.review_status, locale)}</span></div><p>{note.note}</p></li>
             ))}
           </ul>
         ) : <MissingValue copy={copy} />}
@@ -336,6 +348,34 @@ function projectIdentity(report: ReportListItem, fallback: string): string {
   return report.project_name ?? report.candidate_name ?? report.symbol ?? fallback;
 }
 
+function formatBasket(value: string, locale: ProductLocale): string {
+  if (value === "new_emerging") return locale === "pl" ? "Nowe obserwacje" : "New observations";
+  if (value === "follow_up") return locale === "pl" ? "Dalsza obserwacja" : "Follow-up";
+  if (value === "established") return locale === "pl" ? "Established" : "Established";
+  return value.replaceAll("_", " ");
+}
+
+function formatReportStatus(value: string, locale: ProductLocale): string {
+  const normalized = value.trim().toUpperCase();
+  const labels: Record<string, [string, string]> = {
+    WATCHLIST: ["WATCHLIST — manual review only", "WATCHLIST — wyłącznie ręczna analiza"],
+    NEEDS_MANUAL_VERIFICATION: ["Manual verification required", "Wymaga ręcznej weryfikacji"],
+    CRITICAL_RISK: ["Critical risk", "Krytyczne ryzyko"],
+    REJECT: ["Rejected by filters", "Odrzucono przez filtry"],
+    NEW: ["New", "Nowe"],
+    TRIAGED: ["Triaged", "Przejrzane"],
+    PLANNED: ["Planned", "Zaplanowane"],
+    RESOLVED: ["Resolved", "Rozwiązane"],
+    CLOSED: ["Closed", "Zamknięte"],
+    SECURITY_PASSED: ["Check passed without a reported flag", "Kontrola bez wykrytej flagi"],
+    SECURITY_DATA_UNAVAILABLE: ["Security data unavailable", "Dane bezpieczeństwa niedostępne"],
+    NOT_CHECKED: ["Not checked", "Nie sprawdzono"],
+  };
+  const label = labels[normalized];
+  if (label) return label[locale === "pl" ? 1 : 0];
+  return value.replaceAll("_", " ").toLowerCase().replace(/^./, (character) => character.toUpperCase());
+}
+
 function dateValue(value: string | null, locale: ProductLocale, fallback: string): string {
   return value ? formatProductDateTime(value, locale) : fallback;
 }
@@ -373,6 +413,9 @@ const REPORTS_COPY = {
     chain: "Chain",
     basket: "Basket",
     openReport: "Open report",
+    available: "Available",
+    reportType: "Report type",
+    researchReport: "Research report",
     reportDetail: "Report detail",
     loadingReport: "Loading report…",
     selectReport: "Select a report to read it.",
@@ -382,6 +425,9 @@ const REPORTS_COPY = {
     openVerification: "Open manual verification",
     copyContract: "Copy contract",
     reportVersion: "Report version",
+    technicalDetails: "Technical details",
+    reportId: "Report ID",
+    format: "Format",
     scannerRun: "Scanner run ID",
     contract: "Contract address",
     researchSummary: "Research summary",
@@ -432,6 +478,9 @@ const REPORTS_COPY = {
     chain: "Sieć",
     basket: "Koszyk",
     openReport: "Otwórz raport",
+    available: "Dostępny",
+    reportType: "Typ raportu",
+    researchReport: "Raport badawczy",
     reportDetail: "Szczegóły raportu",
     loadingReport: "Ładowanie raportu…",
     selectReport: "Wybierz raport, aby go przeczytać.",
@@ -441,11 +490,14 @@ const REPORTS_COPY = {
     openVerification: "Otwórz ręczną weryfikację",
     copyContract: "Kopiuj kontrakt",
     reportVersion: "Wersja raportu",
+    technicalDetails: "Szczegóły techniczne",
+    reportId: "ID raportu",
+    format: "Format",
     scannerRun: "Scanner run ID",
     contract: "Adres kontraktu",
     researchSummary: "Podsumowanie badawcze",
     candidates: "Kandydaci",
-    reviewEntries: "Wpisy review",
+    reviewEntries: "Wpisy analizy",
     scannerSource: "Źródło skanera",
     contextSource: "Źródło kontekstu",
     sourceFreshness: "Aktualność źródeł",
@@ -461,9 +513,9 @@ const REPORTS_COPY = {
     candidateSnapshot: "Migawka kandydatów",
     manualVerification: "Wymagania ręcznej weryfikacji",
     manualRequired: "Wymaga ręcznej weryfikacji",
-    reviewNotes: "Notatki review",
+    reviewNotes: "Notatki analityczne",
     openQuestions: "Otwarte pytania",
-    nextReviewStep: "Następny krok review",
+    nextReviewStep: "Następny krok analizy",
     notAvailable: "Niedostępne",
     cannotInfer: "Nie można wyciągnąć wniosku",
   },

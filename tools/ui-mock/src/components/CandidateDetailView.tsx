@@ -24,7 +24,7 @@ import {
   type EstablishedPromotionStatus,
 } from "../services/establishedPromotionDataSource";
 import { EstablishedPromotionPanel } from "./EstablishedPromotionPanel";
-import { CopyableAddress, StatusBadge } from "./ProductUi";
+import { CopyableAddress, StatusBadge, TechnicalDetails } from "./ProductUi";
 
 interface CandidateDetailViewProps {
   candidate: UiTokenCandidate | null;
@@ -89,12 +89,7 @@ export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
     .map((condition) => formatBasicFilterCategory(condition.category, t));
   const failedFilters = filterResolution.conditions
     .filter((condition) => condition.state === "failed")
-    .map((condition) => {
-      const reasons = condition.failureReasons
-        .map((reason) => formatFilterReason(reason, locale).summary)
-        .join("; ");
-      return `${formatBasicFilterCategory(condition.category, t)} — ${reasons}`;
-    });
+    .map((condition) => buildFailedFilterRow(condition.category, condition.failureReasons, candidate, locale, t));
   const unknownFilters = filterResolution.conditions
     .filter((condition) => condition.state === "unknown")
     .map((condition) => formatBasicFilterCategory(condition.category, t));
@@ -160,10 +155,14 @@ export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
           <DetailField label={t("followUp.lastChecked")} value={formatProductDateTime(candidate.lastCheckedAt, locale)} />
           <DetailField label={t("detail.pairCreated")} value={candidate.pairCreatedAt ? formatProductDateTime(candidate.pairCreatedAt, locale) : t("radar.missingData")} />
           <DetailField label={t("detail.discoveryMethod")} value={formatDiscoveryMethod(candidate.discoveryMethod, locale)} />
-          <DetailField label={t("detail.runId")} value={candidate.runId} mono />
           <DetailField label={t("detail.universeVersion")} value={candidate.discoveryBasket === "established" ? candidate.universeVersion ?? t("radar.missingData") : t("detail.notApplicable")} />
           {candidate.universeEntryIndex != null && <DetailField label={t("detail.universeEntry")} value={String(candidate.universeEntryIndex)} />}
         </div>
+        <TechnicalDetails label={t("app.technicalDetails")}>
+          <dl className="product-control-details">
+            <div><dt>{t("detail.runId")}</dt><dd className="mono">{candidate.runId}</dd></div>
+          </dl>
+        </TechnicalDetails>
       </section>
 
       <section className="product-detail-section" aria-labelledby="filters-heading">
@@ -186,11 +185,10 @@ export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
             empty={t("detail.noPassedConditions")}
             tone="ready"
           />
-          <ConditionList
+          <FailedConditionList
             title={t("detail.conditionsNotMet")}
             items={failedFilters}
             empty={t("detail.noFailedConditions")}
-            tone={failedFilters.length > 0 ? "warning" : "neutral"}
           />
           {unknownFilters.length > 0 && (
             <ConditionList
@@ -332,6 +330,39 @@ function DetailField({
 
 function ConditionList({ title, items, empty, tone }: { title: string; items: string[]; empty: string; tone: "neutral" | "ready" | "warning" }) {
   return <div className={`condition-list ${tone}`}><strong>{title}</strong>{items.length > 0 ? <ul>{items.map((item) => <li key={item}>{item}</li>)}</ul> : <p>{empty}</p>}</div>;
+}
+
+type FailedFilterRow = {
+  name: string;
+  actual: string;
+  required: string;
+  description: string;
+};
+
+function FailedConditionList({ title, items, empty }: { title: string; items: FailedFilterRow[]; empty: string }) {
+  const { locale } = useProductLocale();
+  const copy = locale === "pl"
+    ? { actual: "Wartość", required: "Wymaganie" }
+    : { actual: "Actual", required: "Required" };
+  return (
+    <div className={`condition-list ${items.length > 0 ? "warning" : "neutral"}`}>
+      <strong>{title}</strong>
+      {items.length > 0 ? (
+        <div className="failed-condition-rows">
+          {items.map((item) => (
+            <article key={item.name} className="failed-condition-row">
+              <h4>{item.name}</h4>
+              <dl>
+                <div><dt>{copy.actual}</dt><dd>{item.actual}</dd></div>
+                <div><dt>{copy.required}</dt><dd>{item.required}</dd></div>
+              </dl>
+              <p>{item.description}</p>
+            </article>
+          ))}
+        </div>
+      ) : <p>{empty}</p>}
+    </div>
+  );
 }
 
 function FilterNoteList({
@@ -483,6 +514,40 @@ function formatLiquidityLock(candidate: UiTokenCandidate, locale: ProductLocale)
   return locale === "pl"
     ? `Potwierdzona · ${candidate.security.liquidityLockDays} dni`
     : `Confirmed · ${candidate.security.liquidityLockDays} days`;
+}
+
+function buildFailedFilterRow(
+  category: BasicFilterCategory,
+  reasons: string[],
+  candidate: UiTokenCandidate,
+  locale: ProductLocale,
+  t: ProductTranslator,
+): FailedFilterRow {
+  const missing = t("radar.missingData");
+  const actual = category === "market_cap"
+    ? formatProductUsd(candidate.marketCap ?? candidate.fdvUsd, locale, missing)
+    : category === "volume_24h"
+      ? formatProductUsd(candidate.volume24h, locale, missing)
+      : category === "liquidity"
+        ? formatProductUsd(candidate.liquidity, locale, missing)
+        : category === "volume_market_cap_ratio"
+          ? candidate.volumeMarketCapRatio == null ? missing : `${(candidate.volumeMarketCapRatio * 100).toFixed(2)}%`
+          : candidate.pairAgeDays == null
+            ? missing
+            : locale === "pl" ? `${candidate.pairAgeDays} dni` : `${candidate.pairAgeDays} days`;
+  const required = category === "market_cap"
+    ? "$300k–$10m"
+    : category === "volume_24h" || category === "liquidity"
+      ? "≥ $30k"
+      : category === "volume_market_cap_ratio"
+        ? "1%–100%"
+        : locale === "pl" ? "> 7 dni" : "> 7 days";
+  return {
+    name: formatBasicFilterCategory(category, t),
+    actual,
+    required,
+    description: reasons.map((reason) => formatFilterReason(reason, locale).summary).join(" "),
+  };
 }
 
 function shortenAddress(value: string, missing: string): string {

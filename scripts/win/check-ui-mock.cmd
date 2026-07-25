@@ -28,6 +28,11 @@ call node --import tsx --test tests\productRadar.test.ts
 if errorlevel 1 exit /b %ERRORLEVEL%
 
 echo.
+echo === Run Premium UI.2 presentation contracts ===
+call pnpm run test:premium-ui2
+if errorlevel 1 exit /b %ERRORLEVEL%
+
+echo.
 echo === Run fail-closed real-data boundary tests ===
 call node --import tsx --test tests\realDataBoundary.test.ts
 if errorlevel 1 exit /b %ERRORLEVEL%

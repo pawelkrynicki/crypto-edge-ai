@@ -17,7 +17,7 @@ export const DEFAULT_PRODUCT_LOCALE = "en" as const;
 export type ProductLocale = "en" | "pl";
 
 const EN = {
-  "app.tagline": "Product Radar · no investment recommendations",
+  "app.tagline": "Digital asset research radar",
   "app.productEyebrow": "Digital asset research",
   "app.workspaceEyebrow": "Research workspace",
   "app.currentContext": "Current context",
@@ -484,7 +484,7 @@ const EN = {
   "method.newTitle": "New / Emerging",
   "method.newDetail": "The latest DexScreener profiles. Projects are very new, remain observation-only, and never move automatically into Established.",
   "method.followUpTitle": "Maturing / follow-up",
-  "method.followUpDetail": "Validated chain + contract identities remain under checkpoint-based observation. Candidate for Established means an owner decision, not safety or approval.",
+  "method.followUpDetail": "Validated network and contract identities remain under checkpoint-based observation. Candidate for Established means an owner decision, not safety or approval.",
   "method.establishedTitle": "Established",
   "method.establishedDetail": "An owner-maintained, versioned chain + contract address list. GoPlus runs only after the filters pass.",
   "method.sources": "Data sources",
@@ -505,7 +505,7 @@ type TranslationKey = keyof typeof EN;
 type TranslationTable = { [K in TranslationKey]: string };
 
 const PL: TranslationTable = {
-  "app.tagline": "Product Radar · bez rekomendacji inwestycyjnych",
+  "app.tagline": "Radar badawczy aktywów cyfrowych",
   "app.productEyebrow": "Analiza aktywów cyfrowych",
   "app.workspaceEyebrow": "Przestrzeń badawcza",
   "app.currentContext": "Aktualny kontekst",
@@ -972,7 +972,7 @@ const PL: TranslationTable = {
   "method.newTitle": "Nowe / Emerging",
   "method.newDetail": "Najnowsze profile DexScreener. Projekty są bardzo nowe, pozostają wyłącznie obserwacyjne i nie awansują automatycznie do Established.",
   "method.followUpTitle": "Dalsza obserwacja / Follow-up",
-  "method.followUpDetail": "Zwalidowane tożsamości chain + contract_address pozostają w obserwacji checkpointowej. Candidate for Established oznacza decyzję ownera, nie bezpieczeństwo ani zatwierdzenie.",
+  "method.followUpDetail": "Zwalidowane tożsamości sieci i kontraktu pozostają w obserwacji okresowej. Candidate for Established oznacza decyzję właściciela, nie bezpieczeństwo ani zatwierdzenie.",
   "method.establishedTitle": "Established",
   "method.establishedDetail": "Utrzymywana przez właściciela, wersjonowana lista sieci i adresów kontraktów. GoPlus uruchamia się dopiero po przejściu filtrów.",
   "method.sources": "Źródła danych",

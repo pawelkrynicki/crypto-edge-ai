@@ -12,7 +12,7 @@ set "CRYPTO_EDGE_RUNTIME_MODE=INTERNAL_BETA"
 set "CRYPTO_EDGE_FEEDBACK_SQLITE_PATH=%TEMP%\crypto-edge-premium-ui-%RANDOM%-%RANDOM%.sqlite"
 
 echo.
-echo === Crypto Edge AI: Premium UI.1 offline gate ===
+echo === Crypto Edge AI: Premium UI.1 + UI.2 offline gate ===
 
 cd /d "%UI_DIR%"
 if errorlevel 1 exit /b 1
@@ -25,6 +25,20 @@ if not exist "node_modules\.bin\tsx.cmd" (
 echo.
 echo === Premium UI contracts ===
 call pnpm run test:premium-ui
+if errorlevel 1 exit /b %ERRORLEVEL%
+
+echo.
+echo === Premium UI.2 contracts ===
+call pnpm run test:premium-ui2
+if errorlevel 1 exit /b %ERRORLEVEL%
+
+echo.
+echo === Control Center, Reports and Feedback ===
+call pnpm run test:control-center
+if errorlevel 1 exit /b %ERRORLEVEL%
+call pnpm run test:reports
+if errorlevel 1 exit /b %ERRORLEVEL%
+call pnpm run test:feedback
 if errorlevel 1 exit /b %ERRORLEVEL%
 
 echo.
