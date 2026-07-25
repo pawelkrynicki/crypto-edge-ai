@@ -6398,3 +6398,328 @@ button:disabled,
 @media (prefers-reduced-motion: reduce) {
   .product-technical-details-content { animation: none !important; }
 }
+.radar-lifecycle-guide {
+  margin: 0 0 18px;
+  border: 1px solid var(--color-border-default);
+  border-radius: 14px;
+  background: var(--color-surface-1);
+}
+
+.radar-lifecycle-guide summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+  color: var(--color-text-primary);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.radar-lifecycle-guide ol {
+  margin: 0;
+  padding: 0 34px 16px 42px;
+  color: var(--color-text-helper);
+  line-height: 1.55;
+}
+
+.token-lifecycle-flow,
+.token-lifecycle-flow *,
+.token-lifecycle-status,
+.token-lifecycle-status *,
+.token-checkpoint-axis,
+.token-checkpoint-axis * {
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.token-lifecycle-flow {
+  margin: 16px 0;
+}
+
+.token-lifecycle-stages {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+}
+
+.token-lifecycle-stage {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: 76px;
+  padding: 12px;
+  border: 1px solid var(--color-border-default);
+  border-radius: 12px;
+  background: var(--color-surface-2);
+}
+
+.token-lifecycle-stage.completed {
+  border-color: color-mix(in srgb, var(--color-status-ready) 45%, var(--color-border-default));
+}
+
+.token-lifecycle-stage.current {
+  border-color: var(--color-border-active);
+  box-shadow: inset 0 0 0 1px var(--color-border-active);
+}
+
+.token-lifecycle-stage.blocked {
+  border-color: color-mix(in srgb, var(--color-status-not-ready) 55%, var(--color-border-default));
+}
+
+.token-lifecycle-stage.unavailable {
+  border-style: dashed;
+  opacity: 0.78;
+}
+
+.token-lifecycle-index {
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  color: var(--color-text-helper);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.token-lifecycle-stage.completed .token-lifecycle-index {
+  color: var(--color-status-ready);
+}
+
+.token-lifecycle-stage.current .token-lifecycle-index {
+  color: var(--color-border-active);
+}
+
+.token-lifecycle-stage-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.token-lifecycle-stage-copy strong,
+.token-lifecycle-stage-copy small {
+  overflow-wrap: anywhere;
+}
+
+.token-lifecycle-stage-copy strong {
+  color: var(--color-text-primary);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.token-lifecycle-stage-copy small {
+  color: var(--color-text-helper);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.token-lifecycle-flow.compact .token-lifecycle-stage {
+  min-height: 64px;
+  padding: 9px;
+}
+
+.token-lifecycle-flow.compact .token-lifecycle-index {
+  width: 22px;
+  height: 22px;
+}
+
+.token-lifecycle-status {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 14px;
+  margin: 12px 0 16px;
+  padding: 14px;
+  border-left: 3px solid var(--color-border-active);
+  border-radius: 10px;
+  background: var(--color-surface-2);
+}
+
+.token-lifecycle-status.blocked,
+.token-lifecycle-status.unavailable,
+.token-lifecycle-status.complete {
+  border-left-color: var(--color-status-warning);
+}
+
+.token-lifecycle-status strong,
+.token-lifecycle-status dt {
+  color: var(--color-text-primary);
+}
+
+.token-lifecycle-status p,
+.token-lifecycle-status dd {
+  margin: 4px 0 0;
+  color: var(--color-text-helper);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.token-lifecycle-status dl {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.token-lifecycle-status dt {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.token-lifecycle-status dd {
+  font-size: 12px;
+}
+
+.token-checkpoint-axis {
+  margin: 14px 0;
+  padding: 14px;
+  border: 1px solid var(--color-border-default);
+  border-radius: 12px;
+  background: var(--color-surface-1);
+}
+
+.token-checkpoint-axis > strong {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--color-text-primary);
+}
+
+.token-checkpoint-axis ol {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+}
+
+.token-checkpoint-axis li {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  min-height: 82px;
+  padding: 9px;
+  border: 1px solid var(--color-border-default);
+  border-radius: 10px;
+  background: var(--color-surface-2);
+}
+
+.token-checkpoint-axis li.completed {
+  border-color: color-mix(in srgb, var(--color-status-ready) 45%, var(--color-border-default));
+}
+
+.token-checkpoint-axis li.current {
+  border-color: var(--color-border-active);
+}
+
+.token-checkpoint-axis li.skipped {
+  border-color: var(--color-status-warning);
+  border-style: dashed;
+}
+
+.token-checkpoint-axis li > span {
+  color: var(--color-text-primary);
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.token-checkpoint-axis li > strong,
+.token-checkpoint-axis li > small,
+.token-checkpoint-axis > p {
+  color: var(--color-text-helper);
+  overflow-wrap: anywhere;
+}
+
+.token-checkpoint-axis li > strong {
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.token-checkpoint-axis li > small {
+  margin-top: 5px;
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.token-checkpoint-axis > p {
+  margin: 10px 0 0;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.token-tracking-facts,
+.lifecycle-source-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 12px 0 16px;
+}
+
+.lifecycle-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.lifecycle-detail-section {
+  border-color: var(--color-border-active);
+}
+
+.established-source-note {
+  margin: 14px 0 0;
+  padding: 12px;
+  border-left: 3px solid var(--color-status-ready);
+  background: var(--color-surface-2);
+  color: var(--color-text-helper);
+  line-height: 1.5;
+}
+
+.follow-up-actions {
+  align-items: center;
+}
+
+.follow-up-actions > p {
+  max-width: 60ch;
+}
+
+@media (max-width: 700px) {
+  .token-lifecycle-stages {
+    grid-template-columns: 1fr;
+  }
+
+  .token-lifecycle-stage {
+    min-height: 0;
+  }
+
+  .token-lifecycle-status,
+  .lifecycle-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .token-checkpoint-axis ol {
+    grid-template-columns: 1fr;
+  }
+
+  .token-checkpoint-axis li {
+    grid-template-columns: 34px 54px minmax(0, 1fr);
+    align-items: center;
+    min-height: 0;
+  }
+}
+
+@media (max-width: 420px) {
+  .radar-lifecycle-guide ol {
+    padding-right: 20px;
+  }
+
+  .token-tracking-facts,
+  .lifecycle-source-facts {
+    grid-template-columns: 1fr;
+  }
+}

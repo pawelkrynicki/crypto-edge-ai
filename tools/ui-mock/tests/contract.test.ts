@@ -1230,7 +1230,7 @@ const externalChecksMarkup = renderToStaticMarkup(React.createElement(ExternalVe
 }));
 
 assert.match(externalChecksMarkup, /Manual source verification/, "external checks view exists");
-assert.match(externalChecksMarkup, /Copy address/, "external checks supports copying the real contract address");
+assert.match(externalChecksMarkup, /Copy contract address/, "external checks supports copying the real contract address");
 assert.match(externalChecksMarkup, /Network explorer/, "external checks explains the explorer target");
 assert.match(externalChecksMarkup, /DexScreener/, "external checks explains the DEX target");
 assert.match(externalChecksMarkup, /Record source/, "external checks explains the source target");

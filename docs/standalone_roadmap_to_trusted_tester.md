@@ -4,7 +4,13 @@
 
 Candidate Detail ma backend-gated sekcję ownera z read-only statusem i dry-run preview. Jedyny POST przyjmuje tylko podpisany one-time `preview_id` i potwierdzenie, ponownie sprawdza canonical record, lifecycle, basic filters, membership, universe version/checksum i lock, a następnie bezpośrednio używa Established Universe Managera.
 
-Tester nie widzi panelu ani capability. Nie ma automatycznego awansu, live provider calls, aktywacji `ENABLED`, VPS/Cloudflare/Task Scheduler changes. Persistent Feedback Loop został zaakceptowany lokalnie 23.07.2026; Premium UI.1 został zaakceptowany przez ownera (`ACCEPT_LOCAL_CODE`, commit `af0ca670d31527434cdda91910b74741b544cb3f`), UI.2 domyka powierzchnie trust/feedback/research, a następnym etapem P0 jest UI.3. Deployment pozostaje późniejszy od UI.3 i lokalnego Release Candidate.
+Tester nie widzi panelu ani kontrolek capability. Nie ma automatycznego awansu, live provider calls, aktywacji `ENABLED`, VPS/Cloudflare/Task Scheduler changes. Persistent Feedback Loop został zaakceptowany lokalnie 23.07.2026; Premium UI.1 i UI.2 mają werdykt `ACCEPT_LOCAL_CODE`, a bieżącym etapem jest FLOW.1. Następnie realizowane są AI.1 i UI.3. Deployment pozostaje późniejszy od UI.3 i lokalnego Release Candidate.
+
+## FLOW.1 — widoczny przepływ tokena
+
+Radar i Candidate Detail pokazują **Nowe → Dalsza obserwacja → Kandydat do Established → Główny Radar** bez tworzenia nowego źródła lifecycle. Poprawna tożsamość `chain + contract_address` jest automatycznie zapisywana do Follow-up w centralnym cyklu; UI pokazuje aktywne śledzenie albo neutralne oczekiwanie, ale nie oferuje ręcznego przycisku ingestu.
+
+Tester widzi checkpointy 1/3/7/14/30, status filtrów i security, brak automatycznej promocji oraz następny krok. Owner zachowuje jedyny istniejący backend-gated flow: status → podpisany dry-run → checkbox → dialog z dokładną tożsamością → najwyżej jeden POST w `ENABLED`. Local review pozostaje w `REVIEW_SAFE`; test zapisu używa wyłącznie temporary universe i injected product data.
 
 ## Status
 
@@ -20,7 +26,7 @@ Tester nie widzi panelu ani capability. Nie ma automatycznego awansu, live provi
 
 Wykryte tokeny są zachowywane według `chain + contract_address` i sprawdzane w checkpointach 1/3/7/14/30 dni przez istniejący centralny collector. `Candidate for Established` wymaga osobnej decyzji ownera i nigdy nie jest automatyczną promocją. Tester widzi lifecycle i statusy, ale nie może uruchamiać providerów ani zmieniać store. Overall preview pozostaje `NOT_READY`.
 
-Kolejność po local owner review: Final Frontend Polish / Premium UI Pass → lokalna regresja i Release Candidate → finalny VPS deployment → Cloudflare/scheduler/smoke/rollback → sesja testera i poprawki P0 → freeze do 15.08.
+Kolejność po local owner review: FLOW.1 → AI.1 Visual Candidate Research Brief → UI.3 accessibility i cross-browser → lokalna regresja i Release Candidate → finalny VPS deployment → Cloudflare/scheduler/smoke/rollback → sesja testera i poprawki P0 → freeze do 15.08.
 
 ## Timing Context
 
@@ -471,11 +477,13 @@ Status: **gotowy lokalnie i zaakceptowany — `ACCEPT_LOCAL_CODE`, 23.07.2026**.
 
 Pozostałe bramki to Premium UI, lokalny Release Candidate, Trusted Tester Preview Mode, VPS, Cloudflare Access i domain smoke, rollback oraz owner approval. Dalsza kolejność jest stała:
 
-1. Final Frontend Polish / Premium UI Pass.
-2. Local regression and Release Candidate.
-3. Final VPS deployment.
-4. Cloudflare, scheduler, smoke and rollback.
-5. Trusted tester session and P0 fixes.
-6. Freeze by 15.08.
+1. FLOW.1 — visible token lifecycle.
+2. AI.1 — Visual Candidate Research Brief.
+3. UI.3 — accessibility and cross-browser.
+4. Local regression and Release Candidate.
+5. Final VPS deployment.
+6. Cloudflare, scheduler, smoke and rollback.
+7. Trusted tester session and P0 fixes.
+8. Freeze by 15.08.
 
 Feedback `READY` closes only the feedback gate. External tester access remains `NO-GO` and overall remains `NOT_READY` until deployment, access smoke, rollback and owner approval are complete.

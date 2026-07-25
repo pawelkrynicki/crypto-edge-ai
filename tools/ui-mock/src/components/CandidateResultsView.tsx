@@ -25,6 +25,10 @@ import {
   resolveProductSecurityState,
   type ProductSecurityState,
 } from "../productSecurityResolver";
+import {
+  findFollowUpByIdentity,
+  resolveTokenLifecycle,
+} from "../tokenLifecycle";
 import type {
   ProductReadinessOutput,
   ScannerDiscoveryMetadata,
@@ -32,6 +36,11 @@ import type {
 } from "../types/scannerTypes";
 import type { FollowUpPublicEntry, FollowUpPublicStatus } from "../types/followUpTypes";
 import { CopyableAddress, StatusBadge } from "./ProductUi";
+import {
+  TokenCheckpointAxis,
+  TokenLifecycleFlow,
+  TokenLifecycleStatus,
+} from "./TokenLifecycleFlow";
 
 type BasketId = "new_emerging" | "maturing" | "established";
 type Tone = "neutral" | "accent" | "warning" | "critical" | "ready";
@@ -49,6 +58,7 @@ interface CandidateResultsViewProps {
   followUpStatus?: FollowUpPublicStatus | null;
   followUpEntries?: FollowUpPublicEntry[];
   onOpenCandidate?: (candidateId: string) => void;
+  onOpenFollowUp?: (entryId: string) => void;
   onOpenExternalChecks?: (candidate: UiTokenCandidate) => void;
 }
 
@@ -65,6 +75,7 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
   followUpStatus = null,
   followUpEntries = [],
   onOpenCandidate,
+  onOpenFollowUp,
   onOpenExternalChecks,
 }) => {
   const { locale, t } = useProductLocale();
@@ -129,6 +140,17 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
         />
       </section>
 
+      <details className="radar-lifecycle-guide">
+        <summary>{locale === "pl" ? "Jak token przechodzi przez Radar" : "How a token moves through Radar"}</summary>
+        <ol>
+          <li>{locale === "pl" ? "Nowy token zostaje wykryty." : "A new token is detected."}</li>
+          <li>{locale === "pl" ? "Poprawna tożsamość jest automatycznie zapisywana do dalszej obserwacji." : "A valid identity is enrolled in follow-up automatically."}</li>
+          <li>{locale === "pl" ? "Token przechodzi checkpointy 1 / 3 / 7 / 14 / 30 dni." : "The token moves through 1 / 3 / 7 / 14 / 30-day checkpoints."}</li>
+          <li>{locale === "pl" ? "Po spełnieniu filtrów może zostać kandydatem." : "After meeting the filters, it may become a candidate."}</li>
+          <li>{locale === "pl" ? "Tylko właściciel może dodać go do Głównego Radaru." : "Only the owner can add it to the Main Radar."}</li>
+        </ol>
+      </details>
+
       <section className="product-summary-grid operational" aria-label={t("radar.data")}>
         <SummaryCard label={t("radar.establishedAfterFilters")} value={String(establishedAfterFilters)} detail={t("radar.candidatesForReview")} />
         <SummaryCard label={t("radar.securityChecked")} value={String(securityChecked)} detail={t("radar.goPlusAfterFilters")} />
@@ -182,11 +204,17 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
           candidates={newCandidates}
           metadata={metadata?.new_emerging}
           readiness={readiness}
+          followUpEntries={followUpEntries}
+          followUpStatus={followUpStatus}
           onOpenCandidate={onOpenCandidate}
           onOpenExternalChecks={onOpenExternalChecks}
         />
       ) : activeBasket === "maturing" ? (
-        <MaturingFollowUpBasket entries={followUpLayerEntries} status={followUpStatus} />
+        <MaturingFollowUpBasket
+          entries={followUpLayerEntries}
+          status={followUpStatus}
+          onOpenFollowUp={onOpenFollowUp}
+        />
       ) : (
         <EstablishedBasket
           candidates={establishedCandidates}
@@ -203,9 +231,11 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
 export function MaturingFollowUpBasket({
   entries,
   status,
+  onOpenFollowUp,
 }: {
   entries: FollowUpPublicEntry[];
   status?: FollowUpPublicStatus | null;
+  onOpenFollowUp?: (entryId: string) => void;
 }) {
   const { locale, t } = useProductLocale();
   if (status && (!status.store_available || status.validation_status === "invalid" || status.validation_status === "unavailable")) {
@@ -231,7 +261,9 @@ export function MaturingFollowUpBasket({
         <StatusBadge tone="manual" className="basket-status observation">{t("followUp.readOnly")}</StatusBadge>
       </header>
       <div className="product-candidate-list">
-        {entries.map((entry) => (
+        {entries.map((entry) => {
+          const lifecycle = resolveTokenLifecycle({ followUp: entry, followUpStatus: status });
+          return (
           <article className={`product-candidate-card follow-up ${entry.lifecycle_status.toLowerCase()}`} key={entry.entry_id}>
             <header className="product-candidate-topline">
               <div>
@@ -253,6 +285,9 @@ export function MaturingFollowUpBasket({
             {entry.lifecycle_status === "CANDIDATE_FOR_ESTABLISHED" && (
               <p className="follow-up-candidate-boundary">{t("followUp.candidateBoundary")}</p>
             )}
+            <TokenLifecycleFlow model={lifecycle} compact />
+            <TokenLifecycleStatus model={lifecycle} />
+            <TokenCheckpointAxis model={lifecycle} />
             <div className="product-metrics-grid">
               <Metric label={t("radar.pairAge")} value={formatProductPairAge(entry.pair_age, locale, t("radar.missingData"))} />
               <Metric label={t("followUp.firstSeen")} value={formatProductElapsedSince(entry.first_seen_at, new Date(), locale, t("radar.missingData"))} />
@@ -264,11 +299,19 @@ export function MaturingFollowUpBasket({
             </div>
             <div className="candidate-explanation-grid">
               <Explanation label={t("followUp.nextReviewStep")} value={formatFollowUpNextStep(entry.next_review_step, locale)} />
-              <Explanation label={t("detail.missingData")} value={entry.missing_data.length > 0 ? entry.missing_data.join(", ") : t("detail.noMissingData")} />
+              <Explanation label={t("detail.missingData")} value={formatFollowUpMissingData(entry.missing_data, locale, t("detail.noMissingData"))} />
               <Explanation label={t("followUp.establishedMembership")} value={entry.established_membership ? t("control.value.yes") : t("control.value.no")} />
             </div>
+            {onOpenFollowUp && (
+              <footer className="product-candidate-footer follow-up-actions">
+                <p>{entry.lifecycle_status === "CANDIDATE_FOR_ESTABLISHED"
+                  ? (locale === "pl" ? "Nie dodano automatycznie. Następny krok: decyzja właściciela." : "Not promoted automatically. Next: owner decision.")
+                  : (locale === "pl" ? "Dalsze sprawdzenie nastąpi automatycznie." : "The next check happens automatically.")}</p>
+                <button type="button" onClick={() => onOpenFollowUp(entry.entry_id)}>{t("radar.openDetails")}</button>
+              </footer>
+            )}
           </article>
-        ))}
+        );})}
       </div>
     </section>
   );
@@ -278,12 +321,16 @@ export function NewEmergingBasket({
   candidates,
   metadata,
   readiness,
+  followUpEntries = [],
+  followUpStatus,
   onOpenCandidate,
   onOpenExternalChecks,
 }: {
   candidates: UiTokenCandidate[];
   metadata?: ScannerDiscoveryMetadata["new_emerging"];
   readiness?: ProductReadinessOutput | null;
+  followUpEntries?: FollowUpPublicEntry[];
+  followUpStatus?: FollowUpPublicStatus | null;
   onOpenCandidate?: (candidateId: string) => void;
   onOpenExternalChecks?: (candidate: UiTokenCandidate) => void;
 }) {
@@ -334,6 +381,8 @@ export function NewEmergingBasket({
           <NewCandidateCard
             key={candidate.id}
             candidate={candidate}
+            followUp={findFollowUpByIdentity(followUpEntries, candidate)}
+            followUpStatus={followUpStatus}
             onOpenCandidate={onOpenCandidate}
             onOpenExternalChecks={onOpenExternalChecks}
           />
@@ -345,15 +394,20 @@ export function NewEmergingBasket({
 
 function NewCandidateCard({
   candidate,
+  followUp,
+  followUpStatus,
   onOpenCandidate,
   onOpenExternalChecks,
 }: {
   candidate: UiTokenCandidate;
+  followUp?: FollowUpPublicEntry | null;
+  followUpStatus?: FollowUpPublicStatus | null;
   onOpenCandidate?: (candidateId: string) => void;
   onOpenExternalChecks?: (candidate: UiTokenCandidate) => void;
 }) {
   const { locale, t } = useProductLocale();
   const reasons = candidate.filterReasons.slice(0, 3);
+  const lifecycle = resolveTokenLifecycle({ candidate, followUp, followUpStatus });
   return (
     <article className="product-candidate-card observation">
       <header className="product-candidate-topline">
@@ -372,6 +426,15 @@ function NewCandidateCard({
         </div>
         <StatusBadge tone="manual" className="basket-status observation">{t("radar.observationLabel")}</StatusBadge>
       </header>
+
+      <TokenLifecycleFlow model={lifecycle} compact />
+      <TokenLifecycleStatus model={lifecycle} />
+      {followUp && (
+        <div className="token-tracking-facts">
+          <Metric label={t("followUp.firstSeen")} value={formatProductDateTime(followUp.first_seen_at, locale)} />
+          <Metric label={t("followUp.nextCheckpoint")} value={followUp.next_check_at ? formatProductDateTime(followUp.next_check_at, locale) : t("followUp.noAutomaticCheck")} />
+        </div>
+      )}
 
       <div className="product-metrics-grid">
         <Metric label={t("radar.pairAge")} value={formatProductPairAge(candidate.pairAgeDays, locale, t("radar.missingData"), { pairCreatedAt: candidate.pairCreatedAt })} />
@@ -508,6 +571,7 @@ function EstablishedCandidateCard({
 }) {
   const { locale, t } = useProductLocale();
   const status = getEstablishedCandidateStatus(candidate, locale);
+  const lifecycle = resolveTokenLifecycle({ candidate, establishedMembership: true });
   const securityResolution = resolveProductSecurityState(candidate);
   const riskFlags = candidate.riskFlags.slice(0, 3);
   const riskItems = securityResolution.state === "not_invoked"
@@ -544,6 +608,9 @@ function EstablishedCandidateCard({
           {candidate.finalLabel === "WATCHLIST" && <small>{t("radar.manualReviewOnly")}</small>}
         </div>
       </header>
+
+      <TokenLifecycleFlow model={lifecycle} compact />
+      <TokenLifecycleStatus model={lifecycle} />
 
       <div className="product-metrics-grid established">
         <Metric label={t("radar.addressIdentity")} value={candidate.addressIdentityVerified ? t("radar.verified") : t("radar.needsVerification")} tone={candidate.addressIdentityVerified ? "ready" : "warning"} />
@@ -775,10 +842,26 @@ function formatFollowUpSecurity(value: string, locale: ProductLocale): string {
 }
 
 function formatFollowUpNextStep(value: FollowUpPublicEntry["next_review_step"], locale: ProductLocale): string {
-  if (value === "OWNER_DECISION_REQUIRED") return locale === "pl" ? "Ręczna decyzja ownera" : "Owner decision required";
+  if (value === "OWNER_DECISION_REQUIRED") return locale === "pl" ? "Decyzja właściciela" : "Owner decision required";
   if (value === "ESTABLISHED_MONITORING") return locale === "pl" ? "Monitoring w Established" : "Established monitoring";
   if (value === "FOLLOW_UP_COMPLETE") return locale === "pl" ? "Plan Follow-up zakończony" : "Follow-up plan complete";
   return locale === "pl" ? "Poczekaj na następny checkpoint" : "Wait for the next checkpoint";
+}
+
+function formatFollowUpMissingData(values: string[], locale: ProductLocale, empty: string): string {
+  if (values.length === 0) return empty;
+  const normalized = new Set(values.map((value) => value.trim().toLowerCase()));
+  const labels: string[] = [];
+  if ([...normalized].some((value) => value.includes("security"))) {
+    labels.push(locale === "pl" ? "Brakuje części danych bezpieczeństwa" : "Some security data is unavailable");
+  }
+  if ([...normalized].some((value) => value.includes("market") || value.includes("liquidity") || value.includes("volume"))) {
+    labels.push(locale === "pl" ? "Brakuje części danych rynkowych" : "Some market data is unavailable");
+  }
+  if (labels.length === 0) {
+    labels.push(locale === "pl" ? "Część danych checkpointu jest niedostępna" : "Some checkpoint data is unavailable");
+  }
+  return labels.join(" · ");
 }
 
 function shortenAddress(value: string, missing: string): string {

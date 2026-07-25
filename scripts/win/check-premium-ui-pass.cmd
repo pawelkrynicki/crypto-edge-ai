@@ -33,6 +33,11 @@ call pnpm run test:premium-ui2
 if errorlevel 1 exit /b %ERRORLEVEL%
 
 echo.
+echo === FLOW.1 visible token lifecycle contracts ===
+call pnpm run test:flow1
+if errorlevel 1 exit /b %ERRORLEVEL%
+
+echo.
 echo === Control Center, Reports and Feedback ===
 call pnpm run test:control-center
 if errorlevel 1 exit /b %ERRORLEVEL%

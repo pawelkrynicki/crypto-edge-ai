@@ -15,6 +15,7 @@
     "test:product-radar": "node --import tsx --test tests/productRadar.test.ts",
     "test:premium-ui": "node --import tsx --test tests/premiumUiPass.test.ts",
     "test:premium-ui2": "node --import tsx --test tests/premiumUi2Pass.test.ts",
+    "test:flow1": "node --import tsx --test tests/tokenFlow.test.ts tests/followUpBasket.test.ts tests/establishedPromotion.test.ts tests/establishedPromotionUi.test.tsx",
     "test:control-center": "node --import tsx --test tests/controlCenter.test.ts",
     "test:reports": "node --import tsx --test tests/reportsLibrary.test.ts",
     "test:owner-operations": "node --import tsx --test tests/ownerOperations.test.ts",

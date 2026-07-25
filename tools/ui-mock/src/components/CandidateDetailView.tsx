@@ -17,18 +17,30 @@ import {
   resolveProductSecurityState,
   type ProductSecurityState,
 } from "../productSecurityResolver";
+import {
+  resolveTokenLifecycle,
+  type TokenLifecycleViewModel,
+} from "../tokenLifecycle";
 import type { UiTokenCandidate } from "../types/scannerTypes";
-import type { FollowUpPublicEntry } from "../types/followUpTypes";
+import type { FollowUpPublicEntry, FollowUpPublicStatus } from "../types/followUpTypes";
 import {
   loadEstablishedPromotionStatus,
   type EstablishedPromotionStatus,
 } from "../services/establishedPromotionDataSource";
 import { EstablishedPromotionPanel } from "./EstablishedPromotionPanel";
 import { CopyableAddress, StatusBadge, TechnicalDetails } from "./ProductUi";
+import {
+  lifecycleActionLabel,
+  lifecycleBlockingLabel,
+  lifecycleStageLabel,
+  TokenLifecycleFlow,
+  TokenLifecycleStatus,
+} from "./TokenLifecycleFlow";
 
 interface CandidateDetailViewProps {
   candidate: UiTokenCandidate | null;
   followUp?: FollowUpPublicEntry | null;
+  followUpStatus?: FollowUpPublicStatus | null;
   onBackToResults?: () => void;
   onOpenExternalChecks?: (candidate: UiTokenCandidate) => void;
   initialOwnerPromotionStatus?: EstablishedPromotionStatus | null;
@@ -37,6 +49,7 @@ interface CandidateDetailViewProps {
 export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
   candidate,
   followUp = null,
+  followUpStatus,
   onBackToResults,
   onOpenExternalChecks,
   initialOwnerPromotionStatus,
@@ -50,18 +63,28 @@ export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
       setOwnerPromotionStatus(initialOwnerPromotionStatus);
       return;
     }
-    if (!candidate?.chain || !candidate.contractAddress) {
+    const chain = candidate?.chain ?? followUp?.chain;
+    const contractAddress = candidate?.contractAddress ?? followUp?.contract_address;
+    if (!chain || !contractAddress) {
       setOwnerPromotionStatus(null);
       return;
     }
     let cancelled = false;
     setOwnerPromotionStatus(null);
-    void loadEstablishedPromotionStatus(candidate.chain, candidate.contractAddress).then((status) => {
+    void loadEstablishedPromotionStatus(chain, contractAddress).then((status) => {
       if (!cancelled) setOwnerPromotionStatus(status?.owner_controls_visible ? status : null);
     });
     return () => { cancelled = true; };
-  }, [candidate?.chain, candidate?.contractAddress, initialOwnerPromotionStatus]);
-  if (!candidate) {
+  }, [candidate?.chain, candidate?.contractAddress, followUp?.chain, followUp?.contract_address, initialOwnerPromotionStatus]);
+  const lifecycle = resolveTokenLifecycle({
+    candidate,
+    followUp,
+    followUpStatus,
+    establishedMembership: ownerPromotionStatus?.established_membership === "ACTIVE"
+      || followUp?.established_membership === true
+      || candidate?.discoveryBasket === "established",
+  });
+  if (!candidate && !followUp) {
     return (
       <section className="candidate-detail-empty product-detail-empty">
         <span className="candidate-detail-eyebrow">{t("detail.eyebrow")}</span>
@@ -71,6 +94,18 @@ export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
       </section>
     );
   }
+  if (!candidate && followUp) {
+    return (
+      <FollowUpOnlyDetail
+        followUp={followUp}
+        lifecycle={lifecycle}
+        ownerPromotionStatus={ownerPromotionStatus}
+        onOwnerPromotionStatusChange={setOwnerPromotionStatus}
+        onBackToResults={onBackToResults}
+      />
+    );
+  }
+  if (!candidate) return null;
 
   const basketLabel = candidate.discoveryBasket === "established"
     ? "Established"
@@ -135,8 +170,14 @@ export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
         </div>
       </section>
 
+      <LifecycleDetailSection
+        model={lifecycle}
+        followUp={followUp}
+        universeVersion={candidate.discoveryBasket === "established" ? candidate.universeVersion : null}
+      />
+
       <section className="product-detail-section" aria-labelledby="market-heading">
-        <SectionHeader id="market-heading" index="2" title={t("detail.marketData")} />
+        <SectionHeader id="market-heading" index="3" title={t("detail.marketData")} />
         <div className="product-detail-grid market">
           <DetailField label={t("radar.price")} value={formatPrice(candidate.priceUsd, t("radar.missingData"))} />
           <DetailField label={t("radar.marketCap")} value={formatProductUsd(candidate.marketCap, locale, t("radar.missingData"))} />
@@ -149,7 +190,7 @@ export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
       </section>
 
       <section className="product-detail-section data-freshness" aria-labelledby="freshness-heading">
-        <SectionHeader id="freshness-heading" index="3" title={t("detail.dataFreshness")} />
+        <SectionHeader id="freshness-heading" index="4" title={t("detail.dataFreshness")} />
         <div className="product-detail-grid data">
           <DetailField label={t("detail.source")} value={candidate.source ? formatProductSourceLabel(candidate.source) : t("radar.missingData")} />
           <DetailField label={t("followUp.lastChecked")} value={formatProductDateTime(candidate.lastCheckedAt, locale)} />
@@ -166,7 +207,7 @@ export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
       </section>
 
       <section className="product-detail-section" aria-labelledby="filters-heading">
-        <SectionHeader id="filters-heading" index="4" title={t("detail.filters")} />
+        <SectionHeader id="filters-heading" index="5" title={t("detail.filters")} />
         <div className="product-filter-summary">
           <DetailField
             label={t("detail.status")}
@@ -223,7 +264,7 @@ export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
       </section>
 
       <section className="product-detail-section" aria-labelledby="security-heading">
-        <SectionHeader id="security-heading" index="5" title={t("detail.security")} />
+        <SectionHeader id="security-heading" index="6" title={t("detail.security")} />
         <div className={`security-state-panel ${securityResolution.state}`}>
           <strong>{getSecurityStateTitle(securityResolution.state, t)}</strong>
           <p>{getSecurityStateDetail(securityResolution.state, candidate.basicFilterStatus, t)}</p>
@@ -269,28 +310,15 @@ export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
         ) : null}
       </section>
 
-      {followUp && (
-        <section className="product-detail-section follow-up-detail" aria-labelledby="follow-up-heading">
-          <SectionHeader id="follow-up-heading" index="6" title={t("followUp.detailTitle")} />
-          <p className="follow-up-candidate-boundary">{t("followUp.detailBoundary")}</p>
-          <div className="product-detail-grid">
-            <DetailField label={t("followUp.lifecycle")} value={formatFollowUpLifecycleStatus(followUp.lifecycle_status, locale)} tone={followUp.lifecycle_status === "CANDIDATE_FOR_ESTABLISHED" ? "warning" : "neutral"} />
-            <DetailField label={t("followUp.firstSeen")} value={formatProductDateTime(followUp.first_seen_at, locale)} />
-            <DetailField label={t("followUp.completedCheckpoints")} value={followUp.completed_checkpoints.length > 0 ? followUp.completed_checkpoints.map((day) => `${day}d`).join(" Â· ") : t("followUp.noneCompleted")} />
-            <DetailField label={t("followUp.nextCheckpoint")} value={followUp.next_check_at ? formatProductDateTime(followUp.next_check_at, locale) : t("followUp.noAutomaticCheck")} />
-            <DetailField label={t("followUp.filterStatus")} value={followUp.filter_status} />
-            <DetailField label={t("followUp.establishedMembership")} value={followUp.established_membership ? t("control.value.yes") : t("control.value.no")} />
-            <DetailField label={t("followUp.nextReviewStep")} value={followUp.next_review_step} />
-          </div>
-        </section>
-      )}
-
       {ownerPromotionStatus?.owner_controls_visible && (
-        <EstablishedPromotionPanel initialStatus={ownerPromotionStatus} />
+        <EstablishedPromotionPanel
+          initialStatus={ownerPromotionStatus}
+          onStatusChange={setOwnerPromotionStatus}
+        />
       )}
 
       <section className="product-detail-section next-step research-actions" aria-labelledby="next-heading">
-        <SectionHeader id="next-heading" index={followUp ? "7" : "6"} title={t("detail.nextStep")} />
+        <SectionHeader id="next-heading" index="7" title={t("detail.nextStep")} />
         <p>{t("detail.nextStepText")}</p>
         <div className="product-detail-actions">
           {onBackToResults && <button type="button" className="secondary" onClick={onBackToResults}>{t("detail.back")}</button>}
@@ -300,6 +328,150 @@ export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
     </div>
   );
 };
+
+function LifecycleDetailSection({
+  model,
+  followUp,
+  universeVersion,
+}: {
+  model: TokenLifecycleViewModel;
+  followUp: FollowUpPublicEntry | null;
+  universeVersion: string | null;
+}) {
+  const { locale, t } = useProductLocale();
+  const blockers = model.blocking_conditions.length > 0
+    ? model.blocking_conditions.map((condition) => lifecycleBlockingLabel(condition, locale)).join(" · ")
+    : (locale === "pl" ? "Brak blokady bieżącego kroku" : "No blocker for the current step");
+  const automatic = model.next_action_type === "owner_decision"
+    ? (locale === "pl" ? "Automatyczne checkpointy zakończyły bieżący etap." : "Automatic checkpoints completed the current stage.")
+    : lifecycleActionLabel(model.next_action_type, locale);
+  const manual = model.owner_decision_required
+    ? (locale === "pl" ? "Decyzja właściciela. Token nie został dodany automatycznie." : "Owner decision. The token was not promoted automatically.")
+    : model.tracking_status === "established"
+      ? (locale === "pl" ? "Brak ręcznej akcji w tym widoku." : "No manual action in this view.")
+      : (locale === "pl" ? "Nie wymaga ręcznego przenoszenia do dalszej obserwacji." : "No manual move to follow-up is required.");
+  const howItGotHere = lifecycleOrigin(model, locale);
+  return (
+    <section className="product-detail-section lifecycle-detail-section" aria-labelledby="follow-up-heading">
+      <SectionHeader id="follow-up-heading" index="2" title={locale === "pl" ? "Przepływ obserwacji" : "Observation flow"} />
+      {model.owner_decision_required && (
+        <p className="follow-up-candidate-boundary">{t("followUp.detailBoundary")}</p>
+      )}
+      <TokenLifecycleFlow model={model} showCheckpoints={Boolean(followUp)} />
+      <TokenLifecycleStatus model={model} />
+      <div className="lifecycle-detail-grid">
+        <DetailField label={locale === "pl" ? "Gdzie jest teraz" : "Current position"} value={lifecycleStageLabel(model.current_stage, locale)} />
+        <DetailField label={locale === "pl" ? "Jak trafił na ten etap" : "How it reached this stage"} value={howItGotHere} />
+        <DetailField label={locale === "pl" ? "Co nastąpi automatycznie" : "What happens automatically"} value={automatic} />
+        <DetailField label={locale === "pl" ? "Co wymaga decyzji" : "What requires a decision"} value={manual} tone={model.owner_decision_required ? "warning" : "neutral"} />
+        <DetailField
+          label={locale === "pl" ? "Najbliższy termin" : "Next due date"}
+          value={model.next_checkpoint_at ? formatProductDateTime(model.next_checkpoint_at, locale) : t("followUp.noAutomaticCheck")}
+        />
+        <DetailField label={locale === "pl" ? "Warunki blokujące" : "Blocking conditions"} value={blockers} tone={model.blocking_conditions.length > 0 ? "warning" : "neutral"} />
+      </div>
+      {followUp && (
+        <div className="lifecycle-source-facts">
+          <DetailField label={t("followUp.firstSeen")} value={formatProductDateTime(followUp.first_seen_at, locale)} />
+          <DetailField label={t("followUp.lastChecked")} value={followUp.last_checked_at ? formatProductDateTime(followUp.last_checked_at, locale) : t("app.noData")} />
+          <DetailField label={t("followUp.filterStatus")} value={formatFollowUpFilterStatus(followUp.filter_status, locale)} />
+          <DetailField label={t("followUp.securityStatus")} value={formatFollowUpSecurityStatus(followUp.security_status, locale)} tone="warning" />
+        </div>
+      )}
+      {model.tracking_status === "established" && (
+        <p className="established-source-note">
+          {locale === "pl"
+            ? `Przepływ jest ukończony. Historia checkpointów może pozostać w Follow-up, ale źródłem prawdy jest Established Universe${universeVersion ? ` (${universeVersion})` : ""}.`
+            : `The flow is complete. Checkpoint history may remain in Follow-up, but the Established Universe is the source of truth${universeVersion ? ` (${universeVersion})` : ""}.`}
+        </p>
+      )}
+    </section>
+  );
+}
+
+function FollowUpOnlyDetail({
+  followUp,
+  lifecycle,
+  ownerPromotionStatus,
+  onOwnerPromotionStatusChange,
+  onBackToResults,
+}: {
+  followUp: FollowUpPublicEntry;
+  lifecycle: TokenLifecycleViewModel;
+  ownerPromotionStatus: EstablishedPromotionStatus | null;
+  onOwnerPromotionStatusChange: (status: EstablishedPromotionStatus) => void;
+  onBackToResults?: () => void;
+}) {
+  const { locale, t } = useProductLocale();
+  return (
+    <div className="candidate-detail-view product-candidate-detail follow-up-only-detail">
+      <section className="candidate-detail-hero">
+        <div className="candidate-detail-hero-copy">
+          <span className="candidate-detail-eyebrow">{locale === "pl" ? "Dalsza obserwacja" : "Follow-up"}</span>
+          <h3>{followUp.symbol ?? t("radar.missingData")} <small>{followUp.display_name ?? ""}</small></h3>
+          <div className="candidate-detail-token-line">
+            <StatusBadge tone={followUp.lifecycle_status === "CANDIDATE_FOR_ESTABLISHED" ? "manual" : "neutral"}>
+              {formatFollowUpLifecycleStatus(followUp.lifecycle_status, locale)}
+            </StatusBadge>
+            <span>{followUp.chain}</span>
+          </div>
+          <CopyableAddress
+            value={followUp.contract_address}
+            displayValue={shortenAddress(followUp.contract_address, t("radar.missingData"))}
+            copyLabel={t("detail.copyLabel", { label: t("detail.contract") })}
+            copiedLabel={t("app.copied")}
+            buttonLabel={t("app.copy")}
+            className="candidate-detail-hero-address"
+          />
+        </div>
+        <div className="candidate-detail-boundary">
+          <strong>{locale === "pl" ? "Badania i obserwacja" : "Research and observation"}</strong>
+          <span>{locale === "pl" ? "Status nie jest rekomendacją inwestycyjną ani potwierdzeniem bezpieczeństwa." : "This status is not investment advice or a safety approval."}</span>
+          {onBackToResults && <button type="button" className="candidate-detail-hero-back" onClick={onBackToResults}>{t("detail.back")}</button>}
+        </div>
+      </section>
+
+      <section className="product-detail-section" aria-labelledby="identity-heading">
+        <SectionHeader id="identity-heading" index="1" title={t("detail.identity")} />
+        <div className="product-detail-grid">
+          <DetailField label={t("detail.contract")} value={followUp.contract_address} copyValue={followUp.contract_address} mono />
+          <DetailField label={t("detail.chain")} value={followUp.chain} />
+        </div>
+      </section>
+
+      <LifecycleDetailSection model={lifecycle} followUp={followUp} universeVersion={null} />
+
+      <section className="product-detail-section" aria-labelledby="follow-up-data-heading">
+        <SectionHeader id="follow-up-data-heading" index="3" title={locale === "pl" ? "Bieżące dane obserwacji" : "Current observation data"} />
+        <div className="product-detail-grid market">
+          <DetailField label={t("radar.price")} value={formatPrice(followUp.market_metrics.price_usd, t("radar.missingData"))} />
+          <DetailField label={t("radar.marketCap")} value={formatProductUsd(followUp.market_metrics.market_cap_usd, locale, t("radar.missingData"))} />
+          <DetailField label={t("radar.liquidity")} value={formatProductUsd(followUp.market_metrics.liquidity_usd, locale, t("radar.missingData"))} />
+          <DetailField label={t("radar.volume24h")} value={formatProductUsd(followUp.market_metrics.volume_24h_usd, locale, t("radar.missingData"))} />
+          <DetailField label={t("followUp.filterStatus")} value={formatFollowUpFilterStatus(followUp.filter_status, locale)} />
+          <DetailField label={t("followUp.securityStatus")} value={formatFollowUpSecurityStatus(followUp.security_status, locale)} tone="warning" />
+        </div>
+      </section>
+
+      {ownerPromotionStatus?.owner_controls_visible && (
+        <EstablishedPromotionPanel
+          initialStatus={ownerPromotionStatus}
+          onStatusChange={onOwnerPromotionStatusChange}
+        />
+      )}
+
+      <section className="product-detail-section next-step research-actions" aria-labelledby="next-heading">
+        <SectionHeader id="next-heading" index="4" title={t("detail.nextStep")} />
+        <p>{lifecycleActionLabel(lifecycle.next_action_type, locale)}</p>
+        {onBackToResults && (
+          <div className="product-detail-actions">
+            <button type="button" className="secondary" onClick={onBackToResults}>{t("detail.back")}</button>
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
 
 function SectionHeader({ id, index, title }: { id: string; index: string; title: string }) {
   return <header className="product-detail-section-header"><span>{index}</span><h3 id={id}>{title}</h3></header>;
@@ -485,6 +657,49 @@ function getSecurityTone(state: ProductSecurityState): "ready" | "warning" | "cr
   if (state === "checked_critical") return "critical";
   if (state === "checked") return "ready";
   return "warning";
+}
+
+function lifecycleOrigin(model: TokenLifecycleViewModel, locale: ProductLocale): string {
+  if (model.tracking_status === "established") {
+    return locale === "pl"
+      ? "Właściciel dodał tę tożsamość do aktywnego Established Universe."
+      : "The owner added this identity to the enabled Established Universe.";
+  }
+  if (model.tracking_status === "candidate") {
+    return locale === "pl"
+      ? "Automatyczna obserwacja potwierdziła spełnienie podstawowych filtrów."
+      : "Automatic observation confirmed that the basic filters were met.";
+  }
+  if (model.tracking_status === "active" || model.tracking_status === "complete") {
+    return locale === "pl"
+      ? "Centralny collector automatycznie zapisał poprawne chain + contract_address."
+      : "The central collector automatically enrolled the valid chain + contract address.";
+  }
+  if (model.tracking_status === "waiting") {
+    return locale === "pl"
+      ? "Token został wykryty w warstwie Nowe i ma poprawną tożsamość."
+      : "The token was detected in New and has a valid identity.";
+  }
+  return locale === "pl"
+    ? "Token został wykryty, ale dalszy etap wymaga dostępnej i poprawnej tożsamości."
+    : "The token was detected, but the next stage requires an available, valid identity.";
+}
+
+function formatFollowUpFilterStatus(
+  value: FollowUpPublicEntry["filter_status"],
+  locale: ProductLocale,
+): string {
+  if (value === "passed_basic_filter") return locale === "pl" ? "Podstawowe filtry spełnione" : "Basic filters met";
+  if (value === "rejected_basic_filter") return locale === "pl" ? "Podstawowe filtry niespełnione" : "Basic filters not met";
+  return locale === "pl" ? "Filtry jeszcze niesprawdzone" : "Filters not checked yet";
+}
+
+function formatFollowUpSecurityStatus(value: string, locale: ProductLocale): string {
+  if (value === "CHECKED") return locale === "pl" ? "Sprawdzono; nadal wymaga oceny" : "Checked; still requires review";
+  if (value === "CRITICAL_RISK") return locale === "pl" ? "Wykryto ryzyko krytyczne" : "Critical risk detected";
+  if (value === "PARTIAL") return locale === "pl" ? "Dane częściowe; wymagana weryfikacja" : "Partial data; verification required";
+  if (value === "UNAVAILABLE") return locale === "pl" ? "Dane niedostępne; wymagana weryfikacja" : "Data unavailable; verification required";
+  return locale === "pl" ? "Wymagana ręczna weryfikacja" : "Manual verification required";
 }
 
 function formatPrice(value: number | null, missing: string): string {

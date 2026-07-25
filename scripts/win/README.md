@@ -434,8 +434,30 @@ scripts\win\start-premium-ui-review.cmd --radar --mobile-guide
 scripts\win\start-premium-ui-review.cmd --detail
 ```
 
-`check-premium-ui-pass.cmd` is the offline UI.1 + UI.2 gate. It clears every live-source and automation opt-in, keeps owner operations `DISABLED`, runs the Premium UI contracts, Control Center, Reports, Feedback, Product Radar/Candidate Detail tests, UI typecheck and the fixture-free `INTERNAL_BETA` build assertion.
+`check-premium-ui-pass.cmd` is the offline UI.1 + UI.2 + FLOW.1 gate. It clears every live-source and automation opt-in, keeps owner operations `DISABLED`, runs the Premium UI and visible lifecycle contracts, Control Center, Reports, Feedback, Product Radar/Candidate Detail tests, UI typecheck and the fixture-free `INTERNAL_BETA` build assertion.
 
 `start-premium-ui-review.cmd` reuses the ordinary real local Product Radar snapshot/store path. `--ui2` prints the required order — Control Center, Reports, Feedback, Owner Feedback Inbox, Verification, Methodology — and opens the existing `INTERNAL_BETA + REVIEW_SAFE` review path. `--radar` opens the main Radar, `--detail` opens Candidate Detail and `--mobile-guide` prints the recommended viewport sizes. It does not add a fixture fallback, activate `ENABLED`, call providers, run the collector, submit feedback or mutate snapshots/stores.
 
 Canonical design and owner checklist: `docs/final_frontend_premium_ui_pass.md`.
+
+## FLOW.1 Token Lifecycle Review
+
+```cmd
+scripts\win\start-token-flow-review.cmd
+scripts\win\start-token-flow-review.cmd --detail
+```
+
+The launcher starts the ordinary fixture-free `INTERNAL_BETA` Product Radar with current local snapshots and stores. The default opens Radar and prints the FLOW.1 owner checklist. `--detail` opens the first available Candidate Detail with owner operations still `DISABLED`; the separate Established promotion review launcher remains the only local `REVIEW_SAFE` path. The number of Maturing and Candidate records depends on the current real Follow-up Store.
+
+It does not run the collector, call providers, run bootstrap `--apply`, activate `ENABLED`, create a synthetic candidate, or mutate Follow-up and Established stores. It does not deploy to VPS, change Cloudflare, or touch Task Scheduler.
+
+Delivery order:
+
+1. FLOW.1 — visible token lifecycle.
+2. AI.1 — Visual Candidate Research Brief.
+3. UI.3 — accessibility and cross-browser.
+4. Local regression and Release Candidate.
+5. Final VPS deployment.
+6. Cloudflare, scheduler, smoke and rollback.
+7. Tester session and P0 fixes.
+8. Freeze by 15.08.

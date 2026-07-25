@@ -1125,7 +1125,7 @@ export function formatFollowUpLifecycleStatus(value: FollowUpLifecycleStatus, lo
   const labels: Record<FollowUpLifecycleStatus, [string, string]> = {
     NEW: ["New", "Nowe"],
     MATURING: ["Maturing", "Dalsza obserwacja"],
-    CANDIDATE_FOR_ESTABLISHED: ["Candidate for Established", "Kandydaci do Established"],
+    CANDIDATE_FOR_ESTABLISHED: ["Candidate for Established", "Kandydat do Established"],
     ESTABLISHED: ["Established", "Established"],
     ARCHIVED: ["Archived", "Archiwalne"],
   };

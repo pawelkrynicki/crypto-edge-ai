@@ -6,6 +6,8 @@ Sprint **UI.1 — Visual Foundation, Product Shell, Radar and Candidate Detail**
 
 Sprint **UI.2 — Trust, Feedback and Research Surfaces** domyka Control Center, Reports, Feedback, Owner Feedback Inbox, Verification i Methodology. Zmiana nadal obejmuje wyłącznie warstwę prezentacji, copy oraz kontrakty UI; nie zmienia API, danych ani granic operacyjnych.
 
+Etap **FLOW.1 — Visible Token Lifecycle and Owner Promotion Path** domyka widoczność przepływu **Nowe → Dalsza obserwacja → Kandydat do Established → Główny Radar**. Reużywa przyjętego systemu UI.1/UI.2, istniejących danych read-only i backend-gated owner flow; nie zmienia lifecycle, scoringu, filtrów, providerów ani store’ów.
+
 UI.1 obejmuje:
 
 - kanoniczny system tokenów;
@@ -251,18 +253,33 @@ Walidacja i owner review mają wykonać zero live provider calls i zero mutacji 
 
 Walidacja UI.2 obejmuje kontrakty UI.1/UI.2, Control Center, Product Radar/Candidate Detail, Reports, Feedback z owner boundary, owner operations, real-data boundary, runtime/import boundary, dwa typechecki oraz build `INTERNAL_BETA`. Kontrola przeglądarkowa obejmuje PL i EN przy 1792, 1440 i 390 px, brak overflow i uciętych akcji, touch targets, focus, reduced motion oraz pusty inbox. Receipt i `Already recorded` są sprawdzane na poziomie kontraktu komponentu bez dodawania rekordu. Kanoniczny store feedbacku pozostaje pusty; podczas kontroli nie wykonuje się submitu.
 
-## UI.3 — następny etap
+## FLOW.1 — wynik
 
-UI.3 pozostaje końcowym accessibility pass, cross-browser review, bardziej szczegółową walidacją klawiatury/screen readera i finalnymi poprawkami wizualnymi P0. Dopiero po UI.3 wykonywana jest lokalna regresja i Release Candidate; deployment VPS pozostaje późniejszy od lokalnego RC.
+- Wspólny komponent `TokenLifecycleFlow` działa poziomo na desktopie i jako pionowa sekwencja na wąskim ekranie, ma semantyczną listę etapów, widoczne tekstowe stany i nie używa ciągłej animacji.
+- Frontendowy model `TokenLifecycleViewModel` udostępnia `current_stage`, `completed_stages`, `next_stage`, `next_action_type`, `next_action_label`, `blocking_conditions`, `next_checkpoint_at`, `completed_checkpoints` i `owner_decision_required` bez duplikowania źródła prawdy lifecycle.
+- Radar ma mały, domyślnie zwinięty blok „Jak token przechodzi przez Radar”; karty Nowe rozróżniają aktywne śledzenie, oczekiwanie na ingest, niepoprawną tożsamość i niedostępne Follow-up.
+- Karty Follow-up i Candidate Detail pokazują oś checkpointów 1/3/7/14/30, filtry, security, następny termin i naturalny następny krok. Checkpoint nie jest prezentowany jako akceptacja.
+- Candidate wymaga decyzji właściciela i nie jest Established bez aktywnego członkostwa universe. Tester nie widzi owner controls; owner w `REVIEW_SAFE` ma preview bez POST, a `ENABLED` jest testowane wyłącznie na temporary stores.
+- Control Center pokazuje stan Follow-up, active/due/candidate, next due, ostatni zapis store, automatyczne śledzenie i naturalny status decyzji właściciela. Overall readiness nie został zmieniony.
+
+## AI.1 — następny etap
+
+AI.1 wykorzysta stabilny read-only model przepływu do **Visual Candidate Research Brief**. FLOW.1 nie wykonuje analizy AI, nie wywołuje OpenAI i nie generuje rekomendacji inwestycyjnej.
+
+## UI.3 — kolejny etap
+
+UI.3 pozostaje końcowym accessibility pass, cross-browser review, bardziej szczegółową walidacją klawiatury/screen readera i finalnymi poprawkami wizualnymi P0. Następuje po AI.1. Dopiero po UI.3 wykonywana jest lokalna regresja i Release Candidate; deployment VPS pozostaje późniejszy od lokalnego RC.
 
 ## Kolejność wydania
 
-1. Final Frontend Polish / Premium UI Pass.
-2. Lokalna regresja i Release Candidate.
-3. Finalny deployment na VPS.
-4. Cloudflare, scheduler, smoke i rollback.
-5. Sesja testera i poprawki P0.
-6. Freeze do 15.08.
+1. FLOW.1 — widoczny przepływ tokena.
+2. AI.1 — Visual Candidate Research Brief.
+3. UI.3 — accessibility i cross-browser.
+4. Lokalna regresja i Release Candidate.
+5. Finalny deployment na VPS.
+6. Cloudflare, scheduler, smoke i rollback.
+7. Sesja testera i poprawki P0.
+8. Freeze do 15.08.
 
 ## Owner review checklist
 

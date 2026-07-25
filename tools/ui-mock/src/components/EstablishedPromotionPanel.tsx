@@ -44,7 +44,7 @@ const COPY = {
     additionUnavailable: "Adding is unavailable because the token does not meet the eligibility requirements.",
     confirm: "I confirm this exact chain and contract address and understand that a new universe version will be created.",
     add: "Add to Established",
-    dialog: "Add this exact chain and contract address to a new Established Universe version?",
+    dialog: (chain: string, address: string) => `Add ${chain} + ${address} to a new Established Universe version?`,
     added: "Added. A new universe version, history snapshot and audit entry were created.",
     noAction: "No change was made because the token is already active in Established.",
     failed: "The controlled addition was rejected. Refresh the plan before trying again.",
@@ -83,7 +83,7 @@ const COPY = {
     additionUnavailable: "Dodanie jest niedostępne, ponieważ token nie spełnia warunków kwalifikacji.",
     confirm: "Potwierdzam dokładny chain i contract address oraz utworzenie nowej wersji Established.",
     add: "Dodaj do Established",
-    dialog: "Dodać ten dokładny chain i contract address do nowej wersji Established Universe?",
+    dialog: (chain: string, address: string) => `Dodać ${chain} + ${address} do nowej wersji Established Universe?`,
     added: "Dodano. Powstała nowa wersja Established, wpis historii i audytu.",
     noAction: "Nie wprowadzono zmiany, ponieważ token jest już aktywny w Established.",
     failed: "Kontrolowane dodanie zostało odrzucone. Odśwież plan przed kolejną próbą.",
@@ -257,9 +257,11 @@ export function formatEstablishedPromotionReason(code: string, locale: ProductLo
 export function EstablishedPromotionPanel({
   initialStatus,
   initialPreview = null,
+  onStatusChange,
 }: {
   initialStatus: EstablishedPromotionStatus;
   initialPreview?: EstablishedPromotionPreview | null;
+  onStatusChange?: (status: EstablishedPromotionStatus) => void;
 }) {
   const { locale } = useProductLocale();
   const copy = COPY[locale];
@@ -307,14 +309,17 @@ export function EstablishedPromotionPanel({
   };
 
   const add = async () => {
-    if (!canAdd || !preview || !window.confirm(copy.dialog)) return;
+    if (!canAdd || !preview || !window.confirm(copy.dialog(status.chain, status.contract_address))) return;
     setSubmitting(true);
     setResult(null);
     try {
       const nextResult = await addToEstablished(preview);
       setResult(nextResult);
       const nextStatus = await loadEstablishedPromotionStatus(status.chain, status.contract_address);
-      if (nextStatus?.owner_controls_visible) setStatus(nextStatus);
+      if (nextStatus?.owner_controls_visible) {
+        setStatus(nextStatus);
+        onStatusChange?.(nextStatus);
+      }
       setPreview(null);
       setConfirmed(false);
     } catch {

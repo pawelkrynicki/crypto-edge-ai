@@ -54,7 +54,7 @@ export function ProductControlCenter({
     if (providedOwnerOperationsStatus !== undefined) return;
     let active = true;
     void loadOwnerOperationsStatus().then((nextStatus) => {
-      if (active && nextStatus?.owner_controls_visible) setLoadedOwnerOperationsStatus(nextStatus);
+      if (active && nextStatus) setLoadedOwnerOperationsStatus(nextStatus);
     });
     return () => { active = false; };
   }, [providedOwnerOperationsStatus]);
@@ -140,13 +140,14 @@ export function ProductControlCenter({
               [t("radar.universeVersion"), status.establishedUniverse.universeVersion ?? t("app.noData")],
               [t("radar.activeEntries"), String(status.establishedUniverse.entriesEnabled)],
               [t("control.field.lastChange"), dateValue(status.establishedUniverse.lastChangeAt, locale, t)],
-              ...(ownerOperationsStatus?.owner_controls_visible
+              ...(ownerOperationsStatus
                 ? [[
-                  locale === "pl" ? "Możliwość promocji ownera" : "Owner promotion capability",
+                  locale === "pl" ? "Status decyzji właściciela" : "Owner decision status",
                   ownerCapabilityValue(ownerOperationsStatus.mode, locale),
                 ] as [string, string]]
                 : []),
             ]}
+            detailsVisible
             t={t}
           />
           <ControlCard
@@ -160,7 +161,16 @@ export function ProductControlCenter({
               [t("control.field.dueFollowUp"), String(status.followUp.dueEntries)],
               [t("control.field.candidateFollowUp"), String(status.followUp.candidateEntries)],
               [t("control.field.nextDue"), dateValue(status.followUp.nextDueAt, locale, t)],
+              [locale === "pl" ? "Ostatni ingest / zapis store" : "Last ingest / store update", dateValue(status.followUp.lastUpdatedAt, locale, t)],
+              [
+                locale === "pl" ? "Automatyczne śledzenie" : "Automatic tracking",
+                status.followUp.storeAvailable
+                  && (status.followUp.validationStatus === "valid" || status.followUp.validationStatus === "recovered")
+                  ? (locale === "pl" ? "Aktywne" : "Active")
+                  : (locale === "pl" ? "Niedostępne" : "Unavailable"),
+              ],
             ]}
+            detailsVisible
             t={t}
           />
           <ControlCard
@@ -223,9 +233,9 @@ export function ProductControlCenter({
                 [t("control.field.lastResult"), resultValue(status.automation.lastResult, t)],
                 [t("automation.nextRun"), dateValue(status.automation.nextRunAt, locale, t)],
                 [t("automation.nextDueAfterActivation"), dateValue(status.automation.nextDueAfterActivation, locale, t)],
-              ]}
-              t={t}
-            />
+            ]}
+            t={t}
+          />
             <ControlCard
               title={t("control.access.title")}
               status={status.accessDeployment.status}
@@ -286,6 +296,7 @@ function ControlCard({
   explanation,
   nextStep,
   details,
+  detailsVisible = false,
   t,
 }: {
   title: string;
@@ -293,6 +304,7 @@ function ControlCard({
   explanation: string;
   nextStep: string;
   details: Array<[string, string]>;
+  detailsVisible?: boolean;
   t: Translator;
 }) {
   return (
@@ -305,6 +317,16 @@ function ControlCard({
       {status !== "READY" && (
         <p className="product-control-next"><strong>{t("control.nextStep")}:</strong> {nextStep}</p>
       )}
+      {detailsVisible ? (
+        <dl className="product-control-details product-control-visible-details">
+          {details.map(([label, value]) => (
+            <div key={label}>
+              <dt>{label}</dt>
+              <dd>{value}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : (
       <TechnicalDetails label={t("app.technicalDetails")}>
         <dl className="product-control-details">
           {details.map(([label, value]) => (
@@ -315,6 +337,7 @@ function ControlCard({
           ))}
         </dl>
       </TechnicalDetails>
+      )}
     </article>
   );
 }
@@ -406,8 +429,8 @@ function validationValue(value: "valid" | "invalid" | "unavailable", t: Translat
 }
 
 function ownerCapabilityValue(mode: OwnerOperationsStatus["mode"], locale: ProductLocale): string {
-  if (mode === "REVIEW_SAFE") return locale === "pl" ? "Bezpieczny przegląd" : "Review safe";
-  if (mode === "ENABLED") return locale === "pl" ? "Włączona" : "Enabled";
+  if (mode === "REVIEW_SAFE") return locale === "pl" ? "Tryb przeglądu" : "Review mode";
+  if (mode === "ENABLED") return locale === "pl" ? "Aktywna decyzja właściciela" : "Owner decision enabled";
   return locale === "pl" ? "Wyłączona" : "Disabled";
 }
 

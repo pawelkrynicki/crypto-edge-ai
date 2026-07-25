@@ -99,13 +99,13 @@ describe("Control Center readiness model", () => {
     assert.equal(universe.status, "READY");
   });
 
-  it("shows Established decision capability only to the backend-confirmed owner", () => {
+  it("shows the natural Established decision status only when the backend returns capability state", () => {
     const status = resolveControlCenterStatus(baseInput());
     const tester = renderControlCenter("en", status, null);
     const owner = renderControlCenter("en", status, ownerStatus("REVIEW_SAFE"));
-    assert.doesNotMatch(tester, /Owner promotion capability|Review safe/);
-    assert.match(owner, /Owner promotion capability/);
-    assert.match(owner, /Review safe/);
+    assert.doesNotMatch(tester, /Owner decision status|Review mode/);
+    assert.match(owner, /Owner decision status/);
+    assert.match(owner, /Review mode/);
     assert.equal(status.overallStatus, "NOT_READY");
   });
 

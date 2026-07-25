@@ -1,5 +1,11 @@
 # Owner Established Promotion Flow
 
+## Integracja FLOW.1
+
+Sekcja **Przepływ obserwacji** w Candidate Detail pokazuje status kandydata, spełnienie podstawowych filtrów, osobny status security, brak automatycznej promocji i następny krok **Decyzja właściciela**. Zwykły tester widzi tę informację, ale nie widzi panelu ownera i nie ma ścieżki POST. `REVIEW_SAFE` udostępnia ownerowi status i podpisany dry-run preview bez zapisu; właściwy checkbox, dialog zawierający rzeczywiste `chain + contract_address` oraz pojedynczy POST są skuteczne wyłącznie w `ENABLED`.
+
+Po udanym POST panel ponownie odczytuje status i przekazuje go do wspólnego modelu FLOW.1, dzięki czemu Candidate Detail dynamicznie przechodzi do **Głównego Radaru**. Źródłem prawdy pozostaje nowa aktywna wersja Established Universe. Follow-up Store nie otrzymuje duplikatu membership ani zapisu lifecycle.
+
 ## Problem i zakres
 
 Dotychczas owner mógł dodać wpis do Established Universe wyłącznie przez lokalny workflow CMD, ręcznie przepisując `chain` i `contract_address`. Nowy przepływ przenosi decyzję do Candidate Detail, ale nie tworzy edytora universe ani pola na dowolny adres. Tożsamość zawsze pochodzi z aktualnego, kanonicznego scanner snapshotu albo indeksu Follow-up.
@@ -82,7 +88,7 @@ POST nie zapisuje lifecycle `ESTABLISHED` w Follow-up. Publiczny resolver ponown
 
 Candidate Detail ładuje owner status same-origin i renderuje sekcję **Owner decision / Decyzja ownera** wyłącznie, gdy backend zwróci `owner_controls_visible = true`. Przed preview pokazuje lifecycle, tożsamość, filtry, security, membership i mode oraz komunikat o braku automatycznego awansu. Po preview pokazuje wersje, duplicate/address checks, zmianę liczników, ostrzeżenia i expiry. Finalny przycisk wymaga checkboxa oraz dialogu z dokładnym `chain + contract_address` i informacją o nowej wersji.
 
-Control Center nie ma nowej dużej karty. W istniejącej karcie Established Universe owner widzi tylko dodatkową capability `Disabled`, `Review safe` albo `Enabled`; tester jej nie widzi. Capability nie wpływa na overall readiness, który pozostaje `NOT_READY`. External tester pozostaje `NO-GO`, a `PUBLIC_BETA` wyłączone.
+Control Center nie ma nowej dużej karty. Istniejąca karta Established Universe pokazuje naturalny status decyzji właściciela: **Wyłączona**, **Tryb przeglądu** albo **Aktywna decyzja właściciela**. Surowe `DISABLED`, `REVIEW_SAFE` i `ENABLED` nie występują w głównym polskim UI. Status nie ujawnia testerowi kontrolek ownera i nie wpływa na overall readiness, który pozostaje `NOT_READY`. External tester pozostaje `NO-GO`, a `PUBLIC_BETA` wyłączone.
 
 ## Local owner review: ACCEPT_LOCAL_CODE — 23.07.2026
 
@@ -130,3 +136,5 @@ scripts\win\check-owner-established-promotion.cmd
 Testy obejmują tester boundary, lifecycle, strict query/body, Origin/session/content type, stale preview, lock, duplikaty, 100 równoległych POST, dokładnie jeden zapis managera, historię/audit, dynamiczny resolver Follow-up, 100 read-only GET i semantykę PL/EN. `ENABLED` nie jest aktywowany przez żaden launcher ani środowisko review.
 
 Następny etap po akceptacji: **Persistent Feedback Loop**. Termin Final Frontend Polish / Premium UI Pass pozostaje **27–30.07.2026**.
+
+Aktualna kolejność produktu po wdrożeniu FLOW.1: **AI.1 — Visual Candidate Research Brief → UI.3 — accessibility i cross-browser → lokalna regresja i Release Candidate → finalny VPS → Cloudflare/scheduler/smoke/rollback → sesja testera i P0 → freeze do 15.08**.
