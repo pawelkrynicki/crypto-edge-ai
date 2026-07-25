@@ -6,6 +6,7 @@ import {
   type ExternalVerificationTarget,
 } from "../externalVerificationTargets";
 import { useProductLocale } from "../productI18n";
+import { formatProductSourceLabel } from "../productPresentation";
 import { resolveProductSecurityState, type ProductSecurityState } from "../productSecurityResolver";
 import type { UiTokenCandidate } from "../types/scannerTypes";
 
@@ -54,7 +55,7 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
           )}
         </div>
         <div><span>{t("verification.pairAddress")}</span><code title={normalizedInput.pairAddress}>{normalizedInput.pairAddress || t("radar.missingData")}</code></div>
-        <div><span>{t("verification.recordSource")}</span><strong>{candidate.source}</strong></div>
+        <div><span>{t("verification.recordSource")}</span><strong>{formatProductSourceLabel(candidate.source)}</strong></div>
       </section>
 
       <section className="verification-guidance">

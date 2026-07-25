@@ -1,5 +1,6 @@
 import type { ProductLocale } from "./productI18n";
 import { PRODUCT_TRANSLATIONS } from "./productI18n";
+import type { ResolvedProductRuntimeMode } from "./runtimeMode";
 
 type FilterTranslationKey = Extract<keyof typeof PRODUCT_TRANSLATIONS.en, `filter.${string}`>;
 
@@ -70,8 +71,8 @@ const STATUS_REASON_KEYS: Record<string, { en: string; pl: string }> = {
     pl: "Opublikowana migawka nie przeszła walidacji kontraktu.",
   },
   SCANNER_FIXTURE_FORBIDDEN: {
-    en: "Sample data is blocked in INTERNAL_BETA.",
-    pl: "Dane przykładowe są zablokowane w INTERNAL_BETA.",
+    en: "Sample data is blocked in the product beta.",
+    pl: "Dane przykładowe są zablokowane w wersji beta produktu.",
   },
   SCANNER_FIXTURE_MARKER_DETECTED: {
     en: "The snapshot contains a sample-data marker and was blocked.",
@@ -105,4 +106,34 @@ export function formatStatusReason(reasonCode: string | null | undefined, locale
   }
   return STATUS_REASON_KEYS[reasonCode]?.[locale]
     ?? (locale === "pl" ? "Stan wymaga sprawdzenia." : "The status needs review.");
+}
+
+const PRODUCT_SOURCE_LABELS: Record<string, string> = {
+  alternative_me_fng: "Alternative.me",
+  defillama_api: "DefiLlama",
+  dexscreener: "DexScreener",
+  goplus: "GoPlus",
+  goplus_security: "GoPlus",
+};
+
+export function formatProductSourceLabel(sourceId: string): string {
+  const normalized = sourceId.trim();
+  if (!normalized) return normalized;
+  return PRODUCT_SOURCE_LABELS[normalized.toLowerCase()]
+    ?? normalized
+      .replaceAll("_", " ")
+      .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+export function formatProductRuntimeMode(
+  runtimeMode: ResolvedProductRuntimeMode,
+  locale: ProductLocale,
+): string {
+  if (runtimeMode === "INTERNAL_BETA") {
+    return locale === "pl" ? "Beta produktu" : "Product beta";
+  }
+  if (runtimeMode === "DEVELOPMENT_DEMO") {
+    return locale === "pl" ? "Tryb demonstracyjny" : "Demo workspace";
+  }
+  return locale === "pl" ? "Wymaga konfiguracji" : "Setup required";
 }

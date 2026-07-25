@@ -613,6 +613,7 @@ describe("Product Radar owner acceptance", () => {
         candidates: [newCandidate],
         metadata,
         readiness,
+        generatedAt: "2026-07-20T10:00:00.000Z",
         ageSeconds,
         freshnessStatus,
         sourceIds,
@@ -634,18 +635,20 @@ describe("Product Radar owner acceptance", () => {
         assert.match(ready.header, /<span>Sources<\/span><strong>Available<\/strong>/);
         assert.match(ready.summary, /<span>Source status<\/span><strong>Available<\/strong>/);
         assert.match(partialHeader.header, /<span>Sources<\/span><strong>Partially available<\/strong>/);
-        assert.match(partialSummary.summary, /<span>Source status<\/span><strong>Source partially available<\/strong><p>defillama_api<\/p>/);
-        assert.match(partialHeader.header, /Snapshot freshness<\/span><strong>Delayed<\/strong>/);
-        assert.match(partialSummary.summary, /<span>Data<\/span><strong>Current<\/strong>/);
+        assert.match(partialSummary.summary, /<span>Source status<\/span><strong>Source partially available<\/strong><p>DefiLlama<\/p>/);
+        assert.match(partialHeader.header, /Snapshot freshness<\/span><strong>2 hr<\/strong>/);
+        assert.doesNotMatch(partialHeader.header, /Snapshot freshness<\/span><strong>Delayed<\/strong>/);
+        assert.doesNotMatch(partialHeader.summary, /product-freshness/);
         assert.match(fallback.header, /<span>Sources<\/span><strong>Partially available<\/strong>/);
         assert.match(fallback.summary, /<span>Source status<\/span><strong>Source partially available<\/strong><p>Source details unavailable<\/p>/);
       } else {
         assert.match(ready.header, /<span>Źródła<\/span><strong>Dostępne<\/strong>/);
         assert.match(ready.summary, /<span>Stan źródeł<\/span><strong>Dostępne<\/strong>/);
         assert.match(partialHeader.header, /<span>Źródła<\/span><strong>Częściowo dostępne<\/strong>/);
-        assert.match(partialSummary.summary, /<span>Stan źródeł<\/span><strong>Źródło częściowo dostępne<\/strong><p>defillama_api<\/p>/);
-        assert.match(partialHeader.header, /Aktualność danych<\/span><strong>Opóźnione<\/strong>/);
-        assert.match(partialSummary.summary, /<span>Dane<\/span><strong>Aktualne<\/strong>/);
+        assert.match(partialSummary.summary, /<span>Stan źródeł<\/span><strong>Źródło częściowo dostępne<\/strong><p>DefiLlama<\/p>/);
+        assert.match(partialHeader.header, /Aktualność danych<\/span><strong>2 godz\.<\/strong>/);
+        assert.doesNotMatch(partialHeader.header, /Aktualność danych<\/span><strong>Opóźnione<\/strong>/);
+        assert.doesNotMatch(partialHeader.summary, /product-freshness/);
         assert.match(fallback.header, /<span>Źródła<\/span><strong>Częściowo dostępne<\/strong>/);
         assert.match(fallback.summary, /<span>Stan źródeł<\/span><strong>Źródło częściowo dostępne<\/strong><p>Brak szczegółów źródeł<\/p>/);
       }
@@ -749,8 +752,9 @@ describe("Product Radar owner acceptance", () => {
     const markup = renderToStaticMarkup(React.createElement(CandidateResultsView, {
       candidates: [newCandidate], metadata: emptyMetadata, readiness: emptyReadiness, ageSeconds: 90, generatedAt: "2026-07-19T10:00:00.000Z", sourceIds: ["dexscreener"],
     }));
-    assert.match(markup, /Current/);
-    assert.match(markup, /1 min/);
+    assert.match(markup, /Status: Current/);
+    assert.match(markup, /Last updated/);
+    assert.doesNotMatch(markup, /product-freshness/);
   });
 
   it("keeps stale candidates visible with timestamp-first EN and PL semantics", () => {

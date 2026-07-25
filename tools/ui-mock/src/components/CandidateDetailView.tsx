@@ -11,7 +11,7 @@ import {
   resolveProductFilterConditions,
   type BasicFilterCategory,
 } from "../productFilterResolver";
-import { formatFilterReason } from "../productPresentation";
+import { formatFilterReason, formatProductSourceLabel } from "../productPresentation";
 import {
   isCompletedProductSecurityState,
   resolveProductSecurityState,
@@ -111,7 +111,7 @@ export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
             <StatusBadge tone={candidate.finalLabel === "WATCHLIST" ? "manual" : candidate.basicFilterStatus === "passed_basic_filter" ? "ready" : "warning"}>{status}</StatusBadge>
             <span>{candidate.chain || t("detail.networkMissing")}</span>
             <span>{candidate.dex || t("detail.dexMissing")}</span>
-            <span>{candidate.source}</span>
+            <span>{formatProductSourceLabel(candidate.source)}</span>
             <span>{formatProductDateTime(candidate.lastCheckedAt, locale)}</span>
           </div>
           <CopyableAddress
@@ -156,7 +156,7 @@ export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
       <section className="product-detail-section data-freshness" aria-labelledby="freshness-heading">
         <SectionHeader id="freshness-heading" index="3" title={t("detail.dataFreshness")} />
         <div className="product-detail-grid data">
-          <DetailField label={t("detail.source")} value={candidate.source || t("radar.missingData")} />
+          <DetailField label={t("detail.source")} value={candidate.source ? formatProductSourceLabel(candidate.source) : t("radar.missingData")} />
           <DetailField label={t("followUp.lastChecked")} value={formatProductDateTime(candidate.lastCheckedAt, locale)} />
           <DetailField label={t("detail.pairCreated")} value={candidate.pairCreatedAt ? formatProductDateTime(candidate.pairCreatedAt, locale) : t("radar.missingData")} />
           <DetailField label={t("detail.discoveryMethod")} value={formatDiscoveryMethod(candidate.discoveryMethod, locale)} />
@@ -240,7 +240,7 @@ export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
         {showSecurityDetails ? (
           <>
             <div className="product-detail-grid security">
-              <DetailField label={t("detail.source")} value={securityResolution.sources.join(", ") || t("radar.missingData")} />
+              <DetailField label={t("detail.source")} value={securityResolution.sources.map(formatProductSourceLabel).join(", ") || t("radar.missingData")} />
               <DetailField label={t("detail.securityLabel")} value={getSecurityStateTitle(securityResolution.state, t)} tone={getSecurityTone(securityResolution.state)} />
               <DetailField label={t("detail.buyTax")} value={formatPercent(candidate.security?.buyTax ?? null, t("radar.missingData"))} />
               <DetailField label={t("detail.sellTax")} value={formatPercent(candidate.security?.sellTax ?? null, t("radar.missingData"))} />

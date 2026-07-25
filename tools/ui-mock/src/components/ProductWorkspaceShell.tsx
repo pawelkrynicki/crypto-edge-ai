@@ -8,7 +8,7 @@ import {
   useProductLocale,
   type ProductLocale,
 } from "../productI18n";
-import { formatStatusReason } from "../productPresentation";
+import { formatProductRuntimeMode, formatStatusReason } from "../productPresentation";
 import {
   type ProductSourceHealthResolution,
 } from "../productSourceHealth";
@@ -79,7 +79,6 @@ export function ProductWorkspaceShell({
   runId,
   generatedAt,
   ageSeconds,
-  freshnessStatus,
   viewRefreshedAt,
   sourceIds,
   sourceHealth,
@@ -95,7 +94,6 @@ export function ProductWorkspaceShell({
   const { locale, setLocale, t } = useProductLocale();
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const apiPresentation = getApiReadinessPresentation(loading, resolvedSource, readiness, locale);
-  const freshnessPresentation = getFreshnessPresentation(ageSeconds, freshnessStatus, locale);
   const sourcePresentation = presentProductSourceHealth(sourceHealth, locale, "header");
   const technicalCodes = unique([
     readinessReasonCode,
@@ -123,22 +121,19 @@ export function ProductWorkspaceShell({
             <h1>Crypto Edge AI</h1>
             <p>{t("app.tagline")}</p>
           </div>
-          <span className="product-runtime-badge">{runtimeMode.replaceAll("_", " ")}</span>
+          <span className="product-runtime-badge">{formatProductRuntimeMode(runtimeMode, locale)}</span>
         </div>
 
         <div className="product-header-status" aria-label={t("app.statusLabel")}>
           <HeaderFact label={t("app.api")} value={apiPresentation.value} tone={apiPresentation.tone} />
           <HeaderFact
             label={t("app.freshness")}
-            value={freshnessPresentation.value}
-            detail={ageSeconds == null ? undefined : formatProductAge(ageSeconds, locale)}
-            tone={freshnessPresentation.tone}
+            value={ageSeconds == null ? t("app.noData") : formatProductAge(ageSeconds, locale)}
           />
           <HeaderFact label={t("app.sources")} value={sourcePresentation.value} tone={sourcePresentation.tone} />
           <HeaderFact
             label={t("app.generated")}
             value={generatedAt ? formatProductDateTime(generatedAt, locale) : t("app.noData")}
-            tone={freshnessPresentation.tone}
           />
           <HeaderFact
             label={t("app.viewRefreshed")}

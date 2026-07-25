@@ -10,7 +10,11 @@ import {
   useProductLocale,
   type ProductLocale,
 } from "../productI18n";
-import { formatFilterReason, formatStatusReason } from "../productPresentation";
+import {
+  formatFilterReason,
+  formatProductSourceLabel,
+  formatStatusReason,
+} from "../productPresentation";
 import {
   resolveProductSourceHealth,
   type ProductSourceHealthResolution,
@@ -109,11 +113,6 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
           <span className="candidate-results-eyebrow">{t("radar.eyebrow")}</span>
           <h3>{t("radar.title")}</h3>
           <p>{t("radar.intro")}</p>
-        </div>
-        <div className={`product-freshness ${freshness.tone}`}>
-          <span>{t("radar.data")}</span>
-          <strong>{freshness.value}</strong>
-          <small>{freshness.detail}</small>
         </div>
       </section>
 
@@ -361,7 +360,7 @@ function NewCandidateCard({
         <div>
           <span className="candidate-results-eyebrow">{t("radar.newProjectEyebrow")}</span>
           <h4>{candidate.symbol} <small>{candidate.name}</small></h4>
-          <p>{formatChain(candidate.chain, t("radar.networkMissing"))} · {candidate.dex || t("radar.dexMissing")} · {candidate.source}</p>
+          <p>{formatChain(candidate.chain, t("radar.networkMissing"))} · {candidate.dex || t("radar.dexMissing")} · {formatProductSourceLabel(candidate.source)}</p>
           <CopyableAddress
             value={candidate.contractAddress}
             displayValue={shortenAddress(candidate.contractAddress, t("radar.missingData"))}
@@ -408,7 +407,7 @@ function NewCandidateCard({
       <footer className="product-candidate-footer">
         <div>
           <span>{t("radar.sourceAndCheck")}</span>
-          <strong>{candidate.source}</strong>
+          <strong>{formatProductSourceLabel(candidate.source)}</strong>
           <small>{formatProductDateTime(candidate.lastCheckedAt, locale)}</small>
         </div>
         <p>{t("radar.newBoundary")}</p>
@@ -520,9 +519,11 @@ function EstablishedCandidateCard({
         : riskFlags.length > 0
           ? riskFlags.map((reason) => presentProductSecurityReason(reason, locale))
           : candidate.missingData.slice(0, 3).map((reason) => presentProductSecurityReason(reason, locale));
-  const checkSource = securityResolution.state === "not_invoked"
-    ? candidate.source
-    : securityResolution.sources.join(", ") || candidate.source;
+  const checkSource = (securityResolution.state === "not_invoked"
+    ? [candidate.source]
+    : securityResolution.sources.length > 0 ? securityResolution.sources : [candidate.source])
+    .map(formatProductSourceLabel)
+    .join(", ");
   return (
     <article className={`product-candidate-card ${status.tone}`}>
       <header className="product-candidate-topline">

@@ -6,6 +6,7 @@ import type {
   ProductSourceHealthResolution,
   ProductSourceHealthStatus,
 } from "./productSourceHealth";
+import { formatProductSourceLabel } from "./productPresentation";
 
 export type ProductSourceHealthPresentation = {
   status: ProductSourceHealthStatus;
@@ -28,7 +29,8 @@ export function presentProductSourceHealth(
   return {
     status: resolution.status,
     value,
-    detail: resolution.detailSourceIds.join(", ") || copy["status.sourceDetailsUnavailable"],
+    detail: resolution.detailSourceIds.map(formatProductSourceLabel).join(", ")
+      || copy["status.sourceDetailsUnavailable"],
     tone: resolution.status === "available" ? "ready" : "warning",
   };
 }

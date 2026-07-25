@@ -12,6 +12,7 @@ import {
   useProductLocale,
   type ProductLocale,
 } from "../productI18n";
+import { formatProductRuntimeMode, formatProductSourceLabel } from "../productPresentation";
 import { loadOwnerOperationsStatus, type OwnerOperationsStatus } from "../services/ownerOperationsDataSource";
 import { OwnerOperationsPanel } from "./OwnerOperationsPanel";
 
@@ -79,7 +80,7 @@ export function ProductControlCenter({
             explanation={t("control.runtime.explanation")}
             nextStep={t("control.runtime.next")}
             details={[
-              [t("control.field.runtimeMode"), status.runtimeApi.runtimeMode],
+              [t("control.field.runtimeMode"), formatProductRuntimeMode(status.runtimeApi.runtimeMode, locale)],
               [t("control.field.healthAvailable"), booleanValue(status.runtimeApi.healthAvailable, t)],
               [t("control.field.apiConnected"), booleanValue(status.runtimeApi.apiConnected, t)],
               [t("control.field.sameOriginResponse"), booleanValue(status.runtimeApi.sameOriginResponseValid, t)],
@@ -114,8 +115,8 @@ export function ProductControlCenter({
             nextStep={t("control.sources.next")}
             details={[
               [t("control.field.availability"), sourceAvailabilityValue(status.sources.availability, t)],
-              [t("app.sources"), status.sources.sourceIds.join(", ") || t("app.noData")],
-              [t("control.field.affectedSources"), status.sources.affectedSourceIds.join(", ") || t("app.noData")],
+              [t("app.sources"), status.sources.sourceIds.map(formatProductSourceLabel).join(", ") || t("app.noData")],
+              [t("control.field.affectedSources"), status.sources.affectedSourceIds.map(formatProductSourceLabel).join(", ") || t("app.noData")],
             ]}
             t={t}
           />
