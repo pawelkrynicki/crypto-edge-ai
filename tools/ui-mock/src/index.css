@@ -6405,14 +6405,56 @@ button:disabled,
   background: var(--color-surface-1);
 }
 
-.radar-lifecycle-guide summary {
+.radar-lifecycle-guide-trigger {
+  width: 100%;
   min-height: 44px;
   display: flex;
   align-items: center;
+  gap: 10px;
   padding: 10px 14px;
   color: var(--color-text-primary);
   font-weight: 700;
+  text-align: left;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
   cursor: pointer;
+}
+
+.radar-lifecycle-guide-trigger:hover {
+  background: var(--color-surface-2);
+}
+
+.radar-lifecycle-guide-trigger:focus-visible {
+  outline: 2px solid var(--color-accent-strong);
+  outline-offset: 3px;
+  box-shadow: var(--focus-ring);
+}
+
+.radar-lifecycle-guide-trigger > span:first-child {
+  flex: 1 1 auto;
+}
+
+.radar-lifecycle-guide-state {
+  color: var(--color-accent-strong);
+  font-size: 11px;
+  font-weight: 720;
+}
+
+.radar-lifecycle-guide-chevron {
+  display: inline-grid;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  place-items: center;
+  color: var(--color-accent-strong);
+  font-size: 20px;
+  line-height: 1;
+  transform: rotate(0deg);
+}
+
+.radar-lifecycle-guide-trigger[aria-expanded="true"] .radar-lifecycle-guide-chevron {
+  transform: rotate(180deg);
 }
 
 .radar-lifecycle-guide ol {
@@ -6526,6 +6568,95 @@ button:disabled,
 .token-lifecycle-flow.compact .token-lifecycle-index {
   width: 22px;
   height: 22px;
+}
+
+.token-lifecycle-card-summary {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 10px 0 12px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--color-border-active);
+  border-radius: 9px;
+  background: var(--color-surface-2);
+}
+
+.token-lifecycle-card-summary.blocked,
+.token-lifecycle-card-summary.unavailable,
+.token-lifecycle-card-summary.complete {
+  border-left-color: var(--color-status-warning);
+}
+
+.token-lifecycle-card-summary p {
+  margin: 0;
+  color: var(--color-text-primary);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.token-lifecycle-card-summary > span {
+  flex: 0 0 auto;
+  padding: 4px 7px;
+  color: var(--color-text-helper);
+  font-size: 10px;
+  font-weight: 700;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-pill);
+}
+
+.token-lifecycle-card-summary > span.no-blockers {
+  color: var(--color-status-ready);
+  border-color: color-mix(in srgb, var(--color-status-ready) 28%, var(--color-border-default));
+}
+
+.token-lifecycle-card-summary > span.has-blockers {
+  color: var(--color-status-warning);
+  white-space: normal;
+}
+
+.token-card-compact {
+  padding: var(--space-4);
+}
+
+.token-card-compact .token-lifecycle-flow.compact {
+  margin: 12px 0 8px;
+}
+
+.token-card-compact .product-metrics-grid {
+  margin-top: 12px;
+}
+
+.token-card-compact .product-metric {
+  min-height: 60px;
+  padding-block: 10px;
+}
+
+.token-card-technical {
+  margin-top: 8px;
+  color: var(--color-text-helper);
+  font-size: 10px;
+}
+
+.token-card-technical > summary {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.token-card-technical code {
+  display: block;
+  padding-top: 4px;
+  overflow-wrap: anywhere;
+}
+
+.token-card-compact .product-candidate-footer {
+  margin-top: 10px;
+  padding-top: 12px;
 }
 
 .token-lifecycle-status {
@@ -6697,6 +6828,10 @@ button:disabled,
     min-height: 0;
   }
 
+  .token-lifecycle-flow.compact .token-lifecycle-stages {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .token-lifecycle-status,
   .lifecycle-detail-grid {
     grid-template-columns: 1fr;
@@ -6714,8 +6849,66 @@ button:disabled,
 }
 
 @media (max-width: 420px) {
+  .product-shell {
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
+  .product-shell .product-shell-body {
+    overflow: visible;
+  }
+
+  .product-shell button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .product-shell summary {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+  }
+
+  .radar-lifecycle-guide-trigger {
+    min-height: 48px;
+    padding-inline: 12px;
+  }
+
+  .radar-lifecycle-guide-state {
+    font-size: 10px;
+  }
+
   .radar-lifecycle-guide ol {
     padding-right: 20px;
+  }
+
+  .token-card-compact {
+    padding: 12px;
+  }
+
+  .token-lifecycle-flow.compact .token-lifecycle-stage {
+    min-height: 68px;
+    padding: 8px;
+    gap: 7px;
+  }
+
+  .token-lifecycle-flow.compact .token-lifecycle-stage-copy strong {
+    font-size: 12px;
+  }
+
+  .token-lifecycle-card-summary {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .token-card-compact .product-metrics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .token-card-compact .product-metric {
+    min-height: 56px;
   }
 
   .token-tracking-facts,

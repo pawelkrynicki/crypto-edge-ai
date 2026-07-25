@@ -18,6 +18,7 @@ import {
   type ProductSecurityState,
 } from "../productSecurityResolver";
 import {
+  resolveTokenIdentity,
   resolveTokenLifecycle,
   type TokenLifecycleViewModel,
 } from "../tokenLifecycle";
@@ -109,8 +110,9 @@ export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
 
   const basketLabel = candidate.discoveryBasket === "established"
     ? "Established"
-    : locale === "pl" ? "Nowe / Emerging" : "New / Emerging";
+    : locale === "pl" ? "Nowe" : "New / Emerging";
   const status = getCandidateStatus(candidate, locale);
+  const technicalIdentity = resolveTokenIdentity(candidate.chain, candidate.contractAddress);
   const filterResolution = resolveProductFilterConditions({
     basicFilterStatus: candidate.basicFilterStatus,
     filterReasons: candidate.filterReasons,
@@ -138,7 +140,9 @@ export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
           <span className="candidate-detail-eyebrow">{basketLabel}</span>
           <h3>{candidate.symbol} <small>{candidate.name}</small></h3>
           <div className="candidate-detail-token-line">
-            <StatusBadge tone={candidate.finalLabel === "WATCHLIST" ? "manual" : candidate.basicFilterStatus === "passed_basic_filter" ? "ready" : "warning"}>{status}</StatusBadge>
+            {candidate.discoveryBasket !== "new_emerging" ? (
+              <StatusBadge tone={candidate.finalLabel === "WATCHLIST" ? "manual" : candidate.basicFilterStatus === "passed_basic_filter" ? "ready" : "warning"}>{status}</StatusBadge>
+            ) : null}
             <span>{candidate.chain || t("detail.networkMissing")}</span>
             <span>{candidate.dex || t("detail.dexMissing")}</span>
             <span>{formatProductSourceLabel(candidate.source)}</span>
@@ -166,7 +170,16 @@ export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
           <DetailField label={t("detail.contract")} value={candidate.contractAddress || t("radar.missingData")} copyValue={candidate.contractAddress} mono />
           <DetailField label={t("detail.pairAddress")} value={candidate.pairAddress || t("radar.missingData")} copyValue={candidate.pairAddress} mono />
           <DetailField label={t("detail.chain")} value={candidate.chain || t("radar.missingData")} />
-          <DetailField label={t("detail.addressIdentity")} value={candidate.addressIdentityVerified ? t("radar.verified") : t("detail.unverified")} tone={candidate.addressIdentityVerified ? "ready" : "warning"} />
+          <DetailField
+            label={t("detail.technicalIdentity")}
+            value={technicalIdentity.status === "valid" ? t("detail.technicalIdentityValid") : t("detail.technicalIdentityInvalid")}
+            tone={technicalIdentity.status === "valid" ? "ready" : "warning"}
+          />
+          <DetailField
+            label={t("detail.sourceVerification")}
+            value={candidate.addressIdentityVerified ? t("detail.sourceVerificationConfirmed") : t("detail.sourceVerificationRequired")}
+            tone={candidate.addressIdentityVerified ? "ready" : "warning"}
+          />
         </div>
       </section>
 

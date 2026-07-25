@@ -72,6 +72,16 @@ const FLOW_COPY = {
       OBSERVATION_COMPLETE_NO_CANDIDATE: "Observation ended without candidate status",
     },
     noBlockers: "No blocker reported for the current automatic step",
+    noBlockersShort: "No blockers",
+    cardSummary: {
+      active: "Automatic tracking is active; the next checkpoint will run automatically.",
+      waiting: "Waiting for automatic Follow-up enrollment during the next data cycle.",
+      candidate: "Basic filters are met; the next step is an owner decision.",
+      established: "This token is in Main Radar; the Established Universe is the source of truth.",
+      blocked: "Automatic Follow-up enrollment is blocked until the technical identity is valid.",
+      unavailable: "Automatic tracking cannot be confirmed while Follow-up data is unavailable.",
+      complete: "The Follow-up checkpoint plan is complete.",
+    },
   },
   pl: {
     aria: "Przepływ obserwacji tokena",
@@ -124,7 +134,17 @@ const FLOW_COPY = {
       OWNER_DECISION_PENDING: "Oczekuje na decyzję właściciela",
       OBSERVATION_COMPLETE_NO_CANDIDATE: "Obserwacja zakończona bez statusu kandydata",
     },
-    noBlockers: "Brak zgłoszonej blokady dla bieżącego kroku automatycznego",
+    noBlockers: "Brak blokad dla automatycznego zapisu.",
+    noBlockersShort: "Brak blokad",
+    cardSummary: {
+      active: "Automatyczne śledzenie jest aktywne; następny checkpoint wykona się automatycznie.",
+      waiting: "Oczekuje na automatyczny zapis do Dalszej obserwacji podczas najbliższego cyklu danych.",
+      candidate: "Podstawowe filtry są spełnione; następnym krokiem jest decyzja właściciela.",
+      established: "Token znajduje się w Głównym Radarze; źródłem prawdy jest Established Universe.",
+      blocked: "Automatyczny zapis do Dalszej obserwacji jest zablokowany do czasu poprawienia tożsamości technicznej.",
+      unavailable: "Nie można potwierdzić automatycznego śledzenia, gdy dane Follow-up są niedostępne.",
+      complete: "Plan checkpointów Dalszej obserwacji został zakończony.",
+    },
   },
 } as const;
 
@@ -182,6 +202,20 @@ export function TokenLifecycleStatus({ model }: { model: TokenLifecycleViewModel
             : copy.noBlockers}</dd>
         </div>
       </dl>
+    </div>
+  );
+}
+
+export function TokenLifecycleCardSummary({ model }: { model: TokenLifecycleViewModel }) {
+  const { locale } = useProductLocale();
+  const copy = FLOW_COPY[locale];
+  const blockers = model.blocking_conditions.map((condition) => blockingLabel(condition, locale));
+  return (
+    <div className={`token-lifecycle-card-summary ${model.tracking_status}`} role="status">
+      <p>{copy.cardSummary[model.tracking_status]}</p>
+      <span className={blockers.length > 0 ? "has-blockers" : "no-blockers"}>
+        {blockers.length > 0 ? blockers.join(" · ") : copy.noBlockersShort}
+      </span>
     </div>
   );
 }

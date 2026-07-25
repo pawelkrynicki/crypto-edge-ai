@@ -112,7 +112,7 @@ describe("Follow-up read-only product boundary", () => {
       }));
       assert.match(markup, locale === "pl" ? /Trzy warstwy Radaru/ : /Three Radar layers/);
       assert.match(markup, locale === "pl" ? /Dalsza obserwacja/ : /Maturing \/ follow-up/);
-      assert.match(markup, /Established \/ (?:main Radar|główny Radar)/);
+      assert.match(markup, locale === "pl" ? /Główny Radar/ : /Established \/ main Radar/);
       assert.doesNotMatch(markup, /Add to Established|Dodaj do Established/);
       if (locale === "pl") {
         assert.doesNotMatch(markup, />MATURING</);

@@ -7,6 +7,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { mapPersistableScannerOutputToUiCandidates } from "../src/adapters/scannerOutputAdapter.js";
 import { CandidateDetailView } from "../src/components/CandidateDetailView.js";
 import {
+  CandidateResultsView,
   MaturingFollowUpBasket,
   NewEmergingBasket,
 } from "../src/components/CandidateResultsView.js";
@@ -68,10 +69,10 @@ describe("FLOW.1 visible token lifecycle contracts", () => {
       followUpEntries: [entry],
       followUpStatus: followUpStatus(),
     }));
-    assert.match(polish, /Automatyczne śledzenie aktywne/);
-    assert.match(polish, /Nie wymaga ręcznego przenoszenia/);
+    assert.match(polish, /Automatyczne śledzenie jest aktywne; następny checkpoint wykona się automatycznie/);
     assert.match(polish, /Pierwsze wykrycie/);
     assert.match(polish, /Następny checkpoint/);
+    assert.match(polish, /Podstawowe filtry nie są obecnie spełnione/);
     assert.doesNotMatch(polish, /Przenieś do dalszej obserwacji/);
   });
 
@@ -90,13 +91,24 @@ describe("FLOW.1 visible token lifecycle contracts", () => {
         followUpStatus: followUpStatus({ entries_total: 0 }),
       }));
       assert.match(markup, locale === "pl"
-        ? /Oczekuje na zapis do dalszej obserwacji/
-        : /Waiting for follow-up enrollment/);
-      assert.match(markup, locale === "pl"
-        ? /najbliższego centralnego cyklu danych/
-        : /next central data cycle/);
+        ? /Oczekuje na automatyczny zapis do Dalszej obserwacji podczas najbliższego cyklu danych\./
+        : /Waiting for automatic Follow-up enrollment during the next data cycle\./);
+      assert.match(markup, locale === "pl" ? /Brak blokad/ : /No blockers/);
+      assert.doesNotMatch(markup, /Co blokuje przejście|What blocks progress|<dt>Następny krok<|<dt>Next action</);
       assert.doesNotMatch(markup, /error|błąd/i);
     }
+  });
+
+  it("keeps the Radar card compact with one lifecycle badge and no duplicated observation panels", () => {
+    const markup = render("pl", React.createElement(NewEmergingBasket, {
+      candidates: [productCandidate()],
+      followUpEntries: [],
+      followUpStatus: followUpStatus({ entries_total: 0 }),
+    }));
+    assert.match(markup, /candidate-results-eyebrow[^>]*>Nowe</);
+    assert.match(markup, /token-lifecycle-card-summary/);
+    assert.doesNotMatch(markup, /OBSERWACJA — NOWY PROJEKT|Dlaczego jest tutaj|Dlaczego nie jest Established|Dlaczego filtry odrzuciły rekord/);
+    assert.doesNotMatch(markup, /token-lifecycle-status/);
   });
 
   it("shows natural identity and availability blockers without raw reason codes", () => {
@@ -119,7 +131,7 @@ describe("FLOW.1 visible token lifecycle contracts", () => {
     }));
     assert.match(invalidMarkup, /Brak poprawnego adresu kontraktu/);
     assert.doesNotMatch(invalidMarkup.replace(/<details>[\s\S]*?<\/details>/g, ""), /INVALID_CONTRACT_ADDRESS/);
-    assert.match(unavailableMarkup, /Dane Follow-up niedostępne/);
+    assert.match(unavailableMarkup, /Dane Follow-up są niedostępne/);
   });
 
   it("presents 1/3/7/14/30 checkpoints as reassessment dates, including a data-unavailable retry", () => {
@@ -203,6 +215,38 @@ describe("FLOW.1 visible token lifecycle contracts", () => {
     assert.doesNotMatch(markup, /established-promotion-panel|Dodaj do Established/);
   });
 
+  it("separates valid technical identity from required source verification and blocks invalid identities", () => {
+    const valid = render("pl", React.createElement(CandidateDetailView, {
+      candidate: productCandidate({ addressIdentityVerified: false }),
+      followUpStatus: followUpStatus({ entries_total: 0 }),
+    }));
+    assert.match(valid, /Tożsamość techniczna[\s\S]*Poprawna/);
+    assert.match(valid, /Weryfikacja źródłowa[\s\S]*Wymagana/);
+    assert.doesNotMatch(valid, /OBSERWACJA — NOWY PROJEKT/);
+    assert.doesNotMatch(valid, /Tożsamość adresu[\s\S]*Niezweryfikowana/);
+    assert.match(valid, /Oczekuje na zapis do dalszej obserwacji/);
+
+    const invalid = render("pl", React.createElement(CandidateDetailView, {
+      candidate: productCandidate({ contractAddress: "not-an-address", addressIdentityVerified: false }),
+      followUpStatus: followUpStatus({ entries_total: 0 }),
+    }));
+    assert.match(invalid, /Tożsamość techniczna[\s\S]*Niepoprawna/);
+    assert.match(invalid, /Brak poprawnego adresu kontraktu/);
+    assert.doesNotMatch(invalid, /Oczekuje na automatyczny zapis do Dalszej obserwacji/);
+  });
+
+  it("renders the Radar explanation as a collapsed accessible control", () => {
+    const markup = render("pl", React.createElement(CandidateResultsView, {
+      candidates: [productCandidate()],
+      followUpStatus: followUpStatus({ entries_total: 0 }),
+      followUpEntries: [],
+    }));
+    assert.match(markup, /class="radar-lifecycle-guide-trigger" aria-expanded="false" aria-controls="radar-lifecycle-guide-content"/);
+    assert.match(markup, /Jak token przechodzi przez Radar/);
+    assert.match(markup, /Rozwiń/);
+    assert.match(markup, /id="radar-lifecycle-guide-content" hidden=""/);
+  });
+
   it("keeps FLOW.1 presentation provider-free, mutation-free, responsive and injection-free", async () => {
     const [model, component, results, detail, app, dataSource, handler, css] = await Promise.all([
       source("src/tokenLifecycle.ts"),
@@ -221,7 +265,11 @@ describe("FLOW.1 visible token lifecycle contracts", () => {
     assert.match(dataSource, /\/api\/follow-up/);
     assert.match(handler, /isFollowUpApiPath[\s\S]*sendJson\(req, res, 405/);
     assert.match(css, /@media \(max-width: 420px\)/);
+    assert.match(css, /\.product-shell button[\s\S]*min-width: 44px;[\s\S]*min-height: 44px;/);
     assert.match(css, /\.token-lifecycle-stages[\s\S]*grid-template-columns: 1fr/);
+    assert.match(css, /\.token-lifecycle-flow\.compact \.token-lifecycle-stages[\s\S]*grid-template-columns: repeat\(2/);
+    assert.match(css, /\.radar-lifecycle-guide-trigger:focus-visible/);
+    assert.match(results, /onKeyDown=.*event\.key !== "Enter".*event\.key !== " "/s);
     assert.match(css, /html,[\s\S]*?#root\s*\{[\s\S]*?overflow-x: hidden/);
     assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
   });

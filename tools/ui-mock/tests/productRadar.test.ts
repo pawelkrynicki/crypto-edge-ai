@@ -459,7 +459,8 @@ describe("Product Radar owner acceptance", () => {
     assert.equal(resolveInitialBasket([newCandidate, establishedCandidate]), "established");
     const newMarkup = renderToStaticMarkup(React.createElement(NewEmergingBasket, { candidates: [newCandidate] }));
     const establishedMarkup = renderToStaticMarkup(React.createElement(EstablishedBasket, { candidates: [establishedCandidate] }));
-    assert.match(newMarkup, /OBSERVATION — NEW PROJECT/);
+    assert.match(newMarkup, /token-lifecycle-card-summary/);
+    assert.doesNotMatch(newMarkup, /OBSERVATION — NEW PROJECT/);
     assert.match(establishedMarkup, /Main address-based Radar/);
   });
 
@@ -928,7 +929,8 @@ describe("Product Radar owner acceptance", () => {
     const markup = renderToStaticMarkup(React.createElement(CandidateResultsView, {
       candidates: [newCandidate], metadata: emptyMetadata, readiness, ageSeconds: 60, sourceIds: ["dexscreener"],
     }));
-    assert.match(markup, /OBSERVATION — NEW PROJECT/);
+    assert.match(markup, /Automatic Follow-up enrollment is blocked until the technical identity is valid/);
+    assert.doesNotMatch(markup, /OBSERVATION — NEW PROJECT/);
     assert.doesNotMatch(markup, /Radar cannot read a valid scan/);
   });
 

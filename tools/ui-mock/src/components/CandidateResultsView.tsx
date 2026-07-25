@@ -11,7 +11,6 @@ import {
   type ProductLocale,
 } from "../productI18n";
 import {
-  formatFilterReason,
   formatProductSourceLabel,
   formatStatusReason,
 } from "../productPresentation";
@@ -37,9 +36,10 @@ import type {
 import type { FollowUpPublicEntry, FollowUpPublicStatus } from "../types/followUpTypes";
 import { CopyableAddress, StatusBadge } from "./ProductUi";
 import {
+  lifecycleStageLabel,
   TokenCheckpointAxis,
+  TokenLifecycleCardSummary,
   TokenLifecycleFlow,
-  TokenLifecycleStatus,
 } from "./TokenLifecycleFlow";
 
 type BasketId = "new_emerging" | "maturing" | "established";
@@ -92,6 +92,7 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
     [followUpEntries],
   );
   const [activeBasket, setActiveBasket] = useState<BasketId>(() => resolveInitialBasket(candidates));
+  const [lifecycleGuideOpen, setLifecycleGuideOpen] = useState(false);
 
   useEffect(() => {
     setActiveBasket(resolveInitialBasket(candidates));
@@ -140,16 +141,33 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
         />
       </section>
 
-      <details className="radar-lifecycle-guide">
-        <summary>{locale === "pl" ? "Jak token przechodzi przez Radar" : "How a token moves through Radar"}</summary>
-        <ol>
+      <section className="radar-lifecycle-guide">
+        <button
+          type="button"
+          className="radar-lifecycle-guide-trigger"
+          aria-expanded={lifecycleGuideOpen}
+          aria-controls="radar-lifecycle-guide-content"
+          onClick={() => setLifecycleGuideOpen((open) => !open)}
+          onKeyDown={(event) => {
+            if (event.key !== "Enter" && event.key !== " ") return;
+            event.preventDefault();
+            setLifecycleGuideOpen((open) => !open);
+          }}
+        >
+          <span>{locale === "pl" ? "Jak token przechodzi przez Radar" : "How a token moves through Radar"}</span>
+          <span className="radar-lifecycle-guide-state">{lifecycleGuideOpen
+            ? (locale === "pl" ? "Zwiń" : "Collapse")
+            : (locale === "pl" ? "Rozwiń" : "Expand")}</span>
+          <span className="radar-lifecycle-guide-chevron" aria-hidden="true">⌄</span>
+        </button>
+        <ol id="radar-lifecycle-guide-content" hidden={!lifecycleGuideOpen}>
           <li>{locale === "pl" ? "Nowy token zostaje wykryty." : "A new token is detected."}</li>
           <li>{locale === "pl" ? "Poprawna tożsamość jest automatycznie zapisywana do dalszej obserwacji." : "A valid identity is enrolled in follow-up automatically."}</li>
           <li>{locale === "pl" ? "Token przechodzi checkpointy 1 / 3 / 7 / 14 / 30 dni." : "The token moves through 1 / 3 / 7 / 14 / 30-day checkpoints."}</li>
           <li>{locale === "pl" ? "Po spełnieniu filtrów może zostać kandydatem." : "After meeting the filters, it may become a candidate."}</li>
           <li>{locale === "pl" ? "Tylko właściciel może dodać go do Głównego Radaru." : "Only the owner can add it to the Main Radar."}</li>
         </ol>
-      </details>
+      </section>
 
       <section className="product-summary-grid operational" aria-label={t("radar.data")}>
         <SummaryCard label={t("radar.establishedAfterFilters")} value={String(establishedAfterFilters)} detail={t("radar.candidatesForReview")} />
@@ -286,7 +304,7 @@ export function MaturingFollowUpBasket({
               <p className="follow-up-candidate-boundary">{t("followUp.candidateBoundary")}</p>
             )}
             <TokenLifecycleFlow model={lifecycle} compact />
-            <TokenLifecycleStatus model={lifecycle} />
+            <TokenLifecycleCardSummary model={lifecycle} />
             <TokenCheckpointAxis model={lifecycle} />
             <div className="product-metrics-grid">
               <Metric label={t("radar.pairAge")} value={formatProductPairAge(entry.pair_age, locale, t("radar.missingData"))} />
@@ -374,7 +392,6 @@ export function NewEmergingBasket({
           <h3>{t("radar.newHeading")}</h3>
           <p>{t("radar.newHeadingDetail")}</p>
         </div>
-        <StatusBadge tone="manual" className="basket-status observation">{t("radar.observationLabel")}</StatusBadge>
       </header>
       <div className="product-candidate-list">
         {candidates.map((candidate) => (
@@ -406,13 +423,12 @@ function NewCandidateCard({
   onOpenExternalChecks?: (candidate: UiTokenCandidate) => void;
 }) {
   const { locale, t } = useProductLocale();
-  const reasons = candidate.filterReasons.slice(0, 3);
   const lifecycle = resolveTokenLifecycle({ candidate, followUp, followUpStatus });
   return (
-    <article className="product-candidate-card observation">
+    <article className="product-candidate-card observation token-card-compact">
       <header className="product-candidate-topline">
         <div>
-          <span className="candidate-results-eyebrow">{t("radar.newProjectEyebrow")}</span>
+          <span className="candidate-results-eyebrow">{lifecycleStageLabel(lifecycle.current_stage, locale)}</span>
           <h4>{candidate.symbol} <small>{candidate.name}</small></h4>
           <p>{formatChain(candidate.chain, t("radar.networkMissing"))} · {candidate.dex || t("radar.dexMissing")} · {formatProductSourceLabel(candidate.source)}</p>
           <CopyableAddress
@@ -424,11 +440,10 @@ function NewCandidateCard({
             className="contract-line"
           />
         </div>
-        <StatusBadge tone="manual" className="basket-status observation">{t("radar.observationLabel")}</StatusBadge>
       </header>
 
       <TokenLifecycleFlow model={lifecycle} compact />
-      <TokenLifecycleStatus model={lifecycle} />
+      <TokenLifecycleCardSummary model={lifecycle} />
       {followUp && (
         <div className="token-tracking-facts">
           <Metric label={t("followUp.firstSeen")} value={formatProductDateTime(followUp.first_seen_at, locale)} />
@@ -447,25 +462,10 @@ function NewCandidateCard({
         <Metric label={t("radar.security")} value={presentRadarSecurityState(resolveProductSecurityState(candidate).state, locale)} tone={getSecurityStateTone(resolveProductSecurityState(candidate).state)} />
       </div>
 
-      <div className="candidate-explanation-grid">
-        <Explanation label={t("radar.whyHere")} value={t("radar.whyHereDetail")} />
-        <Explanation label={t("radar.whyNotEstablished")} value={t("radar.whyNotEstablishedDetail")} />
-        <div>
-          <span>{t("radar.operationalStatus")}</span>
-          <p>{t("radar.observationOnly")}</p>
-          <details>
-            <summary>{t("app.technicalDetails")}</summary>
-            <code>observation_only={String(candidate.observationOnly)} · established_eligible={String(candidate.establishedEligible)}</code>
-          </details>
-        </div>
-      </div>
-
-      {reasons.length > 0 && candidate.basicFilterStatus === "rejected_basic_filter" && (
-        <div className="product-reason-panel warning">
-          <span>{t("radar.filterRejectionReasons")}</span>
-          <ul>{reasons.map((reason) => <li key={reason}><FilterReason reason={reason} /></li>)}</ul>
-        </div>
-      )}
+      <details className="token-card-technical">
+        <summary>{t("app.technicalDetails")}</summary>
+        <code>observation_only={String(candidate.observationOnly)} · established_eligible={String(candidate.establishedEligible)}</code>
+      </details>
 
       <footer className="product-candidate-footer">
         <div>
@@ -610,7 +610,7 @@ function EstablishedCandidateCard({
       </header>
 
       <TokenLifecycleFlow model={lifecycle} compact />
-      <TokenLifecycleStatus model={lifecycle} />
+      <TokenLifecycleCardSummary model={lifecycle} />
 
       <div className="product-metrics-grid established">
         <Metric label={t("radar.addressIdentity")} value={candidate.addressIdentityVerified ? t("radar.verified") : t("radar.needsVerification")} tone={candidate.addressIdentityVerified ? "ready" : "warning"} />
@@ -662,22 +662,6 @@ function CandidateActions({
       {onOpenCandidate && <button type="button" onClick={() => onOpenCandidate(candidate.id)}>{t("radar.openDetails")}</button>}
       {onOpenExternalChecks && <button type="button" className="secondary" onClick={() => onOpenExternalChecks(candidate)}>{t("radar.sourceVerification")}</button>}
     </div>
-  );
-}
-
-function FilterReason({ reason }: { reason: string }) {
-  const { locale, t } = useProductLocale();
-  const presentation = formatFilterReason(reason, locale);
-  return (
-    <span className="filter-reason-copy">
-      {presentation.summary}
-      {!presentation.known && (
-        <details>
-          <summary>{t("app.technicalDetails")}</summary>
-          <code>{presentation.rawReason}</code>
-        </details>
-      )}
-    </span>
   );
 }
 
