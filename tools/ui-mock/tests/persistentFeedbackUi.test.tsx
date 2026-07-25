@@ -28,10 +28,11 @@ describe("Persistent Feedback product UI", () => {
     const polish = render("pl");
     for (const [markup, phrases] of [
       [english, ["Send feedback", "Blocker", "Improvement", "Question or clarification", "Idea for later", "Do not include personal data"]],
-      [polish, ["Przekaż feedback", "Bloker", "Ulepszenie", "Pytanie lub niejasność", "Pomysł na później", "Nie podawaj danych osobowych"]],
+      [polish, ["Przekaż opinię", "Bloker", "Ulepszenie", "Pytanie lub niejasność", "Pomysł na później", "Nie podawaj danych osobowych"]],
     ] as const) {
       for (const phrase of phrases) assert.match(markup, new RegExp(phrase));
       assert.equal((markup.match(/type="radio"/g) ?? []).length, 4);
+      assert.doesNotMatch(markup, /type="radio"[^>]*checked/);
       assert.match(markup, /maxLength="120"/);
       assert.match(markup, /maxLength="3000"/);
       assert.match(markup, /Radar/);
@@ -66,7 +67,7 @@ describe("Persistent Feedback product UI", () => {
     const polishDetail = renderDetail("pl", detail);
     const englishDetail = renderDetail("en", detail);
 
-    assert.match(polishInbox, /Tylko dla ownera/);
+    assert.match(polishInbox, /Panel właściciela/);
     assert.doesNotMatch(polishInbox, /Owner only/);
     assert.match(englishInbox, /Owner only/);
     assert.match(polishDetail, />Nowe</);
@@ -91,7 +92,7 @@ describe("Persistent Feedback product UI", () => {
     const component = await readFile(resolve(uiRoot, "src", "components", "Feedback.tsx"), "utf8");
     assert.doesNotMatch(component, /dangerouslySetInnerHTML/);
     assert.match(component, /submittingRef\.current/);
-    assert.match(component, /Feedback został zapisany\. Dziękujemy\./);
+    assert.match(component, /Opinia została zapisana\. Dziękujemy\./);
     assert.match(component, /To zgłoszenie zostało już zapisane\./);
     assert.match(component, /Wysłano kilka zgłoszeń w krótkim czasie/);
     assert.match(component, /Feedback was saved\. Thank you\./);
@@ -101,6 +102,7 @@ describe("Persistent Feedback product UI", () => {
   it("submits the currently selected category, preserves it across locale renders and refreshes owner data", async () => {
     assert.equal(resolveSelectedFeedbackCategory("IMPROVEMENT", "BLOCKER"), "IMPROVEMENT");
     assert.equal(resolveSelectedFeedbackCategory(null, "CLARIFICATION"), "CLARIFICATION");
+    assert.equal(resolveSelectedFeedbackCategory(null, null), null);
 
     const [component, app] = await Promise.all([
       readFile(resolve(uiRoot, "src", "components", "Feedback.tsx"), "utf8"),
@@ -111,7 +113,7 @@ describe("Persistent Feedback product UI", () => {
     assert.match(component, /categoryCopy\[locale\]\[receipt\.category\]\.label/);
     assert.match(component, /setOwnerInboxRevision\(\(value\) => value \+ 1\)/);
     assert.match(component, /\[category, feedbackStatus, initialStatus, refreshRevision\]/);
-    assert.match(component, /useState<FeedbackCategory>\("BLOCKER"\)/);
+    assert.match(component, /useState<FeedbackCategory \| null>\(null\)/);
     assert.doesNotMatch(component, /useEffect\([\s\S]{0,300}setCategory/);
     assert.match(render("pl"), /value="IMPROVEMENT"/);
     assert.match(render("en"), /value="IMPROVEMENT"/);

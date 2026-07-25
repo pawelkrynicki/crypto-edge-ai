@@ -209,7 +209,7 @@ describe("Control Center readiness model", () => {
     assert.equal(status.unmetGates.includes("REPORTS_LIBRARY"), false);
     assert.equal(status.unmetGates[0], "PERSISTENT_FEEDBACK_CAPTURE");
     assert.equal(blockerItems(renderControlCenter("en", status))[0], "Persistent feedback capture.");
-    assert.equal(blockerItems(renderControlCenter("pl", status))[0], "Trwałe zbieranie feedbacku.");
+    assert.equal(blockerItems(renderControlCenter("pl", status))[0], "Trwałe zbieranie opinii.");
     assert.equal(status.overallStatus, "NOT_READY");
     assert.equal(status.accessDeployment.externalTesterAccess, "NO_GO");
   });
@@ -250,7 +250,7 @@ describe("Control Center readiness model", () => {
     ]);
     assert.deepEqual(blockerItems(renderControlCenter("pl", status)).slice(0, 2), [
       "Biblioteka raportów.",
-      "Trwałe zbieranie feedbacku.",
+      "Trwałe zbieranie opinii.",
     ]);
     assert.equal(status.overallStatus, "NOT_READY");
   });
@@ -277,7 +277,7 @@ describe("Control Center readiness model", () => {
     ]);
     assert.deepEqual(blockerItems(polish), [
       "Biblioteka raportów.",
-      "Trwałe zbieranie feedbacku.",
+      "Trwałe zbieranie opinii.",
       "Trusted Tester Preview Mode.",
       "Deployment na VPS.",
       "Smoke przez domenę i Cloudflare Access.",

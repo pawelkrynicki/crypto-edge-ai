@@ -13,9 +13,10 @@ async function source(path: string): Promise<string> {
 
 describe("Premium UI.2 presentation contracts", () => {
   it("keeps the real Control Center status, READY feedback and blocker semantics", async () => {
-    const [component, resolver] = await Promise.all([
+    const [component, resolver, i18n] = await Promise.all([
       source("src/components/ProductControlCenter.tsx"),
       source("src/controlCenterStatus.ts"),
+      source("src/productI18n.tsx"),
     ]);
     assert.match(component, /const overallStatus = status\?\.overallStatus \?\? "NOT_READY"/);
     assert.match(component, /status=\{status\.feedback\.status\}/);
@@ -25,6 +26,12 @@ describe("Premium UI.2 presentation contracts", () => {
     assert.match(component, /Dostęp i wdrożenie/);
     assert.doesNotMatch(component, /setOverallStatus|overallStatus\s*=\s*"READY"/);
     assert.match(resolver, /if \(feedbackStatus !== "READY"\) unmetGates\.push\("PERSISTENT_FEEDBACK_CAPTURE"\)/);
+    for (const label of ["Środowisko i API", "Dane i migawki", "Koszyk Established", "Dalsza obserwacja", "Zapis analiz"]) {
+      assert.match(i18n, new RegExp(label));
+    }
+    const polishCopy = i18n.slice(i18n.indexOf("const PL: TranslationTable"));
+    assert.match(polishCopy, /Środowisko i API/);
+    assert.doesNotMatch(polishCopy, /same-origin API/);
   });
 
   it("keeps public feedback API categories and a receipt without raw session data", async () => {
@@ -40,6 +47,8 @@ describe("Premium UI.2 presentation contracts", () => {
     assert.match(feedback, /rate_limited/);
     assert.match(feedback, /aria-live="polite"/);
     assert.match(feedback, /formComplete/);
+    assert.match(feedback, /useState<FeedbackCategory \| null>\(null\)/);
+    assert.match(feedback, /category !== null/);
     assert.doesNotMatch(feedback, /detail\.session_group\}/);
     assert.doesNotMatch(feedback, /session_id|Raw session/i);
     assert.match(service, /credentials:\s*"same-origin"/);
@@ -56,6 +65,9 @@ describe("Premium UI.2 presentation contracts", () => {
     assert.match(feedback, /if \(!status\) return null/);
     assert.match(feedback, /getOwnerFeedbackExportUrl\("json"\)/);
     assert.match(feedback, /getOwnerFeedbackExportUrl\("csv"\)/);
+    assert.match(feedback, /owner-feedback-empty-state/);
+    assert.match(feedback, /status\.total_count === 0/);
+    assert.match(feedback, /<button type="button" disabled>\{copy\.exportJson\}<\/button>/);
     assert.match(handler, /requireOwnerFeedbackCapability\(req, ownerMode\)/);
     assert.match(handler, /mode !== "DISABLED" && isLocalOwnerRequest\(req\)/);
     assert.doesNotMatch(feedback, /mark.*resolved|addComment|updateFeedback/i);
@@ -70,22 +82,32 @@ describe("Premium UI.2 presentation contracts", () => {
     assert.match(reports, /report\.report_version/);
     assert.match(reports, /copy\.researchReport/);
     assert.match(reports, /copy\.available/);
+    assert.match(reports, /libraryIsEmpty/);
+    assert.match(reports, /reports-library-empty-panel/);
+    assert.match(reports, /Biblioteka przechowuje do 100 najnowszych raportów\. Dane techniczne plików pozostają ukryte\./);
     assert.doesNotMatch(reports, />\{report\.validation_status\}</);
     assert.match(dataSource, /method:\s*"GET"/);
     assert.doesNotMatch(dataSource, /POST|PUT|PATCH|DELETE|provider|collector/i);
   });
 
   it("keeps Verification manual and provider-free", async () => {
-    const [verification, targets] = await Promise.all([
+    const [verification, targets, i18n] = await Promise.all([
       source("src/components/ExternalVerificationLinksView.tsx"),
       source("src/externalVerificationTargets.ts"),
+      source("src/productI18n.tsx"),
     ]);
     for (const section of ["verification.identity", "Dane rynkowe", "Kontrakt i eksplorator", "Status bezpieczeństwa", "Źródła zewnętrzne", "Lista ręcznej weryfikacji"]) {
       assert.match(verification, new RegExp(section));
     }
     assert.doesNotMatch(verification, /fetch\(|axios|XMLHttpRequest|submit/i);
     assert.doesNotMatch(targets, /fetch\(|axios|XMLHttpRequest/);
-    assert.match(verification, /Honeypot\.is nie uruchamia się automatycznie|securityManual/);
+    assert.match(verification, /securityManual/);
+    assert.doesNotMatch(verification, /Honeypot\.is nie uruchamia się automatycznie/);
+    for (const label of ["Wymaga ręcznej weryfikacji", "Dozwolony link zewnętrzny", "Kopiuj kontrakt", "Kopiuj adres pary", "Kopiuj link"]) {
+      assert.match(i18n, new RegExp(label));
+    }
+    assert.match(targets, /copyLabel: "Copy Pair Address"/);
+    assert.match(targets, /copyLabel: "Copy Link"/);
   });
 
   it("presents Methodology as a document without changing frozen thresholds", async () => {
@@ -101,6 +123,11 @@ describe("Premium UI.2 presentation contracts", () => {
     }
     assert.match(i18n, /Market cap is between USD 300,000 and USD 10,000,000/);
     assert.match(i18n, /Pair age exceeds 7 days/);
+    for (const label of ["Nowe \/ obserwacja", "Dalsza obserwacja", "Kandydat do Established"]) {
+      assert.match(i18n, new RegExp(label));
+    }
+    assert.match(methodology, /Cykl obserwacji/);
+    assert.match(methodology, /dostawców danych/);
   });
 
   it("keeps Run ID in Candidate Detail technical details and renders readable failed-condition rows", async () => {

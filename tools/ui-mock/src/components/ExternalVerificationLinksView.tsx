@@ -53,10 +53,16 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
           <span>{t("verification.contractAddress")}</span>
           <code title={normalizedInput.contractAddress}>{normalizedInput.contractAddress || t("radar.missingData")}</code>
           {normalizedInput.contractAddress && (
-            <button type="button" onClick={() => copyManualValue(normalizedInput.contractAddress)} aria-label={t("verification.copyContract")}>{t("verification.copyAddress")}</button>
+            <button type="button" onClick={() => copyManualValue(normalizedInput.contractAddress)} aria-label={t("verification.copyContract")}>{t("verification.copyContract")}</button>
           )}
         </div>
-        <div><span>{t("verification.pairAddress")}</span><code title={normalizedInput.pairAddress}>{normalizedInput.pairAddress || t("radar.missingData")}</code></div>
+        <div className="verification-contract">
+          <span>{t("verification.pairAddress")}</span>
+          <code title={normalizedInput.pairAddress}>{normalizedInput.pairAddress || t("radar.missingData")}</code>
+          {normalizedInput.pairAddress && (
+            <button type="button" onClick={() => copyManualValue(normalizedInput.pairAddress)} aria-label={t("verification.copyPair")}>{t("verification.copyPair")}</button>
+          )}
+        </div>
         <div><span>{t("verification.recordSource")}</span><strong>{formatProductSourceLabel(candidate.source)}</strong></div>
       </section>
 
@@ -107,6 +113,13 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
 function ExternalCheckCard({ target }: { target: ExternalVerificationTarget }) {
   const { t } = useProductLocale();
   const copyValue = target.copyValue ?? "";
+  const copyLabelKey = target.copyLabel === "Copy Pair Address"
+    ? "verification.copyPair"
+    : target.copyLabel === "Copy Link"
+      ? "verification.copyLink"
+      : target.copyLabel === "Copy Token Input"
+        ? "verification.copyInput"
+        : "verification.copyContract";
   const labelKey = target.id === "explorer"
     ? "verification.networkExplorer"
     : target.id === "dex"
@@ -150,7 +163,7 @@ function ExternalCheckCard({ target }: { target: ExternalVerificationTarget }) {
         ) : (
           <span className="external-check-disabled" aria-disabled="true">{t("verification.sourceUnavailable")}</span>
         )}
-        {copyValue && <button type="button" className="external-check-copy-button" onClick={() => copyManualValue(copyValue)}>{t("verification.copyAddress")}</button>}
+        {copyValue && <button type="button" className="external-check-copy-button" onClick={() => copyManualValue(copyValue)}>{t(copyLabelKey)}</button>}
       </div>
     </article>
   );
@@ -210,7 +223,7 @@ const VERIFICATION_UI_COPY = {
     contractExplorer: "Kontrakt i eksplorator",
     contractExplorerHelp: "Otwórz ręcznie dozwolone źródła i porównaj identyfikatory.",
     securityStatus: "Status bezpieczeństwa",
-    securityStatusHelp: "Brak zgłoszonej flagi nie oznacza, że projekt jest bezpieczny. Honeypot.is nie uruchamia się automatycznie.",
+    securityStatusHelp: "Brak zgłoszonej flagi nie oznacza bezpieczeństwa ani zatwierdzenia.",
     externalSources: "Źródła zewnętrzne",
     manualChecklist: "Lista ręcznej weryfikacji",
     checklist: [
@@ -233,7 +246,7 @@ const VERIFICATION_UI_COPY = {
     contractExplorer: "Contract and explorer",
     contractExplorerHelp: "Open allowlisted sources manually and compare identifiers.",
     securityStatus: "Security status",
-    securityStatusHelp: "No reported flag means neither safety nor approval. Honeypot.is is not run automatically.",
+    securityStatusHelp: "No reported flag means neither safety nor approval.",
     externalSources: "External sources",
     manualChecklist: "Manual checklist",
     checklist: [

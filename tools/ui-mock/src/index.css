@@ -6224,6 +6224,7 @@ button:disabled,
 .report-detail code { overflow-wrap: anywhere; word-break: break-word; }
 .report-metadata-grid.technical { margin: 0; }
 .reports-empty-state { min-height: 110px; display: grid; place-items: center; padding: var(--space-5); text-align: center; }
+.reports-library-empty-panel { grid-column: 1 / -1; }
 
 .feedback-workspace { display: grid; gap: var(--space-5); }
 .feedback-hero { margin: 0; padding: var(--space-5); }
@@ -6233,6 +6234,7 @@ button:disabled,
 .feedback-field > span { color: var(--color-text-primary); }
 .feedback-field em { color: var(--color-text-helper); font-size: 9px; font-style: normal; font-weight: 650; text-transform: uppercase; }
 .feedback-field small { color: var(--color-text-helper); font-size: 10px; }
+.feedback-field textarea { min-height: 124px; }
 .feedback-disabled-help { margin: 0; color: var(--color-text-helper); font-size: 10px; line-height: 1.45; }
 .feedback-success { padding: var(--space-5); }
 .feedback-receipt-heading { display: flex; gap: var(--space-3); align-items: flex-start; }
@@ -6259,6 +6261,11 @@ button:disabled,
 .owner-feedback-message { margin: var(--space-4) 0; padding: var(--space-4); border: 1px solid var(--color-border-default); border-radius: var(--radius-sm); background: var(--color-surface-2); }
 .owner-feedback-message > span { color: var(--color-text-helper); font-size: 9px; font-weight: 750; text-transform: uppercase; }
 .owner-feedback-message p { max-height: 360px; overflow-y: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.owner-feedback-empty-state { display: grid; gap: var(--space-2); min-height: 180px; padding: var(--space-5); place-content: center; text-align: center; border: 1px dashed var(--color-border-default); border-radius: var(--radius-md); background: var(--color-surface-1); }
+.owner-feedback-empty-state strong { color: var(--color-text-primary); }
+.owner-feedback-empty-state p { margin: 0; color: var(--color-text-secondary); }
+.owner-feedback-empty-state small { color: var(--color-text-helper); }
+.owner-feedback-export button { padding: 7px 9px; color: var(--color-text-helper); font-size: 9px; font-weight: 800; border: 1px solid var(--color-border-default); border-radius: 6px; background: var(--color-surface-2); cursor: not-allowed; }
 
 .verification-identity,
 .verification-research-section,
@@ -6351,6 +6358,7 @@ button:disabled,
   .methodology-notice,
   .methodology-research-boundary { padding: var(--space-4); }
   .feedback-category-grid { grid-template-columns: 1fr; }
+  .feedback-field textarea { min-height: 168px; }
   .feedback-category,
   .feedback-field input,
   .feedback-form .product-primary-button,
@@ -6358,6 +6366,7 @@ button:disabled,
   .owner-feedback-list button,
   .owner-feedback-toolbar select,
   .owner-feedback-export a,
+  .owner-feedback-export button,
   .owner-preview-button,
   .owner-refresh-button,
   .product-technical-details > summary,
@@ -6377,7 +6386,8 @@ button:disabled,
   .reports-library-hero,
   .reports-subheader { align-items: flex-start; flex-direction: column; }
   .owner-feedback-export { width: 100%; margin-left: 0; }
-  .owner-feedback-export a { flex: 1 1 0; display: grid; place-items: center; }
+  .owner-feedback-export a,
+  .owner-feedback-export button { flex: 1 1 0; display: grid; place-items: center; }
   .feedback-receipt-actions { display: grid; grid-template-columns: 1fr; }
   .feedback-receipt-actions a,
   .feedback-receipt-actions button { width: 100%; display: grid; place-items: center; }

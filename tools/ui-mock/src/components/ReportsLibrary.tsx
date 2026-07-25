@@ -45,6 +45,7 @@ export function ReportsLibrary({
   const [detailLoading, setDetailLoading] = useState(false);
   const [missingReport, setMissingReport] = useState(false);
   const candidateIds = useMemo(() => new Set(candidates.map((candidate) => candidate.id)), [candidates]);
+  const libraryIsEmpty = !loading && status?.library_status === "READY" && reports.length === 0;
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -107,63 +108,75 @@ export function ReportsLibrary({
         <p className="reports-library-notice unavailable" role="alert">{copy.reportUnavailable}</p>
       )}
 
-      <div className="reports-library-layout">
-        <section className="reports-list" aria-label={copy.reportsList}>
-          <header className="reports-subheader">
-            <div><h4>{copy.savedReports}</h4><p>{copy.savedReportsHelp}</p></div>
-            <button type="button" className="reports-secondary-button" onClick={() => void refresh()} disabled={loading}>
-              {loading ? copy.refreshing : copy.refresh}
-            </button>
-          </header>
-
-          {loading && reports.length === 0 ? (
-            <p className="reports-empty-state" role="status">{copy.loading}</p>
-          ) : status?.library_status === "READY" && reports.length === 0 ? (
+      <div className={`reports-library-layout ${libraryIsEmpty ? "empty" : ""}`}>
+        {libraryIsEmpty ? (
+          <section className="reports-list reports-library-empty-panel" aria-label={copy.reportsList}>
+            <header className="reports-subheader">
+              <div><h4>{copy.savedReports}</h4><p>{copy.savedReportsHelp}</p></div>
+              <button type="button" className="reports-secondary-button" onClick={() => void refresh()} disabled={loading}>
+                {loading ? copy.refreshing : copy.refresh}
+              </button>
+            </header>
             <p className="reports-empty-state">{copy.empty}</p>
-          ) : (
-            <div className="reports-list-records">
-              {reports.map((report) => (
-                <article className="report-list-card" key={report.report_id}>
-                  <div className="report-list-card-main">
-                    <div className="report-list-title-row">
-                      <h5>{report.title}</h5>
-                      <StatusBadge tone="ready">{copy.available}</StatusBadge>
-                    </div>
-                    <p>{projectIdentity(report, copy.notAvailable)}</p>
-                    <dl>
-                      <div><dt>{copy.generatedAt}</dt><dd>{dateValue(report.generated_at, locale, copy.notAvailable)}</dd></div>
-                      <div><dt>{copy.reportVersion}</dt><dd>{report.report_version}</dd></div>
-                      <div><dt>{copy.reportType}</dt><dd>{copy.researchReport}</dd></div>
-                      <div><dt>{copy.chain}</dt><dd>{report.chain ?? copy.notAvailable}</dd></div>
-                      {report.basket && <div><dt>{copy.basket}</dt><dd>{formatBasket(report.basket, locale)}</dd></div>}
-                    </dl>
-                  </div>
-                  <button type="button" className="reports-primary-button" onClick={() => void openReport(report.report_id)}>
-                    {copy.openReport}
-                  </button>
-                </article>
-              ))}
-            </div>
-          )}
-        </section>
+          </section>
+        ) : (
+          <>
+            <section className="reports-list" aria-label={copy.reportsList}>
+              <header className="reports-subheader">
+                <div><h4>{copy.savedReports}</h4><p>{copy.savedReportsHelp}</p></div>
+                <button type="button" className="reports-secondary-button" onClick={() => void refresh()} disabled={loading}>
+                  {loading ? copy.refreshing : copy.refresh}
+                </button>
+              </header>
 
-        <section className="report-detail" aria-label={copy.reportDetail}>
-          {detailLoading ? (
-            <p className="reports-empty-state" role="status">{copy.loadingReport}</p>
-          ) : selectedReport ? (
-            <ReportDetailView
-              detail={selectedReport}
-              linkedCandidate={linkedCandidate}
-              locale={locale}
-              copy={copy}
-              onBack={() => { setSelectedReport(null); setMissingReport(false); onSelectedReportChange?.(null); }}
-              onOpenCandidate={onOpenCandidate}
-              onOpenManualVerification={onOpenManualVerification}
-            />
-          ) : (
-            <p className="reports-empty-state">{copy.selectReport}</p>
-          )}
-        </section>
+              {loading && reports.length === 0 ? (
+                <p className="reports-empty-state" role="status">{copy.loading}</p>
+              ) : (
+                <div className="reports-list-records">
+                  {reports.map((report) => (
+                    <article className="report-list-card" key={report.report_id}>
+                      <div className="report-list-card-main">
+                        <div className="report-list-title-row">
+                          <h5>{report.title}</h5>
+                          <StatusBadge tone="ready">{copy.available}</StatusBadge>
+                        </div>
+                        <p>{projectIdentity(report, copy.notAvailable)}</p>
+                        <dl>
+                          <div><dt>{copy.generatedAt}</dt><dd>{dateValue(report.generated_at, locale, copy.notAvailable)}</dd></div>
+                          <div><dt>{copy.reportVersion}</dt><dd>{report.report_version}</dd></div>
+                          <div><dt>{copy.reportType}</dt><dd>{copy.researchReport}</dd></div>
+                          <div><dt>{copy.chain}</dt><dd>{report.chain ?? copy.notAvailable}</dd></div>
+                          {report.basket && <div><dt>{copy.basket}</dt><dd>{formatBasket(report.basket, locale)}</dd></div>}
+                        </dl>
+                      </div>
+                      <button type="button" className="reports-primary-button" onClick={() => void openReport(report.report_id)}>
+                        {copy.openReport}
+                      </button>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <section className="report-detail" aria-label={copy.reportDetail}>
+              {detailLoading ? (
+                <p className="reports-empty-state" role="status">{copy.loadingReport}</p>
+              ) : selectedReport ? (
+                <ReportDetailView
+                  detail={selectedReport}
+                  linkedCandidate={linkedCandidate}
+                  locale={locale}
+                  copy={copy}
+                  onBack={() => { setSelectedReport(null); setMissingReport(false); onSelectedReportChange?.(null); }}
+                  onOpenCandidate={onOpenCandidate}
+                  onOpenManualVerification={onOpenManualVerification}
+                />
+              ) : (
+                <p className="reports-empty-state">{copy.selectReport}</p>
+              )}
+            </section>
+          </>
+        )}
       </div>
     </div>
   );
@@ -404,7 +417,7 @@ const REPORTS_COPY = {
     reportUnavailable: "This report is no longer available or does not match the current contract.",
     reportsList: "Reports list",
     savedReports: "Saved reports",
-    savedReportsHelp: "Up to 100 newest valid reports, without local filenames or paths.",
+    savedReportsHelp: "The library keeps up to 100 newest reports. Technical file details stay hidden.",
     refresh: "Refresh reports",
     refreshing: "Refreshing…",
     loading: "Loading reports…",
@@ -469,7 +482,7 @@ const REPORTS_COPY = {
     reportUnavailable: "Ten raport nie jest już dostępny albo nie spełnia aktualnego kontraktu.",
     reportsList: "Lista raportów",
     savedReports: "Zapisane raporty",
-    savedReportsHelp: "Do 100 najnowszych prawidłowych raportów, bez lokalnych nazw plików i ścieżek.",
+    savedReportsHelp: "Biblioteka przechowuje do 100 najnowszych raportów. Dane techniczne plików pozostają ukryte.",
     refresh: "Odśwież raporty",
     refreshing: "Odświeżanie…",
     loading: "Ładowanie raportów…",
