@@ -18,6 +18,13 @@ export type ProductLocale = "en" | "pl";
 
 const EN = {
   "app.tagline": "Product Radar · no investment recommendations",
+  "app.productEyebrow": "Digital asset research",
+  "app.workspaceEyebrow": "Research workspace",
+  "app.currentContext": "Current context",
+  "app.openNavigation": "Menu",
+  "app.closeNavigation": "Close menu",
+  "app.copy": "Copy",
+  "app.copied": "Copied",
   "app.researchBoundary": "Research tool. No automated recommendations or trading actions.",
   "app.watchlistBoundary": "WATCHLIST — manual review only.",
   "app.loading": "Loading the latest Radar snapshot…",
@@ -349,6 +356,7 @@ const EN = {
   "detail.additionalFilterInfo": "Additional filter information",
   "detail.security": "Security",
   "detail.source": "Source",
+  "detail.dataFreshness": "Data and freshness",
   "detail.securityLabel": "Security label",
   "detail.buyTax": "Buy tax",
   "detail.sellTax": "Sell tax",
@@ -498,6 +506,13 @@ type TranslationTable = { [K in TranslationKey]: string };
 
 const PL: TranslationTable = {
   "app.tagline": "Product Radar · bez rekomendacji inwestycyjnych",
+  "app.productEyebrow": "Analiza aktywów cyfrowych",
+  "app.workspaceEyebrow": "Przestrzeń badawcza",
+  "app.currentContext": "Aktualny kontekst",
+  "app.openNavigation": "Menu",
+  "app.closeNavigation": "Zamknij menu",
+  "app.copy": "Kopiuj",
+  "app.copied": "Skopiowano",
   "app.researchBoundary": "Narzędzie badawcze. Brak automatycznych rekomendacji i działań transakcyjnych.",
   "app.watchlistBoundary": "WATCHLIST — wyłącznie ręczna analiza.",
   "app.loading": "Ładowanie najnowszego obrazu Radaru…",
@@ -829,6 +844,7 @@ const PL: TranslationTable = {
   "detail.additionalFilterInfo": "Dodatkowe informacje o filtrach",
   "detail.security": "Bezpieczeństwo",
   "detail.source": "Źródło",
+  "detail.dataFreshness": "Dane i aktualność",
   "detail.securityLabel": "Etykieta bezpieczeństwa",
   "detail.buyTax": "Podatek kupna",
   "detail.sellTax": "Podatek sprzedaży",

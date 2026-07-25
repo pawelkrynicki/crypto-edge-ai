@@ -27,6 +27,7 @@ import type {
   UiTokenCandidate,
 } from "../types/scannerTypes";
 import type { FollowUpPublicEntry, FollowUpPublicStatus } from "../types/followUpTypes";
+import { CopyableAddress, StatusBadge } from "./ProductUi";
 
 type BasketId = "new_emerging" | "maturing" | "established";
 type Tone = "neutral" | "accent" | "warning" | "critical" | "ready";
@@ -116,19 +117,22 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
         </div>
       </section>
 
-      <section className="product-summary-grid" aria-label={t("radar.summary")}>
+      <section className="product-summary-grid primary" aria-label={t("radar.summary")}>
         <SummaryCard label={t("radar.newProjects")} value={String(newCandidates.length)} detail={t("radar.observationOnly")} />
         <SummaryCard label={t("followUp.maturingCount")} value={String(followUpStatus?.maturing_count ?? 0)} detail={t("followUp.maturingCountDetail")} />
         <SummaryCard label={t("followUp.candidateCount")} value={String(followUpStatus?.candidate_count ?? 0)} detail={t("followUp.candidateCountDetail")} tone="accent" />
         <SummaryCard label={t("radar.establishedEntries")} value={String(establishedEntries)} detail={t("radar.activeUniverseAddresses")} />
-        <SummaryCard label={t("radar.establishedAfterFilters")} value={String(establishedAfterFilters)} detail={t("radar.candidatesForReview")} />
-        <SummaryCard label={t("radar.securityChecked")} value={String(securityChecked)} detail={t("radar.goPlusAfterFilters")} />
         <SummaryCard
           label={t("app.generated")}
           value={generatedAt ? formatProductDateTime(generatedAt, locale) : t("status.noTimestamp")}
           detail={`${t("detail.status")}: ${freshness.value}`}
           tone={freshness.tone}
         />
+      </section>
+
+      <section className="product-summary-grid operational" aria-label={t("radar.data")}>
+        <SummaryCard label={t("radar.establishedAfterFilters")} value={String(establishedAfterFilters)} detail={t("radar.candidatesForReview")} />
+        <SummaryCard label={t("radar.securityChecked")} value={String(securityChecked)} detail={t("radar.goPlusAfterFilters")} />
         <SummaryCard label={t("radar.sourceState")} value={sourceState.value} detail={sourceState.detail} tone={sourceState.tone} />
       </section>
 
@@ -138,6 +142,7 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
           className={activeBasket === "new_emerging" ? "active" : ""}
           onClick={() => setActiveBasket("new_emerging")}
           aria-pressed={activeBasket === "new_emerging"}
+          data-lifecycle-layer="observation"
         >
           <span>{t("radar.newBasket")}</span>
           <strong>{newCandidates.length}</strong>
@@ -148,6 +153,7 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
           className={activeBasket === "maturing" ? "active" : ""}
           onClick={() => setActiveBasket("maturing")}
           aria-pressed={activeBasket === "maturing"}
+          data-lifecycle-layer="follow-up"
         >
           <span>{t("followUp.basket")}</span>
           <strong>{followUpLayerEntries.length}</strong>
@@ -158,6 +164,7 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
           className={activeBasket === "established" ? "active" : ""}
           onClick={() => setActiveBasket("established")}
           aria-pressed={activeBasket === "established"}
+          data-lifecycle-layer="established"
         >
           <span>{t("radar.establishedBasket")}</span>
           <strong>{establishedCandidates.length}</strong>
@@ -222,7 +229,7 @@ export function MaturingFollowUpBasket({
           <h3>{t("followUp.heading")}</h3>
           <p>{t("followUp.headingDetail")}</p>
         </div>
-        <strong className="basket-status observation">{t("followUp.readOnly")}</strong>
+        <StatusBadge tone="manual" className="basket-status observation">{t("followUp.readOnly")}</StatusBadge>
       </header>
       <div className="product-candidate-list">
         {entries.map((entry) => (
@@ -231,11 +238,18 @@ export function MaturingFollowUpBasket({
               <div>
                 <span className="candidate-results-eyebrow">{t("followUp.lifecycle")}</span>
                 <h4>{entry.symbol ?? t("radar.missingData")} <small>{entry.display_name ?? ""}</small></h4>
-                <p>{entry.chain.toUpperCase()} Â· {shortenAddress(entry.contract_address, t("radar.missingData"))}</p>
+                <p>{entry.chain.toUpperCase()}</p>
+                <CopyableAddress
+                  value={entry.contract_address}
+                  displayValue={shortenAddress(entry.contract_address, t("radar.missingData"))}
+                  copyLabel={t("app.copy")}
+                  copiedLabel={t("app.copied")}
+                  className="contract-line"
+                />
               </div>
-              <strong className={`basket-status ${entry.lifecycle_status === "CANDIDATE_FOR_ESTABLISHED" ? "candidate" : "observation"}`}>
+              <StatusBadge tone={entry.lifecycle_status === "CANDIDATE_FOR_ESTABLISHED" ? "manual" : "neutral"} className={`basket-status ${entry.lifecycle_status === "CANDIDATE_FOR_ESTABLISHED" ? "candidate" : "observation"}`}>
                 {formatFollowUpLifecycleStatus(entry.lifecycle_status, locale)}
-              </strong>
+              </StatusBadge>
             </header>
             {entry.lifecycle_status === "CANDIDATE_FOR_ESTABLISHED" && (
               <p className="follow-up-candidate-boundary">{t("followUp.candidateBoundary")}</p>
@@ -314,7 +328,7 @@ export function NewEmergingBasket({
           <h3>{t("radar.newHeading")}</h3>
           <p>{t("radar.newHeadingDetail")}</p>
         </div>
-        <strong className="basket-status observation">{t("radar.observationLabel")}</strong>
+        <StatusBadge tone="manual" className="basket-status observation">{t("radar.observationLabel")}</StatusBadge>
       </header>
       <div className="product-candidate-list">
         {candidates.map((candidate) => (
@@ -348,8 +362,16 @@ function NewCandidateCard({
           <span className="candidate-results-eyebrow">{t("radar.newProjectEyebrow")}</span>
           <h4>{candidate.symbol} <small>{candidate.name}</small></h4>
           <p>{formatChain(candidate.chain, t("radar.networkMissing"))} · {candidate.dex || t("radar.dexMissing")} · {candidate.source}</p>
+          <CopyableAddress
+            value={candidate.contractAddress}
+            displayValue={shortenAddress(candidate.contractAddress, t("radar.missingData"))}
+            copyLabel={t("radar.copyContract", { symbol: candidate.symbol })}
+            copiedLabel={t("app.copied")}
+            buttonLabel={t("radar.copy")}
+            className="contract-line"
+          />
         </div>
-        <strong className="basket-status observation">{t("radar.observationLabel")}</strong>
+        <StatusBadge tone="manual" className="basket-status observation">{t("radar.observationLabel")}</StatusBadge>
       </header>
 
       <div className="product-metrics-grid">
@@ -359,6 +381,8 @@ function NewCandidateCard({
         <Metric label={t("radar.liquidity")} value={formatProductUsd(candidate.liquidity, locale, t("radar.missingData"))} />
         <Metric label={t("radar.volume24h")} value={formatProductUsd(candidate.volume24h, locale, t("radar.missingData"))} />
         <Metric label={t("radar.ratio")} value={formatRatio(candidate.volumeMarketCapRatio, t("radar.missingData"))} />
+        <Metric label={t("radar.basicFilters")} value={candidate.basicFilterStatus === "passed_basic_filter" ? t("radar.conditionsMet") : t("radar.conditionsRejected")} tone={candidate.basicFilterStatus === "passed_basic_filter" ? "ready" : "warning"} />
+        <Metric label={t("radar.security")} value={presentRadarSecurityState(resolveProductSecurityState(candidate).state, locale)} tone={getSecurityStateTone(resolveProductSecurityState(candidate).state)} />
       </div>
 
       <div className="candidate-explanation-grid">
@@ -452,7 +476,7 @@ export function EstablishedBasket({
           <h3>{t("radar.establishedHeading")}</h3>
           <p>{t("radar.establishedHeadingDetail")}</p>
         </div>
-        <strong className="basket-status established">{t("radar.mainRadar")}</strong>
+        <StatusBadge tone="accent" className="basket-status established">{t("radar.mainRadar")}</StatusBadge>
       </header>
       <div className="product-metrics-grid established">
         <Metric label={t("radar.activeEntries")} value={String(metadata?.established?.entries_enabled ?? candidates.length)} />
@@ -505,13 +529,17 @@ function EstablishedCandidateCard({
         <div>
           <span className="candidate-results-eyebrow">Established · {formatChain(candidate.chain, t("radar.networkMissing"))}</span>
           <h4>{candidate.symbol} <small>{candidate.name}</small></h4>
-          <div className="contract-line">
-            <code title={candidate.contractAddress}>{shortenAddress(candidate.contractAddress, t("radar.missingData"))}</code>
-            <button type="button" onClick={() => copyValue(candidate.contractAddress)} aria-label={t("radar.copyContract", { symbol: candidate.symbol })}>{t("radar.copy")}</button>
-          </div>
+          <CopyableAddress
+            value={candidate.contractAddress}
+            displayValue={shortenAddress(candidate.contractAddress, t("radar.missingData"))}
+            copyLabel={t("radar.copyContract", { symbol: candidate.symbol })}
+            copiedLabel={t("app.copied")}
+            buttonLabel={t("radar.copy")}
+            className="contract-line"
+          />
         </div>
         <div className="candidate-status-stack">
-          <strong className={`basket-status ${status.tone}`}>{status.label}</strong>
+          <StatusBadge tone={status.tone === "critical" ? "critical" : status.tone === "warning" ? "warning" : status.tone === "ready" ? "ready" : "neutral"} className={`basket-status ${status.tone}`}>{status.label}</StatusBadge>
           {candidate.finalLabel === "WATCHLIST" && <small>{t("radar.manualReviewOnly")}</small>}
         </div>
       </header>
@@ -761,9 +789,4 @@ function shortenAddress(value: string, missing: string): string {
 function humanizeReason(value: string): string {
   const normalized = value.replaceAll("_", " ").trim();
   return normalized.length === 0 ? value : normalized.charAt(0).toUpperCase() + normalized.slice(1);
-}
-
-function copyValue(value: string): void {
-  if (!value || typeof navigator === "undefined" || !navigator.clipboard) return;
-  void navigator.clipboard.writeText(value);
 }

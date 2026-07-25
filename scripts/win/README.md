@@ -424,3 +424,17 @@ scripts\win\clear-feedback-loop-review.cmd
 ```
 
 These scripts do not deploy to VPS, change Cloudflare or Task Scheduler, call providers, start the collector, mutate snapshots, Follow-up, Established Universe, automation state or analyst reviews. The technical and product contract is in `docs/persistent_feedback_loop.md`.
+
+## Final Frontend Premium UI Review
+
+```cmd
+scripts\win\check-premium-ui-pass.cmd
+scripts\win\start-premium-ui-review.cmd --radar --mobile-guide
+scripts\win\start-premium-ui-review.cmd --detail
+```
+
+`check-premium-ui-pass.cmd` is an offline UI.1 gate. It clears every live-source and automation opt-in, keeps owner operations `DISABLED`, runs the Premium UI contracts, Product Radar/Candidate Detail tests, UI typecheck and the fixture-free `INTERNAL_BETA` build assertion.
+
+`start-premium-ui-review.cmd` reuses the ordinary real local Product Radar snapshot/store path. `--radar` opens the main Radar, `--detail` opens Candidate Detail and `--mobile-guide` prints the recommended 1440/1280/1024/768/390 viewport sizes. It does not add a fixture fallback, activate `ENABLED`, call providers, run the collector or mutate snapshots/stores.
+
+Canonical design and owner checklist: `docs/final_frontend_premium_ui_pass.md`.

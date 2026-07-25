@@ -8,7 +8,7 @@ Owner-only Candidate Detail flow działa jako status → podpisany read-only pre
 
 Launcher udostępnia wyłącznie `REVIEW_SAFE`. `ENABLED` nie jest aktywny, external tester pozostaje `NO-GO`, `PUBLIC_BETA` pozostaje wyłączone, a overall Trusted Tester Preview to nadal `NOT_READY`. Kontrakt: `docs/owner_established_promotion_flow.md`.
 
-Zaakceptowany commit kodu: `02477bd0499a3b0d5f2f81f88586174ea86ba0e7`. Persistent Feedback Loop również został zaakceptowany lokalnie 23.07.2026. Następny etap: **VPS i private tester preview**. Dalej: Final Frontend Polish / Premium UI Pass, sesja testera i poprawki P0 oraz regresja/backup/dokumentacja/freeze. Termin Premium UI Pass pozostaje bez zmian: **27–30.07.2026**.
+Zaakceptowany commit kodu: `02477bd0499a3b0d5f2f81f88586174ea86ba0e7`. Persistent Feedback Loop również został zaakceptowany lokalnie 23.07.2026. Bieżący etap P0 przed lokalnym Release Candidate to **Final Frontend Polish / Premium UI Pass — UI.1**. VPS, Cloudflare i Task Scheduler pozostają bez zmian do zamknięcia polishu i lokalnej regresji.
 
 ## Maturing / Follow-up Basket
 
@@ -20,12 +20,12 @@ Maturing / Follow-up Basket został zaakceptowany lokalnie 23.07.2026 z werdykte
 
 Owner Established Promotion Flow został zaakceptowany lokalnie 23.07.2026 z werdyktem `ACCEPT_LOCAL_CODE`. Dalsza kolejność:
 
-1. VPS i private tester preview.
-2. Final Frontend Polish / Premium UI Pass.
-3. Sesja testera i poprawki P0.
-4. Regresja, backup, dokumentacja i freeze.
-
-Termin Premium UI Pass pozostaje bez zmian: **27–30.07.2026**.
+1. Final Frontend Polish / Premium UI Pass.
+2. Lokalna regresja i Release Candidate.
+3. Finalny deployment na VPS.
+4. Cloudflare, scheduler, smoke i rollback.
+5. Sesja testera i poprawki P0.
+6. Freeze do 15.08.
 
 ## Established Universe Management
 
@@ -35,7 +35,13 @@ Established Universe Management zostało zaakceptowane lokalnie 21.07.2026 z wer
 
 Runtime ownera jest lokalny i wykluczony z Git. Aktualny universe pozostaje celowo pusty: `established-universe-v000000`, 0 wpisów i 0 aktywnych wpisów. Dodanie prawdziwych wpisów nastąpi później przez owner CLI i będzie wymagało osobnej decyzji biznesowej. VPS deployment nadal oczekuje i nie blokuje lokalnego zarządzania universe. Ten etap nie wdraża VPS, nie zmienia Cloudflare ani nie aktywuje Windows Task Scheduler.
 
-## Current stage: VPS Deployment & Automation
+## Current stage: Final Frontend Polish / Premium UI Pass
+
+UI.1 ustanawia system wizualny, Product Shell, Radar, karty New/Maturing/Established oraz Candidate Detail. Jest to P0 przed lokalnym Release Candidate i jakimkolwiek finalnym deploymentem. Kanoniczny opis: `docs/final_frontend_premium_ui_pass.md`.
+
+Przygotowany wcześniej kod VPS i automatyzacji pozostaje lokalnie zaakceptowany, ale nie jest bieżącym etapem operacyjnym. Nie wykonuje się deploymentu, zmian Cloudflare ani Task Scheduler przed zakończeniem Premium UI i lokalnej regresji.
+
+## Prepared stage: VPS Deployment & Automation
 
 **Product Radar Build & Owner Acceptance** zakończono i zmergowano 21.07.2026. Kanoniczny merge commit: `ccdb5acb855fdfb11e7848af86b30349268e53f5`.
 
@@ -225,14 +231,14 @@ Status: **local owner review accepted — `ACCEPT_LOCAL_CODE`, 23.07.2026; `ENAB
 - wersja, historia, audit i rollback;
 - brak automatycznego awansu.
 
-Zaakceptowana kolejność dalszych prac:
+Zaakceptowana kolejność dalszych prac po domknięciu Persistent Feedback Loop:
 
-1. Persistent Feedback Loop.
-2. VPS i private tester preview.
-3. Final Frontend Polish / Premium UI Pass.
-4. Sesja testera i poprawki P0.
-
-Planowany termin osobnego **Final Frontend Polish / Premium UI Pass** pozostaje **27–30.07.2026**. Kierunek: profesjonalny terminal badawczy, subtelne mikroanimacje, spójna hierarchia i brak hazardowego stylu.
+1. Final Frontend Polish / Premium UI Pass.
+2. Lokalna regresja i Release Candidate.
+3. Finalny deployment na VPS.
+4. Cloudflare, scheduler, smoke i rollback.
+5. Sesja testera i poprawki P0.
+6. Freeze do 15.08.
 
 ### Stage 12B.4: Owner No-CMD Refresh Control
 
@@ -925,9 +931,11 @@ An empty valid store is `READY`; `PARTIAL` and `NOT_READY` restore the separate 
 
 Required delivery order after this sprint:
 
-1. VPS and private tester preview.
-2. Final Frontend Polish / Premium UI Pass, unchanged at 27–30.07.
-3. Tester session and P0 fixes.
-4. Regression, backup, documentation and freeze.
+1. Final Frontend Polish / Premium UI Pass.
+2. Local regression and Release Candidate.
+3. Final VPS deployment.
+4. Cloudflare, scheduler, smoke and rollback.
+5. Tester session and P0 fixes.
+6. Freeze by 15.08.
 
 Canonical contract: `docs/persistent_feedback_loop.md`.

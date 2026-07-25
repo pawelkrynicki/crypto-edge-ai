@@ -24,6 +24,7 @@ import {
   type EstablishedPromotionStatus,
 } from "../services/establishedPromotionDataSource";
 import { EstablishedPromotionPanel } from "./EstablishedPromotionPanel";
+import { CopyableAddress, StatusBadge } from "./ProductUi";
 
 interface CandidateDetailViewProps {
   candidate: UiTokenCandidate | null;
@@ -107,16 +108,25 @@ export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
           <span className="candidate-detail-eyebrow">{basketLabel}</span>
           <h3>{candidate.symbol} <small>{candidate.name}</small></h3>
           <div className="candidate-detail-token-line">
-            <strong>{status}</strong>
+            <StatusBadge tone={candidate.finalLabel === "WATCHLIST" ? "manual" : candidate.basicFilterStatus === "passed_basic_filter" ? "ready" : "warning"}>{status}</StatusBadge>
             <span>{candidate.chain || t("detail.networkMissing")}</span>
             <span>{candidate.dex || t("detail.dexMissing")}</span>
             <span>{candidate.source}</span>
             <span>{formatProductDateTime(candidate.lastCheckedAt, locale)}</span>
           </div>
+          <CopyableAddress
+            value={candidate.contractAddress}
+            displayValue={shortenAddress(candidate.contractAddress, t("radar.missingData"))}
+            copyLabel={t("detail.copyLabel", { label: t("detail.contract") })}
+            copiedLabel={t("app.copied")}
+            buttonLabel={t("app.copy")}
+            className="candidate-detail-hero-address"
+          />
         </div>
         <div className="candidate-detail-boundary">
           <strong>{candidate.observationOnly ? t("detail.boundaryObservation") : t("detail.boundaryManual")}</strong>
           <span>{t("detail.boundaryText")}</span>
+          {onBackToResults && <button type="button" className="candidate-detail-hero-back" onClick={onBackToResults}>{t("detail.back")}</button>}
         </div>
       </section>
 
@@ -127,10 +137,6 @@ export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
           <DetailField label={t("detail.pairAddress")} value={candidate.pairAddress || t("radar.missingData")} copyValue={candidate.pairAddress} mono />
           <DetailField label={t("detail.chain")} value={candidate.chain || t("radar.missingData")} />
           <DetailField label={t("detail.addressIdentity")} value={candidate.addressIdentityVerified ? t("radar.verified") : t("detail.unverified")} tone={candidate.addressIdentityVerified ? "ready" : "warning"} />
-          <DetailField label={t("detail.universeVersion")} value={candidate.discoveryBasket === "established" ? candidate.universeVersion ?? t("radar.missingData") : t("detail.notApplicable")} />
-          <DetailField label={t("detail.discoveryMethod")} value={formatDiscoveryMethod(candidate.discoveryMethod, locale)} />
-          <DetailField label={t("detail.runId")} value={candidate.runId} mono />
-          <DetailField label={t("detail.universeEntry")} value={candidate.universeEntryIndex == null ? t("detail.notApplicable") : String(candidate.universeEntryIndex)} />
         </div>
       </section>
 
@@ -144,12 +150,24 @@ export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
           <DetailField label={t("radar.volume24h")} value={formatProductUsd(candidate.volume24h, locale, t("radar.missingData"))} />
           <DetailField label={t("radar.ratio")} value={candidate.volumeMarketCapRatio == null ? t("radar.missingData") : candidate.volumeMarketCapRatio.toFixed(4)} />
           <DetailField label={t("radar.pairAge")} value={formatProductPairAge(candidate.pairAgeDays, locale, t("radar.missingData"), { pairCreatedAt: candidate.pairCreatedAt })} />
+        </div>
+      </section>
+
+      <section className="product-detail-section data-freshness" aria-labelledby="freshness-heading">
+        <SectionHeader id="freshness-heading" index="3" title={t("detail.dataFreshness")} />
+        <div className="product-detail-grid data">
+          <DetailField label={t("detail.source")} value={candidate.source || t("radar.missingData")} />
+          <DetailField label={t("followUp.lastChecked")} value={formatProductDateTime(candidate.lastCheckedAt, locale)} />
           <DetailField label={t("detail.pairCreated")} value={candidate.pairCreatedAt ? formatProductDateTime(candidate.pairCreatedAt, locale) : t("radar.missingData")} />
+          <DetailField label={t("detail.discoveryMethod")} value={formatDiscoveryMethod(candidate.discoveryMethod, locale)} />
+          <DetailField label={t("detail.runId")} value={candidate.runId} mono />
+          <DetailField label={t("detail.universeVersion")} value={candidate.discoveryBasket === "established" ? candidate.universeVersion ?? t("radar.missingData") : t("detail.notApplicable")} />
+          {candidate.universeEntryIndex != null && <DetailField label={t("detail.universeEntry")} value={String(candidate.universeEntryIndex)} />}
         </div>
       </section>
 
       <section className="product-detail-section" aria-labelledby="filters-heading">
-        <SectionHeader id="filters-heading" index="3" title={t("detail.filters")} />
+        <SectionHeader id="filters-heading" index="4" title={t("detail.filters")} />
         <div className="product-filter-summary">
           <DetailField
             label={t("detail.status")}
@@ -207,7 +225,7 @@ export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
       </section>
 
       <section className="product-detail-section" aria-labelledby="security-heading">
-        <SectionHeader id="security-heading" index="4" title={t("detail.security")} />
+        <SectionHeader id="security-heading" index="5" title={t("detail.security")} />
         <div className={`security-state-panel ${securityResolution.state}`}>
           <strong>{getSecurityStateTitle(securityResolution.state, t)}</strong>
           <p>{getSecurityStateDetail(securityResolution.state, candidate.basicFilterStatus, t)}</p>
@@ -255,7 +273,7 @@ export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
 
       {followUp && (
         <section className="product-detail-section follow-up-detail" aria-labelledby="follow-up-heading">
-          <SectionHeader id="follow-up-heading" index="5" title={t("followUp.detailTitle")} />
+          <SectionHeader id="follow-up-heading" index="6" title={t("followUp.detailTitle")} />
           <p className="follow-up-candidate-boundary">{t("followUp.detailBoundary")}</p>
           <div className="product-detail-grid">
             <DetailField label={t("followUp.lifecycle")} value={formatFollowUpLifecycleStatus(followUp.lifecycle_status, locale)} tone={followUp.lifecycle_status === "CANDIDATE_FOR_ESTABLISHED" ? "warning" : "neutral"} />
@@ -273,8 +291,8 @@ export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
         <EstablishedPromotionPanel initialStatus={ownerPromotionStatus} />
       )}
 
-      <section className="product-detail-section next-step" aria-labelledby="next-heading">
-        <SectionHeader id="next-heading" index={followUp ? "6" : "5"} title={t("detail.nextStep")} />
+      <section className="product-detail-section next-step research-actions" aria-labelledby="next-heading">
+        <SectionHeader id="next-heading" index={followUp ? "7" : "6"} title={t("detail.nextStep")} />
         <p>{t("detail.nextStepText")}</p>
         <div className="product-detail-actions">
           {onBackToResults && <button type="button" className="secondary" onClick={onBackToResults}>{t("detail.back")}</button>}
@@ -465,6 +483,12 @@ function formatLiquidityLock(candidate: UiTokenCandidate, locale: ProductLocale)
   return locale === "pl"
     ? `Potwierdzona · ${candidate.security.liquidityLockDays} dni`
     : `Confirmed · ${candidate.security.liquidityLockDays} days`;
+}
+
+function shortenAddress(value: string, missing: string): string {
+  if (!value) return missing;
+  if (value.length <= 24) return value;
+  return `${value.slice(0, 12)}…${value.slice(-10)}`;
 }
 
 function humanizeReason(value: string): string {

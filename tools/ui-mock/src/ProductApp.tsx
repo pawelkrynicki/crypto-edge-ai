@@ -9,6 +9,7 @@ import { Feedback } from "./components/Feedback";
 import { Methodology } from "./components/Methodology";
 import { ProductControlCenter } from "./components/ProductControlCenter";
 import { ReportsLibrary } from "./components/ReportsLibrary";
+import { LoadingState } from "./components/ProductUi";
 import {
   ProductWorkspaceSection,
   ProductWorkspaceShell,
@@ -290,7 +291,7 @@ export function ProductAppContent() {
     if (loading && candidates.length === 0) {
       return (
         <ProductWorkspaceSection {...copy}>
-          <div className="product-loading" role="status">{t("app.loading")}</div>
+          <LoadingState label={t("app.loading")} />
         </ProductWorkspaceSection>
       );
     }
