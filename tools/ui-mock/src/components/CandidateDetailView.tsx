@@ -160,7 +160,6 @@ export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
         <div className="candidate-detail-boundary">
           <strong>{candidate.observationOnly ? t("detail.boundaryObservation") : t("detail.boundaryManual")}</strong>
           <span>{t("detail.boundaryText")}</span>
-          {onBackToResults && <ActionButton variant="secondary" className="candidate-detail-hero-back" onClick={onBackToResults}>{t("detail.back")}</ActionButton>}
         </div>
       </section>
 
@@ -439,7 +438,6 @@ function FollowUpOnlyDetail({
         <div className="candidate-detail-boundary">
           <strong>{locale === "pl" ? "Badania i obserwacja" : "Research and observation"}</strong>
           <span>{locale === "pl" ? "Status nie jest rekomendacją inwestycyjną ani potwierdzeniem bezpieczeństwa." : "This status is not investment advice or a safety approval."}</span>
-          {onBackToResults && <ActionButton variant="secondary" className="candidate-detail-hero-back" onClick={onBackToResults}>{t("detail.back")}</ActionButton>}
         </div>
       </section>
 

@@ -35,6 +35,14 @@ const BLOCKER_TRANSLATION_KEYS: Record<
   OWNER_TESTER_APPROVAL: "control.blockers.ownerApproval",
 };
 
+const RELEASE_GATE_CHECKLIST: readonly ControlCenterBlocker[] = [
+  "TRUSTED_TESTER_PREVIEW_MODE",
+  "VPS_DEPLOYMENT",
+  "DOMAIN_ACCESS_SMOKE",
+  "ROLLBACK_TEST",
+  "OWNER_TESTER_APPROVAL",
+];
+
 export function ProductControlCenter({
   status,
   ownerOperationsStatus: providedOwnerOperationsStatus,
@@ -262,22 +270,29 @@ export function ProductControlCenter({
         <OwnerOperationsPanel initialStatus={ownerOperationsStatus} />
       )}
 
-      <section className="control-section product-control-blockers">
+      <section className="control-section product-control-blockers" data-interaction="read-only" aria-labelledby="owner-decisions-heading">
         <header className="control-section-header">
           <span className="product-control-group-number">04</span>
           <h3 id="owner-decisions-heading">{ui.ownerDecisions}</h3>
           <p>{t("control.blockers.explanation")}</p>
         </header>
-        {(status?.unmetGates.length ?? 0) > 0 ? (
-          <ol>
-            {(status?.unmetGates ?? []).map((blocker) => (
-              <li key={blocker}>{t(BLOCKER_TRANSLATION_KEYS[blocker])}</li>
-            ))}
-          </ol>
-        ) : <p className="product-control-clear">{ui.noOwnerDecisions}</p>}
+        <ol className="product-control-release-checklist">
+          {RELEASE_GATE_CHECKLIST.map((gate, index) => {
+            const pending = status === null || status.unmetGates.includes(gate);
+            return (
+              <li key={gate} className={pending ? "pending" : "completed"} data-interaction="read-only">
+                <span className="product-control-checklist-index" aria-hidden="true">{index + 1}</span>
+                <span className="product-control-checklist-copy">
+                  <strong>{t(BLOCKER_TRANSLATION_KEYS[gate])}</strong>
+                  <small>{pending ? ui.conditionPending : ui.conditionCompleted}</small>
+                </span>
+              </li>
+            );
+          })}
+        </ol>
       </section>
 
-      <section className="control-section product-control-next-step" aria-labelledby="safe-next-step-heading">
+      <section className="control-section product-control-next-step" data-interaction="read-only" aria-labelledby="safe-next-step-heading">
         <span className="product-control-group-number">05</span>
         <div>
           <h3 id="safe-next-step-heading">{ui.safeNextStep}</h3>
@@ -443,8 +458,9 @@ const CONTROL_UI_COPY = {
     productCapabilitiesHelp: "Funkcje działające lokalnie i ich aktualny poziom gotowości.",
     accessGates: "Dostęp i wdrożenie",
     accessGatesHelp: "Oddziela lokalną gotowość produktu od dostępu zewnętrznego.",
-    ownerDecisions: "Decyzje ownera i warunki udostępnienia",
-    noOwnerDecisions: "Brak otwartych decyzji ownera.",
+    ownerDecisions: "Decyzje właściciela i warunki udostępnienia",
+    conditionPending: "Oczekuje na potwierdzenie",
+    conditionCompleted: "Potwierdzono",
     safeNextStep: "Bezpieczny następny krok",
     safeNextStepReady: "Kontynuuj lokalny przegląd bez zmiany trybu runtime ani uruchamiania providerów.",
   },
@@ -457,7 +473,8 @@ const CONTROL_UI_COPY = {
     accessGates: "Access and deployment",
     accessGatesHelp: "Separates local product readiness from external access.",
     ownerDecisions: "Owner decisions and release conditions",
-    noOwnerDecisions: "No open owner decisions.",
+    conditionPending: "Awaiting confirmation",
+    conditionCompleted: "Confirmed",
     safeNextStep: "Safe next step",
     safeNextStepReady: "Continue local review without changing runtime mode or calling providers.",
   },

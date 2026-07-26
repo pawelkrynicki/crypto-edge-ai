@@ -13,6 +13,7 @@ import {
   StatusBadge,
   TechnicalDetails,
 } from "../src/components/ProductUi.js";
+import { Feedback } from "../src/components/Feedback.js";
 import { ProductLocaleProvider } from "../src/productI18n.js";
 
 void React;
@@ -87,9 +88,12 @@ describe("UX.1 interaction affordance contracts", () => {
     ]);
     assert.match(flow, /data-interaction="read-only"/);
     assert.doesNotMatch(flow, /token-lifecycle-stage[^\n]*onClick/);
+    assert.doesNotMatch(flow, /tabIndex=|onClick=|role="button"/);
     assert.match(css, /\.token-lifecycle-stage,[\s\S]*?cursor: default/);
+    assert.match(css, /\.token-lifecycle-stage:not\(:last-child\)::after/);
+    assert.match(css, /@media \(max-width: 700px\)[\s\S]*?\.token-lifecycle-flow\.compact \.token-lifecycle-stages[\s\S]*?grid-template-columns: 1fr/);
     assert.match(results, /ActionButton variant="primary" icon="arrow" iconPosition="end"/);
-    assert.match(results, /ActionButton variant="secondary"/);
+    assert.match(results, /variant="secondary"[\s\S]{0,180}className="candidate-source-verification-action"/);
     assert.match(reports, /report-list-card \$\{selectedReport\?\.report_id/);
     assert.match(reports, /aria-current=\{selectedReport\?\.report_id/);
   });
@@ -123,6 +127,60 @@ describe("UX.1 interaction affordance contracts", () => {
     assert.match(ownerRefresh, /id="owner-refresh-disabled-help"/);
     assert.match(promotion, /id="established-promotion-disabled-help"/);
     assert.match(promotion, /disabled=\{!canAdd\}/);
+  });
+
+  it("describes every missing feedback requirement without showing a waiting state", async () => {
+    const markup = render(React.createElement(Feedback, {
+      screenContext: "candidate-results",
+      initialPublicStatus: {
+        capture_available: true,
+        feedback_status: "READY",
+        submission_enabled: true,
+        max_title_length: 120,
+        max_details_length: 3_000,
+        supported_categories: ["BLOCKER", "IMPROVEMENT", "CLARIFICATION", "LATER"],
+      },
+      initialOwnerStatus: null,
+    }), "pl");
+    const css = await source("src/index.css");
+    assert.match(markup, /Wybierz kategorię/);
+    assert.match(markup, /Tytuł: 0 z wymaganych 5 znaków/);
+    assert.match(markup, /Opis: 0 z wymaganych 20 znaków/);
+    assert.match(markup, /id="feedback-submit-help" role="status" aria-live="polite"/);
+    assert.match(markup, /disabled=""/);
+    assert.doesNotMatch(markup, /aria-busy="true"|Zapisywanie/);
+    assert.match(css, /\.action-button:disabled:not\(\[aria-busy="true"\]\)[\s\S]*?cursor: not-allowed/);
+    assert.match(css, /\.action-button\[aria-busy="true"\]::after/);
+    assert.doesNotMatch(css, /\.feedback[^\n{]*\{[^}]*cursor:\s*wait/);
+  });
+
+  it("keeps final verification, methodology and owner-release hierarchy semantic", async () => {
+    const [detail, verification, methodology, control, translations, css] = await Promise.all([
+      source("src/components/CandidateDetailView.tsx"),
+      source("src/components/ExternalVerificationLinksView.tsx"),
+      source("src/components/Methodology.tsx"),
+      source("src/components/ProductControlCenter.tsx"),
+      source("src/productI18n.tsx"),
+      source("src/index.css"),
+    ]);
+    assert.doesNotMatch(detail, /candidate-detail-hero-back/);
+    assert.match(detail, /product-detail-actions[\s\S]{0,260}variant="secondary"/);
+    assert.match(verification, /ExternalLinkAction variant="secondary" className="external-check-link"/);
+    assert.match(verification, /CopyButton className="external-check-copy-button"/);
+    assert.match(css, /\.external-check-copy-button > \.action-button--tertiary/);
+    assert.match(methodology, /<nav className="methodology-toc"/);
+    assert.match(methodology, /href=\{`#\$\{link\.id\}`\}/);
+    assert.match(methodology, /<ProductIcon name="arrow" \/>/);
+    assert.doesNotMatch(methodology, /aria-current|onClick/);
+    for (const gate of ["TRUSTED_TESTER_PREVIEW_MODE", "VPS_DEPLOYMENT", "DOMAIN_ACCESS_SMOKE", "ROLLBACK_TEST", "OWNER_TESTER_APPROVAL"]) {
+      assert.match(control, new RegExp(`"${gate}"`));
+    }
+    assert.match(control, /product-control-release-checklist/);
+    assert.match(control, /data-interaction="read-only"/);
+    assert.doesNotMatch(control.match(/<section className="control-section product-control-blockers"[\s\S]*?<\/section>/)?.[0] ?? "", /onClick|tabIndex|role="button"/);
+    for (const label of ["Tryb podglądu zaufanego testera", "Wdrożenie na VPS", "Test domeny i Cloudflare Access", "Test rollbacku\/wycofania", "Zgoda właściciela na dostęp testera"]) {
+      assert.match(translations, new RegExp(label));
+    }
   });
 
   it("has no interactive divs, role-button shims or injected markup", async () => {
@@ -173,10 +231,14 @@ describe("UX.1 interaction affordance contracts", () => {
       readFile(resolve(repoRoot, "scripts", "win", "start-interaction-affordance-review.cmd"), "utf8"),
       readFile(resolve(repoRoot, "docs", "interaction_affordance_system.md"), "utf8").catch(() => ""),
     ]);
-    for (const option of ["--detail", "--feedback", "--mobile-guide"]) assert.match(launcher, new RegExp(option));
+    const canonicalLauncher = await readFile(resolve(repoRoot, "scripts", "win", "start-product-radar-review.cmd"), "utf8");
+    for (const option of ["--detail", "--feedback", "--owner-inbox", "--mobile-guide"]) assert.match(launcher, new RegExp(option));
     for (const item of ["Radar i karta tokena", "Candidate Detail", "Verification", "Reports", "Feedback", "Owner Inbox", "Methodology", "Control Center", "Mobile 390 px", "Keyboard-only"]) assert.match(launcher, new RegExp(item));
     assert.match(launcher, /CRYPTO_EDGE_RUNTIME_MODE=INTERNAL_BETA/);
     assert.match(launcher, /CRYPTO_EDGE_OWNER_OPERATIONS_MODE=DISABLED/);
+    assert.match(launcher, /--feedback --owner-operations-review/);
+    assert.match(launcher, /Owner Inbox \^\(wymaga --owner-inbox i REVIEW_SAFE\^\)/);
+    assert.match(canonicalLauncher, /if \/i not "%RADAR_VIEW%"=="control-center" if \/i not "%RADAR_VIEW%"=="feedback"/);
     assert.doesNotMatch(launcher, /PUBLIC_BETA|OWNER_OPERATIONS_MODE=ENABLED|call[^\n]*collector/i);
     assert.match(documentation, /shadcn\/ui/);
     assert.match(documentation, /Button `default`/);

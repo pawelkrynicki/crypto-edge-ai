@@ -158,7 +158,7 @@ function ExternalCheckCard({ target }: { target: ExternalVerificationTarget }) {
       </div>
       <div className="external-check-actions">
         {target.href ? (
-          <ExternalLinkAction className="external-check-link" href={target.href} aria-label={t("verification.openSourceLabel", { source: title })}>
+          <ExternalLinkAction variant="secondary" className="external-check-link" href={target.href} aria-label={t("verification.openSourceLabel", { source: title })}>
             {t("verification.openSource")}
           </ExternalLinkAction>
         ) : (

@@ -71,7 +71,14 @@ export function Feedback({
   const [receipt, setReceipt] = useState<FeedbackReceipt | null>(initialReceipt ?? null);
   const [ownerInboxRevision, setOwnerInboxRevision] = useState(0);
   const submittingRef = useRef(false);
-  const formComplete = category !== null && title.trim().length >= 5 && details.trim().length >= 20;
+  const titleLength = title.trim().length;
+  const detailsLength = details.trim().length;
+  const missingRequirements = [
+    category === null ? copy.missingCategory : null,
+    titleLength < 5 ? copy.missingTitle(titleLength) : null,
+    detailsLength < 20 ? copy.missingDetails(detailsLength) : null,
+  ].filter((message): message is string => message !== null);
+  const formComplete = category !== null && missingRequirements.length === 0;
 
   useEffect(() => {
     if (initialPublicStatus !== undefined) return;
@@ -82,7 +89,7 @@ export function Feedback({
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (submittingRef.current || !publicStatus?.submission_enabled) return;
+    if (!formComplete || submittingRef.current || state === "submitting" || !publicStatus?.submission_enabled) return;
     const selectedCategory = resolveSelectedFeedbackCategory(
       new FormData(event.currentTarget).get("feedback-category"),
       category,
@@ -196,14 +203,20 @@ export function Feedback({
                 {state === "error" && <p className="feedback-inline-error" role="alert">{copy.error}</p>}
                 {state === "rate_limited" && <p className="feedback-inline-error" role="alert">{copy.rateLimit}</p>}
               </div>
-              {!formComplete && <p className="feedback-disabled-help" id="feedback-submit-help">{copy.completeRequired}</p>}
+              {!formComplete && (
+                <div className="feedback-disabled-help" id="feedback-submit-help" role="status" aria-live="polite">
+                  <ul>
+                    {missingRequirements.map((message) => <li key={message}>{message}</li>)}
+                  </ul>
+                </div>
+              )}
               <ActionButton
                 type="submit"
                 variant="primary"
                 className="product-primary-button"
                 loading={state === "submitting"}
                 loadingLabel={copy.sending}
-                disabled={!formComplete}
+                disabled={!formComplete || state === "submitting"}
                 aria-describedby={!formComplete ? "feedback-submit-help" : undefined}
               >
                 {copy.send}
@@ -514,7 +527,9 @@ function feedbackCopy(locale: ProductLocale) {
     required: "wymagane",
     titleHelp: "Minimum 5 znaków",
     detailsHelp: "Minimum 20 znaków",
-    completeRequired: "Wybierz kategorię oraz uzupełnij wymagany tytuł i opis, aby wysłać zgłoszenie.",
+    missingCategory: "Wybierz kategorię",
+    missingTitle: (count: number) => `Tytuł: ${count} z wymaganych 5 znaków`,
+    missingDetails: (count: number) => `Opis: ${count} z wymaganych 20 znaków`,
     charactersLeft: "znaków pozostało",
     privacy: "Nie podawaj danych osobowych, haseł ani kluczy API. Sesja jest grupowana wyłącznie pseudonimowo.",
     send: "Wyślij opinię",
@@ -578,7 +593,9 @@ function feedbackCopy(locale: ProductLocale) {
     required: "required",
     titleHelp: "At least 5 characters",
     detailsHelp: "At least 20 characters",
-    completeRequired: "Complete the required title and description to send feedback.",
+    missingCategory: "Select a category",
+    missingTitle: (count: number) => `Title: ${count} of 5 required characters`,
+    missingDetails: (count: number) => `Description: ${count} of 20 required characters`,
     charactersLeft: "characters left",
     privacy: "Do not include personal data, passwords or API keys. The session is grouped pseudonymously only.",
     send: "Send feedback",

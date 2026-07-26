@@ -1,5 +1,6 @@
 import React from "react";
 import { useProductLocale } from "../productI18n";
+import { ProductIcon } from "./ProductUi";
 
 export const Methodology: React.FC = () => {
   const { locale, t } = useProductLocale();
@@ -22,7 +23,12 @@ export const Methodology: React.FC = () => {
 
       <nav className="methodology-toc" aria-label={ui.contents}>
         <strong>{ui.contents}</strong>
-        <div>{ui.links.map((link) => <a key={link.id} href={`#${link.id}`}>{link.label}</a>)}</div>
+        <div>{ui.links.map((link) => (
+          <a key={link.id} href={`#${link.id}`}>
+            <ProductIcon name="arrow" />
+            <span>{link.label}</span>
+          </a>
+        ))}</div>
       </nav>
 
       <section className="methodology-document-section" id="method-lifecycle" aria-labelledby="method-lifecycle-heading">

@@ -457,10 +457,11 @@ It does not run the collector, call providers, run bootstrap `--apply`, activate
 scripts\win\start-interaction-affordance-review.cmd
 scripts\win\start-interaction-affordance-review.cmd --detail
 scripts\win\start-interaction-affordance-review.cmd --feedback
+scripts\win\start-interaction-affordance-review.cmd --owner-inbox
 scripts\win\start-interaction-affordance-review.cmd --mobile-guide
 ```
 
-Launcher starts the ordinary fixture-free `INTERNAL_BETA` Radar with owner operations `DISABLED`. It prints the canonical review order for Radar, Candidate Detail, Verification, Reports, Feedback, Owner Inbox, Methodology, Control Center, mobile 390 px and keyboard-only review. `--detail` and `--feedback` select the initial screen; `--mobile-guide` prints the 390 px checks.
+Launcher starts the ordinary fixture-free `INTERNAL_BETA` Radar with owner operations `DISABLED`. It prints the canonical review order for Radar, Candidate Detail, Verification, Reports, Feedback, Owner Inbox, Methodology, Control Center, mobile 390 px and keyboard-only review. `--detail` and `--feedback` select the initial screen; `--mobile-guide` prints the 390 px checks. The Owner Inbox is intentionally absent in the default review and requires `--owner-inbox`; that option delegates to the same canonical `REVIEW_SAFE` owner-authenticated path used by UI.2 and does not enable mutations.
 
 It does not call providers, run the collector, submit feedback, execute owner actions, run bootstrap `--apply`, activate `ENABLED`/`PUBLIC_BETA`, mutate product stores, bypass owner authentication, deploy to VPS, change Cloudflare or touch Task Scheduler. Contract: `docs/interaction_affordance_system.md`.
 

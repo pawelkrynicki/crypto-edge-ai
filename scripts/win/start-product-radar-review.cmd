@@ -24,8 +24,8 @@ goto parse_args
 
 :args_done
 if "%ESTABLISHED_PROMOTION_REVIEW%"=="1" set "RADAR_VIEW=candidate-detail"
-if "%OWNER_OPERATIONS_REVIEW%"=="1" if /i not "%RADAR_VIEW%"=="control-center" (
-  echo ERROR: --owner-operations-review wymaga --control-center.
+if "%OWNER_OPERATIONS_REVIEW%"=="1" if /i not "%RADAR_VIEW%"=="control-center" if /i not "%RADAR_VIEW%"=="feedback" (
+  echo ERROR: --owner-operations-review wymaga --control-center albo --feedback.
   exit /b 1
 )
 if "%ESTABLISHED_PROMOTION_REVIEW%"=="1" if /i not "%RADAR_VIEW%"=="candidate-detail" (

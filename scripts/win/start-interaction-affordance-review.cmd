@@ -5,6 +5,7 @@ set "SCRIPT_DIR=%~dp0"
 for %%I in ("%SCRIPT_DIR%..\..") do set "REPO_ROOT=%%~fI"
 set "REVIEW_VIEW=radar"
 set "SHOW_MOBILE_GUIDE=0"
+set "OWNER_INBOX_REVIEW=0"
 
 :parse_args
 if "%~1"=="" goto args_done
@@ -12,11 +13,14 @@ if /i "%~1"=="--detail" (
   set "REVIEW_VIEW=detail"
 ) else if /i "%~1"=="--feedback" (
   set "REVIEW_VIEW=feedback"
+) else if /i "%~1"=="--owner-inbox" (
+  set "REVIEW_VIEW=feedback"
+  set "OWNER_INBOX_REVIEW=1"
 ) else if /i "%~1"=="--mobile-guide" (
   set "SHOW_MOBILE_GUIDE=1"
 ) else (
   echo ERROR: Nieznany parametr: %~1
-  echo Uzycie: scripts\win\start-interaction-affordance-review.cmd [--detail] [--feedback] [--mobile-guide]
+  echo Uzycie: scripts\win\start-interaction-affordance-review.cmd [--detail] [--feedback] [--owner-inbox] [--mobile-guide]
   exit /b 1
 )
 shift
@@ -27,12 +31,13 @@ set "ALLOW_LIVE_PROVIDER_CALLS="
 set "CRYPTO_EDGE_ALLOW_LIVE_SOURCE_CHECK="
 set "CRYPTO_EDGE_AUTOMATION_ENABLED="
 set "CRYPTO_EDGE_OWNER_OPERATIONS_MODE=DISABLED"
+if "%OWNER_INBOX_REVIEW%"=="1" set "CRYPTO_EDGE_OWNER_OPERATIONS_MODE=REVIEW_SAFE"
 set "CRYPTO_EDGE_RUNTIME_MODE=INTERNAL_BETA"
 
 echo.
 echo === Crypto Edge AI: UX.1 interaction affordance review ===
 echo Runtime: INTERNAL_BETA
-echo Owner operations: DISABLED
+echo Owner operations: %CRYPTO_EDGE_OWNER_OPERATIONS_MODE%
 echo Provider calls: DISABLED
 echo.
 echo Kolejnosc review:
@@ -41,7 +46,7 @@ echo   2. Candidate Detail.
 echo   3. Verification.
 echo   4. Reports.
 echo   5. Feedback.
-echo   6. Owner Inbox.
+echo   6. Owner Inbox ^(wymaga --owner-inbox i REVIEW_SAFE^).
 echo   7. Methodology.
 echo   8. Control Center.
 echo   9. Mobile 390 px.
@@ -64,6 +69,11 @@ if /i "%REVIEW_VIEW%"=="detail" (
 )
 
 if /i "%REVIEW_VIEW%"=="feedback" (
+  if "%OWNER_INBOX_REVIEW%"=="1" (
+    rem Deleguje do tej samej kanonicznej sciezki REVIEW_SAFE co UI.2.
+    call "%REPO_ROOT%\scripts\win\start-product-radar-review.cmd" --feedback --owner-operations-review
+    exit /b
+  )
   call "%REPO_ROOT%\scripts\win\start-product-radar-review.cmd" --feedback
   exit /b %ERRORLEVEL%
 )

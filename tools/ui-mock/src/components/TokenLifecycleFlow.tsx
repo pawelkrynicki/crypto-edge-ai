@@ -270,6 +270,9 @@ function stageLabel(stage: TokenLifecycleStage, locale: ProductLocale): string {
 }
 
 function stageStateLabel(state: TokenLifecycleStageState, locale: ProductLocale): string {
+  // Keep the machine state available in data-state while presenting the calm,
+  // four-label progress vocabulary used by the read-only lifecycle axis.
+  if (state === "unavailable") return FLOW_COPY[locale].states.pending;
   return FLOW_COPY[locale].states[state];
 }
 

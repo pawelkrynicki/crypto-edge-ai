@@ -126,19 +126,19 @@ UX.1 nie dodaje runtime dependencies, biblioteki ikon, animacji ani fontu. Końc
 
 Końcowy pomiar UX.1 w tym samym buildzie:
 
-- CSS: 199,68 kB; gzip 28,22 kB — zmiana +7,72 kB / +1,22 kB gzip;
-- JS: 463,99 kB; gzip 129,21 kB — zmiana +4,66 kB / +1,37 kB gzip.
+- CSS: 206,10 kB; gzip 28,95 kB — zmiana +14,14 kB / +1,95 kB gzip;
+- JS: 464,94 kB; gzip 129,44 kB — zmiana +5,61 kB / +1,60 kB gzip.
 
 ## Owner review checklist
 
-1. Radar i karta tokena — czy klikalne są tylko koszyki, disclosure, copy i jawne CTA.
-2. Candidate Detail — primary verification, secondary back, read-only fields i copy.
-3. Verification — external-link icon, copy contract/pair/link, widoczny unavailable reason.
+1. Radar i karta tokena — czy klikalne są tylko koszyki, disclosure, copy i jawne CTA; oś lifecycle pozostaje niefokusowalna.
+2. Candidate Detail — primary verification, pojedynczy secondary back na dole, read-only fields i copy.
+3. Verification — secondary external-link, tertiary copy contract/pair/link, widoczny unavailable reason.
 4. Reports — jawne CTA, selected record, metadata bez affordance filtra.
-5. Feedback — radio hover/checked/focus, labels, disabled submit reason.
+5. Feedback — radio hover/checked/focus, labels, komplet bieżących braków i disabled submit bez stanu oczekiwania.
 6. Owner Inbox — filtry z `aria-pressed`, selecty, active record, disabled export reason.
 7. Methodology — TOC wygląda jak nawigacja, definicje pozostają informacyjne.
-8. Control Center — readiness nie ma hoveru; tylko disclosures i dozwolone owner actions są interaktywne.
+8. Control Center — readiness i pięciostopniowa lista warunków nie mają hoveru ani fokusu; tylko disclosures i dozwolone owner actions są interaktywne.
 9. Mobile 390 px — 44 px, brak overflow, primary przed secondary, pełne disclosure rows.
 10. Keyboard-only — logiczny Tab, widoczny focus, Enter/Space, brak fokusowalnych statusów.
 
@@ -148,4 +148,4 @@ Komenda:
 scripts\win\start-interaction-affordance-review.cmd --mobile-guide
 ```
 
-Launcher otwiera zwykły `INTERNAL_BETA`, pozostawia owner operations w `DISABLED`, nie uruchamia collectora, providerów, `--apply` ani mutacji danych i nie omija owner authentication.
+Launcher otwiera zwykły `INTERNAL_BETA`, pozostawia owner operations w `DISABLED`, nie uruchamia collectora, providerów, `--apply` ani mutacji danych i nie omija owner authentication. Odczytowa skrzynka Owner Inbox wymaga jawnego `--owner-inbox`; parametr deleguje do istniejącej kanonicznej ścieżki `REVIEW_SAFE` używanej przez UI.2.

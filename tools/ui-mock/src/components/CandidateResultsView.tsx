@@ -667,7 +667,13 @@ function CandidateActions({
         </ActionButton>
       )}
       {onOpenExternalChecks && (
-        <ActionButton variant="secondary" onClick={() => onOpenExternalChecks(candidate)}>
+        <ActionButton
+          variant="secondary"
+          icon="arrow"
+          iconPosition="end"
+          className="candidate-source-verification-action"
+          onClick={() => onOpenExternalChecks(candidate)}
+        >
           {t("radar.sourceVerification")}
         </ActionButton>
       )}
