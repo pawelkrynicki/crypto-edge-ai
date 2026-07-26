@@ -15,6 +15,21 @@ Standalone AI.1 pozostaje niezależny technologicznie, ale jego granice odpowiad
 | semaphore | PM2 analyzer worker concurrency | bounded worker pool i timeout |
 | no-op usage recorder | `insight_costs` + `token_pools` adapter | user i billing tylko z protected server context |
 
+## Etykiety prezentacyjne
+
+AI KINTEL powinien zachować machine source reference IDs w danych i mapować je dopiero w warstwie prezentacji. Aktualne naturalne etykiety Canvasu:
+
+| Machine reference | PL | EN |
+|---|---|---|
+| `basic_filters` | Podstawowe filtry | Basic filters |
+| `security_status`, `security` | Status bezpieczeństwa | Security status |
+| `scanner_snapshot` | Migawka skanera | Scanner snapshot |
+| `follow_up_checkpoints`, `lifecycle` | Etap obserwacji | Observation stage |
+| `established_membership` | Członkostwo w Established | Established membership |
+| `methodology` | Metodologia produktu | Product methodology |
+
+To mapowanie jest wyłącznie copy/view-model contractem. Nie zmienia `ai_research_brief_v1`, source reference IDs, store ani adapterów migracyjnych.
+
 ## MySQL / Drizzle mapping
 
 Docelowa tabela `crypto_ai_research_briefs`:

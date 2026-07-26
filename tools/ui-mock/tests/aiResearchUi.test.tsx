@@ -14,7 +14,7 @@ import { CandidateDetailView } from "../src/components/CandidateDetailView.js";
 import { ExternalVerificationLinksView } from "../src/components/ExternalVerificationLinksView.js";
 import { PERSISTABLE_SCANNER_SAMPLE } from "../src/fixtures/persistableScannerSample.js";
 import { ProductLocaleProvider, type ProductLocale } from "../src/productI18n.js";
-import type { AIResearchBriefLookup } from "../src/types/aiResearchTypes.js";
+import type { AIResearchBrief, AIResearchBriefLookup } from "../src/types/aiResearchTypes.js";
 
 void React;
 
@@ -39,6 +39,8 @@ const contextEn = await buildAIResearchContext("base", ADDRESS, "en", {
   reports: { reportsRootPath: resolve(root, "missing-reports") },
 });
 const briefEn = buildDeterministicPreview(contextEn, new Date("2026-07-26T15:00:00.000Z"));
+const semanticBriefPl = buildSemanticReviewBrief(briefPl, "pl");
+const semanticBriefEn = buildSemanticReviewBrief(briefEn, "en");
 const candidate = mapPersistableScannerOutputToUiCandidates(value)[0]!;
 
 after(async () => { await rm(root, { recursive: true, force: true }); });
@@ -60,6 +62,63 @@ describe("AI.1 Visual Candidate Research Canvas", () => {
     assert.match(en, /The product has no data that can assess this area/);
     assert.match(pl, /Podgląd formatu — bez wywołania AI/);
     assert.match(en, /Format preview — no AI call/);
+  });
+
+  it("separates lifecycle, freshness and filter assessment in the PL and EN presentation", () => {
+    const pl = render("pl", <AIResearchBriefCanvas brief={semanticBriefPl} symbol="SCOOBERT" name="Scoobert" />);
+    const en = render("en", <AIResearchBriefCanvas brief={semanticBriefEn} symbol="SCOOBERT" name="Scoobert" />);
+
+    assert.match(pl, /Etap badawczy<\/span><strong>Nowe<\/strong>/);
+    assert.match(pl, /Świeżość danych<\/span><strong>Nieaktualne<\/strong>/);
+    assert.match(pl, /Podstawowe filtry<\/span><strong>Niewystarczające<\/strong>/);
+    assert.match(pl, /Dane do oceny filtrów<\/span><strong>Wystarczające<\/strong>/);
+    assert.match(en, /Research stage<\/span><strong>New<\/strong>/);
+    assert.match(en, /Data freshness<\/span><strong>Stale<\/strong>/);
+    assert.match(en, /Basic filters<\/span><strong>Insufficient<\/strong>/);
+    assert.match(en, /Data for filter assessment<\/span><strong>Sufficient<\/strong>/);
+  });
+
+  it("prioritizes a fresh snapshot while keeping verification secondary and external links tertiary", () => {
+    const pl = render("pl", <AIResearchBriefCanvas brief={semanticBriefPl} symbol="SCOOBERT" name="Scoobert" />);
+    const en = render("en", <AIResearchBriefCanvas brief={semanticBriefEn} symbol="SCOOBERT" name="Scoobert" />);
+
+    for (const label of [
+      "Aktualny etap", "Nowe", "Dane nieaktualne i filtry niespełnione", "Poczekaj na świeżą migawkę",
+      "Publikacja nowych danych i ponowne obliczenie filtrów",
+    ]) assert.match(pl, new RegExp(label));
+    for (const label of [
+      "Current stage", "New", "Data is stale and filters are not met", "Wait for a fresh snapshot",
+      "Publication of new data and recalculation of filters",
+    ]) assert.match(en, new RegExp(label));
+    assert.match(pl, /data-action-variant="secondary"[^>]*>[\s\S]*?Otwórz weryfikację źródłową/);
+    assert.match(pl, /data-action-variant="tertiary"[^>]*>[\s\S]*?Otwórz DexScreener/);
+    assert.match(pl, /data-action-variant="tertiary"[^>]*>[\s\S]*?Otwórz eksplorator/);
+    assert.doesNotMatch(pl, /data-action-variant="primary"/);
+  });
+
+  it("uses natural source labels and concrete missing-information copy without exposing raw refs", () => {
+    const pl = render("pl", <AIResearchBriefCanvas brief={semanticBriefPl} symbol="SCOOBERT" name="Scoobert" />);
+    const en = render("en", <AIResearchBriefCanvas brief={semanticBriefEn} symbol="SCOOBERT" name="Scoobert" />);
+
+    for (const label of ["Podstawowe filtry", "Status bezpieczeństwa", "Migawka skanera", "Etap obserwacji", "Członkostwo w Established", "Metodologia produktu"]) assert.match(pl, new RegExp(label));
+    for (const label of ["Basic filters", "Security status", "Scanner snapshot", "Observation stage", "Established membership", "Product methodology"]) assert.match(en, new RegExp(label));
+    assert.doesNotMatch(pl, /basic_filters|security_status|scanner_snapshot|established_membership|follow_up_checkpoints|>security</);
+    assert.doesNotMatch(en, /basic_filters|security_status|scanner_snapshot|established_membership|follow_up_checkpoints|>security</);
+
+    for (const description of [
+      "Produkt nie posiada wyniku kontroli bezpieczeństwa kontraktu.",
+      "Token nie posiada jeszcze historii pozwalającej porównać zmiany w kolejnych okresach.",
+      "Nie zapisano jeszcze wyniku następnego punktu kontrolnego.",
+      "Ostatnia migawka jest starsza niż dopuszczalny limit świeżości.",
+      "Tożsamość projektu i dane zewnętrzne nie zostały jeszcze potwierdzone ręcznie.",
+    ]) assert.match(pl, new RegExp(description.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    for (const description of [
+      "The product does not have a contract security check result.",
+      "The token does not yet have enough history to compare changes across consecutive periods.",
+      "The result of the next checkpoint has not been recorded yet.",
+      "The latest snapshot is older than the allowed freshness limit.",
+      "The project&#x27;s identity and external data have not yet been confirmed manually.",
+    ]) assert.match(en, new RegExp(description.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   });
 
   it("renders all Candidate Detail states with aria-live, aria-busy and UX.1 hierarchy", () => {
@@ -151,6 +210,50 @@ describe("AI.1 responsive and accessibility contracts", () => {
 
 function render(locale: ProductLocale, element: React.ReactElement): string {
   return renderToStaticMarkup(<ProductLocaleProvider initialLocale={locale}>{element}</ProductLocaleProvider>);
+}
+
+function buildSemanticReviewBrief(brief: AIResearchBrief, locale: ProductLocale): AIResearchBrief {
+  const pl = locale === "pl";
+  const result = structuredClone(brief);
+  result.research_state = "DATA_STALE";
+  for (const fact of result.known_facts) {
+    if (fact.key === "lifecycle") fact.value = "new";
+    if (fact.key === "freshness") fact.value = "STALE";
+    if (fact.key === "basic_filters") fact.value = "rejected_basic_filter";
+  }
+  const filterCoverage = result.coverage.find(({ area }) => area === "basic_filters");
+  if (filterCoverage) filterCoverage.state = "sufficient";
+  result.risk_factors = [{
+    severity: "high",
+    category: "basic_filters",
+    title: pl ? "Filtry niespełnione" : "Filters not met",
+    explanation: pl ? "Co najmniej jeden podstawowy warunek produktu nie jest spełniony." : "At least one basic product condition is not met.",
+    evidence_reference_ids: ["basic_filters", "security_status", "scanner_snapshot", "follow_up_checkpoints", "established_membership", "methodology"],
+  }];
+  result.missing_information = [
+    ["security", pl ? "Brak danych bezpieczeństwa" : "Security data missing", "security_status"],
+    ["history", pl ? "Brak wystarczającej historii" : "Insufficient history", "follow_up_checkpoints"],
+    ["next_checkpoint", pl ? "Brak kolejnego checkpointu" : "Next checkpoint missing", "follow_up_checkpoints"],
+    ["fresh_data", pl ? "Brak świeżych danych" : "Fresh data missing", "scanner_snapshot"],
+    ["source_verification", pl ? "Brak weryfikacji źródłowej" : "Source verification missing", "scanner_snapshot"],
+  ].map(([key, label, source_reference_id]) => ({ key, label, explanation: pl ? "Opis ogólny." : "Generic description.", source_reference_ids: [source_reference_id] }));
+  result.next_actions = [{
+    action_type: "OPEN_VERIFICATION", label: pl ? "Otwórz weryfikację źródłową" : "Open source verification", priority: "primary", reason: "", target_type: "internal_route", target_reference: "#external-checks",
+  }, {
+    action_type: "OPEN_DEXSCREENER", label: pl ? "Otwórz DexScreener" : "Open DexScreener", priority: "secondary", reason: "", target_type: "external_url", target_reference: "https://dexscreener.com/base/0x1111111111111111111111111111111111111111",
+  }, {
+    action_type: "OPEN_EXPLORER", label: pl ? "Otwórz eksplorator" : "Open explorer", priority: "secondary", reason: "", target_type: "external_url", target_reference: "https://basescan.org/token/0x1111111111111111111111111111111111111111",
+  }];
+  result.source_references = [
+    ["basic_filters", "basic_filters"], ["security_status", "security_status"], ["scanner_snapshot", "scanner_snapshot"],
+    ["follow_up_checkpoints", "lifecycle"], ["established_membership", "established_membership"], ["methodology", "methodology"],
+  ].map(([id, label]) => ({ id, source_type: sourceType(id), label, observed_at: null, completeness: "complete", url: null }));
+  return result;
+}
+
+function sourceType(id: string): AIResearchBrief["source_references"][number]["source_type"] {
+  if (id === "follow_up_checkpoints") return "follow_up_checkpoint";
+  return id as AIResearchBrief["source_references"][number]["source_type"];
 }
 
 function source(path: string) {

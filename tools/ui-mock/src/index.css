@@ -93,6 +93,7 @@
     /* Scoped compatibility tokens for the AI Research Canvas. */
     --ai-panel-background: #090f15;
     --ai-grid-line: rgba(74, 214, 204, 0.16);
+    --ai-canvas-grid-line: rgba(74, 214, 204, 0.105);
     --ai-accent-gradient: linear-gradient(92deg, #61d9e3 0%, #64d7a2 82%);
     --ai-risk-low: var(--color-status-ready);
     --ai-risk-medium: var(--color-status-warning);
@@ -7731,8 +7732,8 @@ summary {
   border: 1px solid rgba(67, 219, 210, 0.28);
   border-radius: var(--radius-md);
   background:
-    linear-gradient(var(--ai-grid-line) 1px, transparent 1px),
-    linear-gradient(90deg, var(--ai-grid-line) 1px, transparent 1px),
+    linear-gradient(var(--ai-canvas-grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--ai-canvas-grid-line) 1px, transparent 1px),
     radial-gradient(circle at 76% 0%, rgba(59, 198, 159, 0.09), transparent 30%),
     var(--ai-panel-background);
   background-size: 34px 34px, 34px 34px, auto, auto;

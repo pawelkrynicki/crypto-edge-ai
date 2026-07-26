@@ -29,6 +29,15 @@ export function AIResearchBriefCanvas({
   const mainRisk = brief.risk_factors[0];
   const mainAction = brief.next_actions[0];
   const mainCondition = brief.status_change_conditions[0];
+  const freshnessIsStale = String(freshness) === "STALE";
+  const filtersAreNotMet = String(filters) === "rejected_basic_filter";
+  const currentProblem = freshnessIsStale && filtersAreNotMet
+    ? ui.staleAndFiltersFailed
+    : mainRisk?.title ?? ui.noRecordedProblem;
+  const nextAction = freshnessIsStale ? ui.waitForFreshSnapshot : mainAction?.label ?? ui.noAction;
+  const reassessmentCondition = freshnessIsStale && filtersAreNotMet
+    ? ui.newDataAndFilterRecalculation
+    : freshnessIsStale ? ui.newDataPublished : mainCondition?.label ?? ui.noCondition;
   return (
     <article className="ai-research-canvas" aria-labelledby="ai-research-canvas-title">
       <header className="ai-research-header">
@@ -50,9 +59,9 @@ export function AIResearchBriefCanvas({
       </header>
 
       <section className="ai-research-kpis" aria-label={ui.kpiLabel}>
-        <Kpi label={ui.researchStage} value={stateLabel(brief.research_state, locale)} tone={stateTone(brief.research_state)} />
+        <Kpi label={ui.researchStage} value={presentValue("lifecycle", currentStage, locale)} tone={lifecycleTone(currentStage)} />
         <Kpi label={ui.freshness} value={presentValue("freshness", freshness, locale)} tone={String(freshness) === "FRESH" ? "ready" : "warning"} />
-        <Kpi label={ui.filters} value={presentValue("basic_filters", filters, locale)} tone={String(filters) === "passed_basic_filter" ? "ready" : "warning"} />
+        <Kpi label={ui.basicFilters} value={filterAssessmentLabel(filters, locale)} tone={String(filters) === "passed_basic_filter" ? "ready" : "warning"} />
         <Kpi label={ui.securityCoverage} value={coverageLabel(security, locale)} tone={coverageTone(security)} />
         <Kpi label={ui.missingAreas} value={String(brief.missing_information.length)} tone={brief.missing_information.length === 0 ? "ready" : "warning"} />
         <Kpi label={ui.nextCheckpoint} value={currentCheckpoint ? `${currentCheckpoint.day} ${checkpointUnit(currentCheckpoint.day, locale)}` : ui.notScheduled} tone={currentCheckpoint ? "accent" : "neutral"} />
@@ -75,9 +84,9 @@ export function AIResearchBriefCanvas({
         <PanelHeading eyebrow="02" id="ai-next-map-title" title={ui.whatsNext} detail={ui.whatsNextHelp} />
         <ol className="ai-next-map">
           <MapNode label={ui.currentStage} value={presentValue("lifecycle", currentStage, locale)} />
-          <MapNode label={ui.mainProblem} value={mainRisk?.title ?? ui.noRecordedProblem} tone={mainRisk ? severityTone(mainRisk.severity) : "ready"} />
-          <MapNode label={ui.nextAction} value={mainAction?.label ?? ui.noAction} tone="accent" />
-          <MapNode label={ui.reassessmentCondition} value={mainCondition?.label ?? ui.noCondition} />
+          <MapNode label={ui.mainProblem} value={currentProblem} tone={mainRisk ? severityTone(mainRisk.severity) : "ready"} />
+          <MapNode label={ui.nextAction} value={nextAction} tone="accent" />
+          <MapNode label={ui.reassessmentCondition} value={reassessmentCondition} />
         </ol>
         <div className="ai-next-actions">
           {brief.next_actions.map((action) => <ResearchAction key={action.action_type} action={action} />)}
@@ -95,7 +104,7 @@ export function AIResearchBriefCanvas({
               <strong role="cell" data-label={ui.area}>{risk.title}</strong>
               <span role="cell" data-label={ui.state}><StatusBadge tone={severityTone(risk.severity)}>{severityLabel(risk.severity, locale)}</StatusBadge></span>
               <p role="cell" data-label={ui.meaning}>{risk.explanation}</p>
-              <SourceIds ids={risk.evidence_reference_ids} label={ui.sources} />
+              <SourceIds ids={risk.evidence_reference_ids} label={ui.sources} locale={locale} />
             </div>
           ))}
         </div>
@@ -104,7 +113,7 @@ export function AIResearchBriefCanvas({
       <section className="ai-research-panel ai-missing-panel" aria-labelledby="ai-missing-title">
         <PanelHeading eyebrow="04" id="ai-missing-title" title={ui.whatWeDoNotKnow} detail={ui.missingHelp} />
         {brief.missing_information.length > 0 ? (
-          <ul className="ai-missing-list">{brief.missing_information.map((item) => <li key={item.key}><strong>{item.label}</strong><p>{item.explanation}</p><SourceIds ids={item.source_reference_ids} label={ui.sources} /></li>)}</ul>
+          <ul className="ai-missing-list">{brief.missing_information.map((item) => <li key={item.key}><strong>{item.label}</strong><p>{missingInformationExplanation(item.key, item.explanation, locale)}</p><SourceIds ids={item.source_reference_ids} label={ui.sources} locale={locale} /></li>)}</ul>
         ) : <p className="ai-empty-line">{ui.noRecordedGaps}</p>}
       </section>
 
@@ -135,7 +144,7 @@ export function AIResearchBriefCanvas({
         <ul className="ai-source-list">
           {brief.source_references.map((source) => (
             <li key={source.id}>
-              <div><strong>{source.label}</strong><span>{source.observed_at ? formatProductDateTime(source.observed_at, locale) : ui.noTimestamp}</span></div>
+              <div><strong>{sourceReferenceLabel(source.id, locale, source.label)}</strong><span>{source.observed_at ? formatProductDateTime(source.observed_at, locale) : ui.noTimestamp}</span></div>
               <StatusBadge tone={source.completeness === "complete" ? "ready" : source.completeness === "partial" ? "partial" : "warning"}>{sourceCompleteness(source.completeness, locale)}</StatusBadge>
               {source.url && (source.url.startsWith("#")
                 ? <ActionLink variant="tertiary" href={source.url}>{ui.openSource}</ActionLink>
@@ -176,13 +185,14 @@ function MapNode({ label, value, tone = "neutral" }: { label: string; value: str
 }
 
 function ResearchAction({ action }: { action: AIResearchBrief["next_actions"][number] }) {
-  if (action.target_type === "external_url") return <ExternalLinkAction variant={action.priority} href={action.target_reference}>{action.label}</ExternalLinkAction>;
-  if (action.target_type === "internal_route") return <ActionLink variant={action.priority} href={action.target_reference}>{action.label}</ActionLink>;
-  return <ActionLink variant={action.priority} href="#ai-research-checkpoints">{action.label}</ActionLink>;
+  const variant = action.target_type === "external_url" ? "tertiary" : action.action_type === "OPEN_VERIFICATION" ? "secondary" : action.priority;
+  if (action.target_type === "external_url") return <ExternalLinkAction variant={variant} href={action.target_reference}>{action.label}</ExternalLinkAction>;
+  if (action.target_type === "internal_route") return <ActionLink variant={variant} href={action.target_reference}>{action.label}</ActionLink>;
+  return <ActionLink variant={variant} href="#ai-research-checkpoints">{action.label}</ActionLink>;
 }
 
-function SourceIds({ ids, label }: { ids: string[]; label: string }) {
-  return <span className="ai-source-ids" role="cell" data-label={label}>{ids.join(" · ")}</span>;
+function SourceIds({ ids, label, locale }: { ids: string[]; label: string; locale: "pl" | "en" }) {
+  return <span className="ai-source-ids" role="cell" data-label={label}>{ids.map((id) => sourceReferenceLabel(id, locale)).join(" · ")}</span>;
 }
 
 function presentValue(key: string, value: string | number | boolean | null, locale: "pl" | "en"): string {
@@ -195,11 +205,26 @@ function presentValue(key: string, value: string | number | boolean | null, loca
     return String(value);
   }
   const labels: Record<string, [string, string]> = {
-    new: ["New", "Nowe"], follow_up: ["Follow-up", "Dalsza obserwacja"], candidate: ["Candidate for Established", "Kandydat do Established"], established: ["Established", "Established"],
-    FRESH: ["Fresh", "Świeże"], STALE: ["Stale", "Nieaktualne"], UNKNOWN: ["Unknown", "Nieznane"],
+    new: ["New", "Nowe"], follow_up: ["Further observation", "Dalsza obserwacja"], candidate: ["Candidate for Established", "Kandydat do Established"], established: ["Main Radar", "Główny Radar"],
+    FRESH: ["Current", "Aktualne"], DELAYED: ["Delayed", "Opóźnione"], STALE: ["Stale", "Nieaktualne"], UNKNOWN: ["Unavailable", "Niedostępne"], UNAVAILABLE: ["Unavailable", "Niedostępne"],
     passed_basic_filter: ["Filters met", "Filtry spełnione"], rejected_basic_filter: ["Filters not met", "Filtry niespełnione"], not_checked: ["Not checked", "Nie sprawdzono"],
   };
   return labels[value]?.[locale === "pl" ? 1 : 0] ?? value;
+}
+
+function lifecycleTone(value: string | number | boolean | null): "neutral" | "ready" | "accent" {
+  if (value === "established") return "ready";
+  if (value === "candidate") return "accent";
+  return "neutral";
+}
+
+function filterAssessmentLabel(value: string | number | boolean | null, locale: "pl" | "en"): string {
+  const labels: Record<string, [string, string]> = {
+    passed_basic_filter: ["Sufficient", "Wystarczające"],
+    rejected_basic_filter: ["Insufficient", "Niewystarczające"],
+    not_checked: ["Unavailable", "Niedostępne"],
+  };
+  return labels[String(value)]?.[locale === "pl" ? 1 : 0] ?? (locale === "pl" ? "Niedostępne" : "Unavailable");
 }
 
 function stateLabel(value: AIResearchState, locale: "pl" | "en") {
@@ -236,8 +261,43 @@ function coverageTone(value: AIResearchCoverageState): "ready" | "partial" | "wa
 }
 
 function coverageAreaLabel(value: AIResearchBrief["coverage"][number]["area"], locale: "pl" | "en") {
-  const labels = { market_data: ["Market data", "Dane rynkowe"], basic_filters: ["Basic filters", "Podstawowe filtry"], security_coverage: ["Security coverage", "Pokrycie bezpieczeństwa"], information_completeness: ["Information completeness", "Kompletność informacji"] } as const;
+  const labels = { market_data: ["Market data", "Dane rynkowe"], basic_filters: ["Data for filter assessment", "Dane do oceny filtrów"], security_coverage: ["Security coverage", "Pokrycie bezpieczeństwa"], information_completeness: ["Information completeness", "Kompletność informacji"] } as const;
   return labels[value][locale === "pl" ? 1 : 0];
+}
+
+function sourceReferenceLabel(id: string, locale: "pl" | "en", fallback?: string): string {
+  const labels: Record<string, [string, string]> = {
+    basic_filters: ["Basic filters", "Podstawowe filtry"],
+    security: ["Security status", "Status bezpieczeństwa"],
+    security_status: ["Security status", "Status bezpieczeństwa"],
+    scanner_snapshot: ["Scanner snapshot", "Migawka skanera"],
+    lifecycle: ["Observation stage", "Etap obserwacji"],
+    follow_up_checkpoints: ["Observation stage", "Etap obserwacji"],
+    established_membership: ["Established membership", "Członkostwo w Established"],
+    methodology: ["Product methodology", "Metodologia produktu"],
+    dexscreener_link: ["DexScreener", "DexScreener"],
+    explorer_link: ["Network explorer", "Eksplorator sieci"],
+    current_report: ["Current report", "Aktualny raport"],
+  };
+  return labels[id]?.[locale === "pl" ? 1 : 0] ?? fallback ?? humanizeSourceId(id);
+}
+
+function humanizeSourceId(value: string): string {
+  const normalized = value.replaceAll("_", " ").trim();
+  return normalized ? `${normalized[0]!.toUpperCase()}${normalized.slice(1)}` : value;
+}
+
+function missingInformationExplanation(key: string, fallback: string, locale: "pl" | "en"): string {
+  const labels: Record<string, [string, string]> = {
+    security: ["The product does not have a contract security check result.", "Produkt nie posiada wyniku kontroli bezpieczeństwa kontraktu."],
+    holder_concentration: ["The product does not have data on token concentration in the largest wallets.", "Produkt nie posiada danych o koncentracji tokenów w największych portfelach."],
+    history: ["The token does not yet have enough history to compare changes across consecutive periods.", "Token nie posiada jeszcze historii pozwalającej porównać zmiany w kolejnych okresach."],
+    next_checkpoint: ["The result of the next checkpoint has not been recorded yet.", "Nie zapisano jeszcze wyniku następnego punktu kontrolnego."],
+    fresh_data: ["The latest snapshot is older than the allowed freshness limit.", "Ostatnia migawka jest starsza niż dopuszczalny limit świeżości."],
+    source_verification: ["The project's identity and external data have not yet been confirmed manually.", "Tożsamość projektu i dane zewnętrzne nie zostały jeszcze potwierdzone ręcznie."],
+    verification_sources: ["The product does not yet have a verification link to DexScreener or a network explorer.", "Produkt nie posiada jeszcze linku weryfikacyjnego do DexScreener ani eksploratora sieci."],
+  };
+  return labels[key]?.[locale === "pl" ? 1 : 0] ?? fallback;
 }
 
 function checkpointLabel(value: AIResearchBrief["checkpoints"][number]["state"], locale: "pl" | "en") {
@@ -259,9 +319,9 @@ function shortAddress(value: string) { return value.length > 24 ? `${value.slice
 
 const COPY = {
   pl: {
-    canvasEyebrow: "Visual Candidate Research Canvas", previewBadge: "Podgląd formatu — bez wywołania AI", dataTime: "Czas danych", analysisTime: "Czas analizy", kpiLabel: "Kluczowe wskaźniki analizy", researchStage: "Etap badawczy", freshness: "Świeżość danych", filters: "Filtry", securityCoverage: "Pokrycie security", missingAreas: "Brakujące obszary", nextCheckpoint: "Następny checkpoint", notScheduled: "Nie zaplanowano", visualState: "Wizualny stan badawczy", visualStateHelp: "Cztery jakościowe obszary bez sztucznego wyniku procentowego.", whatsNext: "Co dalej", whatsNextHelp: "Sekwencja od aktualnego etapu do warunku ponownej oceny.", currentStage: "Aktualny etap", mainProblem: "Główny problem", nextAction: "Następna czynność", reassessmentCondition: "Warunek ponownej oceny", noRecordedProblem: "Brak zapisanej blokady", noAction: "Brak dostępnej czynności", noCondition: "Brak zapisanego warunku", riskMatrix: "Macierz ryzyk", riskHelp: "Brak danych pozostaje stanem nieznanym, nigdy niskim ryzykiem.", area: "Obszar", state: "Stan", meaning: "Znaczenie", sources: "Źródła", whatWeDoNotKnow: "Czego nadal nie wiemy", missingHelp: "Widoczne luki ograniczające dalszą ocenę.", noRecordedGaps: "Brak zapisanych luk w obszarach sprawdzanych przez produkt.", checkpointAxis: "Oś checkpointów", checkpointHelp: "Terminy ponownej oceny danych, nie automatycznej akceptacji.", shortBrief: "Krótki brief badawczy", shortBriefHelp: "Zwięzłe podsumowanie oparte wyłącznie na zapisanych danych.", whatWeKnow: "Co wiemy", statusConditions: "Co może zmienić aktualny status", sourcesHelp: "Katalog danych użytych do analizy.", noTimestamp: "Brak czasu", openSource: "Otwórz źródło", noExternalCalls: "Podczas tej analizy nie wykonano automatycznych zewnętrznych zapytań.", researchBoundaryTitle: "Granica badawcza", researchBoundary: "Analiza AI porządkuje dostępne dane i proponuje kolejny krok badawczy. Nie potwierdza bezpieczeństwa projektu i nie jest rekomendacją inwestycyjną.", unknown: "Nieznane",
+    canvasEyebrow: "Visual Candidate Research Canvas", previewBadge: "Podgląd formatu — bez wywołania AI", dataTime: "Czas danych", analysisTime: "Czas analizy", kpiLabel: "Kluczowe wskaźniki analizy", researchStage: "Etap badawczy", freshness: "Świeżość danych", basicFilters: "Podstawowe filtry", securityCoverage: "Pokrycie security", missingAreas: "Brakujące obszary", nextCheckpoint: "Następny checkpoint", notScheduled: "Nie zaplanowano", visualState: "Wizualny stan badawczy", visualStateHelp: "Cztery jakościowe obszary bez sztucznego wyniku procentowego.", whatsNext: "Co dalej", whatsNextHelp: "Sekwencja od aktualnego etapu do warunku ponownej oceny.", currentStage: "Aktualny etap", mainProblem: "Główny problem", nextAction: "Następna czynność", reassessmentCondition: "Warunek ponownej oceny", noRecordedProblem: "Brak zapisanej blokady", noAction: "Brak dostępnej czynności", noCondition: "Brak zapisanego warunku", staleAndFiltersFailed: "Dane nieaktualne i filtry niespełnione", waitForFreshSnapshot: "Poczekaj na świeżą migawkę", newDataAndFilterRecalculation: "Publikacja nowych danych i ponowne obliczenie filtrów", newDataPublished: "Publikacja nowych danych", riskMatrix: "Macierz ryzyk", riskHelp: "Brak danych pozostaje stanem nieznanym, nigdy niskim ryzykiem.", area: "Obszar", state: "Stan", meaning: "Znaczenie", sources: "Źródła", whatWeDoNotKnow: "Czego nadal nie wiemy", missingHelp: "Widoczne luki ograniczające dalszą ocenę.", noRecordedGaps: "Brak zapisanych luk w obszarach sprawdzanych przez produkt.", checkpointAxis: "Oś checkpointów", checkpointHelp: "Terminy ponownej oceny danych, nie automatycznej akceptacji.", shortBrief: "Krótki brief badawczy", shortBriefHelp: "Zwięzłe podsumowanie oparte wyłącznie na zapisanych danych.", whatWeKnow: "Co wiemy", statusConditions: "Co może zmienić aktualny status", sourcesHelp: "Katalog danych użytych do analizy.", noTimestamp: "Brak czasu", openSource: "Otwórz źródło", noExternalCalls: "Podczas tej analizy nie wykonano automatycznych zewnętrznych zapytań.", researchBoundaryTitle: "Granica badawcza", researchBoundary: "Analiza AI porządkuje dostępne dane i proponuje kolejny krok badawczy. Nie potwierdza bezpieczeństwa projektu i nie jest rekomendacją inwestycyjną.", unknown: "Nieznane",
   },
   en: {
-    canvasEyebrow: "Visual Candidate Research Canvas", previewBadge: "Format preview — no AI call", dataTime: "Data time", analysisTime: "Analysis time", kpiLabel: "Key analysis indicators", researchStage: "Research stage", freshness: "Data freshness", filters: "Filters", securityCoverage: "Security coverage", missingAreas: "Missing areas", nextCheckpoint: "Next checkpoint", notScheduled: "Not scheduled", visualState: "Visual research state", visualStateHelp: "Four qualitative areas without an artificial percentage score.", whatsNext: "What next", whatsNextHelp: "A sequence from the current stage to the reassessment condition.", currentStage: "Current stage", mainProblem: "Main problem", nextAction: "Next action", reassessmentCondition: "Reassessment condition", noRecordedProblem: "No recorded blocker", noAction: "No available action", noCondition: "No recorded condition", riskMatrix: "Risk matrix", riskHelp: "Missing data remains unknown and is never treated as low risk.", area: "Area", state: "State", meaning: "Meaning", sources: "Sources", whatWeDoNotKnow: "What we still do not know", missingHelp: "Visible gaps that limit further assessment.", noRecordedGaps: "No recorded gaps in areas checked by the product.", checkpointAxis: "Checkpoint timeline", checkpointHelp: "Data reassessment dates, not automatic acceptance.", shortBrief: "Short research brief", shortBriefHelp: "A concise summary based only on stored data.", whatWeKnow: "What we know", statusConditions: "What may change the current status", sourcesHelp: "Catalog of data used by the analysis.", noTimestamp: "No timestamp", openSource: "Open source", noExternalCalls: "No automated external requests were made during this analysis.", researchBoundaryTitle: "Research boundary", researchBoundary: "AI analysis organizes available data and proposes the next research step. It does not confirm project safety and is not investment advice.", unknown: "Unknown",
+    canvasEyebrow: "Visual Candidate Research Canvas", previewBadge: "Format preview — no AI call", dataTime: "Data time", analysisTime: "Analysis time", kpiLabel: "Key analysis indicators", researchStage: "Research stage", freshness: "Data freshness", basicFilters: "Basic filters", securityCoverage: "Security coverage", missingAreas: "Missing areas", nextCheckpoint: "Next checkpoint", notScheduled: "Not scheduled", visualState: "Visual research state", visualStateHelp: "Four qualitative areas without an artificial percentage score.", whatsNext: "What next", whatsNextHelp: "A sequence from the current stage to the reassessment condition.", currentStage: "Current stage", mainProblem: "Main problem", nextAction: "Next action", reassessmentCondition: "Reassessment condition", noRecordedProblem: "No recorded blocker", noAction: "No available action", noCondition: "No recorded condition", staleAndFiltersFailed: "Data is stale and filters are not met", waitForFreshSnapshot: "Wait for a fresh snapshot", newDataAndFilterRecalculation: "Publication of new data and recalculation of filters", newDataPublished: "Publication of new data", riskMatrix: "Risk matrix", riskHelp: "Missing data remains unknown and is never treated as low risk.", area: "Area", state: "State", meaning: "Meaning", sources: "Sources", whatWeDoNotKnow: "What we still do not know", missingHelp: "Visible gaps that limit further assessment.", noRecordedGaps: "No recorded gaps in areas checked by the product.", checkpointAxis: "Checkpoint timeline", checkpointHelp: "Data reassessment dates, not automatic acceptance.", shortBrief: "Short research brief", shortBriefHelp: "A concise summary based only on stored data.", whatWeKnow: "What we know", statusConditions: "What may change the current status", sourcesHelp: "Catalog of data used by the analysis.", noTimestamp: "No timestamp", openSource: "Open source", noExternalCalls: "No automated external requests were made during this analysis.", researchBoundaryTitle: "Research boundary", researchBoundary: "AI analysis organizes available data and proposes the next research step. It does not confirm project safety and is not investment advice.", unknown: "Unknown",
   },
 } as const;
