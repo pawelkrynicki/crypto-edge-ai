@@ -1,5 +1,22 @@
 # Roadmap
 
+## Current stage: AI.1 — Visual Candidate Research Brief
+
+AI.1 dodaje generowaną wyłącznie na żądanie, research-only Analizę badawczą AI. Backend buduje bounded context z istniejących danych, wylicza fingerprint, sprawdza współdzielony cache, egzekwuje idempotency/rate limit/single-flight i zapisuje wyłącznie zwalidowany `ai_research_brief_v1` w oddzielnym SQLite. Frontend korzysta tylko z same-origin API i renderuje deterministyczny Visual Candidate Research Canvas. Domyślny provider pozostaje `DISABLED`; etap nie uruchamia OpenAI, providerów danych, collectora ani mutacji lifecycle.
+
+Kanoniczna kolejność:
+
+1. AI.1 — Visual Candidate Research Brief.
+2. UI.3 — accessibility i cross-browser.
+3. INT.1 — AI KINTEL Integration Readiness Pack.
+4. Lokalna regresja i Release Candidate.
+5. Finalny standalone deployment na VPS.
+6. Cloudflare, scheduler, smoke i rollback.
+7. Sesja testera i poprawki P0.
+8. Freeze do 15.08.
+
+Kontrakty: `docs/ai_research_brief.md`, `docs/ai_research_brief_schema.md` i `docs/ai_kintel_ai_research_mapping.md`.
+
 ## Current stage: UX.1 — Global Interaction Affordance Pass
 
 UX.1 porządkuje globalny język interakcji bez zmiany zaakceptowanego kierunku UI. Wspólne role obejmują primary/secondary/tertiary actions, external links, copy, disclosures, read-only cards, statuses, formularze oraz widoczne disabled reasons. Kontrakt jest gotowy do późniejszego odwzorowania w AI KINTEL/shadcn bez dodawania zależności do bieżącej aplikacji. Szczegóły: `docs/interaction_affordance_system.md`.

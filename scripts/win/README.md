@@ -434,7 +434,7 @@ scripts\win\start-premium-ui-review.cmd --radar --mobile-guide
 scripts\win\start-premium-ui-review.cmd --detail
 ```
 
-`check-premium-ui-pass.cmd` is the offline UI.1 + UI.2 + FLOW.1 gate. It clears every live-source and automation opt-in, keeps owner operations `DISABLED`, runs the Premium UI and visible lifecycle contracts, Control Center, Reports, Feedback, Product Radar/Candidate Detail tests, UI typecheck and the fixture-free `INTERNAL_BETA` build assertion.
+`check-premium-ui-pass.cmd` is the offline UI.1 + UI.2 + FLOW.1 + UX.1 + AI.1 gate. It clears every live-source and automation opt-in, keeps owner operations `DISABLED`, runs the AI Research, Premium UI and visible lifecycle contracts, Control Center, Reports, Feedback, Product Radar/Candidate Detail tests, UI typecheck and the fixture-free `INTERNAL_BETA` build assertion.
 
 `start-premium-ui-review.cmd` reuses the ordinary real local Product Radar snapshot/store path. `--ui2` prints the required order — Control Center, Reports, Feedback, Owner Feedback Inbox, Verification, Methodology — and opens the existing `INTERNAL_BETA + REVIEW_SAFE` review path. `--radar` opens the main Radar, `--detail` opens Candidate Detail and `--mobile-guide` prints the recommended viewport sizes. It does not add a fixture fallback, activate `ENABLED`, call providers, run the collector, submit feedback or mutate snapshots/stores.
 
@@ -467,11 +467,23 @@ It does not call providers, run the collector, submit feedback, execute owner ac
 
 Delivery order:
 
-1. FLOW.1 — visible token lifecycle.
-2. AI.1 — Visual Candidate Research Brief.
-3. UI.3 — accessibility and cross-browser.
+1. AI.1 — Visual Candidate Research Brief.
+2. UI.3 — accessibility and cross-browser.
+3. INT.1 — AI KINTEL Integration Readiness Pack.
 4. Local regression and Release Candidate.
-5. Final VPS deployment.
+5. Final standalone VPS deployment.
 6. Cloudflare, scheduler, smoke and rollback.
 7. Tester session and P0 fixes.
 8. Freeze by 15.08.
+
+## AI.1 Research Brief Review
+
+```cmd
+scripts\win\start-ai-research-brief-review.cmd
+scripts\win\start-ai-research-brief-review.cmd --render-preview
+scripts\win\start-ai-research-brief-review.cmd --render-preview --mobile-guide
+```
+
+The default opens Candidate Detail in fixture-free `INTERNAL_BETA` with the AI provider `DISABLED`; AI and Feedback SQLite paths are isolated under `%TEMP%`, so canonical stores remain untouched. `--render-preview` builds a deterministic `ai_research_brief_v1` in process memory from the newest real local candidate, never falls back to a fixture, records zero token usage and never opens or writes the AI SQLite store. It shows the explicit “Podgląd formatu — bez wywołania AI” badge. `--mobile-guide` prints the 390 px checks.
+
+The launcher clears every live provider, collector and automation opt-in and keeps owner operations `DISABLED`. It never performs a real OpenAI call, data-provider call, collector run, bootstrap `--apply`, lifecycle change, owner action, VPS deployment, Cloudflare change or Task Scheduler change. Contract and rollback: `docs/ai_research_brief.md`.

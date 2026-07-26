@@ -9,13 +9,14 @@ import { formatProductUsd, useProductLocale } from "../productI18n";
 import { formatProductSourceLabel } from "../productPresentation";
 import { resolveProductSecurityState, type ProductSecurityState } from "../productSecurityResolver";
 import type { UiTokenCandidate } from "../types/scannerTypes";
-import { ActionLink, CopyButton, ExternalLinkAction } from "./ProductUi";
+import { ActionButton, ActionLink, CopyButton, ExternalLinkAction } from "./ProductUi";
 
 interface ExternalVerificationLinksViewProps {
   candidate?: UiTokenCandidate | null;
+  onOpenResearchBrief?: (candidate: UiTokenCandidate) => void;
 }
 
-export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksViewProps> = ({ candidate }) => {
+export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksViewProps> = ({ candidate, onOpenResearchBrief }) => {
   const { locale, t } = useProductLocale();
   const ui = VERIFICATION_UI_COPY[locale];
   if (!candidate) {
@@ -66,6 +67,18 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
         </div>
         <div><span>{t("verification.recordSource")}</span><strong>{formatProductSourceLabel(candidate.source)}</strong></div>
       </section>
+
+      {onOpenResearchBrief && (
+        <section className="verification-ai-research-action" aria-label={locale === "pl" ? "Analiza badawcza AI" : "AI Research Brief"}>
+          <div>
+            <strong>{locale === "pl" ? "Analiza badawcza AI" : "AI Research Brief"}</strong>
+            <p>{locale === "pl" ? "Analiza AI uzupełnia, ale nie zastępuje ręcznej weryfikacji." : "AI analysis complements but does not replace manual verification."}</p>
+          </div>
+          <ActionButton variant="secondary" icon="arrow" iconPosition="end" onClick={() => onOpenResearchBrief(candidate)}>
+            {locale === "pl" ? "Otwórz analizę AI" : "Open AI analysis"}
+          </ActionButton>
+        </section>
+      )}
 
       <section className="verification-research-section" aria-labelledby="verification-market-heading">
         <header><span>02</span><div><h3 id="verification-market-heading">{ui.marketData}</h3><p>{ui.marketDataHelp}</p></div></header>

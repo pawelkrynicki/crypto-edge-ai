@@ -35,6 +35,7 @@ import type {
 } from "../types/scannerTypes";
 import type { FollowUpPublicEntry, FollowUpPublicStatus } from "../types/followUpTypes";
 import { ActionButton, CopyableAddress, ReadOnlyCard, StatusBadge, TechnicalDetails } from "./ProductUi";
+import { AIResearchRadarStatus } from "./AIResearchSection";
 import {
   lifecycleStageLabel,
   TokenCheckpointAxis,
@@ -321,6 +322,11 @@ export function MaturingFollowUpBasket({
               <Explanation label={t("detail.missingData")} value={formatFollowUpMissingData(entry.missing_data, locale, t("detail.noMissingData"))} />
               <Explanation label={t("followUp.establishedMembership")} value={entry.established_membership ? t("control.value.yes") : t("control.value.no")} />
             </div>
+            <AIResearchRadarStatus
+              chain={entry.chain}
+              contractAddress={entry.contract_address}
+              onOpen={onOpenFollowUp ? () => onOpenFollowUp(entry.entry_id) : undefined}
+            />
             {onOpenFollowUp && (
               <footer className="product-candidate-footer follow-up-actions">
                 <p>{entry.lifecycle_status === "CANDIDATE_FOR_ESTABLISHED"
@@ -468,6 +474,12 @@ function NewCandidateCard({
       <TechnicalDetails label={t("app.technicalDetails")} className="token-card-technical">
         <code>observation_only={String(candidate.observationOnly)} · established_eligible={String(candidate.establishedEligible)}</code>
       </TechnicalDetails>
+
+      <AIResearchRadarStatus
+        chain={candidate.chain}
+        contractAddress={candidate.contractAddress}
+        onOpen={onOpenCandidate ? () => onOpenCandidate(candidate.id) : undefined}
+      />
 
       <footer className="product-candidate-footer">
         <div>
@@ -635,6 +647,12 @@ function EstablishedCandidateCard({
           {riskItems.length === 0 && securityResolution.state !== "checked" && <small>{t("detail.riskFlagsRequireReview")}</small>}
         </div>
       </div>
+
+      <AIResearchRadarStatus
+        chain={candidate.chain}
+        contractAddress={candidate.contractAddress}
+        onOpen={onOpenCandidate ? () => onOpenCandidate(candidate.id) : undefined}
+      />
 
       <footer className="product-candidate-footer">
         <div>

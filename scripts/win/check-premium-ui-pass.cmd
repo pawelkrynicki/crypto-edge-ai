@@ -10,6 +10,8 @@ set "CRYPTO_EDGE_AUTOMATION_ENABLED="
 set "CRYPTO_EDGE_OWNER_OPERATIONS_MODE=DISABLED"
 set "CRYPTO_EDGE_RUNTIME_MODE=INTERNAL_BETA"
 set "CRYPTO_EDGE_FEEDBACK_SQLITE_PATH=%TEMP%\crypto-edge-premium-ui-%RANDOM%-%RANDOM%.sqlite"
+set "CRYPTO_EDGE_AI_RESEARCH_PROVIDER=DISABLED"
+set "CRYPTO_EDGE_AI_RESEARCH_SQLITE_PATH=%TEMP%\crypto-edge-ai-premium-ui-%RANDOM%-%RANDOM%.sqlite"
 
 echo.
 echo === Crypto Edge AI: Premium UI.1 + UI.2 offline gate ===
@@ -21,6 +23,11 @@ if not exist "node_modules\.bin\tsx.cmd" (
   echo ERROR: Brak zaleznosci tools\ui-mock.
   exit /b 1
 )
+
+echo.
+echo === AI.1 research brief contracts ===
+call pnpm run test:ai1
+if errorlevel 1 exit /b %ERRORLEVEL%
 
 echo.
 echo === UX.1 interaction affordance contracts ===
@@ -71,4 +78,7 @@ echo PREMIUM UI PASS CHECK OK
 if exist "%CRYPTO_EDGE_FEEDBACK_SQLITE_PATH%" del /q "%CRYPTO_EDGE_FEEDBACK_SQLITE_PATH%"
 if exist "%CRYPTO_EDGE_FEEDBACK_SQLITE_PATH%-wal" del /q "%CRYPTO_EDGE_FEEDBACK_SQLITE_PATH%-wal"
 if exist "%CRYPTO_EDGE_FEEDBACK_SQLITE_PATH%-shm" del /q "%CRYPTO_EDGE_FEEDBACK_SQLITE_PATH%-shm"
+if exist "%CRYPTO_EDGE_AI_RESEARCH_SQLITE_PATH%" del /q "%CRYPTO_EDGE_AI_RESEARCH_SQLITE_PATH%"
+if exist "%CRYPTO_EDGE_AI_RESEARCH_SQLITE_PATH%-wal" del /q "%CRYPTO_EDGE_AI_RESEARCH_SQLITE_PATH%-wal"
+if exist "%CRYPTO_EDGE_AI_RESEARCH_SQLITE_PATH%-shm" del /q "%CRYPTO_EDGE_AI_RESEARCH_SQLITE_PATH%-shm"
 exit /b 0

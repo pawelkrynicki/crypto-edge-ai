@@ -1,5 +1,22 @@
 # Standalone Roadmap To Trusted Tester
 
+## AI.1 — Visual Candidate Research Brief
+
+AI.1 jest bieżącym etapem po zaakceptowanych UI.1, UI.2, FLOW.1 i UX.1. Dodaje do Candidate Detail deterministyczny Visual Candidate Research Canvas, mały status na Radarze i secondary action w Verification. Analiza powstaje wyłącznie po jawnym żądaniu, z danych już zapisanych w produkcie, przez backendowy provider adapter i strict schema. Domyślny provider pozostaje `DISABLED`; owner review ma 0 OpenAI/provider/collector calls i 0 mutacji kanonicznych store’ów.
+
+Aktualna kolejność:
+
+1. AI.1 — Visual Candidate Research Brief.
+2. UI.3 — accessibility i cross-browser.
+3. INT.1 — AI KINTEL Integration Readiness Pack.
+4. Lokalna regresja i Release Candidate.
+5. Finalny standalone deployment na VPS.
+6. Cloudflare, scheduler, smoke i rollback.
+7. Sesja testera i poprawki P0.
+8. Freeze do 15.08.
+
+Kontrakty: `docs/ai_research_brief.md`, `docs/ai_research_brief_schema.md`, `docs/ai_kintel_ai_research_mapping.md`.
+
 ## UX.1 — Global Interaction Affordance Pass
 
 UX.1 jest bieżącym etapem po zaakceptowanych UI.1, UI.2 i FLOW.1. Porządkuje rozpoznawalność akcji, linków, disclosure, pól, kart read-only, statusów i disabled states bez zmiany API, danych, lifecycle, owner gates ani provider boundary. System ma stabilne role gotowe do późniejszego mapowania na shadcn/ui i Radix; bieżący standalone nie otrzymuje Tailwind 4 ani nowych runtime dependencies.

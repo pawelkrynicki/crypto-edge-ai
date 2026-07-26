@@ -29,6 +29,7 @@ import {
   type EstablishedPromotionStatus,
 } from "../services/establishedPromotionDataSource";
 import { EstablishedPromotionPanel } from "./EstablishedPromotionPanel";
+import { AIResearchSection } from "./AIResearchSection";
 import { ActionButton, CopyButton, CopyableAddress, StatusBadge, TechnicalDetails } from "./ProductUi";
 import {
   lifecycleActionLabel,
@@ -186,6 +187,13 @@ export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
         model={lifecycle}
         followUp={followUp}
         universeVersion={candidate.discoveryBasket === "established" ? candidate.universeVersion : null}
+      />
+
+      <AIResearchSection
+        chain={candidate.chain}
+        contractAddress={candidate.contractAddress}
+        symbol={candidate.symbol}
+        name={candidate.name}
       />
 
       <section className="product-detail-section" aria-labelledby="market-heading">
@@ -450,6 +458,13 @@ function FollowUpOnlyDetail({
       </section>
 
       <LifecycleDetailSection model={lifecycle} followUp={followUp} universeVersion={null} />
+
+      <AIResearchSection
+        chain={followUp.chain}
+        contractAddress={followUp.contract_address}
+        symbol={followUp.symbol ?? ""}
+        name={followUp.display_name ?? followUp.symbol ?? ""}
+      />
 
       <section className="product-detail-section" aria-labelledby="follow-up-data-heading">
         <SectionHeader id="follow-up-data-heading" index="3" title={locale === "pl" ? "Bieżące dane obserwacji" : "Current observation data"} />

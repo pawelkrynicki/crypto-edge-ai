@@ -274,9 +274,16 @@ Walidacja UI.2 obejmuje kontrakty UI.1/UI.2, Control Center, Product Radar/Candi
 - Pusty eksport, niepełny Feedback oraz owner actions w `REVIEW_SAFE` mają widoczny powód powiązany przez `aria-describedby`.
 - Mobile 390 px zachowuje 44 px hit area, jednokolumnowe grupy akcji i brak poziomego overflow.
 
-## AI.1 — następny etap
+## AI.1 — wynik
 
-AI.1 wykorzysta stabilny read-only model przepływu do **Visual Candidate Research Brief**. FLOW.1 nie wykonuje analizy AI, nie wywołuje OpenAI i nie generuje rekomendacji inwestycyjnej.
+- Candidate Detail ma główną sekcję Analizy badawczej AI po lifecycle i przed szczegółami rynku; Canvas pokazuje identity, KPI, pokrycie, mapę „Co dalej”, ryzyka, braki, checkpointy, krótki brief, źródła i research boundary.
+- Radar zachowuje zwartą kartę dzięki małemu statusowi oraz tertiary action, a Verification ma secondary action bez zastępowania ręcznej weryfikacji.
+- UI obejmuje PL/EN i stany absent, generating, ready, stale, rate limited, provider disabled, insufficient data i error; nie wyświetla raw enumów, promptu ani odpowiedzi providera.
+- Backend normalizuje identity, składa bounded read-only context, fingerprintuje dane, sprawdza cache, single-flight i rate limits, waliduje strict JSON oraz atomowo zapisuje osobny SQLite.
+- Provider jest domyślnie `DISABLED`; generowanie działa wyłącznie po kliknięciu. Render-only preview jest schema-valid, ma usage 0, nie otwiera AI store i nie wykonuje żadnego wywołania.
+- Scoped warstwa kompatybilności AI KINTEL zachowuje istniejący shell i UX.1 bez dodawania Tailwind, shadcn, tRPC, Drizzle, MySQL, PM2 ani nowych runtime dependencies.
+
+Pełny kontrakt: `docs/ai_research_brief.md`.
 
 ## UI.3 — kolejny etap
 
@@ -284,15 +291,14 @@ UI.3 pozostaje końcowym accessibility pass, cross-browser review, bardziej szcz
 
 ## Kolejność wydania
 
-1. UX.1 — Global Interaction Affordance Pass.
-2. AI.1 — Visual Candidate Research Brief.
-3. UI.3 — accessibility i cross-browser.
-4. INT.1 — AI KINTEL Integration Readiness Pack.
-5. Lokalna regresja i Release Candidate.
-6. Finalny standalone deployment VPS.
-7. Cloudflare, scheduler, smoke i rollback.
-8. Sesja testera i poprawki P0.
-9. Freeze do 15.08.
+1. AI.1 — Visual Candidate Research Brief.
+2. UI.3 — accessibility i cross-browser.
+3. INT.1 — AI KINTEL Integration Readiness Pack.
+4. Lokalna regresja i Release Candidate.
+5. Finalny standalone deployment na VPS.
+6. Cloudflare, scheduler, smoke i rollback.
+7. Sesja testera i poprawki P0.
+8. Freeze do 15.08.
 
 ## Owner review checklist
 
@@ -312,8 +318,8 @@ Owner ocenia tylko wygląd i UX:
 
 Owner nie wykonuje mutujących operacji i nie powtarza testów technicznych.
 
-Komenda:
+Komenda AI.1:
 
 ```cmd
-scripts\win\start-interaction-affordance-review.cmd --mobile-guide
+scripts\win\start-ai-research-brief-review.cmd --render-preview --mobile-guide
 ```

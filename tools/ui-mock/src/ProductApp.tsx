@@ -359,7 +359,10 @@ export function ProductAppContent() {
     if (activeSection === "external-checks") {
       return (
         <ProductWorkspaceSection {...copy}>
-          <ExternalVerificationLinksView candidate={verificationCandidate} />
+          <ExternalVerificationLinksView
+            candidate={verificationCandidate}
+            onOpenResearchBrief={(candidate) => openCandidate(candidate.id)}
+          />
         </ProductWorkspaceSection>
       );
     }

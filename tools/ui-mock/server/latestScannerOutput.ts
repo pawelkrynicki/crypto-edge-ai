@@ -78,6 +78,7 @@ export type ScannerSourcesDiagnostics = {
 export type LatestScannerOutputOptions = {
   outputDirPath?: string;
   fixturePath?: string;
+  allowFixtureFallback?: boolean;
   runtimeMode?: ProductRuntimeMode | string;
   now?: Date;
 };
@@ -120,6 +121,7 @@ export async function readLatestScannerOutput(
       });
     }
 
+    if (options.allowFixtureFallback === false) throw new ScannerOutputError(SCANNER_OUTPUT_UNAVAILABLE);
     return readFixtureOutput(
       fixturePath,
       candidates.length === 0 ? "no local scanner output found" : "no valid local scanner output found",
