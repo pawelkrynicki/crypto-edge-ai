@@ -8,6 +8,8 @@ Sprint **UI.2 — Trust, Feedback and Research Surfaces** domyka Control Center,
 
 Etap **FLOW.1 — Visible Token Lifecycle and Owner Promotion Path** domyka widoczność przepływu **Nowe → Dalsza obserwacja → Kandydat do Established → Główny Radar**. Reużywa przyjętego systemu UI.1/UI.2, istniejących danych read-only i backend-gated owner flow; nie zmienia lifecycle, scoringu, filtrów, providerów ani store’ów.
 
+Etap **UX.1 — Global Interaction Affordance Pass** porządkuje wspólny język akcji, linków, disclosure, copy, formularzy, kart read-only i statusów. Nie zmienia zaakceptowanego kierunku premium ani backendowych semantyk. Kanoniczny kontrakt i mapowanie do AI KINTEL/shadcn: `docs/interaction_affordance_system.md`.
+
 UI.1 obejmuje:
 
 - kanoniczny system tokenów;
@@ -262,6 +264,16 @@ Walidacja UI.2 obejmuje kontrakty UI.1/UI.2, Control Center, Product Radar/Candi
 - Candidate wymaga decyzji właściciela i nie jest Established bez aktywnego członkostwa universe. Tester nie widzi owner controls; owner w `REVIEW_SAFE` ma preview bez POST, a `ENABLED` jest testowane wyłącznie na temporary stores.
 - Control Center pokazuje stan Follow-up, active/due/candidate, next due, ostatni zapis store, automatyczne śledzenie i naturalny status decyzji właściciela. Overall readiness nie został zmieniony.
 
+## UX.1 — wynik
+
+- `ActionButton` i `ActionLink` mają stabilne warianty `primary`, `secondary`, `tertiary` i `danger`, a loading/disabled są częścią tego samego kontraktu.
+- `CopyButton` pokazuje ikonę, naturalną etykietę i live feedback „Skopiowano/Copied”.
+- `TechnicalDetails` jest pełnym disclosure row z chevronem, `aria-expanded` oraz Rozwiń/Zwiń.
+- Karty tokenów, metryki, readiness, lifecycle i status „Brak blokad” pozostają read-only bez pointera i hover-lift.
+- Reports oraz Owner Inbox mają jawne CTA/active state; Feedback zachowuje natywne radio, label i checked/focus state.
+- Pusty eksport, niepełny Feedback oraz owner actions w `REVIEW_SAFE` mają widoczny powód powiązany przez `aria-describedby`.
+- Mobile 390 px zachowuje 44 px hit area, jednokolumnowe grupy akcji i brak poziomego overflow.
+
 ## AI.1 — następny etap
 
 AI.1 wykorzysta stabilny read-only model przepływu do **Visual Candidate Research Brief**. FLOW.1 nie wykonuje analizy AI, nie wywołuje OpenAI i nie generuje rekomendacji inwestycyjnej.
@@ -272,14 +284,15 @@ UI.3 pozostaje końcowym accessibility pass, cross-browser review, bardziej szcz
 
 ## Kolejność wydania
 
-1. FLOW.1 — widoczny przepływ tokena.
+1. UX.1 — Global Interaction Affordance Pass.
 2. AI.1 — Visual Candidate Research Brief.
 3. UI.3 — accessibility i cross-browser.
-4. Lokalna regresja i Release Candidate.
-5. Finalny deployment na VPS.
-6. Cloudflare, scheduler, smoke i rollback.
-7. Sesja testera i poprawki P0.
-8. Freeze do 15.08.
+4. INT.1 — AI KINTEL Integration Readiness Pack.
+5. Lokalna regresja i Release Candidate.
+6. Finalny standalone deployment VPS.
+7. Cloudflare, scheduler, smoke i rollback.
+8. Sesja testera i poprawki P0.
+9. Freeze do 15.08.
 
 ## Owner review checklist
 
@@ -302,5 +315,5 @@ Owner nie wykonuje mutujących operacji i nie powtarza testów technicznych.
 Komenda:
 
 ```cmd
-scripts\win\start-premium-ui-review.cmd --ui2
+scripts\win\start-interaction-affordance-review.cmd --mobile-guide
 ```

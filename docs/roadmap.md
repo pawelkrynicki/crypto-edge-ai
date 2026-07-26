@@ -1,5 +1,21 @@
 # Roadmap
 
+## Current stage: UX.1 — Global Interaction Affordance Pass
+
+UX.1 porządkuje globalny język interakcji bez zmiany zaakceptowanego kierunku UI. Wspólne role obejmują primary/secondary/tertiary actions, external links, copy, disclosures, read-only cards, statuses, formularze oraz widoczne disabled reasons. Kontrakt jest gotowy do późniejszego odwzorowania w AI KINTEL/shadcn bez dodawania zależności do bieżącej aplikacji. Szczegóły: `docs/interaction_affordance_system.md`.
+
+Kanoniczna kolejność po UX.1:
+
+1. UX.1 — Global Interaction Affordance Pass.
+2. AI.1 — Visual Candidate Research Brief, integration-ready dla AI KINTEL.
+3. UI.3 — accessibility i cross-browser.
+4. INT.1 — AI KINTEL Integration Readiness Pack.
+5. Lokalna regresja i Release Candidate.
+6. Finalny standalone deployment VPS.
+7. Cloudflare, scheduler, smoke i rollback.
+8. Sesja testera i poprawki P0.
+9. Freeze do 15.08.
+
 ## Owner Established Promotion Flow
 
 Status: **local owner review accepted — `ACCEPT_LOCAL_CODE`, 23.07.2026; `ENABLED` inactive**.
@@ -43,7 +59,7 @@ Established Universe Management zostało zaakceptowane lokalnie 21.07.2026 z wer
 
 Runtime ownera jest lokalny i wykluczony z Git. Aktualny universe pozostaje celowo pusty: `established-universe-v000000`, 0 wpisów i 0 aktywnych wpisów. Dodanie prawdziwych wpisów nastąpi później przez owner CLI i będzie wymagało osobnej decyzji biznesowej. VPS deployment nadal oczekuje i nie blokuje lokalnego zarządzania universe. Ten etap nie wdraża VPS, nie zmienia Cloudflare ani nie aktywuje Windows Task Scheduler.
 
-## Current stage: FLOW.1 — Visible Token Lifecycle and Owner Promotion Path
+## Accepted stage: FLOW.1 — Visible Token Lifecycle and Owner Promotion Path
 
 UI.1 ustanowił system wizualny, Product Shell, Radar, karty New/Maturing/Established oraz Candidate Detail i został zaakceptowany przez ownera. UI.2 rozszerzył ten sam system na Control Center, Reports, Feedback, Owner Feedback Inbox, Verification i Methodology. FLOW.1 wykorzystuje te przyjęte powierzchnie do pokazania pełnego lifecycle i ręcznej granicy Candidate → Established bez zmian API write, danych, lifecycle, providerów lub owner gating. Następne są AI.1 i UI.3, a dopiero po nich lokalna regresja i Release Candidate. Kanoniczny opis: `docs/final_frontend_premium_ui_pass.md`.
 

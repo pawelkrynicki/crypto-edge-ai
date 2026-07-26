@@ -451,6 +451,19 @@ The launcher starts the ordinary fixture-free `INTERNAL_BETA` Product Radar with
 
 It does not run the collector, call providers, run bootstrap `--apply`, activate `ENABLED`, create a synthetic candidate, or mutate Follow-up and Established stores. It does not deploy to VPS, change Cloudflare, or touch Task Scheduler.
 
+## UX.1 Interaction Affordance Review
+
+```cmd
+scripts\win\start-interaction-affordance-review.cmd
+scripts\win\start-interaction-affordance-review.cmd --detail
+scripts\win\start-interaction-affordance-review.cmd --feedback
+scripts\win\start-interaction-affordance-review.cmd --mobile-guide
+```
+
+Launcher starts the ordinary fixture-free `INTERNAL_BETA` Radar with owner operations `DISABLED`. It prints the canonical review order for Radar, Candidate Detail, Verification, Reports, Feedback, Owner Inbox, Methodology, Control Center, mobile 390 px and keyboard-only review. `--detail` and `--feedback` select the initial screen; `--mobile-guide` prints the 390 px checks.
+
+It does not call providers, run the collector, submit feedback, execute owner actions, run bootstrap `--apply`, activate `ENABLED`/`PUBLIC_BETA`, mutate product stores, bypass owner authentication, deploy to VPS, change Cloudflare or touch Task Scheduler. Contract: `docs/interaction_affordance_system.md`.
+
 Delivery order:
 
 1. FLOW.1 — visible token lifecycle.

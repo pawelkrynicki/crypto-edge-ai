@@ -905,7 +905,11 @@ assert.match(candidateResultsMarkup, /Three Radar layers with three different me
 assert.match(candidateResultsMarkup, /New \/ observation/, "product radar renders new-emerging basket selector");
 assert.match(candidateResultsMarkup, /Maturing \/ follow-up/, "product radar renders follow-up basket selector");
 assert.match(candidateResultsMarkup, /Established \/ main Radar/, "product radar renders established basket selector");
-assert.match(candidateResultsMarkup, /Waiting for automatic Follow-up enrollment/, "new-emerging status explains the automatic next step");
+assert.match(
+  candidateResultsMarkup,
+  /Automatic Follow-up enrollment is blocked until the technical identity is valid/,
+  "new-emerging status explains the automatic next step and its visible blocker",
+);
 assert.doesNotMatch(candidateResultsMarkup, /OBSERVATION — NEW PROJECT/, "new-emerging does not duplicate the lifecycle badge");
 assert.match(candidateResultsMarkup, /observation_only=true/, "new-emerging preserves observation-only metadata");
 assert.match(candidateResultsMarkup, /No automated recommendation/, "new-emerging does not imply an automatic recommendation");

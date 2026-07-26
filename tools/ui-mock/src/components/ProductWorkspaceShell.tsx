@@ -18,6 +18,7 @@ import type { ResolvedScannerSource } from "../services/scannerDataSource";
 import type { AutomationStatus } from "../services/automationStatusDataSource";
 import type { EstablishedUniverseStatus } from "../services/establishedUniverseStatusDataSource";
 import type { ProductReadinessOutput } from "../types/scannerTypes";
+import { ActionButton, TechnicalDetails } from "./ProductUi";
 
 export type ProductSectionId =
   | "candidate-results"
@@ -142,8 +143,8 @@ export function ProductWorkspaceShell({
         </div>
 
         <div className="product-header-actions">
-          <button
-            type="button"
+          <ActionButton
+            variant="tertiary"
             className="product-mobile-nav-toggle"
             aria-expanded={mobileNavigationOpen}
             aria-controls="product-navigation"
@@ -151,7 +152,7 @@ export function ProductWorkspaceShell({
           >
             <span aria-hidden="true">{mobileNavigationOpen ? "×" : "≡"}</span>
             {mobileNavigationOpen ? t("app.closeNavigation") : t("app.openNavigation")}
-          </button>
+          </ActionButton>
           <div className="product-locale-switch" role="group" aria-label={t("app.language")}>
             {(["en", "pl"] as const).map((option) => (
               <button
@@ -165,14 +166,13 @@ export function ProductWorkspaceShell({
               </button>
             ))}
           </div>
-          <button type="button" className="product-feedback-button" onClick={onSendFeedback}>
+          <ActionButton variant="secondary" className="product-feedback-button" onClick={onSendFeedback}>
             {t("feedback.quickAction")}
-          </button>
-          <button type="button" className="product-refresh-button" onClick={onRefresh} disabled={loading}>
-            {loading ? t("app.refreshing") : t("app.refresh")}
-          </button>
-          <details className="product-header-technical">
-            <summary>{t("app.technicalDetails")}</summary>
+          </ActionButton>
+          <ActionButton variant="primary" icon="refresh" className="product-refresh-button" onClick={onRefresh} loading={loading} loadingLabel={t("app.refreshing")}>
+            {t("app.refresh")}
+          </ActionButton>
+          <TechnicalDetails label={t("app.technicalDetails")} className="product-header-technical">
             <dl>
               <div><dt>{t("app.environment")}</dt><dd>{runtimeMode}</dd></div>
               <div><dt>{t("app.runId")}</dt><dd>{runId ?? t("app.noData")}</dd></div>
@@ -191,7 +191,7 @@ export function ProductWorkspaceShell({
                 </div>
               )}
             </dl>
-          </details>
+          </TechnicalDetails>
         </div>
       </header>
 
@@ -247,11 +247,10 @@ export function ProductWorkspaceShell({
                 <p>{formatStatusReason(dataUnavailableReasonCode, locale)}</p>
               </div>
               <p>{t("app.unavailableMessage")}</p>
-              <details>
-                <summary>{t("app.technicalDetails")}</summary>
+              <TechnicalDetails label={t("app.technicalDetails")}>
                 <code>{dataUnavailableReasonCode ?? "SCANNER_OUTPUT_UNAVAILABLE"}</code>
                 <p>{dataUnavailableMessage}</p>
-              </details>
+              </TechnicalDetails>
             </div>
           )}
 

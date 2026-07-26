@@ -9,6 +9,7 @@ import { formatProductUsd, useProductLocale } from "../productI18n";
 import { formatProductSourceLabel } from "../productPresentation";
 import { resolveProductSecurityState, type ProductSecurityState } from "../productSecurityResolver";
 import type { UiTokenCandidate } from "../types/scannerTypes";
+import { ActionLink, CopyButton, ExternalLinkAction } from "./ProductUi";
 
 interface ExternalVerificationLinksViewProps {
   candidate?: UiTokenCandidate | null;
@@ -53,14 +54,14 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
           <span>{t("verification.contractAddress")}</span>
           <code title={normalizedInput.contractAddress}>{normalizedInput.contractAddress || t("radar.missingData")}</code>
           {normalizedInput.contractAddress && (
-            <button type="button" onClick={() => copyManualValue(normalizedInput.contractAddress)} aria-label={t("verification.copyContract")}>{t("verification.copyContract")}</button>
+            <CopyButton value={normalizedInput.contractAddress} label={t("verification.copyContract")} copiedLabel={t("app.copied")} />
           )}
         </div>
         <div className="verification-contract">
           <span>{t("verification.pairAddress")}</span>
           <code title={normalizedInput.pairAddress}>{normalizedInput.pairAddress || t("radar.missingData")}</code>
           {normalizedInput.pairAddress && (
-            <button type="button" onClick={() => copyManualValue(normalizedInput.pairAddress)} aria-label={t("verification.copyPair")}>{t("verification.copyPair")}</button>
+            <CopyButton value={normalizedInput.pairAddress} label={t("verification.copyPair")} copiedLabel={t("app.copied")} />
           )}
         </div>
         <div><span>{t("verification.recordSource")}</span><strong>{formatProductSourceLabel(candidate.source)}</strong></div>
@@ -104,7 +105,7 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
 
       <section className="verification-return" aria-labelledby="verification-return-heading">
         <div><span className="external-checks-eyebrow">07</span><h3 id="verification-return-heading">{ui.returnTitle}</h3><p>{ui.returnHelp}</p></div>
-        <a className="product-primary-button" href="#candidate-detail">{ui.returnAction}</a>
+        <ActionLink variant="primary" icon="arrow" iconPosition="end" className="product-primary-button" href="#candidate-detail">{ui.returnAction}</ActionLink>
       </section>
     </div>
   );
@@ -157,13 +158,13 @@ function ExternalCheckCard({ target }: { target: ExternalVerificationTarget }) {
       </div>
       <div className="external-check-actions">
         {target.href ? (
-          <a className="external-check-link" href={target.href} target="_blank" rel="noreferrer noopener" aria-label={t("verification.openSourceLabel", { source: title })}>
+          <ExternalLinkAction className="external-check-link" href={target.href} aria-label={t("verification.openSourceLabel", { source: title })}>
             {t("verification.openSource")}
-          </a>
+          </ExternalLinkAction>
         ) : (
           <span className="external-check-disabled" aria-disabled="true">{t("verification.sourceUnavailable")}</span>
         )}
-        {copyValue && <button type="button" className="external-check-copy-button" onClick={() => copyManualValue(copyValue)}>{t(copyLabelKey)}</button>}
+        {copyValue && <CopyButton className="external-check-copy-button" value={copyValue} label={t(copyLabelKey)} copiedLabel={t("app.copied")} />}
       </div>
     </article>
   );
@@ -205,11 +206,6 @@ function translateStatus(
   if (value === "Chain Unknown") return t("verification.chainUnknown");
   if (value === "Liquidity Unknown") return t("verification.liquidityUnknown");
   return t("verification.missingContext");
-}
-
-function copyManualValue(value: string): void {
-  if (!value || typeof navigator === "undefined" || !navigator.clipboard) return;
-  void navigator.clipboard.writeText(value);
 }
 
 const VERIFICATION_UI_COPY = {

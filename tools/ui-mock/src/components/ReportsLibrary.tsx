@@ -14,7 +14,7 @@ import type {
   ReportListItem,
   ReportsLibraryStatus,
 } from "../types/reportTypes";
-import { StatusBadge, TechnicalDetails } from "./ProductUi";
+import { ActionButton, CopyButton, StatusBadge, TechnicalDetails } from "./ProductUi";
 import { formatProductSourceLabel } from "../productPresentation";
 
 type ReportsLibraryProps = {
@@ -113,9 +113,9 @@ export function ReportsLibrary({
           <section className="reports-list reports-library-empty-panel" aria-label={copy.reportsList}>
             <header className="reports-subheader">
               <div><h4>{copy.savedReports}</h4><p>{copy.savedReportsHelp}</p></div>
-              <button type="button" className="reports-secondary-button" onClick={() => void refresh()} disabled={loading}>
-                {loading ? copy.refreshing : copy.refresh}
-              </button>
+              <ActionButton variant="secondary" icon="refresh" className="reports-secondary-button" onClick={() => void refresh()} loading={loading} loadingLabel={copy.refreshing}>
+                {copy.refresh}
+              </ActionButton>
             </header>
             <p className="reports-empty-state">{copy.empty}</p>
           </section>
@@ -124,9 +124,9 @@ export function ReportsLibrary({
             <section className="reports-list" aria-label={copy.reportsList}>
               <header className="reports-subheader">
                 <div><h4>{copy.savedReports}</h4><p>{copy.savedReportsHelp}</p></div>
-                <button type="button" className="reports-secondary-button" onClick={() => void refresh()} disabled={loading}>
-                  {loading ? copy.refreshing : copy.refresh}
-                </button>
+                <ActionButton variant="secondary" icon="refresh" className="reports-secondary-button" onClick={() => void refresh()} loading={loading} loadingLabel={copy.refreshing}>
+                  {copy.refresh}
+                </ActionButton>
               </header>
 
               {loading && reports.length === 0 ? (
@@ -134,7 +134,7 @@ export function ReportsLibrary({
               ) : (
                 <div className="reports-list-records">
                   {reports.map((report) => (
-                    <article className="report-list-card" key={report.report_id}>
+                    <article className={`report-list-card ${selectedReport?.report_id === report.report_id ? "selected" : ""}`} key={report.report_id} data-interaction="read-only">
                       <div className="report-list-card-main">
                         <div className="report-list-title-row">
                           <h5>{report.title}</h5>
@@ -149,9 +149,16 @@ export function ReportsLibrary({
                           {report.basket && <div><dt>{copy.basket}</dt><dd>{formatBasket(report.basket, locale)}</dd></div>}
                         </dl>
                       </div>
-                      <button type="button" className="reports-primary-button" onClick={() => void openReport(report.report_id)}>
+                      <ActionButton
+                        variant="primary"
+                        icon="arrow"
+                        iconPosition="end"
+                        className="reports-primary-button"
+                        aria-current={selectedReport?.report_id === report.report_id ? "page" : undefined}
+                        onClick={() => void openReport(report.report_id)}
+                      >
                         {copy.openReport}
-                      </button>
+                      </ActionButton>
                     </article>
                   ))}
                 </div>
@@ -211,15 +218,15 @@ function ReportDetailView({
       </header>
 
       <div className="report-detail-actions">
-        <button type="button" className="reports-secondary-button" onClick={onBack}>{copy.back}</button>
+        <ActionButton variant="secondary" className="reports-secondary-button" onClick={onBack}>{copy.back}</ActionButton>
         {linkedCandidate && (
           <>
-            <button type="button" className="reports-primary-button" onClick={() => onOpenCandidate(linkedCandidate.candidate_id)}>{copy.openCandidate}</button>
-            <button type="button" className="reports-secondary-button" onClick={() => onOpenManualVerification(linkedCandidate.candidate_id)}>{copy.openVerification}</button>
+            <ActionButton variant="primary" icon="arrow" iconPosition="end" className="reports-primary-button" onClick={() => onOpenCandidate(linkedCandidate.candidate_id)}>{copy.openCandidate}</ActionButton>
+            <ActionButton variant="secondary" className="reports-secondary-button" onClick={() => onOpenManualVerification(linkedCandidate.candidate_id)}>{copy.openVerification}</ActionButton>
           </>
         )}
         {detail.contract_address && (
-          <button type="button" className="reports-secondary-button" onClick={() => void copyContract(detail.contract_address!)}>{copy.copyContract}</button>
+          <CopyButton value={detail.contract_address} label={copy.copyContract} copiedLabel={copy.copied} />
         )}
       </div>
 
@@ -393,12 +400,6 @@ function dateValue(value: string | null, locale: ProductLocale, fallback: string
   return value ? formatProductDateTime(value, locale) : fallback;
 }
 
-async function copyContract(contractAddress: string): Promise<void> {
-  if (typeof navigator !== "undefined" && navigator.clipboard) {
-    await navigator.clipboard.writeText(contractAddress);
-  }
-}
-
 type ReportsCopy = { [Key in keyof typeof REPORTS_COPY.en]: string };
 
 const REPORTS_COPY = {
@@ -437,6 +438,7 @@ const REPORTS_COPY = {
     openCandidate: "Open candidate detail",
     openVerification: "Open manual verification",
     copyContract: "Copy contract",
+    copied: "Copied",
     reportVersion: "Report version",
     technicalDetails: "Technical details",
     reportId: "Report ID",
@@ -502,6 +504,7 @@ const REPORTS_COPY = {
     openCandidate: "Otwórz szczegóły kandydata",
     openVerification: "Otwórz ręczną weryfikację",
     copyContract: "Kopiuj kontrakt",
+    copied: "Skopiowano",
     reportVersion: "Wersja raportu",
     technicalDetails: "Szczegóły techniczne",
     reportId: "ID raportu",

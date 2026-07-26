@@ -308,7 +308,7 @@ function ControlCard({
   t: Translator;
 }) {
   return (
-    <article className={`control-status-card product-control-card ${statusClass(status)}`}>
+    <article className={`control-status-card product-control-card ${statusClass(status)}`} data-interaction="read-only">
       <div className="control-status-card-topline">
         <h4>{title}</h4>
         <StatusBadge status={status} t={t} />

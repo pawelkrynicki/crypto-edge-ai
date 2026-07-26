@@ -1,5 +1,23 @@
 # Standalone Roadmap To Trusted Tester
 
+## UX.1 — Global Interaction Affordance Pass
+
+UX.1 jest bieżącym etapem po zaakceptowanych UI.1, UI.2 i FLOW.1. Porządkuje rozpoznawalność akcji, linków, disclosure, pól, kart read-only, statusów i disabled states bez zmiany API, danych, lifecycle, owner gates ani provider boundary. System ma stabilne role gotowe do późniejszego mapowania na shadcn/ui i Radix; bieżący standalone nie otrzymuje Tailwind 4 ani nowych runtime dependencies.
+
+Kanoniczna kolejność:
+
+1. UX.1 — Global Interaction Affordance Pass.
+2. AI.1 — Visual Candidate Research Brief, integration-ready dla AI KINTEL.
+3. UI.3 — accessibility i cross-browser.
+4. INT.1 — AI KINTEL Integration Readiness Pack.
+5. Lokalna regresja i Release Candidate.
+6. Finalny standalone deployment VPS.
+7. Cloudflare, scheduler, smoke i rollback.
+8. Sesja testera i poprawki P0.
+9. Freeze do 15.08.
+
+Kontrakt: `docs/interaction_affordance_system.md`.
+
 ## Owner Established Promotion Flow
 
 Candidate Detail ma backend-gated sekcję ownera z read-only statusem i dry-run preview. Jedyny POST przyjmuje tylko podpisany one-time `preview_id` i potwierdzenie, ponownie sprawdza canonical record, lifecycle, basic filters, membership, universe version/checksum i lock, a następnie bezpośrednio używa Established Universe Managera.

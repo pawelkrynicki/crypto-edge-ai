@@ -164,6 +164,7 @@ export function TokenLifecycleFlow({
             key={stage.id}
             className={`token-lifecycle-stage ${stage.state}`}
             aria-current={stage.state === "current" ? "step" : undefined}
+            data-interaction="read-only"
             data-stage={stage.id}
             data-state={stage.state}
           >
@@ -185,7 +186,7 @@ export function TokenLifecycleStatus({ model }: { model: TokenLifecycleViewModel
   const copy = FLOW_COPY[locale];
   const [title, detail] = copy.tracking[model.tracking_status];
   return (
-    <div className={`token-lifecycle-status ${model.tracking_status}`} role="status">
+    <div className={`token-lifecycle-status ${model.tracking_status}`} role="status" data-interaction="status">
       <div>
         <strong>{title}</strong>
         <p>{detail}</p>
@@ -211,7 +212,7 @@ export function TokenLifecycleCardSummary({ model }: { model: TokenLifecycleView
   const copy = FLOW_COPY[locale];
   const blockers = model.blocking_conditions.map((condition) => blockingLabel(condition, locale));
   return (
-    <div className={`token-lifecycle-card-summary ${model.tracking_status}`} role="status">
+    <div className={`token-lifecycle-card-summary ${model.tracking_status}`} role="status" data-interaction="status">
       <p>{copy.cardSummary[model.tracking_status]}</p>
       <span className={blockers.length > 0 ? "has-blockers" : "no-blockers"}>
         {blockers.length > 0 ? blockers.join(" · ") : copy.noBlockersShort}

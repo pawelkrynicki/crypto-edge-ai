@@ -23,6 +23,11 @@ if not exist "node_modules\.bin\tsx.cmd" (
 )
 
 echo.
+echo === UX.1 interaction affordance contracts ===
+call pnpm run test:ux1
+if errorlevel 1 exit /b %ERRORLEVEL%
+
+echo.
 echo === Premium UI contracts ===
 call pnpm run test:premium-ui
 if errorlevel 1 exit /b %ERRORLEVEL%

@@ -22,7 +22,7 @@ import {
   type OwnerFeedbackListItem,
   type OwnerFeedbackStatus,
 } from "../services/feedbackDataSource";
-import { StatusBadge, TechnicalDetails } from "./ProductUi";
+import { ActionButton, ActionLink, ProductIcon, StatusBadge, TechnicalDetails } from "./ProductUi";
 
 type FeedbackProps = {
   screenContext: FeedbackScreenContext;
@@ -197,14 +197,17 @@ export function Feedback({
                 {state === "rate_limited" && <p className="feedback-inline-error" role="alert">{copy.rateLimit}</p>}
               </div>
               {!formComplete && <p className="feedback-disabled-help" id="feedback-submit-help">{copy.completeRequired}</p>}
-              <button
+              <ActionButton
                 type="submit"
+                variant="primary"
                 className="product-primary-button"
-                disabled={state === "submitting" || !formComplete}
+                loading={state === "submitting"}
+                loadingLabel={copy.sending}
+                disabled={!formComplete}
                 aria-describedby={!formComplete ? "feedback-submit-help" : undefined}
               >
-                {state === "submitting" ? copy.sending : copy.send}
-              </button>
+                {copy.send}
+              </ActionButton>
             </form>
           )}
         </section>
@@ -244,8 +247,8 @@ export function FeedbackReceiptPanel({ receipt, onReset }: { receipt: FeedbackRe
       </dl>
       <p className="feedback-receipt-next">{duplicate ? copy.duplicateNext : copy.successNext}</p>
       <div className="feedback-receipt-actions">
-        <a className="product-primary-button" href="#candidate-results">{copy.returnToProduct}</a>
-        <button type="button" className="reports-secondary-button" onClick={onReset}>{copy.addAnother}</button>
+        <ActionLink variant="primary" icon="arrow" iconPosition="end" className="product-primary-button" href="#candidate-results">{copy.returnToProduct}</ActionLink>
+        <ActionButton variant="secondary" className="reports-secondary-button" onClick={onReset}>{copy.addAnother}</ActionButton>
       </div>
     </div>
   );
@@ -346,13 +349,13 @@ function OwnerFeedbackInbox({
         <div className="owner-feedback-export">
           {status.total_count === 0 ? (
             <>
-              <button type="button" disabled>{copy.exportJson}</button>
-              <button type="button" disabled>{copy.exportCsv}</button>
+              <ActionButton variant="tertiary" icon="lock" disabled aria-describedby="feedback-export-help">{copy.exportJson}</ActionButton>
+              <ActionButton variant="tertiary" icon="lock" disabled aria-describedby="feedback-export-help">{copy.exportCsv}</ActionButton>
             </>
           ) : (
             <>
-              <a href={getOwnerFeedbackExportUrl("json")} download>{copy.exportJson}</a>
-              <a href={getOwnerFeedbackExportUrl("csv")} download>{copy.exportCsv}</a>
+              <ActionLink variant="secondary" icon="download" href={getOwnerFeedbackExportUrl("json")} download>{copy.exportJson}</ActionLink>
+              <ActionLink variant="secondary" icon="download" href={getOwnerFeedbackExportUrl("csv")} download>{copy.exportCsv}</ActionLink>
             </>
           )}
         </div>
@@ -362,7 +365,7 @@ function OwnerFeedbackInbox({
         <div className="owner-feedback-empty-state">
           <strong>{copy.emptyInboxTitle}</strong>
           <p>{copy.emptyInbox}</p>
-          <small>{copy.exportUnavailable}</small>
+          <small id="feedback-export-help">{copy.exportUnavailable}</small>
         </div>
       ) : (
         <div className="owner-feedback-content">
@@ -371,10 +374,17 @@ function OwnerFeedbackInbox({
             {listUnavailable && <p className="feedback-empty error" role="alert">{copy.inboxUnavailable}</p>}
             {!itemsLoading && !listUnavailable && items.length === 0 && <p className="feedback-empty">{copy.empty}</p>}
             {items.map((item) => (
-              <button type="button" key={item.feedback_id} onClick={() => void openDetail(item.feedback_id)} className={detail?.feedback_id === item.feedback_id ? "active" : ""}>
+              <button
+                type="button"
+                key={item.feedback_id}
+                onClick={() => void openDetail(item.feedback_id)}
+                className={detail?.feedback_id === item.feedback_id ? "active" : ""}
+                aria-current={detail?.feedback_id === item.feedback_id ? "true" : undefined}
+              >
                 <span className="owner-feedback-record-topline"><span className={`feedback-category-pill ${item.category.toLowerCase()}`}>{categoryCopy[locale][item.category].label}</span><span>{formatOwnerFeedbackStatus(item.status, locale)}</span></span>
                 <strong>{item.title}</strong>
                 <small>{item.subject_summary ?? screenLabel(item.screen_context, locale)} · {formatProductDateTime(item.created_at, locale)}</small>
+                <span className="owner-feedback-open-indicator">{copy.openItem}<ProductIcon name="arrow" /></span>
               </button>
             ))}
           </div>
@@ -425,7 +435,7 @@ export function OwnerFeedbackDetailPanel({ detail }: { detail: OwnerFeedbackDeta
 }
 
 function FeedbackFilterStat({ label, value, active, onClick }: { label: string; value: number; active: boolean; onClick: () => void }) {
-  return <button type="button" className={active ? "active" : ""} aria-pressed={active} onClick={onClick}><span>{label}</span><strong>{value}</strong></button>;
+  return <button type="button" className={active ? "active" : ""} data-action-variant="tertiary" aria-pressed={active} onClick={onClick}><span>{label}</span><strong>{value}</strong></button>;
 }
 
 function createSubmissionKey(): string {
@@ -546,6 +556,7 @@ function feedbackCopy(locale: ProductLocale) {
     loadingDetail: "Ładowanie szczegółu…",
     inboxUnavailable: "Nie udało się odczytać skrzynki. Spróbuj ponownie później.",
     selectItem: "Wybierz zgłoszenie, aby zobaczyć szczegóły.",
+    openItem: "Otwórz szczegóły",
     subject: "Kontekst produktu",
     sessionGroup: "Pseudonimowa grupa sesji",
     productVersion: "Wersja produktu",
@@ -609,6 +620,7 @@ function feedbackCopy(locale: ProductLocale) {
     loadingDetail: "Loading detail…",
     inboxUnavailable: "The inbox could not be loaded. Try again later.",
     selectItem: "Select feedback to view details.",
+    openItem: "Open details",
     subject: "Product context",
     sessionGroup: "Pseudonymous session group",
     productVersion: "Product version",

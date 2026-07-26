@@ -29,7 +29,7 @@ import {
   type EstablishedPromotionStatus,
 } from "../services/establishedPromotionDataSource";
 import { EstablishedPromotionPanel } from "./EstablishedPromotionPanel";
-import { CopyableAddress, StatusBadge, TechnicalDetails } from "./ProductUi";
+import { ActionButton, CopyButton, CopyableAddress, StatusBadge, TechnicalDetails } from "./ProductUi";
 import {
   lifecycleActionLabel,
   lifecycleBlockingLabel,
@@ -91,7 +91,7 @@ export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
         <span className="candidate-detail-eyebrow">{t("detail.eyebrow")}</span>
         <h3>{t("detail.noneTitle")}</h3>
         <p>{t("detail.noneDetail")}</p>
-        {onBackToResults && <button type="button" className="candidate-detail-secondary-button" onClick={onBackToResults}>{t("detail.back")}</button>}
+        {onBackToResults && <ActionButton variant="secondary" className="candidate-detail-secondary-button" onClick={onBackToResults}>{t("detail.back")}</ActionButton>}
       </section>
     );
   }
@@ -151,7 +151,7 @@ export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
           <CopyableAddress
             value={candidate.contractAddress}
             displayValue={shortenAddress(candidate.contractAddress, t("radar.missingData"))}
-            copyLabel={t("detail.copyLabel", { label: t("detail.contract") })}
+            copyLabel={t("verification.copyContract")}
             copiedLabel={t("app.copied")}
             buttonLabel={t("app.copy")}
             className="candidate-detail-hero-address"
@@ -160,15 +160,15 @@ export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
         <div className="candidate-detail-boundary">
           <strong>{candidate.observationOnly ? t("detail.boundaryObservation") : t("detail.boundaryManual")}</strong>
           <span>{t("detail.boundaryText")}</span>
-          {onBackToResults && <button type="button" className="candidate-detail-hero-back" onClick={onBackToResults}>{t("detail.back")}</button>}
+          {onBackToResults && <ActionButton variant="secondary" className="candidate-detail-hero-back" onClick={onBackToResults}>{t("detail.back")}</ActionButton>}
         </div>
       </section>
 
       <section className="product-detail-section" aria-labelledby="identity-heading">
         <SectionHeader id="identity-heading" index="1" title={t("detail.identity")} />
         <div className="product-detail-grid">
-          <DetailField label={t("detail.contract")} value={candidate.contractAddress || t("radar.missingData")} copyValue={candidate.contractAddress} mono />
-          <DetailField label={t("detail.pairAddress")} value={candidate.pairAddress || t("radar.missingData")} copyValue={candidate.pairAddress} mono />
+          <DetailField label={t("detail.contract")} value={candidate.contractAddress || t("radar.missingData")} copyValue={candidate.contractAddress} copyLabel={t("verification.copyContract")} mono />
+          <DetailField label={t("detail.pairAddress")} value={candidate.pairAddress || t("radar.missingData")} copyValue={candidate.pairAddress} copyLabel={t("verification.copyPair")} mono />
           <DetailField label={t("detail.chain")} value={candidate.chain || t("radar.missingData")} />
           <DetailField
             label={t("detail.technicalIdentity")}
@@ -282,12 +282,11 @@ export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
           <strong>{getSecurityStateTitle(securityResolution.state, t)}</strong>
           <p>{getSecurityStateDetail(securityResolution.state, candidate.basicFilterStatus, t)}</p>
           {securityResolution.state === "not_invoked" && <p>{t("detail.riskFlagsNotAssessed")}</p>}
-          <details>
-            <summary>{t("app.technicalDetails")}</summary>
+          <TechnicalDetails label={t("app.technicalDetails")}>
             <code>
               security_state={securityResolution.state}; security_label={securityResolution.rawSecurityLabel}; coverage_status={securityResolution.rawCoverageStatus ?? "null"}
             </code>
-          </details>
+          </TechnicalDetails>
         </div>
         {showSecurityDetails ? (
           <>
@@ -334,8 +333,8 @@ export const CandidateDetailView: React.FC<CandidateDetailViewProps> = ({
         <SectionHeader id="next-heading" index="7" title={t("detail.nextStep")} />
         <p>{t("detail.nextStepText")}</p>
         <div className="product-detail-actions">
-          {onBackToResults && <button type="button" className="secondary" onClick={onBackToResults}>{t("detail.back")}</button>}
-          {onOpenExternalChecks && <button type="button" onClick={() => onOpenExternalChecks(candidate)}>{t("detail.openVerification")}</button>}
+          {onOpenExternalChecks && <ActionButton variant="primary" icon="arrow" iconPosition="end" onClick={() => onOpenExternalChecks(candidate)}>{t("detail.openVerification")}</ActionButton>}
+          {onBackToResults && <ActionButton variant="secondary" onClick={onBackToResults}>{t("detail.back")}</ActionButton>}
         </div>
       </section>
     </div>
@@ -431,7 +430,7 @@ function FollowUpOnlyDetail({
           <CopyableAddress
             value={followUp.contract_address}
             displayValue={shortenAddress(followUp.contract_address, t("radar.missingData"))}
-            copyLabel={t("detail.copyLabel", { label: t("detail.contract") })}
+            copyLabel={t("verification.copyContract")}
             copiedLabel={t("app.copied")}
             buttonLabel={t("app.copy")}
             className="candidate-detail-hero-address"
@@ -440,14 +439,14 @@ function FollowUpOnlyDetail({
         <div className="candidate-detail-boundary">
           <strong>{locale === "pl" ? "Badania i obserwacja" : "Research and observation"}</strong>
           <span>{locale === "pl" ? "Status nie jest rekomendacją inwestycyjną ani potwierdzeniem bezpieczeństwa." : "This status is not investment advice or a safety approval."}</span>
-          {onBackToResults && <button type="button" className="candidate-detail-hero-back" onClick={onBackToResults}>{t("detail.back")}</button>}
+          {onBackToResults && <ActionButton variant="secondary" className="candidate-detail-hero-back" onClick={onBackToResults}>{t("detail.back")}</ActionButton>}
         </div>
       </section>
 
       <section className="product-detail-section" aria-labelledby="identity-heading">
         <SectionHeader id="identity-heading" index="1" title={t("detail.identity")} />
         <div className="product-detail-grid">
-          <DetailField label={t("detail.contract")} value={followUp.contract_address} copyValue={followUp.contract_address} mono />
+          <DetailField label={t("detail.contract")} value={followUp.contract_address} copyValue={followUp.contract_address} copyLabel={t("verification.copyContract")} mono />
           <DetailField label={t("detail.chain")} value={followUp.chain} />
         </div>
       </section>
@@ -478,7 +477,7 @@ function FollowUpOnlyDetail({
         <p>{lifecycleActionLabel(lifecycle.next_action_type, locale)}</p>
         {onBackToResults && (
           <div className="product-detail-actions">
-            <button type="button" className="secondary" onClick={onBackToResults}>{t("detail.back")}</button>
+            <ActionButton variant="secondary" onClick={onBackToResults}>{t("detail.back")}</ActionButton>
           </div>
         )}
       </section>
@@ -494,12 +493,14 @@ function DetailField({
   label,
   value,
   copyValue,
+  copyLabel,
   mono = false,
   tone = "neutral",
 }: {
   label: string;
   value: string;
   copyValue?: string;
+  copyLabel?: string;
   mono?: boolean;
   tone?: "neutral" | "ready" | "warning" | "critical";
 }) {
@@ -508,7 +509,13 @@ function DetailField({
     <div className={`product-detail-field ${tone}`}>
       <span>{label}</span>
       <div className={mono ? "mono" : ""} title={value}>{value}</div>
-      {copyValue && <button type="button" onClick={() => copyToClipboard(copyValue)} aria-label={t("detail.copyLabel", { label })}>{t("radar.copy")}</button>}
+      {copyValue && (
+        <CopyButton
+          value={copyValue}
+          label={copyLabel ?? t("detail.copyLabel", { label })}
+          copiedLabel={t("app.copied")}
+        />
+      )}
     </div>
   );
 }
@@ -571,10 +578,9 @@ function FilterNoteList({
           <li key={reason}>
             {presentation.summary}
             {showUnknownCodes && !presentation.known && (
-              <details>
-                <summary>{t("app.technicalDetails")}</summary>
+              <TechnicalDetails label={t("app.technicalDetails")}>
                 <code>{presentation.rawReason}</code>
-              </details>
+              </TechnicalDetails>
             )}
           </li>
         );
@@ -787,9 +793,4 @@ function shortenAddress(value: string, missing: string): string {
 function humanizeReason(value: string): string {
   const normalized = value.replaceAll("_", " ").trim();
   return normalized.length === 0 ? value : normalized.charAt(0).toUpperCase() + normalized.slice(1);
-}
-
-function copyToClipboard(value: string): void {
-  if (!value || typeof navigator === "undefined" || !navigator.clipboard) return;
-  void navigator.clipboard.writeText(value);
 }

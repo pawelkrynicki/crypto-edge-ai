@@ -11,6 +11,7 @@ import {
   type OwnerRefreshPreview,
   type OwnerRefreshResult,
 } from "../services/ownerOperationsDataSource";
+import { ActionButton } from "./ProductUi";
 
 const COPY = {
   en: {
@@ -29,6 +30,8 @@ const COPY = {
     yes: "Yes",
     no: "No",
     reviewOnly: "Review-safe mode: the real refresh remains blocked.",
+    previewFirst: "Preview the current refresh plan before confirming this action.",
+    confirmFirst: "Confirm the cadence-controlled cycle to enable this action.",
     preview: "Preview refresh plan",
     previewUnavailable: "The refresh plan could not be loaded.",
     mayCall: "Sources that may be contacted",
@@ -69,6 +72,8 @@ const COPY = {
     yes: "Tak",
     no: "Nie",
     reviewOnly: "Tryb bezpiecznego przeglądu: prawdziwe odświeżenie pozostaje zablokowane.",
+    previewFirst: "Najpierw sprawdź bieżący plan odświeżenia.",
+    confirmFirst: "Potwierdź cykl zgodny z harmonogramem, aby aktywować tę akcję.",
     preview: "Sprawdź plan odświeżenia",
     previewUnavailable: "Nie udało się pobrać planu odświeżenia.",
     mayCall: "Źródła, które mogą zostać wywołane",
@@ -125,6 +130,13 @@ export function OwnerOperationsPanel({ initialStatus }: { initialStatus: OwnerOp
     && !status.action_in_progress
     && confirmed
     && !running;
+  const disabledReason = status.mode === "REVIEW_SAFE"
+    ? copy.reviewOnly
+    : !previewFresh
+      ? copy.previewFirst
+      : !confirmed
+        ? copy.confirmFirst
+        : copy.noAction;
 
   const checkPlan = async () => {
     setLoadingPreview(true);
@@ -164,7 +176,7 @@ export function OwnerOperationsPanel({ initialStatus }: { initialStatus: OwnerOp
         <p className="control-center-research-note">{copy.browserBoundary}</p>
       </header>
 
-      {status.mode === "REVIEW_SAFE" && <p className="owner-review-safe" role="status">{copy.reviewOnly}</p>}
+      {status.mode === "REVIEW_SAFE" && <p className="owner-review-safe" id="owner-refresh-mode-help" role="status">{copy.reviewOnly}</p>}
 
       <div className="owner-operations-summary" aria-label={copy.currentStatus}>
         <OwnerFact label={copy.mode} value={ownerModeLabel(status.mode, locale)} />
@@ -178,9 +190,9 @@ export function OwnerOperationsPanel({ initialStatus }: { initialStatus: OwnerOp
         <OwnerFact label={copy.lastAction} value={status.last_action_status ? resultStatusLabel(status.last_action_status, locale) : copy.missing} />
       </div>
 
-      <button type="button" className="secondary-button owner-preview-button" onClick={() => void checkPlan()} disabled={loadingPreview}>
+      <ActionButton variant="secondary" className="secondary-button owner-preview-button" onClick={() => void checkPlan()} loading={loadingPreview} loadingLabel={`${copy.preview}…`}>
         {copy.preview}
-      </button>
+      </ActionButton>
 
       {loadingPreview && <p role="status">{copy.preview}…</p>}
       {!loadingPreview && previewError && <p role="alert">{copy.previewUnavailable}</p>}
@@ -208,9 +220,18 @@ export function OwnerOperationsPanel({ initialStatus }: { initialStatus: OwnerOp
         <span>{copy.confirm}</span>
       </label>
 
-      <button type="button" className="primary-button owner-refresh-button" onClick={() => void startRefresh()} disabled={!canRun}>
+      {!canRun && status.mode !== "REVIEW_SAFE" && <p className="owner-disabled-reason" id="owner-refresh-disabled-help">{disabledReason}</p>}
+      <ActionButton
+        variant="primary"
+        icon="refresh"
+        className="primary-button owner-refresh-button"
+        onClick={() => void startRefresh()}
+        loading={running}
+        disabled={!canRun}
+        aria-describedby={!canRun ? (status.mode === "REVIEW_SAFE" ? "owner-refresh-mode-help" : "owner-refresh-disabled-help") : undefined}
+      >
         {copy.run}
-      </button>
+      </ActionButton>
 
       {result && <OwnerResult result={result} copy={copy} />}
     </section>

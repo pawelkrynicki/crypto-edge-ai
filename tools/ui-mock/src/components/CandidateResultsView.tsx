@@ -34,7 +34,7 @@ import type {
   UiTokenCandidate,
 } from "../types/scannerTypes";
 import type { FollowUpPublicEntry, FollowUpPublicStatus } from "../types/followUpTypes";
-import { CopyableAddress, StatusBadge } from "./ProductUi";
+import { ActionButton, CopyableAddress, ReadOnlyCard, StatusBadge, TechnicalDetails } from "./ProductUi";
 import {
   lifecycleStageLabel,
   TokenCheckpointAxis,
@@ -147,6 +147,7 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
           className="radar-lifecycle-guide-trigger"
           aria-expanded={lifecycleGuideOpen}
           aria-controls="radar-lifecycle-guide-content"
+          data-interaction="disclosure"
           onClick={() => setLifecycleGuideOpen((open) => !open)}
           onKeyDown={(event) => {
             if (event.key !== "Enter" && event.key !== " ") return;
@@ -291,7 +292,7 @@ export function MaturingFollowUpBasket({
                 <CopyableAddress
                   value={entry.contract_address}
                   displayValue={shortenAddress(entry.contract_address, t("radar.missingData"))}
-                  copyLabel={t("app.copy")}
+                  copyLabel={t("verification.copyContract")}
                   copiedLabel={t("app.copied")}
                   className="contract-line"
                 />
@@ -325,7 +326,9 @@ export function MaturingFollowUpBasket({
                 <p>{entry.lifecycle_status === "CANDIDATE_FOR_ESTABLISHED"
                   ? (locale === "pl" ? "Nie dodano automatycznie. Następny krok: decyzja właściciela." : "Not promoted automatically. Next: owner decision.")
                   : (locale === "pl" ? "Dalsze sprawdzenie nastąpi automatycznie." : "The next check happens automatically.")}</p>
-                <button type="button" onClick={() => onOpenFollowUp(entry.entry_id)}>{t("radar.openDetails")}</button>
+                <ActionButton variant="primary" icon="arrow" iconPosition="end" onClick={() => onOpenFollowUp(entry.entry_id)}>
+                  {t("radar.openDetails")}
+                </ActionButton>
               </footer>
             )}
           </article>
@@ -462,10 +465,9 @@ function NewCandidateCard({
         <Metric label={t("radar.security")} value={presentRadarSecurityState(resolveProductSecurityState(candidate).state, locale)} tone={getSecurityStateTone(resolveProductSecurityState(candidate).state)} />
       </div>
 
-      <details className="token-card-technical">
-        <summary>{t("app.technicalDetails")}</summary>
+      <TechnicalDetails label={t("app.technicalDetails")} className="token-card-technical">
         <code>observation_only={String(candidate.observationOnly)} · established_eligible={String(candidate.establishedEligible)}</code>
-      </details>
+      </TechnicalDetails>
 
       <footer className="product-candidate-footer">
         <div>
@@ -506,7 +508,7 @@ export function EstablishedBasket({
           <div className="product-metric warning">
             <span>{t("radar.state")}</span>
             <strong>{t("radar.establishedEmptyEyebrow")}</strong>
-            <details><summary>{t("app.technicalDetails")}</summary><code>ESTABLISHED_UNIVERSE_EMPTY</code></details>
+            <TechnicalDetails label={t("app.technicalDetails")}><code>ESTABLISHED_UNIVERSE_EMPTY</code></TechnicalDetails>
           </div>
           <Metric label={t("radar.universeVersion")} value={universe?.universe_version ?? "established_address_universe_v1"} />
           <Metric label={t("radar.activeEntries")} value="0" />
@@ -659,18 +661,26 @@ function CandidateActions({
   const { t } = useProductLocale();
   return (
     <div className="product-card-actions">
-      {onOpenCandidate && <button type="button" onClick={() => onOpenCandidate(candidate.id)}>{t("radar.openDetails")}</button>}
-      {onOpenExternalChecks && <button type="button" className="secondary" onClick={() => onOpenExternalChecks(candidate)}>{t("radar.sourceVerification")}</button>}
+      {onOpenCandidate && (
+        <ActionButton variant="primary" icon="arrow" iconPosition="end" onClick={() => onOpenCandidate(candidate.id)}>
+          {t("radar.openDetails")}
+        </ActionButton>
+      )}
+      {onOpenExternalChecks && (
+        <ActionButton variant="secondary" onClick={() => onOpenExternalChecks(candidate)}>
+          {t("radar.sourceVerification")}
+        </ActionButton>
+      )}
     </div>
   );
 }
 
 function SummaryCard({ label, value, detail, tone = "neutral" }: { label: string; value: string; detail: string; tone?: Tone }) {
-  return <div className={`product-summary-card ${tone}`}><span>{label}</span><strong>{value}</strong><p>{detail}</p></div>;
+  return <ReadOnlyCard className={`product-summary-card ${tone}`}><span>{label}</span><strong>{value}</strong><p>{detail}</p></ReadOnlyCard>;
 }
 
 function Metric({ label, value, tone = "neutral" }: { label: string; value: string; tone?: Tone }) {
-  return <div className={`product-metric ${tone}`}><span>{label}</span><strong>{value}</strong></div>;
+  return <div className={`product-metric ${tone}`} data-interaction="read-only"><span>{label}</span><strong>{value}</strong></div>;
 }
 
 function Explanation({ label, value }: { label: string; value: string }) {
@@ -685,10 +695,9 @@ function BasketUnavailable({ title, reasonCode, detail }: { title: string; reaso
       <h3>{title}</h3>
       <p>{formatStatusReason(reasonCode, locale)}</p>
       <p>{detail}</p>
-      <details>
-        <summary>{t("app.technicalDetails")}</summary>
+      <TechnicalDetails label={t("app.technicalDetails")}>
         <code>{reasonCode}</code>
-      </details>
+      </TechnicalDetails>
     </section>
   );
 }
@@ -700,10 +709,9 @@ function BasketEmpty({ title, detail, code }: { title: string; detail: string; c
       <span>{t("radar.emptyResult")}</span>
       <h3>{title}</h3>
       <p>{detail}</p>
-      <details>
-        <summary>{t("app.technicalDetails")}</summary>
+      <TechnicalDetails label={t("app.technicalDetails")}>
         <code>{code}</code>
-      </details>
+      </TechnicalDetails>
     </section>
   );
 }

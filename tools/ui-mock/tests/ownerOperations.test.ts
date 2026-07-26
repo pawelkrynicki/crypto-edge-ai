@@ -55,7 +55,7 @@ describe("owner operations capability and UI boundary", () => {
     assert.match(polish, /Jednorazowe odświeżenie danych/);
     assert.match(polish, /Sprawdź plan odświeżenia/);
     assert.match(polish, /prawdziwe odświeżenie pozostaje zablokowane/);
-    assert.match(english, /<button[^>]*disabled=""[^>]*>Run one-time refresh<\/button>/);
+    assert.match(english, /<button[^>]*disabled=""[^>]*>[\s\S]*?Run one-time refresh<\/button>/);
   });
 
   it("keeps the local launcher DISABLED by default and exposes only the REVIEW_SAFE review variant", async () => {

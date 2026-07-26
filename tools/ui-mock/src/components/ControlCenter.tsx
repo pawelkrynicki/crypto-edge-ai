@@ -109,7 +109,7 @@ export const ControlCenter: React.FC<ControlCenterProps> = ({
         />
         <div className="control-readiness-grid">
           {status.readinessItems.map((item) => (
-            <article key={item.label} className="control-status-card">
+            <article key={item.label} className="control-status-card" data-interaction="read-only">
               <div className="control-status-card-topline">
                 <h4>{item.label}</h4>
                 <StatusBadge status={item.status} />
@@ -314,7 +314,7 @@ function StatusCard({
   detail?: string | null;
 }) {
   return (
-    <article className="control-status-card">
+    <article className="control-status-card" data-interaction="read-only">
       <div className="control-status-card-topline">
         <h4>{label}</h4>
         <StatusBadge status={status} />

@@ -375,7 +375,7 @@ describe("Product Radar owner acceptance", () => {
     for (const locale of ["en", "pl"] as const) {
       const details = renderWithLocale(locale, React.createElement(CandidateDetailView, { candidate: beansCandidate }));
       const verification = renderWithLocale(locale, React.createElement(ExternalVerificationLinksView, { candidate: beansCandidate }));
-      const detailsWithoutTechnical = details.replace(/<details>[\s\S]*?<\/details>/g, "");
+      const detailsWithoutTechnical = details.replace(/<details\b[^>]*>[\s\S]*?<\/details>/g, "");
 
       if (locale === "pl") {
         assert.match(details, /Kontrola bezpieczeństwa nie została uruchomiona/);
@@ -392,7 +392,7 @@ describe("Product Radar owner acceptance", () => {
       assert.doesNotMatch(details, /GoPlus|Buy tax|Sell tax|Podatek kupna|Podatek sprzedaży|Brak zgłoszonych flag|No reported flags/);
       assert.doesNotMatch(verification, /Dane obecne|Security data present|Data present — verify it/);
       assert.doesNotMatch(detailsWithoutTechnical, /unknown|Security data unavailable|Not checked|Partial security coverage/i);
-      assert.match(details, /<details><summary>(?:Technical details|Szczegóły techniczne)<\/summary><code>security_state=not_invoked; security_label=SECURITY DATA UNAVAILABLE;/);
+      assert.match(details, /<details\b[^>]*><summary[^>]*><span>(?:Technical details|Szczegóły techniczne)<\/span>[\s\S]*?<code>security_state=not_invoked; security_label=SECURITY DATA UNAVAILABLE;/);
       assert.match(verification, locale === "pl" ? /Bezpieczeństwo — kontrola ręczna/ : /Security — manual check/);
 
       const basicConditionLabels = [
@@ -436,7 +436,7 @@ describe("Product Radar owner acceptance", () => {
     assert.match(partialVerification, /Dane częściowe — wymagana ręczna weryfikacja/);
 
     for (const markup of [unavailableDetails, unavailableVerification, partialDetails, partialVerification]) {
-      const withoutTechnical = markup.replace(/<details>[\s\S]*?<\/details>/g, "");
+      const withoutTechnical = markup.replace(/<details\b[^>]*>[\s\S]*?<\/details>/g, "");
       assert.doesNotMatch(withoutTechnical, /unknown|Security data unavailable|Not checked|Partial security coverage/i);
     }
   });

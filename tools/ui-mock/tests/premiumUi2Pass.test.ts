@@ -75,7 +75,7 @@ describe("Premium UI.2 presentation contracts", () => {
     assert.match(feedback, /getOwnerFeedbackExportUrl\("csv"\)/);
     assert.match(feedback, /owner-feedback-empty-state/);
     assert.match(feedback, /status\.total_count === 0/);
-    assert.match(feedback, /<button type="button" disabled>\{copy\.exportJson\}<\/button>/);
+    assert.match(feedback, /ActionButton variant="tertiary" icon="lock" disabled aria-describedby="feedback-export-help">\{copy\.exportJson\}<\/ActionButton>/);
     assert.match(handler, /requireOwnerFeedbackCapability\(req, ownerMode\)/);
     assert.match(handler, /mode !== "DISABLED" && isLocalOwnerRequest\(req\)/);
     assert.doesNotMatch(feedback, /mark.*resolved|addComment|updateFeedback/i);
