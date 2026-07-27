@@ -50,7 +50,7 @@ describe("AI.1 Visual Candidate Research Canvas", () => {
   it("renders the complete deterministic Canvas in PL and EN without chatbot or trading language", () => {
     const pl = render("pl", <AIResearchBriefCanvas brief={briefPl} symbol="PASS" name="Pass Token" />);
     const en = render("en", <AIResearchBriefCanvas brief={briefEn} symbol="PASS" name="Pass Token" />);
-    for (const [markup, labels] of [[pl, ["Wizualny stan badawczy", "Co dalej", "Macierz ryzyk", "Czego nadal nie wiemy", "Oś checkpointów", "Granica badawcza"]], [en, ["Visual research state", "What next", "Risk matrix", "What we still do not know", "Checkpoint timeline", "Research boundary"]]] as const) {
+    for (const [markup, labels] of [[pl, ["Wizualny stan badawczy", "Co dalej", "Macierz ryzyk", "Czego nadal nie wiemy", "Oś punktów kontrolnych", "Granica badawcza"]], [en, ["Visual research state", "What next", "Risk matrix", "What we still do not know", "Checkpoint timeline", "Research boundary"]]] as const) {
       for (const label of labels) assert.match(markup, new RegExp(label));
       assert.match(markup, /ai-research-kpis/);
       assert.match(markup, /ai-next-map/);
@@ -77,6 +77,7 @@ describe("AI.1 Visual Candidate Research Canvas", () => {
     assert.match(en, /Data freshness<\/span><strong>Stale<\/strong>/);
     assert.match(en, /Basic filters<\/span><strong>Insufficient<\/strong>/);
     assert.match(en, /Data for filter assessment<\/span><strong>Sufficient<\/strong>/);
+    assert.doesNotMatch(pl, /\b(?:DATA_STALE|STALE|new|rejected_basic_filter|lifecycle|security|holder_concentration)\b/i);
   });
 
   it("prioritizes a fresh snapshot while keeping verification secondary and external links tertiary", () => {
@@ -91,10 +92,10 @@ describe("AI.1 Visual Candidate Research Canvas", () => {
       "Current stage", "New", "Data is stale and filters are not met", "Wait for a fresh snapshot",
       "Publication of new data and recalculation of filters",
     ]) assert.match(en, new RegExp(label));
+    assert.match(pl, /data-action-variant="primary"[^>]*>[\s\S]*?Poczekaj na świeżą migawkę/);
     assert.match(pl, /data-action-variant="secondary"[^>]*>[\s\S]*?Otwórz weryfikację źródłową/);
     assert.match(pl, /data-action-variant="tertiary"[^>]*>[\s\S]*?Otwórz DexScreener/);
     assert.match(pl, /data-action-variant="tertiary"[^>]*>[\s\S]*?Otwórz eksplorator/);
-    assert.doesNotMatch(pl, /data-action-variant="primary"/);
   });
 
   it("uses natural source labels and concrete missing-information copy without exposing raw refs", () => {
@@ -347,11 +348,13 @@ function buildSemanticReviewBrief(brief: AIResearchBrief, locale: ProductLocale)
     ["source_verification", pl ? "Brak weryfikacji źródłowej" : "Source verification missing", "scanner_snapshot"],
   ].map(([key, label, source_reference_id]) => ({ key, label, explanation: pl ? "Opis ogólny." : "Generic description.", source_reference_ids: [source_reference_id] }));
   result.next_actions = [{
-    action_type: "OPEN_VERIFICATION", label: pl ? "Otwórz weryfikację źródłową" : "Open source verification", priority: "primary", reason: "", target_type: "internal_route", target_reference: "#external-checks",
+    action_type: "WAIT_FOR_CHECKPOINT", label: pl ? "Poczekaj na świeżą migawkę" : "Wait for a fresh snapshot", priority: "primary", reason: "", target_type: "internal_route", target_reference: "#ai-research-checkpoints",
   }, {
-    action_type: "OPEN_DEXSCREENER", label: pl ? "Otwórz DexScreener" : "Open DexScreener", priority: "secondary", reason: "", target_type: "external_url", target_reference: "https://dexscreener.com/base/0x1111111111111111111111111111111111111111",
+    action_type: "OPEN_VERIFICATION", label: pl ? "Otwórz weryfikację źródłową" : "Open source verification", priority: "secondary", reason: "", target_type: "internal_route", target_reference: "#external-checks",
   }, {
-    action_type: "OPEN_EXPLORER", label: pl ? "Otwórz eksplorator" : "Open explorer", priority: "secondary", reason: "", target_type: "external_url", target_reference: "https://basescan.org/token/0x1111111111111111111111111111111111111111",
+    action_type: "OPEN_DEXSCREENER", label: pl ? "Otwórz DexScreener" : "Open DexScreener", priority: "tertiary", reason: "", target_type: "external_url", target_reference: "https://dexscreener.com/base/0x1111111111111111111111111111111111111111",
+  }, {
+    action_type: "OPEN_EXPLORER", label: pl ? "Otwórz eksplorator" : "Open explorer", priority: "tertiary", reason: "", target_type: "external_url", target_reference: "https://basescan.org/token/0x1111111111111111111111111111111111111111",
   }];
   result.source_references = [
     ["basic_filters", "basic_filters"], ["security_status", "security_status"], ["scanner_snapshot", "scanner_snapshot"],

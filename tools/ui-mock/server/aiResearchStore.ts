@@ -109,8 +109,9 @@ ORDER BY generated_at DESC LIMIT 1
       const rows = requireDb().prepare(`
 SELECT ai_analysis, status FROM crypto_ai_research_briefs
 WHERE chain = ? AND contract_address = ? AND locale = ?
+  AND prompt_version = ?
 ORDER BY generated_at DESC LIMIT 10
-`).all(chain, contractAddress, locale);
+`).all(chain, contractAddress, locale, AI_RESEARCH_PROMPT_VERSION);
       for (const row of rows) {
         const record = safeRecord(row);
         if (record) return record;

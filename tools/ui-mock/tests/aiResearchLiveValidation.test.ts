@@ -86,7 +86,7 @@ describe("AI.2 OpenAI client contract", () => {
     assert.equal("previous_response_id" in body, false);
     assert.equal("conversation" in body, false);
     assert.equal((body.text as { format: { type: string; name: string; strict: boolean } }).format.type, "json_schema");
-    assert.equal((body.text as { format: { type: string; name: string; strict: boolean } }).format.name, "ai_research_brief_v1");
+    assert.equal((body.text as { format: { type: string; name: string; strict: boolean } }).format.name, "ai_research_narrative_v2");
     assert.equal((body.text as { format: { type: string; name: string; strict: boolean } }).format.strict, true);
     assert.equal(result.request_id, "req_ai2_test");
     assert.deepEqual(result.token_usage, { prompt_tokens: 17, completion_tokens: 8, total_tokens: 25 });
@@ -208,6 +208,28 @@ describe("AI.2 live-one budget, cache and isolated store", () => {
     await assert.rejects(() => service.generate(request("pl", "ai2_validation_second_01"), "validation-session-2"), (error) => isErrorCode(error, "LIVE_CALL_BUDGET_EXHAUSTED"));
     assert.equal(calls, 1);
     assert.equal(store.liveCallBudgetUsage(), 1);
+    store.close();
+  });
+
+  it("does not issue an automatic repair call after semantic validation fails outside live-one", async () => {
+    const store = await createAIResearchStore({ databaseFilePath: resolve(root, "semantic-no-retry.sqlite") });
+    let calls = 0;
+    const invalidProvider: AIResearchProvider = {
+      mode: "OPENAI",
+      model: "configured-test-model",
+      async generate() {
+        calls += 1;
+        return {
+          raw_json: JSON.stringify({ narrative_version: "ai_research_narrative_v2", summary: "DATA_STALE" }),
+          model: "configured-test-model",
+          token_usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+        };
+      },
+    };
+    const service = createAIResearchService({ ...contextOptions(), provider: invalidProvider, providerConfig: config(), store, now: () => NOW });
+    await assert.rejects(() => service.generate(request("pl", "ai2_semantic_no_retry_01"), "semantic-session"), (error) => isErrorCode(error, "VALIDATION_FAILURE"));
+    assert.equal(calls, 1);
+    assert.equal(store.stats().records, 0);
     store.close();
   });
 
@@ -357,22 +379,21 @@ function request(locale: "pl" | "en", idempotencyKey: string) {
   return { chain: "base", contract_address: ADDRESS, locale, idempotency_key: idempotencyKey };
 }
 
-function draft(context: AIResearchContext) {
+function narrative(context: AIResearchContext) {
   const pl = context.locale === "pl";
   return {
-    schema_version: "ai_research_brief_v1" as const,
-    research_state: context.research_state,
+    narrative_version: "ai_research_narrative_v2" as const,
     summary: pl
       ? "Dane określają aktualny etap badawczy. Następny krok dotyczy wyłącznie dalszej weryfikacji."
       : "The data identifies the current research stage. The next step concerns further verification only.",
-    known_facts: context.fact_candidates.map((fact) => ({
-      ...fact,
+    fact_narratives: context.fact_candidates.map((fact) => ({
+      id: `fact:${fact.key}`,
       interpretation: pl ? "Wartość pochodzi z kontekstu produktu." : "The value comes from product context.",
     })),
-    risk_factors: context.risk_candidates,
-    missing_information: context.missing_information,
-    next_actions: context.action_catalog.slice(0, 3).map(({ action_type, reason }) => ({ action_type, reason })),
-    status_change_conditions: context.status_change_conditions,
+    risk_narratives: context.risk_candidates.map((risk, index) => ({ id: `risk:${index}`, explanation: risk.explanation })),
+    missing_narratives: context.missing_information.map((item) => ({ id: `missing:${item.key}`, explanation: item.explanation })),
+    action_narratives: context.action_catalog.map((action, index) => ({ id: `action:${index}`, reason: action.reason })),
+    status_change_narratives: context.status_change_conditions.map((condition) => ({ id: `condition:${condition.key}`, explanation: condition.explanation })),
   };
 }
 
@@ -380,14 +401,14 @@ function responsePayload(context: AIResearchContext) {
   return {
     id: "resp_test",
     object: "response",
-    output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(draft(context)) }] }],
+    output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(narrative(context)) }] }],
     usage: { input_tokens: 17, output_tokens: 8, total_tokens: 25 },
   };
 }
 
 function providerResult(context: AIResearchContext) {
   return {
-    raw_json: JSON.stringify(draft(context)),
+    raw_json: JSON.stringify(narrative(context)),
     model: "configured-test-model",
     token_usage: { prompt_tokens: 17, completion_tokens: 8, total_tokens: 25 },
     latency_ms: 12,

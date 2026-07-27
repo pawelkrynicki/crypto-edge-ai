@@ -21,6 +21,8 @@ import {
 } from "../src/types/aiResearchTypes.js";
 import type { FollowUpPublicEntry } from "../src/types/followUpTypes.js";
 import type { ScannerApiOutput, UiTokenCandidate } from "../src/types/scannerTypes.js";
+import { getAIResearchCapability } from "./aiResearchCapabilities.js";
+import { AI_RESEARCH_NARRATIVE_VERSION, aiResearchNarrativeId } from "./aiResearchNarrativeContract.js";
 import { readFollowUpList, readFollowUpStatus, type FollowUpApiOptions } from "./followUpApi.js";
 import { readLatestScannerOutput, type LatestScannerOutputOptions } from "./latestScannerOutput.js";
 import { readReportsList, type ReportsLibraryOptions } from "./reportsLibrary.js";
@@ -127,7 +129,7 @@ export async function buildAIResearchContext(
   const riskCandidates = buildRisks(candidate, followUp, freshness, locale);
   const coverage = buildCoverage(candidate, followUp, missingInformation, locale);
   const researchState = resolveResearchState(candidate, followUp, freshness, factCandidates.length);
-  const actionCatalog = buildActions(candidate, followUp, lifecycle, sourceReferences, locale);
+  const actionCatalog = resolveAIResearchActions(candidate, followUp, lifecycle, freshness, sourceReferences, locale);
   const statusChangeConditions = buildStatusConditions(candidate, followUp, lifecycle, freshness, locale);
   const canonicalInput = {
     identity: { chain: identity.chain, contract_address: identity.contract_address },
@@ -174,17 +176,34 @@ export async function buildAIResearchContext(
     coverage,
     checkpoints: lifecycle.checkpoints,
     provider_context: {
-      identity: { chain: identity.chain, contract_address: identity.contract_address },
+      contract_version: AI_RESEARCH_NARRATIVE_VERSION,
+      locale,
       project_fields_are_untrusted_data: { symbol, name },
-      machine_research_state: researchState,
-      lifecycle: canonicalInput.lifecycle,
-      known_fact_candidates: factCandidates,
-      risk_candidates: riskCandidates,
-      missing_information: missingInformation,
-      allowed_action_types: actionCatalog.map(({ action_type }) => action_type),
-      status_change_conditions: statusChangeConditions,
-      allowed_source_reference_ids: sourceReferences.map(({ id }) => id),
-      coverage,
+      deterministic_state_label: presentResearchState(researchState, locale),
+      narrative_targets: {
+        facts: factCandidates.map((fact) => ({
+          id: aiResearchNarrativeId("fact", fact.key),
+          label: fact.label,
+          value: presentFactValue(fact.key, fact.value, locale),
+        })),
+        risks: riskCandidates.map((risk, index) => ({
+          id: aiResearchNarrativeId("risk", index),
+          title: risk.title,
+          severity: presentRiskSeverity(risk.severity, locale),
+        })),
+        missing_information: missingInformation.map((item) => ({
+          id: aiResearchNarrativeId("missing", item.key),
+          label: item.label,
+        })),
+        actions: actionCatalog.map((action, index) => ({
+          id: aiResearchNarrativeId("action", index),
+          label: action.label,
+        })),
+        status_change_conditions: statusChangeConditions.map((condition) => ({
+          id: aiResearchNarrativeId("condition", condition.key),
+          label: condition.label,
+        })),
+      },
     },
   };
 }
@@ -213,7 +232,7 @@ function buildSources(
   }, {
     id: "security_status",
     source_type: "security_status",
-    label: locale === "pl" ? "Status security" : "Security status",
+    label: locale === "pl" ? "Status bezpieczeństwa" : "Security status",
     observed_at: candidate?.security?.checkedAt ?? followUp?.last_checked_at ?? null,
     completeness: candidate?.security
       ? candidate.security.coverageStatus ? "partial" : "complete"
@@ -233,15 +252,14 @@ function buildSources(
     observed_at: null,
     completeness: "complete",
     url: "#methodology",
-  }];
-  if (followUp) refs.push({
+  }, {
     id: "follow_up_checkpoints",
     source_type: "follow_up_checkpoint",
-    label: locale === "pl" ? "Checkpointy Follow-up" : "Follow-up checkpoints",
-    observed_at: followUp.last_checked_at,
-    completeness: followUp.missing_data.length > 0 ? "partial" : "complete",
+    label: locale === "pl" ? "Punkty kontrolne obserwacji" : "Observation checkpoints",
+    observed_at: followUp?.last_checked_at ?? null,
+    completeness: followUp ? (followUp.missing_data.length > 0 ? "partial" : "complete") : "unavailable",
     url: null,
-  });
+  }];
   const dexUrl = safeExternalUrl(candidate?.sourceUrl, new Set(["dexscreener.com", "www.dexscreener.com"]));
   if (dexUrl) refs.push({
     id: "dexscreener_link",
@@ -288,7 +306,7 @@ function buildFactCandidates(
   const metrics = marketMetrics(candidate, followUp);
   const facts: AIResearchFactCandidate[] = [{
     key: "lifecycle",
-    label: pl ? "Etap lifecycle" : "Lifecycle stage",
+    label: pl ? "Etap obserwacji" : "Observation stage",
     value: lifecycle.current_stage,
     source_reference_ids: followUp ? ["follow_up_checkpoints"] : ["scanner_snapshot"],
   }, {
@@ -333,11 +351,11 @@ function buildRisks(
   if (filterStatus === "rejected_basic_filter") add("high", "basic_filters", "Filtry niespełnione", "Filters not met", "Co najmniej jeden podstawowy warunek produktu nie jest spełniony.", "At least one basic product condition is not met.", ["basic_filters"]);
   else if (!filterStatus || filterStatus === "not_checked") add("unknown", "basic_filters", "Filtry bez wyniku", "Filters without a result", "Produkt nie posiada wyniku pozwalającego ocenić ten obszar.", "The product has no result that can assess this area.", ["basic_filters"]);
   const security = resolveSecurityCoverage(candidate, followUp);
-  if (security === "unavailable") add("unknown", "coverage_missing", "Brak pokrycia security", "Security coverage missing", "Produkt nie posiada danych pozwalających ocenić ten obszar.", "The product has no data that can assess this area.", ["security_status"]);
-  else if (security === "partial") add("unknown", "security", "Częściowe dane security", "Partial security data", "Pokrycie jest niepełne i wymaga ręcznej weryfikacji.", "Coverage is incomplete and requires manual verification.", ["security_status"]);
-  else if (candidate?.criticalReasons.length || candidate?.securityLabel.includes("CRITICAL")) add("high", "security", "Krytyczna flaga security", "Critical security flag", "Dane produktu zawierają krytyczną flagę wymagającą weryfikacji.", "Product data includes a critical flag that requires verification.", ["security_status"]);
+  if (security === "unavailable") add("unknown", "coverage_missing", "Brak danych bezpieczeństwa", "Security coverage missing", "Produkt nie posiada danych pozwalających ocenić ten obszar.", "The product has no data that can assess this area.", ["security_status"]);
+  else if (security === "partial") add("unknown", "security", "Częściowe dane o bezpieczeństwie", "Partial security data", "Pokrycie jest niepełne i wymaga ręcznej weryfikacji.", "Coverage is incomplete and requires manual verification.", ["security_status"]);
+  else if (candidate?.criticalReasons.length || candidate?.securityLabel.includes("CRITICAL")) add("high", "security", "Krytyczna flaga bezpieczeństwa", "Critical security flag", "Dane produktu zawierają krytyczną flagę wymagającą weryfikacji.", "Product data includes a critical flag that requires verification.", ["security_status"]);
   if (freshness === "STALE") add("unknown", "freshness", "Dane są nieaktualne", "Data is stale", "Aktualny stan wymaga świeższej migawki przed dalszą oceną.", "The current state needs a fresher snapshot before further assessment.", ["scanner_snapshot"]);
-  for (const flag of (candidate?.riskFlags ?? []).slice(0, 2)) add("high", "security_flag", boundedUntrustedText(flag, 80), boundedUntrustedText(flag, 80), "Flaga pochodzi z zapisanego statusu security i wymaga ręcznej interpretacji.", "The flag comes from the stored security status and needs manual interpretation.", ["security_status"]);
+  for (const _flag of (candidate?.riskFlags ?? []).slice(0, 2)) add("high", "security_flag", "Zapisana flaga kontroli bezpieczeństwa", "Recorded security check flag", "Flaga pochodzi z zapisanego statusu bezpieczeństwa i wymaga ręcznej interpretacji.", "The flag comes from the stored security status and needs manual interpretation.", ["security_status"]);
   if (risks.length === 0) add("low", "workflow", "Brak blokady procesu", "No workflow blocker", "Nie wykryto blokady procesu; nie oznacza to potwierdzenia bezpieczeństwa.", "No workflow blocker was detected; this does not confirm safety.", ["methodology"]);
   return risks.slice(0, 5);
 }
@@ -354,14 +372,18 @@ function buildMissing(
     ? "Produkt nie posiada danych pozwalających ocenić ten obszar."
     : "The product has no data that can assess this area.";
   const items: AIResearchMissingInformation[] = [];
-  const add = (key: string, plLabel: string, enLabel: string, refs: string[]) => items.push({ key, label: pl ? plLabel : enLabel, explanation: generic, source_reference_ids: refs });
-  if (resolveSecurityCoverage(candidate, followUp) === "unavailable") add("security", "Brak danych security", "Security data missing", ["security_status"]);
-  if (candidate?.security && candidate.security.top10WalletsPct === null) add("holder_concentration", "Brak koncentracji holderów", "Holder concentration missing", ["security_status"]);
-  if (!followUp || followUp.completed_checkpoints.length < 2) add("history", "Brak wystarczającej historii", "Insufficient history", followUp ? ["follow_up_checkpoints"] : ["scanner_snapshot"]);
-  if (!followUp?.next_check_at && followUp?.lifecycle_status !== "ESTABLISHED") add("next_checkpoint", "Brak kolejnego checkpointu", "Next checkpoint missing", followUp ? ["follow_up_checkpoints"] : ["scanner_snapshot"]);
-  if (freshness === "STALE" || freshness === "UNKNOWN") add("fresh_data", "Brak świeżych danych", "Fresh data missing", ["scanner_snapshot"]);
-  if (!candidate?.addressIdentityVerified) add("source_verification", "Brak weryfikacji źródłowej", "Source verification missing", ["scanner_snapshot"]);
-  if (!sources.some(({ source_type }) => source_type === "dexscreener" || source_type === "explorer")) add("verification_sources", "Brak wymaganych źródeł weryfikacyjnych", "Required verification sources missing", ["methodology"]);
+  const add = (key: string, plLabel: string, enLabel: string) => {
+    const capability = getAIResearchCapability(key);
+    if (!capability) return;
+    const refs = capability.source_reference_ids.filter((id) => sources.some((source) => source.id === id));
+    if (refs.length !== capability.source_reference_ids.length) return;
+    items.push({ key, label: pl ? plLabel : enLabel, explanation: generic, source_reference_ids: [...refs] });
+  };
+  if (resolveSecurityCoverage(candidate, followUp) === "unavailable") add("security", "Brak danych bezpieczeństwa", "Security data missing");
+  if (!followUp || followUp.completed_checkpoints.length < 2) add("history", "Brak wystarczającej historii", "Insufficient history");
+  if (!followUp?.next_check_at && followUp?.lifecycle_status !== "ESTABLISHED") add("next_checkpoint", "Brak kolejnego punktu kontrolnego", "Next checkpoint missing");
+  if (freshness === "STALE" || freshness === "UNKNOWN") add("fresh_data", "Brak świeżych danych", "Fresh data missing");
+  if (!candidate?.addressIdentityVerified) add("source_verification", "Brak weryfikacji źródłowej", "Source verification missing");
   return items.slice(0, 5);
 }
 
@@ -395,10 +417,11 @@ function buildCoverage(
   }];
 }
 
-function buildActions(
+export function resolveAIResearchActions(
   candidate: UiTokenCandidate | null,
   followUp: FollowUpPublicEntry | null,
   lifecycle: TokenLifecycleViewModel,
+  freshness: string,
   sources: AIResearchSourceReference[],
   locale: AIResearchLocale,
 ): AIResearchNextAction[] {
@@ -413,15 +436,20 @@ function buildActions(
     target_reference,
   });
   const security = resolveSecurityCoverage(candidate, followUp);
-  if (security !== "complete") add("OPEN_VERIFICATION", "Otwórz weryfikację źródłową", "Open source verification", "primary", "Uzupełnij lub porównaj niepełne dane ręcznie.", "Complete or compare incomplete data manually.", "internal_route", "#external-checks");
-  else if (lifecycle.owner_decision_required) add("OWNER_REVIEW", "Przegląd właściciela", "Owner review", "primary", "Etap wymaga oddzielnej decyzji właściciela.", "This stage requires a separate owner decision.", "internal_route", "#candidate-detail");
-  else if (lifecycle.next_checkpoint_at) add("WAIT_FOR_CHECKPOINT", "Poczekaj na checkpoint", "Wait for checkpoint", "primary", "Ponowna ocena powinna użyć następnego zapisanego checkpointu.", "Reassessment should use the next stored checkpoint.", "internal_route", "#ai-research-checkpoints");
+  const filters = candidate?.basicFilterStatus ?? followUp?.filter_status;
+  if (freshness === "STALE" || freshness === "UNKNOWN" || filters === "rejected_basic_filter") {
+    add("WAIT_FOR_CHECKPOINT", "Poczekaj na świeżą migawkę", "Wait for a fresh snapshot", "primary", "Najpierw poczekaj na najbliższy cykl danych, a następnie ponownie oblicz filtry.", "Wait for the next data cycle first, then recalculate the filters.", "internal_route", "#ai-research-checkpoints");
+  } else if (lifecycle.owner_decision_required) add("OWNER_REVIEW", "Przegląd właściciela", "Owner review", "primary", "Etap wymaga oddzielnej decyzji właściciela.", "This stage requires a separate owner decision.", "internal_route", "#candidate-detail");
+  else if (lifecycle.next_checkpoint_at) add("WAIT_FOR_CHECKPOINT", "Poczekaj na punkt kontrolny", "Wait for checkpoint", "primary", "Ponowna ocena powinna użyć następnego zapisanego punktu kontrolnego.", "Reassessment should use the next stored checkpoint.", "internal_route", "#ai-research-checkpoints");
   else add("RETURN_TO_RADAR", "Wróć do Radaru", "Return to Radar", "primary", "Kontynuuj obserwację w bieżącym etapie.", "Continue observing at the current stage.", "internal_route", "#candidate-results");
+  if (security !== "complete" || !candidate?.addressIdentityVerified) {
+    add("OPEN_VERIFICATION", "Otwórz weryfikację źródłową", "Open source verification", "secondary", "Uzupełnij lub porównaj niepełne dane ręcznie po ustaleniu aktualnego stanu.", "Complete or compare incomplete data manually after the current state is established.", "internal_route", "#external-checks");
+  }
   const dex = sources.find(({ source_type, url }) => source_type === "dexscreener" && url !== null);
-  if (dex?.url) add("OPEN_DEXSCREENER", "Otwórz DexScreener", "Open DexScreener", "secondary", "Porównaj bieżące dane w dozwolonym źródle.", "Compare current data in an allowlisted source.", "external_url", dex.url);
+  if (dex?.url) add("OPEN_DEXSCREENER", "Otwórz DexScreener", "Open DexScreener", "tertiary", "Porównaj bieżące dane w dozwolonym źródle.", "Compare current data in an allowlisted source.", "external_url", dex.url);
   const explorer = sources.find(({ source_type, url }) => source_type === "explorer" && url !== null);
-  if (explorer?.url) add("OPEN_EXPLORER", "Otwórz eksplorator", "Open explorer", "secondary", "Zweryfikuj kontrakt w eksploratorze sieci.", "Verify the contract in the network explorer.", "external_url", explorer.url);
-  if (followUp) add("REVIEW_CHECKPOINTS", "Przejrzyj checkpointy", "Review checkpoints", "tertiary", "Porównaj zapisane etapy obserwacji.", "Compare the stored observation stages.", "internal_route", "#candidate-detail");
+  if (explorer?.url) add("OPEN_EXPLORER", "Otwórz eksplorator", "Open explorer", "tertiary", "Zweryfikuj kontrakt w eksploratorze sieci.", "Verify the contract in the network explorer.", "external_url", explorer.url);
+  if (followUp) add("REVIEW_CHECKPOINTS", "Przejrzyj punkty kontrolne", "Review checkpoints", "tertiary", "Porównaj zapisane etapy obserwacji.", "Compare the stored observation stages.", "internal_route", "#candidate-detail");
   return result.slice(0, 4);
 }
 
@@ -435,7 +463,7 @@ function buildStatusConditions(
   const pl = locale === "pl";
   const items: AIResearchStatusChangeCondition[] = [];
   const add = (key: string, labelPl: string, labelEn: string, detailPl: string, detailEn: string, refs: string[]) => items.push({ key, label: pl ? labelPl : labelEn, explanation: pl ? detailPl : detailEn, source_reference_ids: refs });
-  if (lifecycle.next_checkpoint_at) add("next_checkpoint", "Pojawienie się następnego checkpointu", "Next checkpoint becomes available", "Nowy checkpoint pozwoli ponownie ocenić dane, ale nie gwarantuje zmiany etapu.", "A new checkpoint enables reassessment but does not guarantee a stage change.", ["follow_up_checkpoints"]);
+  if (lifecycle.next_checkpoint_at) add("next_checkpoint", "Pojawienie się następnego punktu kontrolnego", "Next checkpoint becomes available", "Nowy punkt kontrolny pozwoli ponownie ocenić dane, ale nie gwarantuje zmiany etapu.", "A new checkpoint enables reassessment but does not guarantee a stage change.", ["follow_up_checkpoints"]);
   if ((candidate?.basicFilterStatus ?? followUp?.filter_status) !== "passed_basic_filter") add("filter_thresholds", "Spełnienie progów filtrów", "Filter thresholds are met", "Zmiana metryk może zmienić wynik filtrów; nie oznacza automatycznej promocji.", "Metric changes may alter filter results; they do not mean automatic promotion.", ["basic_filters"]);
   if (freshness !== "FRESH") add("fresh_snapshot", "Dostępność świeżych danych", "Fresh data becomes available", "Świeża migawka może zmienić ocenę braków i ryzyk.", "A fresh snapshot may change the assessment of gaps and risks.", ["scanner_snapshot"]);
   if (lifecycle.owner_decision_required) add("owner_decision", "Decyzja właściciela", "Owner decision", "Decyzja jest oddzielna od analizy AI i nie jest automatyczna.", "The decision is separate from AI analysis and is not automatic.", ["established_membership"]);
@@ -500,6 +528,48 @@ function sameIdentity(chainA: string, addressA: string, chainB: string, addressB
   const left = resolveTokenIdentity(chainA, addressA);
   const right = resolveTokenIdentity(chainB, addressB);
   return left.status === "valid" && right.status === "valid" && left.key === right.key;
+}
+
+function presentResearchState(value: AIResearchState, locale: AIResearchLocale): string {
+  const labels: Record<AIResearchState, [string, string]> = {
+    INSUFFICIENT_DATA: ["Niewystarczające dane", "Insufficient data"],
+    BASIC_FILTERS_FAILED: ["Filtry niespełnione", "Filters not met"],
+    KEEP_OBSERVING: ["Kontynuuj obserwację", "Keep observing"],
+    MANUAL_VERIFICATION_REQUIRED: ["Wymagana ręczna weryfikacja", "Manual verification required"],
+    OWNER_DECISION_REQUIRED: ["Wymagana decyzja właściciela", "Owner decision required"],
+    ESTABLISHED_RESEARCH: ["Analiza Established", "Established research"],
+    DATA_STALE: ["Dane nieaktualne", "Data is stale"],
+  };
+  return labels[value][locale === "pl" ? 0 : 1];
+}
+
+function presentFactValue(key: string, value: AIResearchFactCandidate["value"], locale: AIResearchLocale): string | number | boolean | null {
+  if (typeof value !== "string") return value;
+  const labels: Record<string, [string, string]> = {
+    new: ["Nowe", "New"],
+    follow_up: ["Dalsza obserwacja", "Further observation"],
+    candidate: ["Kandydat do Established", "Established candidate"],
+    established: ["Główny Radar", "Main Radar"],
+    FRESH: ["Aktualne", "Current"],
+    DELAYED: ["Opóźnione", "Delayed"],
+    STALE: ["Dane nieaktualne", "Stale data"],
+    UNKNOWN: ["Niedostępne", "Unavailable"],
+    UNAVAILABLE: ["Niedostępne", "Unavailable"],
+    passed_basic_filter: ["Filtry spełnione", "Filters met"],
+    rejected_basic_filter: ["Filtry niespełnione", "Filters not met"],
+    not_checked: ["Nie sprawdzono", "Not checked"],
+  };
+  return labels[value]?.[locale === "pl" ? 0 : 1] ?? (key === "lifecycle" ? presentResearchState("KEEP_OBSERVING", locale) : value);
+}
+
+function presentRiskSeverity(value: AIResearchRiskFactor["severity"], locale: AIResearchLocale): string {
+  const labels = {
+    low: ["Niskie", "Low"],
+    medium: ["Średnie", "Medium"],
+    high: ["Wysokie", "High"],
+    unknown: ["Nieznane", "Unknown"],
+  } as const;
+  return labels[value][locale === "pl" ? 0 : 1];
 }
 
 export function stableJson(value: unknown): string {

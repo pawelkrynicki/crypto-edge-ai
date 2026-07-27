@@ -1,10 +1,12 @@
-# AI.2 — Controlled OpenAI Live Validation
+# AI.2C — Semantic quality boundary po pierwszym OpenAI live validation
 
 ## Cel i status
 
-AI.2 przygotowuje kontrolowaną ścieżkę pierwszej rzeczywistej analizy OpenAI dla aktualnego tokena widocznego w Candidate Detail. Implementacja nie uruchamia modelu automatycznie. Pierwszy płatny request wykonuje właściciel dopiero po review kodu, przez osobny parametr `--live-one` i jawne kliknięcie **Wygeneruj analizę AI**.
+Pierwsze kontrolowane wywołanie OpenAI zakończyło się technicznym sukcesem: `CALLS_USED=1`, `BRIEFS=1`, model `gpt-5-mini`, 1563 input tokens, 2081 output tokens, 3644 total tokens, latency 21183 ms, `validation=VALID`, `cache_hit=0`. AI.2C nie wykonuje kolejnego calla. Izolowany store pozostaje materiałem dowodowym.
 
-AI.2 nie zmienia kontraktu domenowego AI.1: pozostają `AIResearchProvider`, Responses API, `ai_research_brief_v1`, istniejący prompt version, bounded context, strict validation, fingerprint, cache, idempotency, rate limits, single-flight, last-known-good i zaakceptowany Visual Candidate Research Canvas. Model nie zmienia lifecycle, Follow-up ani Established Universe i nie generuje sygnałów BUY, SELL lub HOLD.
+Techniczna walidacja v1 przepuściła semantycznie wadliwy wynik: summary zawierało `DATA_STALE`, narracja kopiowała `new`, `STALE`, `rejected_basic_filter` oraz mieszała `lifecycle`, `security` i `holderów`; model dodał unsupported `holder_concentration` oparte błędnie na `security_status` i ustawił `OPEN_VERIFICATION` jako primary mimo deterministycznej potrzeby oczekiwania na świeżą migawkę. To jest dokładna przyczyna podniesienia promptu do `ai_research_prompt_v2`.
+
+AI.2C zachowuje Responses API, publiczny `ai_research_brief_v1`, fingerprint, cache, idempotency, rate limits, single-flight, last-known-good i zaakceptowany Canvas. Zmienia wyłącznie granicę odpowiedzialności: backend tworzy deterministic skeleton, model zwraca bounded narrative, a semantic quality gate sprawdza ich zgodność.
 
 ## Wymagana konfiguracja
 
@@ -67,11 +69,11 @@ Pojedynczy `responses.create` zawiera:
 - brak `previous_response_id` i conversation;
 - brak streamingu;
 - `text.format.type = "json_schema"`;
-- schema name `ai_research_brief_v1`;
-- istniejący JSON Schema;
+- schema name `ai_research_narrative_v2`;
+- prywatny JSON Schema zawierający wyłącznie summary i teksty przypięte do narrative IDs;
 - `strict: true`.
 
-Starszy `json_object` nie jest używany. Automatyczne retry SDK jest wyłączone. Normalny AI.1 może zachować jedną kontrolowaną próbę naprawy wyniku po walidacji, ale `--live-one` kończy się fail-closed po pierwszym błędnym wyniku i nigdy nie wykonuje płatnej próby naprawczej.
+Starszy `json_object` nie jest używany. Automatyczne retry SDK jest wyłączone. Błąd składni, polityki lub semantyki kończy się fail-closed po pierwszym wyniku we wszystkich trybach; backend nie uruchamia automatycznego requestu naprawczego.
 
 ## Twardy budżet jednego wywołania
 
@@ -103,23 +105,48 @@ Skrypt usuwa wyłącznie review SQLite oraz jego `-wal` i `-shm`. Nie zabija pro
 
 Cleanup zeruje również procesowy zapis zużytej próby. Nie należy go wykonywać po nieudanym pierwszym smoke tylko po to, aby uzyskać drugi call. Kolejna próba wymaga najpierw oceny błędu i osobnej decyzji właściciela.
 
+## Deterministic skeleton i bounded narrative
+
+Backend ustala `research_state`, etap obserwacji, wartości known facts, kategorie/severity/źródła ryzyk, obsługiwane braki, source reference IDs oraz pełną listę akcji z priority, targetami, URL i kolejnością. Model otrzymuje lokalizowane fakty oraz zamknięte identyfikatory i może zwrócić tylko:
+
+- summary;
+- interpretacje faktów;
+- wyjaśnienia ryzyk i braków;
+- powody akcji;
+- wyjaśnienia warunków zmiany stanu.
+
+Model nie ma pól pozwalających zmienić skeleton. Backend składa finalny `ai_research_brief_v1` dopiero po walidacji wszystkich narrative IDs i ich kolejności.
+
+## Capability registry
+
+Dozwolone braki to obecnie `security`, `history`, `next_checkpoint`, `fresh_data` i `source_verification`. Każdy ma dedykowany source reference i source type. `follow_up_checkpoints` istnieje w source catalog również jako `unavailable`, dzięki czemu brak historii lub kolejnego punktu kontrolnego ma właściwe źródło.
+
+`holder_concentration` nie jest wspieraną capability i nie może używać `security_status`: status bezpieczeństwa nie zawiera danych o koncentracji portfeli. AI.2C nie dodaje nowego providera holderów.
+
 ## Walidacja jakości po odpowiedzi
 
 Przed zapisem backend wymaga:
 
-- poprawnego JSON i exact keys zgodnych ze strict schema;
-- dozwolonych enumów, action types i research state;
-- identycznego deterministycznego lifecycle/research state jak w produkcie;
-- source reference IDs obecnych w wejściowym katalogu;
-- known facts skopiowanych dokładnie z kandydatów faktów w bounded context;
+- poprawnego JSON, exact keys oraz kompletnej, niezmienionej kolejności narrative IDs;
+- identycznego deterministycznego research state i etapu obserwacji jak w produkcie;
+- identycznych kluczy, etykiet, wartości i źródeł known facts;
+- identycznych kategorii, severity, tytułów i źródeł ryzyk;
+- capability każdego missing key, dedykowanego źródła oraz obecności reference ID w katalogu;
+- identycznych action types, labels, priority, targets, URL i kolejności względem resolvera;
 - braku nowych lub przeliczonych wartości liczbowych;
 - braku URL wygenerowanych przez model;
-- zgodności next action z serwerowym action catalog, freshness i filters;
+- braku raw enums, machine values, snake_case i mieszania języków w polach user-facing;
 - braku BUY, SELL, HOLD, rekomendacji transakcyjnej i safety claim;
 - braku automatycznej promocji lub zmiany lifecycle;
 - braku wykonania instrukcji w nazwie, symbolu, URL, raporcie lub tekście projektu.
 
-Niepoprawny wynik nie jest zapisywany. Last-known-good pozostaje nienaruszony, UI pokazuje fail-closed, a budżet live-one blokuje drugi płatny request.
+Niepoprawny wynik nie jest zapisywany. Last-known-good v2 pozostaje nienaruszony, UI pokazuje fail-closed, a backend nie wykonuje drugiego requestu. Guard działa na jawnie wybranych polach narracyjnych; nie stosuje globalnego replace do JSON.
+
+## Prompt v2 i cache separation
+
+Publiczny schema version pozostaje `ai_research_brief_v1`, natomiast `prompt_version` to `ai_research_prompt_v2`. Cache key i unikalność SQLite nadal obejmują prompt version. Stary brief v1 pozostaje w review store, lecz validator/reader v2 nie zwraca go jako aktualnego ani last-known-good v2. Nie ma migracji ani czyszczenia kanonicznego store.
+
+Offline regression fixture zawiera wyłącznie zanonimizowany, testowo istotny wycinek pierwszego wyniku. Nie zawiera API key, Authorization, request ID, sesji, lokalnej ścieżki, raw promptu ani niezwiązanego raw completion. Test potwierdza osobno: unsupported `holder_concentration`, błędne źródło, raw enum w summary, machine values w narracji i sprzeczny action priority. Companion fixture przechodzi ten sam semantic audit.
 
 ## Metryki owner review
 
@@ -137,9 +164,9 @@ Po poprawnym live call izolowany store zapisuje:
 
 Canvas pokazuje je w zwijanych **Szczegółach technicznych**. Request ID jest dostępny wyłącznie przez osobny loopback-only endpoint owner review i nie trafia do publicznego `AIResearchBrief`. Główne UI nie pokazuje raw odpowiedzi, promptu, input/output hashy, danych klucza ani wyliczonego kosztu USD. Koszt nie jest obliczany bez jawnej, wersjonowanej tabeli cenowej.
 
-## Owner acceptance pierwszego smoke
+## Wynik owner acceptance pierwszego smoke
 
-Po jednym poprawnym kliknięciu właściciel sprawdza:
+Pierwszy wynik spełnił techniczne kryteria transportu, Structured Outputs, usage i zapisu, lecz nie spełnił kryteriów semantycznych punktów 1–3. Po AI.2C kolejne wyniki muszą spełnić:
 
 1. Canvas opisuje wyłącznie rzeczywisty przekazany rekord i nie dopowiada braków.
 2. Lifecycle, research state, freshness, filters i next action zgadzają się z produktem.
@@ -154,10 +181,10 @@ Po błędzie należy zachować bazę do diagnozy, zapisać kod błędu, sprawdzi
 
 ## Dalsza kolejność
 
-1. AI.2A — bezpieczna ścieżka jednego live call.
-2. AI.2B — owner wykonuje jedną rzeczywistą analizę.
-3. AI.2C — ocena jakości, cache, czasu i token usage.
-4. AI.2D — maksymalnie 3–5 dodatkowych przypadków po osobnej zgodzie; nie przez samowolne zwiększenie budżetu pierwszego smoke.
+1. AI.2A — bezpieczna ścieżka jednego live call — zakończone.
+2. AI.2B — owner wykonuje jedną rzeczywistą analizę — zakończone (`CALLS_USED=1`, `BRIEFS=1`).
+3. AI.2C — semantic quality boundary, prompt v2 i regresja pierwszego wyniku — zakończone offline, bez nowego calla.
+4. AI.2D — maksymalnie 3–5 dodatkowych przypadków po osobnej zgodzie; nie przez czyszczenie lub samowolne zwiększenie budżetu pierwszego smoke.
 5. UI.3 — final user navigation, accessibility i cross-browser.
 6. INT.1 — AI KINTEL Integration Readiness Pack.
 7. Lokalna regresja i Release Candidate.

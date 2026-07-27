@@ -1,4 +1,4 @@
-# AI.1 + AI.2 — Visual Candidate Research Brief i Controlled OpenAI Validation
+# AI.1 + AI.2C — Visual Candidate Research Brief i semantic quality boundary
 
 ## Status i granica produktu
 
@@ -6,19 +6,19 @@ AI.1 dodaje do standalone Crypto Edge AI moduł **Analiza badawcza AI / AI Resea
 
 Domyślny provider to `DISABLED`. Samo wejście na ekran, odświeżenie widoku, zmiana języka, checkpoint i collector nigdy nie generują analizy. Generowanie jest możliwe wyłącznie po jawnym kliknięciu i tylko przez backend.
 
-AI.2 nie przebudowuje tego kontraktu. Dodaje owner-only ścieżkę pierwszego kontrolowanego live smoke z budżetem jednego wywołania, wyłączonym retry SDK, izolowanym store i metrykami technicznymi. Pełny runbook: `docs/ai_research_openai_live_validation.md`.
+AI.2 dodał owner-only ścieżkę pierwszego kontrolowanego live smoke z budżetem jednego wywołania, wyłączonym retry SDK, izolowanym store i metrykami technicznymi. AI.2C po pierwszym wyniku dodaje semantic quality boundary: deterministyczny skeleton backendu, capability registry, ograniczony kontrakt narracyjny i post-validation. Pełny runbook: `docs/ai_research_openai_live_validation.md`.
 
 ## Przepływ backendowy
 
 1. Frontend wysyła do same-origin API wyłącznie `chain`, `contract_address`, `locale` i `idempotency_key`.
 2. Backend normalizuje istniejącym resolverem tożsamość `chain + contract_address` i odnajduje kanoniczny rekord.
 3. Read-only adapter składa ograniczony kontekst ze scanner snapshotu, Follow-up, checkpointów FLOW.1, lifecycle, filtrów, security, Established membership, freshness, metryk, linków weryfikacyjnych, opcjonalnego raportu i wersji metodologii.
-4. Backend tworzy katalog faktów, ryzyk, braków, warunków, dozwolonych akcji i bezpiecznych source reference IDs. Dane projektu są traktowane jako niezaufane.
+4. Backend tworzy kompletny deterministyczny skeleton: state, fakty i wartości, ryzyka, obsługiwane braki, warunki, pełną kolejność akcji wraz z priority/targetami oraz bezpieczne source reference IDs. Dane projektu są traktowane jako niezaufane.
 5. Z kanonicznego wejścia wyliczany jest SHA-256 `snapshot_fingerprint`. Czas odczytu UI nie uczestniczy w fingerprintcie.
 6. Usługa najpierw szuka cache dla tożsamości, fingerprintu, `prompt_version`, języka i rodziny/modelu.
 7. Przy cache miss jawny POST przechodzi idempotency, trzy rate limity, single-flight i globalny semaphore.
-8. Adapter providera zwraca JSON Structured Output. Backend parsuje go, wykonuje ścisłą walidację i maksymalnie jedną kontrolowaną próbę naprawczą bez rozszerzania kontekstu.
-9. Backend mapuje dozwolone typy akcji na własne trasy lub allowlistowane URL, dopełnia metadane i hashe, a następnie atomowo zapisuje wyłącznie zwalidowany model.
+8. Adapter providera zwraca `ai_research_narrative_v2`: summary oraz teksty przypięte do zamkniętych identyfikatorów faktów, ryzyk, braków, akcji i warunków. Nie zwraca state, wartości, severity, źródeł, action types, priority, targetów ani URL.
+9. Backend składa narrację ze skeletonem, wykonuje semantic quality gate, dopełnia metadane i hashe, a następnie atomowo zapisuje wyłącznie zwalidowany model. Błąd nie uruchamia automatycznego drugiego requestu.
 10. Frontend otrzymuje bezpieczny model publiczny. Nie otrzymuje promptu, raw odpowiedzi, sekretów, lokalnych ścieżek, sesji ani lock metadata.
 
 Ten przepływ nie uruchamia DexScreener, GoPlus, Honeypot.is ani collectora. Brak informacji pozostaje widocznym brakiem, a nie domysłem modelu.
@@ -47,11 +47,11 @@ CRYPTO_EDGE_AI_RESEARCH_SESSION_SECRET=<sekret środowiska>
 CRYPTO_EDGE_AI_RESEARCH_SQLITE_PATH=<opcjonalna ścieżka SQLite>
 ```
 
-Model nie jest stałą domeny. `OPENAI_API_KEY` nie trafia do frontendowego bundla, modelu publicznego ani store. Adapter OpenAI używa Responses API, `store: false`, `background: false`, braku tools oraz strict JSON Schema. Oficjalny klient ma `maxRetries: 0`, bounded timeout i wyłączone logowanie SDK. Obecny `AIResearchUsageRecorder` zapisuje usage w briefie i jest no-op dla billingu. Budżet `1` jest wyłącznie ograniczeniem izolowanego owner review; inna ustawiona wartość failuje przed call’em.
+Model nie jest stałą domeny. `OPENAI_API_KEY` nie trafia do frontendowego bundla, modelu publicznego ani store. Adapter OpenAI używa Responses API, `store: false`, `background: false`, braku tools oraz strict JSON Schema `ai_research_narrative_v2`. Oficjalny klient ma `maxRetries: 0`, bounded timeout i wyłączone logowanie SDK. Obecny `AIResearchUsageRecorder` zapisuje usage w briefie i jest no-op dla billingu. Budżet `1` jest wyłącznie ograniczeniem izolowanego owner review; inna ustawiona wartość failuje przed call’em.
 
 ## Cache, single-flight i limity
 
-Klucz generacji obejmuje znormalizowaną tożsamość, fingerprint, prompt version, język i model. Unikalność SQLite pomija model zgodnie z kontraktem produktu: `identity + snapshot_fingerprint + prompt_version + locale`. Brak zmiany danych zwraca poprzednią analizę bez nowego wywołania. Zmiana danych oznacza poprzedni rekord jako `STALE`, ale go nie usuwa.
+Klucz generacji obejmuje znormalizowaną tożsamość, fingerprint, prompt version, język i model. Unikalność SQLite pomija model zgodnie z kontraktem produktu: `identity + snapshot_fingerprint + prompt_version + locale`. AI.2C używa `ai_research_prompt_v2`; rekordy v1 pozostają w SQLite, ale reader v2 ich nie zwraca. Brak zmiany danych zwraca poprzednią analizę v2 bez nowego wywołania. Zmiana danych oznacza poprzedni rekord jako `STALE`, ale go nie usuwa.
 
 Jedna instancja procesu dopuszcza najwyżej jedną aktywną generację dla klucza. Równoległe żądania czekają na ten sam Promise; inny token nie jest blokowany poza bounded globalnym semaphore. Lock jest zawsze zwalniany po błędzie.
 
@@ -70,17 +70,19 @@ Dedykowany SQLite znajduje się domyślnie w `tools/ui-mock/.local/ai-research-b
 
 Zapis obejmuje wersję, UUID analizy, znormalizowaną tożsamość, locale, fingerprint, prompt version, model, zwalidowany JSON, UTC timestamps, usage, input/output SHA-256 i stan `VALID|STALE`. Nie zapisuje promptu ani raw completion. Rekord render-preview jest odrzucany przez store. Przy uszkodzonym najnowszym rekordzie reader pomija go i szuka ostatniego poprawnego wpisu; poprawny last-known-good nie jest usuwany przez nieudaną regenerację.
 
-## Bezpieczeństwo promptu i odpowiedzi
+## Skeleton, capability registry i bezpieczeństwo odpowiedzi
 
-Prompt wymusza research-only, wyłącznie bounded context, jawne braki, autorytatywny maszynowy state, kopiowanie wartości faktów bez nowych obliczeń oraz brak zewnętrznej wiedzy. Nazwa, symbol, URL, raport i teksty projektu są oznaczone jako niezaufane dane, których instrukcji nie wolno wykonywać.
+Backend jest właścicielem state, etapu obserwacji, wartości faktów, kategorii i severity ryzyk, braków, source reference IDs oraz pełnej kolejności/priority/targetów akcji. Model dostaje lokalizowane fakty i zamknięte narrative IDs. Prompt wymusza research-only, wyłącznie bounded context, brak zewnętrznej wiedzy i zwrot samej narracji. Nazwa, symbol, raport i teksty projektu są oznaczone jako niezaufane dane, których instrukcji nie wolno wykonywać.
 
-Walidator fail-closed sprawdza exact keys, rozmiary, enumy, fakty względem wejścia, wszystkie source reference IDs, allowlistę URL i typów akcji, token usage, UTC, hashe i zabronione treści transakcyjne/safety claims. Model nigdy nie tworzy URL ani statusu. Maksymalnie jedna naprawa dotyczy wyłącznie błędu schematu lub polityki.
+Capability registry dopuszcza obecnie `security`, `history`, `next_checkpoint`, `fresh_data` i `source_verification`, każde z dedykowanym source reference ID oraz source type. `holder_concentration` jest celowo wyłączone: `security_status` nie potwierdza koncentracji holderów, a produkt nie ma osobnej capability ani providera tych danych.
+
+Walidator fail-closed sprawdza exact keys i kolejność narrative IDs, następnie zgodność złożonego briefu ze skeletonem: state, known facts, ryzyka, capabilities, wszystkie source reference IDs, akcje wraz z priority/targetami, token usage, UTC i hashe. Guard pól user-facing wykrywa raw enums, machine values, snake_case, mieszanie języków, nowe liczby i URL oraz zabronione treści transakcyjne/safety claims. Nie wykonuje globalnego replace na JSON. Przy błędzie nie ma zapisu ani automatycznej naprawy; last-known-good pozostaje nienaruszony.
 
 ## Visual Candidate Research Canvas
 
 Canvas jest deterministycznym React UI, nie treścią HTML/SVG/CSS generowaną przez model. Zawiera nagłówek tokena z lokalnym identiconem, sześć KPI, czteropolową macierz pokrycia, mapę „Co dalej”, macierz ryzyk, jawne „Czego nadal nie wiemy”, checkpointy 1/3/7/14/30, krótki brief, źródła i stałą granicę badawczą.
 
-Warstwa prezentacji rozdziela lifecycle od świeżości: „Etap badawczy” pokazuje `new`, `follow_up`, `candidate` lub `established` jako naturalne etykiety, a „Świeżość danych” osobno prezentuje stan aktualny, opóźniony, nieaktualny albo niedostępny. Wynik filtrów jest oddzielony od kompletności wejścia: KPI „Podstawowe filtry” pokazuje wystarczające/niewystarczające, natomiast komórka pokrycia „Dane do oceny filtrów” mówi wyłącznie, czy wynik można było obliczyć. Przy nieaktualnej migawce mapa „Co dalej” najpierw zaleca oczekiwanie na nowe dane; ręczna weryfikacja pozostaje secondary action, a DexScreener i eksplorator są tertiary external actions.
+Warstwa prezentacji rozdziela etap obserwacji od świeżości: „Etap badawczy” pokazuje wartości maszynowe jako naturalne etykiety, np. „Nowe”, a „Świeżość danych” osobno prezentuje „Aktualne”, „Opóźnione”, „Nieaktualne” albo „Niedostępne”. Wynik filtrów jest oddzielony od kompletności wejścia: KPI „Podstawowe filtry” pokazuje wystarczające/niewystarczające, natomiast komórka pokrycia „Dane do oceny filtrów” mówi wyłącznie, czy wynik można było obliczyć. Przy nieaktualnej migawce i niespełnionych filtrach deterministyczny resolver ustawia oczekiwanie na świeżą migawkę jako primary, ponowne obliczenie filtrów jako powód, weryfikację źródłową jako secondary oraz DexScreener i eksplorator jako tertiary external actions.
 
 Główny Canvas tłumaczy source reference IDs na naturalne etykiety PL/EN i pokazuje konkretne opisy każdej obsługiwanej luki. Surowe identyfikatory pozostają kontraktem maszynowym, nie copy użytkowym. Brak danych jest nadal stanem nieznanym, nigdy niskim ryzykiem. Linie siatki tła są celowo słabsze od obramowań paneli, aby zachować terminalowy charakter bez konkurowania z tekstem i tabelami.
 
@@ -112,6 +114,6 @@ scripts\win\start-ai-research-openai-review.cmd --live-one
 scripts\win\clear-ai-research-openai-review.cmd
 ```
 
-Pierwsza komenda utrzymuje provider `DISABLED`. Druga wymaga klucza i modelu, ale nadal nie wykonuje requestu przy starcie — pierwszy call następuje dopiero po kliknięciu ownera. Oba tryby używają `tools\ui-mock\.local\ai-research-openai-review.sqlite`; live-one rezerwuje jedną próbę atomowo także na wypadek błędu i nie uruchamia automatycznej naprawy. Cleanup usuwa tylko tę bazę oraz jej WAL/SHM i nie zatrzymuje procesów.
+Pierwsza komenda utrzymuje provider `DISABLED`. Druga wymaga klucza i modelu, ale nadal nie wykonuje requestu przy starcie — call następuje dopiero po kliknięciu ownera. Pierwszy budżet został już wykorzystany (`CALLS_USED=1`, `BRIEFS=1`), dlatego review store pozostaje materiałem dowodowym i nie należy go czyścić w celu ponowienia. Oba tryby używają `tools\ui-mock\.local\ai-research-openai-review.sqlite`; live-one rezerwuje jedną próbę atomowo także na wypadek błędu i nie uruchamia automatycznej naprawy. Cleanup usuwa tylko tę bazę oraz jej WAL/SHM i nie zatrzymuje procesów, ale nie jest częścią AI.2C.
 
 Rollback kodu polega na cofnięciu commitu AI.1. Operacyjny rollback polega na ustawieniu `CRYPTO_EDGE_AI_RESEARCH_PROVIDER=DISABLED`; odcina generowanie bez naruszania istniejących briefów. Osobny plik SQLite można zachować jako last-known-good lub po zatrzymaniu procesu przenieść do archiwum. Rollback nie wymaga zmian scanner snapshotu, lifecycle, Follow-up, Established, Feedback, VPS, Cloudflare ani Task Scheduler.

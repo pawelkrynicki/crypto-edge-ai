@@ -139,7 +139,7 @@ function isReviewMetrics(value: unknown): value is AIResearchReviewMetrics {
     && value.schema_version === "ai_research_review_metrics_v1"
     && typeof value.analysis_id === "string"
     && typeof value.model === "string"
-    && value.prompt_version === "ai_research_prompt_v1"
+    && value.prompt_version === "ai_research_prompt_v2"
     && typeof value.snapshot_fingerprint === "string"
     && typeof value.generated_at === "string"
     && typeof value.data_generated_at === "string"

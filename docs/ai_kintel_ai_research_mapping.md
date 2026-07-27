@@ -15,6 +15,14 @@ Standalone AI.1 pozostaje niezależny technologicznie, ale jego granice odpowiad
 | semaphore | PM2 analyzer worker concurrency | bounded worker pool i timeout |
 | no-op usage recorder | `insight_costs` + `token_pools` adapter | user i billing tylko z protected server context |
 
+AI.2C dodaje granicę, którą INT.1 musi zachować bez rozszerzania władzy modelu:
+
+- backendowy deterministic skeleton jest właścicielem state, facts, risks, missing capabilities, sources i actions;
+- provider zwraca tylko `ai_research_narrative_v2` przypięte do zamkniętych narrative IDs;
+- semantic quality gate porównuje złożony brief z kanonicznym kontekstem przed zapisem;
+- capability registry jest częścią domeny i nie może być zastąpione dowolnymi brakami wygenerowanymi przez model;
+- `ai_research_prompt_v2` pozostaje częścią cache key, a v1 nie jest aktualnym cache v2.
+
 ## Etykiety prezentacyjne
 
 AI KINTEL powinien zachować machine source reference IDs w danych i mapować je dopiero w warstwie prezentacji. Aktualne naturalne etykiety Canvasu:
@@ -29,6 +37,20 @@ AI KINTEL powinien zachować machine source reference IDs w danych i mapować je
 | `methodology` | Metodologia produktu | Product methodology |
 
 To mapowanie jest wyłącznie copy/view-model contractem. Nie zmienia `ai_research_brief_v1`, source reference IDs, store ani adapterów migracyjnych.
+
+Surowe wartości maszynowe mogą pozostać w modelu domenowym i szczegółach technicznych, ale główne UI mapuje je kontrolowanie: `DATA_STALE`/`STALE` → „Dane nieaktualne”, `new` → „Nowe”, `rejected_basic_filter` → „Filtry niespełnione”, `lifecycle` → „etap obserwacji”, `security` → „bezpieczeństwo”. To jest mapowanie pól, nie globalny replace JSON.
+
+## Capability mapping
+
+| Capability | Source reference | Reguła |
+|---|---|---|
+| `security` | `security_status` | wyłącznie brak wyniku kontroli bezpieczeństwa |
+| `history` | `follow_up_checkpoints` | niewystarczająca historia obserwacji |
+| `next_checkpoint` | `follow_up_checkpoints` | brak zapisanego następnego punktu kontrolnego |
+| `fresh_data` | `scanner_snapshot` | migawka nieaktualna lub niedostępna |
+| `source_verification` | `scanner_snapshot` | brak potwierdzonej tożsamości źródłowej |
+
+`holder_concentration` nie jest obsługiwane. Nie może być wyprowadzone ze `security_status`; przyszłe włączenie wymaga osobnej capability, kanonicznych danych i jawnego source reference.
 
 ## MySQL / Drizzle mapping
 
@@ -78,7 +100,7 @@ Cięższa generacja może działać w oddzielnym procesie `crypto-ai-research-an
 3. zwraca stan generowania albo czeka w ograniczonym czasie;
 4. odczytuje wyłącznie zwalidowany wynik.
 
-Analyzer ładuje bounded context po identity, wykonuje backendowy helper OpenAI, waliduje i zapisuje transakcyjnie. PM2 restart nie może pozostawić permanent lock; job musi mieć lease/timeout. Concurrency pozostaje bounded, a różne identity mogą działać niezależnie. Collector i analyzer to osobne procesy oraz osobne uprawnienia.
+Analyzer ładuje bounded context po identity, buduje deterministic skeleton, wykonuje backendowy helper OpenAI wyłącznie dla narracji, składa wynik, uruchamia semantic quality gate i zapisuje transakcyjnie. Błąd walidacji nie uruchamia automatycznego drugiego requestu. PM2 restart nie może pozostawić permanent lock; job musi mieć lease/timeout. Concurrency pozostaje bounded, a różne identity mogą działać niezależnie. Collector i analyzer to osobne procesy oraz osobne uprawnienia.
 
 ## Token billing mapping
 
@@ -93,6 +115,6 @@ Analyzer ładuje bounded context po identity, wykonuje backendowy helper OpenAI,
 
 ## Security i operacje
 
-Sekrety providera należą do procesu analyzera. Frontend i web response nie widzą klucza, promptu, raw completion ani cross-user context. Source refs i action targets nadal powstają na serwerze. Model pozostaje niewładny wobec lifecycle.
+Sekrety providera należą do procesu analyzera. Frontend i web response nie widzą klucza, promptu, raw completion ani cross-user context. Source refs, risk severity, missing capabilities i action priority/targets/order powstają na serwerze. Model pozostaje niewładny wobec etapu obserwacji i innych decyzji produktu.
 
 Przed integracją INT.1 trzeba zatwierdzić: auth boundary, transakcję billing/store, distributed lock, retention, observability bez sensitive payloads, migrations/rollback, PM2 health i retry policy. AI.1 nie dodaje obecnie MySQL, Drizzle, tRPC, Tailwind, shadcn, Radix, PM2 ani kodu monorepo KINTEL.

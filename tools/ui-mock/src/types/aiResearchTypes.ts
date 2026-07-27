@@ -1,5 +1,5 @@
 export const AI_RESEARCH_SCHEMA_VERSION = "ai_research_brief_v1" as const;
-export const AI_RESEARCH_PROMPT_VERSION = "ai_research_prompt_v1" as const;
+export const AI_RESEARCH_PROMPT_VERSION = "ai_research_prompt_v2" as const;
 
 export const AI_RESEARCH_STATES = [
   "INSUFFICIENT_DATA",

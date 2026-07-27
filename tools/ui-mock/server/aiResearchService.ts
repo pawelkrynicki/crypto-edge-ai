@@ -9,6 +9,7 @@ import {
   type AIResearchReviewMetricsLookup,
 } from "../src/types/aiResearchTypes.js";
 import { buildAIResearchContext, sha256, stableJson, type AIResearchContext, type AIResearchContextOptions } from "./aiResearchContext.js";
+import { AI_RESEARCH_NARRATIVE_VERSION, aiResearchNarrativeId } from "./aiResearchNarrativeContract.js";
 import {
   createAIResearchProvider,
   NOOP_AI_RESEARCH_USAGE_RECORDER,
@@ -17,7 +18,13 @@ import {
   type AIResearchProviderConfig,
   type AIResearchUsageRecorder,
 } from "./aiResearchProvider.js";
-import { AIResearchValidationError, parseAIResearchProviderDraft, validateStoredAIResearchBrief } from "./aiResearchSchema.js";
+import {
+  AIResearchValidationError,
+  assertAIResearchSemanticQuality,
+  parseAIResearchProviderNarrative,
+  validateStoredAIResearchBrief,
+  type AIResearchProviderNarrative,
+} from "./aiResearchSchema.js";
 import {
   createAIResearchStore,
   isAIResearchOpenAIReviewStorePath,
@@ -161,23 +168,15 @@ export function createAIResearchService(options: AIResearchServiceOptions = {}) 
           if (providerConfig.liveCallBudget && !store.reserveLiveCallBudget(providerConfig.liveCallBudget).allowed) {
             throw new AIResearchServiceError("LIVE_CALL_BUDGET_EXHAUSTED", 409, { cachedBrief: stale });
           }
-          let providerResult = await provider.generate(context);
-          let draft;
+          const providerResult = await provider.generate(context);
+          let narrative;
           try {
-            draft = parseAIResearchProviderDraft(providerResult.raw_json, context);
+            narrative = parseAIResearchProviderNarrative(providerResult.raw_json, context);
           } catch (error) {
             if (!(error instanceof AIResearchValidationError)) throw error;
-            if (providerConfig.liveCallBudget) {
-              throw new AIResearchServiceError("VALIDATION_FAILURE", 502, { cachedBrief: stale });
-            }
-            providerResult = await provider.generate(context, error.code);
-            try {
-              draft = parseAIResearchProviderDraft(providerResult.raw_json, context);
-            } catch {
-              throw new AIResearchServiceError("VALIDATION_FAILURE", 502, { cachedBrief: stale });
-            }
+            throw new AIResearchServiceError("VALIDATION_FAILURE", 502, { cachedBrief: stale });
           }
-          const brief = hydrateBrief(context, draft, providerResult.model, providerResult.token_usage, now(), false);
+          const brief = hydrateBrief(context, narrative, providerResult.model, providerResult.token_usage, now(), false);
           const metrics = providerConfig.liveCallBudget ? buildReviewMetrics(brief, providerResult) : undefined;
           const saved = store.save(brief, metrics).brief;
           await usageRecorder.record({
@@ -190,6 +189,9 @@ export function createAIResearchService(options: AIResearchServiceOptions = {}) 
           return saved;
         } catch (error) {
           if (error instanceof AIResearchServiceError) throw error;
+          if (error instanceof AIResearchValidationError) {
+            throw new AIResearchServiceError("VALIDATION_FAILURE", 502, { cachedBrief: stale });
+          }
           const code = isProviderCode(error) ? error.code : "PROVIDER_ERROR";
           throw new AIResearchServiceError(code === "INVALID_PROVIDER_RESPONSE" ? "PROVIDER_ERROR" : code, code === "PROVIDER_TIMEOUT" ? 504 : 502, { cachedBrief: stale });
         }
@@ -242,7 +244,7 @@ function buildReviewMetrics(
 
 function hydrateBrief(
   context: AIResearchContext,
-  draft: ReturnType<typeof parseAIResearchProviderDraft>,
+  narrative: AIResearchProviderNarrative,
   model: string,
   tokenUsage: AIResearchBrief["token_usage"],
   generatedAt: Date,
@@ -255,11 +257,6 @@ function hydrateBrief(
     locale: context.locale,
     model,
   }));
-  const actions = draft.next_actions.map((selection) => {
-    const mapped = context.action_catalog.find(({ action_type }) => action_type === selection.action_type);
-    if (!mapped) throw new AIResearchServiceError("VALIDATION_FAILURE", 502);
-    return { ...mapped, reason: selection.reason };
-  });
   const base = {
     schema_version: AI_RESEARCH_SCHEMA_VERSION,
     analysis_id: `air_${randomUUID()}`,
@@ -271,12 +268,27 @@ function hydrateBrief(
     generated_at: generatedAt.toISOString(),
     data_generated_at: context.data_generated_at,
     research_state: context.research_state,
-    summary: draft.summary,
-    known_facts: draft.known_facts,
-    risk_factors: draft.risk_factors,
-    missing_information: draft.missing_information,
-    next_actions: actions,
-    status_change_conditions: draft.status_change_conditions,
+    summary: narrative.summary,
+    known_facts: context.fact_candidates.map((fact, index) => ({
+      ...fact,
+      interpretation: narrative.fact_narratives[index]!.interpretation,
+    })),
+    risk_factors: context.risk_candidates.map((risk, index) => ({
+      ...risk,
+      explanation: narrative.risk_narratives[index]!.explanation,
+    })),
+    missing_information: context.missing_information.map((item, index) => ({
+      ...item,
+      explanation: narrative.missing_narratives[index]!.explanation,
+    })),
+    next_actions: context.action_catalog.map((action, index) => ({
+      ...action,
+      reason: narrative.action_narratives[index]!.reason,
+    })),
+    status_change_conditions: context.status_change_conditions.map((condition, index) => ({
+      ...condition,
+      explanation: narrative.status_change_narratives[index]!.explanation,
+    })),
     source_references: context.source_references,
     coverage: context.coverage,
     checkpoints: context.checkpoints,
@@ -285,28 +297,40 @@ function hydrateBrief(
     output_hash: "0".repeat(64),
     render_preview: renderPreview,
   } satisfies AIResearchBrief;
+  assertAIResearchSemanticQuality(base, context);
   const outputHash = sha256(stableJson(base));
   return validateStoredAIResearchBrief({ ...base, output_hash: outputHash });
 }
 
 export function buildDeterministicPreview(context: AIResearchContext, generatedAt = new Date()): AIResearchBrief {
   const pl = context.locale === "pl";
-  const draft = {
-    schema_version: AI_RESEARCH_SCHEMA_VERSION,
-    research_state: context.research_state,
+  const narrative: AIResearchProviderNarrative = {
+    narrative_version: AI_RESEARCH_NARRATIVE_VERSION,
     summary: pl
-      ? "Analiza porządkuje aktualną migawkę produktu i wskazuje najważniejsze luki wymagające dalszego sprawdzenia. Aktualny etap wynika z zapisanych danych i lifecycle, a nie z decyzji modelu."
-      : "The analysis organizes the current product snapshot and highlights the most important gaps for further review. The current stage comes from stored data and lifecycle, not from a model decision.",
-    known_facts: context.fact_candidates.map((fact) => ({
-      ...fact,
+      ? "Analiza porządkuje aktualną migawkę produktu i wskazuje najważniejsze luki wymagające dalszego sprawdzenia. Aktualny etap obserwacji wynika z zapisanych danych, a nie z decyzji modelu."
+      : "The analysis organizes the current product snapshot and highlights the most important gaps for further review. The current observation stage comes from stored data, not from a model decision.",
+    fact_narratives: context.fact_candidates.map((fact) => ({
+      id: aiResearchNarrativeId("fact", fact.key),
       interpretation: pl ? "Wartość pochodzi bezpośrednio z bieżącego kontekstu produktu." : "This value comes directly from the current product context.",
     })),
-    risk_factors: context.risk_candidates,
-    missing_information: context.missing_information,
-    next_actions: context.action_catalog.slice(0, 3).map(({ action_type, reason }) => ({ action_type, reason })),
-    status_change_conditions: context.status_change_conditions,
+    risk_narratives: context.risk_candidates.map((risk, index) => ({
+      id: aiResearchNarrativeId("risk", index),
+      explanation: risk.explanation,
+    })),
+    missing_narratives: context.missing_information.map((item) => ({
+      id: aiResearchNarrativeId("missing", item.key),
+      explanation: item.explanation,
+    })),
+    action_narratives: context.action_catalog.map((action, index) => ({
+      id: aiResearchNarrativeId("action", index),
+      reason: action.reason,
+    })),
+    status_change_narratives: context.status_change_conditions.map((condition) => ({
+      id: aiResearchNarrativeId("condition", condition.key),
+      explanation: condition.explanation,
+    })),
   };
-  return hydrateBrief(context, draft, "render-preview", { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }, generatedAt, true);
+  return hydrateBrief(context, narrative, "render-preview", { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }, generatedAt, true);
 }
 
 function lookup(
