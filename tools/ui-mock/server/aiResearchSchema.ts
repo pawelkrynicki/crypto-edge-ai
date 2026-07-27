@@ -174,6 +174,12 @@ export function parseAIResearchProviderDraft(raw: string, context: AIResearchCon
     if (!action) throw new AIResearchValidationError("FORBIDDEN_ACTION");
     return { action_type: action.action_type, reason: text(item.reason, 1, 280) };
   });
+  const actionIndexes = actions.map(({ action_type }) => context.action_catalog.findIndex((item) => item.action_type === action_type));
+  if (
+    actions[0]?.action_type !== context.action_catalog[0]?.action_type
+    || new Set(actionIndexes).size !== actionIndexes.length
+    || actionIndexes.some((index, position) => position > 0 && index <= actionIndexes[position - 1])
+  ) throw new AIResearchValidationError("FORBIDDEN_ACTION");
   const conditions = array(value.status_change_conditions, 0, 3).map((item) => {
     if (!isRecord(item) || !hasExactKeys(item, ["key", "label", "explanation", "source_reference_ids"])) fail();
     const condition = context.status_change_conditions.find(({ key }) => key === item.key);
@@ -183,7 +189,10 @@ export function parseAIResearchProviderDraft(raw: string, context: AIResearchCon
     return { ...condition, explanation: text(item.explanation, 1, 280), source_reference_ids: sourceIds };
   });
   if (conditions.length !== context.status_change_conditions.length || !sameSet(conditions.map(({ key }) => key), context.status_change_conditions.map(({ key }) => key))) fail();
-  assertNoForbiddenContent({ summary, knownFacts, risks, missing, actions, conditions });
+  const narrative = { summary, knownFacts, risks, missing, actions, conditions };
+  assertNoForbiddenContent(narrative);
+  assertNoGeneratedUrls(narrative);
+  assertNoInventedNumbers(narrative, context);
   return {
     schema_version: AI_RESEARCH_SCHEMA_VERSION,
     research_state: context.research_state,
@@ -334,8 +343,25 @@ function refs(value: unknown, context: AIResearchContext): string[] {
 
 function assertNoForbiddenContent(value: unknown): void {
   const content = JSON.stringify(value).normalize("NFKC");
-  const forbidden = /\b(?:buy|sell|trade|deposit|connect\s+wallet|kup|kupuj|sprzedaj|sprzedaż|wejdź\s+w\s+pozycj|safe|bezpieczn(?:y|a|e)|gwarantowan(?:y|a|e)|guaranteed\s+profit|prawdopodobn(?:y|a)\s+zwrot|investment\s+recommendation|rekomendacj[aą]\s+inwestycyjn[aą])\b/iu;
+  const forbidden = /\b(?:buy|sell|trade|hold|deposit|connect\s+wallet|kup|kupuj|sprzedaj|sprzedaż|trzymaj|wejdź\s+w\s+pozycj|safe|bezpieczn(?:y|a|e)|gwarantowan(?:y|a|e)|guaranteed\s+profit|prawdopodobn(?:y|a)\s+zwrot|investment\s+recommendation|rekomendacj[aą]\s+inwestycyjn[aą]|ignore\s+(?:all\s+)?previous|system\s+prompt|developer\s+message|prompt\s+injection|promot(?:e|es|ed|ing|ion)|promuj|awansuj)\b/iu;
   if (forbidden.test(content)) throw new AIResearchValidationError("FORBIDDEN_CONTENT");
+}
+
+function assertNoGeneratedUrls(value: unknown): void {
+  if (/(?:https?:\/\/|www\.|\b(?:[a-z0-9-]+\.)+(?:com|org|net|io|ai|app|dev|xyz|finance|exchange|co)\b)/iu.test(JSON.stringify(value))) {
+    throw new AIResearchValidationError("FORBIDDEN_CONTENT");
+  }
+}
+
+function assertNoInventedNumbers(value: unknown, context: AIResearchContext): void {
+  const allowed = new Set(numberTokens(stableJson(context)));
+  if (numberTokens(JSON.stringify(value)).some((token) => !allowed.has(token))) {
+    throw new AIResearchValidationError("UNKNOWN_FACT");
+  }
+}
+
+function numberTokens(value: string): string[] {
+  return [...value.matchAll(/[-+]?\d+(?:[.,]\d+)?%?/gu)].map(([token]) => token.replace(",", "."));
 }
 
 function isAllowedPublicUrl(value: string): boolean {

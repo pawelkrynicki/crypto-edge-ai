@@ -67,6 +67,16 @@ export function parseAIResearchQuery(urlValue: string | undefined): {
   return { chain: identity.chain, contract_address: identity.contract_address, locale };
 }
 
+export function parseAIResearchReviewMetricsQuery(urlValue: string | undefined): string {
+  let url: URL;
+  try { url = new URL(urlValue ?? "/", "http://local.invalid"); } catch { throw new AIResearchApiError("QUERY_INVALID", 400); }
+  const keys = [...url.searchParams.keys()].sort();
+  if (!sameKeys(keys, ["analysis_id"])) throw new AIResearchApiError("QUERY_INVALID", 400);
+  const analysisId = url.searchParams.get("analysis_id");
+  if (!analysisId || !/^air_[0-9a-f-]{36}$/.test(analysisId)) throw new AIResearchApiError("QUERY_INVALID", 400);
+  return analysisId;
+}
+
 export async function readAIResearchGenerateRequest(req: IncomingMessage): Promise<AIResearchGenerateRequest> {
   requireAIResearchPostRequest(req);
   const chunks: Buffer[] = [];

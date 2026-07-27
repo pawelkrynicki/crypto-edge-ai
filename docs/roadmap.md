@@ -1,21 +1,23 @@
 # Roadmap
 
-## Current stage: AI.1 — Visual Candidate Research Brief
+## Current stage: AI.2 — Controlled OpenAI Live Validation
 
-AI.1 dodaje generowaną wyłącznie na żądanie, research-only Analizę badawczą AI. Backend buduje bounded context z istniejących danych, wylicza fingerprint, sprawdza współdzielony cache, egzekwuje idempotency/rate limit/single-flight i zapisuje wyłącznie zwalidowany `ai_research_brief_v1` w oddzielnym SQLite. Frontend korzysta tylko z same-origin API i renderuje deterministyczny Visual Candidate Research Canvas. Domyślny provider pozostaje `DISABLED`; etap nie uruchamia OpenAI, providerów danych, collectora ani mutacji lifecycle.
+AI.1 dostarczył generowaną na żądanie, research-only Analizę badawczą AI. AI.2 zachowuje cały ten kontrakt i dodaje bezpieczną ścieżkę pierwszego owner-run: provider domyślnie `DISABLED`, osobny store `ai-research-openai-review.sqlite`, wymagany model i klucz z environment, Responses API z `store: false`, `background: false`, strict Structured Outputs, `maxRetries: 0` i atomowym budżetem jednego call’a. Start i nawigacja wykonują 0 calls; pierwszy płatny request następuje dopiero po jawnym kliknięciu ownera. Implementacja i testy Codexa nie wykonują live call.
 
 Kanoniczna kolejność:
 
-1. AI.1 — Visual Candidate Research Brief.
-2. UI.3 — accessibility i cross-browser.
-3. INT.1 — AI KINTEL Integration Readiness Pack.
-4. Lokalna regresja i Release Candidate.
-5. Finalny standalone deployment na VPS.
-6. Cloudflare, scheduler, smoke i rollback.
-7. Sesja testera i poprawki P0.
-8. Freeze do 15.08.
+1. AI.2A — bezpieczna ścieżka jednego live call.
+2. AI.2B — owner wykonuje jedną rzeczywistą analizę.
+3. AI.2C — ocena jakości, cache, czasu i token usage.
+4. AI.2D — maksymalnie 3–5 dodatkowych przypadków po osobnej zgodzie.
+5. UI.3 — final user navigation, accessibility i cross-browser.
+6. INT.1 — AI KINTEL Integration Readiness Pack.
+7. Lokalna regresja i Release Candidate.
+8. Finalny deployment VPS i produkcyjna konfiguracja OpenAI.
+9. Cloudflare, scheduler, smoke i rollback.
+10. Tester i freeze do 15.08.
 
-Kontrakty: `docs/ai_research_brief.md`, `docs/ai_research_brief_schema.md` i `docs/ai_kintel_ai_research_mapping.md`.
+Kontrakty: `docs/ai_research_brief.md`, `docs/ai_research_openai_live_validation.md`, `docs/ai_research_brief_schema.md` i `docs/ai_kintel_ai_research_mapping.md`.
 
 ## Current stage: UX.1 — Global Interaction Affordance Pass
 

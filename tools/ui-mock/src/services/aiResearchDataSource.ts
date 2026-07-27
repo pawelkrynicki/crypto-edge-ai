@@ -7,6 +7,8 @@ import {
   type AIResearchGenerateRequest,
   type AIResearchLocale,
   type AIResearchProviderStatus,
+  type AIResearchReviewMetrics,
+  type AIResearchReviewMetricsLookup,
 } from "../types/aiResearchTypes";
 
 export class AIResearchDataSourceError extends Error {
@@ -75,6 +77,20 @@ export async function generateAIResearchBrief(
   return value;
 }
 
+export async function loadAIResearchReviewMetrics(
+  analysisId: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<AIResearchReviewMetrics | null> {
+  const query = new URLSearchParams({ analysis_id: analysisId });
+  const response = await fetchImpl(`/api/ai-research/review-metrics?${query}`, {
+    headers: { accept: "application/json" },
+    credentials: "same-origin",
+  });
+  if (!response.ok) return null;
+  const value: unknown = await response.json();
+  return isReviewMetricsLookup(value) ? value.metrics : null;
+}
+
 function createIdempotencyKey(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
   return `ui_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 18)}`;
@@ -106,7 +122,34 @@ function isLookup(value: unknown): value is AIResearchBriefLookup {
     && (value.provider_mode === "DISABLED" || value.provider_mode === "OPENAI")
     && (value.brief === null || isBrief(value.brief))
     && (value.retry_after_seconds === null || typeof value.retry_after_seconds === "number")
-    && (value.error_code === null || typeof value.error_code === "string");
+    && (value.error_code === null || typeof value.error_code === "string")
+    && (value.generation_blocked_reason === undefined
+      || value.generation_blocked_reason === null
+      || ["LIVE_CALL_BUDGET_EXHAUSTED", "LIVE_CALL_BUDGET_INVALID", "REVIEW_STORE_REQUIRED"].includes(String(value.generation_blocked_reason)));
+}
+
+function isReviewMetricsLookup(value: unknown): value is AIResearchReviewMetricsLookup {
+  return isRecord(value)
+    && value.schema_version === "ai_research_review_metrics_lookup_v1"
+    && (value.metrics === null || isReviewMetrics(value.metrics));
+}
+
+function isReviewMetrics(value: unknown): value is AIResearchReviewMetrics {
+  return isRecord(value)
+    && value.schema_version === "ai_research_review_metrics_v1"
+    && typeof value.analysis_id === "string"
+    && typeof value.model === "string"
+    && value.prompt_version === "ai_research_prompt_v1"
+    && typeof value.snapshot_fingerprint === "string"
+    && typeof value.generated_at === "string"
+    && typeof value.data_generated_at === "string"
+    && typeof value.latency_ms === "number"
+    && typeof value.prompt_tokens === "number"
+    && typeof value.output_tokens === "number"
+    && typeof value.total_tokens === "number"
+    && value.cache_hit === false
+    && value.validation_status === "VALID"
+    && (value.request_id === null || typeof value.request_id === "string");
 }
 
 function isBrief(value: unknown): value is AIResearchBrief {

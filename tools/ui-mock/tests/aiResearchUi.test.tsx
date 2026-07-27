@@ -14,7 +14,7 @@ import { CandidateDetailView } from "../src/components/CandidateDetailView.js";
 import { ExternalVerificationLinksView } from "../src/components/ExternalVerificationLinksView.js";
 import { PERSISTABLE_SCANNER_SAMPLE } from "../src/fixtures/persistableScannerSample.js";
 import { ProductLocaleProvider, type ProductLocale } from "../src/productI18n.js";
-import type { AIResearchBrief, AIResearchBriefLookup } from "../src/types/aiResearchTypes.js";
+import type { AIResearchBrief, AIResearchBriefLookup, AIResearchReviewMetrics } from "../src/types/aiResearchTypes.js";
 
 void React;
 
@@ -205,6 +205,70 @@ describe("AI.1 responsive and accessibility contracts", () => {
     assert.match(launcher, /start-product-radar-review\.cmd" --candidate-detail/);
     assert.match(launcher, /OpenAI calls: 0/);
     assert.doesNotMatch(launcher, /collect:internal-beta|scanner:persist:live|CRYPTO_EDGE_AI_RESEARCH_PROVIDER=OPENAI|^\s*call .*--apply/im);
+  });
+});
+
+describe("AI.2 controlled OpenAI owner review UI", () => {
+  it("shows OpenAI provenance and owner-only technical metrics without a preview badge or raw payload", () => {
+    const brief = { ...semanticBriefPl, render_preview: false, model: "configured-test-model" };
+    const metrics: AIResearchReviewMetrics = {
+      schema_version: "ai_research_review_metrics_v1",
+      analysis_id: brief.analysis_id,
+      model: brief.model,
+      prompt_version: brief.prompt_version,
+      snapshot_fingerprint: brief.snapshot_fingerprint,
+      generated_at: brief.generated_at,
+      data_generated_at: brief.data_generated_at,
+      latency_ms: 432,
+      prompt_tokens: brief.token_usage.prompt_tokens,
+      output_tokens: brief.token_usage.completion_tokens,
+      total_tokens: brief.token_usage.total_tokens,
+      cache_hit: false,
+      validation_status: "VALID",
+      request_id: "req_owner_review_123",
+    };
+    const canvas = render("pl", <AIResearchBriefCanvas brief={brief} symbol="SCOOBERT" name="Scoobert" reviewMetrics={metrics} />);
+    assert.match(canvas, /Szczegóły techniczne/);
+    assert.match(canvas, /req_owner_review_123/);
+    assert.match(canvas, /432 ms/);
+    assert.match(canvas, /Fingerprint snapshotu/);
+    assert.doesNotMatch(canvas, /Podgląd formatu|raw prompt|raw completion|cost USD/i);
+
+    const section = render("pl", <AIResearchSection chain="base" contractAddress={ADDRESS} symbol="SCOOBERT" name="Scoobert" initialLookup={{
+      schema_version: "ai_research_lookup_v1",
+      availability: "READY",
+      provider_mode: "OPENAI",
+      brief,
+      retry_after_seconds: null,
+      error_code: null,
+    }} />);
+    assert.match(section, /Analiza wygenerowana przez OpenAI/);
+  });
+
+  it("keeps generation disabled after the live-one budget is consumed while preserving cache access", () => {
+    const absent = render("pl", <AIResearchSection chain="base" contractAddress={ADDRESS} symbol="SCOOBERT" name="Scoobert" initialLookup={{
+      schema_version: "ai_research_lookup_v1",
+      availability: "ABSENT",
+      provider_mode: "OPENAI",
+      brief: null,
+      retry_after_seconds: null,
+      error_code: null,
+      generation_blocked_reason: "LIVE_CALL_BUDGET_EXHAUSTED",
+    }} />);
+    assert.match(absent, /Limit jednego płatnego wywołania został wykorzystany/);
+    assert.match(absent, /<button[^>]*disabled=""[^>]*>Wygeneruj analizę AI<\/button>/);
+
+    const stale = render("pl", <AIResearchSection chain="base" contractAddress={ADDRESS} symbol="SCOOBERT" name="Scoobert" initialLookup={{
+      schema_version: "ai_research_lookup_v1",
+      availability: "STALE",
+      provider_mode: "OPENAI",
+      brief: { ...semanticBriefPl, render_preview: false },
+      retry_after_seconds: null,
+      error_code: null,
+      generation_blocked_reason: "LIVE_CALL_BUDGET_EXHAUSTED",
+    }} />);
+    assert.match(stale, /Otwórz analizę AI/);
+    assert.match(stale, /<button[^>]*disabled=""[^>]*>Zaktualizuj analizę AI<\/button>/);
   });
 });
 

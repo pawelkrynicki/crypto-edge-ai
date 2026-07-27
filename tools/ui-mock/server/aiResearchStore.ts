@@ -1,9 +1,9 @@
 import { mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, isAbsolute, resolve } from "node:path";
+import { basename, dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
-import type { AIResearchBrief, AIResearchLocale } from "../src/types/aiResearchTypes.js";
+import type { AIResearchBrief, AIResearchLocale, AIResearchReviewMetrics } from "../src/types/aiResearchTypes.js";
 import { AI_RESEARCH_PROMPT_VERSION, AI_RESEARCH_SCHEMA_VERSION } from "../src/types/aiResearchTypes.js";
 import { validateStoredAIResearchBrief } from "./aiResearchSchema.js";
 
@@ -52,6 +52,10 @@ export function getDefaultAIResearchStorePath(): string {
   return DEFAULT_DATABASE_PATH;
 }
 
+export function isAIResearchOpenAIReviewStorePath(value: string): boolean {
+  return basename(resolve(value)).toLowerCase() === "ai-research-openai-review.sqlite";
+}
+
 export function resolveAIResearchDatabasePath(value?: string): string {
   const configured = value?.trim() || process.env.CRYPTO_EDGE_AI_RESEARCH_SQLITE_PATH?.trim();
   if (configured) return isAbsolute(configured) ? resolve(configured) : resolve(RUNTIME_ROOT, configured);
@@ -62,6 +66,7 @@ export function resolveAIResearchDatabasePath(value?: string): string {
 
 export async function createAIResearchStore(options: AIResearchStoreOptions = {}) {
   const databaseFilePath = resolveAIResearchDatabasePath(options.databaseFilePath);
+  const reviewStore = isAIResearchOpenAIReviewStorePath(databaseFilePath);
   const maxRecords = boundedInteger(options.maxRecords, DEFAULT_MAX_RECORDS, 1, 50_000);
   const busyTimeoutMs = boundedInteger(options.busyTimeoutMs, 5_000, 100, 60_000);
   let database: SqliteDatabase | null = null;
@@ -69,7 +74,7 @@ export async function createAIResearchStore(options: AIResearchStoreOptions = {}
     mkdirSync(dirname(databaseFilePath), { recursive: true });
     const sqlite = await loadNodeSqlite();
     database = new sqlite.DatabaseSync(databaseFilePath);
-    migrate(database, busyTimeoutMs);
+    migrate(database, busyTimeoutMs, reviewStore);
     assertSchema(database);
   } catch {
     try { database?.close(); } catch { /* preserve safe store failure */ }
@@ -113,8 +118,10 @@ ORDER BY generated_at DESC LIMIT 10
       return null;
     },
 
-    save(brief: AIResearchBrief): { created: boolean; brief: AIResearchBrief } {
+    save(brief: AIResearchBrief, reviewMetrics?: AIResearchReviewMetrics): { created: boolean; brief: AIResearchBrief } {
       const validated = validateStoredAIResearchBrief(brief);
+      const validatedMetrics = reviewMetrics ? validateReviewMetrics(reviewMetrics, validated) : null;
+      if (validatedMetrics && !reviewStore) throw new AIResearchStoreError("STORE_SCHEMA_INVALID");
       if (validated.render_preview) throw new AIResearchStoreError("STORE_SCHEMA_INVALID");
       const db = requireDb();
       db.exec("BEGIN IMMEDIATE TRANSACTION");
@@ -177,6 +184,18 @@ INSERT INTO crypto_ai_research_briefs (
           validated.generated_at,
           validated.generated_at,
         );
+        if (validatedMetrics) {
+          db.prepare(`
+INSERT INTO crypto_ai_research_review_metrics (
+  analysis_id, latency_ms, request_id, validation_status, cache_hit, created_at
+) VALUES (?, ?, ?, 'VALID', 0, ?)
+`).run(
+            validatedMetrics.analysis_id,
+            validatedMetrics.latency_ms,
+            validatedMetrics.request_id,
+            validatedMetrics.generated_at,
+          );
+        }
         db.exec("COMMIT");
         return { created: true, brief: validated };
       } catch (error) {
@@ -200,13 +219,57 @@ FROM crypto_ai_research_briefs
       }
     },
 
+    findReviewMetrics(analysisId: string): AIResearchReviewMetrics | null {
+      if (!reviewStore) return null;
+      if (!/^air_[0-9a-f-]{36}$/.test(analysisId)) return null;
+      const row = requireDb().prepare(`
+SELECT b.analysis_id, b.model, b.prompt_version, b.snapshot_fingerprint,
+  b.generated_at, b.data_generated_at, b.prompt_tokens, b.completion_tokens,
+  b.total_tokens, m.latency_ms, m.request_id, m.validation_status, m.cache_hit
+FROM crypto_ai_research_briefs b
+JOIN crypto_ai_research_review_metrics m ON m.analysis_id = b.analysis_id
+WHERE b.analysis_id = ? LIMIT 1
+`).get(analysisId);
+      return parseReviewMetrics(row);
+    },
+
+    liveCallBudgetUsage(): number {
+      if (!reviewStore) return 0;
+      const row = requireDb().prepare("SELECT calls_used FROM crypto_ai_research_live_call_budget WHERE id = 1").get();
+      return readCount(row, "calls_used");
+    },
+
+    reserveLiveCallBudget(limit: 1): { allowed: boolean; used: number } {
+      if (!reviewStore) throw new AIResearchStoreError("STORE_SCHEMA_INVALID");
+      const db = requireDb();
+      db.exec("BEGIN IMMEDIATE TRANSACTION");
+      try {
+        const used = readCount(db.prepare("SELECT calls_used FROM crypto_ai_research_live_call_budget WHERE id = 1").get(), "calls_used");
+        if (used >= limit) {
+          db.exec("COMMIT");
+          return { allowed: false, used };
+        }
+        const updatedAt = new Date().toISOString();
+        db.prepare(`
+INSERT INTO crypto_ai_research_live_call_budget (id, calls_used, updated_at)
+VALUES (1, 1, ?)
+ON CONFLICT(id) DO UPDATE SET calls_used = calls_used + 1, updated_at = excluded.updated_at
+`).run(updatedAt);
+        db.exec("COMMIT");
+        return { allowed: true, used: used + 1 };
+      } catch {
+        try { db.exec("ROLLBACK"); } catch { /* preserve safe store failure */ }
+        throw new AIResearchStoreError("STORE_UNAVAILABLE");
+      }
+    },
+
     close(): void {
       try { database?.close(); } finally { database = null; }
     },
   };
 }
 
-function migrate(database: SqliteDatabase, busyTimeoutMs: number): void {
+function migrate(database: SqliteDatabase, busyTimeoutMs: number, reviewStore: boolean): void {
   database.exec(`PRAGMA busy_timeout = ${busyTimeoutMs}`);
   database.exec("PRAGMA journal_mode = WAL");
   database.exec("PRAGMA synchronous = FULL");
@@ -242,6 +305,23 @@ CREATE INDEX IF NOT EXISTS idx_ai_research_snapshot ON crypto_ai_research_briefs
 CREATE INDEX IF NOT EXISTS idx_ai_research_status ON crypto_ai_research_briefs(status);
 PRAGMA user_version = 1;
 `);
+  if (!reviewStore) return;
+  database.exec(`
+CREATE TABLE IF NOT EXISTS crypto_ai_research_review_metrics (
+  analysis_id TEXT PRIMARY KEY REFERENCES crypto_ai_research_briefs(analysis_id) ON DELETE CASCADE,
+  latency_ms INTEGER NOT NULL CHECK (latency_ms >= 0),
+  request_id TEXT,
+  validation_status TEXT NOT NULL CHECK (validation_status = 'VALID'),
+  cache_hit INTEGER NOT NULL CHECK (cache_hit = 0),
+  created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS crypto_ai_research_live_call_budget (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  calls_used INTEGER NOT NULL CHECK (calls_used >= 0),
+  updated_at TEXT NOT NULL
+);
+PRAGMA user_version = 2;
+`);
 }
 
 function assertSchema(database: SqliteDatabase): void {
@@ -271,6 +351,60 @@ function parseBrief(raw: string): AIResearchBrief | null {
 
 function cacheHash(brief: AIResearchBrief): string {
   return brief.input_hash;
+}
+
+function validateReviewMetrics(value: AIResearchReviewMetrics, brief: AIResearchBrief): AIResearchReviewMetrics {
+  if (value.schema_version !== "ai_research_review_metrics_v1"
+    || value.analysis_id !== brief.analysis_id
+    || value.model !== brief.model
+    || value.prompt_version !== brief.prompt_version
+    || value.snapshot_fingerprint !== brief.snapshot_fingerprint
+    || value.generated_at !== brief.generated_at
+    || value.data_generated_at !== brief.data_generated_at
+    || !Number.isSafeInteger(value.latency_ms)
+    || value.latency_ms < 0
+    || value.prompt_tokens !== brief.token_usage.prompt_tokens
+    || value.output_tokens !== brief.token_usage.completion_tokens
+    || value.total_tokens !== brief.token_usage.total_tokens
+    || value.cache_hit !== false
+    || value.validation_status !== "VALID"
+    || (value.request_id !== null && !/^[A-Za-z0-9._-]{1,200}$/.test(value.request_id))) {
+    throw new AIResearchStoreError("STORE_SCHEMA_INVALID");
+  }
+  return value;
+}
+
+function parseReviewMetrics(value: unknown): AIResearchReviewMetrics | null {
+  if (!isRecord(value)
+    || typeof value.analysis_id !== "string"
+    || typeof value.model !== "string"
+    || value.prompt_version !== AI_RESEARCH_PROMPT_VERSION
+    || typeof value.snapshot_fingerprint !== "string"
+    || typeof value.generated_at !== "string"
+    || typeof value.data_generated_at !== "string"
+    || typeof value.latency_ms !== "number"
+    || typeof value.prompt_tokens !== "number"
+    || typeof value.completion_tokens !== "number"
+    || typeof value.total_tokens !== "number"
+    || value.validation_status !== "VALID"
+    || value.cache_hit !== 0
+    || (value.request_id !== null && typeof value.request_id !== "string")) return null;
+  return {
+    schema_version: "ai_research_review_metrics_v1",
+    analysis_id: value.analysis_id,
+    model: value.model,
+    prompt_version: AI_RESEARCH_PROMPT_VERSION,
+    snapshot_fingerprint: value.snapshot_fingerprint,
+    generated_at: value.generated_at,
+    data_generated_at: value.data_generated_at,
+    latency_ms: value.latency_ms,
+    prompt_tokens: value.prompt_tokens,
+    output_tokens: value.completion_tokens,
+    total_tokens: value.total_tokens,
+    cache_hit: false,
+    validation_status: "VALID",
+    request_id: value.request_id,
+  };
 }
 
 async function loadNodeSqlite(): Promise<SqliteModule> {

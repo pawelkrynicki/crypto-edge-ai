@@ -5,6 +5,8 @@ import {
   type AIResearchBriefLookup,
   type AIResearchGenerateRequest,
   type AIResearchProviderStatus,
+  type AIResearchReviewMetrics,
+  type AIResearchReviewMetricsLookup,
 } from "../src/types/aiResearchTypes.js";
 import { buildAIResearchContext, sha256, stableJson, type AIResearchContext, type AIResearchContextOptions } from "./aiResearchContext.js";
 import {
@@ -16,7 +18,12 @@ import {
   type AIResearchUsageRecorder,
 } from "./aiResearchProvider.js";
 import { AIResearchValidationError, parseAIResearchProviderDraft, validateStoredAIResearchBrief } from "./aiResearchSchema.js";
-import { createAIResearchStore, type AIResearchStore, type AIResearchStoreOptions } from "./aiResearchStore.js";
+import {
+  createAIResearchStore,
+  isAIResearchOpenAIReviewStorePath,
+  type AIResearchStore,
+  type AIResearchStoreOptions,
+} from "./aiResearchStore.js";
 
 export type AIResearchServiceOptions = AIResearchContextOptions & {
   provider?: AIResearchProvider;
@@ -43,6 +50,9 @@ export class AIResearchServiceError extends Error {
     | "PROVIDER_ERROR"
     | "VALIDATION_FAILURE"
     | "RATE_LIMITED"
+    | "LIVE_CALL_BUDGET_EXHAUSTED"
+    | "LIVE_CALL_BUDGET_INVALID"
+    | "REVIEW_STORE_REQUIRED"
     | "STORE_UNAVAILABLE";
   readonly httpStatus: number;
   readonly retryAfterSeconds?: number;
@@ -95,7 +105,7 @@ export function createAIResearchService(options: AIResearchServiceOptions = {}) 
       return {
         schema_version: "ai_research_status_v1",
         provider_mode: provider.mode,
-        available: renderPreview || (provider.mode === "OPENAI" && Boolean(provider.model) && Boolean(providerConfig.apiKey)),
+        available: renderPreview || (provider.mode === "OPENAI" && Boolean(provider.model) && Boolean(providerConfig.apiKey) && !providerConfig.liveCallBudgetInvalid),
         model_configured: Boolean(provider.model),
         render_preview: renderPreview,
       };
@@ -106,13 +116,16 @@ export function createAIResearchService(options: AIResearchServiceOptions = {}) 
       if (renderPreview) return lookup("READY", provider.mode, buildDeterministicPreview(context, now()), null, null);
       let store: AIResearchStore;
       try { store = await getStore(); } catch { return lookup("ERROR", provider.mode, null, null, "STORE_UNAVAILABLE"); }
+      const blockedReason = generationBlockedReason(store, providerConfig);
       const exact = store.findExact({ ...context.identity, locale, snapshot_fingerprint: context.snapshot_fingerprint });
-      if (exact) return lookup("READY", provider.mode, exact.brief, null, null);
+      if (exact) return lookup("READY", provider.mode, exact.brief, null, null, blockedReason);
       const latest = store.findLatest(context.identity.chain, context.identity.contract_address, locale);
-      if (latest) return lookup("STALE", provider.mode, latest.brief, null, null);
+      if (latest) return lookup("STALE", provider.mode, latest.brief, null, null, blockedReason);
       if (context.research_state === "INSUFFICIENT_DATA") return lookup("INSUFFICIENT_DATA", provider.mode, null, null, null);
-      if (provider.mode === "DISABLED" || !provider.model || !providerConfig.apiKey) return lookup("PROVIDER_DISABLED", provider.mode, null, null, null);
-      return lookup("ABSENT", provider.mode, null, null, null);
+      if (provider.mode === "DISABLED") return lookup("PROVIDER_DISABLED", provider.mode, null, null, "PROVIDER_DISABLED");
+      if (!provider.model) return lookup("PROVIDER_DISABLED", provider.mode, null, null, "MODEL_NOT_CONFIGURED");
+      if (!providerConfig.apiKey) return lookup("PROVIDER_DISABLED", provider.mode, null, null, "MISSING_API_KEY");
+      return lookup("ABSENT", provider.mode, null, null, null, blockedReason);
     },
 
     async generate(request: AIResearchGenerateRequest, sessionId: string): Promise<AIResearchBriefLookup> {
@@ -120,14 +133,14 @@ export function createAIResearchService(options: AIResearchServiceOptions = {}) 
       if (renderPreview) return lookup("READY", provider.mode, buildDeterministicPreview(context, now()), null, null);
       const store = await getStore();
       const exact = store.findExact({ ...context.identity, locale: request.locale, snapshot_fingerprint: context.snapshot_fingerprint });
-      if (exact) return lookup("READY", provider.mode, exact.brief, null, null);
+      if (exact) return lookup("READY", provider.mode, exact.brief, null, null, generationBlockedReason(store, providerConfig));
       const idempotencyKey = [sessionId, context.identity.chain, context.identity.contract_address, request.locale, request.idempotency_key].join(":");
       pruneIdempotency(idempotency, now().getTime());
       const previous = idempotency.get(idempotencyKey);
-      if (previous) return lookup("READY", provider.mode, previous.brief, null, null);
+      if (previous) return lookup("READY", provider.mode, previous.brief, null, null, generationBlockedReason(store, providerConfig));
       const key = cacheKey(context, provider.model);
       const existing = inflight.get(key);
-      if (existing) return lookup("READY", provider.mode, await existing, null, null);
+      if (existing) return lookup("READY", provider.mode, await existing, null, null, generationBlockedReason(store, providerConfig));
       const stale = store.findLatest(context.identity.chain, context.identity.contract_address, request.locale)?.brief;
       const retry = consumeRates(rates, [
         [`session:${sessionId}`, sessionLimit],
@@ -138,15 +151,25 @@ export function createAIResearchService(options: AIResearchServiceOptions = {}) 
       if (provider.mode === "DISABLED") throw new AIResearchServiceError("PROVIDER_DISABLED", 503, { cachedBrief: stale });
       if (!provider.model) throw new AIResearchServiceError("MODEL_NOT_CONFIGURED", 503, { cachedBrief: stale });
       if (!providerConfig.apiKey && !options.provider) throw new AIResearchServiceError("MISSING_API_KEY", 503, { cachedBrief: stale });
+      if (providerConfig.liveCallBudgetInvalid) throw new AIResearchServiceError("LIVE_CALL_BUDGET_INVALID", 503, { cachedBrief: stale });
+      if (providerConfig.liveCallBudget && !isAIResearchOpenAIReviewStorePath(store.databaseFilePath)) {
+        throw new AIResearchServiceError("REVIEW_STORE_REQUIRED", 503, { cachedBrief: stale });
+      }
 
       const generation = semaphore.run(async () => {
         try {
+          if (providerConfig.liveCallBudget && !store.reserveLiveCallBudget(providerConfig.liveCallBudget).allowed) {
+            throw new AIResearchServiceError("LIVE_CALL_BUDGET_EXHAUSTED", 409, { cachedBrief: stale });
+          }
           let providerResult = await provider.generate(context);
           let draft;
           try {
             draft = parseAIResearchProviderDraft(providerResult.raw_json, context);
           } catch (error) {
             if (!(error instanceof AIResearchValidationError)) throw error;
+            if (providerConfig.liveCallBudget) {
+              throw new AIResearchServiceError("VALIDATION_FAILURE", 502, { cachedBrief: stale });
+            }
             providerResult = await provider.generate(context, error.code);
             try {
               draft = parseAIResearchProviderDraft(providerResult.raw_json, context);
@@ -155,7 +178,8 @@ export function createAIResearchService(options: AIResearchServiceOptions = {}) 
             }
           }
           const brief = hydrateBrief(context, draft, providerResult.model, providerResult.token_usage, now(), false);
-          const saved = store.save(brief).brief;
+          const metrics = providerConfig.liveCallBudget ? buildReviewMetrics(brief, providerResult) : undefined;
+          const saved = store.save(brief, metrics).brief;
           await usageRecorder.record({
             analysis_id: saved.analysis_id,
             identity: saved.identity,
@@ -172,15 +196,47 @@ export function createAIResearchService(options: AIResearchServiceOptions = {}) 
       });
       inflight.set(key, generation);
       try {
-        return lookup("READY", provider.mode, await generation, null, null);
+        return lookup("READY", provider.mode, await generation, null, null, generationBlockedReason(store, providerConfig));
       } finally {
         if (inflight.get(key) === generation) inflight.delete(key);
       }
     },
 
     diagnostics() {
-      return { renderPreview, inflight: inflight.size, providerMode: provider.mode };
+      return { renderPreview, inflight: inflight.size, providerMode: provider.mode, liveCallBudget: providerConfig.liveCallBudget };
     },
+
+    async getReviewMetrics(analysisId: string): Promise<AIResearchReviewMetricsLookup> {
+      const store = await getStore();
+      return {
+        schema_version: "ai_research_review_metrics_lookup_v1",
+        metrics: store.findReviewMetrics(analysisId),
+      };
+    },
+  };
+}
+
+function buildReviewMetrics(
+  brief: AIResearchBrief,
+  providerResult: Awaited<ReturnType<AIResearchProvider["generate"]>>,
+): AIResearchReviewMetrics {
+  return {
+    schema_version: "ai_research_review_metrics_v1",
+    analysis_id: brief.analysis_id,
+    model: brief.model,
+    prompt_version: brief.prompt_version,
+    snapshot_fingerprint: brief.snapshot_fingerprint,
+    generated_at: brief.generated_at,
+    data_generated_at: brief.data_generated_at,
+    latency_ms: Number.isSafeInteger(providerResult.latency_ms) && (providerResult.latency_ms ?? -1) >= 0
+      ? providerResult.latency_ms!
+      : 0,
+    prompt_tokens: brief.token_usage.prompt_tokens,
+    output_tokens: brief.token_usage.completion_tokens,
+    total_tokens: brief.token_usage.total_tokens,
+    cache_hit: false,
+    validation_status: "VALID",
+    request_id: providerResult.request_id ?? null,
   };
 }
 
@@ -259,8 +315,27 @@ function lookup(
   brief: AIResearchBrief | null,
   retryAfter: number | null,
   errorCode: string | null,
+  generationBlockedReason: AIResearchBriefLookup["generation_blocked_reason"] = null,
 ): AIResearchBriefLookup {
-  return { schema_version: "ai_research_lookup_v1", availability, provider_mode: providerMode, brief, retry_after_seconds: retryAfter, error_code: errorCode };
+  return {
+    schema_version: "ai_research_lookup_v1",
+    availability,
+    provider_mode: providerMode,
+    brief,
+    retry_after_seconds: retryAfter,
+    error_code: errorCode,
+    generation_blocked_reason: generationBlockedReason,
+  };
+}
+
+function generationBlockedReason(
+  store: AIResearchStore,
+  config: AIResearchProviderConfig,
+): AIResearchBriefLookup["generation_blocked_reason"] {
+  if (config.liveCallBudgetInvalid) return "LIVE_CALL_BUDGET_INVALID";
+  if (!config.liveCallBudget) return null;
+  if (!isAIResearchOpenAIReviewStorePath(store.databaseFilePath)) return "REVIEW_STORE_REQUIRED";
+  return store.liveCallBudgetUsage() >= config.liveCallBudget ? "LIVE_CALL_BUDGET_EXHAUSTED" : null;
 }
 
 function cacheKey(context: AIResearchContext, model: string | null): string {

@@ -7667,6 +7667,15 @@ summary {
   font-size: 13px;
 }
 
+.ai-openai-generated-status {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 5px;
+  color: var(--accent-green);
+  font-size: 10px;
+  font-weight: 700;
+}
+
 .ai-research-section-actions {
   display: flex;
   flex: 0 0 auto;
@@ -8242,6 +8251,39 @@ summary {
   font-size: 10px;
 }
 
+.ai-research-technical {
+  border-color: var(--ai-grid-line);
+  background: rgba(5, 10, 15, 0.36);
+}
+
+.ai-research-technical-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 16px;
+  padding: 8px 12px 12px;
+}
+
+.ai-research-technical-grid > div {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.7fr) minmax(0, 1.3fr);
+  gap: 8px;
+  padding: 6px 0;
+  border-top: 1px solid var(--border-sub);
+}
+
+.ai-research-technical-grid dt {
+  color: var(--text-helper);
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.ai-research-technical-grid dd {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 10px;
+  text-align: right;
+}
+
 .ai-research-boundary {
   padding: 11px 12px;
   border: 1px solid var(--border-sub);
@@ -8292,6 +8334,7 @@ summary {
   .ai-research-section-actions .action-button { flex: 1; }
   .ai-research-canvas { padding: 10px; }
   .ai-research-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ai-research-technical-grid { grid-template-columns: 1fr; }
   .ai-missing-list,
   .ai-brief-columns,
   .ai-source-list { grid-template-columns: 1fr; }

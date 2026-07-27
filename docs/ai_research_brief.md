@@ -1,10 +1,12 @@
-# AI.1 — Visual Candidate Research Brief
+# AI.1 + AI.2 — Visual Candidate Research Brief i Controlled OpenAI Validation
 
 ## Status i granica produktu
 
 AI.1 dodaje do standalone Crypto Edge AI moduł **Analiza badawcza AI / AI Research Brief**. Moduł porządkuje wyłącznie dane już zapisane w produkcie, wyjaśnia maszynowy stan badawczy i prowadzi do kolejnego kroku weryfikacji. Nie jest sygnałem transakcyjnym, nie potwierdza bezpieczeństwa projektu i nie zmienia lifecycle, Follow-up ani Established Universe.
 
 Domyślny provider to `DISABLED`. Samo wejście na ekran, odświeżenie widoku, zmiana języka, checkpoint i collector nigdy nie generują analizy. Generowanie jest możliwe wyłącznie po jawnym kliknięciu i tylko przez backend.
+
+AI.2 nie przebudowuje tego kontraktu. Dodaje owner-only ścieżkę pierwszego kontrolowanego live smoke z budżetem jednego wywołania, wyłączonym retry SDK, izolowanym store i metrykami technicznymi. Pełny runbook: `docs/ai_research_openai_live_validation.md`.
 
 ## Przepływ backendowy
 
@@ -27,6 +29,7 @@ Endpointy first-party:
 
 - `GET /api/ai-research/status` — publiczny stan konfiguracji bez sekretów;
 - `GET /api/ai-research/brief?chain=…&contract_address=…&locale=pl|en` — cache/read-only;
+- `GET /api/ai-research/review-metrics?analysis_id=…` — loopback-only metryki owner review, poza publicznym modelem briefu;
 - `POST /api/ai-research/generate` — jawna generacja on demand.
 
 POST wymaga `application/json`, zgodnego `Origin`, dokładnie czterech pól, maksymalnie 4096 B i poprawnej pseudonimowej sesji zapisanej w podpisanym cookie `HttpOnly; SameSite=Strict`. Nieznane pola są odrzucane.
@@ -39,11 +42,12 @@ CRYPTO_EDGE_AI_RESEARCH_MODEL=<model skonfigurowany operacyjnie>
 OPENAI_API_KEY=<sekret środowiska>
 CRYPTO_EDGE_AI_RESEARCH_TIMEOUT_MS=30000
 CRYPTO_EDGE_AI_RESEARCH_MAX_CONCURRENCY=2
+CRYPTO_EDGE_AI_RESEARCH_LIVE_CALL_BUDGET=1
 CRYPTO_EDGE_AI_RESEARCH_SESSION_SECRET=<sekret środowiska>
 CRYPTO_EDGE_AI_RESEARCH_SQLITE_PATH=<opcjonalna ścieżka SQLite>
 ```
 
-Model nie jest stałą domeny. `OPENAI_API_KEY` nie trafia do frontendowego bundla, modelu publicznego ani store. Adapter OpenAI używa Responses API, `store: false` oraz strict JSON Schema. Obecny `AIResearchUsageRecorder` zapisuje usage w briefie i jest no-op dla billingu.
+Model nie jest stałą domeny. `OPENAI_API_KEY` nie trafia do frontendowego bundla, modelu publicznego ani store. Adapter OpenAI używa Responses API, `store: false`, `background: false`, braku tools oraz strict JSON Schema. Oficjalny klient ma `maxRetries: 0`, bounded timeout i wyłączone logowanie SDK. Obecny `AIResearchUsageRecorder` zapisuje usage w briefie i jest no-op dla billingu. Budżet `1` jest wyłącznie ograniczeniem izolowanego owner review; inna ustawiona wartość failuje przed call’em.
 
 ## Cache, single-flight i limity
 
@@ -99,5 +103,15 @@ scripts\win\start-ai-research-brief-review.cmd --render-preview --mobile-guide
 ```
 
 Launcher wymusza `INTERNAL_BETA`, provider `DISABLED`, owner operations `DISABLED`, brak live-source opt-in i brak automatyzacji. Store AI i pomocniczy Feedback Store są kierowane do izolowanych losowych ścieżek `%TEMP%`, więc zwykły review nie dotyka kanonicznych baz. `--render-preview` używa najnowszego prawdziwego lokalnego tokena, nie dopuszcza fixture fallback, tworzy brief tylko w pamięci z `token_usage=0`, pokazuje badge „Podgląd formatu — bez wywołania AI” i nie otwiera nawet tymczasowego store AI.
+
+AI.2 dodaje osobny bezpłatny review oraz przyszły live-one:
+
+```cmd
+scripts\win\start-ai-research-openai-review.cmd
+scripts\win\start-ai-research-openai-review.cmd --live-one
+scripts\win\clear-ai-research-openai-review.cmd
+```
+
+Pierwsza komenda utrzymuje provider `DISABLED`. Druga wymaga klucza i modelu, ale nadal nie wykonuje requestu przy starcie — pierwszy call następuje dopiero po kliknięciu ownera. Oba tryby używają `tools\ui-mock\.local\ai-research-openai-review.sqlite`; live-one rezerwuje jedną próbę atomowo także na wypadek błędu i nie uruchamia automatycznej naprawy. Cleanup usuwa tylko tę bazę oraz jej WAL/SHM i nie zatrzymuje procesów.
 
 Rollback kodu polega na cofnięciu commitu AI.1. Operacyjny rollback polega na ustawieniu `CRYPTO_EDGE_AI_RESEARCH_PROVIDER=DISABLED`; odcina generowanie bez naruszania istniejących briefów. Osobny plik SQLite można zachować jako last-known-good lub po zatrzymaniu procesu przenieść do archiwum. Rollback nie wymaga zmian scanner snapshotu, lifecycle, Follow-up, Established, Feedback, VPS, Cloudflare ani Task Scheduler.

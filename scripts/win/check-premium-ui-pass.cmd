@@ -11,7 +11,10 @@ set "CRYPTO_EDGE_OWNER_OPERATIONS_MODE=DISABLED"
 set "CRYPTO_EDGE_RUNTIME_MODE=INTERNAL_BETA"
 set "CRYPTO_EDGE_FEEDBACK_SQLITE_PATH=%TEMP%\crypto-edge-premium-ui-%RANDOM%-%RANDOM%.sqlite"
 set "CRYPTO_EDGE_AI_RESEARCH_PROVIDER=DISABLED"
+set "CRYPTO_EDGE_AI_RESEARCH_MODEL="
+set "CRYPTO_EDGE_AI_RESEARCH_LIVE_CALL_BUDGET="
 set "CRYPTO_EDGE_AI_RESEARCH_SQLITE_PATH=%TEMP%\crypto-edge-ai-premium-ui-%RANDOM%-%RANDOM%.sqlite"
+set "OPENAI_API_KEY="
 
 echo.
 echo === Crypto Edge AI: Premium UI.1 + UI.2 offline gate ===
@@ -27,6 +30,11 @@ if not exist "node_modules\.bin\tsx.cmd" (
 echo.
 echo === AI.1 research brief contracts ===
 call pnpm run test:ai1
+if errorlevel 1 exit /b %ERRORLEVEL%
+
+echo.
+echo === AI.2 controlled OpenAI validation contracts ^(offline stubs only^) ===
+call pnpm run test:ai2
 if errorlevel 1 exit /b %ERRORLEVEL%
 
 echo.

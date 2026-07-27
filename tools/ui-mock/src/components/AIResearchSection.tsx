@@ -4,8 +4,9 @@ import {
   AIResearchDataSourceError,
   generateAIResearchBrief,
   loadAIResearchBrief,
+  loadAIResearchReviewMetrics,
 } from "../services/aiResearchDataSource";
-import type { AIResearchBriefLookup } from "../types/aiResearchTypes";
+import type { AIResearchBriefLookup, AIResearchReviewMetrics } from "../types/aiResearchTypes";
 import { resolveTokenIdentity } from "../tokenLifecycle";
 import { AIResearchBriefCanvas } from "./AIResearchBriefCanvas";
 import { ActionButton, StatusBadge } from "./ProductUi";
@@ -34,6 +35,7 @@ export function AIResearchSection({
   const [expanded, setExpanded] = useState(Boolean(initialLookup?.brief?.render_preview));
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [retryAfter, setRetryAfter] = useState<number | null>(null);
+  const [reviewMetrics, setReviewMetrics] = useState<AIResearchReviewMetrics | null>(null);
   const requestRevision = useRef(0);
 
   useEffect(() => {
@@ -55,6 +57,16 @@ export function AIResearchSection({
       .finally(() => { if (revision === requestRevision.current) setLoading(false); });
   }, [identity, initialLookup, locale]);
 
+  useEffect(() => {
+    const analysisId = lookup?.brief?.render_preview ? null : lookup?.brief?.analysis_id;
+    if (!analysisId) { setReviewMetrics(null); return; }
+    let cancelled = false;
+    void loadAIResearchReviewMetrics(analysisId)
+      .then((value) => { if (!cancelled) setReviewMetrics(value); })
+      .catch(() => { if (!cancelled) setReviewMetrics(null); });
+    return () => { cancelled = true; };
+  }, [lookup?.brief?.analysis_id, lookup?.brief?.render_preview]);
+
   const generate = async () => {
     if (identity.status !== "valid" || generating) return;
     setGenerating(true);
@@ -68,7 +80,15 @@ export function AIResearchSection({
       if (error instanceof AIResearchDataSourceError) {
         setErrorCode(error.code);
         setRetryAfter(error.retryAfterSeconds);
-        if (error.cachedBrief) setLookup({ schema_version: "ai_research_lookup_v1", availability: "STALE", provider_mode: "OPENAI", brief: error.cachedBrief, retry_after_seconds: error.retryAfterSeconds, error_code: error.code });
+        if (error.cachedBrief) setLookup({
+          schema_version: "ai_research_lookup_v1",
+          availability: "STALE",
+          provider_mode: "OPENAI",
+          brief: error.cachedBrief,
+          retry_after_seconds: error.retryAfterSeconds,
+          error_code: error.code,
+          generation_blocked_reason: error.code === "LIVE_CALL_BUDGET_EXHAUSTED" ? "LIVE_CALL_BUDGET_EXHAUSTED" : null,
+        });
       } else setErrorCode("AI_RESEARCH_UNAVAILABLE");
     } finally {
       setGenerating(false);
@@ -77,7 +97,12 @@ export function AIResearchSection({
 
   const availability = generating ? "GENERATING" : lookup?.availability ?? (loading ? "GENERATING" : "ERROR");
   const brief = lookup?.brief ?? null;
-  const canGenerate = identity.status === "valid" && availability !== "PROVIDER_DISABLED" && availability !== "INSUFFICIENT_DATA";
+  const blockedReason = lookup?.generation_blocked_reason ?? (errorCode === "LIVE_CALL_BUDGET_EXHAUSTED" ? errorCode : null);
+  const effectiveError = errorCode ?? lookup?.error_code ?? blockedReason;
+  const canGenerate = identity.status === "valid"
+    && availability !== "PROVIDER_DISABLED"
+    && availability !== "INSUFFICIENT_DATA"
+    && blockedReason === null;
   return (
     <section className="product-detail-section ai-research-section" aria-labelledby="ai-research-section-heading" aria-live="polite">
       <header className="ai-research-section-heading">
@@ -87,7 +112,10 @@ export function AIResearchSection({
       <div className="ai-research-section-summary">
         <div>
           <strong>{stateTitle(availability, locale)}</strong>
-          <p>{stateDetail(availability, errorCode, retryAfter, locale)}</p>
+          <p>{stateDetail(availability, effectiveError, retryAfter, locale)}</p>
+          {brief && !brief.render_preview && lookup?.provider_mode === "OPENAI" && (
+            <span className="ai-openai-generated-status">{ui.openaiGenerated}</span>
+          )}
         </div>
         <div className="ai-research-section-actions">
           {(availability === "ABSENT" || availability === "ERROR" || availability === "STALE" || availability === "RATE_LIMITED") && (
@@ -109,7 +137,7 @@ export function AIResearchSection({
         </div>
       </div>
       <span className="sr-only" role="status" aria-live="polite">{generating ? ui.generatingStatus : ""}</span>
-      {brief && expanded && <AIResearchBriefCanvas brief={brief} symbol={symbol} name={name} />}
+      {brief && expanded && <AIResearchBriefCanvas brief={brief} symbol={symbol} name={name} reviewMetrics={reviewMetrics} />}
     </section>
   );
 }
@@ -186,9 +214,14 @@ function stateTitle(value: AIResearchBriefLookup["availability"], locale: "pl" |
 
 function stateDetail(value: AIResearchBriefLookup["availability"], error: string | null, retry: number | null, locale: "pl" | "en") {
   const pl = locale === "pl";
+  if (error === "LIVE_CALL_BUDGET_EXHAUSTED") return pl ? "Limit jednego płatnego wywołania został wykorzystany. Istniejący cache pozostaje dostępny." : "The one paid-call budget has been used. Existing cache remains available.";
+  if (error === "LIVE_CALL_BUDGET_INVALID") return pl ? "Konfiguracja limitu live call jest nieprawidłowa; żaden request nie zostanie wykonany." : "The live-call budget is invalid; no request will be made.";
+  if (error === "REVIEW_STORE_REQUIRED") return pl ? "Tryb live-one wymaga izolowanego store review; żaden request nie zostanie wykonany." : "Live-one requires the isolated review store; no request will be made.";
   if (value === "READY") return pl ? "Otwórz deterministyczny Canvas z ryzykami, brakami i kolejnym krokiem badawczym." : "Open the deterministic Canvas with risks, gaps and the next research step.";
   if (value === "STALE") return pl ? "Poprzedni brief pozostaje dostępny. Wygeneruj nowy dopiero na żądanie." : "The previous brief remains available. Generate a new one only on demand.";
   if (value === "GENERATING") return pl ? "Jedno żądanie pracuje dla tego fingerprintu; równoległe żądania współdzielą wynik." : "One request is running for this fingerprint; concurrent requests share the result.";
+  if (value === "PROVIDER_DISABLED" && error === "MISSING_API_KEY") return pl ? "Brak OPENAI_API_KEY. Generowanie jest zablokowane i nie wykonano requestu." : "OPENAI_API_KEY is missing. Generation is blocked and no request was made.";
+  if (value === "PROVIDER_DISABLED" && error === "MODEL_NOT_CONFIGURED") return pl ? "Brak CRYPTO_EDGE_AI_RESEARCH_MODEL. Generowanie jest zablokowane i nie wykonano requestu." : "CRYPTO_EDGE_AI_RESEARCH_MODEL is missing. Generation is blocked and no request was made.";
   if (value === "PROVIDER_DISABLED") return pl ? "Tryb domyślny to DISABLED. Konfiguracja lub osobna zgoda ownera jest wymagana przed prawdziwym wywołaniem." : "The default mode is DISABLED. Configuration or separate owner approval is required before a real call.";
   if (value === "INSUFFICIENT_DATA") return pl ? "Produkt nie posiada danych pozwalających przygotować wiarygodny brief dla tego obszaru." : "The product has no data that can prepare a reliable brief for this area.";
   if (value === "RATE_LIMITED") return pl ? `Spróbuj ponownie${retry ? ` za ${retry} s` : " później"}. Poprawny cache nie został usunięty.` : `Try again${retry ? ` in ${retry} sec` : " later"}. The valid cache was preserved.`;
@@ -197,12 +230,17 @@ function stateDetail(value: AIResearchBriefLookup["availability"], error: string
 }
 
 function safeErrorLabel(value: string, locale: "pl" | "en") {
+  if (value === "LIVE_CALL_BUDGET_EXHAUSTED") return locale === "pl" ? "limit jednego wywołania został wykorzystany" : "the one-call budget has been used";
+  if (value === "LIVE_CALL_BUDGET_INVALID") return locale === "pl" ? "nieprawidłowy limit live call" : "invalid live-call budget";
+  if (value === "REVIEW_STORE_REQUIRED") return locale === "pl" ? "wymagany izolowany store review" : "isolated review store required";
+  if (value === "MISSING_API_KEY") return locale === "pl" ? "brak konfiguracji klucza API" : "API key is not configured";
+  if (value === "MODEL_NOT_CONFIGURED") return locale === "pl" ? "brak konfiguracji modelu" : "model is not configured";
   if (value === "VALIDATION_FAILURE") return locale === "pl" ? "wynik nie przeszedł walidacji" : "result failed validation";
   if (value === "STORE_UNAVAILABLE") return locale === "pl" ? "store niedostępny" : "store unavailable";
   return locale === "pl" ? "analiza niedostępna" : "analysis unavailable";
 }
 
 const COPY = {
-  pl: { title: "Analiza badawcza AI", intro: "Uporządkowanie dostępnych danych i kolejnego kroku badawczego — bez sygnałów transakcyjnych.", generate: "Wygeneruj analizę AI", generating: "Generowanie…", generatingStatus: "Generowanie analizy AI trwa.", open: "Otwórz analizę AI", close: "Zamknij analizę AI", update: "Zaktualizuj analizę AI", radarLabel: "Analiza AI", radarOpen: "Otwórz analizę AI", radarDetails: "Przejdź do szczegółów, aby wygenerować" },
-  en: { title: "AI Research Brief", intro: "Organization of available data and the next research step — without trading signals.", generate: "Generate AI analysis", generating: "Generating…", generatingStatus: "AI analysis generation is in progress.", open: "Open AI analysis", close: "Close AI analysis", update: "Update AI analysis", radarLabel: "AI analysis", radarOpen: "Open AI analysis", radarDetails: "Go to details to generate" },
+  pl: { title: "Analiza badawcza AI", intro: "Uporządkowanie dostępnych danych i kolejnego kroku badawczego — bez sygnałów transakcyjnych.", generate: "Wygeneruj analizę AI", generating: "Generowanie…", generatingStatus: "Generowanie analizy AI trwa.", open: "Otwórz analizę AI", close: "Zamknij analizę AI", update: "Zaktualizuj analizę AI", radarLabel: "Analiza AI", radarOpen: "Otwórz analizę AI", radarDetails: "Przejdź do szczegółów, aby wygenerować", openaiGenerated: "Analiza wygenerowana przez OpenAI" },
+  en: { title: "AI Research Brief", intro: "Organization of available data and the next research step — without trading signals.", generate: "Generate AI analysis", generating: "Generating…", generatingStatus: "AI analysis generation is in progress.", open: "Open AI analysis", close: "Close AI analysis", update: "Update AI analysis", radarLabel: "AI analysis", radarOpen: "Open AI analysis", radarDetails: "Go to details to generate", openaiGenerated: "Analysis generated by OpenAI" },
 } as const;

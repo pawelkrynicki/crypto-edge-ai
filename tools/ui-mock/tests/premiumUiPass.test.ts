@@ -166,11 +166,11 @@ describe("Premium UI.1 presentation contract", () => {
     assert.match(check, /build:internal-beta/);
   });
 
-  it("does not add a visual dependency", async () => {
+  it("keeps visual dependencies limited to React while allowing the server-only OpenAI SDK", async () => {
     const packageJson = JSON.parse(await readFile(resolve(productRoot, "package.json"), "utf8")) as {
       dependencies: Record<string, string>;
     };
-    assert.deepEqual(Object.keys(packageJson.dependencies).sort(), ["react", "react-dom"]);
+    assert.deepEqual(Object.keys(packageJson.dependencies).sort(), ["openai", "react", "react-dom"]);
     const componentNames = await readdir(resolve(productRoot, "src", "components"));
     assert.ok(componentNames.includes("ProductUi.tsx"));
   });

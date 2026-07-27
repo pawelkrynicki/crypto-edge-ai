@@ -36,6 +36,10 @@ export type AIResearchActionType = typeof AI_RESEARCH_ACTION_TYPES[number];
 export type AIResearchRiskSeverity = typeof AI_RESEARCH_RISK_SEVERITIES[number];
 export type AIResearchCoverageState = typeof AI_RESEARCH_COVERAGE_STATES[number];
 export type AIResearchLocale = "pl" | "en";
+export type AIResearchGenerationBlockedReason =
+  | "LIVE_CALL_BUDGET_EXHAUSTED"
+  | "LIVE_CALL_BUDGET_INVALID"
+  | "REVIEW_STORE_REQUIRED";
 export type AIResearchAvailabilityState =
   | "ABSENT"
   | "GENERATING"
@@ -142,6 +146,29 @@ export type AIResearchBriefLookup = {
   brief: AIResearchBrief | null;
   retry_after_seconds: number | null;
   error_code: string | null;
+  generation_blocked_reason?: AIResearchGenerationBlockedReason | null;
+};
+
+export type AIResearchReviewMetrics = {
+  schema_version: "ai_research_review_metrics_v1";
+  analysis_id: string;
+  model: string;
+  prompt_version: typeof AI_RESEARCH_PROMPT_VERSION;
+  snapshot_fingerprint: string;
+  generated_at: string;
+  data_generated_at: string;
+  latency_ms: number;
+  prompt_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+  cache_hit: false;
+  validation_status: "VALID";
+  request_id: string | null;
+};
+
+export type AIResearchReviewMetricsLookup = {
+  schema_version: "ai_research_review_metrics_lookup_v1";
+  metrics: AIResearchReviewMetrics | null;
 };
 
 export type AIResearchProviderStatus = {

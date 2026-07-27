@@ -85,6 +85,7 @@ import {
   createAIResearchSessionManager,
   publicAIResearchError,
   parseAIResearchQuery,
+  parseAIResearchReviewMetricsQuery,
   readAIResearchGenerateRequest,
   type AIResearchApiOptions,
 } from "./aiResearchApi.js";
@@ -199,6 +200,20 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
         if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
         const query = parseAIResearchQuery(req.url);
         sendJson(req, res, 200, await aiResearchService.getBrief(query.chain, query.contract_address, query.locale), runtimeMode);
+      } catch (error) {
+        sendAIResearchError(req, res, error, runtimeMode);
+      }
+      return;
+    }
+
+    if (req.method === "GET" && path === "/api/ai-research/review-metrics") {
+      if (!isLocalOwnerRequest(req)) {
+        sendJson(req, res, 404, { error: "not_found", message: "Route not found" }, runtimeMode);
+        return;
+      }
+      try {
+        const analysisId = parseAIResearchReviewMetricsQuery(req.url);
+        sendJson(req, res, 200, await aiResearchService.getReviewMetrics(analysisId), runtimeMode);
       } catch (error) {
         sendAIResearchError(req, res, error, runtimeMode);
       }

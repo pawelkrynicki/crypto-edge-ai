@@ -18,6 +18,7 @@
     "test:flow1": "node --import tsx --test tests/tokenFlow.test.ts tests/followUpBasket.test.ts tests/establishedPromotion.test.ts tests/establishedPromotionUi.test.tsx",
     "test:ux1": "node --import tsx --test tests/interactionAffordance.test.ts",
     "test:ai1": "node --import tsx --test tests/aiResearchContracts.test.ts tests/aiResearchUi.test.tsx",
+    "test:ai2": "node --import tsx --test tests/aiResearchLiveValidation.test.ts",
     "test:control-center": "node --import tsx --test tests/controlCenter.test.ts",
     "test:reports": "node --import tsx --test tests/reportsLibrary.test.ts",
     "test:owner-operations": "node --import tsx --test tests/ownerOperations.test.ts",
@@ -32,6 +33,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "openai": "^6.49.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6"
   },

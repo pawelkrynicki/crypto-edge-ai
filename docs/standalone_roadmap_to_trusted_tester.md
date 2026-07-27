@@ -1,21 +1,23 @@
 # Standalone Roadmap To Trusted Tester
 
-## AI.1 — Visual Candidate Research Brief
+## AI.2 — Controlled OpenAI Live Validation
 
-AI.1 jest bieżącym etapem po zaakceptowanych UI.1, UI.2, FLOW.1 i UX.1. Dodaje do Candidate Detail deterministyczny Visual Candidate Research Canvas, mały status na Radarze i secondary action w Verification. Analiza powstaje wyłącznie po jawnym żądaniu, z danych już zapisanych w produkcie, przez backendowy provider adapter i strict schema. Domyślny provider pozostaje `DISABLED`; owner review ma 0 OpenAI/provider/collector calls i 0 mutacji kanonicznych store’ów.
+AI.1 dostarczył deterministyczny Visual Candidate Research Canvas i backendowy kontrakt `ai_research_brief_v1`. AI.2 przygotowuje pierwszy kontrolowany owner smoke dla aktualnego rzeczywistego tokena: domyślnie 0 calls, osobny launcher `--live-one`, wymagany model i klucz z environment, izolowany SQLite, `store: false`, brak tools i retry, bounded timeout oraz trwały budżet jednej próby. Codex przygotowuje kod i testy offline; rzeczywisty call wykonuje później wyłącznie owner po review.
 
 Aktualna kolejność:
 
-1. AI.1 — Visual Candidate Research Brief.
-2. UI.3 — accessibility i cross-browser.
-3. INT.1 — AI KINTEL Integration Readiness Pack.
-4. Lokalna regresja i Release Candidate.
-5. Finalny standalone deployment na VPS.
-6. Cloudflare, scheduler, smoke i rollback.
-7. Sesja testera i poprawki P0.
-8. Freeze do 15.08.
+1. AI.2A — bezpieczna ścieżka jednego live call.
+2. AI.2B — owner wykonuje jedną rzeczywistą analizę.
+3. AI.2C — ocena jakości, cache, czasu i token usage.
+4. AI.2D — maksymalnie 3–5 dodatkowych przypadków po osobnej zgodzie.
+5. UI.3 — final user navigation, accessibility i cross-browser.
+6. INT.1 — AI KINTEL Integration Readiness Pack.
+7. Lokalna regresja i Release Candidate.
+8. Finalny deployment VPS i produkcyjna konfiguracja OpenAI.
+9. Cloudflare, scheduler, smoke i rollback.
+10. Tester i freeze do 15.08.
 
-Kontrakty: `docs/ai_research_brief.md`, `docs/ai_research_brief_schema.md`, `docs/ai_kintel_ai_research_mapping.md`.
+Kontrakty: `docs/ai_research_brief.md`, `docs/ai_research_openai_live_validation.md`, `docs/ai_research_brief_schema.md`, `docs/ai_kintel_ai_research_mapping.md`.
 
 ## UX.1 — Global Interaction Affordance Pass
 
