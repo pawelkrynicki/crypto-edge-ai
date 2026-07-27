@@ -77,19 +77,11 @@ export function AIResearchSection({
       setLookup(result);
       setExpanded(true);
     } catch (error) {
-      if (error instanceof AIResearchDataSourceError) {
-        setErrorCode(error.code);
-        setRetryAfter(error.retryAfterSeconds);
-        if (error.cachedBrief) setLookup({
-          schema_version: "ai_research_lookup_v1",
-          availability: "STALE",
-          provider_mode: "OPENAI",
-          brief: error.cachedBrief,
-          retry_after_seconds: error.retryAfterSeconds,
-          error_code: error.code,
-          generation_blocked_reason: error.code === "LIVE_CALL_BUDGET_EXHAUSTED" ? "LIVE_CALL_BUDGET_EXHAUSTED" : null,
-        });
-      } else setErrorCode("AI_RESEARCH_UNAVAILABLE");
+      const code = error instanceof AIResearchDataSourceError ? error.code : "AI_RESEARCH_UNAVAILABLE";
+      const retry = error instanceof AIResearchDataSourceError ? error.retryAfterSeconds : null;
+      setErrorCode(code);
+      setRetryAfter(retry);
+      setLookup((previous) => applyAIResearchGenerationFailure(previous, error));
     } finally {
       setGenerating(false);
     }
@@ -140,6 +132,24 @@ export function AIResearchSection({
       {brief && expanded && <AIResearchBriefCanvas brief={brief} symbol={symbol} name={name} reviewMetrics={reviewMetrics} />}
     </section>
   );
+}
+
+export function applyAIResearchGenerationFailure(
+  previous: AIResearchBriefLookup | null,
+  error: unknown,
+): AIResearchBriefLookup {
+  const knownError = error instanceof AIResearchDataSourceError ? error : null;
+  const errorCode = knownError?.code ?? "AI_RESEARCH_UNAVAILABLE";
+  const cachedBrief = knownError?.cachedBrief ?? previous?.brief ?? null;
+  return {
+    schema_version: "ai_research_lookup_v1",
+    availability: cachedBrief ? "STALE" : "ERROR",
+    provider_mode: previous?.provider_mode ?? "OPENAI",
+    brief: cachedBrief,
+    retry_after_seconds: knownError?.retryAfterSeconds ?? null,
+    error_code: errorCode,
+    generation_blocked_reason: errorCode === "LIVE_CALL_BUDGET_EXHAUSTED" ? "LIVE_CALL_BUDGET_EXHAUSTED" : null,
+  };
 }
 
 export function AIResearchRadarStatus({
@@ -218,6 +228,7 @@ function stateDetail(value: AIResearchBriefLookup["availability"], error: string
   if (error === "LIVE_CALL_BUDGET_INVALID") return pl ? "Konfiguracja limitu live call jest nieprawidłowa; żaden request nie zostanie wykonany." : "The live-call budget is invalid; no request will be made.";
   if (error === "REVIEW_STORE_REQUIRED") return pl ? "Tryb live-one wymaga izolowanego store review; żaden request nie zostanie wykonany." : "Live-one requires the isolated review store; no request will be made.";
   if (value === "READY") return pl ? "Otwórz deterministyczny Canvas z ryzykami, brakami i kolejnym krokiem badawczym." : "Open the deterministic Canvas with risks, gaps and the next research step.";
+  if (value === "STALE" && error) return pl ? `Nie udało się zaktualizować analizy (${safeErrorLabel(error, locale)}). Poprzedni brief pozostaje dostępny.` : `The analysis could not be updated (${safeErrorLabel(error, locale)}). The previous brief remains available.`;
   if (value === "STALE") return pl ? "Poprzedni brief pozostaje dostępny. Wygeneruj nowy dopiero na żądanie." : "The previous brief remains available. Generate a new one only on demand.";
   if (value === "GENERATING") return pl ? "Jedno żądanie pracuje dla tego fingerprintu; równoległe żądania współdzielą wynik." : "One request is running for this fingerprint; concurrent requests share the result.";
   if (value === "PROVIDER_DISABLED" && error === "MISSING_API_KEY") return pl ? "Brak OPENAI_API_KEY. Generowanie jest zablokowane i nie wykonano requestu." : "OPENAI_API_KEY is missing. Generation is blocked and no request was made.";
@@ -233,6 +244,9 @@ function safeErrorLabel(value: string, locale: "pl" | "en") {
   if (value === "LIVE_CALL_BUDGET_EXHAUSTED") return locale === "pl" ? "limit jednego wywołania został wykorzystany" : "the one-call budget has been used";
   if (value === "LIVE_CALL_BUDGET_INVALID") return locale === "pl" ? "nieprawidłowy limit live call" : "invalid live-call budget";
   if (value === "REVIEW_STORE_REQUIRED") return locale === "pl" ? "wymagany izolowany store review" : "isolated review store required";
+  if (value === "SAME_ORIGIN_REQUIRED") return locale === "pl" ? "żądanie odrzucone przez kontrolę bezpieczeństwa" : "request rejected by the origin security check";
+  if (value === "PROVIDER_TIMEOUT") return locale === "pl" ? "przekroczono czas oczekiwania na provider" : "provider request timed out";
+  if (value === "PROVIDER_ERROR") return locale === "pl" ? "provider jest chwilowo niedostępny" : "provider is temporarily unavailable";
   if (value === "MISSING_API_KEY") return locale === "pl" ? "brak konfiguracji klucza API" : "API key is not configured";
   if (value === "MODEL_NOT_CONFIGURED") return locale === "pl" ? "brak konfiguracji modelu" : "model is not configured";
   if (value === "VALIDATION_FAILURE") return locale === "pl" ? "wynik nie przeszedł walidacji" : "result failed validation";

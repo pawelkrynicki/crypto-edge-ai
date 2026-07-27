@@ -1,6 +1,13 @@
 import { defineConfig, loadEnv } from "vite";
+import type { ProxyOptions } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "node:path";
+
+export const LOCAL_API_PROXY = {
+  target: "http://127.0.0.1:5177",
+  changeOrigin: false,
+  xfwd: true,
+} satisfies ProxyOptions;
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
@@ -23,7 +30,7 @@ export default defineConfig(({ mode }) => {
     server: {
       allowedHosts: true,
       proxy: {
-        "/api": "http://localhost:5177",
+        "/api": LOCAL_API_PROXY,
       },
     },
   };

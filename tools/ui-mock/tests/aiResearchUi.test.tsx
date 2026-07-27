@@ -9,11 +9,12 @@ import { buildAIResearchContext } from "../server/aiResearchContext.js";
 import { buildDeterministicPreview } from "../server/aiResearchService.js";
 import { mapPersistableScannerOutputToUiCandidates } from "../src/adapters/scannerOutputAdapter.js";
 import { AIResearchBriefCanvas } from "../src/components/AIResearchBriefCanvas.js";
-import { AIResearchRadarStatus, AIResearchSection } from "../src/components/AIResearchSection.js";
+import { AIResearchRadarStatus, AIResearchSection, applyAIResearchGenerationFailure } from "../src/components/AIResearchSection.js";
 import { CandidateDetailView } from "../src/components/CandidateDetailView.js";
 import { ExternalVerificationLinksView } from "../src/components/ExternalVerificationLinksView.js";
 import { PERSISTABLE_SCANNER_SAMPLE } from "../src/fixtures/persistableScannerSample.js";
 import { ProductLocaleProvider, type ProductLocale } from "../src/productI18n.js";
+import { AIResearchDataSourceError } from "../src/services/aiResearchDataSource.js";
 import type { AIResearchBrief, AIResearchBriefLookup, AIResearchReviewMetrics } from "../src/types/aiResearchTypes.js";
 
 void React;
@@ -209,6 +210,50 @@ describe("AI.1 responsive and accessibility contracts", () => {
 });
 
 describe("AI.2 controlled OpenAI owner review UI", () => {
+  it("moves a failed clicked generation without a brief to visible ERROR instead of leaving ABSENT", () => {
+    const failure = applyAIResearchGenerationFailure({
+      schema_version: "ai_research_lookup_v1",
+      availability: "ABSENT",
+      provider_mode: "OPENAI",
+      brief: null,
+      retry_after_seconds: null,
+      error_code: null,
+    }, new AIResearchDataSourceError(502, "PROVIDER_ERROR", null, null));
+
+    assert.equal(failure.availability, "ERROR");
+    assert.notEqual(failure.availability, "ABSENT");
+    assert.equal(failure.brief, null);
+    const markup = render("pl", <AIResearchSection chain="base" contractAddress={ADDRESS} symbol="SCOOBERT" name="Scoobert" initialLookup={failure} />);
+    assert.match(markup, /Błąd/);
+    assert.match(markup, /Nie udało się przygotować briefu/);
+    assert.match(markup, /Żądanie zakończyło się bez zapisu/);
+    assert.match(markup, /Wygeneruj analizę AI/);
+    assert.doesNotMatch(markup, /Brak analizy/);
+  });
+
+  it("keeps the last-known-good brief available as STALE after a failed update", () => {
+    const previous: AIResearchBriefLookup = {
+      schema_version: "ai_research_lookup_v1",
+      availability: "READY",
+      provider_mode: "OPENAI",
+      brief: { ...semanticBriefPl, render_preview: false },
+      retry_after_seconds: null,
+      error_code: null,
+    };
+    const failure = applyAIResearchGenerationFailure(
+      previous,
+      new AIResearchDataSourceError(504, "PROVIDER_TIMEOUT", null, null),
+    );
+
+    assert.equal(failure.availability, "STALE");
+    assert.equal(failure.brief, previous.brief);
+    const markup = render("pl", <AIResearchSection chain="base" contractAddress={ADDRESS} symbol="SCOOBERT" name="Scoobert" initialLookup={failure} />);
+    assert.match(markup, /Nieaktualna/);
+    assert.match(markup, /Nie udało się zaktualizować analizy/);
+    assert.match(markup, /Poprzedni brief pozostaje dostępny/);
+    assert.match(markup, /Otwórz analizę AI/);
+  });
+
   it("shows OpenAI provenance and owner-only technical metrics without a preview badge or raw payload", () => {
     const brief = { ...semanticBriefPl, render_preview: false, model: "configured-test-model" };
     const metrics: AIResearchReviewMetrics = {
