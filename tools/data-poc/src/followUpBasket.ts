@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, open, readFile, rename, rm } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { dirname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   loadEstablishedAddressUniverse,
@@ -156,10 +156,17 @@ const SECURITY_FIELDS = new Set(["status", "source", "checked_at", "missing_data
 const AUDIT_FIELDS = new Set([
   "audit_id", "changed_at", "operation", "entry_id", "from_status", "to_status", "source_run_id",
 ]);
-const DEFAULT_FOLLOW_UP_STORE_PATH = resolve(dirname(fileURLToPath(import.meta.url)), "../../.local/follow-up/store.json");
+const DEFAULT_FOLLOW_UP_STORE_PATH = resolve(resolveDataPocRoot(fileURLToPath(import.meta.url)), ".local/follow-up/store.json");
 
 export function getDefaultFollowUpStorePath(env: NodeJS.ProcessEnv = process.env): string {
   return resolve(env.CRYPTO_EDGE_FOLLOW_UP_STORE_PATH?.trim() || DEFAULT_FOLLOW_UP_STORE_PATH);
+}
+
+function resolveDataPocRoot(modulePath: string): string {
+  const marker = `${sep}tools${sep}data-poc${sep}`;
+  const index = modulePath.toLowerCase().indexOf(marker.toLowerCase());
+  if (index < 0) throw new Error("FOLLOW_UP_STORE_PATH_UNAVAILABLE");
+  return modulePath.slice(0, index + marker.length - 1);
 }
 
 export function followUpIdentity(chain: string, contractAddress: string): {

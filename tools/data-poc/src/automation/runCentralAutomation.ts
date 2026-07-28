@@ -8,7 +8,7 @@ import { inspectActiveGlobalCollectorLock } from "./globalCollectorLock.js";
 import { readPublishedSnapshotTimes } from "./publishedSnapshotTimes.js";
 import { decideCentralSchedule, type PublishedSnapshotTimes, type SchedulerDecisionCode } from "./schedulerDecision.js";
 
-export type SchedulerRunner = (runId: string) => Promise<CentralAutomationRunnerResult>;
+export type SchedulerRunner = (runId: string, previousState: AutomationState) => Promise<CentralAutomationRunnerResult>;
 
 export type RunCentralSchedulerOnceOptions = {
   enabled: boolean;
@@ -24,7 +24,7 @@ export type RunCentralSchedulerOnceOptions = {
 export type RunCentralSchedulerOnceResult = {
   decision: SchedulerDecisionCode;
   run_mode: CentralAutomationRunMode | null;
-  run_status: "SUCCESS" | "FAILED" | "RUN_ALREADY_IN_PROGRESS" | null;
+  run_status: "SUCCESS" | "PARTIAL" | "FAILED" | "RUN_ALREADY_IN_PROGRESS" | null;
   run_id?: string;
   active_run_id?: string;
   error_code?: string;
@@ -35,6 +35,7 @@ async function main(): Promise<void> {
   const result = await runCentralSchedulerOnce({ enabled: true });
   console.log(JSON.stringify(result, null, 2));
   if (result.run_status === "FAILED" || result.decision === "STATE_UNAVAILABLE") process.exitCode = 1;
+  else if (result.run_status === "PARTIAL") process.exitCode = 2;
 }
 
 export function assertExplicitLiveAutomationOptIn(env: NodeJS.ProcessEnv): void {
@@ -127,6 +128,41 @@ export async function runCentralSchedulerOnce(
   };
 }
 
+export async function runCentralLiveCycleOnce(options: {
+  now?: () => Date;
+  automationDirectoryPath?: string;
+  stateStore?: AutomationStateStore;
+  runner?: SchedulerRunner;
+  beforeRun?: (runId: string) => Promise<void>;
+} = {}): Promise<RunCentralSchedulerOnceResult> {
+  const coordinated = await runCentralAutomation({
+    runner: options.runner ?? ((_runId, previousState) => defaultScannerAndContextRunner(
+      ["alternative_me_fng", "defillama_api"],
+      previousState.last_published_context_run_id,
+    )),
+    mode: "scanner_and_context",
+    now: options.now,
+    automationDirectoryPath: options.automationDirectoryPath,
+    stateStore: options.stateStore,
+    beforeRun: options.beforeRun,
+  });
+  if (coordinated.status === "RUN_ALREADY_IN_PROGRESS") {
+    return {
+      decision: "RUN_ALREADY_IN_PROGRESS",
+      run_mode: "scanner_and_context",
+      run_status: "RUN_ALREADY_IN_PROGRESS",
+      active_run_id: coordinated.active_run_id,
+    };
+  }
+  return {
+    decision: "RUN_SCANNER_AND_CONTEXT",
+    run_mode: "scanner_and_context",
+    run_status: coordinated.status,
+    run_id: coordinated.run_id,
+    ...(coordinated.status === "FAILED" ? { error_code: coordinated.error_code } : {}),
+  };
+}
+
 function applySchedulerObservation(
   state: AutomationState,
   schedule: ReturnType<typeof decideCentralSchedule>,
@@ -154,6 +190,17 @@ async function defaultScannerAndContextRunner(
     scanner_run_id: result.run_id,
     context_run_id: result.context_run_id,
     context_sources_refreshed: result.context_refreshed_source_ids,
+    snapshot_generated_at: result.scanner.provenance?.generated_at ?? result.scanner.scan_run.finished_at,
+    records_received: result.records_received,
+    records_valid: result.records_valid,
+    records_rejected: result.records_rejected,
+    new_records: result.new_records,
+    follow_up_ingested: result.follow_up.ingested,
+    checkpoints_processed: result.follow_up.checkpoints_processed,
+    source_statuses: {
+      ...result.source_health,
+      follow_up_store: result.follow_up.status === "READY" ? "READY" : "DEGRADED",
+    },
   };
 }
 
@@ -167,6 +214,15 @@ async function defaultContextOnlyRunner(
     request_counts: result.request_counts,
     context_run_id: result.context_run_id,
     context_sources_refreshed: result.refreshed_source_ids,
+    // A context-only refresh must not overwrite the canonical scanner snapshot timestamp.
+    snapshot_generated_at: undefined,
+    records_received: result.context.summary.records_total,
+    records_valid: result.context.summary.records_total,
+    records_rejected: 0,
+    new_records: 0,
+    follow_up_ingested: 0,
+    checkpoints_processed: 0,
+    source_statuses: result.source_health,
   };
 }
 

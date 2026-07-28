@@ -104,6 +104,63 @@ describe("central automation coordinator", () => {
     if (nextLock.status === "ACQUIRED") await nextLock.release();
   });
 
+  it("records a partial cycle without presenting it as the last full success", async () => {
+    const automationDirectoryPath = await tempDirectory();
+    const store = createAutomationStateStore(automationDirectoryPath);
+    const first = await runCentralAutomation({
+      automationDirectoryPath,
+      stateStore: store,
+      runIdFactory: () => "run_full",
+      now: sequenceClock("2026-07-28T10:00:00.000Z", "2026-07-28T10:00:00.000Z", "2026-07-28T10:00:01.250Z"),
+      runner: async () => ({
+        scanner_run_id: "scan_full",
+        context_run_id: "context_full",
+        snapshot_generated_at: "2026-07-28T10:00:01.000Z",
+        records_received: 12,
+        records_valid: 10,
+        records_rejected: 2,
+        new_records: 8,
+        follow_up_ingested: 3,
+        checkpoints_processed: 4,
+        source_statuses: { dexscreener: "READY", defillama_api: "READY" },
+      }),
+    });
+    assert.equal(first.status, "SUCCESS");
+    const fullSuccessAt = (await store.read()).last_success_at;
+
+    const partial = await runCentralAutomation({
+      automationDirectoryPath,
+      stateStore: store,
+      runIdFactory: () => "run_partial",
+      now: sequenceClock("2026-07-28T11:00:00.000Z", "2026-07-28T11:00:00.000Z", "2026-07-28T11:00:02.000Z"),
+      runner: async () => ({
+        scanner_run_id: "scan_partial",
+        context_run_id: "context_partial",
+        snapshot_generated_at: "2026-07-28T11:00:01.000Z",
+        records_received: 9,
+        records_valid: 7,
+        records_rejected: 2,
+        new_records: 7,
+        follow_up_ingested: 1,
+        checkpoints_processed: 2,
+        source_statuses: { dexscreener: "READY", defillama_api: "DEGRADED" },
+      }),
+    });
+    assert.equal(partial.status, "PARTIAL");
+    const state = await store.read();
+    assert.equal(state.last_success_at, fullSuccessAt);
+    assert.equal(state.last_result, "PARTIAL");
+    assert.equal(state.cycle_status, "PARTIAL");
+    assert.equal(state.cycle_id, "run_partial");
+    assert.equal(state.cycle_duration_ms, 2_000);
+    assert.equal(state.snapshot_generated_at, "2026-07-28T11:00:01.000Z");
+    assert.deepEqual(
+      [state.records_received, state.records_valid, state.records_rejected, state.new_records, state.follow_up_ingested, state.checkpoints_processed],
+      [9, 7, 2, 7, 1, 2],
+    );
+    assert.deepEqual(state.source_statuses, { dexscreener: "READY", defillama_api: "DEGRADED" });
+  });
+
   it("fails closed before runner execution when state cannot be written and still releases the lock", async () => {
     const automationDirectoryPath = await tempDirectory();
     let runnerCalls = 0;
@@ -173,4 +230,9 @@ async function tempDirectory(): Promise<string> {
   const root = await mkdtemp(resolve(tmpdir(), "crypto-edge-coordinator-"));
   tempRoots.push(root);
   return resolve(root, "automation");
+}
+
+function sequenceClock(...timestamps: string[]): () => Date {
+  let index = 0;
+  return () => new Date(timestamps[Math.min(index++, timestamps.length - 1)]!);
 }

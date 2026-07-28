@@ -98,6 +98,10 @@ export type InternalBetaCollectorResult = {
   source_health: Record<string, "READY" | "DEGRADED" | "UNAVAILABLE" | "NOT_INVOKED">;
   request_counts: Record<string, number>;
   context_refreshed_source_ids: ContextSourceId[];
+  records_received: number;
+  records_valid: number;
+  records_rejected: number;
+  new_records: number;
   scanner: PersistableScannerOutput;
   context: ApprovedSourcesRunOutput;
   scanner_publish: AtomicPublishResult;
@@ -110,6 +114,8 @@ export type InternalBetaCollectorResult = {
     records_rechecked: number;
     records_failed: number;
     store_updated: boolean;
+    ingested: number;
+    checkpoints_processed: number;
     error_code: string | null;
   };
 };
@@ -297,13 +303,22 @@ export async function runInternalBetaCollector(
 
   let followUpStoreUpdated = false;
   let followUpErrorCode: string | null = null;
+  let followUpIngested = 0;
+  let checkpointsProcessed = 0;
   try {
-    await updateFollowUpStore((current) => {
+    const beforeStore = followUpPreparation.diagnostics.store_available
+      ? followUpPreparation.diagnostics.store
+      : null;
+    const updatedStore = await updateFollowUpStore((current) => {
       const membershipSynced = synchronizeFollowUpEstablishedMembership(current, universe, finishedAt, runId);
       const rechecked = applyFollowUpRecheckBatch(membershipSynced, followUpRechecks, universe);
       return ingestScannerSnapshot(rechecked, scanner, universe);
     }, { storePath: followUpStorePath, now: new Date(finishedAt) });
     followUpStoreUpdated = true;
+    followUpIngested = beforeStore ? Math.max(0, updatedStore.entries.length - beforeStore.entries.length) : 0;
+    checkpointsProcessed = beforeStore
+      ? Math.max(0, completedCheckpointCount(updatedStore) - completedCheckpointCount(beforeStore))
+      : 0;
   } catch (error) {
     followUpErrorCode = safeFollowUpErrorCode(error);
   }
@@ -321,6 +336,13 @@ export async function runInternalBetaCollector(
     source_health: sourceHealth,
     request_counts: requestCounts,
     context_refreshed_source_ids: contextCollection.refreshed_source_ids,
+    records_received: discovery.new_emerging.pairs_loaded + discovery.established.pairs_loaded,
+    records_valid: scanner.candidates.length,
+    records_rejected: Math.max(
+      0,
+      discovery.new_emerging.pairs_loaded + discovery.established.pairs_loaded - scanner.candidates.length,
+    ),
+    new_records: scanner.candidates.filter((candidate) => candidate.discovery_basket === "new_emerging").length,
     scanner,
     context,
     scanner_publish: scannerPublish,
@@ -339,9 +361,15 @@ export async function runInternalBetaCollector(
       records_rechecked: followUpRechecks.successes.length,
       records_failed: followUpRechecks.failed_entry_ids.length,
       store_updated: followUpStoreUpdated,
+      ingested: followUpIngested,
+      checkpoints_processed: checkpointsProcessed,
       error_code: followUpErrorCode,
     },
   };
+}
+
+function completedCheckpointCount(store: { entries: Array<{ completed_checkpoints: readonly unknown[] }> }): number {
+  return store.entries.reduce((total, entry) => total + entry.completed_checkpoints.length, 0);
 }
 
 function buildDiscoveryReadiness(

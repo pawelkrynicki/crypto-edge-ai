@@ -35,6 +35,7 @@ export type InternalBetaContextCollectionResult = {
   context: ApprovedSourcesRunOutput;
   request_counts: Record<ContextSourceId, number>;
   refreshed_source_ids: ContextSourceId[];
+  source_health: Record<ContextSourceId, "READY" | "DEGRADED" | "UNAVAILABLE">;
 };
 
 export async function collectInternalBetaContext(
@@ -72,8 +73,28 @@ export async function collectInternalBetaContext(
       defillama_api: <T>(url: string | URL, init?: RequestInit) => clients.defillama_api.requestJson<T>(url, init),
     },
   });
-  for (const source of context.sources) {
-    if (due.has(asContextSourceId(source.source_id))) source.fetched_at = options.now.toISOString();
+  const refreshedSourceIds: ContextSourceId[] = [];
+  for (let index = 0; index < context.sources.length; index += 1) {
+    const source = context.sources[index]!;
+    const sourceId = asContextSourceId(source.source_id);
+    if (!due.has(sourceId)) continue;
+    if (source.records.length > 0 && source.errors.length === 0) {
+      source.fetched_at = options.now.toISOString();
+      refreshedSourceIds.push(sourceId);
+      continue;
+    }
+    const previousSource = previous?.sources.find((candidate) => candidate.source_id === sourceId);
+    if (previousSource?.records.length && previousSource.errors.length === 0) {
+      context.sources[index] = {
+        ...structuredClone(previousSource),
+        health_status: "degraded_external_source",
+        warnings: [...new Set([
+          ...previousSource.warnings,
+          `SOURCE_LAST_KNOWN_GOOD: ${sourceId}`,
+        ])],
+        errors: [],
+      };
+    }
   }
   const requestCounts = {
     alternative_me_fng: clients.alternative_me_fng.getStats().request_count,
@@ -83,8 +104,34 @@ export async function collectInternalBetaContext(
     request_counts: requestCounts,
     attributions: Object.fromEntries(context.sources.map((source) => [source.source_id, source.attribution])),
   };
+  context.summary = summarizeContext(context.sources);
   validateDisplayEligibleContextSnapshot(context);
-  return { context, request_counts: requestCounts, refreshed_source_ids: [...due] };
+  return {
+    context,
+    request_counts: requestCounts,
+    refreshed_source_ids: refreshedSourceIds,
+    source_health: Object.fromEntries(context.sources.map((source) => [
+      source.source_id,
+      source.records.length === 0 || source.errors.length > 0
+        ? "UNAVAILABLE"
+        : source.health_status === "degraded_external_source" || source.warnings.length > 0
+          ? "DEGRADED"
+          : "READY",
+    ])) as InternalBetaContextCollectionResult["source_health"],
+  };
+}
+
+function summarizeContext(sources: NormalizedSourceOutput[]): ApprovedSourcesRunOutput["summary"] {
+  return {
+    sources_requested: CONTEXT_SOURCE_IDS.length,
+    sources_allowed: sources.filter((source) => source.policy.allowed).length,
+    sources_denied: sources.filter((source) => !source.policy.allowed).length,
+    records_total: sources.reduce((total, source) => total + source.records.length, 0),
+    warnings_total: sources.reduce((total, source) => total + source.warnings.length, 0),
+    errors_total: sources.reduce((total, source) => total + source.errors.length, 0),
+    degraded_external_sources_total: sources.filter((source) => source.health_status === "degraded_external_source").length,
+    hard_failures_total: sources.filter((source) => source.health_status === "error" && source.errors.length > 0).length,
+  };
 }
 
 async function readPreviousContext(outputDir: string | undefined, runId: string | null | undefined): Promise<ApprovedSourcesRunOutput | undefined> {
