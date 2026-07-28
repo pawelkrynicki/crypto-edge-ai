@@ -10,6 +10,7 @@ import {
   createEmptyFollowUpStore,
   elapsedCheckpointDays,
   followUpIdentity,
+  getDefaultFollowUpStorePath,
   ingestFollowUpObservations,
   inspectFollowUpStore,
   readFollowUpStore,
@@ -25,6 +26,10 @@ const ADDRESS_B = "0x2222222222222222222222222222222222222222";
 const START = "2026-06-01T00:00:00.000Z";
 
 describe("Follow-up Basket model and store", () => {
+  it("resolves one canonical store path from both source and compiled module layouts", () => {
+    assert.match(getDefaultFollowUpStorePath({}), /tools[\\/]data-poc[\\/]\.local[\\/]follow-up[\\/]store\.json$/i);
+  });
+
   it("uses normalized chain + contract_address as the only identity and rejects invalid identities", () => {
     const left = followUpIdentity(" Base ", ADDRESS_A.toUpperCase().replace("0X", "0x"));
     const right = followUpIdentity("base", ADDRESS_A);

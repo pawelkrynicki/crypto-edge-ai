@@ -370,7 +370,7 @@ export function ProductAppContent() {
     if (activeSection === "control-center") {
       return (
         <ProductWorkspaceSection {...copy}>
-          <ProductControlCenter status={controlCenterStatus} />
+          <ProductControlCenter status={controlCenterStatus} automationStatus={automationStatus} />
         </ProductWorkspaceSection>
       );
     }

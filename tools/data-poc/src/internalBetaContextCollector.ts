@@ -32,6 +32,7 @@ export type InternalBetaContextCollectorResult = {
   context_run_id: string;
   request_counts: Record<string, number>;
   refreshed_source_ids: ContextSourceId[];
+  source_health: Record<ContextSourceId, "READY" | "DEGRADED" | "UNAVAILABLE">;
   context: ApprovedSourcesRunOutput;
   context_publish: AtomicPublishResult;
 };
@@ -67,6 +68,7 @@ export async function runInternalBetaContextCollector(
     context_run_id: contextRunId,
     request_counts: requestCounts,
     refreshed_source_ids: refreshedSourceIds,
+    source_health: collected.source_health,
     context,
     context_publish: contextPublish,
   };

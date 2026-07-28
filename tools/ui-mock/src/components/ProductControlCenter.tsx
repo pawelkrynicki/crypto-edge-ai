@@ -13,6 +13,7 @@ import {
   type ProductLocale,
 } from "../productI18n";
 import { formatProductRuntimeMode, formatProductSourceLabel } from "../productPresentation";
+import type { AutomationStatus } from "../services/automationStatusDataSource";
 import { loadOwnerOperationsStatus, type OwnerOperationsStatus } from "../services/ownerOperationsDataSource";
 import { OwnerOperationsPanel } from "./OwnerOperationsPanel";
 import { TechnicalDetails } from "./ProductUi";
@@ -45,14 +46,22 @@ const RELEASE_GATE_CHECKLIST: readonly ControlCenterBlocker[] = [
 
 export function ProductControlCenter({
   status,
+  automationStatus,
   ownerOperationsStatus: providedOwnerOperationsStatus,
 }: {
   status: ControlCenterStatus | null;
+  automationStatus?: AutomationStatus | null;
   ownerOperationsStatus?: OwnerOperationsStatus | null;
 }) {
   const { locale, t } = useProductLocale();
   const ui = CONTROL_UI_COPY[locale];
   const overallStatus = status?.overallStatus ?? "NOT_READY";
+  const openReleaseGateCount = status
+    ? RELEASE_GATE_CHECKLIST.filter((gate) => status.unmetGates.includes(gate)).length
+    : RELEASE_GATE_CHECKLIST.length;
+  const nextReleaseGate = RELEASE_GATE_CHECKLIST.find((gate) => (
+    status === null || status.unmetGates.includes(gate)
+  ));
   const [loadedOwnerOperationsStatus, setLoadedOwnerOperationsStatus] = useState<OwnerOperationsStatus | null>(null);
   const ownerOperationsStatus = providedOwnerOperationsStatus === undefined
     ? loadedOwnerOperationsStatus
@@ -76,8 +85,9 @@ export function ProductControlCenter({
           <p>{t("control.summaryExplanation")}</p>
         </div>
         <div className="product-control-overall">
+          <span className="product-control-release-label">{ui.testerReleaseReadiness}</span>
           <StatusBadge status={overallStatus} t={t} />
-          <strong>{status?.unmetGates.length ?? 0}</strong>
+          <strong>{openReleaseGateCount}</strong>
           <span>{ui.blockerCount}</span>
         </div>
       </section>
@@ -107,11 +117,25 @@ export function ProductControlCenter({
           <ControlCard
             title={t("control.data.title")}
             status={status.dataSnapshots.status}
+            badgeLabel={status.dataSnapshots.status === "READY" ? t("control.data.mechanismReady") : undefined}
             explanation={t("control.data.explanation")}
             nextStep={t("control.data.next")}
             details={[
-              [t("control.field.scannerSnapshot"), dateValue(status.dataSnapshots.scanner.generatedAt, locale, t)],
-              [t("control.field.contextSnapshot"), dateValue(status.dataSnapshots.context.generatedAt, locale, t)],
+              [t("control.field.publishedSnapshot"), publishedSnapshotValue(automationStatus, status.automation.lastResult, t)],
+              [t("control.field.snapshotTime"), dateValue(
+                automationStatus?.snapshot_generated_at
+                  ?? status.dataSnapshots.scanner.generatedAt
+                  ?? status.dataSnapshots.context.generatedAt,
+                locale,
+                t,
+              )],
+              [t("control.field.lastAttempt"), dateValue(
+                automationStatus?.last_attempt_at ?? status.automation.lastRunAt,
+                locale,
+                t,
+              )],
+              [t("control.field.lastFullSuccess"), dateValue(automationStatus?.last_success_at ?? null, locale, t)],
+              [t("control.field.partialSource"), partialSourceValue(automationStatus, status.sources.affectedSourceIds, t)],
               [t("control.field.scannerFreshness"), freshnessValue(status.dataSnapshots.scanner.freshness, t)],
               [t("control.field.contextFreshness"), freshnessValue(status.dataSnapshots.context.freshness, t)],
               [t("control.field.lastKnownGood"), booleanValue(
@@ -121,6 +145,7 @@ export function ProductControlCenter({
               [t("control.field.newObservation"), String(status.dataSnapshots.scanner.newObservationCount)],
               [t("control.field.establishedAfterFilters"), String(status.dataSnapshots.scanner.establishedAfterFilters)],
             ]}
+            detailsVisible
             t={t}
           />
           <ControlCard
@@ -171,12 +196,13 @@ export function ProductControlCenter({
               [t("control.field.nextDue"), dateValue(status.followUp.nextDueAt, locale, t)],
               [locale === "pl" ? "Ostatni ingest / zapis store" : "Last ingest / store update", dateValue(status.followUp.lastUpdatedAt, locale, t)],
               [
-                locale === "pl" ? "Automatyczne śledzenie" : "Automatic tracking",
+                t("control.field.centralCycleHandling"),
                 status.followUp.storeAvailable
                   && (status.followUp.validationStatus === "valid" || status.followUp.validationStatus === "recovered")
-                  ? (locale === "pl" ? "Aktywne" : "Active")
+                  ? t("control.value.active")
                   : (locale === "pl" ? "Niedostępne" : "Unavailable"),
               ],
+              [t("control.field.centralCycleSchedule"), t("control.value.notInstalled")],
             ]}
             detailsVisible
             t={t}
@@ -247,6 +273,8 @@ export function ProductControlCenter({
             <ControlCard
               title={t("control.access.title")}
               status={status.accessDeployment.status}
+              badgeLabel={status.accessDeployment.status === "NOT_READY" ? ui.finalReleaseStage : undefined}
+              badgeTone={status.accessDeployment.status === "NOT_READY" ? "MANUAL_CHECK_REQUIRED" : undefined}
               explanation={t("control.access.explanation")}
               nextStep={t("control.access.next")}
               details={[
@@ -296,8 +324,8 @@ export function ProductControlCenter({
         <span className="product-control-group-number">05</span>
         <div>
           <h3 id="safe-next-step-heading">{ui.safeNextStep}</h3>
-          <p>{status?.unmetGates[0]
-            ? t(BLOCKER_TRANSLATION_KEYS[status.unmetGates[0]])
+          <p>{nextReleaseGate
+            ? t(BLOCKER_TRANSLATION_KEYS[nextReleaseGate])
             : ui.safeNextStepReady}</p>
         </div>
       </section>
@@ -312,6 +340,8 @@ function ControlCard({
   nextStep,
   details,
   detailsVisible = false,
+  badgeLabel,
+  badgeTone,
   t,
 }: {
   title: string;
@@ -320,13 +350,16 @@ function ControlCard({
   nextStep: string;
   details: Array<[string, string]>;
   detailsVisible?: boolean;
+  badgeLabel?: string;
+  badgeTone?: ControlCenterReadinessStatus;
   t: Translator;
 }) {
+  const presentationStatus = badgeTone ?? status;
   return (
-    <article className={`control-status-card product-control-card ${statusClass(status)}`} data-interaction="read-only">
+    <article className={`control-status-card product-control-card ${statusClass(presentationStatus)}`} data-interaction="read-only">
       <div className="control-status-card-topline">
         <h4>{title}</h4>
-        <StatusBadge status={status} t={t} />
+        <StatusBadge status={presentationStatus} label={badgeLabel} t={t} />
       </div>
       <p className="product-control-explanation">{explanation}</p>
       {status !== "READY" && (
@@ -380,8 +413,16 @@ function ControlGroup({
   );
 }
 
-function StatusBadge({ status, t }: { status: ControlCenterReadinessStatus; t: Translator }) {
-  return <span className={`control-status-badge ${statusClass(status)}`}>{statusLabel(status, t)}</span>;
+function StatusBadge({
+  status,
+  label,
+  t,
+}: {
+  status: ControlCenterReadinessStatus;
+  label?: string;
+  t: Translator;
+}) {
+  return <span className={`control-status-badge ${statusClass(status)}`}>{label ?? statusLabel(status, t)}</span>;
 }
 
 function statusClass(status: ControlCenterReadinessStatus): string {
@@ -431,10 +472,39 @@ function sourceAvailabilityValue(
   return t("status.unavailable");
 }
 
-function resultValue(value: "SUCCESS" | "FAILED" | null, t: Translator): string {
+function resultValue(value: "SUCCESS" | "PARTIAL" | "FAILED" | null, t: Translator): string {
   if (value === "SUCCESS") return t("control.value.success");
+  if (value === "PARTIAL") return t("control.status.partial");
   if (value === "FAILED") return t("control.value.failed");
   return t("app.noData");
+}
+
+function publishedSnapshotValue(
+  automationStatus: AutomationStatus | null | undefined,
+  fallback: "SUCCESS" | "PARTIAL" | "FAILED" | null,
+  t: Translator,
+): string {
+  const dataStatus = automationStatus?.data_status;
+  const cycleStatus = automationStatus?.cycle_status ?? automationStatus?.last_result ?? fallback;
+  if (dataStatus === "PARTIAL" || cycleStatus === "PARTIAL") return t("control.value.partialSnapshot");
+  if (dataStatus === "FRESH" || cycleStatus === "SUCCESS") return t("control.value.fullSnapshot");
+  if (dataStatus === "LAST_KNOWN_GOOD") return t("automation.lastKnownGood");
+  if (dataStatus === "STALE") return t("status.delayed");
+  if (dataStatus === "IN_PROGRESS" || cycleStatus === "IN_PROGRESS") return t("automation.inProgress");
+  if (cycleStatus === "FAILED") return t("control.value.failed");
+  return t("app.noData");
+}
+
+function partialSourceValue(
+  automationStatus: AutomationStatus | null | undefined,
+  fallbackSourceIds: string[],
+  t: Translator,
+): string {
+  const cycleSourceIds = Object.entries(automationStatus?.source_statuses ?? {})
+    .filter(([, sourceStatus]) => sourceStatus === "DEGRADED" || sourceStatus === "UNAVAILABLE")
+    .map(([sourceId]) => sourceId);
+  const sourceIds = cycleSourceIds.length > 0 ? cycleSourceIds : fallbackSourceIds;
+  return sourceIds.map(formatProductSourceLabel).join(", ") || t("app.noData");
 }
 
 function validationValue(value: "valid" | "invalid" | "unavailable", t: Translator): string {
@@ -452,10 +522,11 @@ function ownerCapabilityValue(mode: OwnerOperationsStatus["mode"], locale: Produ
 const CONTROL_UI_COPY = {
   pl: {
     blockerCount: "otwartych warunków",
+    testerReleaseReadiness: "Gotowość udostępnienia zaufanemu testerowi",
     dataReadiness: "Gotowość danych",
     dataReadinessHelp: "Dostępność środowiska, migawek i zatwierdzonych źródeł.",
-    productCapabilities: "Możliwości produktu",
-    productCapabilitiesHelp: "Funkcje działające lokalnie i ich aktualny poziom gotowości.",
+    productCapabilities: "Gotowość funkcjonalna produktu",
+    productCapabilitiesHelp: "Funkcje dostępne lokalnie, niezależnie od końcowych warunków udostępnienia testerowi.",
     accessGates: "Dostęp i wdrożenie",
     accessGatesHelp: "Oddziela lokalną gotowość produktu od dostępu zewnętrznego.",
     ownerDecisions: "Decyzje właściciela i warunki udostępnienia",
@@ -463,13 +534,15 @@ const CONTROL_UI_COPY = {
     conditionCompleted: "Potwierdzono",
     safeNextStep: "Bezpieczny następny krok",
     safeNextStepReady: "Kontynuuj lokalny przegląd bez zmiany trybu runtime ani uruchamiania providerów.",
+    finalReleaseStage: "Etap końcowy",
   },
   en: {
     blockerCount: "open conditions",
+    testerReleaseReadiness: "Trusted tester release readiness",
     dataReadiness: "Data readiness",
     dataReadinessHelp: "Runtime, snapshot and approved-source availability.",
-    productCapabilities: "Product capabilities",
-    productCapabilitiesHelp: "Features available locally and their current readiness.",
+    productCapabilities: "Product functional readiness",
+    productCapabilitiesHelp: "Features available locally, independent of the final tester release conditions.",
     accessGates: "Access and deployment",
     accessGatesHelp: "Separates local product readiness from external access.",
     ownerDecisions: "Owner decisions and release conditions",
@@ -477,5 +550,6 @@ const CONTROL_UI_COPY = {
     conditionCompleted: "Confirmed",
     safeNextStep: "Safe next step",
     safeNextStepReady: "Continue local review without changing runtime mode or calling providers.",
+    finalReleaseStage: "Final stage",
   },
 } as const;

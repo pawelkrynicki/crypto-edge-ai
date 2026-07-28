@@ -15,6 +15,8 @@ export type AutomationSchedulerDecision =
   | "STATE_UNAVAILABLE";
 
 export type AutomationRequestCounts = Record<string, number>;
+export type AutomationSourceStatus = "READY" | "DEGRADED" | "UNAVAILABLE" | "NOT_INVOKED";
+export type AutomationCycleStatus = "IN_PROGRESS" | "SUCCESS" | "PARTIAL" | "FAILED" | null;
 
 export type AutomationState = {
   schema_version: typeof AUTOMATION_STATE_SCHEMA_VERSION;
@@ -23,8 +25,21 @@ export type AutomationState = {
   last_failure_at: string | null;
   last_run_id: string | null;
   active_run_id: string | null;
-  last_result: "SUCCESS" | "FAILED" | null;
+  last_result: "SUCCESS" | "PARTIAL" | "FAILED" | null;
   last_error_code: string | null;
+  cycle_id: string | null;
+  cycle_status: AutomationCycleStatus;
+  cycle_duration_ms: number | null;
+  snapshot_generated_at: string | null;
+  records_received: number;
+  records_valid: number;
+  records_rejected: number;
+  new_records: number;
+  follow_up_ingested: number;
+  checkpoints_processed: number;
+  source_statuses: Record<string, AutomationSourceStatus>;
+  failure_code: string | null;
+  safe_error: string | null;
   request_counts: AutomationRequestCounts;
   last_published_scanner_run_id: string | null;
   last_published_context_run_id: string | null;
@@ -66,6 +81,19 @@ export function createInitialAutomationState(): AutomationState {
     active_run_id: null,
     last_result: null,
     last_error_code: null,
+    cycle_id: null,
+    cycle_status: null,
+    cycle_duration_ms: null,
+    snapshot_generated_at: null,
+    records_received: 0,
+    records_valid: 0,
+    records_rejected: 0,
+    new_records: 0,
+    follow_up_ingested: 0,
+    checkpoints_processed: 0,
+    source_statuses: {},
+    failure_code: null,
+    safe_error: null,
     request_counts: {},
     last_published_scanner_run_id: null,
     last_published_context_run_id: null,
@@ -137,10 +165,23 @@ export function normalizeAutomationState(value: unknown): AutomationState {
     last_failure_at: nullableIso(record.last_failure_at),
     last_run_id: nullableSafeText(record.last_run_id),
     active_run_id: nullableSafeText(record.active_run_id),
-    last_result: record.last_result === null || record.last_result === "SUCCESS" || record.last_result === "FAILED"
+    last_result: record.last_result === null || record.last_result === "SUCCESS" || record.last_result === "PARTIAL" || record.last_result === "FAILED"
       ? record.last_result
       : invalidState(),
     last_error_code: nullableSafeText(record.last_error_code),
+    cycle_id: optionalNullableSafeText(record.cycle_id ?? record.last_run_id),
+    cycle_status: optionalCycleStatus(record.cycle_status ?? record.last_result),
+    cycle_duration_ms: optionalNullableNonNegativeInteger(record.cycle_duration_ms),
+    snapshot_generated_at: optionalNullableIso(record.snapshot_generated_at),
+    records_received: optionalNonNegativeInteger(record.records_received),
+    records_valid: optionalNonNegativeInteger(record.records_valid),
+    records_rejected: optionalNonNegativeInteger(record.records_rejected),
+    new_records: optionalNonNegativeInteger(record.new_records),
+    follow_up_ingested: optionalNonNegativeInteger(record.follow_up_ingested),
+    checkpoints_processed: optionalNonNegativeInteger(record.checkpoints_processed),
+    source_statuses: normalizeSourceStatuses(record.source_statuses),
+    failure_code: optionalNullableSafeText(record.failure_code ?? record.last_error_code),
+    safe_error: optionalNullableSafeDescription(record.safe_error),
     request_counts: normalizeRequestCounts(record.request_counts),
     last_published_scanner_run_id: nullableSafeText(record.last_published_scanner_run_id),
     last_published_context_run_id: nullableSafeText(record.last_published_context_run_id),
@@ -185,6 +226,39 @@ function optionalNonNegativeInteger(value: unknown): number {
   if (value === undefined) return 0;
   if (Number.isSafeInteger(value) && Number(value) >= 0) return Number(value);
   return invalidState();
+}
+
+function optionalNullableNonNegativeInteger(value: unknown): number | null {
+  if (value === undefined || value === null) return null;
+  if (Number.isSafeInteger(value) && Number(value) >= 0) return Number(value);
+  return invalidState();
+}
+
+function optionalCycleStatus(value: unknown): AutomationCycleStatus {
+  if (value === undefined || value === null) return null;
+  if (["IN_PROGRESS", "SUCCESS", "PARTIAL", "FAILED"].includes(String(value))) {
+    return value as Exclude<AutomationCycleStatus, null>;
+  }
+  return invalidState();
+}
+
+function optionalNullableSafeDescription(value: unknown): string | null {
+  if (value === undefined || value === null) return null;
+  if (typeof value === "string" && value.length > 0 && value.length <= 240 && !/[\r\n]/.test(value)) return value;
+  return invalidState();
+}
+
+function normalizeSourceStatuses(value: unknown): Record<string, AutomationSourceStatus> {
+  if (value === undefined) return {};
+  if (!value || typeof value !== "object" || Array.isArray(value)) return invalidState();
+  const statuses: Record<string, AutomationSourceStatus> = {};
+  for (const [key, status] of Object.entries(value as Record<string, unknown>)) {
+    if (!/^[A-Za-z0-9._-]{1,64}$/.test(key) || !["READY", "DEGRADED", "UNAVAILABLE", "NOT_INVOKED"].includes(String(status))) {
+      return invalidState();
+    }
+    statuses[key] = status as AutomationSourceStatus;
+  }
+  return statuses;
 }
 
 function normalizeRequestCounts(value: unknown): AutomationRequestCounts {

@@ -55,7 +55,7 @@ export type ControlCenterReadinessInput = {
     active: boolean;
     stateAvailable: boolean;
     lastRunAt: string | null;
-    lastResult: "SUCCESS" | "FAILED" | null;
+    lastResult: "SUCCESS" | "PARTIAL" | "FAILED" | null;
     nextRunAt: string | null;
     nextDueAfterActivation: string | null;
   };
@@ -189,7 +189,7 @@ export function resolveControlCenterStatus(input: ControlCenterReadinessInput): 
       : "NOT_READY";
   const automationStatus = !input.automation.enabled
     ? "MANUAL_CHECK_REQUIRED"
-    : !input.automation.stateAvailable || input.automation.lastResult === "FAILED"
+    : !input.automation.stateAvailable || input.automation.lastResult === "FAILED" || input.automation.lastResult === "PARTIAL"
       ? "PARTIAL"
       : "READY";
   const universeStatus = input.establishedUniverse.validationStatus === "valid"

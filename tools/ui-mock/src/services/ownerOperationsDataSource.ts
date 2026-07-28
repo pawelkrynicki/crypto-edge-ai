@@ -1,6 +1,6 @@
 export type OwnerOperationsMode = "DISABLED" | "REVIEW_SAFE" | "ENABLED";
 export type OwnerRefreshPlanMode = "scanner_and_context" | "context_only" | "no_action";
-export type OwnerActionStatus = "IN_PROGRESS" | "SUCCESS" | "NO_ACTION" | "FAILED" | "RUN_ALREADY_IN_PROGRESS" | null;
+export type OwnerActionStatus = "IN_PROGRESS" | "SUCCESS" | "PARTIAL" | "NO_ACTION" | "FAILED" | "RUN_ALREADY_IN_PROGRESS" | null;
 
 export type OwnerOperationsStatus = {
   mode: OwnerOperationsMode;
@@ -122,7 +122,7 @@ function isOwnerRefreshPreview(value: unknown): value is OwnerRefreshPreview {
 
 function isOwnerRefreshResult(value: unknown): value is OwnerRefreshResult {
   return isRecord(value)
-    && ["SUCCESS", "NO_ACTION", "FAILED", "RUN_ALREADY_IN_PROGRESS"].includes(String(value.status))
+    && ["SUCCESS", "PARTIAL", "NO_ACTION", "FAILED", "RUN_ALREADY_IN_PROGRESS"].includes(String(value.status))
     && (value.run_id === undefined || isSafeText(value.run_id))
     && (value.error_code === undefined || isSafeText(value.error_code))
     && typeof value.last_known_good_preserved === "boolean";
@@ -137,7 +137,7 @@ function isPlanMode(value: unknown): value is OwnerRefreshPlanMode {
 }
 
 function isActionStatus(value: unknown): value is OwnerActionStatus {
-  return value === null || ["IN_PROGRESS", "SUCCESS", "NO_ACTION", "FAILED", "RUN_ALREADY_IN_PROGRESS"].includes(String(value));
+  return value === null || ["IN_PROGRESS", "SUCCESS", "PARTIAL", "NO_ACTION", "FAILED", "RUN_ALREADY_IN_PROGRESS"].includes(String(value));
 }
 
 function isNullableIso(value: unknown): value is string | null {

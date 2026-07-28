@@ -92,6 +92,50 @@ describe("automation status API", () => {
     }
   });
 
+  it("exposes cycle, snapshot, record and source metadata with an explicit PARTIAL data state", async () => {
+    const server = createScannerApiServer({
+      runtimeMode: "INTERNAL_BETA",
+      automation: {
+        enabled: true,
+        now: () => new Date("2026-07-28T12:10:00.000Z"),
+        readState: async () => ({
+          schema_version: "central_automation_state_v1",
+          last_result: "PARTIAL",
+          last_attempt_at: "2026-07-28T12:00:00.000Z",
+          last_success_at: "2026-07-28T11:00:00.000Z",
+          cycle_id: "automation_partial",
+          cycle_status: "PARTIAL",
+          cycle_duration_ms: 2_500,
+          snapshot_generated_at: "2026-07-28T12:09:30.000Z",
+          records_received: 21,
+          records_valid: 12,
+          records_rejected: 9,
+          new_records: 7,
+          follow_up_ingested: 3,
+          checkpoints_processed: 2,
+          source_statuses: { dexscreener: "READY", defillama_api: "DEGRADED" },
+          failure_code: null,
+          safe_error: null,
+        }),
+      },
+    });
+    await listen(server);
+    try {
+      const body = await fetchBody(server);
+      assert.equal(body.data_status, "PARTIAL");
+      assert.equal(body.cycle_id, "automation_partial");
+      assert.equal(body.cycle_duration_ms, 2_500);
+      assert.equal(body.snapshot_age_seconds, 30);
+      assert.deepEqual(
+        [body.records_received, body.records_valid, body.records_rejected, body.new_records, body.follow_up_ingested, body.checkpoints_processed],
+        [21, 12, 9, 7, 3, 2],
+      );
+      assert.deepEqual(body.source_statuses, { dexscreener: "READY", defillama_api: "DEGRADED" });
+    } finally {
+      await close(server);
+    }
+  });
+
   it("returns safe initial and unavailable states with HTTP 200", async () => {
     const missingPath = resolve(import.meta.dirname, `.missing-${crypto.randomUUID()}.json`);
     const missing = createScannerApiServer({

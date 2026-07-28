@@ -10,8 +10,8 @@ if "%~1"=="" (
   echo Planned action: unregister %TASK_NAME%
   exit /b 0
 )
-if /I not "%~1"=="--apply" (
-  echo ERROR: only --apply is supported.
+if /I not "%~1"=="--uninstall" (
+  echo ERROR: only --uninstall is supported.
   exit /b 64
 )
 if not "%~2"=="" (
