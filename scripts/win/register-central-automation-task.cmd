@@ -1,10 +1,11 @@
 @echo off
 setlocal EnableExtensions
 
+set "SCRIPT_DIR=%~dp0"
 set "TASK_NAME=Crypto Edge AI Central Automation"
 set "INTERVAL_MINUTES=5"
 set "MODE=PREVIEW"
-for %%I in ("%~dp0..\..") do set "CRYPTO_EDGE_REPO_ROOT=%%~fI"
+for %%I in ("%SCRIPT_DIR%..\..") do set "CRYPTO_EDGE_REPO_ROOT=%%~fI"
 set "CANONICAL_WRAPPER=%CRYPTO_EDGE_REPO_ROOT%\scripts\win\run-central-automation.cmd"
 set "TASK_USER=%USERDOMAIN%\%USERNAME%"
 set "BACKUP_DIRECTORY=%CRYPTO_EDGE_REPO_ROOT%\tools\data-poc\.local\automation\task-config-backup"
@@ -46,5 +47,5 @@ echo Secrets in command line: none
 
 if /I "%MODE%"=="PREVIEW" exit /b 0
 
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0register-central-automation-task.ps1" -TaskName "%TASK_NAME%" -TaskUser "%TASK_USER%" -RepoRoot "%CRYPTO_EDGE_REPO_ROOT%" -RunnerPath "%CANONICAL_WRAPPER%" -IntervalMinutes %INTERVAL_MINUTES% -BackupDirectory "%BACKUP_DIRECTORY%"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%register-central-automation-task.ps1" -TaskName "%TASK_NAME%" -TaskUser "%TASK_USER%" -RepoRoot "%CRYPTO_EDGE_REPO_ROOT%" -RunnerPath "%CANONICAL_WRAPPER%" -IntervalMinutes %INTERVAL_MINUTES% -BackupDirectory "%BACKUP_DIRECTORY%"
 exit /b %ERRORLEVEL%
