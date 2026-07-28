@@ -98,6 +98,7 @@ export function createProductVpsServer(options: ProductVpsServerOptions): Server
     establishedPromotion: options.establishedPromotion,
     followUp: options.followUp,
     reports: options.reports,
+    aiResearch: options.aiResearch,
     feedback: options.feedback,
     ownerOperations: options.ownerOperations,
     health: {

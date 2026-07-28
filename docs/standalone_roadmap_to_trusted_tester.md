@@ -1,10 +1,53 @@
 # Standalone Roadmap To Trusted Tester
 
+## AI.2 — Controlled OpenAI Live Validation
+
+AI.1 dostarczył deterministyczny Visual Candidate Research Canvas i backendowy kontrakt `ai_research_brief_v1`. AI.2 przygotowuje pierwszy kontrolowany owner smoke dla aktualnego rzeczywistego tokena: domyślnie 0 calls, osobny launcher `--live-one`, wymagany model i klucz z environment, izolowany SQLite, `store: false`, brak tools i retry, bounded timeout oraz trwały budżet jednej próby. Codex przygotowuje kod i testy offline; rzeczywisty call wykonuje później wyłącznie owner po review.
+
+Aktualna kolejność:
+
+1. AI.2A — bezpieczna ścieżka jednego live call.
+2. AI.2B — owner wykonuje jedną rzeczywistą analizę.
+3. AI.2C — ocena jakości, cache, czasu i token usage.
+4. AI.2D — maksymalnie 3–5 dodatkowych przypadków po osobnej zgodzie.
+5. UI.3 — final user navigation, accessibility i cross-browser.
+6. INT.1 — AI KINTEL Integration Readiness Pack.
+7. Lokalna regresja i Release Candidate.
+8. Finalny deployment VPS i produkcyjna konfiguracja OpenAI.
+9. Cloudflare, scheduler, smoke i rollback.
+10. Tester i freeze do 15.08.
+
+Kontrakty: `docs/ai_research_brief.md`, `docs/ai_research_openai_live_validation.md`, `docs/ai_research_brief_schema.md`, `docs/ai_kintel_ai_research_mapping.md`.
+
+## UX.1 — Global Interaction Affordance Pass
+
+UX.1 jest bieżącym etapem po zaakceptowanych UI.1, UI.2 i FLOW.1. Porządkuje rozpoznawalność akcji, linków, disclosure, pól, kart read-only, statusów i disabled states bez zmiany API, danych, lifecycle, owner gates ani provider boundary. System ma stabilne role gotowe do późniejszego mapowania na shadcn/ui i Radix; bieżący standalone nie otrzymuje Tailwind 4 ani nowych runtime dependencies.
+
+Kanoniczna kolejność:
+
+1. UX.1 — Global Interaction Affordance Pass.
+2. AI.1 — Visual Candidate Research Brief, integration-ready dla AI KINTEL.
+3. UI.3 — accessibility i cross-browser.
+4. INT.1 — AI KINTEL Integration Readiness Pack.
+5. Lokalna regresja i Release Candidate.
+6. Finalny standalone deployment VPS.
+7. Cloudflare, scheduler, smoke i rollback.
+8. Sesja testera i poprawki P0.
+9. Freeze do 15.08.
+
+Kontrakt: `docs/interaction_affordance_system.md`.
+
 ## Owner Established Promotion Flow
 
 Candidate Detail ma backend-gated sekcję ownera z read-only statusem i dry-run preview. Jedyny POST przyjmuje tylko podpisany one-time `preview_id` i potwierdzenie, ponownie sprawdza canonical record, lifecycle, basic filters, membership, universe version/checksum i lock, a następnie bezpośrednio używa Established Universe Managera.
 
-Tester nie widzi panelu ani capability. Nie ma automatycznego awansu, live provider calls, aktywacji `ENABLED`, VPS/Cloudflare/Task Scheduler changes. Persistent Feedback Loop został zaakceptowany lokalnie 23.07.2026; overall pozostaje `NOT_READY`, a następnym etapem jest **VPS i private tester preview**. Premium UI Pass nadal ma termin **27–30.07.2026**.
+Tester nie widzi panelu ani kontrolek capability. Nie ma automatycznego awansu, live provider calls, aktywacji `ENABLED`, VPS/Cloudflare/Task Scheduler changes. Persistent Feedback Loop został zaakceptowany lokalnie 23.07.2026; Premium UI.1 i UI.2 mają werdykt `ACCEPT_LOCAL_CODE`, a bieżącym etapem jest FLOW.1. Następnie realizowane są AI.1 i UI.3. Deployment pozostaje późniejszy od UI.3 i lokalnego Release Candidate.
+
+## FLOW.1 — widoczny przepływ tokena
+
+Radar i Candidate Detail pokazują **Nowe → Dalsza obserwacja → Kandydat do Established → Główny Radar** bez tworzenia nowego źródła lifecycle. Poprawna tożsamość `chain + contract_address` jest automatycznie zapisywana do Follow-up w centralnym cyklu; UI pokazuje aktywne śledzenie albo neutralne oczekiwanie, ale nie oferuje ręcznego przycisku ingestu.
+
+Tester widzi checkpointy 1/3/7/14/30, status filtrów i security, brak automatycznej promocji oraz następny krok. Owner zachowuje jedyny istniejący backend-gated flow: status → podpisany dry-run → checkbox → dialog z dokładną tożsamością → najwyżej jeden POST w `ENABLED`. Local review pozostaje w `REVIEW_SAFE`; test zapisu używa wyłącznie temporary universe i injected product data.
 
 ## Status
 
@@ -14,13 +57,13 @@ Tester nie widzi panelu ani capability. Nie ma automatycznego awansu, live provi
 - Frontend productization is now the main axis.
 - Next stage is 12E.2 Candidate Results View.
 - Reports are not the critical path for the next frontend rebuild.
-- Maturing / Follow-up Basket dodaje read-only trzecią warstwę Radaru; Owner Established Promotion Flow realizuje bezpieczną decyzję ownera, Persistent Feedback Loop jest gotowy lokalnie i zaakceptowany, a następnym etapem jest VPS/private tester preview.
+- Maturing / Follow-up Basket dodaje read-only trzecią warstwę Radaru; Owner Established Promotion Flow realizuje bezpieczną decyzję ownera, Persistent Feedback Loop jest gotowy lokalnie i zaakceptowany, UI.1 jest zaakceptowany, UI.2 domknięty w kodzie, a kolejny etap Premium UI to UI.3.
 
 ## Maturing / Follow-up Basket
 
 Wykryte tokeny są zachowywane według `chain + contract_address` i sprawdzane w checkpointach 1/3/7/14/30 dni przez istniejący centralny collector. `Candidate for Established` wymaga osobnej decyzji ownera i nigdy nie jest automatyczną promocją. Tester widzi lifecycle i statusy, ale nie może uruchamiać providerów ani zmieniać store. Overall preview pozostaje `NOT_READY`.
 
-Kolejność po local owner review: VPS/private tester preview → Final Frontend Polish / Premium UI Pass → sesja testera i poprawki P0. Plan Premium UI Pass 27–30.07 pozostaje bez zmian.
+Kolejność po local owner review: FLOW.1 → AI.1 Visual Candidate Research Brief → UI.3 accessibility i cross-browser → lokalna regresja i Release Candidate → finalny VPS deployment → Cloudflare/scheduler/smoke/rollback → sesja testera i poprawki P0 → freeze do 15.08.
 
 ## Timing Context
 
@@ -469,11 +512,15 @@ The previous static `#feedback-notes` worksheet remains demo/reference material.
 
 Status: **gotowy lokalnie i zaakceptowany — `ACCEPT_LOCAL_CODE`, 23.07.2026**. Owner review potwierdził trwałość po restarcie, jeden kanoniczny store dla capture/inbox/export/Control Center, bezpieczną prezentację danych oraz usunięcie wyłącznie feedback blockera.
 
-Pozostałe bramki to Trusted Tester Preview Mode, VPS, Cloudflare Access i domain smoke, rollback oraz owner approval. Dalsza kolejność jest stała:
+Pozostałe bramki to Premium UI, lokalny Release Candidate, Trusted Tester Preview Mode, VPS, Cloudflare Access i domain smoke, rollback oraz owner approval. Dalsza kolejność jest stała:
 
-1. VPS and private tester preview.
-2. Final Frontend Polish / Premium UI Pass (27–30.07 remains unchanged).
-3. Trusted tester session and P0 fixes.
-4. Regression, backup, documentation and freeze.
+1. FLOW.1 — visible token lifecycle.
+2. AI.1 — Visual Candidate Research Brief.
+3. UI.3 — accessibility and cross-browser.
+4. Local regression and Release Candidate.
+5. Final VPS deployment.
+6. Cloudflare, scheduler, smoke and rollback.
+7. Trusted tester session and P0 fixes.
+8. Freeze by 15.08.
 
 Feedback `READY` closes only the feedback gate. External tester access remains `NO-GO` and overall remains `NOT_READY` until deployment, access smoke, rollback and owner approval are complete.

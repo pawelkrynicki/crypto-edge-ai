@@ -21,7 +21,7 @@ export interface ExternalVerificationTarget {
   state: ExternalVerificationTargetState;
   href?: string;
   copyValue?: string;
-  copyLabel?: "Copy Contract" | "Copy Token Input";
+  copyLabel?: "Copy Contract" | "Copy Pair Address" | "Copy Link" | "Copy Token Input";
   reason?: string;
 }
 
@@ -91,7 +91,7 @@ export function buildExternalVerificationTargets(input: ExternalVerificationInpu
     buildExplorerTarget(normalized, copyValue, copyLabel),
     buildDexTarget(normalized, copyValue, copyLabel),
     buildSecurityTarget(normalized, copyValue, copyLabel),
-    buildSourceTarget(normalized, copyValue, copyLabel),
+    buildSourceTarget(normalized),
   ];
 }
 
@@ -191,8 +191,8 @@ function buildDexTarget(
     detail: "Open External Check",
     state: "link",
     href: `https://dexscreener.com/${encodeURIComponent(input.chain)}/${encodeURIComponent(input.pairAddress)}`,
-    copyValue,
-    copyLabel,
+    copyValue: input.pairAddress,
+    copyLabel: "Copy Pair Address",
   };
 }
 
@@ -218,11 +218,7 @@ function buildSecurityTarget(
   };
 }
 
-function buildSourceTarget(
-  input: Required<ExternalVerificationInput>,
-  copyValue: string,
-  copyLabel: "Copy Contract" | "Copy Token Input",
-): ExternalVerificationTarget {
+function buildSourceTarget(input: Required<ExternalVerificationInput>): ExternalVerificationTarget {
   const href = normalizeAllowlistedHttpUrl(input.sourceUrl);
 
   if (href) {
@@ -234,8 +230,8 @@ function buildSourceTarget(
       detail: "Source Freshness Unknown",
       state: "link",
       href,
-      copyValue,
-      copyLabel,
+      copyValue: href,
+      copyLabel: "Copy Link",
     };
   }
 
@@ -246,8 +242,6 @@ function buildSourceTarget(
     status: "Source Freshness Unknown",
     detail: "Manual Verification Required",
     state: "manual",
-    copyValue,
-    copyLabel,
     reason: "Manual Verification Required",
   };
 }

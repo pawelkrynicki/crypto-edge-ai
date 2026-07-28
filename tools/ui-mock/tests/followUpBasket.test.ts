@@ -112,7 +112,7 @@ describe("Follow-up read-only product boundary", () => {
       }));
       assert.match(markup, locale === "pl" ? /Trzy warstwy Radaru/ : /Three Radar layers/);
       assert.match(markup, locale === "pl" ? /Dalsza obserwacja/ : /Maturing \/ follow-up/);
-      assert.match(markup, /Established \/ (?:main Radar|główny Radar)/);
+      assert.match(markup, locale === "pl" ? /Główny Radar/ : /Established \/ main Radar/);
       assert.doesNotMatch(markup, /Add to Established|Dodaj do Established/);
       if (locale === "pl") {
         assert.doesNotMatch(markup, />MATURING</);
@@ -149,7 +149,7 @@ describe("Follow-up read-only product boundary", () => {
 
     const statuses = ["NEW", "MATURING", "CANDIDATE_FOR_ESTABLISHED", "ESTABLISHED", "ARCHIVED"] as const;
     assert.deepEqual(statuses.map((status) => formatFollowUpLifecycleStatus(status, "pl")), [
-      "Nowe", "Dalsza obserwacja", "Kandydaci do Established", "Established", "Archiwalne",
+      "Nowe", "Dalsza obserwacja", "Kandydat do Established", "Established", "Archiwalne",
     ]);
     assert.deepEqual(statuses.map((status) => formatFollowUpLifecycleStatus(status, "en")), [
       "New", "Maturing", "Candidate for Established", "Established", "Archived",
@@ -158,7 +158,10 @@ describe("Follow-up read-only product boundary", () => {
   });
 
   it("shows Candidate for Established as an owner decision and links detail only through safe identity", () => {
-    const candidate = mapPersistableScannerOutputToUiCandidates(PERSISTABLE_SCANNER_SAMPLE)[0]!;
+    const candidate = {
+      ...mapPersistableScannerOutputToUiCandidates(PERSISTABLE_SCANNER_SAMPLE)[0]!,
+      contractAddress: "So11111111111111111111111111111111111111112",
+    };
     const entry = { ...publicEntry(), chain: candidate.chain, contract_address: candidate.contractAddress, lifecycle_status: "CANDIDATE_FOR_ESTABLISHED" as const, next_review_step: "OWNER_DECISION_REQUIRED" as const };
     const englishBasket = render("en", React.createElement(MaturingFollowUpBasket, { entries: [entry], status: publicStatus() }));
     const polishBasket = render("pl", React.createElement(MaturingFollowUpBasket, { entries: [entry], status: publicStatus() }));
@@ -167,7 +170,7 @@ describe("Follow-up read-only product boundary", () => {
     const englishDetail = render("en", React.createElement(CandidateDetailView, { candidate, followUp: entry }));
     const polishDetail = render("pl", React.createElement(CandidateDetailView, { candidate, followUp: entry }));
     assert.match(englishDetail, /Candidate for Established/);
-    assert.match(polishDetail, /Kandydaci do Established/);
+    assert.match(polishDetail, /Kandydat do Established/);
     assert.doesNotMatch(polishDetail, /CANDIDATE_FOR_ESTABLISHED|CANDIDATE FOR ESTABLISHED/);
     assert.match(englishDetail, /Adding this token to Established requires a separate owner decision\./);
     assert.match(polishDetail, /Dodanie do Established wymaga osobnej, ręcznej decyzji ownera\./);

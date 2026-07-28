@@ -1,4 +1,5 @@
 import React from "react";
+import { formatProductSourceLabel } from "../productPresentation";
 import type {
   DefiContextRecord,
   FearGreedIndexRecord,
@@ -78,7 +79,7 @@ export const MarketContextPanel: React.FC<Props> = ({ state }) => {
           `Run ${context.run_id}`,
           `generated ${formatDate(context.generated_at)}`,
           context._source_meta.age_seconds == null ? null : `age ${formatAge(context._source_meta.age_seconds)}`,
-          context._source_meta.source_ids?.join(", "),
+          context._source_meta.source_ids?.map(formatProductSourceLabel).join(", "),
         ].filter((value): value is string => Boolean(value)).join(" · ")}
         summary={context.summary}
       />

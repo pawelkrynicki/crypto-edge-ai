@@ -14,6 +14,7 @@ set "RUN_CHECK=0"
 if "%~1"=="" goto args_done
 if /i "%~1"=="--control-center" set "RADAR_VIEW=control-center"
 if /i "%~1"=="--reports" set "RADAR_VIEW=reports"
+if /i "%~1"=="--feedback" set "RADAR_VIEW=feedback"
 if /i "%~1"=="--candidate-detail" set "RADAR_VIEW=candidate-detail"
 if /i "%~1"=="--owner-operations-review" set "OWNER_OPERATIONS_REVIEW=1"
 if /i "%~1"=="--established-promotion-review" set "ESTABLISHED_PROMOTION_REVIEW=1"
@@ -23,8 +24,8 @@ goto parse_args
 
 :args_done
 if "%ESTABLISHED_PROMOTION_REVIEW%"=="1" set "RADAR_VIEW=candidate-detail"
-if "%OWNER_OPERATIONS_REVIEW%"=="1" if /i not "%RADAR_VIEW%"=="control-center" (
-  echo ERROR: --owner-operations-review wymaga --control-center.
+if "%OWNER_OPERATIONS_REVIEW%"=="1" if /i not "%RADAR_VIEW%"=="control-center" if /i not "%RADAR_VIEW%"=="feedback" (
+  echo ERROR: --owner-operations-review wymaga --control-center albo --feedback.
   exit /b 1
 )
 if "%ESTABLISHED_PROMOTION_REVIEW%"=="1" if /i not "%RADAR_VIEW%"=="candidate-detail" (

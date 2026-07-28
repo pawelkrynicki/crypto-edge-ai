@@ -81,6 +81,15 @@ import {
   type FeedbackStoreOptions,
   type VerifiedFeedbackSubject,
 } from "./feedbackStore.js";
+import {
+  createAIResearchSessionManager,
+  publicAIResearchError,
+  parseAIResearchQuery,
+  parseAIResearchReviewMetricsQuery,
+  readAIResearchGenerateRequest,
+  type AIResearchApiOptions,
+} from "./aiResearchApi.js";
+import { createAIResearchService } from "./aiResearchService.js";
 
 const DEMO_CORS_ORIGINS = new Set(["http://127.0.0.1:5173", "http://localhost:5173"]);
 
@@ -103,6 +112,7 @@ export type ScannerApiHandlerOptions = {
   ownerOperations?: OwnerOperationsOptions;
   reports?: ReportsLibraryOptions;
   followUp?: FollowUpApiOptions;
+  aiResearch?: AIResearchApiOptions;
   feedback?: FeedbackStoreOptions & {
     store?: FeedbackStore;
     submissionEnabled?: boolean;
@@ -117,9 +127,16 @@ export type ScannerApiHandlerOptions = {
 
 export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}): RequestListener {
   const runtimeMode = resolveProductRuntimeMode(options.runtimeMode ?? process.env.CRYPTO_EDGE_RUNTIME_MODE);
+  const aiResearchRenderPreview = options.aiResearch?.renderPreview
+    ?? process.env.CRYPTO_EDGE_AI_RESEARCH_RENDER_PREVIEW === "1";
   const reviewSessionProvider = options.reviewSessionProvider
     ?? createConfiguredReviewSessionStorageProvider({ reviewSession: options.reviewSession });
   const scannerOptions: LatestScannerOutputOptions = { ...options.scanner, runtimeMode };
+  const aiResearchScannerOptions: LatestScannerOutputOptions = aiResearchRenderPreview ? {
+    ...options.scanner,
+    runtimeMode: "DEVELOPMENT_DEMO",
+    allowFixtureFallback: false,
+  } : scannerOptions;
   const contextOptions: LatestContextOutputOptions = { ...options.context, runtimeMode };
   const ownerMode = resolveOwnerOperationsMode(options.ownerOperations?.mode ?? process.env.CRYPTO_EDGE_OWNER_OPERATIONS_MODE);
   const ownerSessionSecret = ownerMode === "DISABLED"
@@ -161,9 +178,65 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
       options.reports,
     )),
   }));
+  const aiResearchService = options.aiResearch?.service ?? createAIResearchService({
+    ...options.aiResearch,
+    scanner: aiResearchScannerOptions,
+    followUp: options.followUp,
+    reports: options.reports,
+  });
+  const aiResearchSessionManager = createAIResearchSessionManager(options.aiResearch?.sessionSecret);
 
   return async (req, res) => {
     const path = getRequestPath(req.url);
+
+    if (req.method === "GET" && path === "/api/ai-research/status") {
+      sendJson(req, res, 200, aiResearchService.status(), runtimeMode);
+      return;
+    }
+
+    if (req.method === "GET" && path === "/api/ai-research/brief") {
+      try {
+        const session = aiResearchSessionManager.resolve(req);
+        if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
+        const query = parseAIResearchQuery(req.url);
+        sendJson(req, res, 200, await aiResearchService.getBrief(query.chain, query.contract_address, query.locale), runtimeMode);
+      } catch (error) {
+        sendAIResearchError(req, res, error, runtimeMode);
+      }
+      return;
+    }
+
+    if (req.method === "GET" && path === "/api/ai-research/review-metrics") {
+      if (!isLocalOwnerRequest(req)) {
+        sendJson(req, res, 404, { error: "not_found", message: "Route not found" }, runtimeMode);
+        return;
+      }
+      try {
+        const analysisId = parseAIResearchReviewMetricsQuery(req.url);
+        sendJson(req, res, 200, await aiResearchService.getReviewMetrics(analysisId), runtimeMode);
+      } catch (error) {
+        sendAIResearchError(req, res, error, runtimeMode);
+      }
+      return;
+    }
+
+    if (req.method === "POST" && path === "/api/ai-research/generate") {
+      try {
+        const session = aiResearchSessionManager.resolve(req);
+        if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
+        const body = await readAIResearchGenerateRequest(req);
+        sendJson(req, res, 200, await aiResearchService.generate(body, session.sessionId), runtimeMode);
+      } catch (error) {
+        sendAIResearchError(req, res, error, runtimeMode);
+      }
+      return;
+    }
+
+    if (path === "/api/ai-research" || path.startsWith("/api/ai-research/")) {
+      res.setHeader("allow", path.endsWith("/generate") ? "POST" : "GET");
+      sendJson(req, res, 405, { error: "method_not_allowed", message: "Method not allowed" }, runtimeMode);
+      return;
+    }
 
     if (req.method === "GET" && path === "/api/feedback/status") {
       const session = feedbackSessionManager.resolve(req);
@@ -752,6 +825,25 @@ function sendFeedbackError(
     message: feedbackError.code === "RATE_LIMITED"
       ? "Feedback rate limit reached"
       : feedbackError.httpStatus === 404 ? "Route or feedback not found" : "Feedback request rejected",
+  }, runtimeMode);
+}
+
+function sendAIResearchError(
+  req: IncomingMessage,
+  res: ServerResponse,
+  error: unknown,
+  runtimeMode: ResolvedProductRuntimeMode,
+): void {
+  const value = publicAIResearchError(error);
+  if (value.retryAfterSeconds !== undefined) res.setHeader("retry-after", String(value.retryAfterSeconds));
+  sendJson(req, res, value.status, {
+    schema_version: "ai_research_error_v1",
+    error: value.code,
+    message: value.code === "RATE_LIMITED"
+      ? "AI research generation is temporarily limited. Try again after the indicated time."
+      : "AI research brief is currently unavailable.",
+    retry_after_seconds: value.retryAfterSeconds ?? null,
+    cached_brief: value.cachedBrief ?? null,
   }, runtimeMode);
 }
 

@@ -99,13 +99,13 @@ describe("Control Center readiness model", () => {
     assert.equal(universe.status, "READY");
   });
 
-  it("shows Established decision capability only to the backend-confirmed owner", () => {
+  it("shows the natural Established decision status only when the backend returns capability state", () => {
     const status = resolveControlCenterStatus(baseInput());
     const tester = renderControlCenter("en", status, null);
     const owner = renderControlCenter("en", status, ownerStatus("REVIEW_SAFE"));
-    assert.doesNotMatch(tester, /Owner promotion capability|Review safe/);
-    assert.match(owner, /Owner promotion capability/);
-    assert.match(owner, /Review safe/);
+    assert.doesNotMatch(tester, /Owner decision status|Review mode/);
+    assert.match(owner, /Owner decision status/);
+    assert.match(owner, /Review mode/);
     assert.equal(status.overallStatus, "NOT_READY");
   });
 
@@ -148,9 +148,12 @@ describe("Control Center readiness model", () => {
       "REPORTS_LIBRARY",
       "PERSISTENT_FEEDBACK_CAPTURE",
     ]);
-    assert.deepEqual(blockerItems(renderControlCenter("en", status)).slice(0, 2), [
-      "Reports Library.",
-      "Persistent feedback capture.",
+    const markup = renderControlCenter("en", status);
+    assert.match(markup, /<h4>Reports<\/h4>/);
+    assert.match(markup, /<h4>Feedback<\/h4>/);
+    assert.deepEqual(blockerItems(markup).slice(0, 2), [
+      "Trusted tester preview mode",
+      "VPS deployment",
     ]);
   });
 
@@ -208,8 +211,8 @@ describe("Control Center readiness model", () => {
     assert.equal(status.reports.validReportCount, 0);
     assert.equal(status.unmetGates.includes("REPORTS_LIBRARY"), false);
     assert.equal(status.unmetGates[0], "PERSISTENT_FEEDBACK_CAPTURE");
-    assert.equal(blockerItems(renderControlCenter("en", status))[0], "Persistent feedback capture.");
-    assert.equal(blockerItems(renderControlCenter("pl", status))[0], "Trwałe zbieranie feedbacku.");
+    assert.equal(blockerItems(renderControlCenter("en", status))[0], "Trusted tester preview mode");
+    assert.equal(blockerItems(renderControlCenter("pl", status))[0], "Tryb podglądu zaufanego testera");
     assert.equal(status.overallStatus, "NOT_READY");
     assert.equal(status.accessDeployment.externalTesterAccess, "NO_GO");
   });
@@ -248,9 +251,12 @@ describe("Control Center readiness model", () => {
       "REPORTS_LIBRARY",
       "PERSISTENT_FEEDBACK_CAPTURE",
     ]);
-    assert.deepEqual(blockerItems(renderControlCenter("pl", status)).slice(0, 2), [
-      "Biblioteka raportów.",
-      "Trwałe zbieranie feedbacku.",
+    const markup = renderControlCenter("pl", status);
+    assert.match(markup, /<h4>Raporty<\/h4>/);
+    assert.match(markup, /<h4>Opinie<\/h4>/);
+    assert.deepEqual(blockerItems(markup).slice(0, 2), [
+      "Tryb podglądu zaufanego testera",
+      "Wdrożenie na VPS",
     ]);
     assert.equal(status.overallStatus, "NOT_READY");
   });
@@ -267,22 +273,18 @@ describe("Control Center readiness model", () => {
     assert.match(polish, /Biblioteka raportów wyłącznie do odczytu korzysta z kanonicznego lokalnego indeksu raportów\./);
     assert.equal(countStatusCards(english), countStatusCards(polish));
     assert.deepEqual(blockerItems(english), [
-      "Reports Library.",
-      "Persistent feedback capture.",
-      "Trusted Tester Preview Mode.",
-      "Deployment to the VPS.",
-      "Smoke through the domain and Cloudflare Access.",
-      "Rollback test.",
-      "Owner approval for the tester.",
+      "Trusted tester preview mode",
+      "VPS deployment",
+      "Domain and Cloudflare Access test",
+      "Rollback test",
+      "Owner approval for tester access",
     ]);
     assert.deepEqual(blockerItems(polish), [
-      "Biblioteka raportów.",
-      "Trwałe zbieranie feedbacku.",
-      "Trusted Tester Preview Mode.",
-      "Deployment na VPS.",
-      "Smoke przez domenę i Cloudflare Access.",
-      "Test rollbacku.",
-      "Zgoda ownera dla testera.",
+      "Tryb podglądu zaufanego testera",
+      "Wdrożenie na VPS",
+      "Test domeny i Cloudflare Access",
+      "Test rollbacku/wycofania",
+      "Zgoda właściciela na dostęp testera",
     ]);
     assert.equal(blockerItems(english).length, blockerItems(polish).length);
     assert.equal(status.overallStatus, "NOT_READY");
@@ -550,9 +552,9 @@ function countStatusCards(markup: string): number {
 }
 
 function blockerItems(markup: string): string[] {
-  const section = markup.match(/<section class="control-section product-control-blockers">([\s\S]*?)<\/section>/);
+  const section = markup.match(/<section class="control-section product-control-blockers"[^>]*>([\s\S]*?)<\/section>/);
   assert.ok(section, "Control Center blocker section is missing");
-  return Array.from(section[1].matchAll(/<li>(.*?)<\/li>/g), (match) => match[1]);
+  return Array.from(section[1].matchAll(/<li class="pending"[^>]*>[\s\S]*?<strong>(.*?)<\/strong>[\s\S]*?<\/li>/g), (match) => match[1]);
 }
 
 function listen(server: ReturnType<typeof createScannerApiServer>): Promise<void> {

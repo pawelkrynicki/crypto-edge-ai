@@ -4,6 +4,8 @@ setlocal
 set "SCRIPT_DIR=%~dp0"
 for %%I in ("%SCRIPT_DIR%..\..") do set "REPO_ROOT=%%~fI"
 set "CRYPTO_EDGE_FEEDBACK_SQLITE_PATH=%TEMP%\crypto-edge-ui-check-feedback-%RANDOM%-%RANDOM%.sqlite"
+set "CRYPTO_EDGE_AI_RESEARCH_PROVIDER=DISABLED"
+set "CRYPTO_EDGE_AI_RESEARCH_SQLITE_PATH=%TEMP%\crypto-edge-ui-check-ai-%RANDOM%-%RANDOM%.sqlite"
 
 echo.
 echo === Crypto Edge AI: ui-mock check ===
@@ -25,6 +27,11 @@ if errorlevel 1 exit /b %ERRORLEVEL%
 echo.
 echo === Run Product Radar owner acceptance tests ===
 call node --import tsx --test tests\productRadar.test.ts
+if errorlevel 1 exit /b %ERRORLEVEL%
+
+echo.
+echo === Run Premium UI.2 presentation contracts ===
+call pnpm run test:premium-ui2
 if errorlevel 1 exit /b %ERRORLEVEL%
 
 echo.
@@ -57,4 +64,7 @@ echo UI-MOCK CHECK OK
 if exist "%CRYPTO_EDGE_FEEDBACK_SQLITE_PATH%" del /q "%CRYPTO_EDGE_FEEDBACK_SQLITE_PATH%"
 if exist "%CRYPTO_EDGE_FEEDBACK_SQLITE_PATH%-wal" del /q "%CRYPTO_EDGE_FEEDBACK_SQLITE_PATH%-wal"
 if exist "%CRYPTO_EDGE_FEEDBACK_SQLITE_PATH%-shm" del /q "%CRYPTO_EDGE_FEEDBACK_SQLITE_PATH%-shm"
+if exist "%CRYPTO_EDGE_AI_RESEARCH_SQLITE_PATH%" del /q "%CRYPTO_EDGE_AI_RESEARCH_SQLITE_PATH%"
+if exist "%CRYPTO_EDGE_AI_RESEARCH_SQLITE_PATH%-wal" del /q "%CRYPTO_EDGE_AI_RESEARCH_SQLITE_PATH%-wal"
+if exist "%CRYPTO_EDGE_AI_RESEARCH_SQLITE_PATH%-shm" del /q "%CRYPTO_EDGE_AI_RESEARCH_SQLITE_PATH%-shm"
 exit /b 0

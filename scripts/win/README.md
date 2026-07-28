@@ -424,3 +424,82 @@ scripts\win\clear-feedback-loop-review.cmd
 ```
 
 These scripts do not deploy to VPS, change Cloudflare or Task Scheduler, call providers, start the collector, mutate snapshots, Follow-up, Established Universe, automation state or analyst reviews. The technical and product contract is in `docs/persistent_feedback_loop.md`.
+
+## Final Frontend Premium UI Review
+
+```cmd
+scripts\win\check-premium-ui-pass.cmd
+scripts\win\start-premium-ui-review.cmd --ui2
+scripts\win\start-premium-ui-review.cmd --radar --mobile-guide
+scripts\win\start-premium-ui-review.cmd --detail
+```
+
+`check-premium-ui-pass.cmd` is the offline UI.1 + UI.2 + FLOW.1 + UX.1 + AI.1 + AI.2 gate. It clears the inherited OpenAI key/model and every live-source or automation opt-in, keeps owner operations `DISABLED`, runs the AI Research (with local injected stubs only), Premium UI and visible lifecycle contracts, Control Center, Reports, Feedback, Product Radar/Candidate Detail tests, UI typecheck and the fixture-free `INTERNAL_BETA` build assertion.
+
+`start-premium-ui-review.cmd` reuses the ordinary real local Product Radar snapshot/store path. `--ui2` prints the required order — Control Center, Reports, Feedback, Owner Feedback Inbox, Verification, Methodology — and opens the existing `INTERNAL_BETA + REVIEW_SAFE` review path. `--radar` opens the main Radar, `--detail` opens Candidate Detail and `--mobile-guide` prints the recommended viewport sizes. It does not add a fixture fallback, activate `ENABLED`, call providers, run the collector, submit feedback or mutate snapshots/stores.
+
+Canonical design and owner checklist: `docs/final_frontend_premium_ui_pass.md`.
+
+## FLOW.1 Token Lifecycle Review
+
+```cmd
+scripts\win\start-token-flow-review.cmd
+scripts\win\start-token-flow-review.cmd --detail
+```
+
+The launcher starts the ordinary fixture-free `INTERNAL_BETA` Product Radar with current local snapshots and stores. The default opens Radar and prints the FLOW.1 owner checklist. `--detail` opens the first available Candidate Detail with owner operations still `DISABLED`; the separate Established promotion review launcher remains the only local `REVIEW_SAFE` path. The number of Maturing and Candidate records depends on the current real Follow-up Store.
+
+It does not run the collector, call providers, run bootstrap `--apply`, activate `ENABLED`, create a synthetic candidate, or mutate Follow-up and Established stores. It does not deploy to VPS, change Cloudflare, or touch Task Scheduler.
+
+## UX.1 Interaction Affordance Review
+
+```cmd
+scripts\win\start-interaction-affordance-review.cmd
+scripts\win\start-interaction-affordance-review.cmd --detail
+scripts\win\start-interaction-affordance-review.cmd --feedback
+scripts\win\start-interaction-affordance-review.cmd --owner-inbox
+scripts\win\start-interaction-affordance-review.cmd --mobile-guide
+```
+
+Launcher starts the ordinary fixture-free `INTERNAL_BETA` Radar with owner operations `DISABLED`. It prints the canonical review order for Radar, Candidate Detail, Verification, Reports, Feedback, Owner Inbox, Methodology, Control Center, mobile 390 px and keyboard-only review. `--detail` and `--feedback` select the initial screen; `--mobile-guide` prints the 390 px checks. The Owner Inbox is intentionally absent in the default review and requires `--owner-inbox`; that option delegates to the same canonical `REVIEW_SAFE` owner-authenticated path used by UI.2 and does not enable mutations.
+
+It does not call providers, run the collector, submit feedback, execute owner actions, run bootstrap `--apply`, activate `ENABLED`/`PUBLIC_BETA`, mutate product stores, bypass owner authentication, deploy to VPS, change Cloudflare or touch Task Scheduler. Contract: `docs/interaction_affordance_system.md`.
+
+Delivery order:
+
+1. AI.2A — safe one-live-call path.
+2. AI.2B — owner performs one real analysis.
+3. AI.2C — quality, cache, latency and token-usage assessment.
+4. AI.2D — at most 3–5 additional cases after separate approval.
+5. UI.3 — final navigation, accessibility and cross-browser.
+6. INT.1 — AI KINTEL Integration Readiness Pack.
+7. Local regression and Release Candidate.
+8. Final VPS deployment and production OpenAI configuration.
+9. Cloudflare, scheduler, smoke and rollback.
+10. Tester and freeze by 15.08.
+
+## AI.1 Research Brief Review
+
+```cmd
+scripts\win\start-ai-research-brief-review.cmd
+scripts\win\start-ai-research-brief-review.cmd --render-preview
+scripts\win\start-ai-research-brief-review.cmd --render-preview --mobile-guide
+```
+
+The default opens Candidate Detail in fixture-free `INTERNAL_BETA` with the AI provider `DISABLED`; AI and Feedback SQLite paths are isolated under `%TEMP%`, so canonical stores remain untouched. `--render-preview` builds a deterministic `ai_research_brief_v1` in process memory from the newest real local candidate, never falls back to a fixture, records zero token usage and never opens or writes the AI SQLite store. It shows the explicit “Podgląd formatu — bez wywołania AI” badge. `--mobile-guide` prints the 390 px checks.
+
+The launcher clears every live provider, collector and automation opt-in and keeps owner operations `DISABLED`. It never performs a real OpenAI call, data-provider call, collector run, bootstrap `--apply`, lifecycle change, owner action, VPS deployment, Cloudflare change or Task Scheduler change. Contract and rollback: `docs/ai_research_brief.md`.
+
+## AI.2 Controlled OpenAI Validation Review
+
+```cmd
+scripts\win\start-ai-research-openai-review.cmd
+scripts\win\start-ai-research-openai-review.cmd --live-one
+scripts\win\clear-ai-research-openai-review.cmd
+```
+
+The default command is the no-cost owner review: it clears `OPENAI_API_KEY` for the child runtime, forces provider `DISABLED`, opens current Candidate Detail and uses only `tools\ui-mock\.local\ai-research-openai-review.sqlite`. It never calls OpenAI at startup or on navigation.
+
+`--live-one` is reserved for a later manual owner run after code review. It fails before runtime startup unless both `OPENAI_API_KEY` and `CRYPTO_EDGE_AI_RESEARCH_MODEL` are present, then sets provider `OPENAI`, `INTERNAL_BETA`, forces concurrency 1 and sets `CRYPTO_EDGE_AI_RESEARCH_LIVE_CALL_BUDGET=1`. Startup remains read-only. Only the explicit **Wygeneruj analizę AI** click can reserve the single call. The SDK uses `store: false`, `background: false`, no tools, strict `json_schema`, bounded timeout and `maxRetries: 0`.
+
+The review database persists the one-call reservation even after an API/validation failure or runtime restart. Cache hit and render preview consume no budget. The cleanup script removes only that SQLite plus its WAL and SHM; it never kills a process and fails with a close-runtime instruction if files remain locked. Full quality, cache, failure and rollback checklist: `docs/ai_research_openai_live_validation.md`.

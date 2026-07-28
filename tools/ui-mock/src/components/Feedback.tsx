@@ -22,6 +22,7 @@ import {
   type OwnerFeedbackListItem,
   type OwnerFeedbackStatus,
 } from "../services/feedbackDataSource";
+import { ActionButton, ActionLink, ProductIcon, StatusBadge, TechnicalDetails } from "./ProductUi";
 
 type FeedbackProps = {
   screenContext: FeedbackScreenContext;
@@ -29,6 +30,7 @@ type FeedbackProps = {
   subjectLabel?: string;
   initialPublicStatus?: FeedbackPublicStatus | null;
   initialOwnerStatus?: OwnerFeedbackStatus | null;
+  initialReceipt?: FeedbackReceipt | null;
   refreshRevision?: number;
   onFeedbackRecorded?: () => void | Promise<void>;
 };
@@ -54,20 +56,29 @@ export function Feedback({
   subjectLabel,
   initialPublicStatus,
   initialOwnerStatus,
+  initialReceipt,
   refreshRevision = 0,
   onFeedbackRecorded,
 }: FeedbackProps) {
   const { locale } = useProductLocale();
   const copy = feedbackCopy(locale);
   const [publicStatus, setPublicStatus] = useState<Awaited<ReturnType<typeof loadFeedbackStatus>>>(initialPublicStatus ?? null);
-  const [category, setCategory] = useState<FeedbackCategory>("BLOCKER");
+  const [category, setCategory] = useState<FeedbackCategory | null>(null);
   const [title, setTitle] = useState("");
   const [details, setDetails] = useState("");
   const [submissionKey, setSubmissionKey] = useState(createSubmissionKey);
-  const [state, setState] = useState<"idle" | "submitting" | "error" | "rate_limited" | "success">("idle");
-  const [receipt, setReceipt] = useState<FeedbackReceipt | null>(null);
+  const [state, setState] = useState<"idle" | "submitting" | "error" | "rate_limited" | "success">(initialReceipt ? "success" : "idle");
+  const [receipt, setReceipt] = useState<FeedbackReceipt | null>(initialReceipt ?? null);
   const [ownerInboxRevision, setOwnerInboxRevision] = useState(0);
   const submittingRef = useRef(false);
+  const titleLength = title.trim().length;
+  const detailsLength = details.trim().length;
+  const missingRequirements = [
+    category === null ? copy.missingCategory : null,
+    titleLength < 5 ? copy.missingTitle(titleLength) : null,
+    detailsLength < 20 ? copy.missingDetails(detailsLength) : null,
+  ].filter((message): message is string => message !== null);
+  const formComplete = category !== null && missingRequirements.length === 0;
 
   useEffect(() => {
     if (initialPublicStatus !== undefined) return;
@@ -78,11 +89,12 @@ export function Feedback({
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (submittingRef.current || !publicStatus?.submission_enabled) return;
+    if (!formComplete || submittingRef.current || state === "submitting" || !publicStatus?.submission_enabled) return;
     const selectedCategory = resolveSelectedFeedbackCategory(
       new FormData(event.currentTarget).get("feedback-category"),
       category,
     );
+    if (!selectedCategory) return;
     submittingRef.current = true;
     setState("submitting");
     try {
@@ -107,6 +119,7 @@ export function Feedback({
   };
 
   const reset = () => {
+    setCategory(null);
     setTitle("");
     setDetails("");
     setReceipt(null);
@@ -117,7 +130,7 @@ export function Feedback({
   return (
     <div className="feedback-workspace">
       <section className="feedback-hero">
-        <span className="section-label">Feedback</span>
+        <span className="section-label">{copy.eyebrow}</span>
         <h3>{copy.heading}</h3>
         <p>{copy.description}</p>
       </section>
@@ -135,18 +148,10 @@ export function Feedback({
           ) : !publicStatus.submission_enabled ? (
             <div className="feedback-notice error" role="alert">{copy.unavailable}</div>
           ) : state === "success" && receipt ? (
-            <div className="feedback-success" role="status">
-              <span aria-hidden="true">✓</span>
-              <h4>{receipt.submission_status === "ALREADY_RECORDED" ? copy.duplicate : copy.success}</h4>
-              <dl>
-                <div><dt>{copy.receipt}</dt><dd>{shortFeedbackId(receipt.feedback_id)}</dd></div>
-                <div><dt>{copy.category}</dt><dd>{categoryCopy[locale][receipt.category].label}</dd></div>
-                <div><dt>{copy.savedAt}</dt><dd>{formatProductDateTime(receipt.created_at, locale)}</dd></div>
-              </dl>
-              <button type="button" className="product-primary-button" onClick={reset}>{copy.addAnother}</button>
-            </div>
+            <FeedbackReceiptPanel receipt={receipt} onReset={reset} />
           ) : (
-            <form onSubmit={(event) => void submit(event)} className="feedback-form">
+            <form onSubmit={(event) => void submit(event)} className="feedback-form" aria-describedby="feedback-form-purpose">
+              <p id="feedback-form-purpose" className="feedback-form-purpose">{copy.formPurpose}</p>
               <fieldset>
                 <legend>{copy.category}</legend>
                 <div className="feedback-category-grid">
@@ -166,7 +171,7 @@ export function Feedback({
               </fieldset>
 
               <label className="feedback-field">
-                <span>{copy.title}</span>
+                <span>{copy.title} <em>{copy.required}</em></span>
                 <input
                   value={title}
                   onChange={(event) => setTitle(event.target.value)}
@@ -174,29 +179,48 @@ export function Feedback({
                   maxLength={publicStatus.max_title_length}
                   required
                   autoComplete="off"
+                  aria-describedby="feedback-title-help"
                 />
-                <small>{Math.max(0, publicStatus.max_title_length - [...title].length)} {copy.charactersLeft}</small>
+                <small id="feedback-title-help">{copy.titleHelp} · {Math.max(0, publicStatus.max_title_length - [...title].length)} {copy.charactersLeft}</small>
               </label>
 
               <label className="feedback-field">
-                <span>{copy.details}</span>
+                <span>{copy.details} <em>{copy.required}</em></span>
                 <textarea
                   value={details}
                   onChange={(event) => setDetails(event.target.value)}
                   minLength={20}
                   maxLength={publicStatus.max_details_length}
-                  rows={8}
+                  rows={6}
                   required
+                  aria-describedby="feedback-details-help"
                 />
-                <small>{Math.max(0, publicStatus.max_details_length - [...details].length)} {copy.charactersLeft}</small>
+                <small id="feedback-details-help">{copy.detailsHelp} · {Math.max(0, publicStatus.max_details_length - [...details].length)} {copy.charactersLeft}</small>
               </label>
 
               <p className="feedback-privacy">{copy.privacy}</p>
-              {state === "error" && <p className="feedback-inline-error" role="alert">{copy.error}</p>}
-              {state === "rate_limited" && <p className="feedback-inline-error" role="alert">{copy.rateLimit}</p>}
-              <button type="submit" className="product-primary-button" disabled={state === "submitting"}>
-                {state === "submitting" ? copy.sending : copy.send}
-              </button>
+              <div aria-live="polite">
+                {state === "error" && <p className="feedback-inline-error" role="alert">{copy.error}</p>}
+                {state === "rate_limited" && <p className="feedback-inline-error" role="alert">{copy.rateLimit}</p>}
+              </div>
+              {!formComplete && (
+                <div className="feedback-disabled-help" id="feedback-submit-help" role="status" aria-live="polite">
+                  <ul>
+                    {missingRequirements.map((message) => <li key={message}>{message}</li>)}
+                  </ul>
+                </div>
+              )}
+              <ActionButton
+                type="submit"
+                variant="primary"
+                className="product-primary-button"
+                loading={state === "submitting"}
+                loadingLabel={copy.sending}
+                disabled={!formComplete || state === "submitting"}
+                aria-describedby={!formComplete ? "feedback-submit-help" : undefined}
+              >
+                {copy.send}
+              </ActionButton>
             </form>
           )}
         </section>
@@ -216,6 +240,33 @@ export function Feedback({
   );
 }
 
+export function FeedbackReceiptPanel({ receipt, onReset }: { receipt: FeedbackReceipt; onReset: () => void }) {
+  const { locale } = useProductLocale();
+  const copy = feedbackCopy(locale);
+  const duplicate = receipt.submission_status === "ALREADY_RECORDED";
+  return (
+    <div className={`feedback-success ${duplicate ? "duplicate" : "recorded"}`} role="status" aria-live="polite">
+      <div className="feedback-receipt-heading">
+        <span className="feedback-receipt-mark" aria-hidden="true">✓</span>
+        <div>
+          <StatusBadge tone={duplicate ? "partial" : "ready"}>{duplicate ? copy.alreadyRecorded : copy.recorded}</StatusBadge>
+          <h4>{duplicate ? copy.duplicate : copy.success}</h4>
+        </div>
+      </div>
+      <dl>
+        <div><dt>{copy.receipt}</dt><dd>{shortFeedbackId(receipt.feedback_id)}</dd></div>
+        <div><dt>{copy.category}</dt><dd>{categoryCopy[locale][receipt.category].label}</dd></div>
+        <div><dt>{copy.savedAt}</dt><dd>{formatProductDateTime(receipt.created_at, locale)}</dd></div>
+      </dl>
+      <p className="feedback-receipt-next">{duplicate ? copy.duplicateNext : copy.successNext}</p>
+      <div className="feedback-receipt-actions">
+        <ActionLink variant="primary" icon="arrow" iconPosition="end" className="product-primary-button" href="#candidate-results">{copy.returnToProduct}</ActionLink>
+        <ActionButton variant="secondary" className="reports-secondary-button" onClick={onReset}>{copy.addAnother}</ActionButton>
+      </div>
+    </div>
+  );
+}
+
 function OwnerFeedbackInbox({
   initialStatus,
   refreshRevision,
@@ -230,10 +281,16 @@ function OwnerFeedbackInbox({
   const [detail, setDetail] = useState<OwnerFeedbackDetail | null>(null);
   const [category, setCategory] = useState<FeedbackCategory | "">("");
   const [feedbackStatus, setFeedbackStatus] = useState<FeedbackStatus | "">("");
+  const [itemsLoading, setItemsLoading] = useState(initialStatus === undefined);
+  const [listUnavailable, setListUnavailable] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const inboxIsEmpty = status?.total_count === 0 && !itemsLoading && !listUnavailable;
 
   useEffect(() => {
     if (initialStatus !== undefined) return;
     let active = true;
+    setItemsLoading(true);
+    setListUnavailable(false);
     void Promise.all([
       loadOwnerFeedbackStatus(),
       loadOwnerFeedbackList({
@@ -244,13 +301,17 @@ function OwnerFeedbackInbox({
       if (!active) return;
       if (nextStatus) setStatus(nextStatus);
       if (nextItems) setItems(nextItems);
+      else if (nextStatus) setListUnavailable(true);
+      setItemsLoading(false);
     });
     return () => { active = false; };
   }, [category, feedbackStatus, initialStatus, refreshRevision]);
 
   const openDetail = async (feedbackId: string) => {
+    setDetailLoading(true);
     const value = await loadOwnerFeedbackDetail(feedbackId);
     if (value) setDetail(value);
+    setDetailLoading(false);
   };
 
   if (!status) return null;
@@ -263,20 +324,19 @@ function OwnerFeedbackInbox({
           <h3>{copy.inboxHeading}</h3>
           <p>{copy.inboxDescription}</p>
         </div>
-        <div className={`feedback-storage-status ${status.feedback_status.toLowerCase()}`}>
-          {status.feedback_status}
-        </div>
+        <StatusBadge tone={readinessTone(status.feedback_status)}>{formatReadiness(status.feedback_status, locale)}</StatusBadge>
       </header>
 
       <div className="owner-feedback-stats">
-        <FeedbackStat label={copy.total} value={status.total_count} />
-        <FeedbackStat label={copy.newItems} value={status.new_count} />
-        <FeedbackStat label={copy.blockers} value={status.blocker_count} />
-        <FeedbackStat label={copy.improvements} value={status.improvement_count} />
-        <FeedbackStat label={copy.clarifications} value={status.clarification_count} />
-        <FeedbackStat label={copy.laterItems} value={status.later_count} />
-        <FeedbackStat label={copy.latest} value={status.latest_feedback_at ? formatProductDateTime(status.latest_feedback_at, locale) : "—"} />
+        <FeedbackFilterStat active={!category && !feedbackStatus} label={copy.total} value={status.total_count} onClick={() => { setCategory(""); setFeedbackStatus(""); setDetail(null); }} />
+        <FeedbackFilterStat active={feedbackStatus === "NEW"} label={copy.newItems} value={status.new_count} onClick={() => { setCategory(""); setFeedbackStatus("NEW"); setDetail(null); }} />
+        <FeedbackFilterStat active={category === "BLOCKER"} label={copy.blockers} value={status.blocker_count} onClick={() => { setCategory("BLOCKER"); setFeedbackStatus(""); setDetail(null); }} />
+        <FeedbackFilterStat active={category === "IMPROVEMENT"} label={copy.improvements} value={status.improvement_count} onClick={() => { setCategory("IMPROVEMENT"); setFeedbackStatus(""); setDetail(null); }} />
+        <FeedbackFilterStat active={category === "CLARIFICATION"} label={copy.clarifications} value={status.clarification_count} onClick={() => { setCategory("CLARIFICATION"); setFeedbackStatus(""); setDetail(null); }} />
+        <FeedbackFilterStat active={category === "LATER"} label={copy.laterItems} value={status.later_count} onClick={() => { setCategory("LATER"); setFeedbackStatus(""); setDetail(null); }} />
       </div>
+
+      <p className="owner-feedback-latest">{copy.latest}: <strong>{status.latest_feedback_at ? formatProductDateTime(status.latest_feedback_at, locale) : "—"}</strong></p>
 
       <div className="owner-feedback-toolbar">
         <label>{copy.category}
@@ -296,30 +356,56 @@ function OwnerFeedbackInbox({
             setDetail(null);
           }}>
             <option value="">{copy.all}</option>
-            {FEEDBACK_STATUSES.map((value) => <option value={value} key={value}>{value}</option>)}
+            {FEEDBACK_STATUSES.map((value) => <option value={value} key={value}>{formatOwnerFeedbackStatus(value, locale)}</option>)}
           </select>
         </label>
         <div className="owner-feedback-export">
-          <a href={getOwnerFeedbackExportUrl("json")} download>{copy.exportJson}</a>
-          <a href={getOwnerFeedbackExportUrl("csv")} download>{copy.exportCsv}</a>
+          {status.total_count === 0 ? (
+            <>
+              <ActionButton variant="tertiary" icon="lock" disabled aria-describedby="feedback-export-help">{copy.exportJson}</ActionButton>
+              <ActionButton variant="tertiary" icon="lock" disabled aria-describedby="feedback-export-help">{copy.exportCsv}</ActionButton>
+            </>
+          ) : (
+            <>
+              <ActionLink variant="secondary" icon="download" href={getOwnerFeedbackExportUrl("json")} download>{copy.exportJson}</ActionLink>
+              <ActionLink variant="secondary" icon="download" href={getOwnerFeedbackExportUrl("csv")} download>{copy.exportCsv}</ActionLink>
+            </>
+          )}
         </div>
       </div>
 
-      <div className="owner-feedback-content">
-        <div className="owner-feedback-list">
-          {items.length === 0 && <p className="feedback-empty">{copy.empty}</p>}
-          {items.map((item) => (
-            <button type="button" key={item.feedback_id} onClick={() => void openDetail(item.feedback_id)} className={detail?.feedback_id === item.feedback_id ? "active" : ""}>
-              <span className={`feedback-category-pill ${item.category.toLowerCase()}`}>{categoryCopy[locale][item.category].label}</span>
-              <strong>{item.title}</strong>
-              <small>{screenLabel(item.screen_context, locale)} · {formatProductDateTime(item.created_at, locale)}</small>
-            </button>
-          ))}
+      {inboxIsEmpty ? (
+        <div className="owner-feedback-empty-state">
+          <strong>{copy.emptyInboxTitle}</strong>
+          <p>{copy.emptyInbox}</p>
+          <small id="feedback-export-help">{copy.exportUnavailable}</small>
         </div>
-        <article className="owner-feedback-detail">
-          <OwnerFeedbackDetailPanel detail={detail} />
-        </article>
-      </div>
+      ) : (
+        <div className="owner-feedback-content">
+          <div className="owner-feedback-list">
+            {itemsLoading && <p className="feedback-empty" role="status">{copy.loadingInbox}</p>}
+            {listUnavailable && <p className="feedback-empty error" role="alert">{copy.inboxUnavailable}</p>}
+            {!itemsLoading && !listUnavailable && items.length === 0 && <p className="feedback-empty">{copy.empty}</p>}
+            {items.map((item) => (
+              <button
+                type="button"
+                key={item.feedback_id}
+                onClick={() => void openDetail(item.feedback_id)}
+                className={detail?.feedback_id === item.feedback_id ? "active" : ""}
+                aria-current={detail?.feedback_id === item.feedback_id ? "true" : undefined}
+              >
+                <span className="owner-feedback-record-topline"><span className={`feedback-category-pill ${item.category.toLowerCase()}`}>{categoryCopy[locale][item.category].label}</span><span>{formatOwnerFeedbackStatus(item.status, locale)}</span></span>
+                <strong>{item.title}</strong>
+                <small>{item.subject_summary ?? screenLabel(item.screen_context, locale)} · {formatProductDateTime(item.created_at, locale)}</small>
+                <span className="owner-feedback-open-indicator">{copy.openItem}<ProductIcon name="arrow" /></span>
+              </button>
+            ))}
+          </div>
+          <article className="owner-feedback-detail">
+            {detailLoading ? <p className="feedback-empty" role="status">{copy.loadingDetail}</p> : <OwnerFeedbackDetailPanel detail={detail} />}
+          </article>
+        </div>
+      )}
     </section>
   );
 }
@@ -337,20 +423,32 @@ export function OwnerFeedbackDetailPanel({ detail }: { detail: OwnerFeedbackDeta
         <span>{formatOwnerFeedbackStatus(detail.status, locale)}</span>
       </div>
       <h4>{detail.title}</h4>
-      <p className="owner-feedback-details-text">{detail.details}</p>
-      <dl>
-        <div><dt>{copy.receipt}</dt><dd>{shortFeedbackId(detail.feedback_id)}</dd></div>
+      <dl className="owner-feedback-primary-meta">
+        <div><dt>{copy.savedAt}</dt><dd>{formatProductDateTime(detail.created_at, locale)}</dd></div>
         <div><dt>{copy.contextLabel}</dt><dd>{screenLabel(detail.screen_context, locale)}</dd></div>
         {detail.subject_summary && <div><dt>{copy.subject}</dt><dd>{detail.subject_summary}</dd></div>}
         <div><dt>{copy.sessionGroup}</dt><dd>{formatPseudonymousSessionGroup(detail.session_group)}</dd></div>
         {productVersion && <div><dt>{copy.productVersion}</dt><dd>{formatProductVersion(productVersion)}</dd></div>}
       </dl>
+      <section className="owner-feedback-message" aria-label={copy.feedbackContent}>
+        <span>{copy.feedbackContent}</span>
+        <p className="owner-feedback-details-text">{detail.details}</p>
+      </section>
+      <TechnicalDetails label={copy.technicalDetails}>
+        <dl>
+          <div><dt>{copy.receipt}</dt><dd>{shortFeedbackId(detail.feedback_id)}</dd></div>
+          {detail.scanner_run_id && <div><dt>Run ID</dt><dd>{detail.scanner_run_id}</dd></div>}
+          {detail.report_id && <div><dt>Report ID</dt><dd>{detail.report_id}</dd></div>}
+          {detail.viewport_class && <div><dt>Viewport</dt><dd>{detail.viewport_class}</dd></div>}
+          <div><dt>{copy.locale}</dt><dd>{detail.locale.toUpperCase()}</dd></div>
+        </dl>
+      </TechnicalDetails>
     </>
   );
 }
 
-function FeedbackStat({ label, value }: { label: string; value: string | number }) {
-  return <div><span>{label}</span><strong>{value}</strong></div>;
+function FeedbackFilterStat({ label, value, active, onClick }: { label: string; value: number; active: boolean; onClick: () => void }) {
+  return <button type="button" className={active ? "active" : ""} data-action-variant="tertiary" aria-pressed={active} onClick={onClick}><span>{label}</span><strong>{value}</strong></button>;
 }
 
 function createSubmissionKey(): string {
@@ -359,8 +457,8 @@ function createSubmissionKey(): string {
 
 export function resolveSelectedFeedbackCategory(
   selectedValue: FormDataEntryValue | null,
-  fallback: FeedbackCategory,
-): FeedbackCategory {
+  fallback: FeedbackCategory | null,
+): FeedbackCategory | null {
   return typeof selectedValue === "string"
     && (FEEDBACK_CATEGORIES as readonly string[]).includes(selectedValue)
     ? selectedValue as FeedbackCategory
@@ -369,7 +467,22 @@ export function resolveSelectedFeedbackCategory(
 
 export function formatOwnerFeedbackStatus(status: FeedbackStatus, locale: ProductLocale): string {
   if (status === "NEW") return locale === "pl" ? "Nowe" : "New";
-  return status;
+  if (status === "TRIAGED") return locale === "pl" ? "Przejrzane" : "Triaged";
+  if (status === "PLANNED") return locale === "pl" ? "Zaplanowane" : "Planned";
+  if (status === "RESOLVED") return locale === "pl" ? "Rozwiązane" : "Resolved";
+  return locale === "pl" ? "Zamknięte" : "Closed";
+}
+
+function formatReadiness(value: OwnerFeedbackStatus["feedback_status"], locale: ProductLocale): string {
+  if (value === "READY") return locale === "pl" ? "Gotowa" : "Ready";
+  if (value === "PARTIAL") return locale === "pl" ? "Częściowa" : "Partial";
+  return locale === "pl" ? "Niegotowa" : "Not ready";
+}
+
+function readinessTone(value: OwnerFeedbackStatus["feedback_status"]): "ready" | "partial" | "not-ready" {
+  if (value === "READY") return "ready";
+  if (value === "PARTIAL") return "partial";
+  return "not-ready";
 }
 
 export function formatPseudonymousSessionGroup(sessionGroup: string): string {
@@ -394,38 +507,51 @@ function screenLabel(screen: FeedbackScreenContext, locale: ProductLocale): stri
     methodology: ["Methodology", "Metodologia"],
     "control-center": ["Control Center", "Centrum sterowania"],
     "trusted-preview": ["Preview path", "Ścieżka testowa"],
-    feedback: ["Feedback", "Feedback"],
+    feedback: ["Feedback", "Opinia"],
   };
   return labels[screen][locale === "pl" ? 1 : 0];
 }
 
 function feedbackCopy(locale: ProductLocale) {
   if (locale === "pl") return {
-    heading: "Przekaż feedback",
+    eyebrow: "Opinia",
+    heading: "Przekaż opinię",
     description: "Zgłoś bloker, niejasność albo pomysł dotyczący bieżącego widoku.",
+    formPurpose: "Opisz jedną konkretną obserwację. Kontekst bieżącego ekranu zostanie dołączony automatycznie.",
     contextLabel: "Kontekst ekranu",
     checking: "Sprawdzanie dostępności zapisu…",
-    unavailable: "Trwały zapis feedbacku jest teraz niedostępny. Spróbuj ponownie później.",
+    unavailable: "Trwały zapis opinii jest teraz niedostępny. Spróbuj ponownie później.",
     category: "Kategoria",
     title: "Tytuł",
     details: "Opis",
+    required: "wymagane",
+    titleHelp: "Minimum 5 znaków",
+    detailsHelp: "Minimum 20 znaków",
+    missingCategory: "Wybierz kategorię",
+    missingTitle: (count: number) => `Tytuł: ${count} z wymaganych 5 znaków`,
+    missingDetails: (count: number) => `Opis: ${count} z wymaganych 20 znaków`,
     charactersLeft: "znaków pozostało",
-    privacy: "Nie podawaj danych osobowych, haseł ani kluczy API.",
-    send: "Wyślij feedback",
+    privacy: "Nie podawaj danych osobowych, haseł ani kluczy API. Sesja jest grupowana wyłącznie pseudonimowo.",
+    send: "Wyślij opinię",
     sending: "Zapisywanie…",
-    success: "Feedback został zapisany. Dziękujemy.",
+    success: "Opinia została zapisana. Dziękujemy.",
     duplicate: "To zgłoszenie zostało już zapisane.",
-    error: "Nie udało się zapisać feedbacku. Spróbuj ponownie.",
+    recorded: "Przyjęto",
+    alreadyRecorded: "Już przyjęto",
+    successNext: "Zgłoszenie trafiło do odczytowej skrzynki właściciela. Nie zmienia danych ani decyzji Radaru.",
+    duplicateNext: "Nie utworzono drugiego wpisu. Wcześniej przyjęte zgłoszenie pozostaje w skrzynce właściciela.",
+    returnToProduct: "Wróć do Radaru",
+    error: "Nie udało się zapisać opinii. Spróbuj ponownie.",
     rateLimit: "Wysłano kilka zgłoszeń w krótkim czasie. Odczekaj chwilę.",
     receipt: "Identyfikator",
     savedAt: "Zapisano",
     addAnother: "Dodaj kolejne zgłoszenie",
-    boundaryTitle: "Bezpieczna granica",
-    boundaryBody: "Feedback nie zmienia Radaru, scoringu, lifecycle ani żadnej decyzji analitycznej.",
+    boundaryTitle: "Zakres zgłoszenia",
+    boundaryBody: "Opinia nie zmienia Radaru, oceny, cyklu obserwacji ani żadnej decyzji analitycznej.",
     noPersonalData: "Zapisujemy wyłącznie treść zgłoszenia i pseudonimowy identyfikator sesji.",
-    inboxHeading: "Skrzynka feedbacku",
-    inboxDescription: "Wyłącznie odczytowy widok ownera. Tester nie widzi tej sekcji.",
-    ownerOnly: "Tylko dla ownera",
+    inboxHeading: "Skrzynka opinii",
+    inboxDescription: "Wyłącznie odczytowy panel właściciela. Tester nie widzi tej sekcji.",
+    ownerOnly: "Panel właściciela",
     total: "Wszystkie",
     newItems: "Nowe",
     blockers: "Blokery",
@@ -435,29 +561,52 @@ function feedbackCopy(locale: ProductLocale) {
     latest: "Ostatnie zgłoszenie",
     all: "Wszystkie",
     status: "Status",
-    exportJson: "Eksport JSON",
-    exportCsv: "Eksport CSV",
+    exportJson: "Pobierz JSON",
+    exportCsv: "Pobierz CSV",
     empty: "Brak zgłoszeń dla wybranych filtrów.",
+    emptyInboxTitle: "Brak zapisanych opinii",
+    emptyInbox: "Skrzynka jest pusta. Nie zapisano jeszcze żadnej opinii.",
+    exportUnavailable: "Pobieranie będzie dostępne po zapisaniu pierwszej opinii.",
+    loadingInbox: "Ładowanie skrzynki…",
+    loadingDetail: "Ładowanie szczegółu…",
+    inboxUnavailable: "Nie udało się odczytać skrzynki. Spróbuj ponownie później.",
     selectItem: "Wybierz zgłoszenie, aby zobaczyć szczegóły.",
+    openItem: "Otwórz szczegóły",
     subject: "Kontekst produktu",
     sessionGroup: "Pseudonimowa grupa sesji",
     productVersion: "Wersja produktu",
+    feedbackContent: "Treść zgłoszenia",
+    technicalDetails: "Szczegóły techniczne",
+    locale: "Język",
   };
   return {
+    eyebrow: "Feedback",
     heading: "Send feedback",
     description: "Report a blocker, unclear point or idea about the current view.",
+    formPurpose: "Describe one specific observation. The current screen context is attached automatically.",
     contextLabel: "Screen context",
     checking: "Checking capture availability…",
     unavailable: "Persistent feedback capture is currently unavailable. Try again later.",
     category: "Category",
     title: "Title",
     details: "Details",
+    required: "required",
+    titleHelp: "At least 5 characters",
+    detailsHelp: "At least 20 characters",
+    missingCategory: "Select a category",
+    missingTitle: (count: number) => `Title: ${count} of 5 required characters`,
+    missingDetails: (count: number) => `Description: ${count} of 20 required characters`,
     charactersLeft: "characters left",
-    privacy: "Do not include personal data, passwords or API keys.",
+    privacy: "Do not include personal data, passwords or API keys. The session is grouped pseudonymously only.",
     send: "Send feedback",
     sending: "Saving…",
     success: "Feedback was saved. Thank you.",
     duplicate: "This feedback was already recorded.",
+    recorded: "Recorded",
+    alreadyRecorded: "Already recorded",
+    successNext: "The report is available in the read-only owner inbox. It does not change Radar data or decisions.",
+    duplicateNext: "No duplicate entry was created. The previously recorded report remains in the owner inbox.",
+    returnToProduct: "Return to Radar",
     error: "Feedback could not be saved. Please try again.",
     rateLimit: "Several reports were sent in a short time. Please wait a moment.",
     receipt: "Receipt",
@@ -481,9 +630,19 @@ function feedbackCopy(locale: ProductLocale) {
     exportJson: "Export JSON",
     exportCsv: "Export CSV",
     empty: "No feedback matches the selected filters.",
+    emptyInboxTitle: "No feedback recorded",
+    emptyInbox: "The inbox is empty. No feedback has been recorded yet.",
+    exportUnavailable: "Downloads will be available after the first feedback entry is recorded.",
+    loadingInbox: "Loading inbox…",
+    loadingDetail: "Loading detail…",
+    inboxUnavailable: "The inbox could not be loaded. Try again later.",
     selectItem: "Select feedback to view details.",
+    openItem: "Open details",
     subject: "Product context",
     sessionGroup: "Pseudonymous session group",
     productVersion: "Product version",
+    feedbackContent: "Feedback content",
+    technicalDetails: "Technical details",
+    locale: "Language",
   };
 }

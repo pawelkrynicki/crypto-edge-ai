@@ -1,5 +1,13 @@
 # Maturing / Follow-up Basket
 
+## FLOW.1 — widoczny przepływ tokena
+
+FLOW.1 dodaje wspólny, read-only model prezentacyjny i komponent pokazujący cztery etapy: **Nowe → Dalsza obserwacja → Kandydat do Established → Główny Radar**. Model przyjmuje istniejący lifecycle Follow-up oraz członkostwo aktywnego Established Universe; nie oblicza scoringu, filtrów, progów ani lifecycle ponownie. Dopasowanie pomiędzy skanerem i Follow-up używa wyłącznie znormalizowanych `chain + contract_address`, z dotychczasową semantyką EVM i Solana.
+
+Karta Nowego tokena pokazuje **Automatyczne śledzenie aktywne**, gdy tożsamość jest już w Follow-up, albo neutralne **Oczekuje na zapis do dalszej obserwacji**, gdy poprawny rekord czeka na najbliższy centralny cykl. Brak przycisku ręcznego przenoszenia. Niepoprawna tożsamość i niedostępność danych mają naturalne komunikaty bez surowych reason codes.
+
+Dalsza obserwacja i Candidate Detail pokazują pierwsze wykrycie, ostatnią kontrolę, następny termin, filtry, osobny status security oraz oś 1/3/7/14/30 dni. Checkpoint oznacza termin ponownej oceny, nie akceptację. `CANDIDATE_FOR_ESTABLISHED` pokazuje **Nie dodano automatycznie** i **Decyzja właściciela**. Dopiero `enabled` membership w Established Universe kończy przepływ jako **Główny Radar**; historia Follow-up pozostaje historią, nie drugim źródłem membership.
+
 ## Aktualizacja: decyzja ownera
 
 Owner Established Promotion Flow realizuje osobną, dry-run-first decyzję w Candidate Detail. Zwykły tester nadal nie widzi panelu. `NEW`, `MATURING` i `ARCHIVED` otrzymują wyłącznie powód blokady; plan `ADD` wymaga `CANDIDATE_FOR_ESTABLISHED` i aktualnego `passed_basic_filter`. Brakujące security pozostaje `Manual Verification Required` i nie jest przedstawiane jako bezpieczeństwo.
@@ -98,7 +106,7 @@ Zaakceptowany commit kodu: `80374f1dc7cf2422ca6513f5076809ab637b1727`.
 Owner review potwierdził:
 
 - trzy rozłączne warstwy Radaru: `New / observation`, `Maturing / follow-up` i `Established / main Radar`;
-- poprawne polskie etykiety „Dalsza obserwacja” i „Kandydaci do Established”, bez prezentowania surowych identyfikatorów maszynowych jako polskiego copy;
+- poprawne polskie etykiety „Dalsza obserwacja” i „Kandydat do Established”, bez prezentowania surowych identyfikatorów maszynowych jako polskiego copy;
 - prezentację wieku pary w godzinach poniżej 24 godzin oraz w dniach od 24 godzin;
 - poprawne „1 dzień” dla SCOOBERT, którego para miała w chwili review około 42 godzin;
 - jeden wspólny formatter wieku używany przez New, Follow-up i Candidate Detail;
@@ -137,3 +145,14 @@ scripts\win\start-follow-up-basket-review.cmd
 ```
 
 **Owner Established Promotion Flow** realizuje jawną, dry-run-first i potwierdzaną decyzję ownera przez istniejący manager Established Universe. Następny etap po akceptacji to **Persistent Feedback Loop**.
+
+## Kolejność po FLOW.1
+
+1. FLOW.1 — widoczny przepływ tokena.
+2. AI.1 — Visual Candidate Research Brief.
+3. UI.3 — accessibility i cross-browser.
+4. Lokalna regresja i Release Candidate.
+5. Finalny deployment na VPS.
+6. Cloudflare, scheduler, smoke i rollback.
+7. Sesja testera i poprawki P0.
+8. Freeze do 15.08.

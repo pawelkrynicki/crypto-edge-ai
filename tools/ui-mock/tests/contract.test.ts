@@ -905,7 +905,12 @@ assert.match(candidateResultsMarkup, /Three Radar layers with three different me
 assert.match(candidateResultsMarkup, /New \/ observation/, "product radar renders new-emerging basket selector");
 assert.match(candidateResultsMarkup, /Maturing \/ follow-up/, "product radar renders follow-up basket selector");
 assert.match(candidateResultsMarkup, /Established \/ main Radar/, "product radar renders established basket selector");
-assert.match(candidateResultsMarkup, /OBSERVATION — NEW PROJECT/, "new-emerging status is observation-first");
+assert.match(
+  candidateResultsMarkup,
+  /Automatic Follow-up enrollment is blocked until the technical identity is valid/,
+  "new-emerging status explains the automatic next step and its visible blocker",
+);
+assert.doesNotMatch(candidateResultsMarkup, /OBSERVATION — NEW PROJECT/, "new-emerging does not duplicate the lifecycle badge");
 assert.match(candidateResultsMarkup, /observation_only=true/, "new-emerging preserves observation-only metadata");
 assert.match(candidateResultsMarkup, /No automated recommendation/, "new-emerging does not imply an automatic recommendation");
 assert.match(candidateResultsMarkup, /Last updated/, "radar summary renders generated data state");
@@ -1230,7 +1235,7 @@ const externalChecksMarkup = renderToStaticMarkup(React.createElement(ExternalVe
 }));
 
 assert.match(externalChecksMarkup, /Manual source verification/, "external checks view exists");
-assert.match(externalChecksMarkup, /Copy address/, "external checks supports copying the real contract address");
+assert.match(externalChecksMarkup, /Copy contract address/, "external checks supports copying the real contract address");
 assert.match(externalChecksMarkup, /Network explorer/, "external checks explains the explorer target");
 assert.match(externalChecksMarkup, /DexScreener/, "external checks explains the DEX target");
 assert.match(externalChecksMarkup, /Record source/, "external checks explains the source target");

@@ -1,0 +1,13 @@
+{
+  "fixture_version": "ai_research_corrected_v2",
+  "summary": "Dane wymagają odświeżenia przed dalszą oceną. Kolejny krok wynika z bieżącego stanu produktu.",
+  "fact_interpretations": {
+    "lifecycle": "To jest początkowy etap obserwacji.",
+    "basic_filters": "Wynik pochodzi z podstawowych filtrów produktu.",
+    "freshness": "Najpierw potrzebna jest aktualna migawka danych."
+  },
+  "risk_explanation": "Zapisany stan wymaga dalszego sprawdzenia w granicach produktu.",
+  "missing_explanation": "Produkt jednoznacznie wskazuje brak danych w obsługiwanym obszarze.",
+  "action_reason": "Wykonaj ten krok zgodnie z kolejnością ustaloną przez produkt.",
+  "condition_explanation": "Ponowna ocena nastąpi po zmianie danych zapisanych przez produkt."
+}

@@ -9,6 +9,7 @@ import { Feedback } from "./components/Feedback";
 import { Methodology } from "./components/Methodology";
 import { ProductControlCenter } from "./components/ProductControlCenter";
 import { ReportsLibrary } from "./components/ReportsLibrary";
+import { LoadingState } from "./components/ProductUi";
 import {
   ProductWorkspaceSection,
   ProductWorkspaceShell,
@@ -32,6 +33,10 @@ import {
 import { loadControlCenterStatus } from "./services/controlCenterStatusDataSource";
 import { loadFollowUpList, loadFollowUpStatus } from "./services/followUpDataSource";
 import type { FollowUpPublicEntry, FollowUpPublicStatus } from "./types/followUpTypes";
+import {
+  findFollowUpByIdentity,
+  isSameTokenIdentity,
+} from "./tokenLifecycle";
 import type { ReportDetail } from "./types/reportTypes";
 import type { FeedbackScreenContext, FeedbackSubjectRef } from "./services/feedbackDataSource";
 import type {
@@ -94,6 +99,7 @@ export function ProductAppContent() {
   const [controlCenterStatus, setControlCenterStatus] = useState<ControlCenterStatus | null>(null);
   const [followUpStatus, setFollowUpStatus] = useState<FollowUpPublicStatus | null>(null);
   const [followUpEntries, setFollowUpEntries] = useState<FollowUpPublicEntry[]>([]);
+  const [selectedFollowUpEntryId, setSelectedFollowUpEntryId] = useState<string | null>(null);
   const [feedbackContext, setFeedbackContext] = useState<FeedbackScreenContext>(() => (
     resolveSection() === "feedback" ? "feedback" : resolveSection()
   ));
@@ -123,18 +129,22 @@ export function ProductAppContent() {
     "control-center": { title: t("nav.controlCenter"), description: t("section.controlCenterDescription") },
   }), [t]);
 
-  const selectedCandidate =
-    candidates.find((candidate) => candidate.id === selectedCandidateId)
-    ?? candidates.find((candidate) => candidate.discoveryBasket === "established" && candidate.finalLabel === "WATCHLIST")
-    ?? candidates.find((candidate) => candidate.discoveryBasket === "established")
-    ?? candidates[0]
-    ?? null;
+  const explicitlySelectedFollowUp = followUpEntries.find((entry) => entry.entry_id === selectedFollowUpEntryId) ?? null;
+  const selectedCandidate = explicitlySelectedFollowUp
+    ? candidates.find((candidate) => isSameTokenIdentity(
+      explicitlySelectedFollowUp,
+      { chain: candidate.chain, contract_address: candidate.contractAddress },
+    )) ?? null
+    : candidates.find((candidate) => candidate.id === selectedCandidateId)
+      ?? candidates.find((candidate) => candidate.discoveryBasket === "established" && candidate.finalLabel === "WATCHLIST")
+      ?? candidates.find((candidate) => candidate.discoveryBasket === "established")
+      ?? candidates[0]
+      ?? null;
   const verificationCandidate =
     candidates.find((candidate) => candidate.id === verificationCandidateId)
     ?? selectedCandidate;
-  const selectedFollowUp = selectedCandidate
-    ? followUpEntries.find((entry) => isSameTokenIdentity(entry, selectedCandidate)) ?? null
-    : null;
+  const selectedFollowUp = explicitlySelectedFollowUp
+    ?? (selectedCandidate ? findFollowUpByIdentity(followUpEntries, selectedCandidate) : null);
   const sourceHealth = useMemo(
     () => resolveProductSourceHealth({ metadata, readiness, sourceIds }),
     [metadata, readiness, sourceIds],
@@ -246,9 +256,23 @@ export function ProductAppContent() {
   }, [activeSection, feedbackContext, navigate, selectedCandidate, selectedReportContext]);
 
   const openCandidate = useCallback((candidateId: string) => {
+    setSelectedFollowUpEntryId(null);
     setSelectedCandidateId(candidateId);
     navigate("candidate-detail");
   }, [navigate]);
+
+  const openFollowUp = useCallback((entryId: string) => {
+    const entry = followUpEntries.find((candidate) => candidate.entry_id === entryId);
+    const matchingCandidate = entry
+      ? candidates.find((candidate) => isSameTokenIdentity(
+        entry,
+        { chain: candidate.chain, contract_address: candidate.contractAddress },
+      ))
+      : null;
+    setSelectedFollowUpEntryId(entryId);
+    setSelectedCandidateId(matchingCandidate?.id ?? null);
+    navigate("candidate-detail");
+  }, [candidates, followUpEntries, navigate]);
 
   const openVerification = useCallback((candidate: UiTokenCandidate) => {
     setSelectedCandidateId(candidate.id);
@@ -290,7 +314,7 @@ export function ProductAppContent() {
     if (loading && candidates.length === 0) {
       return (
         <ProductWorkspaceSection {...copy}>
-          <div className="product-loading" role="status">{t("app.loading")}</div>
+          <LoadingState label={t("app.loading")} />
         </ProductWorkspaceSection>
       );
     }
@@ -311,6 +335,7 @@ export function ProductAppContent() {
             followUpStatus={followUpStatus}
             followUpEntries={followUpEntries}
             onOpenCandidate={openCandidate}
+            onOpenFollowUp={openFollowUp}
             onOpenExternalChecks={openVerification}
           />
         </ProductWorkspaceSection>
@@ -323,6 +348,7 @@ export function ProductAppContent() {
           <CandidateDetailView
             candidate={selectedCandidate}
             followUp={selectedFollowUp}
+            followUpStatus={followUpStatus}
             onBackToResults={() => navigate("candidate-results")}
             onOpenExternalChecks={openVerification}
           />
@@ -333,7 +359,10 @@ export function ProductAppContent() {
     if (activeSection === "external-checks") {
       return (
         <ProductWorkspaceSection {...copy}>
-          <ExternalVerificationLinksView candidate={verificationCandidate} />
+          <ExternalVerificationLinksView
+            candidate={verificationCandidate}
+            onOpenResearchBrief={(candidate) => openCandidate(candidate.id)}
+          />
         </ProductWorkspaceSection>
       );
     }
@@ -380,13 +409,6 @@ export function ProductAppContent() {
       {renderSection()}
     </ProductWorkspaceShell>
   );
-}
-
-function isSameTokenIdentity(entry: FollowUpPublicEntry, candidate: UiTokenCandidate): boolean {
-  if (entry.chain.trim().toLowerCase() !== candidate.chain.trim().toLowerCase()) return false;
-  return entry.chain.trim().toLowerCase() === "solana"
-    ? entry.contract_address === candidate.contractAddress
-    : entry.contract_address.toLowerCase() === candidate.contractAddress.toLowerCase();
 }
 
 function resolveSection(): ProductSectionId {

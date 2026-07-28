@@ -260,6 +260,8 @@ describe("Reports Library presentation boundary", () => {
     ] as const) {
       const markup = renderReports(locale, status("READY", 0, 0), [], null);
       assert.match(markup, new RegExp(escapeRegExp(expected)));
+      assert.match(markup, /reports-library-empty-panel/);
+      assert.doesNotMatch(markup, /Select a report to read it|Wybierz raport, aby go przeczytać/);
     }
     assert.match(renderReports("en", status("PARTIAL", 1, 1), [], null), /Some reports were skipped/);
     assert.match(renderReports("pl", status("PARTIAL", 1, 1), [], null), /Część raportów została pominięta/);

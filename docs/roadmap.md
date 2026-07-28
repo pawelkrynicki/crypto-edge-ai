@@ -1,5 +1,40 @@
 # Roadmap
 
+## Current stage: AI.2 — Controlled OpenAI Live Validation
+
+AI.1 dostarczył generowaną na żądanie, research-only Analizę badawczą AI. AI.2 zachowuje cały ten kontrakt i dodaje bezpieczną ścieżkę pierwszego owner-run: provider domyślnie `DISABLED`, osobny store `ai-research-openai-review.sqlite`, wymagany model i klucz z environment, Responses API z `store: false`, `background: false`, strict Structured Outputs, `maxRetries: 0` i atomowym budżetem jednego call’a. Start i nawigacja wykonują 0 calls; pierwszy płatny request następuje dopiero po jawnym kliknięciu ownera. Implementacja i testy Codexa nie wykonują live call.
+
+Kanoniczna kolejność:
+
+1. AI.2A — bezpieczna ścieżka jednego live call.
+2. AI.2B — owner wykonuje jedną rzeczywistą analizę.
+3. AI.2C — ocena jakości, cache, czasu i token usage.
+4. AI.2D — maksymalnie 3–5 dodatkowych przypadków po osobnej zgodzie.
+5. UI.3 — final user navigation, accessibility i cross-browser.
+6. INT.1 — AI KINTEL Integration Readiness Pack.
+7. Lokalna regresja i Release Candidate.
+8. Finalny deployment VPS i produkcyjna konfiguracja OpenAI.
+9. Cloudflare, scheduler, smoke i rollback.
+10. Tester i freeze do 15.08.
+
+Kontrakty: `docs/ai_research_brief.md`, `docs/ai_research_openai_live_validation.md`, `docs/ai_research_brief_schema.md` i `docs/ai_kintel_ai_research_mapping.md`.
+
+## Current stage: UX.1 — Global Interaction Affordance Pass
+
+UX.1 porządkuje globalny język interakcji bez zmiany zaakceptowanego kierunku UI. Wspólne role obejmują primary/secondary/tertiary actions, external links, copy, disclosures, read-only cards, statuses, formularze oraz widoczne disabled reasons. Kontrakt jest gotowy do późniejszego odwzorowania w AI KINTEL/shadcn bez dodawania zależności do bieżącej aplikacji. Szczegóły: `docs/interaction_affordance_system.md`.
+
+Kanoniczna kolejność po UX.1:
+
+1. UX.1 — Global Interaction Affordance Pass.
+2. AI.1 — Visual Candidate Research Brief, integration-ready dla AI KINTEL.
+3. UI.3 — accessibility i cross-browser.
+4. INT.1 — AI KINTEL Integration Readiness Pack.
+5. Lokalna regresja i Release Candidate.
+6. Finalny standalone deployment VPS.
+7. Cloudflare, scheduler, smoke i rollback.
+8. Sesja testera i poprawki P0.
+9. Freeze do 15.08.
+
 ## Owner Established Promotion Flow
 
 Status: **local owner review accepted — `ACCEPT_LOCAL_CODE`, 23.07.2026; `ENABLED` inactive**.
@@ -8,7 +43,13 @@ Owner-only Candidate Detail flow działa jako status → podpisany read-only pre
 
 Launcher udostępnia wyłącznie `REVIEW_SAFE`. `ENABLED` nie jest aktywny, external tester pozostaje `NO-GO`, `PUBLIC_BETA` pozostaje wyłączone, a overall Trusted Tester Preview to nadal `NOT_READY`. Kontrakt: `docs/owner_established_promotion_flow.md`.
 
-Zaakceptowany commit kodu: `02477bd0499a3b0d5f2f81f88586174ea86ba0e7`. Persistent Feedback Loop również został zaakceptowany lokalnie 23.07.2026. Następny etap: **VPS i private tester preview**. Dalej: Final Frontend Polish / Premium UI Pass, sesja testera i poprawki P0 oraz regresja/backup/dokumentacja/freeze. Termin Premium UI Pass pozostaje bez zmian: **27–30.07.2026**.
+Zaakceptowany commit kodu: `02477bd0499a3b0d5f2f81f88586174ea86ba0e7`. Persistent Feedback Loop również został zaakceptowany lokalnie 23.07.2026. **Premium UI.1** i **Premium UI.2** mają werdykt `ACCEPT_LOCAL_CODE`. Bieżący etap to **FLOW.1 — Visible Token Lifecycle and Owner Promotion Path**. Po nim następują AI.1 oraz UI.3. VPS, Cloudflare i Task Scheduler pozostają bez zmian do zamknięcia UI.3 i lokalnej regresji.
+
+## FLOW.1 — Visible Token Lifecycle and Owner Promotion Path
+
+FLOW.1 pokazuje jeden czytelny przepływ **Nowe → Dalsza obserwacja → Kandydat do Established → Główny Radar** na Radarze, kartach, Candidate Detail i w Control Center. Jedynym kluczem dopasowania jest znormalizowane `chain + contract_address`. Nowe rekordy są oznaczane jako automatycznie śledzone albo oczekujące na najbliższy centralny ingest; nie istnieje ręczny przycisk przenoszenia do Follow-up.
+
+Checkpointy 1/3/7/14/30 są terminami ponownej oceny, nie akceptacją. Candidate pokazuje spełnienie podstawowych filtrów, osobny status security, brak automatycznej promocji i decyzję właściciela. Established wynika wyłącznie z aktywnego membership bieżącego universe. Wspólny model prezentacyjny jest gotowy do odczytu przez AI.1, ale FLOW.1 nie wywołuje OpenAI i nie wykonuje analizy AI.
 
 ## Maturing / Follow-up Basket
 
@@ -20,12 +61,14 @@ Maturing / Follow-up Basket został zaakceptowany lokalnie 23.07.2026 z werdykte
 
 Owner Established Promotion Flow został zaakceptowany lokalnie 23.07.2026 z werdyktem `ACCEPT_LOCAL_CODE`. Dalsza kolejność:
 
-1. VPS i private tester preview.
-2. Final Frontend Polish / Premium UI Pass.
-3. Sesja testera i poprawki P0.
-4. Regresja, backup, dokumentacja i freeze.
-
-Termin Premium UI Pass pozostaje bez zmian: **27–30.07.2026**.
+1. FLOW.1 — widoczny przepływ tokena.
+2. AI.1 — Visual Candidate Research Brief.
+3. UI.3 — accessibility i cross-browser.
+4. Lokalna regresja i Release Candidate.
+5. Finalny deployment na VPS.
+6. Cloudflare, scheduler, smoke i rollback.
+7. Sesja testera i poprawki P0.
+8. Freeze do 15.08.
 
 ## Established Universe Management
 
@@ -35,7 +78,13 @@ Established Universe Management zostało zaakceptowane lokalnie 21.07.2026 z wer
 
 Runtime ownera jest lokalny i wykluczony z Git. Aktualny universe pozostaje celowo pusty: `established-universe-v000000`, 0 wpisów i 0 aktywnych wpisów. Dodanie prawdziwych wpisów nastąpi później przez owner CLI i będzie wymagało osobnej decyzji biznesowej. VPS deployment nadal oczekuje i nie blokuje lokalnego zarządzania universe. Ten etap nie wdraża VPS, nie zmienia Cloudflare ani nie aktywuje Windows Task Scheduler.
 
-## Current stage: VPS Deployment & Automation
+## Accepted stage: FLOW.1 — Visible Token Lifecycle and Owner Promotion Path
+
+UI.1 ustanowił system wizualny, Product Shell, Radar, karty New/Maturing/Established oraz Candidate Detail i został zaakceptowany przez ownera. UI.2 rozszerzył ten sam system na Control Center, Reports, Feedback, Owner Feedback Inbox, Verification i Methodology. FLOW.1 wykorzystuje te przyjęte powierzchnie do pokazania pełnego lifecycle i ręcznej granicy Candidate → Established bez zmian API write, danych, lifecycle, providerów lub owner gating. Następne są AI.1 i UI.3, a dopiero po nich lokalna regresja i Release Candidate. Kanoniczny opis: `docs/final_frontend_premium_ui_pass.md`.
+
+Przygotowany wcześniej kod VPS i automatyzacji pozostaje lokalnie zaakceptowany, ale nie jest bieżącym etapem operacyjnym. Nie wykonuje się deploymentu, zmian Cloudflare ani Task Scheduler przed zakończeniem Premium UI i lokalnej regresji.
+
+## Prepared stage: VPS Deployment & Automation
 
 **Product Radar Build & Owner Acceptance** zakończono i zmergowano 21.07.2026. Kanoniczny merge commit: `ccdb5acb855fdfb11e7848af86b30349268e53f5`.
 
@@ -225,14 +274,16 @@ Status: **local owner review accepted — `ACCEPT_LOCAL_CODE`, 23.07.2026; `ENAB
 - wersja, historia, audit i rollback;
 - brak automatycznego awansu.
 
-Zaakceptowana kolejność dalszych prac:
+Zaakceptowana kolejność dalszych prac po domknięciu Persistent Feedback Loop:
 
-1. Persistent Feedback Loop.
-2. VPS i private tester preview.
-3. Final Frontend Polish / Premium UI Pass.
-4. Sesja testera i poprawki P0.
-
-Planowany termin osobnego **Final Frontend Polish / Premium UI Pass** pozostaje **27–30.07.2026**. Kierunek: profesjonalny terminal badawczy, subtelne mikroanimacje, spójna hierarchia i brak hazardowego stylu.
+1. FLOW.1 — widoczny przepływ tokena.
+2. AI.1 — Visual Candidate Research Brief.
+3. UI.3 — accessibility i cross-browser.
+4. Lokalna regresja i Release Candidate.
+5. Finalny deployment na VPS.
+6. Cloudflare, scheduler, smoke i rollback.
+7. Sesja testera i poprawki P0.
+8. Freeze do 15.08.
 
 ### Stage 12B.4: Owner No-CMD Refresh Control
 
@@ -925,9 +976,13 @@ An empty valid store is `READY`; `PARTIAL` and `NOT_READY` restore the separate 
 
 Required delivery order after this sprint:
 
-1. VPS and private tester preview.
-2. Final Frontend Polish / Premium UI Pass, unchanged at 27–30.07.
-3. Tester session and P0 fixes.
-4. Regression, backup, documentation and freeze.
+1. FLOW.1 — visible token lifecycle.
+2. AI.1 — Visual Candidate Research Brief.
+3. UI.3 — accessibility and cross-browser.
+4. Local regression and Release Candidate.
+5. Final VPS deployment.
+6. Cloudflare, scheduler, smoke and rollback.
+7. Tester session and P0 fixes.
+8. Freeze by 15.08.
 
 Canonical contract: `docs/persistent_feedback_loop.md`.

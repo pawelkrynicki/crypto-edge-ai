@@ -375,7 +375,7 @@ describe("Product Radar owner acceptance", () => {
     for (const locale of ["en", "pl"] as const) {
       const details = renderWithLocale(locale, React.createElement(CandidateDetailView, { candidate: beansCandidate }));
       const verification = renderWithLocale(locale, React.createElement(ExternalVerificationLinksView, { candidate: beansCandidate }));
-      const detailsWithoutTechnical = details.replace(/<details>[\s\S]*?<\/details>/g, "");
+      const detailsWithoutTechnical = details.replace(/<details\b[^>]*>[\s\S]*?<\/details>/g, "");
 
       if (locale === "pl") {
         assert.match(details, /Kontrola bezpieczeństwa nie została uruchomiona/);
@@ -392,7 +392,7 @@ describe("Product Radar owner acceptance", () => {
       assert.doesNotMatch(details, /GoPlus|Buy tax|Sell tax|Podatek kupna|Podatek sprzedaży|Brak zgłoszonych flag|No reported flags/);
       assert.doesNotMatch(verification, /Dane obecne|Security data present|Data present — verify it/);
       assert.doesNotMatch(detailsWithoutTechnical, /unknown|Security data unavailable|Not checked|Partial security coverage/i);
-      assert.match(details, /<details><summary>(?:Technical details|Szczegóły techniczne)<\/summary><code>security_state=not_invoked; security_label=SECURITY DATA UNAVAILABLE;/);
+      assert.match(details, /<details\b[^>]*><summary[^>]*><span>(?:Technical details|Szczegóły techniczne)<\/span>[\s\S]*?<code>security_state=not_invoked; security_label=SECURITY DATA UNAVAILABLE;/);
       assert.match(verification, locale === "pl" ? /Bezpieczeństwo — kontrola ręczna/ : /Security — manual check/);
 
       const basicConditionLabels = [
@@ -436,7 +436,7 @@ describe("Product Radar owner acceptance", () => {
     assert.match(partialVerification, /Dane częściowe — wymagana ręczna weryfikacja/);
 
     for (const markup of [unavailableDetails, unavailableVerification, partialDetails, partialVerification]) {
-      const withoutTechnical = markup.replace(/<details>[\s\S]*?<\/details>/g, "");
+      const withoutTechnical = markup.replace(/<details\b[^>]*>[\s\S]*?<\/details>/g, "");
       assert.doesNotMatch(withoutTechnical, /unknown|Security data unavailable|Not checked|Partial security coverage/i);
     }
   });
@@ -459,7 +459,8 @@ describe("Product Radar owner acceptance", () => {
     assert.equal(resolveInitialBasket([newCandidate, establishedCandidate]), "established");
     const newMarkup = renderToStaticMarkup(React.createElement(NewEmergingBasket, { candidates: [newCandidate] }));
     const establishedMarkup = renderToStaticMarkup(React.createElement(EstablishedBasket, { candidates: [establishedCandidate] }));
-    assert.match(newMarkup, /OBSERVATION — NEW PROJECT/);
+    assert.match(newMarkup, /token-lifecycle-card-summary/);
+    assert.doesNotMatch(newMarkup, /OBSERVATION — NEW PROJECT/);
     assert.match(establishedMarkup, /Main address-based Radar/);
   });
 
@@ -613,6 +614,7 @@ describe("Product Radar owner acceptance", () => {
         candidates: [newCandidate],
         metadata,
         readiness,
+        generatedAt: "2026-07-20T10:00:00.000Z",
         ageSeconds,
         freshnessStatus,
         sourceIds,
@@ -634,18 +636,20 @@ describe("Product Radar owner acceptance", () => {
         assert.match(ready.header, /<span>Sources<\/span><strong>Available<\/strong>/);
         assert.match(ready.summary, /<span>Source status<\/span><strong>Available<\/strong>/);
         assert.match(partialHeader.header, /<span>Sources<\/span><strong>Partially available<\/strong>/);
-        assert.match(partialSummary.summary, /<span>Source status<\/span><strong>Source partially available<\/strong><p>defillama_api<\/p>/);
-        assert.match(partialHeader.header, /Snapshot freshness<\/span><strong>Delayed<\/strong>/);
-        assert.match(partialSummary.summary, /<span>Data<\/span><strong>Current<\/strong>/);
+        assert.match(partialSummary.summary, /<span>Source status<\/span><strong>Source partially available<\/strong><p>DefiLlama<\/p>/);
+        assert.match(partialHeader.header, /Snapshot freshness<\/span><strong>2 hr<\/strong>/);
+        assert.doesNotMatch(partialHeader.header, /Snapshot freshness<\/span><strong>Delayed<\/strong>/);
+        assert.doesNotMatch(partialHeader.summary, /product-freshness/);
         assert.match(fallback.header, /<span>Sources<\/span><strong>Partially available<\/strong>/);
         assert.match(fallback.summary, /<span>Source status<\/span><strong>Source partially available<\/strong><p>Source details unavailable<\/p>/);
       } else {
         assert.match(ready.header, /<span>Źródła<\/span><strong>Dostępne<\/strong>/);
         assert.match(ready.summary, /<span>Stan źródeł<\/span><strong>Dostępne<\/strong>/);
         assert.match(partialHeader.header, /<span>Źródła<\/span><strong>Częściowo dostępne<\/strong>/);
-        assert.match(partialSummary.summary, /<span>Stan źródeł<\/span><strong>Źródło częściowo dostępne<\/strong><p>defillama_api<\/p>/);
-        assert.match(partialHeader.header, /Aktualność danych<\/span><strong>Opóźnione<\/strong>/);
-        assert.match(partialSummary.summary, /<span>Dane<\/span><strong>Aktualne<\/strong>/);
+        assert.match(partialSummary.summary, /<span>Stan źródeł<\/span><strong>Źródło częściowo dostępne<\/strong><p>DefiLlama<\/p>/);
+        assert.match(partialHeader.header, /Aktualność danych<\/span><strong>2 godz\.<\/strong>/);
+        assert.doesNotMatch(partialHeader.header, /Aktualność danych<\/span><strong>Opóźnione<\/strong>/);
+        assert.doesNotMatch(partialHeader.summary, /product-freshness/);
         assert.match(fallback.header, /<span>Źródła<\/span><strong>Częściowo dostępne<\/strong>/);
         assert.match(fallback.summary, /<span>Stan źródeł<\/span><strong>Źródło częściowo dostępne<\/strong><p>Brak szczegółów źródeł<\/p>/);
       }
@@ -749,8 +753,9 @@ describe("Product Radar owner acceptance", () => {
     const markup = renderToStaticMarkup(React.createElement(CandidateResultsView, {
       candidates: [newCandidate], metadata: emptyMetadata, readiness: emptyReadiness, ageSeconds: 90, generatedAt: "2026-07-19T10:00:00.000Z", sourceIds: ["dexscreener"],
     }));
-    assert.match(markup, /Current/);
-    assert.match(markup, /1 min/);
+    assert.match(markup, /Status: Current/);
+    assert.match(markup, /Last updated/);
+    assert.doesNotMatch(markup, /product-freshness/);
   });
 
   it("keeps stale candidates visible with timestamp-first EN and PL semantics", () => {
@@ -924,7 +929,8 @@ describe("Product Radar owner acceptance", () => {
     const markup = renderToStaticMarkup(React.createElement(CandidateResultsView, {
       candidates: [newCandidate], metadata: emptyMetadata, readiness, ageSeconds: 60, sourceIds: ["dexscreener"],
     }));
-    assert.match(markup, /OBSERVATION — NEW PROJECT/);
+    assert.match(markup, /Automatic Follow-up enrollment is blocked until the technical identity is valid/);
+    assert.doesNotMatch(markup, /OBSERVATION — NEW PROJECT/);
     assert.doesNotMatch(markup, /Radar cannot read a valid scan/);
   });
 

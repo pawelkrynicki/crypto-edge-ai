@@ -10,6 +10,7 @@ import {
   type EstablishedPromotionResult,
   type EstablishedPromotionStatus,
 } from "../services/establishedPromotionDataSource";
+import { ActionButton } from "./ProductUi";
 
 const COPY = {
   en: {
@@ -41,10 +42,12 @@ const COPY = {
     previewLoading: "Loading the read-only addition plan…",
     previewUnavailable: "The addition plan is unavailable.",
     reviewSafe: "Review-safe mode: adding to Established remains blocked.",
+    previewFirst: "Check the addition plan before confirming this action.",
+    confirmFirst: "Confirm the exact chain and contract address to enable this action.",
     additionUnavailable: "Adding is unavailable because the token does not meet the eligibility requirements.",
     confirm: "I confirm this exact chain and contract address and understand that a new universe version will be created.",
     add: "Add to Established",
-    dialog: "Add this exact chain and contract address to a new Established Universe version?",
+    dialog: (chain: string, address: string) => `Add ${chain} + ${address} to a new Established Universe version?`,
     added: "Added. A new universe version, history snapshot and audit entry were created.",
     noAction: "No change was made because the token is already active in Established.",
     failed: "The controlled addition was rejected. Refresh the plan before trying again.",
@@ -80,10 +83,12 @@ const COPY = {
     previewLoading: "Wczytywanie planu dodania tylko do odczytu…",
     previewUnavailable: "Plan dodania jest niedostępny.",
     reviewSafe: "Tryb bezpiecznego przeglądu: dodanie do Established pozostaje zablokowane.",
+    previewFirst: "Najpierw sprawdź plan dodania, aby potwierdzić tę akcję.",
+    confirmFirst: "Potwierdź dokładną sieć i adres kontraktu, aby aktywować tę akcję.",
     additionUnavailable: "Dodanie jest niedostępne, ponieważ token nie spełnia warunków kwalifikacji.",
     confirm: "Potwierdzam dokładny chain i contract address oraz utworzenie nowej wersji Established.",
     add: "Dodaj do Established",
-    dialog: "Dodać ten dokładny chain i contract address do nowej wersji Established Universe?",
+    dialog: (chain: string, address: string) => `Dodać ${chain} + ${address} do nowej wersji Established Universe?`,
     added: "Dodano. Powstała nowa wersja Established, wpis historii i audytu.",
     noAction: "Nie wprowadzono zmiany, ponieważ token jest już aktywny w Established.",
     failed: "Kontrolowane dodanie zostało odrzucone. Odśwież plan przed kolejną próbą.",
@@ -257,9 +262,11 @@ export function formatEstablishedPromotionReason(code: string, locale: ProductLo
 export function EstablishedPromotionPanel({
   initialStatus,
   initialPreview = null,
+  onStatusChange,
 }: {
   initialStatus: EstablishedPromotionStatus;
   initialPreview?: EstablishedPromotionPreview | null;
+  onStatusChange?: (status: EstablishedPromotionStatus) => void;
 }) {
   const { locale } = useProductLocale();
   const copy = COPY[locale];
@@ -290,6 +297,13 @@ export function EstablishedPromotionPanel({
     && preview.lock_available
     && !submitting;
   const canAdd = canConfirm && confirmed;
+  const disabledReason = status.mode === "REVIEW_SAFE"
+    ? copy.reviewSafe
+    : !previewFresh
+      ? copy.previewFirst
+      : !confirmed
+        ? copy.confirmFirst
+        : copy.additionUnavailable;
   const previewBlocked = preview !== null
     && (preview.action_plan !== "ADD" || preview.eligibility_status === "BLOCKED");
   const lifecycleLabel = formatEstablishedPromotionValue("lifecycle", status.lifecycle_status, locale);
@@ -307,14 +321,17 @@ export function EstablishedPromotionPanel({
   };
 
   const add = async () => {
-    if (!canAdd || !preview || !window.confirm(copy.dialog)) return;
+    if (!canAdd || !preview || !window.confirm(copy.dialog(status.chain, status.contract_address))) return;
     setSubmitting(true);
     setResult(null);
     try {
       const nextResult = await addToEstablished(preview);
       setResult(nextResult);
       const nextStatus = await loadEstablishedPromotionStatus(status.chain, status.contract_address);
-      if (nextStatus?.owner_controls_visible) setStatus(nextStatus);
+      if (nextStatus?.owner_controls_visible) {
+        setStatus(nextStatus);
+        onStatusChange?.(nextStatus);
+      }
       setPreview(null);
       setConfirmed(false);
     } catch {
@@ -332,7 +349,7 @@ export function EstablishedPromotionPanel({
         <p>{copy.candidateBoundary(lifecycleLabel)}</p>
       </header>
 
-      {status.mode === "REVIEW_SAFE" && <p className="owner-review-safe" role="status">{copy.reviewSafe}</p>}
+      {status.mode === "REVIEW_SAFE" && <p className="owner-review-safe" id="established-owner-mode-help" role="status">{copy.reviewSafe}</p>}
 
       <div className="owner-operations-summary">
         <PromotionFact label={copy.lifecycle} value={lifecycleLabel} />
@@ -353,9 +370,9 @@ export function EstablishedPromotionPanel({
           || status.security_status === "UNAVAILABLE") && <p className="warning">{copy.missingSecurity}</p>}
       </div>
 
-      <button type="button" className="secondary-button owner-preview-button" onClick={() => void checkPlan()} disabled={loadingPreview}>
+      <ActionButton variant="secondary" className="secondary-button owner-preview-button" onClick={() => void checkPlan()} loading={loadingPreview} loadingLabel={copy.previewLoading}>
         {copy.preview}
-      </button>
+      </ActionButton>
       {loadingPreview && <p role="status">{copy.previewLoading}</p>}
       {!loadingPreview && previewError && <p role="alert">{copy.previewUnavailable}</p>}
 
@@ -395,9 +412,17 @@ export function EstablishedPromotionPanel({
         <strong>{status.chain}</strong>
         <code>{status.contract_address}</code>
       </div>
-      <button type="button" className="primary-button owner-promotion-button" onClick={() => void add()} disabled={!canAdd}>
+      {!canAdd && status.mode !== "REVIEW_SAFE" && <p className="owner-disabled-reason" id="established-promotion-disabled-help">{disabledReason}</p>}
+      <ActionButton
+        variant="primary"
+        className="primary-button owner-promotion-button"
+        onClick={() => void add()}
+        loading={submitting}
+        disabled={!canAdd}
+        aria-describedby={!canAdd ? (status.mode === "REVIEW_SAFE" ? "established-owner-mode-help" : "established-promotion-disabled-help") : undefined}
+      >
         {copy.add}
-      </button>
+      </ActionButton>
 
       {result === "ERROR" && <p className="owner-operation-result failed" role="alert">{copy.failed}</p>}
       {result && result !== "ERROR" && (

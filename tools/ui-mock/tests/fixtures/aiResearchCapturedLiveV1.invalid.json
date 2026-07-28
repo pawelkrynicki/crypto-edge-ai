@@ -1,0 +1,17 @@
+{
+  "fixture_version": "ai_research_captured_live_v1_anonymized",
+  "origin": "first_controlled_live_result",
+  "summary": "Stan DATA_STALE wymaga dalszej oceny.",
+  "fact_interpretations": {
+    "lifecycle": "Wartość lifecycle ma stan new.",
+    "basic_filters": "Wartość rejected_basic_filter pochodzi z filtrów.",
+    "freshness": "Wartość STALE opisuje freshness danych."
+  },
+  "unsupported_missing": {
+    "key": "holder_concentration",
+    "label": "Brak koncentracji holderów",
+    "explanation": "Dane security nie zawierają tej informacji.",
+    "source_reference_ids": ["security_status"]
+  },
+  "primary_action_type": "OPEN_VERIFICATION"
+}
