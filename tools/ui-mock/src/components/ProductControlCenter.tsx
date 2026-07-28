@@ -431,8 +431,9 @@ function sourceAvailabilityValue(
   return t("status.unavailable");
 }
 
-function resultValue(value: "SUCCESS" | "FAILED" | null, t: Translator): string {
+function resultValue(value: "SUCCESS" | "PARTIAL" | "FAILED" | null, t: Translator): string {
   if (value === "SUCCESS") return t("control.value.success");
+  if (value === "PARTIAL") return t("control.status.partial");
   if (value === "FAILED") return t("control.value.failed");
   return t("app.noData");
 }

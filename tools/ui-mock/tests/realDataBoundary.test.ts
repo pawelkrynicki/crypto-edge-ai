@@ -220,6 +220,21 @@ describe("INTERNAL_BETA scanner provenance boundary", () => {
     assert.equal(asRecords(result.candidates).every((candidate) => candidate.discovery_basket === "new_emerging"), true);
     assert.equal(JSON.stringify(result).includes("fixture-fallback"), false);
   });
+
+  it("accepts the current versioned Established Universe metadata emitted by the collector", async () => {
+    const output = makeEmptyEstablishedScannerOutput();
+    const established = output.provenance.metadata.established as Record<string, unknown>;
+    established.universe_version = "established-universe-v000000";
+    established.validation_status = "valid";
+    const result = await readScanner(output);
+    assert.equal(
+      isRecord(result.provenance)
+        && isRecord(result.provenance.metadata)
+        && isRecord(result.provenance.metadata.established)
+        && result.provenance.metadata.established.universe_version,
+      "established-universe-v000000",
+    );
+  });
 });
 
 describe("API and frontend fail-closed behavior", () => {
@@ -276,6 +291,52 @@ describe("API and frontend fail-closed behavior", () => {
     assert.equal(isRecord(result._source_meta) && result._source_meta.selected_run_id, older.scan_run.run_id);
     assert.equal(isRecord(result._source_meta) && result._source_meta.freshness_status, "STALE");
     assert.equal(asRecords(result.candidates).length, older.candidates.length);
+  });
+
+  it("serves only state-committed scanner and context snapshots and ignores valid orphan artifacts", async () => {
+    const outputDir = resolve(tempRoot, `committed-snapshots-${crypto.randomUUID()}`);
+    const committedScanner = makeScannerOutput();
+    setScannerRunId(committedScanner, "scan_20260716115900_committed");
+    setScannerTime(committedScanner, "2026-07-16T11:59:00.000Z");
+    const orphanScanner = makeScannerOutput();
+    setScannerRunId(orphanScanner, "scan_20260716120000_orphan");
+
+    const committedContext = makeContextOutput();
+    setContextIdentity(committedContext, "approved_sources_20260716115900", "2026-07-16T11:59:00.000Z");
+    const orphanContext = makeContextOutput();
+    setContextIdentity(orphanContext, "approved_sources_20260716120000", "2026-07-16T12:00:00.000Z");
+
+    for (const scanner of [committedScanner, orphanScanner]) {
+      const runDir = resolve(outputDir, scanner.scan_run.run_id);
+      await mkdir(runDir, { recursive: true });
+      await writeFile(resolve(runDir, "full_output.json"), JSON.stringify(scanner), "utf8");
+    }
+    for (const context of [committedContext, orphanContext]) {
+      const runDir = resolve(outputDir, context.run_id);
+      await mkdir(runDir, { recursive: true });
+      await writeFile(resolve(runDir, "approved_sources_output.json"), JSON.stringify(context), "utf8");
+    }
+    const statePath = resolve(tempRoot, `automation-state-${crypto.randomUUID()}.json`);
+    await writeFile(statePath, JSON.stringify({
+      schema_version: "central_automation_state_v1",
+      last_published_scanner_run_id: committedScanner.scan_run.run_id,
+      last_published_context_run_id: committedContext.run_id,
+    }), "utf8");
+
+    const scannerResult = await readLatestScannerOutput({
+      runtimeMode: "INTERNAL_BETA",
+      outputDirPath: outputDir,
+      automationStatePath: statePath,
+      now: NOW,
+    });
+    const contextResult = await readLatestContextOutput({
+      runtimeMode: "INTERNAL_BETA",
+      outputDirPath: outputDir,
+      automationStatePath: statePath,
+      now: NOW,
+    });
+    assert.equal(scannerResult._source_meta.selected_run_id, committedScanner.scan_run.run_id);
+    assert.equal(contextResult.run_id, committedContext.run_id);
   });
 
   it("keeps scanner readiness usable when non-critical context is unavailable", async () => {
@@ -800,6 +861,14 @@ function setScannerRunId(output: ScannerFactoryOutput, runId: string): void {
   for (const candidate of output.candidates) candidate.run_id = runId;
   for (const security of output.security_checks) security.run_id = runId;
   for (const scorecard of output.scorecards) scorecard.run_id = runId;
+}
+
+function setContextIdentity(output: ContextFactoryOutput, runId: string, timestamp: string): void {
+  output.run_id = runId;
+  output.generated_at = timestamp;
+  output.provenance.run_id = runId;
+  output.provenance.generated_at = timestamp;
+  output.provenance.finished_at = timestamp;
 }
 
 function makeContextOutput(): ContextFactoryOutput {

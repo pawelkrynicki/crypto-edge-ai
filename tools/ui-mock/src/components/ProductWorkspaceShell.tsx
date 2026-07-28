@@ -96,6 +96,7 @@ export function ProductWorkspaceShell({
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const apiPresentation = getApiReadinessPresentation(loading, resolvedSource, readiness, locale);
   const sourcePresentation = presentProductSourceHealth(sourceHealth, locale, "header");
+  const cyclePresentation = dataCyclePresentation(automationStatus, t);
   const technicalCodes = unique([
     readinessReasonCode,
     dataUnavailableReasonCode,
@@ -131,6 +132,7 @@ export function ProductWorkspaceShell({
             label={t("app.freshness")}
             value={ageSeconds == null ? t("app.noData") : formatProductAge(ageSeconds, locale)}
           />
+          <HeaderFact label={t("automation.dataStatus")} value={cyclePresentation.value} tone={cyclePresentation.tone} />
           <HeaderFact label={t("app.sources")} value={sourcePresentation.value} tone={sourcePresentation.tone} />
           <HeaderFact
             label={t("app.generated")}
@@ -182,7 +184,11 @@ export function ProductWorkspaceShell({
               <div><dt>{t("radar.validationStatus")}</dt><dd>{establishedUniverseStatus?.validation_status ?? t("app.noData")}</dd></div>
               {technicalCodes.length > 0 && <div><dt>{t("app.codes")}</dt><dd>{technicalCodes.join(", ")}</dd></div>}
               <div><dt>{t("automation.title")}</dt><dd>{automationPresentation(automationStatus, t)}</dd></div>
-              <div><dt>{t("automation.lastRun")}</dt><dd>{automationStatus?.last_attempt_at ? formatProductDateTime(automationStatus.last_attempt_at, locale) : t("app.noData")}</dd></div>
+              <div><dt>{t("automation.lastAttempt")}</dt><dd>{automationStatus?.last_attempt_at ? formatProductDateTime(automationStatus.last_attempt_at, locale) : t("app.noData")}</dd></div>
+              <div><dt>{t("automation.lastSuccess")}</dt><dd>{automationStatus?.last_success_at ? formatProductDateTime(automationStatus.last_success_at, locale) : t("app.noData")}</dd></div>
+              <div><dt>{t("automation.snapshotGenerated")}</dt><dd>{automationStatus?.snapshot_generated_at ? formatProductDateTime(automationStatus.snapshot_generated_at, locale) : generatedAt ? formatProductDateTime(generatedAt, locale) : t("app.noData")}</dd></div>
+              <div><dt>{t("app.viewRefreshed")}</dt><dd>{viewRefreshedAt ? formatProductDateTime(viewRefreshedAt, locale) : t("app.noData")}</dd></div>
+              <div><dt>{t("automation.cycleStatus")}</dt><dd>{cycleOutcomePresentation(automationStatus, t)}</dd></div>
               <div><dt>{t("automation.nextRun")}</dt><dd>{nextAutomationRunPresentation(automationStatus, locale, t)}</dd></div>
               {automationStatus && !automationStatus.enabled && automationStatus.next_due_at && (
                 <div>
@@ -264,6 +270,30 @@ export function ProductWorkspaceShell({
       </footer>
     </div>
   );
+}
+
+function dataCyclePresentation(
+  status: AutomationStatus | null | undefined,
+  t: (key: keyof typeof PRODUCT_TRANSLATIONS.en) => string,
+): { value: string; tone: "neutral" | "ready" | "warning" | "error" } {
+  if (!status?.data_status) return { value: t("status.unavailable"), tone: "warning" };
+  if (status.data_status === "FRESH") return { value: t("status.current"), tone: "ready" };
+  if (status.data_status === "STALE") return { value: t("status.delayed"), tone: "warning" };
+  if (status.data_status === "PARTIAL") return { value: t("automation.partial"), tone: "warning" };
+  if (status.data_status === "LAST_KNOWN_GOOD") return { value: t("automation.lastKnownGood"), tone: "error" };
+  if (status.data_status === "IN_PROGRESS") return { value: t("automation.inProgress"), tone: "neutral" };
+  return { value: t("status.unavailable"), tone: "error" };
+}
+
+function cycleOutcomePresentation(
+  status: AutomationStatus | null | undefined,
+  t: (key: keyof typeof PRODUCT_TRANSLATIONS.en) => string,
+): string {
+  if (status?.cycle_status === "IN_PROGRESS") return t("automation.inProgress");
+  if (status?.cycle_status === "FAILED") return t("automation.lastCycleFailed");
+  if (status?.cycle_status === "PARTIAL") return t("automation.partial");
+  if (status?.cycle_status === "SUCCESS") return t("control.value.success");
+  return t("app.noData");
 }
 
 function automationPresentation(

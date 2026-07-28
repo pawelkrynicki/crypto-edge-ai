@@ -14,6 +14,7 @@ import {
   type ProductRuntimeMode,
   type ResolvedProductRuntimeMode,
 } from "../src/runtimeMode.js";
+import { readCommittedSnapshotState } from "./committedSnapshotState.js";
 
 const APPROVED_CONTEXT_FILENAME = "approved_sources_output.json";
 const APPROVED_CONTEXT_PREFIX = "approved_sources_";
@@ -110,6 +111,8 @@ export type LatestContextOutputOptions = {
   fixturePath?: string;
   runtimeMode?: ProductRuntimeMode | string;
   now?: Date;
+  committedRunId?: string | null;
+  automationStatePath?: string;
 };
 
 type ContextCandidate = {
@@ -141,7 +144,10 @@ export async function readLatestContextOutput(
     throw new ContextOutputError("RUNTIME_MODE_UNCONFIGURED");
   }
 
-  const candidates = await findContextCandidates(outputDirPath);
+  const allCandidates = await findContextCandidates(outputDirPath);
+  const candidates = runtimeMode === "INTERNAL_BETA"
+    ? await selectCommittedContextCandidates(allCandidates, options)
+    : allCandidates;
 
   if (runtimeMode === "DEVELOPMENT_DEMO") {
     for (const candidate of candidates) {
@@ -178,6 +184,24 @@ export async function readLatestContextOutput(
     }
     throw new ContextOutputError("CONTEXT_SCHEMA_INVALID");
   }
+}
+
+async function selectCommittedContextCandidates(
+  candidates: ContextCandidate[],
+  options: LatestContextOutputOptions,
+): Promise<ContextCandidate[]> {
+  if (
+    options.outputDirPath !== undefined
+    && options.committedRunId === undefined
+    && options.automationStatePath === undefined
+  ) return candidates;
+  const runId = options.committedRunId === undefined
+    ? (await readCommittedSnapshotState(options.automationStatePath)).context_run_id
+    : options.committedRunId;
+  if (!runId) throw new ContextOutputError("CONTEXT_COMMITTED_POINTER_UNAVAILABLE");
+  const selected = candidates.find((candidate) => candidate.run_id === runId);
+  if (!selected) throw new ContextOutputError("CONTEXT_COMMITTED_SNAPSHOT_MISSING");
+  return [selected];
 }
 
 export function isContextLatestOutputShape(value: unknown): boolean {

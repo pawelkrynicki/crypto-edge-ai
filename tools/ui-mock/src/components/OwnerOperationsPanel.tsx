@@ -42,6 +42,7 @@ const COPY = {
     run: "Run one-time refresh",
     dialog: "Start one controlled refresh cycle using this current preflight plan?",
     success: "The one-time refresh completed successfully.",
+    partial: "The refresh completed with partial source data. Last-known-good data was preserved.",
     noActionResult: "No action was needed. No provider was contacted.",
     failed: "The refresh failed. The last-known-good snapshot was preserved.",
     inProgress: "Refresh already in progress.",
@@ -84,6 +85,7 @@ const COPY = {
     run: "Uruchom jednorazowe odświeżenie",
     dialog: "Uruchomić jeden kontrolowany cykl odświeżenia według aktualnego planu?",
     success: "Jednorazowe odświeżenie zakończyło się powodzeniem.",
+    partial: "Odświeżenie zakończyło się z częściowymi danymi źródłowymi. Zachowano ostatnie prawidłowe dane.",
     noActionResult: "Nie było nic do zrobienia. Nie wywołano żadnego źródła danych.",
     failed: "Odświeżenie nie powiodło się. Zachowano ostatnią prawidłową migawkę.",
     inProgress: "Odświeżenie już trwa.",
@@ -251,6 +253,7 @@ function OwnerResult({
 }) {
   if (result === "ERROR") return <p className="owner-operation-result failed" role="alert">{copy.failed}</p>;
   if (result.status === "SUCCESS") return <p className="owner-operation-result success" role="status">{copy.success}</p>;
+  if (result.status === "PARTIAL") return <p className="owner-operation-result" role="status">{copy.partial}</p>;
   if (result.status === "NO_ACTION") return <p className="owner-operation-result" role="status">{copy.noActionResult}</p>;
   if (result.status === "RUN_ALREADY_IN_PROGRESS") return <p className="owner-operation-result" role="status">{copy.inProgress}</p>;
   return <p className="owner-operation-result failed" role="alert">{copy.failed} {result.last_known_good_preserved ? copy.preserved : ""}</p>;

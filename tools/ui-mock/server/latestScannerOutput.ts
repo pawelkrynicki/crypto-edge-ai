@@ -15,6 +15,7 @@ import {
   type ProductRuntimeMode,
   type ResolvedProductRuntimeMode,
 } from "../src/runtimeMode.js";
+import { readCommittedSnapshotState } from "./committedSnapshotState.js";
 
 export const SCANNER_OUTPUT_UNAVAILABLE = "SCANNER_OUTPUT_UNAVAILABLE";
 export const INVALID_SCANNER_OUTPUT = "SCANNER_SCHEMA_INVALID";
@@ -81,6 +82,8 @@ export type LatestScannerOutputOptions = {
   allowFixtureFallback?: boolean;
   runtimeMode?: ProductRuntimeMode | string;
   now?: Date;
+  committedRunId?: string | null;
+  automationStatePath?: string;
 };
 
 export class ScannerOutputError extends RealDataBoundaryError {}
@@ -104,7 +107,10 @@ export async function readLatestScannerOutput(
     throw new ScannerOutputError("RUNTIME_MODE_UNCONFIGURED");
   }
 
-  const candidates = await findCandidateRuns(outputDirPath);
+  const allCandidates = await findCandidateRuns(outputDirPath);
+  const candidates = runtimeMode === "INTERNAL_BETA"
+    ? await selectCommittedScannerCandidates(allCandidates, options)
+    : allCandidates;
 
   if (runtimeMode === "DEVELOPMENT_DEMO") {
     const latestValid = candidates.find((candidate) => isPersistableScannerOutputShape(candidate.output));
@@ -160,7 +166,10 @@ export async function getScannerSourcesDiagnostics(
     throw new ScannerOutputError("RUNTIME_MODE_UNCONFIGURED");
   }
   const outputDirExists = await pathExists(outputDirPath);
-  const candidates = await findCandidateRuns(outputDirPath);
+  const allCandidates = await findCandidateRuns(outputDirPath);
+  const candidates = runtimeMode === "INTERNAL_BETA"
+    ? await selectCommittedScannerCandidates(allCandidates, options).catch(() => [])
+    : allCandidates;
 
   const runs = candidates.slice(0, 10).map((candidate) => {
     let reasonCode: string | null = null;
@@ -203,6 +212,24 @@ export async function getScannerSourcesDiagnostics(
     } : {}),
     runs,
   };
+}
+
+async function selectCommittedScannerCandidates(
+  candidates: CandidateRun[],
+  options: LatestScannerOutputOptions,
+): Promise<CandidateRun[]> {
+  if (
+    options.outputDirPath !== undefined
+    && options.committedRunId === undefined
+    && options.automationStatePath === undefined
+  ) return candidates;
+  const runId = options.committedRunId === undefined
+    ? (await readCommittedSnapshotState(options.automationStatePath)).scanner_run_id
+    : options.committedRunId;
+  if (!runId) throw new ScannerOutputError("SCANNER_COMMITTED_POINTER_UNAVAILABLE");
+  const selected = candidates.find((candidate) => candidate.run_id === runId);
+  if (!selected) throw new ScannerOutputError("SCANNER_COMMITTED_SNAPSHOT_MISSING");
+  return [selected];
 }
 
 export function isPersistableScannerOutputShape(value: unknown): boolean {
@@ -282,7 +309,7 @@ function sanitizeInternalBetaScannerOutput(value: unknown, now: Date): ScannerOu
     throw new RealDataBoundaryError(INVALID_SCANNER_OUTPUT);
   }
 
-  const candidates = value.candidates.map((candidate) => sanitizeCandidate(candidate, manifest));
+  const candidates = value.candidates.map((candidate) => sanitizeCandidate(candidate, manifest, scannerMetadata));
   if (candidates.some((candidate) => candidate === null)) {
     throw new RealDataBoundaryError(INVALID_SCANNER_OUTPUT);
   }
@@ -440,19 +467,39 @@ function sanitizeNewEmergingMetadata(value: unknown): Record<string, unknown> {
 }
 
 function sanitizeEstablishedMetadata(value: unknown): Record<string, unknown> {
-  const fields = [
+  const baseFields = [
     "discovery_method", "universe_version", "universe_status", "entries_total", "entries_enabled",
     "pairs_loaded", "candidates_before_filters", "candidates_after_filters", "base_token_candidates",
     "quote_token_candidates",
   ];
+  const legacyUniverse = isRecord(value)
+    && value.universe_version === "established_address_universe_v1"
+    && value.validation_status === undefined;
+  const fields = legacyUniverse ? baseFields : [...baseFields, "validation_status"];
+  const universeStatus = isRecord(value) ? String(value.universe_status) : "";
+  const validUniverseStatus = universeStatus === "ESTABLISHED_UNIVERSE_EMPTY"
+    || universeStatus === "ESTABLISHED_UNIVERSE_READY";
   if (
     !isRecord(value)
     || !hasExactKeys(value, fields)
     || value.discovery_method !== "address_seeded_universe"
-    || value.universe_version !== "established_address_universe_v1"
-    || !["ESTABLISHED_UNIVERSE_EMPTY", "ESTABLISHED_UNIVERSE_READY"].includes(String(value.universe_status))
+    || ![
+      "ESTABLISHED_UNIVERSE_EMPTY", "ESTABLISHED_UNIVERSE_READY",
+      "ESTABLISHED_UNIVERSE_INVALID", "ESTABLISHED_UNIVERSE_UNAVAILABLE",
+    ].includes(universeStatus)
+    || (validUniverseStatus && !legacyUniverse && (
+      typeof value.universe_version !== "string"
+      || !/^established-universe-v\d{6}$/.test(value.universe_version)
+      || value.validation_status !== "valid"
+    ))
+    || (!validUniverseStatus && value.universe_version !== "unavailable")
+    || (universeStatus === "ESTABLISHED_UNIVERSE_INVALID" && value.validation_status !== "invalid")
+    || (universeStatus === "ESTABLISHED_UNIVERSE_UNAVAILABLE" && value.validation_status !== "unavailable")
   ) throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
-  const numericFields = fields.slice(3);
+  const numericFields = [
+    "entries_total", "entries_enabled", "pairs_loaded", "candidates_before_filters", "candidates_after_filters",
+    "base_token_candidates", "quote_token_candidates",
+  ];
   if (numericFields.some((field) => !isNonNegativeInteger(value[field]))) {
     throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
   }
@@ -469,7 +516,9 @@ function sanitizeEstablishedMetadata(value: unknown): Record<string, unknown> {
     if (enabled !== 0 || pairs !== 0 || candidates !== 0 || passed !== 0) {
       throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
     }
-  } else if (enabled < 1 || candidates < 1) {
+  } else if (value.universe_status === "ESTABLISHED_UNIVERSE_READY" && (enabled < 1 || candidates < 1)) {
+    throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
+  } else if (!validUniverseStatus && (total !== 0 || enabled !== 0 || pairs !== 0 || candidates !== 0 || passed !== 0)) {
     throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
   }
   return Object.fromEntries(fields.map((field) => [field, value[field]]));
@@ -481,10 +530,12 @@ function sanitizeDiscoveryReadiness(value: unknown, universeStatus: string, disc
     !isRecord(value) || !hasExactKeys(value, fields)
     || value.process !== "READY"
     || !["READY", "DEGRADED"].includes(String(value.new_emerging))
-    || !["READY", "EMPTY_CONFIGURED"].includes(String(value.established))
+    || !["READY", "EMPTY_CONFIGURED", "UNAVAILABLE"].includes(String(value.established))
     || !["READY", "UNAVAILABLE"].includes(String(value.context))
   ) throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
-  const expected = universeStatus === "ESTABLISHED_UNIVERSE_EMPTY" ? "EMPTY_CONFIGURED" : "READY";
+  const expected = universeStatus === "ESTABLISHED_UNIVERSE_EMPTY"
+    ? "EMPTY_CONFIGURED"
+    : universeStatus === "ESTABLISHED_UNIVERSE_READY" ? "READY" : "UNAVAILABLE";
   if (value.established !== expected) throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
   if (value.new_emerging !== discoveryStatus) throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
   return Object.fromEntries(fields.map((field) => [field, value[field]]));
@@ -541,6 +592,7 @@ function sanitizeScanRun(value: Record<string, unknown>): Record<string, unknown
 function sanitizeCandidate(
   value: unknown,
   manifest: RealDataProvenanceManifest,
+  metadata: Record<string, unknown>,
 ): Record<string, unknown> | null {
   if (!isRecord(value)) return null;
 
@@ -597,10 +649,11 @@ function sanitizeCandidate(
       || value.address_identity_verified !== false
     ) throw new RealDataBoundaryError(INVALID_SCANNER_OUTPUT);
   } else if (
-    value.discovery_method !== "address_seeded_universe"
+    !isRecord(metadata.established)
+    || value.discovery_method !== "address_seeded_universe"
     || value.observation_only !== false
     || value.established_eligible !== (value.basic_filter_status === "passed_basic_filter")
-    || value.universe_version !== "established_address_universe_v1"
+    || value.universe_version !== metadata.established.universe_version
     || !isNonNegativeInteger(value.universe_entry_index)
     || value.address_identity_verified !== true
   ) {

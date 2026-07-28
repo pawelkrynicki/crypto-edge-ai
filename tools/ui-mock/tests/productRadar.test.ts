@@ -709,11 +709,11 @@ describe("Product Radar owner acceptance", () => {
 
     assert.match(disabledEnglish, /Automation<\/dt><dd>Disabled/);
     assert.match(disabledEnglish, /Next run<\/dt><dd>Not scheduled/);
-    assert.match(disabledEnglish, new RegExp(`Last run<\\/dt><dd>${escapeRegExp(formatProductDateTime(lastRunAt, "en"))}`));
+    assert.match(disabledEnglish, new RegExp(`Last cycle attempt<\\/dt><dd>${escapeRegExp(formatProductDateTime(lastRunAt, "en"))}`));
     assert.match(disabledEnglish, new RegExp(`Next due after activation<\\/dt><dd>${escapeRegExp(formatProductDateTime(nextDueAt, "en"))}`));
     assert.match(disabledPolish, /Automatyzacja<\/dt><dd>Nieaktywna/);
     assert.match(disabledPolish, /Następny run<\/dt><dd>Nie zaplanowano/);
-    assert.match(disabledPolish, new RegExp(`Ostatni run<\\/dt><dd>${escapeRegExp(formatProductDateTime(lastRunAt, "pl"))}`));
+    assert.match(disabledPolish, new RegExp(`Ostatnia próba cyklu<\\/dt><dd>${escapeRegExp(formatProductDateTime(lastRunAt, "pl"))}`));
     assert.match(disabledPolish, new RegExp(`Najbliższy termin po aktywacji<\\/dt><dd>${escapeRegExp(formatProductDateTime(nextDueAt, "pl"))}`));
 
     assert.match(enabledEnglish, /Automation<\/dt><dd>Active/);

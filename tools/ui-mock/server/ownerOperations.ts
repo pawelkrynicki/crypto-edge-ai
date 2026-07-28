@@ -37,7 +37,7 @@ const OWNER_SOURCE_IDS = [
 
 export type OwnerOperationsMode = typeof OWNER_OPERATIONS_MODES[number];
 export type OwnerRefreshPlanMode = "scanner_and_context" | "context_only" | "no_action";
-export type OwnerActionStatus = "IN_PROGRESS" | "SUCCESS" | "NO_ACTION" | "FAILED" | "RUN_ALREADY_IN_PROGRESS" | null;
+export type OwnerActionStatus = "IN_PROGRESS" | "SUCCESS" | "PARTIAL" | "NO_ACTION" | "FAILED" | "RUN_ALREADY_IN_PROGRESS" | null;
 
 export type OwnerSnapshotStatus = {
   scanner_timestamp: string | null;
@@ -264,6 +264,10 @@ export function createOwnerOperationsService(options: OwnerOperationsOptions = {
       if (runResult.run_status === "SUCCESS" && runResult.run_id) {
         lastAction = { status: "SUCCESS", started_at: startedAt, finished_at: finishedAt, run_id: runResult.run_id };
         return { status: "SUCCESS", run_id: runResult.run_id, last_known_good_preserved: false };
+      }
+      if (runResult.run_status === "PARTIAL" && runResult.run_id) {
+        lastAction = { status: "PARTIAL", started_at: startedAt, finished_at: finishedAt, run_id: runResult.run_id };
+        return { status: "PARTIAL", run_id: runResult.run_id, last_known_good_preserved: true };
       }
       if (runResult.run_status === "RUN_ALREADY_IN_PROGRESS" || runResult.decision === "RUN_ALREADY_IN_PROGRESS") {
         lastAction = { status: "RUN_ALREADY_IN_PROGRESS", started_at: startedAt, finished_at: finishedAt, run_id: null };
