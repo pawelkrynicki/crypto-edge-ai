@@ -6187,6 +6187,7 @@ button:disabled,
 .product-control-center-hero { align-items: center; margin: 0; }
 .product-control-overall { display: grid; grid-template-columns: auto auto; align-items: center; gap: 2px var(--space-3); min-width: 170px; }
 .product-control-overall .control-status-badge { grid-column: 1 / -1; justify-self: end; }
+.product-control-overall > .product-control-release-label { grid-column: 1 / -1; justify-self: end; max-width: 240px; font-weight: 650; text-align: right; }
 .product-control-overall > strong { color: var(--color-text-primary); font-size: 28px; line-height: 1; text-align: right; }
 .product-control-overall > span { max-width: 90px; color: var(--color-text-helper); font-size: 10px; line-height: 1.35; }
 .product-control-boundary { margin: calc(var(--space-3) * -1) 0 0; }
@@ -6340,6 +6341,7 @@ button:disabled,
   .product-control-center-hero { align-items: flex-start; flex-direction: column; }
   .product-control-overall { width: 100%; grid-template-columns: auto minmax(0, 1fr); }
   .product-control-overall .control-status-badge { justify-self: start; }
+  .product-control-overall > .product-control-release-label { justify-self: start; text-align: left; }
   .product-control-group .control-card-grid,
   .owner-feedback-stats,
   .verification-identity,

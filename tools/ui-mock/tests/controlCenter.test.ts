@@ -12,6 +12,7 @@ import {
   type ControlCenterReadinessInput,
 } from "../src/controlCenterStatus.js";
 import { ProductControlCenter } from "../src/components/ProductControlCenter.js";
+import type { AutomationStatus } from "../src/services/automationStatusDataSource.js";
 import type { OwnerOperationsStatus } from "../src/services/ownerOperationsDataSource.js";
 import { ProductLocaleProvider } from "../src/productI18n.js";
 import type { ReviewSessionStorageProvider } from "../server/reviewSessionStorageProvider.js";
@@ -88,6 +89,53 @@ describe("Control Center readiness model", () => {
     input.sources.availability = "partial";
     input.sources.affectedSourceIds = ["dexscreener"];
     assert.equal(resolveControlCenterStatus(input).sources.status, "PARTIAL");
+  });
+
+  it("separates local functional readiness from trusted tester release readiness", () => {
+    const status = resolveControlCenterStatus(baseInput());
+    const polish = renderControlCenter("pl", status);
+    assert.match(polish, /Gotowość udostępnienia zaufanemu testerowi/);
+    assert.match(polish, /Gotowość funkcjonalna produktu/);
+    assert.match(polish, /Niegotowe/);
+    assert.match(polish, />5<\/strong><span>otwartych warunków/);
+    assert.match(polish, /<h4>Dostęp i wdrożenie<\/h4><span class="control-status-badge manual">Etap końcowy<\/span>/);
+    assert.deepEqual(blockerItems(polish), [
+      "Tryb podglądu zaufanego testera",
+      "Wdrożenie na VPS",
+      "Test domeny i Cloudflare Access",
+      "Test rollbacku/wycofania",
+      "Zgoda właściciela na dostęp testera",
+    ]);
+  });
+
+  it("shows mechanism readiness separately from the PARTIAL published snapshot", () => {
+    const input = baseInput();
+    input.sources.availability = "partial";
+    input.sources.affectedSourceIds = ["defillama_api"];
+    input.automation.lastResult = "PARTIAL";
+    const status = resolveControlCenterStatus(input);
+    const polish = renderControlCenter("pl", status, undefined, partialAutomationStatus());
+    const dataCard = statusCard(polish, "Dane i migawki");
+
+    assert.match(dataCard, /Mechanizm gotowy/);
+    assert.match(dataCard, /Ostatnia opublikowana migawka<\/dt><dd>Częściowa<\/dd>/);
+    assert.match(dataCard, /Czas ostatniej migawki/);
+    assert.match(dataCard, /Czas ostatniej próby/);
+    assert.match(dataCard, /Czas ostatniego pełnego sukcesu/);
+    assert.match(dataCard, /Źródło powodujące PARTIAL<\/dt><dd>DefiLlama<\/dd>/);
+    assert.doesNotMatch(dataCard, /control-status-badge ready">Gotowe/);
+  });
+
+  it("describes Follow-up cycle handling without claiming background scheduling", () => {
+    const status = resolveControlCenterStatus(baseInput());
+    const polish = renderControlCenter("pl", status);
+    const followUpCard = statusCard(polish, "Dalsza obserwacja");
+
+    assert.match(followUpCard, /Obsługa w centralnym cyklu<\/dt><dd>Aktywna<\/dd>/);
+    assert.match(followUpCard, /Harmonogram centralnego cyklu<\/dt><dd>Niezainstalowany<\/dd>/);
+    assert.match(followUpCard, /Kandydaci do Established/);
+    assert.match(followUpCard, /Następny termin/);
+    assert.doesNotMatch(followUpCard, /Automatyczne śledzenie|Candidate for Established|Następny due|NEXT DUE/);
   });
 
   it("accepts a valid empty Established Universe", () => {
@@ -265,10 +313,10 @@ describe("Control Center readiness model", () => {
     const status = resolveControlCenterStatus(baseInput());
     const english = renderControlCenter("en", status);
     const polish = renderControlCenter("pl", status);
-    assert.match(english, /Trusted tester preview/);
+    assert.match(english, /Trusted tester release readiness/);
     assert.match(english, /Not ready/);
     assert.match(english, /read-only Reports Library uses the canonical local report index\./);
-    assert.match(polish, /Podgląd dla zaufanego testera/);
+    assert.match(polish, /Gotowość udostępnienia zaufanemu testerowi/);
     assert.match(polish, /Niegotowe/);
     assert.match(polish, /Biblioteka raportów wyłącznie do odczytu korzysta z kanonicznego lokalnego indeksu raportów\./);
     assert.equal(countStatusCards(english), countStatusCards(polish));
@@ -519,12 +567,51 @@ function renderControlCenter(
   locale: "en" | "pl",
   status: ReturnType<typeof resolveControlCenterStatus>,
   ownerOperationsStatus?: OwnerOperationsStatus | null,
+  automationStatus?: AutomationStatus | null,
 ): string {
   return renderToStaticMarkup(React.createElement(
     ProductLocaleProvider,
     { initialLocale: locale },
-    React.createElement(ProductControlCenter, { status, ownerOperationsStatus }),
+    React.createElement(ProductControlCenter, { status, ownerOperationsStatus, automationStatus }),
   ));
+}
+
+function partialAutomationStatus(): AutomationStatus {
+  return {
+    enabled: true,
+    active_run_id: null,
+    last_result: "PARTIAL",
+    last_error_code: null,
+    last_attempt_at: "2026-07-28T13:10:00.000Z",
+    last_success_at: "2026-07-21T12:01:00.000Z",
+    last_failure_at: null,
+    next_run_at: "2026-07-28T13:15:00.000Z",
+    next_due_at: "2026-07-28T13:15:00.000Z",
+    next_scanner_run_at: "2026-07-28T13:15:00.000Z",
+    next_context_run_at: "2026-07-28T14:00:00.000Z",
+    last_published_scanner_run_id: "scan_partial",
+    last_published_context_run_id: "context_partial",
+    request_counts: { dexscreener: 1, defillama_api: 1 },
+    scheduler_status: "RUN_SCANNER_AND_CONTEXT",
+    cycle_id: "automation_partial",
+    cycle_status: "PARTIAL",
+    cycle_duration_ms: 1_820,
+    snapshot_generated_at: "2026-07-28T13:10:01.820Z",
+    snapshot_age_seconds: 0,
+    records_received: 37,
+    records_valid: 13,
+    records_rejected: 24,
+    new_records: 13,
+    follow_up_ingested: 7,
+    checkpoints_processed: 0,
+    source_statuses: {
+      dexscreener: "READY",
+      defillama_api: "DEGRADED",
+    },
+    failure_code: null,
+    safe_error: null,
+    data_status: "PARTIAL",
+  };
 }
 
 function ownerStatus(mode: "REVIEW_SAFE" | "ENABLED"): OwnerOperationsStatus {
@@ -549,6 +636,15 @@ function ownerStatus(mode: "REVIEW_SAFE" | "ENABLED"): OwnerOperationsStatus {
 
 function countStatusCards(markup: string): number {
   return (markup.match(/product-control-card/g) ?? []).length;
+}
+
+function statusCard(markup: string, title: string): string {
+  const card = Array.from(
+    markup.matchAll(/<article class="[^"]*product-control-card[^"]*"[^>]*>[\s\S]*?<\/article>/g),
+    (match) => match[0],
+  ).find((candidate) => candidate.includes(`<h4>${title}</h4>`));
+  assert.ok(card, `${title} card is missing`);
+  return card;
 }
 
 function blockerItems(markup: string): string[] {
