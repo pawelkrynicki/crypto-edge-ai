@@ -77,7 +77,7 @@ scripts\win\preview-central-automation-task.cmd
 
 `build-product-vps.cmd` synchronizes only the `tools/ui-mock` locked dependencies and builds the fixture-free `INTERNAL_BETA` surface. `start-product-vps.cmd` serves the UI and the existing `/api/*` contract from one Node process on `127.0.0.1:4180`; it does not start the collector, configure Cloudflare, or create a Scheduled Task. `check-product-vps-runtime.cmd` uses a dedicated random high port and always closes its server. `check-automation-single-flight.cmd` runs only offline lock/coordinator tests against isolated temporary files.
 
-`check-central-scheduler.cmd` uses injected clocks/runners and includes cadence, decision, lock, coordinator and Task Scheduler source checks offline. `check-automation-status-api.cmd` starts the same-origin product runtime on a random local port, performs 100 read-only status requests, verifies unchanged state and zero runner/provider calls, then closes the process. `preview-central-automation-task.cmd` prints the fixed task plan without changing Windows.
+`check-central-scheduler.cmd` uses injected clocks/runners and includes cadence, decision, lock, coordinator and Task Scheduler source checks offline. `check-automation-status-api.cmd` starts the same-origin product runtime on a random local port, performs 100 read-only status requests, verifies unchanged state and zero runner/provider calls, then closes the process. `preview-central-automation-task.cmd` prints the default five-minute task plan without changing Windows.
 
 Source schedule:
 
@@ -98,14 +98,19 @@ scripts\win\register-central-automation-task.cmd
 scripts\win\unregister-central-automation-task.cmd
 ```
 
-Future explicit owner-only changes require `--apply`:
+Future explicit owner-only changes use operation-specific flags and may set the accepted wake interval:
 
 ```cmd
-scripts\win\register-central-automation-task.cmd --apply
-scripts\win\unregister-central-automation-task.cmd --apply
+scripts\win\status-central-automation-task.cmd
+scripts\win\last-result-central-automation-task.cmd
+scripts\win\register-central-automation-task.cmd --install --interval-minutes 5
+scripts\win\start-central-automation-task.cmd --run-task
+scripts\win\disable-central-automation-task.cmd --disable
+scripts\win\unregister-central-automation-task.cmd --uninstall
+scripts\win\rollback-central-automation-task-config.cmd --rollback-config
 ```
 
-Neither `--apply` command is part of automated validation. Full contract and runbook: `docs/vps_deployment_automation.md`. VPS deployment, Cloudflare changes, Task Scheduler activation, live provider calls, port `4173`, `PUBLIC_BETA`, and external tester access remain outside this sprint. Local checks do not require VPS access.
+No mutating Task Scheduler command is part of automated validation. The DATA.1 one-cycle launcher is dry-run by default; `--run-once-live` performs exactly one backed-up cycle and `--rollback <backup_id>` is explicit. Full contract and runbook: `docs/central_data_cycle.md`. VPS deployment, Cloudflare changes, Task Scheduler activation, port `4173`, `PUBLIC_BETA`, and external tester access remain outside this sprint.
 
 ## Product Radar owner review
 

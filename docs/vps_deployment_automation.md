@@ -6,6 +6,8 @@ Established Universe Management działa lokalnie niezależnie od oczekującego d
 
 Sprint 1 i Sprint 2 zostały zaakceptowane lokalnie. Aktualny stan to **local code complete, VPS operational deployment pending**. Rzeczywiste wdrożenie nie zostało wykonane, scheduler nie został aktywowany, konfiguracja Cloudflare nie została zmieniona, a tester zewnętrzny pozostaje `NO-GO`.
 
+DATA.1 domknęło lokalny centralny cykl, atomowy commit pointer, metadane `PARTIAL`/LKG, backup/rollback oraz konfigurowalne skrypty zadania. Kontrolowany snapshot z 28.07.2026 jest dostępny lokalnie; szczegóły i aktualny runbook: `docs/central_data_cycle.md`. Nie zmienia to statusu wdrożenia ani schedulera.
+
 ## Local owner review: ACCEPT_LOCAL_CODE — 21.07.2026
 
 Końcowy lokalny owner review Sprintu 1 i Sprintu 2 zakończył się werdyktem `ACCEPT_LOCAL_CODE`. Akceptacja dotyczy wyłącznie lokalnego kodu i nie oznacza wykonania deploymentu ani uruchomienia automatyzacji operacyjnej.
@@ -154,7 +156,7 @@ Mały panel w Technical details jest tylko do odczytu. Przy `enabled=false` poka
 
 ## Windows Task Scheduler — pakiet nieaktywny
 
-Skrypty rejestracji i usunięcia są domyślnie dry-run. Dopiero jawne `--apply` może zmienić dokładnie zadanie `Crypto Edge AI Central Automation`. Plan ma cadence 5 minut, trigger startowy, `MultipleInstances=IgnoreNew`, kanoniczny wrapper, working directory repo i zero sekretów w command line. W tym sprincie nie wykonano `--apply`; Task Scheduler, Cloudflare i VPS pozostają niezmienione.
+Skrypty rejestracji i usunięcia są domyślnie preview/dry-run. Zmiana dokładnie zadania `Crypto Edge AI Central Automation` wymaga osobnej flagi `--install`, `--disable`, `--run-task`, `--uninstall` albo `--rollback-config`. Zaakceptowana domyślna pobudka to 5 minut, konfigurowalna przez `--interval-minutes 1..1440`; nie zmienia ona cadence providerów. Plan ma trigger startowy, `MultipleInstances=IgnoreNew`, kanoniczny wrapper, working directory repo, backup poprzedniej konfiguracji i zero sekretów w command line. DATA.1 nie instaluje zadania; Task Scheduler, Cloudflare i VPS pozostają niezmienione.
 
 ## Owner runbook
 
@@ -199,8 +201,9 @@ scripts\win\preview-central-automation-task.cmd
 Jawne komendy ownera do przyszłej rejestracji lub usunięcia — nie wykonywać podczas offline review:
 
 ```cmd
-scripts\win\register-central-automation-task.cmd --apply
-scripts\win\unregister-central-automation-task.cmd --apply
+scripts\win\register-central-automation-task.cmd --install --interval-minutes 5
+scripts\win\unregister-central-automation-task.cmd --uninstall
+scripts\win\rollback-central-automation-task-config.cmd --rollback-config
 ```
 
 Lokalne uruchomienie przygotowanego runtime na domyślnym loopback `4180` — tylko po upewnieniu się, że port jest przeznaczony na review; ta komenda nie wdraża domeny, nie zmienia Cloudflare i nie tworzy autostartu:
