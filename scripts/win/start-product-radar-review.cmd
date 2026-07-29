@@ -9,6 +9,7 @@ set "RADAR_VIEW=candidate-results"
 set "OWNER_OPERATIONS_REVIEW=0"
 set "ESTABLISHED_PROMOTION_REVIEW=0"
 set "RUN_CHECK=0"
+set "OPEN_BROWSER=1"
 
 :parse_args
 if "%~1"=="" goto args_done
@@ -19,6 +20,7 @@ if /i "%~1"=="--candidate-detail" set "RADAR_VIEW=candidate-detail"
 if /i "%~1"=="--owner-operations-review" set "OWNER_OPERATIONS_REVIEW=1"
 if /i "%~1"=="--established-promotion-review" set "ESTABLISHED_PROMOTION_REVIEW=1"
 if /i "%~1"=="--check" set "RUN_CHECK=1"
+if /i "%~1"=="--no-open" set "OPEN_BROWSER=0"
 shift
 goto parse_args
 
@@ -95,5 +97,5 @@ echo Radar: !RADAR_URL!
 echo Zatrzymanie: scripts\win\kill-local-ports.cmd
 echo Zamknij dwa okna procesu dopiero po zakonczeniu oceny ownera.
 
-start "" "!RADAR_URL!"
+if "%OPEN_BROWSER%"=="1" start "" "!RADAR_URL!"
 exit /b 0

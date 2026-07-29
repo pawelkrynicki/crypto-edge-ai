@@ -1,5 +1,7 @@
 # Standalone Roadmap To Trusted Tester
 
+> Aktualizacja AI.3: etap kontrolowanego `--live-one` został zakończony i wycofany. Publiczne żądania wyłącznie kolejkują analizę, a provider może uruchomić tylko osobny centralny worker. Bieżący kontrakt opisuje `docs/ai_shared_queue_cache.md`; sekcja AI.2 poniżej pozostaje historią zrealizowanej walidacji.
+
 ## AI.2 — Controlled OpenAI Live Validation
 
 AI.1 dostarczył deterministyczny Visual Candidate Research Canvas i backendowy kontrakt `ai_research_brief_v1`. AI.2 przygotowuje pierwszy kontrolowany owner smoke dla aktualnego rzeczywistego tokena: domyślnie 0 calls, osobny launcher `--live-one`, wymagany model i klucz z environment, izolowany SQLite, `store: false`, brak tools i retry, bounded timeout oraz trwały budżet jednej próby. Codex przygotowuje kod i testy offline; rzeczywisty call wykonuje później wyłącznie owner po review.

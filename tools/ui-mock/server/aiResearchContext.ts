@@ -7,6 +7,7 @@ import {
   type TokenLifecycleViewModel,
 } from "../src/tokenLifecycle.js";
 import {
+  AI_RESEARCH_DATA_CONTRACT_VERSION,
   AI_RESEARCH_PROMPT_VERSION,
   type AIResearchActionType,
   type AIResearchCoverageItem,
@@ -109,19 +110,21 @@ export async function buildAIResearchContext(
   if (!candidate && !followUp) throw new AIResearchContextError("CANDIDATE_NOT_FOUND", 404);
 
   const status = followUpStatus.status === "fulfilled" ? followUpStatus.value : null;
-  const lifecycle = resolveTokenLifecycle({
-    candidate,
-    followUp,
-    followUpStatus: status,
-    establishedMembership: followUp?.established_membership === true || candidate?.discoveryBasket === "established",
-    now: options.now?.() ?? new Date(),
-  });
   const dataGeneratedAt = scanner?.provenance?.generated_at
     ?? scanner?.scan_run.finished_at
     ?? followUp?.last_checked_at
     ?? followUp?.last_seen_at
     ?? followUp?.first_seen_at
     ?? new Date(0).toISOString();
+  const lifecycle = resolveTokenLifecycle({
+    candidate,
+    followUp,
+    followUpStatus: status,
+    establishedMembership: followUp?.established_membership === true || candidate?.discoveryBasket === "established",
+    // The persisted data clock, not the view refresh clock, keeps the analysis
+    // fingerprint and deterministic skeleton stable for the same stored state.
+    now: new Date(dataGeneratedAt),
+  });
   const freshness = scanner?._source_meta?.freshness_status ?? "UNKNOWN";
   const sourceReferences = buildSources(candidate, followUp, reportList.status === "fulfilled" ? reportList.value.reports : [], dataGeneratedAt, locale);
   const factCandidates = buildFactCandidates(candidate, followUp, lifecycle, freshness, locale);
@@ -131,8 +134,12 @@ export async function buildAIResearchContext(
   const researchState = resolveResearchState(candidate, followUp, freshness, factCandidates.length);
   const actionCatalog = resolveAIResearchActions(candidate, followUp, lifecycle, freshness, sourceReferences, locale);
   const statusChangeConditions = buildStatusConditions(candidate, followUp, lifecycle, freshness, locale);
+  const symbol = boundedUntrustedText(candidate?.symbol ?? followUp?.symbol ?? "", 32);
+  const name = boundedUntrustedText(candidate?.name ?? followUp?.display_name ?? symbol, 120);
   const canonicalInput = {
+    data_contract_version: AI_RESEARCH_DATA_CONTRACT_VERSION,
     identity: { chain: identity.chain, contract_address: identity.contract_address },
+    token_identity: { symbol, name },
     lifecycle: {
       current_stage: lifecycle.current_stage,
       tracking_status: lifecycle.tracking_status,
@@ -147,6 +154,19 @@ export async function buildAIResearchContext(
       reasons: [...(candidate?.filterReasons ?? followUp?.filter_reasons ?? [])].sort(),
     },
     security: securityFingerprint(candidate, followUp),
+    source_health: sourceReferences.map(({ id, source_type, observed_at, completeness }) => ({
+      id,
+      source_type,
+      observed_at,
+      completeness,
+    })),
+    follow_up_checkpoint: followUp ? {
+      lifecycle_status: followUp.lifecycle_status,
+      completed_checkpoints: [...followUp.completed_checkpoints].sort((left, right) => left - right),
+      next_check_at: followUp.next_check_at,
+      last_checked_at: followUp.last_checked_at,
+      missing_data: [...followUp.missing_data].sort(),
+    } : null,
     membership: followUp?.established_membership === true || candidate?.discoveryBasket === "established",
     report_assets: sourceReferences
       .filter(({ source_type }) => source_type === "report")
@@ -154,8 +174,6 @@ export async function buildAIResearchContext(
     methodology_version: AI_RESEARCH_METHODOLOGY_VERSION,
   };
   const snapshotFingerprint = sha256(stableJson(canonicalInput));
-  const symbol = boundedUntrustedText(candidate?.symbol ?? followUp?.symbol ?? "", 32);
-  const name = boundedUntrustedText(candidate?.name ?? followUp?.display_name ?? symbol, 120);
 
   return {
     identity: { chain: identity.chain, contract_address: identity.contract_address },
@@ -355,7 +373,7 @@ function buildRisks(
   else if (security === "partial") add("unknown", "security", "Częściowe dane o bezpieczeństwie", "Partial security data", "Pokrycie jest niepełne i wymaga ręcznej weryfikacji.", "Coverage is incomplete and requires manual verification.", ["security_status"]);
   else if (candidate?.criticalReasons.length || candidate?.securityLabel.includes("CRITICAL")) add("high", "security", "Krytyczna flaga bezpieczeństwa", "Critical security flag", "Dane produktu zawierają krytyczną flagę wymagającą weryfikacji.", "Product data includes a critical flag that requires verification.", ["security_status"]);
   if (freshness === "STALE") add("unknown", "freshness", "Dane są nieaktualne", "Data is stale", "Aktualny stan wymaga świeższej migawki przed dalszą oceną.", "The current state needs a fresher snapshot before further assessment.", ["scanner_snapshot"]);
-  for (const _flag of (candidate?.riskFlags ?? []).slice(0, 2)) add("high", "security_flag", "Zapisana flaga kontroli bezpieczeństwa", "Recorded security check flag", "Flaga pochodzi z zapisanego statusu bezpieczeństwa i wymaga ręcznej interpretacji.", "The flag comes from the stored security status and needs manual interpretation.", ["security_status"]);
+  if ((candidate?.riskFlags ?? []).length > 0) add("high", "security_flag", "Zapisana flaga kontroli bezpieczeństwa", "Recorded security check flag", "Flaga pochodzi z zapisanego statusu bezpieczeństwa i wymaga ręcznej interpretacji.", "The flag comes from the stored security status and needs manual interpretation.", ["security_status"]);
   if (risks.length === 0) add("low", "workflow", "Brak blokady procesu", "No workflow blocker", "Nie wykryto blokady procesu; nie oznacza to potwierdzenia bezpieczeństwa.", "No workflow blocker was detected; this does not confirm safety.", ["methodology"]);
   return risks.slice(0, 5);
 }
@@ -586,7 +604,10 @@ export function sha256(value: string): string {
 }
 
 function boundedUntrustedText(value: string, max: number): string {
-  return value.replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, max);
+  return Array.from(value, (character) => {
+    const code = character.charCodeAt(0);
+    return code <= 31 || code === 127 ? " " : character;
+  }).join("").trim().slice(0, max);
 }
 
 function safeExternalUrl(value: string | null | undefined, hosts: Set<string>): string | null {

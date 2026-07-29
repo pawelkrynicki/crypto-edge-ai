@@ -1,21 +1,18 @@
 import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
 import { createServer as createHttpServer, type Server } from "node:http";
-import type { AddressInfo } from "node:net";
+import { createServer as createNetServer, type AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { after, describe, it } from "node:test";
 import { createServer as createViteServer, type ViteDevServer } from "vite";
 import { createFeedbackStore } from "../server/feedbackStore.js";
 import { createScannerApiHandler } from "../server/scannerApiHandler.js";
-import type { AIResearchProvider, AIResearchProviderConfig } from "../server/aiResearchProvider.js";
+import { createAIAnalysisQueueStore } from "../server/aiResearchQueueStore.js";
 import { createAIResearchService } from "../server/aiResearchService.js";
-import { createAIResearchStore } from "../server/aiResearchStore.js";
 import { LOCAL_API_PROXY } from "../vite.config.js";
 
 const root = await mkdtemp(resolve(tmpdir(), "crypto-edge-ai-proxy-tests-"));
-const TEST_API_KEY = "proxy-test-key-must-never-be-logged";
-
 after(async () => { await rm(root, { recursive: true, force: true }); });
 
 describe("AI.2 local same-origin proxy", () => {
@@ -26,21 +23,12 @@ describe("AI.2 local same-origin proxy", () => {
   });
 
   it("accepts the public proxy host, rejects a foreign Origin, validates forwarded host and spends no live budget", async () => {
-    const store = await createAIResearchStore({ databaseFilePath: resolve(root, "ai-research-openai-review.sqlite") });
+    const store = await createAIAnalysisQueueStore({ databaseFilePath: resolve(root, "ai-analysis-queue.sqlite") });
     const feedbackStore = await createFeedbackStore({ databaseFilePath: resolve(root, "feedback.sqlite") });
-    let providerCalls = 0;
-    const provider: AIResearchProvider = {
-      mode: "OPENAI",
-      model: "configured-test-model",
-      async generate() {
-        providerCalls += 1;
-        throw new Error("provider must not be called by proxy validation tests");
-      },
-    };
     const service = createAIResearchService({
-      provider,
-      providerConfig: liveOneConfig(),
-      store,
+      queueStore: store,
+      providerEnabled: true,
+      modelId: "gpt-5-mini",
     });
     const forwardedHosts: Array<string | string[] | undefined> = [];
     const handler = createScannerApiHandler({
@@ -60,6 +48,7 @@ describe("AI.2 local same-origin proxy", () => {
     try {
       await listen(apiServer);
       const apiPort = requirePort(apiServer);
+      const vitePort = await reservePort();
       vite = await createViteServer({
         configFile: false,
         root: resolve(import.meta.dirname, ".."),
@@ -67,7 +56,7 @@ describe("AI.2 local same-origin proxy", () => {
         logLevel: "silent",
         server: {
           host: "127.0.0.1",
-          port: 0,
+          port: vitePort,
           strictPort: true,
           allowedHosts: true,
           proxy: {
@@ -105,10 +94,8 @@ describe("AI.2 local same-origin proxy", () => {
       assert.equal((await forgedForwardedHost.json() as { error?: string }).error, "SAME_ORIGIN_REQUIRED");
       assert.notEqual(forgedForwardedHost.headers.get("access-control-allow-origin"), "*");
 
-      assert.equal(providerCalls, 0);
-      assert.equal(store.liveCallBudgetUsage(), 0);
       assert.equal(store.stats().records, 0);
-      assert.doesNotMatch(capturedLogs.join("\n"), new RegExp(TEST_API_KEY));
+      assert.doesNotMatch(capturedLogs.join("\n"), /OPENAI_API_KEY|Bearer\s+[A-Za-z0-9_-]+/);
     } finally {
       console.error = originalError;
       console.warn = originalWarn;
@@ -120,23 +107,24 @@ describe("AI.2 local same-origin proxy", () => {
   });
 });
 
-function liveOneConfig(): AIResearchProviderConfig {
-  return {
-    mode: "OPENAI",
-    model: "configured-test-model",
-    apiKey: TEST_API_KEY,
-    timeoutMs: 5_000,
-    maxConcurrency: 1,
-    liveCallBudget: 1,
-    liveCallBudgetInvalid: false,
-  };
-}
-
 function postEmptyBody(url: string, origin: string) {
   return fetch(url, {
     method: "POST",
     headers: { origin, "content-type": "application/json" },
     body: "{}",
+  });
+}
+
+function reservePort(): Promise<number> {
+  return new Promise((resolvePort, reject) => {
+    const server = createNetServer();
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      if (!address || typeof address === "string") { server.close(); reject(new Error("PORT_UNAVAILABLE")); return; }
+      const port = address.port;
+      server.close((error) => error ? reject(error) : resolvePort(port));
+    });
   });
 }
 

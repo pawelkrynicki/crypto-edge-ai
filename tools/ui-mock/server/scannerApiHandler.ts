@@ -206,6 +206,18 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
       return;
     }
 
+    if (req.method === "GET" && (path === "/api/v1/ai-analyses/status" || path === "/api/v1/ai-analyses/result")) {
+      try {
+        const session = aiResearchSessionManager.resolve(req);
+        if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
+        const query = parseAIResearchQuery(req.url);
+        sendJson(req, res, 200, await aiResearchService.getBrief(query.chain, query.contract_address, query.locale), runtimeMode);
+      } catch (error) {
+        sendAIResearchError(req, res, error, runtimeMode);
+      }
+      return;
+    }
+
     if (req.method === "GET" && path === "/api/ai-research/review-metrics") {
       if (!isLocalOwnerRequest(req)) {
         sendJson(req, res, 404, { error: "not_found", message: "Route not found" }, runtimeMode);
@@ -232,8 +244,21 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
       return;
     }
 
-    if (path === "/api/ai-research" || path.startsWith("/api/ai-research/")) {
-      res.setHeader("allow", path.endsWith("/generate") ? "POST" : "GET");
+
+    if (req.method === "POST" && path === "/api/v1/ai-analyses/requests") {
+      try {
+        const session = aiResearchSessionManager.resolve(req);
+        if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
+        const body = await readAIResearchGenerateRequest(req);
+        sendJson(req, res, 202, await aiResearchService.generate(body, session.sessionId), runtimeMode);
+      } catch (error) {
+        sendAIResearchError(req, res, error, runtimeMode);
+      }
+      return;
+    }
+
+    if (path === "/api/ai-research" || path.startsWith("/api/ai-research/") || path.startsWith("/api/v1/ai-analyses/")) {
+      res.setHeader("allow", path.endsWith("/generate") || path.endsWith("/requests") ? "POST" : "GET");
       sendJson(req, res, 405, { error: "method_not_allowed", message: "Method not allowed" }, runtimeMode);
       return;
     }

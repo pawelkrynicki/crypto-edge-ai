@@ -1,5 +1,31 @@
 export const AI_RESEARCH_SCHEMA_VERSION = "ai_research_brief_v1" as const;
 export const AI_RESEARCH_PROMPT_VERSION = "ai_research_prompt_v2" as const;
+export const AI_ANALYSIS_QUEUE_SCHEMA_VERSION = "ai_analysis_queue_v1" as const;
+export const AI_RESEARCH_DATA_CONTRACT_VERSION = "ai_research_data_contract_v2" as const;
+export const AI_RESEARCH_TARGET_MODEL = "gpt-5-mini" as const;
+
+export const AI_ANALYSIS_STATUSES = [
+  "ABSENT",
+  "QUEUED",
+  "PROCESSING",
+  "READY",
+  "STALE",
+  "FAILED",
+  "SUSPENDED",
+] as const;
+
+export const AI_ANALYSIS_REQUEST_OUTCOMES = [
+  "READY",
+  "QUEUED",
+  "PROCESSING",
+  "ALREADY_EXISTS",
+  "COOLDOWN",
+  "DATA_STALE",
+  "DATA_UNAVAILABLE",
+  "PROVIDER_DISABLED",
+  "SUSPENDED",
+  "RATE_LIMITED",
+] as const;
 
 export const AI_RESEARCH_STATES = [
   "INSUFFICIENT_DATA",
@@ -36,15 +62,21 @@ export type AIResearchActionType = typeof AI_RESEARCH_ACTION_TYPES[number];
 export type AIResearchRiskSeverity = typeof AI_RESEARCH_RISK_SEVERITIES[number];
 export type AIResearchCoverageState = typeof AI_RESEARCH_COVERAGE_STATES[number];
 export type AIResearchLocale = "pl" | "en";
+export type AIAnalysisStatus = typeof AI_ANALYSIS_STATUSES[number];
+export type AIAnalysisRequestOutcome = typeof AI_ANALYSIS_REQUEST_OUTCOMES[number];
 export type AIResearchGenerationBlockedReason =
   | "LIVE_CALL_BUDGET_EXHAUSTED"
   | "LIVE_CALL_BUDGET_INVALID"
   | "REVIEW_STORE_REQUIRED";
 export type AIResearchAvailabilityState =
   | "ABSENT"
-  | "GENERATING"
+  | "QUEUED"
+  | "PROCESSING"
   | "READY"
   | "STALE"
+  | "FAILED"
+  | "SUSPENDED"
+  | "COOLDOWN"
   | "PROVIDER_DISABLED"
   | "INSUFFICIENT_DATA"
   | "RATE_LIMITED"
@@ -147,6 +179,13 @@ export type AIResearchBriefLookup = {
   retry_after_seconds: number | null;
   error_code: string | null;
   generation_blocked_reason?: AIResearchGenerationBlockedReason | null;
+  queue_schema_version?: typeof AI_ANALYSIS_QUEUE_SCHEMA_VERSION;
+  analysis_id?: string | null;
+  cache_key?: string | null;
+  queue_status?: AIAnalysisStatus;
+  request_outcome?: AIAnalysisRequestOutcome | null;
+  shared_result?: true;
+  is_last_known_good?: boolean;
 };
 
 export type AIResearchReviewMetrics = {
