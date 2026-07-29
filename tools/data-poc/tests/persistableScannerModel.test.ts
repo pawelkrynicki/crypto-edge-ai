@@ -125,7 +125,7 @@ describe("buildPersistableScannerOutput", () => {
   it("adds an explicit development fixture provenance manifest", () => {
     const output = buildPersistableScannerOutput({ combined: combinedOutput(), runId: "scan_test" });
     assert.ok(output.provenance);
-    assert.equal(output.provenance.schema_version, "scanner_snapshot_v1");
+    assert.equal(output.provenance.schema_version, "scanner_snapshot_v2");
     assert.equal(output.provenance.contract_version, "real_data_boundary_v1");
     assert.equal(output.provenance.environment, "DEVELOPMENT_DEMO");
     assert.equal(output.provenance.mode, "fixture");

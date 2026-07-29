@@ -42,7 +42,8 @@ export async function collectInternalBetaContext(
   options: InternalBetaContextCollectionOptions,
 ): Promise<InternalBetaContextCollectionResult> {
   const previous = options.previousContext
-    ?? await readPreviousContext(options.outputDir, options.previousContextRunId);
+    ? validatedPreviousContext(options.previousContext)
+    : await readPreviousContext(options.outputDir, options.previousContextRunId);
   const requestedDue = options.dueSourceIds ?? [...CONTEXT_SOURCE_IDS];
   const effectiveDue = previous ? requestedDue : [...CONTEXT_SOURCE_IDS];
   const due = new Set<ContextSourceId>(effectiveDue);
@@ -140,10 +141,16 @@ async function readPreviousContext(outputDir: string | undefined, runId: string 
     const path = resolve(outputDir ?? DEFAULT_OUTPUT_DIR, runId, APPROVED_SOURCES_OUTPUT_FILENAME);
     const output = JSON.parse(await readFile(path, "utf8")) as ApprovedSourcesRunOutput;
     validateDisplayEligibleContextSnapshot(output);
+    if (output.run_id !== runId) throw new Error("PREVIOUS_CONTEXT_LINEAGE_MISMATCH");
     return output;
   } catch {
     return undefined;
   }
+}
+
+function validatedPreviousContext(output: ApprovedSourcesRunOutput): ApprovedSourcesRunOutput {
+  validateDisplayEligibleContextSnapshot(output);
+  return output;
 }
 
 function passthroughAdapter(adapter: SourceAdapter, previous: NormalizedSourceOutput): SourceAdapter {
