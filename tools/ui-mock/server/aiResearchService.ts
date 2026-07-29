@@ -1,43 +1,39 @@
 import { randomUUID } from "node:crypto";
 import {
+  AI_ANALYSIS_QUEUE_SCHEMA_VERSION,
   AI_RESEARCH_SCHEMA_VERSION,
+  AI_RESEARCH_TARGET_MODEL,
   type AIResearchBrief,
   type AIResearchBriefLookup,
   type AIResearchGenerateRequest,
   type AIResearchProviderStatus,
-  type AIResearchReviewMetrics,
   type AIResearchReviewMetricsLookup,
 } from "../src/types/aiResearchTypes.js";
 import { buildAIResearchContext, sha256, stableJson, type AIResearchContext, type AIResearchContextOptions } from "./aiResearchContext.js";
 import { AI_RESEARCH_NARRATIVE_VERSION, aiResearchNarrativeId } from "./aiResearchNarrativeContract.js";
 import {
-  createAIResearchProvider,
-  NOOP_AI_RESEARCH_USAGE_RECORDER,
-  resolveAIResearchProviderConfig,
-  type AIResearchProvider,
-  type AIResearchProviderConfig,
-  type AIResearchUsageRecorder,
-} from "./aiResearchProvider.js";
-import {
-  AIResearchValidationError,
   assertAIResearchSemanticQuality,
-  parseAIResearchProviderNarrative,
   validateStoredAIResearchBrief,
   type AIResearchProviderNarrative,
 } from "./aiResearchSchema.js";
 import {
-  createAIResearchStore,
-  isAIResearchOpenAIReviewStorePath,
-  type AIResearchStore,
-  type AIResearchStoreOptions,
-} from "./aiResearchStore.js";
+  AIAnalysisQueueStoreError,
+  buildAIAnalysisCacheIdentity,
+  createAIAnalysisQueueStore,
+  hashAIAnalysisRateScope,
+  type AIAnalysisCacheIdentity,
+  type AIAnalysisEnqueueResult,
+  type AIAnalysisQueueLookup,
+  type AIAnalysisQueueStore,
+  type AIAnalysisQueueStoreOptions,
+  type AIAnalysisRateLimits,
+} from "./aiResearchQueueStore.js";
 
 export type AIResearchServiceOptions = AIResearchContextOptions & {
-  provider?: AIResearchProvider;
-  providerConfig?: AIResearchProviderConfig;
-  store?: AIResearchStore;
-  storeOptions?: AIResearchStoreOptions;
-  usageRecorder?: AIResearchUsageRecorder;
+  queueStore?: AIAnalysisQueueStore;
+  queueStoreOptions?: AIAnalysisQueueStoreOptions;
+  modelId?: string;
+  providerEnabled?: boolean;
   renderPreview?: boolean;
   now?: () => Date;
   rateLimits?: {
@@ -45,21 +41,14 @@ export type AIResearchServiceOptions = AIResearchContextOptions & {
     session?: number;
     identity?: number;
     global?: number;
+    cooldownMs?: number;
   };
 };
 
 export class AIResearchServiceError extends Error {
   readonly code:
     | "PROVIDER_DISABLED"
-    | "MISSING_API_KEY"
-    | "MODEL_NOT_CONFIGURED"
-    | "PROVIDER_TIMEOUT"
-    | "PROVIDER_ERROR"
-    | "VALIDATION_FAILURE"
     | "RATE_LIMITED"
-    | "LIVE_CALL_BUDGET_EXHAUSTED"
-    | "LIVE_CALL_BUDGET_INVALID"
-    | "REVIEW_STORE_REQUIRED"
     | "STORE_UNAVAILABLE";
   readonly httpStatus: number;
   readonly retryAfterSeconds?: number;
@@ -80,20 +69,21 @@ export class AIResearchServiceError extends Error {
 }
 
 export function createAIResearchService(options: AIResearchServiceOptions = {}) {
-  const providerConfig = options.providerConfig ?? resolveAIResearchProviderConfig();
-  const provider = options.provider ?? createAIResearchProvider({ config: providerConfig });
-  const usageRecorder = options.usageRecorder ?? NOOP_AI_RESEARCH_USAGE_RECORDER;
   const renderPreview = options.renderPreview ?? process.env.CRYPTO_EDGE_AI_RESEARCH_RENDER_PREVIEW === "1";
   const now = options.now ?? (() => new Date());
-  const rateWindowMs = bounded(options.rateLimits?.windowMs, 10 * 60_000, 1_000, 60 * 60_000);
-  const sessionLimit = bounded(options.rateLimits?.session, 3, 1, 1_000);
-  const identityLimit = bounded(options.rateLimits?.identity, 2, 1, 1_000);
-  const globalLimit = bounded(options.rateLimits?.global, 20, 1, 10_000);
-  const inflight = new Map<string, Promise<AIResearchBrief>>();
-  const idempotency = new Map<string, { expiresAt: number; brief: AIResearchBrief }>();
-  const rates = new Map<string, number[]>();
-  const semaphore = createSemaphore(providerConfig.maxConcurrency);
-  let storePromise: Promise<AIResearchStore> | null = options.store ? Promise.resolve(options.store) : null;
+  const modelId = safeModelId(options.modelId ?? process.env.CRYPTO_EDGE_AI_RESEARCH_MODEL) ?? AI_RESEARCH_TARGET_MODEL;
+  const providerEnabled = options.providerEnabled
+    ?? (process.env.CRYPTO_EDGE_AI_WORKER_ENABLED === "1"
+      && process.env.CRYPTO_EDGE_AI_RESEARCH_PROVIDER?.trim().toUpperCase() === "OPENAI"
+      && modelId === AI_RESEARCH_TARGET_MODEL);
+  const rateLimits: AIAnalysisRateLimits = {
+    windowMs: bounded(options.rateLimits?.windowMs, 10 * 60_000, 1_000, 60 * 60_000),
+    session: bounded(options.rateLimits?.session, 3, 1, 1_000),
+    identity: bounded(options.rateLimits?.identity, 10, 1, 1_000),
+    global: bounded(options.rateLimits?.global, 100, 1, 10_000),
+    cooldownMs: bounded(options.rateLimits?.cooldownMs, 60_000, 1_000, 24 * 60 * 60_000),
+  };
+  let storePromise: Promise<AIAnalysisQueueStore> | null = options.queueStore ? Promise.resolve(options.queueStore) : null;
   const contextOptions: AIResearchContextOptions = {
     scanner: options.scanner,
     followUp: options.followUp,
@@ -101,154 +91,126 @@ export function createAIResearchService(options: AIResearchServiceOptions = {}) 
     now,
   };
 
-  const getStore = async (): Promise<AIResearchStore> => {
+  const getStore = async (): Promise<AIAnalysisQueueStore> => {
     if (renderPreview) throw new AIResearchServiceError("STORE_UNAVAILABLE", 503);
-    storePromise ??= createAIResearchStore(options.storeOptions);
+    storePromise ??= createAIAnalysisQueueStore(options.queueStoreOptions);
     try { return await storePromise; } catch { throw new AIResearchServiceError("STORE_UNAVAILABLE", 503); }
+  };
+
+  const contextAndIdentity = async (chain: string, contractAddress: string, locale: "pl" | "en") => {
+    const context = await buildAIResearchContext(chain, contractAddress, locale, contextOptions);
+    const identity = buildAIAnalysisCacheIdentity({
+      ...context.identity,
+      locale,
+      snapshot_fingerprint: context.snapshot_fingerprint,
+      prompt_version: context.prompt_version,
+      model_id: modelId,
+      analysis_schema_version: AI_RESEARCH_SCHEMA_VERSION,
+    });
+    return { context, identity };
   };
 
   return {
     status(): AIResearchProviderStatus {
       return {
         schema_version: "ai_research_status_v1",
-        provider_mode: provider.mode,
-        available: renderPreview || (provider.mode === "OPENAI" && Boolean(provider.model) && Boolean(providerConfig.apiKey) && !providerConfig.liveCallBudgetInvalid),
-        model_configured: Boolean(provider.model),
+        provider_mode: providerEnabled ? "OPENAI" : "DISABLED",
+        available: renderPreview || providerEnabled,
+        model_configured: Boolean(modelId),
         render_preview: renderPreview,
       };
     },
 
     async getBrief(chain: string, contractAddress: string, locale: "pl" | "en"): Promise<AIResearchBriefLookup> {
-      const context = await buildAIResearchContext(chain, contractAddress, locale, contextOptions);
-      if (renderPreview) return lookup("READY", provider.mode, buildDeterministicPreview(context, now()), null, null);
-      let store: AIResearchStore;
-      try { store = await getStore(); } catch { return lookup("ERROR", provider.mode, null, null, "STORE_UNAVAILABLE"); }
-      const blockedReason = generationBlockedReason(store, providerConfig);
-      const exact = store.findExact({ ...context.identity, locale, snapshot_fingerprint: context.snapshot_fingerprint });
-      if (exact) return lookup("READY", provider.mode, exact.brief, null, null, blockedReason);
-      const latest = store.findLatest(context.identity.chain, context.identity.contract_address, locale);
-      if (latest) return lookup("STALE", provider.mode, latest.brief, null, null, blockedReason);
-      if (context.research_state === "INSUFFICIENT_DATA") return lookup("INSUFFICIENT_DATA", provider.mode, null, null, null);
-      if (provider.mode === "DISABLED") return lookup("PROVIDER_DISABLED", provider.mode, null, null, "PROVIDER_DISABLED");
-      if (!provider.model) return lookup("PROVIDER_DISABLED", provider.mode, null, null, "MODEL_NOT_CONFIGURED");
-      if (!providerConfig.apiKey) return lookup("PROVIDER_DISABLED", provider.mode, null, null, "MISSING_API_KEY");
-      return lookup("ABSENT", provider.mode, null, null, null, blockedReason);
+      const { context, identity } = await contextAndIdentity(chain, contractAddress, locale);
+      if (renderPreview) return lookup("READY", "DISABLED", buildDeterministicPreview(context, now()), null, null);
+      let store: AIAnalysisQueueStore;
+      try { store = await getStore(); } catch { return lookup("ERROR", providerMode(providerEnabled), null, null, "STORE_UNAVAILABLE"); }
+      const current = store.lookup(identity);
+      if (!current.record && !current.last_known_good && context.research_state === "INSUFFICIENT_DATA") {
+        return lookup("INSUFFICIENT_DATA", providerMode(providerEnabled), null, null, "DATA_UNAVAILABLE", null, identity);
+      }
+      return publicLookup(current, identity, providerEnabled, null, null);
     },
 
     async generate(request: AIResearchGenerateRequest, sessionId: string): Promise<AIResearchBriefLookup> {
-      const context = await buildAIResearchContext(request.chain, request.contract_address, request.locale, contextOptions);
-      if (renderPreview) return lookup("READY", provider.mode, buildDeterministicPreview(context, now()), null, null);
+      const { context, identity } = await contextAndIdentity(request.chain, request.contract_address, request.locale);
+      if (renderPreview) return lookup("READY", "DISABLED", buildDeterministicPreview(context, now()), null, null);
       const store = await getStore();
-      const exact = store.findExact({ ...context.identity, locale: request.locale, snapshot_fingerprint: context.snapshot_fingerprint });
-      if (exact) return lookup("READY", provider.mode, exact.brief, null, null, generationBlockedReason(store, providerConfig));
-      const idempotencyKey = [sessionId, context.identity.chain, context.identity.contract_address, request.locale, request.idempotency_key].join(":");
-      pruneIdempotency(idempotency, now().getTime());
-      const previous = idempotency.get(idempotencyKey);
-      if (previous) return lookup("READY", provider.mode, previous.brief, null, null, generationBlockedReason(store, providerConfig));
-      const key = cacheKey(context, provider.model);
-      const existing = inflight.get(key);
-      if (existing) return lookup("READY", provider.mode, await existing, null, null, generationBlockedReason(store, providerConfig));
-      const stale = store.findLatest(context.identity.chain, context.identity.contract_address, request.locale)?.brief;
-      const retry = consumeRates(rates, [
-        [`session:${sessionId}`, sessionLimit],
-        [`identity:${context.identity.chain}:${context.identity.contract_address}`, identityLimit],
-        ["global", globalLimit],
-      ], now().getTime(), rateWindowMs);
-      if (retry !== null) throw new AIResearchServiceError("RATE_LIMITED", 429, { retryAfterSeconds: retry, cachedBrief: stale });
-      if (provider.mode === "DISABLED") throw new AIResearchServiceError("PROVIDER_DISABLED", 503, { cachedBrief: stale });
-      if (!provider.model) throw new AIResearchServiceError("MODEL_NOT_CONFIGURED", 503, { cachedBrief: stale });
-      if (!providerConfig.apiKey && !options.provider) throw new AIResearchServiceError("MISSING_API_KEY", 503, { cachedBrief: stale });
-      if (providerConfig.liveCallBudgetInvalid) throw new AIResearchServiceError("LIVE_CALL_BUDGET_INVALID", 503, { cachedBrief: stale });
-      if (providerConfig.liveCallBudget && !isAIResearchOpenAIReviewStorePath(store.databaseFilePath)) {
-        throw new AIResearchServiceError("REVIEW_STORE_REQUIRED", 503, { cachedBrief: stale });
+      const existing = store.lookup(identity);
+      if (existing.record && existing.record.status !== "FAILED") {
+        const status = publicLookup(existing, identity, providerEnabled, "ALREADY_EXISTS", null);
+        if (existing.record?.status === "READY" || existing.record?.status === "STALE") status.request_outcome = "READY";
+        if (existing.record?.status === "SUSPENDED") status.request_outcome = "SUSPENDED";
+        return status;
       }
-
-      const generation = semaphore.run(async () => {
-        try {
-          if (providerConfig.liveCallBudget && !store.reserveLiveCallBudget(providerConfig.liveCallBudget).allowed) {
-            throw new AIResearchServiceError("LIVE_CALL_BUDGET_EXHAUSTED", 409, { cachedBrief: stale });
-          }
-          const providerResult = await provider.generate(context);
-          let narrative;
-          try {
-            narrative = parseAIResearchProviderNarrative(providerResult.raw_json, context);
-          } catch (error) {
-            if (!(error instanceof AIResearchValidationError)) throw error;
-            throw new AIResearchServiceError("VALIDATION_FAILURE", 502, { cachedBrief: stale });
-          }
-          const brief = hydrateBrief(context, narrative, providerResult.model, providerResult.token_usage, now(), false);
-          const metrics = providerConfig.liveCallBudget ? buildReviewMetrics(brief, providerResult) : undefined;
-          const saved = store.save(brief, metrics).brief;
-          await usageRecorder.record({
-            analysis_id: saved.analysis_id,
-            identity: saved.identity,
-            model: saved.model,
-            token_usage: saved.token_usage,
-          });
-          idempotency.set(idempotencyKey, { expiresAt: now().getTime() + rateWindowMs, brief: saved });
-          return saved;
-        } catch (error) {
-          if (error instanceof AIResearchServiceError) throw error;
-          if (error instanceof AIResearchValidationError) {
-            throw new AIResearchServiceError("VALIDATION_FAILURE", 502, { cachedBrief: stale });
-          }
-          const code = isProviderCode(error) ? error.code : "PROVIDER_ERROR";
-          throw new AIResearchServiceError(code === "INVALID_PROVIDER_RESPONSE" ? "PROVIDER_ERROR" : code, code === "PROVIDER_TIMEOUT" ? 504 : 502, { cachedBrief: stale });
-        }
-      });
-      inflight.set(key, generation);
+      if (context.research_state === "INSUFFICIENT_DATA") {
+        return lookup("INSUFFICIENT_DATA", providerMode(providerEnabled), null, null, "DATA_UNAVAILABLE", null, identity, "DATA_UNAVAILABLE");
+      }
+      if (!providerEnabled) {
+        return lookup("PROVIDER_DISABLED", "DISABLED", null, null, "PROVIDER_DISABLED", null, identity, "PROVIDER_DISABLED");
+      }
+      if (store.workerState().suspended) {
+        return lookup("SUSPENDED", "OPENAI", null, null, "WORKER_SUSPENDED", null, identity, "SUSPENDED");
+      }
+      let queued: AIAnalysisEnqueueResult;
       try {
-        return lookup("READY", provider.mode, await generation, null, null, generationBlockedReason(store, providerConfig));
-      } finally {
-        if (inflight.get(key) === generation) inflight.delete(key);
+        queued = store.enqueue({
+          identity,
+          session_scope_hash: hashAIAnalysisRateScope(sessionId),
+          now: now(),
+          rate_limits: rateLimits,
+        });
+      } catch (error) {
+        if (error instanceof AIAnalysisQueueStoreError && error.code === "RATE_LIMITED") {
+          throw new AIResearchServiceError("RATE_LIMITED", 429, {
+            retryAfterSeconds: error.retryAfterSeconds ?? undefined,
+            cachedBrief: existing.last_known_good ?? undefined,
+          });
+        }
+        throw new AIResearchServiceError("STORE_UNAVAILABLE", 503);
       }
+      return publicLookup(queued, identity, providerEnabled, queued.outcome, queued.retry_after_seconds);
     },
 
     diagnostics() {
-      return { renderPreview, inflight: inflight.size, providerMode: provider.mode, liveCallBudget: providerConfig.liveCallBudget };
+      return { renderPreview, providerMode: providerMode(providerEnabled), modelId, queueSchemaVersion: AI_ANALYSIS_QUEUE_SCHEMA_VERSION };
     },
 
     async getReviewMetrics(analysisId: string): Promise<AIResearchReviewMetricsLookup> {
       const store = await getStore();
+      const record = store.findByAnalysisId(analysisId);
       return {
         schema_version: "ai_research_review_metrics_lookup_v1",
-        metrics: store.findReviewMetrics(analysisId),
+        metrics: record?.result && record.validation_status === "VALID" ? {
+          schema_version: "ai_research_review_metrics_v1",
+          analysis_id: record.result.analysis_id,
+          model: record.model_id,
+          prompt_version: record.result.prompt_version,
+          snapshot_fingerprint: record.snapshot_fingerprint,
+          generated_at: record.result.generated_at,
+          data_generated_at: record.result.data_generated_at,
+          latency_ms: record.latency_ms ?? 0,
+          prompt_tokens: record.token_usage.prompt_tokens,
+          output_tokens: record.token_usage.completion_tokens,
+          total_tokens: record.token_usage.total_tokens,
+          cache_hit: false,
+          validation_status: "VALID",
+          request_id: record.provider_response_id,
+        } : null,
       };
     },
   };
 }
 
-function buildReviewMetrics(
-  brief: AIResearchBrief,
-  providerResult: Awaited<ReturnType<AIResearchProvider["generate"]>>,
-): AIResearchReviewMetrics {
-  return {
-    schema_version: "ai_research_review_metrics_v1",
-    analysis_id: brief.analysis_id,
-    model: brief.model,
-    prompt_version: brief.prompt_version,
-    snapshot_fingerprint: brief.snapshot_fingerprint,
-    generated_at: brief.generated_at,
-    data_generated_at: brief.data_generated_at,
-    latency_ms: Number.isSafeInteger(providerResult.latency_ms) && (providerResult.latency_ms ?? -1) >= 0
-      ? providerResult.latency_ms!
-      : 0,
-    prompt_tokens: brief.token_usage.prompt_tokens,
-    output_tokens: brief.token_usage.completion_tokens,
-    total_tokens: brief.token_usage.total_tokens,
-    cache_hit: false,
-    validation_status: "VALID",
-    request_id: providerResult.request_id ?? null,
-  };
-}
-
-function hydrateBrief(
+export function hydrateAIResearchBrief(
   context: AIResearchContext,
   narrative: AIResearchProviderNarrative,
   model: string,
   tokenUsage: AIResearchBrief["token_usage"],
   generatedAt: Date,
   renderPreview: boolean,
+  analysisId?: string,
 ): AIResearchBrief {
   const inputHash = sha256(stableJson({
     identity: context.identity,
@@ -259,7 +221,7 @@ function hydrateBrief(
   }));
   const base = {
     schema_version: AI_RESEARCH_SCHEMA_VERSION,
-    analysis_id: `air_${randomUUID()}`,
+    analysis_id: analysisId ?? `air_${randomUUID()}`,
     identity: context.identity,
     analysis_language: context.locale,
     snapshot_fingerprint: context.snapshot_fingerprint,
@@ -330,7 +292,7 @@ export function buildDeterministicPreview(context: AIResearchContext, generatedA
       explanation: condition.explanation,
     })),
   };
-  return hydrateBrief(context, narrative, "render-preview", { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }, generatedAt, true);
+  return hydrateAIResearchBrief(context, narrative, "render-preview", { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }, generatedAt, true);
 }
 
 function lookup(
@@ -340,6 +302,8 @@ function lookup(
   retryAfter: number | null,
   errorCode: string | null,
   generationBlockedReason: AIResearchBriefLookup["generation_blocked_reason"] = null,
+  identity: AIAnalysisCacheIdentity | null = null,
+  requestOutcome: AIResearchBriefLookup["request_outcome"] = null,
 ): AIResearchBriefLookup {
   return {
     schema_version: "ai_research_lookup_v1",
@@ -349,68 +313,54 @@ function lookup(
     retry_after_seconds: retryAfter,
     error_code: errorCode,
     generation_blocked_reason: generationBlockedReason,
+    queue_schema_version: AI_ANALYSIS_QUEUE_SCHEMA_VERSION,
+    analysis_id: brief?.analysis_id ?? null,
+    cache_key: identity?.cache_key ?? null,
+    queue_status: availabilityToQueueStatus(availability),
+    request_outcome: requestOutcome,
+    shared_result: true,
+    is_last_known_good: availability === "STALE",
   };
 }
 
-function generationBlockedReason(
-  store: AIResearchStore,
-  config: AIResearchProviderConfig,
-): AIResearchBriefLookup["generation_blocked_reason"] {
-  if (config.liveCallBudgetInvalid) return "LIVE_CALL_BUDGET_INVALID";
-  if (!config.liveCallBudget) return null;
-  if (!isAIResearchOpenAIReviewStorePath(store.databaseFilePath)) return "REVIEW_STORE_REQUIRED";
-  return store.liveCallBudgetUsage() >= config.liveCallBudget ? "LIVE_CALL_BUDGET_EXHAUSTED" : null;
-}
-
-function cacheKey(context: AIResearchContext, model: string | null): string {
-  return [context.identity.chain, context.identity.contract_address, context.snapshot_fingerprint, context.prompt_version, context.locale, model ?? "unconfigured"].join(":");
-}
-
-function consumeRates(
-  store: Map<string, number[]>,
-  limits: Array<[string, number]>,
-  now: number,
-  windowMs: number,
-): number | null {
-  let retryAt = 0;
-  for (const [key, limit] of limits) {
-    const recent = (store.get(key) ?? []).filter((timestamp) => timestamp > now - windowMs);
-    store.set(key, recent);
-    if (recent.length >= limit) retryAt = Math.max(retryAt, recent[0] + windowMs);
+function publicLookup(
+  value: AIAnalysisQueueLookup,
+  identity: AIAnalysisCacheIdentity,
+  providerEnabled: boolean,
+  requestOutcome: AIResearchBriefLookup["request_outcome"],
+  retryAfter: number | null,
+): AIResearchBriefLookup {
+  const record = value.record;
+  const brief = record?.result ?? value.last_known_good;
+  if (!record) {
+    if (brief) return lookup("STALE", providerMode(providerEnabled), brief, retryAfter, null, null, identity, requestOutcome ?? "DATA_STALE");
+    return lookup(providerEnabled ? "ABSENT" : "PROVIDER_DISABLED", providerMode(providerEnabled), null, retryAfter,
+      providerEnabled ? null : "PROVIDER_DISABLED", null, identity, requestOutcome);
   }
-  if (retryAt > 0) return Math.max(1, Math.ceil((retryAt - now) / 1_000));
-  for (const [key] of limits) store.get(key)?.push(now);
-  return null;
+  const availability = record.status === "STALE" && record.result ? "READY" : record.status;
+  const result = lookup(availability, providerMode(providerEnabled), brief, retryAfter, record.safe_error_code, null, identity, requestOutcome);
+  result.analysis_id = record.analysis_id;
+  result.queue_status = record.status;
+  result.is_last_known_good = Boolean(brief) && availability !== "READY";
+  return result;
 }
 
-function createSemaphore(max: number) {
-  let active = 0;
-  const waiters: Array<() => void> = [];
-  const acquire = async () => {
-    if (active < max) { active += 1; return; }
-    await new Promise<void>((resolve) => waiters.push(resolve));
-    active += 1;
-  };
-  const release = () => {
-    active = Math.max(0, active - 1);
-    waiters.shift()?.();
-  };
-  return {
-    async run<T>(work: () => Promise<T>): Promise<T> {
-      await acquire();
-      try { return await work(); } finally { release(); }
-    },
-  };
+function availabilityToQueueStatus(value: AIResearchBriefLookup["availability"]): AIResearchBriefLookup["queue_status"] {
+  if (["QUEUED", "PROCESSING", "READY", "STALE", "FAILED", "SUSPENDED"].includes(value)) {
+    return value as NonNullable<AIResearchBriefLookup["queue_status"]>;
+  }
+  return "ABSENT";
 }
 
-function pruneIdempotency(store: Map<string, { expiresAt: number }>, now: number): void {
-  for (const [key, value] of store) if (value.expiresAt <= now) store.delete(key);
+function providerMode(enabled: boolean): AIResearchBriefLookup["provider_mode"] {
+  return enabled ? "OPENAI" : "DISABLED";
+}
+
+function safeModelId(value: string | undefined): string | null {
+  const normalized = value?.trim();
+  return normalized && /^[A-Za-z0-9._-]{1,128}$/.test(normalized) ? normalized : null;
 }
 
 function bounded(value: number | undefined, fallback: number, minimum: number, maximum: number): number {
   return value !== undefined && Number.isSafeInteger(value) && value >= minimum && value <= maximum ? value : fallback;
-}
-
-function isProviderCode(error: unknown): error is { code: "MISSING_API_KEY" | "MODEL_NOT_CONFIGURED" | "PROVIDER_TIMEOUT" | "PROVIDER_ERROR" | "INVALID_PROVIDER_RESPONSE" } {
-  return typeof error === "object" && error !== null && "code" in error && ["MISSING_API_KEY", "MODEL_NOT_CONFIGURED", "PROVIDER_TIMEOUT", "PROVIDER_ERROR", "INVALID_PROVIDER_RESPONSE"].includes(String(error.code));
 }

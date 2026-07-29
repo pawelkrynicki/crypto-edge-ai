@@ -75,7 +75,7 @@ export function resolveAIResearchProviderConfig(env: NodeJS.ProcessEnv = process
     model,
     apiKey,
     timeoutMs: boundedInteger(env.CRYPTO_EDGE_AI_RESEARCH_TIMEOUT_MS, 30_000, 1_000, 120_000),
-    maxConcurrency: boundedInteger(env.CRYPTO_EDGE_AI_RESEARCH_MAX_CONCURRENCY, 2, 1, 8),
+    maxConcurrency: boundedInteger(env.CRYPTO_EDGE_AI_RESEARCH_MAX_CONCURRENCY, 1, 1, 8),
     liveCallBudget: liveCallBudgetValue === "1" ? 1 : null,
     liveCallBudgetInvalid: liveCallBudgetValue !== undefined && liveCallBudgetValue !== "" && liveCallBudgetValue !== "1",
   };
