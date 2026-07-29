@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useProductLocale } from "../productI18n";
+import { isAIResearchRenderPreviewMode } from "../runtimeMode";
 import {
   AIResearchDataSourceError,
   loadAIResearchBrief,
@@ -30,44 +31,61 @@ export function AIResearchSection({
   const { locale } = useProductLocale();
   const ui = COPY[locale];
   const identity = useMemo(() => resolveTokenIdentity(chain, contractAddress), [chain, contractAddress]);
-  const resolvedInitialLookup = initialLookup == null ? initialLookup : applyRenderReviewOverride(initialLookup);
-  const [lookup, setLookup] = useState<AIResearchBriefLookup | null>(resolvedInitialLookup ?? null);
-  const [loading, setLoading] = useState(initialLookup === undefined);
+  const renderPreviewMode = isAIResearchRenderPreviewMode();
+  const initialNeedsPreview = renderPreviewMode && initialLookup?.brief?.render_preview !== true;
+  const [lookup, setLookup] = useState<AIResearchBriefLookup | null>(initialLookup ?? null);
+  const [loading, setLoading] = useState(initialLookup === undefined || initialNeedsPreview);
   const [requesting, setRequesting] = useState(false);
-  const [expanded, setExpanded] = useState(Boolean(resolvedInitialLookup?.brief?.render_preview));
+  const [expanded, setExpanded] = useState(Boolean(initialLookup?.brief?.render_preview));
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [retryAfter, setRetryAfter] = useState<number | null>(null);
   const [reviewMetrics, setReviewMetrics] = useState<AIResearchReviewMetrics | null>(null);
   const requestRevision = useRef(0);
 
   useEffect(() => {
-    if (initialLookup !== undefined || identity.status !== "valid") return;
     const revision = ++requestRevision.current;
+    setLookup(initialLookup ?? null);
+    setExpanded(Boolean(initialLookup?.brief?.render_preview));
+
+    const transientInitialLookup = initialLookup?.availability === "PROCESSING" && initialLookup.brief === null;
+    const shouldLoad = initialLookup === undefined || transientInitialLookup || initialNeedsPreview;
+    if (!shouldLoad) {
+      setLoading(false);
+      setErrorCode(null);
+      return;
+    }
+    if (identity.status !== "valid") {
+      setLoading(false);
+      setErrorCode("INVALID_TOKEN_IDENTITY");
+      return;
+    }
+
     setLoading(true);
     setErrorCode(null);
     void loadAIResearchBrief(identity.chain, identity.contract_address, locale)
       .then((value) => {
         if (revision !== requestRevision.current) return;
-        const resolved = applyRenderReviewOverride(value);
-        setLookup(resolved);
-        setExpanded(Boolean(resolved.brief?.render_preview && resolved.availability === "READY"));
+        setLookup(value);
+        setExpanded(Boolean(value.brief?.render_preview));
       })
       .catch((error) => {
         if (revision !== requestRevision.current) return;
         setErrorCode(error instanceof AIResearchDataSourceError ? error.code : "AI_RESEARCH_UNAVAILABLE");
       })
       .finally(() => { if (revision === requestRevision.current) setLoading(false); });
-  }, [identity, initialLookup, locale]);
+  }, [identity, initialLookup, initialNeedsPreview, locale]);
+
+  const displayLookup = lookup === null ? null : applyRenderReviewOverride(lookup);
 
   useEffect(() => {
-    const analysisId = lookup?.brief?.render_preview ? null : lookup?.brief?.analysis_id;
+    const analysisId = displayLookup?.brief?.render_preview ? null : displayLookup?.brief?.analysis_id;
     if (!analysisId) { setReviewMetrics(null); return; }
     let cancelled = false;
     void loadAIResearchReviewMetrics(analysisId)
       .then((value) => { if (!cancelled) setReviewMetrics(value); })
       .catch(() => { if (!cancelled) setReviewMetrics(null); });
     return () => { cancelled = true; };
-  }, [lookup?.brief?.analysis_id, lookup?.brief?.render_preview]);
+  }, [displayLookup?.brief?.analysis_id, displayLookup?.brief?.render_preview]);
 
   const requestPreparation = async () => {
     if (identity.status !== "valid" || requesting) return;
@@ -89,10 +107,10 @@ export function AIResearchSection({
     }
   };
 
-  const availability: AIResearchBriefLookup["availability"] = lookup?.availability ?? (loading ? "PROCESSING" : "ERROR");
-  const brief = lookup?.brief ?? null;
-  const effectiveError = errorCode ?? lookup?.error_code ?? null;
-  const effectiveRetryAfter = retryAfter ?? lookup?.retry_after_seconds ?? null;
+  const availability: AIResearchBriefLookup["availability"] = displayLookup?.availability ?? (loading ? "PROCESSING" : "ERROR");
+  const brief = displayLookup?.brief ?? null;
+  const effectiveError = errorCode ?? displayLookup?.error_code ?? null;
+  const effectiveRetryAfter = retryAfter ?? displayLookup?.retry_after_seconds ?? null;
   const waitingToRetry = availability === "COOLDOWN" || availability === "RATE_LIMITED";
   const canRequest = identity.status === "valid"
     && !["QUEUED", "PROCESSING", "READY", "PROVIDER_DISABLED", "INSUFFICIENT_DATA", "SUSPENDED", "COOLDOWN", "RATE_LIMITED"].includes(availability);
@@ -109,7 +127,7 @@ export function AIResearchSection({
           <strong>{stateTitle(availability, locale)}</strong>
           <p>{stateDetail(availability, effectiveError, effectiveRetryAfter, locale, Boolean(brief))}</p>
           <p className="ai-shared-queue-note">{ui.sharedQueue}</p>
-          {brief && !brief.render_preview && lookup?.provider_mode === "OPENAI" && (
+          {brief && !brief.render_preview && displayLookup?.provider_mode === "OPENAI" && (
             <span className="ai-openai-generated-status">{ui.openaiGenerated}</span>
           )}
         </div>

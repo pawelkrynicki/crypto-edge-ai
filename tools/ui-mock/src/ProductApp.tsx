@@ -19,7 +19,7 @@ import {
 import { ProductLocaleProvider, useProductLocale } from "./productI18n";
 import type { ControlCenterStatus } from "./controlCenterStatus";
 import { resolveProductSourceHealth } from "./productSourceHealth";
-import { getProductRuntimeMode } from "./runtimeMode";
+import { getProductRuntimeMode, isAIResearchRenderPreviewMode } from "./runtimeMode";
 import {
   loadScannerApiDataSourceResult,
   loadScannerReadinessResult,
@@ -36,6 +36,7 @@ import type { FollowUpPublicEntry, FollowUpPublicStatus } from "./types/followUp
 import {
   findFollowUpByIdentity,
   isSameTokenIdentity,
+  resolveTokenIdentity,
 } from "./tokenLifecycle";
 import type { ReportDetail } from "./types/reportTypes";
 import type { FeedbackScreenContext, FeedbackSubjectRef } from "./services/feedbackDataSource";
@@ -130,12 +131,14 @@ export function ProductAppContent() {
   }), [t]);
 
   const explicitlySelectedFollowUp = followUpEntries.find((entry) => entry.entry_id === selectedFollowUpEntryId) ?? null;
+  const reviewPreviewCandidate = selectAIResearchReviewCandidate(candidates);
   const selectedCandidate = explicitlySelectedFollowUp
     ? candidates.find((candidate) => isSameTokenIdentity(
       explicitlySelectedFollowUp,
       { chain: candidate.chain, contract_address: candidate.contractAddress },
     )) ?? null
-    : candidates.find((candidate) => candidate.id === selectedCandidateId)
+    : reviewPreviewCandidate
+      ?? candidates.find((candidate) => candidate.id === selectedCandidateId)
       ?? candidates.find((candidate) => candidate.discoveryBasket === "established" && candidate.finalLabel === "WATCHLIST")
       ?? candidates.find((candidate) => candidate.discoveryBasket === "established")
       ?? candidates[0]
@@ -409,6 +412,13 @@ export function ProductAppContent() {
       {renderSection()}
     </ProductWorkspaceShell>
   );
+}
+
+export function selectAIResearchReviewCandidate(candidates: UiTokenCandidate[]): UiTokenCandidate | null {
+  if (!isAIResearchRenderPreviewMode()) return null;
+  return candidates.find((candidate) => (
+    resolveTokenIdentity(candidate.chain, candidate.contractAddress).status === "valid"
+  )) ?? null;
 }
 
 function resolveSection(): ProductSectionId {

@@ -12,10 +12,13 @@ export const LOCAL_API_PROXY = {
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const runtimeMode = env.CRYPTO_EDGE_RUNTIME_MODE ?? process.env.CRYPTO_EDGE_RUNTIME_MODE ?? "";
+  const aiResearchRenderPreview = (env.CRYPTO_EDGE_AI_RESEARCH_RENDER_PREVIEW
+    ?? process.env.CRYPTO_EDGE_AI_RESEARCH_RENDER_PREVIEW) === "1";
 
   return {
     define: {
       __CRYPTO_EDGE_RUNTIME_MODE__: JSON.stringify(runtimeMode),
+      __CRYPTO_EDGE_AI_RESEARCH_RENDER_PREVIEW__: JSON.stringify(aiResearchRenderPreview),
     },
     publicDir: runtimeMode === "DEVELOPMENT_DEMO" ? "public" : false,
     plugins: [react()],
