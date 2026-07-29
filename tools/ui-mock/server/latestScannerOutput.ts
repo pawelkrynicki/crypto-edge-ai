@@ -19,8 +19,10 @@ import { readCommittedSnapshotState } from "./committedSnapshotState.js";
 
 export const SCANNER_OUTPUT_UNAVAILABLE = "SCANNER_OUTPUT_UNAVAILABLE";
 export const INVALID_SCANNER_OUTPUT = "SCANNER_SCHEMA_INVALID";
-export const SCANNER_SCHEMA_VERSION = "scanner_snapshot_v1";
-export const SCANNER_GENERATOR_VERSION = "data_poc_persistable_scanner_v1";
+export const LEGACY_SCANNER_SCHEMA_VERSION = "scanner_snapshot_v1";
+export const LEGACY_SCANNER_GENERATOR_VERSION = "data_poc_persistable_scanner_v1";
+export const SCANNER_SCHEMA_VERSION = "scanner_snapshot_v2";
+export const SCANNER_GENERATOR_VERSION = "data_poc_persistable_scanner_v2";
 export const SCANNER_MAX_AGE_MS = 30 * 60 * 1000;
 export const SECURITY_MAX_AGE_MS = 30 * 60 * 1000;
 
@@ -249,14 +251,19 @@ function sanitizeInternalBetaScannerOutput(value: unknown, now: Date): ScannerOu
     throw new RealDataBoundaryError(INVALID_SCANNER_OUTPUT);
   }
 
+  const manifestContract = resolveScannerManifestContract(value.provenance);
   const manifest = validateProvenanceManifest(value.provenance, {
     prefix: "SCANNER",
-    schemaVersion: SCANNER_SCHEMA_VERSION,
-    generatorVersions: [SCANNER_GENERATOR_VERSION],
+    schemaVersion: manifestContract.schemaVersion,
+    generatorVersions: [manifestContract.generatorVersion],
     allowedSourceIds: SCANNER_SOURCE_IDS,
     requiredSourceIds: ["dexscreener"],
   });
-  const scannerMetadata = sanitizeScannerMetadata(manifest.metadata, manifest.source_ids);
+  const scannerMetadata = sanitizeScannerMetadata(
+    manifest.metadata,
+    manifest.source_ids,
+    manifestContract.schemaVersion === LEGACY_SCANNER_SCHEMA_VERSION,
+  );
   const sanitizedManifest = { ...manifest, metadata: scannerMetadata };
   const scanRun = value.scan_run;
 
@@ -342,11 +349,39 @@ function sanitizeInternalBetaScannerOutput(value: unknown, now: Date): ScannerOu
   });
 }
 
-function sanitizeScannerMetadata(value: unknown, sourceIds: string[]): Record<string, unknown> {
+function resolveScannerManifestContract(value: unknown): { schemaVersion: string; generatorVersion: string } {
+  if (!isRecord(value)) throw new RealDataBoundaryError("SCANNER_MANIFEST_MISSING");
+  if (
+    value.schema_version === LEGACY_SCANNER_SCHEMA_VERSION
+    && value.generator_version === LEGACY_SCANNER_GENERATOR_VERSION
+  ) {
+    return {
+      schemaVersion: LEGACY_SCANNER_SCHEMA_VERSION,
+      generatorVersion: LEGACY_SCANNER_GENERATOR_VERSION,
+    };
+  }
+  if (
+    value.schema_version === SCANNER_SCHEMA_VERSION
+    && value.generator_version === SCANNER_GENERATOR_VERSION
+  ) {
+    return {
+      schemaVersion: SCANNER_SCHEMA_VERSION,
+      generatorVersion: SCANNER_GENERATOR_VERSION,
+    };
+  }
+  throw new RealDataBoundaryError("SCANNER_MANIFEST_VERSION_UNSUPPORTED");
+}
+
+function sanitizeScannerMetadata(
+  value: unknown,
+  sourceIds: string[],
+  legacyManifest: boolean,
+): Record<string, unknown> {
   if (!isRecord(value)) throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
   const allowedFields = [
     "discovery_architecture", "new_emerging", "established", "readiness",
     "security_candidate_limit", "security_candidates_requested", "request_counts", "source_health", "attribution",
+    ...(legacyManifest ? [] : ["context_provenance"]),
   ];
   if (Object.keys(value).some((key) => !allowedFields.includes(key))) {
     throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
@@ -390,12 +425,12 @@ function sanitizeScannerMetadata(value: unknown, sourceIds: string[]): Record<st
     || dexCount < 1 + seedCount || dexCount > 1 + seedCount + Math.min(seedCount, 5)
       + establishedEnabled + Math.min(establishedEnabled, 5)
     || goPlusCount > securityLimit + Math.min(securityLimit, 3)
-    || (requestCounts.alternative_me_fng as number) < 1
-    || (requestCounts.alternative_me_fng as number) > 2
-    || (requestCounts.defillama_api as number) < 1
-    || (requestCounts.defillama_api as number) > 2
     || sourceHealth.dexscreener !== newEmerging.discovery_status
   ) throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
+
+  const contextProvenance = legacyManifest
+    ? validateLegacyContextRequestCounts(requestCounts)
+    : sanitizeContextProvenance(value.context_provenance, requestCounts);
 
   const goplusInvoked = goPlusCount > 0;
   if (goplusInvoked !== sourceIds.includes("goplus_security")) {
@@ -421,7 +456,79 @@ function sanitizeScannerMetadata(value: unknown, sourceIds: string[]): Record<st
     request_counts: Object.fromEntries(requestFields.map((field) => [field, requestCounts[field]])),
     source_health: Object.fromEntries(healthFields.map((field) => [field, sourceHealth[field]])),
     ...(attribution ? { attribution } : {}),
+    ...(contextProvenance ? { context_provenance: contextProvenance } : {}),
   };
+}
+
+function validateLegacyContextRequestCounts(requestCounts: Record<string, unknown>): undefined {
+  if (
+    (requestCounts.alternative_me_fng as number) < 1
+    || (requestCounts.alternative_me_fng as number) > 2
+    || (requestCounts.defillama_api as number) < 1
+    || (requestCounts.defillama_api as number) > 2
+  ) throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
+  return undefined;
+}
+
+function sanitizeContextProvenance(
+  value: unknown,
+  requestCounts: Record<string, unknown>,
+): Record<string, unknown> {
+  const fields = ["contract_version", "linked_context_run_id", "linked_context_validation_status", "sources"];
+  if (
+    !isRecord(value)
+    || !hasExactKeys(value, fields)
+    || value.contract_version !== "scanner_context_provenance_v1"
+    || value.linked_context_validation_status !== "VALIDATED"
+    || !isSafeRunId(value.linked_context_run_id)
+    || !isRecord(value.sources)
+    || !hasExactKeys(value.sources, ["alternative_me_fng", "defillama_api"])
+  ) throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
+
+  const sources: Record<string, Record<string, unknown>> = {};
+  for (const sourceId of ["alternative_me_fng", "defillama_api"]) {
+    const source = value.sources[sourceId];
+    const requestCount = requestCounts[sourceId];
+    if (
+      !isRecord(source)
+      || !hasExactKeys(source, ["mode", "refreshed_in_cycle", "validated_context_run_id"])
+      || !isSafeRunId(source.validated_context_run_id)
+    ) throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
+
+    if (source.mode === "REFRESHED") {
+      if (
+        source.refreshed_in_cycle !== true
+        || !isPositiveInteger(requestCount)
+        || requestCount > 2
+        || source.validated_context_run_id !== value.linked_context_run_id
+      ) throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
+    } else if (source.mode === "REUSED_VALIDATED") {
+      if (
+        source.refreshed_in_cycle !== false
+        || requestCount !== 0
+        || source.validated_context_run_id === value.linked_context_run_id
+      ) throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
+    } else {
+      throw new RealDataBoundaryError("SCANNER_METADATA_INVALID");
+    }
+
+    sources[sourceId] = {
+      mode: source.mode,
+      refreshed_in_cycle: source.refreshed_in_cycle,
+      validated_context_run_id: source.validated_context_run_id,
+    };
+  }
+
+  return {
+    contract_version: "scanner_context_provenance_v1",
+    linked_context_run_id: value.linked_context_run_id,
+    linked_context_validation_status: "VALIDATED",
+    sources,
+  };
+}
+
+function isSafeRunId(value: unknown): value is string {
+  return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(value);
 }
 
 function sanitizeNewEmergingMetadata(value: unknown): Record<string, unknown> {

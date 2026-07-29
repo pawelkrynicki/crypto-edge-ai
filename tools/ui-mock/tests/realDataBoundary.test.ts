@@ -293,7 +293,7 @@ describe("API and frontend fail-closed behavior", () => {
     assert.equal(asRecords(result.candidates).length, older.candidates.length);
   });
 
-  it("serves only state-committed scanner and context snapshots and ignores valid orphan artifacts", async () => {
+  it("serves v2 state-committed scanner and context snapshots through the API without DATA_UNAVAILABLE", async () => {
     const outputDir = resolve(tempRoot, `committed-snapshots-${crypto.randomUUID()}`);
     const committedScanner = makeScannerOutput();
     setScannerRunId(committedScanner, "scan_20260716115900_committed");
@@ -303,6 +303,7 @@ describe("API and frontend fail-closed behavior", () => {
 
     const committedContext = makeContextOutput();
     setContextIdentity(committedContext, "approved_sources_20260716115900", "2026-07-16T11:59:00.000Z");
+    setScannerManifestV2(committedScanner, committedContext.run_id);
     const orphanContext = makeContextOutput();
     setContextIdentity(orphanContext, "approved_sources_20260716120000", "2026-07-16T12:00:00.000Z");
 
@@ -318,25 +319,36 @@ describe("API and frontend fail-closed behavior", () => {
     }
     const statePath = resolve(tempRoot, `automation-state-${crypto.randomUUID()}.json`);
     await writeFile(statePath, JSON.stringify({
-      schema_version: "central_automation_state_v1",
+      schema_version: "central_automation_state_v2",
       last_published_scanner_run_id: committedScanner.scan_run.run_id,
       last_published_context_run_id: committedContext.run_id,
     }), "utf8");
 
-    const scannerResult = await readLatestScannerOutput({
+    const server = createScannerApiServer({
       runtimeMode: "INTERNAL_BETA",
-      outputDirPath: outputDir,
-      automationStatePath: statePath,
-      now: NOW,
+      scanner: { outputDirPath: outputDir, automationStatePath: statePath, now: NOW },
+      context: { outputDirPath: outputDir, automationStatePath: statePath, now: NOW },
     });
-    const contextResult = await readLatestContextOutput({
-      runtimeMode: "INTERNAL_BETA",
-      outputDirPath: outputDir,
-      automationStatePath: statePath,
-      now: NOW,
-    });
-    assert.equal(scannerResult._source_meta.selected_run_id, committedScanner.scan_run.run_id);
-    assert.equal(contextResult.run_id, committedContext.run_id);
+    await listen(server);
+    try {
+      const address = server.address() as AddressInfo;
+      const base = `http://127.0.0.1:${address.port}`;
+      const [scannerResponse, contextResponse] = await Promise.all([
+        fetch(`${base}/api/scanner/latest`),
+        fetch(`${base}/api/context/latest`),
+      ]);
+      const scannerResult = await scannerResponse.json() as Record<string, unknown>;
+      const contextResult = await contextResponse.json() as Record<string, unknown>;
+
+      assert.equal(scannerResponse.status, 200);
+      assert.equal(contextResponse.status, 200);
+      assert.notEqual(scannerResult.reason_code, "DATA_UNAVAILABLE");
+      assert.notEqual(contextResult.reason_code, "DATA_UNAVAILABLE");
+      assert.equal(isRecord(scannerResult._source_meta) && scannerResult._source_meta.selected_run_id, committedScanner.scan_run.run_id);
+      assert.equal(contextResult.run_id, committedContext.run_id);
+    } finally {
+      await close(server);
+    }
   });
 
   it("keeps scanner readiness usable when non-critical context is unavailable", async () => {
@@ -801,6 +813,28 @@ function makeScannerOutput(): ScannerFactoryOutput {
     },
   };
   return output;
+}
+
+function setScannerManifestV2(output: ScannerFactoryOutput, contextRunId: string): void {
+  output.provenance.schema_version = "scanner_snapshot_v2";
+  output.provenance.generator_version = "data_poc_persistable_scanner_v2";
+  output.provenance.metadata.context_provenance = {
+    contract_version: "scanner_context_provenance_v1",
+    linked_context_run_id: contextRunId,
+    linked_context_validation_status: "VALIDATED",
+    sources: {
+      alternative_me_fng: {
+        mode: "REFRESHED",
+        refreshed_in_cycle: true,
+        validated_context_run_id: contextRunId,
+      },
+      defillama_api: {
+        mode: "REFRESHED",
+        refreshed_in_cycle: true,
+        validated_context_run_id: contextRunId,
+      },
+    },
+  };
 }
 
 function makeEmptyEstablishedScannerOutput(): ScannerFactoryOutput {
