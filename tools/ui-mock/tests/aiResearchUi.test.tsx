@@ -143,7 +143,7 @@ describe("AI.1 Visual Candidate Research Canvas", () => {
       const markup = render("pl", <AIResearchSection chain="base" contractAddress={ADDRESS} symbol="PASS" name="Pass Token" initialLookup={lookup} />);
       assert.match(markup, label);
       assert.match(markup, /aria-live="polite"/);
-      if (["ABSENT", "ERROR", "STALE", "FAILED", "COOLDOWN", "RATE_LIMITED"].includes(availability)) {
+      if (["ABSENT", "ERROR", "STALE", "FAILED"].includes(availability)) {
         assert.match(markup, /Zgłoś przygotowanie analizy/);
       }
     }
@@ -259,7 +259,44 @@ describe("AI.3 shared queue UI", () => {
       )));
       assert.match(markup, expectedLabel, reviewState ?? "default READY");
       assert.equal(markup.includes("ai-research-canvas"), expectedCanvas, reviewState ?? "default READY");
+      if (reviewState === null || ["queued", "processing", "suspended", "cooldown"].includes(reviewState)) {
+        assert.doesNotMatch(markup, />Request analysis preparation</, reviewState ?? "default READY");
+      }
+      if (reviewState === "failed") assert.match(markup, />Request analysis preparation</);
     }
+  });
+
+  it("shows an inactive retry CTA for COOLDOWN and RATE_LIMITED", () => {
+    const cooldown = withReviewSearch("?ai_review_state=cooldown", () => render("pl", (
+      <AIResearchSection
+        chain="base"
+        contractAddress={ADDRESS}
+        symbol="SCOOBERT"
+        name="Scoobert"
+        initialLookup={renderPreviewLookup()}
+      />
+    )));
+    assert.match(cooldown, /<button[^>]*disabled=""[^>]*>Spróbuj ponownie za 60 s<\/button>/);
+    assert.doesNotMatch(cooldown, />Zgłoś przygotowanie analizy<\/button>/);
+
+    const rateLimitedLookup: AIResearchBriefLookup = {
+      ...renderPreviewLookup(),
+      availability: "RATE_LIMITED",
+      brief: null,
+      retry_after_seconds: null,
+      queue_status: "ABSENT",
+    };
+    const rateLimited = render("pl", (
+      <AIResearchSection
+        chain="base"
+        contractAddress={ADDRESS}
+        symbol="SCOOBERT"
+        name="Scoobert"
+        initialLookup={rateLimitedLookup}
+      />
+    ));
+    assert.match(rateLimited, /<button[^>]*disabled=""[^>]*>Spróbuj ponownie później<\/button>/);
+    assert.doesNotMatch(rateLimited, />Zgłoś przygotowanie analizy<\/button>/);
   });
 
   it("ignores review state for an ordinary non-preview runtime lookup", () => {

@@ -92,9 +92,11 @@ export function AIResearchSection({
   const availability: AIResearchBriefLookup["availability"] = lookup?.availability ?? (loading ? "PROCESSING" : "ERROR");
   const brief = lookup?.brief ?? null;
   const effectiveError = errorCode ?? lookup?.error_code ?? null;
+  const effectiveRetryAfter = retryAfter ?? lookup?.retry_after_seconds ?? null;
+  const waitingToRetry = availability === "COOLDOWN" || availability === "RATE_LIMITED";
   const canRequest = identity.status === "valid"
-    && !["QUEUED", "PROCESSING", "READY", "PROVIDER_DISABLED", "INSUFFICIENT_DATA", "SUSPENDED"].includes(availability);
-  const showRequest = ["ABSENT", "STALE", "FAILED", "COOLDOWN", "RATE_LIMITED", "ERROR"].includes(availability);
+    && !["QUEUED", "PROCESSING", "READY", "PROVIDER_DISABLED", "INSUFFICIENT_DATA", "SUSPENDED", "COOLDOWN", "RATE_LIMITED"].includes(availability);
+  const showRequest = ["ABSENT", "STALE", "FAILED", "ERROR"].includes(availability);
 
   return (
     <section className="product-detail-section ai-research-section" aria-labelledby="ai-research-section-heading" aria-live="polite">
@@ -105,7 +107,7 @@ export function AIResearchSection({
       <div className="ai-research-section-summary">
         <div>
           <strong>{stateTitle(availability, locale)}</strong>
-          <p>{stateDetail(availability, effectiveError, retryAfter, locale, Boolean(brief))}</p>
+          <p>{stateDetail(availability, effectiveError, effectiveRetryAfter, locale, Boolean(brief))}</p>
           <p className="ai-shared-queue-note">{ui.sharedQueue}</p>
           {brief && !brief.render_preview && lookup?.provider_mode === "OPENAI" && (
             <span className="ai-openai-generated-status">{ui.openaiGenerated}</span>
@@ -121,6 +123,11 @@ export function AIResearchSection({
               onClick={() => void requestPreparation()}
             >
               {ui.request}
+            </ActionButton>
+          )}
+          {waitingToRetry && (
+            <ActionButton variant="secondary" disabled>
+              {effectiveRetryAfter === null ? ui.tryAgainLater : ui.tryAgainIn(effectiveRetryAfter)}
             </ActionButton>
           )}
           {brief && (
@@ -262,6 +269,8 @@ const COPY = {
     request: "Zgłoś przygotowanie analizy",
     requesting: "Zapisywanie zgłoszenia…",
     requestingStatus: "Zgłoszenie trafia do wspólnej kolejki.",
+    tryAgainLater: "Spróbuj ponownie później",
+    tryAgainIn: (seconds: number) => `Spróbuj ponownie za ${seconds} s`,
     open: "Otwórz analizę AI",
     close: "Zamknij analizę AI",
     radarLabel: "Analiza AI",
@@ -276,6 +285,8 @@ const COPY = {
     request: "Request analysis preparation",
     requesting: "Recording request…",
     requestingStatus: "The request is being added to the shared queue.",
+    tryAgainLater: "Try again later",
+    tryAgainIn: (seconds: number) => `Try again in ${seconds} sec`,
     open: "Open AI analysis",
     close: "Close AI analysis",
     radarLabel: "AI analysis",
