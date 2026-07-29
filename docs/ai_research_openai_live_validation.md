@@ -1,5 +1,7 @@
 # AI.2C — Semantic quality boundary po pierwszym OpenAI live validation
 
+> Dokument historyczny. AI.3 wycofało `--live-one` i bezpośrednią generację z publicznego runtime. Aktualny model wykonania — centralna kolejka, współdzielony cache i osobny worker — opisuje `docs/ai_shared_queue_cache.md`. Poniższe dane pozostają niezmienionym zapisem pierwszej walidacji AI.2C i nie są instrukcją uruchomienia kolejnego calla.
+
 ## Cel i status
 
 Pierwsze kontrolowane wywołanie OpenAI zakończyło się technicznym sukcesem: `CALLS_USED=1`, `BRIEFS=1`, model `gpt-5-mini`, 1563 input tokens, 2081 output tokens, 3644 total tokens, latency 21183 ms, `validation=VALID`, `cache_hit=0`. AI.2C nie wykonuje kolejnego calla. Izolowany store pozostaje materiałem dowodowym.

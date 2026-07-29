@@ -508,12 +508,19 @@ The launcher clears every live provider, collector and automation opt-in and kee
 
 ```cmd
 scripts\win\start-ai-research-openai-review.cmd
-scripts\win\start-ai-research-openai-review.cmd --live-one
 scripts\win\clear-ai-research-openai-review.cmd
 ```
 
 The default command is the no-cost owner review: it clears `OPENAI_API_KEY` for the child runtime, forces provider `DISABLED`, opens current Candidate Detail and uses only `tools\ui-mock\.local\ai-research-openai-review.sqlite`. It never calls OpenAI at startup or on navigation.
 
-`--live-one` is reserved for a later manual owner run after code review. It fails before runtime startup unless both `OPENAI_API_KEY` and `CRYPTO_EDGE_AI_RESEARCH_MODEL` are present, then sets provider `OPENAI`, `INTERNAL_BETA`, forces concurrency 1 and sets `CRYPTO_EDGE_AI_RESEARCH_LIVE_CALL_BUDGET=1`. Startup remains read-only. Only the explicit **Wygeneruj analizę AI** click can reserve the single call. The SDK uses `store: false`, `background: false`, no tools, strict `json_schema`, bounded timeout and `maxRetries: 0`.
+AI.3 wycofuje `--live-one`: publiczny POST tylko kolejkuje, a provider call może wykonać wyłącznie osobny centralny worker po niezależnej akceptacji operacyjnej. Próba użycia starej flagi kończy launcher przed startem runtime i wykonuje 0 OpenAI calls.
 
 The review database persists the one-call reservation even after an API/validation failure or runtime restart. Cache hit and render preview consume no budget. The cleanup script removes only that SQLite plus its WAL and SHM; it never kills a process and fails with a close-runtime instruction if files remain locked. Full quality, cache, failure and rollback checklist: `docs/ai_research_openai_live_validation.md`.
+
+## AI.3 Shared Queue Review
+
+```cmd
+scripts\win\start-ai3-shared-queue-review.cmd
+```
+
+The launcher uses the newest validated local token identity, a deterministic mock and an isolated temporary queue SQLite file. It opens `ABSENT`, `QUEUED`, `PROCESSING`, `READY`, `STALE`, `FAILED`, `SUSPENDED` and `COOLDOWN` views. It performs zero OpenAI calls, zero data-provider calls and does not mutate canonical AI, feedback, Follow-up, Established, lifecycle or Task Scheduler state.

@@ -1,5 +1,7 @@
 # AI.1 + AI.2C — Visual Candidate Research Brief i semantic quality boundary
 
+> Aktualizacja AI.3: bezpośrednia generacja w publicznym request path została zastąpiona centralną kolejką i współdzielonym cache. Kanoniczny bieżący kontrakt opisuje `docs/ai_shared_queue_cache.md`. Historyczne szczegóły AI.1/AI.2C poniżej pozostają dokumentacją ewolucji schema/skeletonu, lecz opis synchronicznego `POST /generate`, pamięciowego single-flight i `--live-one` nie jest już aktywnym modelem wykonania.
+
 ## Status i granica produktu
 
 AI.1 dodaje do standalone Crypto Edge AI moduł **Analiza badawcza AI / AI Research Brief**. Moduł porządkuje wyłącznie dane już zapisane w produkcie, wyjaśnia maszynowy stan badawczy i prowadzi do kolejnego kroku weryfikacji. Nie jest sygnałem transakcyjnym, nie potwierdza bezpieczeństwa projektu i nie zmienia lifecycle, Follow-up ani Established Universe.
