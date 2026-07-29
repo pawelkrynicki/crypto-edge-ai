@@ -9,7 +9,8 @@ import { buildAIResearchContext } from "../server/aiResearchContext.js";
 import { buildDeterministicPreview } from "../server/aiResearchService.js";
 import { mapPersistableScannerOutputToUiCandidates } from "../src/adapters/scannerOutputAdapter.js";
 import { AIResearchBriefCanvas } from "../src/components/AIResearchBriefCanvas.js";
-import { AIResearchRadarStatus, AIResearchSection, applyAIResearchGenerationFailure } from "../src/components/AIResearchSection.js";
+import { AIResearchRadarStatus, AIResearchSection } from "../src/components/AIResearchSection.js";
+import { applyAIResearchGenerationFailure } from "../src/components/aiResearchState.js";
 import { CandidateDetailView } from "../src/components/CandidateDetailView.js";
 import { ExternalVerificationLinksView } from "../src/components/ExternalVerificationLinksView.js";
 import { PERSISTABLE_SCANNER_SAMPLE } from "../src/fixtures/persistableScannerSample.js";
@@ -125,25 +126,27 @@ describe("AI.1 Visual Candidate Research Canvas", () => {
 
   it("renders all Candidate Detail states with aria-live, aria-busy and UX.1 hierarchy", () => {
     const states: Array<[AIResearchBriefLookup["availability"], RegExp]> = [
-      ["ABSENT", /Brak analizy/], ["GENERATING", /Generowanie/], ["READY", /Gotowa/], ["STALE", /Nieaktualna/],
-      ["PROVIDER_DISABLED", /Niedostępna/], ["INSUFFICIENT_DATA", /Niewystarczające dane/], ["RATE_LIMITED", /Limit czasowy/], ["ERROR", /Błąd/],
+      ["ABSENT", /Brak analizy/], ["QUEUED", /W kolejce/], ["PROCESSING", /Przygotowywana/], ["READY", /Dostępna/],
+      ["STALE", /Ostatnia analiza/], ["FAILED", /Chwilowo niedostępna/], ["SUSPENDED", /Wstrzymana/],
+      ["COOLDOWN", /Czas oczekiwania/], ["PROVIDER_DISABLED", /Niedostępna/],
+      ["INSUFFICIENT_DATA", /Niewystarczające dane/], ["RATE_LIMITED", /Limit czasowy/], ["ERROR", /Niedostępna/],
     ];
     for (const [availability, label] of states) {
       const lookup: AIResearchBriefLookup = {
         schema_version: "ai_research_lookup_v1",
         availability,
         provider_mode: availability === "PROVIDER_DISABLED" ? "DISABLED" : "OPENAI",
-        brief: availability === "READY" || availability === "STALE" ? briefPl : null,
+        brief: ["READY", "STALE", "FAILED"].includes(availability) ? briefPl : null,
         retry_after_seconds: availability === "RATE_LIMITED" ? 60 : null,
         error_code: availability === "ERROR" ? "VALIDATION_FAILURE" : null,
       };
       const markup = render("pl", <AIResearchSection chain="base" contractAddress={ADDRESS} symbol="PASS" name="Pass Token" initialLookup={lookup} />);
       assert.match(markup, label);
       assert.match(markup, /aria-live="polite"/);
-      if (["ABSENT", "ERROR", "STALE", "RATE_LIMITED"].includes(availability)) assert.match(markup, /data-action-variant="primary"/);
+      if (["ABSENT", "ERROR", "STALE", "FAILED", "COOLDOWN", "RATE_LIMITED"].includes(availability)) {
+        assert.match(markup, /Zgłoś przygotowanie analizy/);
+      }
     }
-    const generating = render("pl", <AIResearchSection chain="base" contractAddress={ADDRESS} symbol="PASS" name="Pass Token" initialLookup={{ schema_version: "ai_research_lookup_v1", availability: "GENERATING", provider_mode: "OPENAI", brief: null, retry_after_seconds: null, error_code: null }} />);
-    assert.match(generating, /Generowanie/);
   });
 
   it("places AI Research after lifecycle in Candidate Detail and adds compact Radar and Verification actions", () => {
@@ -152,7 +155,7 @@ describe("AI.1 Visual Candidate Research Canvas", () => {
     assert.ok(detail.indexOf("Analiza badawcza AI") < detail.indexOf("Dane rynkowe"));
     const radar = render("pl", <AIResearchRadarStatus chain="base" contractAddress={ADDRESS} onOpen={() => undefined} />);
     assert.match(radar, /ai-radar-status/);
-    assert.match(radar, /Przejdź do szczegółów, aby wygenerować/);
+    assert.match(radar, /Przejdź do szczegółów analizy/);
     const verification = render("pl", <ExternalVerificationLinksView candidate={candidate} onOpenResearchBrief={() => undefined} />);
     assert.match(verification, /Analiza AI uzupełnia, ale nie zastępuje ręcznej weryfikacji/);
     assert.match(verification, /data-action-variant="secondary"[^>]*>[\s\S]*Otwórz analizę AI/);
@@ -180,19 +183,19 @@ describe("AI.1 responsive and accessibility contracts", () => {
     assert.match(canvas, /role="table"/);
     assert.match(canvas, /<ol className="ai-checkpoint-axis">/);
     assert.match(section, /aria-live="polite"/);
-    assert.match(section, /loading=\{generating\}/);
+    assert.match(section, /loading=\{requesting\}/);
     assert.doesNotMatch([canvas, section, client].join("\n"), /dangerouslySetInnerHTML|onClick=\{undefined\}|role="button"/);
   });
 
   it("keeps the schema portable to AI KINTEL storage and billing adapters", async () => {
     const [types, store, provider] = await Promise.all([
-      source("src/types/aiResearchTypes.ts"), source("server/aiResearchStore.ts"), source("server/aiResearchProvider.ts"),
+      source("src/types/aiResearchTypes.ts"), source("server/aiResearchQueueStore.ts"), source("server/aiResearchProvider.ts"),
     ]);
     for (const field of ["analysis_id", "snapshot_fingerprint", "prompt_version", "model", "token_usage", "input_hash", "output_hash", "generated_at"]) assert.match(types, new RegExp(field));
-    assert.match(store, /crypto_ai_research_briefs/);
-    assert.match(store, /idx_ai_research_identity/);
-    assert.match(store, /idx_ai_research_generated_at/);
-    assert.match(store, /idx_ai_research_snapshot/);
+    assert.match(store, /crypto_ai_analysis_queue/);
+    assert.match(store, /idx_ai_analysis_identity/);
+    assert.match(store, /idx_ai_analysis_claim/);
+    assert.match(store, /idx_ai_analysis_completed/);
     assert.match(provider, /AIResearchUsageRecorder/);
     assert.match(provider, /NOOP_AI_RESEARCH_USAGE_RECORDER/);
   });
@@ -210,8 +213,8 @@ describe("AI.1 responsive and accessibility contracts", () => {
   });
 });
 
-describe("AI.2 controlled OpenAI owner review UI", () => {
-  it("moves a failed clicked generation without a brief to visible ERROR instead of leaving ABSENT", () => {
+describe("AI.3 shared queue UI", () => {
+  it("moves a failed queue submission without a brief to visible unavailable state", () => {
     const failure = applyAIResearchGenerationFailure({
       schema_version: "ai_research_lookup_v1",
       availability: "ABSENT",
@@ -225,10 +228,10 @@ describe("AI.2 controlled OpenAI owner review UI", () => {
     assert.notEqual(failure.availability, "ABSENT");
     assert.equal(failure.brief, null);
     const markup = render("pl", <AIResearchSection chain="base" contractAddress={ADDRESS} symbol="SCOOBERT" name="Scoobert" initialLookup={failure} />);
-    assert.match(markup, /Błąd/);
-    assert.match(markup, /Nie udało się przygotować briefu/);
-    assert.match(markup, /Żądanie zakończyło się bez zapisu/);
-    assert.match(markup, /Wygeneruj analizę AI/);
+    assert.match(markup, /Niedostępna/);
+    assert.match(markup, /Analiza chwilowo niedostępna/);
+    assert.match(markup, /Zgłoś przygotowanie analizy/);
+    assert.doesNotMatch(markup, /Wygeneruj analizę AI/);
     assert.doesNotMatch(markup, /Brak analizy/);
   });
 
@@ -249,13 +252,12 @@ describe("AI.2 controlled OpenAI owner review UI", () => {
     assert.equal(failure.availability, "STALE");
     assert.equal(failure.brief, previous.brief);
     const markup = render("pl", <AIResearchSection chain="base" contractAddress={ADDRESS} symbol="SCOOBERT" name="Scoobert" initialLookup={failure} />);
-    assert.match(markup, /Nieaktualna/);
-    assert.match(markup, /Nie udało się zaktualizować analizy/);
-    assert.match(markup, /Poprzedni brief pozostaje dostępny/);
+    assert.match(markup, /Ostatnia analiza/);
+    assert.match(markup, /Poprzedni prawidłowy wynik pozostaje dostępny/);
     assert.match(markup, /Otwórz analizę AI/);
   });
 
-  it("shows OpenAI provenance and owner-only technical metrics without a preview badge or raw payload", () => {
+  it("shows central-worker provenance and owner-only technical metrics without raw payload", () => {
     const brief = { ...semanticBriefPl, render_preview: false, model: "configured-test-model" };
     const metrics: AIResearchReviewMetrics = {
       schema_version: "ai_research_review_metrics_v1",
@@ -288,33 +290,33 @@ describe("AI.2 controlled OpenAI owner review UI", () => {
       retry_after_seconds: null,
       error_code: null,
     }} />);
-    assert.match(section, /Analiza wygenerowana przez OpenAI/);
+    assert.match(section, /Analiza przygotowana przez centralnego workera AI/);
   });
 
-  it("keeps generation disabled after the live-one budget is consumed while preserving cache access", () => {
-    const absent = render("pl", <AIResearchSection chain="base" contractAddress={ADDRESS} symbol="SCOOBERT" name="Scoobert" initialLookup={{
+  it("separates SUSPENDED and QUEUED from the ordinary request action", () => {
+    const suspended = render("pl", <AIResearchSection chain="base" contractAddress={ADDRESS} symbol="SCOOBERT" name="Scoobert" initialLookup={{
       schema_version: "ai_research_lookup_v1",
-      availability: "ABSENT",
+      availability: "SUSPENDED",
+      provider_mode: "OPENAI",
+      brief: null,
+      retry_after_seconds: null,
+      error_code: "WORKER_SUSPENDED",
+      queue_status: "SUSPENDED",
+    }} />);
+    assert.match(suspended, /Przygotowanie analizy zostało wstrzymane/);
+    assert.doesNotMatch(suspended, /Zgłoś przygotowanie analizy/);
+
+    const queued = render("pl", <AIResearchSection chain="base" contractAddress={ADDRESS} symbol="SCOOBERT" name="Scoobert" initialLookup={{
+      schema_version: "ai_research_lookup_v1",
+      availability: "QUEUED",
       provider_mode: "OPENAI",
       brief: null,
       retry_after_seconds: null,
       error_code: null,
-      generation_blocked_reason: "LIVE_CALL_BUDGET_EXHAUSTED",
+      queue_status: "QUEUED",
     }} />);
-    assert.match(absent, /Limit jednego płatnego wywołania został wykorzystany/);
-    assert.match(absent, /<button[^>]*disabled=""[^>]*>Wygeneruj analizę AI<\/button>/);
-
-    const stale = render("pl", <AIResearchSection chain="base" contractAddress={ADDRESS} symbol="SCOOBERT" name="Scoobert" initialLookup={{
-      schema_version: "ai_research_lookup_v1",
-      availability: "STALE",
-      provider_mode: "OPENAI",
-      brief: { ...semanticBriefPl, render_preview: false },
-      retry_after_seconds: null,
-      error_code: null,
-      generation_blocked_reason: "LIVE_CALL_BUDGET_EXHAUSTED",
-    }} />);
-    assert.match(stale, /Otwórz analizę AI/);
-    assert.match(stale, /<button[^>]*disabled=""[^>]*>Zaktualizuj analizę AI<\/button>/);
+    assert.match(queued, /Analiza oczekuje w kolejce/);
+    assert.doesNotMatch(queued, /Zgłoś przygotowanie analizy/);
   });
 });
 

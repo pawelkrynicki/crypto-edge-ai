@@ -45,7 +45,7 @@ export async function loadAIResearchBrief(
   fetchImpl: typeof fetch = fetch,
 ): Promise<AIResearchBriefLookup> {
   const query = new URLSearchParams({ chain, contract_address: contractAddress, locale });
-  const response = await fetchImpl(`/api/ai-research/brief?${query}`, {
+  const response = await fetchImpl(`/api/v1/ai-analyses/result?${query}`, {
     headers: { accept: "application/json" },
     credentials: "same-origin",
   });
@@ -55,7 +55,7 @@ export async function loadAIResearchBrief(
   return value;
 }
 
-export async function generateAIResearchBrief(
+export async function requestAIResearchBrief(
   input: Omit<AIResearchGenerateRequest, "idempotency_key"> & { idempotency_key?: string },
   fetchImpl: typeof fetch = fetch,
 ): Promise<AIResearchBriefLookup> {
@@ -65,7 +65,7 @@ export async function generateAIResearchBrief(
     locale: input.locale,
     idempotency_key: input.idempotency_key ?? createIdempotencyKey(),
   };
-  const response = await fetchImpl("/api/ai-research/generate", {
+  const response = await fetchImpl("/api/v1/ai-analyses/requests", {
     method: "POST",
     credentials: "same-origin",
     headers: { accept: "application/json", "content-type": "application/json; charset=utf-8" },
@@ -118,7 +118,7 @@ function isProviderStatus(value: unknown): value is AIResearchProviderStatus {
 function isLookup(value: unknown): value is AIResearchBriefLookup {
   return isRecord(value)
     && value.schema_version === "ai_research_lookup_v1"
-    && ["ABSENT", "GENERATING", "READY", "STALE", "PROVIDER_DISABLED", "INSUFFICIENT_DATA", "RATE_LIMITED", "ERROR"].includes(String(value.availability))
+    && ["ABSENT", "QUEUED", "PROCESSING", "READY", "STALE", "FAILED", "SUSPENDED", "COOLDOWN", "PROVIDER_DISABLED", "INSUFFICIENT_DATA", "RATE_LIMITED", "ERROR"].includes(String(value.availability))
     && (value.provider_mode === "DISABLED" || value.provider_mode === "OPENAI")
     && (value.brief === null || isBrief(value.brief))
     && (value.retry_after_seconds === null || typeof value.retry_after_seconds === "number")

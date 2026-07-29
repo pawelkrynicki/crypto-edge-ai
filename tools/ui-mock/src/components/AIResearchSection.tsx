@@ -2,13 +2,14 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useProductLocale } from "../productI18n";
 import {
   AIResearchDataSourceError,
-  generateAIResearchBrief,
   loadAIResearchBrief,
   loadAIResearchReviewMetrics,
+  requestAIResearchBrief,
 } from "../services/aiResearchDataSource";
 import type { AIResearchBriefLookup, AIResearchReviewMetrics } from "../types/aiResearchTypes";
 import { resolveTokenIdentity } from "../tokenLifecycle";
 import { AIResearchBriefCanvas } from "./AIResearchBriefCanvas";
+import { applyAIResearchGenerationFailure } from "./aiResearchState";
 import { ActionButton, StatusBadge } from "./ProductUi";
 
 void React;
@@ -31,7 +32,7 @@ export function AIResearchSection({
   const identity = useMemo(() => resolveTokenIdentity(chain, contractAddress), [chain, contractAddress]);
   const [lookup, setLookup] = useState<AIResearchBriefLookup | null>(initialLookup ?? null);
   const [loading, setLoading] = useState(initialLookup === undefined);
-  const [generating, setGenerating] = useState(false);
+  const [requesting, setRequesting] = useState(false);
   const [expanded, setExpanded] = useState(Boolean(initialLookup?.brief?.render_preview));
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [retryAfter, setRetryAfter] = useState<number | null>(null);
@@ -67,15 +68,15 @@ export function AIResearchSection({
     return () => { cancelled = true; };
   }, [lookup?.brief?.analysis_id, lookup?.brief?.render_preview]);
 
-  const generate = async () => {
-    if (identity.status !== "valid" || generating) return;
-    setGenerating(true);
+  const requestPreparation = async () => {
+    if (identity.status !== "valid" || requesting) return;
+    setRequesting(true);
     setErrorCode(null);
     setRetryAfter(null);
     try {
-      const result = await generateAIResearchBrief({ chain: identity.chain, contract_address: identity.contract_address, locale });
+      const result = await requestAIResearchBrief({ chain: identity.chain, contract_address: identity.contract_address, locale });
       setLookup(result);
-      setExpanded(true);
+      if (result.brief) setExpanded(true);
     } catch (error) {
       const code = error instanceof AIResearchDataSourceError ? error.code : "AI_RESEARCH_UNAVAILABLE";
       const retry = error instanceof AIResearchDataSourceError ? error.retryAfterSeconds : null;
@@ -83,18 +84,17 @@ export function AIResearchSection({
       setRetryAfter(retry);
       setLookup((previous) => applyAIResearchGenerationFailure(previous, error));
     } finally {
-      setGenerating(false);
+      setRequesting(false);
     }
   };
 
-  const availability = generating ? "GENERATING" : lookup?.availability ?? (loading ? "GENERATING" : "ERROR");
+  const availability: AIResearchBriefLookup["availability"] = lookup?.availability ?? (loading ? "PROCESSING" : "ERROR");
   const brief = lookup?.brief ?? null;
-  const blockedReason = lookup?.generation_blocked_reason ?? (errorCode === "LIVE_CALL_BUDGET_EXHAUSTED" ? errorCode : null);
-  const effectiveError = errorCode ?? lookup?.error_code ?? blockedReason;
-  const canGenerate = identity.status === "valid"
-    && availability !== "PROVIDER_DISABLED"
-    && availability !== "INSUFFICIENT_DATA"
-    && blockedReason === null;
+  const effectiveError = errorCode ?? lookup?.error_code ?? null;
+  const canRequest = identity.status === "valid"
+    && !["QUEUED", "PROCESSING", "READY", "PROVIDER_DISABLED", "INSUFFICIENT_DATA", "SUSPENDED"].includes(availability);
+  const showRequest = ["ABSENT", "STALE", "FAILED", "COOLDOWN", "RATE_LIMITED", "ERROR"].includes(availability);
+
   return (
     <section className="product-detail-section ai-research-section" aria-labelledby="ai-research-section-heading" aria-live="polite">
       <header className="ai-research-section-heading">
@@ -104,52 +104,35 @@ export function AIResearchSection({
       <div className="ai-research-section-summary">
         <div>
           <strong>{stateTitle(availability, locale)}</strong>
-          <p>{stateDetail(availability, effectiveError, retryAfter, locale)}</p>
+          <p>{stateDetail(availability, effectiveError, retryAfter, locale, Boolean(brief))}</p>
+          <p className="ai-shared-queue-note">{ui.sharedQueue}</p>
           {brief && !brief.render_preview && lookup?.provider_mode === "OPENAI" && (
             <span className="ai-openai-generated-status">{ui.openaiGenerated}</span>
           )}
         </div>
         <div className="ai-research-section-actions">
-          {(availability === "ABSENT" || availability === "ERROR" || availability === "STALE" || availability === "RATE_LIMITED") && (
+          {showRequest && (
             <ActionButton
-              variant={availability === "STALE" ? "primary" : brief ? "secondary" : "primary"}
-              loading={generating}
-              loadingLabel={ui.generating}
-              disabled={!canGenerate}
-              onClick={() => void generate()}
+              variant={brief ? "secondary" : "primary"}
+              loading={requesting}
+              loadingLabel={ui.requesting}
+              disabled={!canRequest}
+              onClick={() => void requestPreparation()}
             >
-              {availability === "STALE" ? ui.update : ui.generate}
+              {ui.request}
             </ActionButton>
           )}
-          {brief && (availability === "READY" || availability === "STALE") && (
-            <ActionButton variant={availability === "STALE" ? "secondary" : "primary"} onClick={() => setExpanded((value) => !value)}>
+          {brief && (
+            <ActionButton variant="primary" onClick={() => setExpanded((value) => !value)}>
               {expanded ? ui.close : ui.open}
             </ActionButton>
           )}
         </div>
       </div>
-      <span className="sr-only" role="status" aria-live="polite">{generating ? ui.generatingStatus : ""}</span>
+      <span className="sr-only" role="status" aria-live="polite">{requesting ? ui.requestingStatus : ""}</span>
       {brief && expanded && <AIResearchBriefCanvas brief={brief} symbol={symbol} name={name} reviewMetrics={reviewMetrics} />}
     </section>
   );
-}
-
-export function applyAIResearchGenerationFailure(
-  previous: AIResearchBriefLookup | null,
-  error: unknown,
-): AIResearchBriefLookup {
-  const knownError = error instanceof AIResearchDataSourceError ? error : null;
-  const errorCode = knownError?.code ?? "AI_RESEARCH_UNAVAILABLE";
-  const cachedBrief = knownError?.cachedBrief ?? previous?.brief ?? null;
-  return {
-    schema_version: "ai_research_lookup_v1",
-    availability: cachedBrief ? "STALE" : "ERROR",
-    provider_mode: previous?.provider_mode ?? "OPENAI",
-    brief: cachedBrief,
-    retry_after_seconds: knownError?.retryAfterSeconds ?? null,
-    error_code: errorCode,
-    generation_blocked_reason: errorCode === "LIVE_CALL_BUDGET_EXHAUSTED" ? "LIVE_CALL_BUDGET_EXHAUSTED" : null,
-  };
 }
 
 export function AIResearchRadarStatus({
@@ -164,20 +147,21 @@ export function AIResearchRadarStatus({
   const { locale } = useProductLocale();
   const ui = COPY[locale];
   const [state, setState] = useState<AIResearchBriefLookup["availability"]>("ABSENT");
+  const identity = useMemo(() => resolveTokenIdentity(chain, contractAddress), [chain, contractAddress]);
   useEffect(() => {
-    const identity = resolveTokenIdentity(chain, contractAddress);
-    if (identity.status !== "valid") { setState("ERROR"); return; }
+    if (identity.status !== "valid") return;
     let cancelled = false;
     void loadAIResearchBrief(identity.chain, identity.contract_address, locale)
       .then((value) => { if (!cancelled) setState(value.availability); })
       .catch(() => { if (!cancelled) setState("ERROR"); });
     return () => { cancelled = true; };
-  }, [chain, contractAddress, locale]);
-  const ready = state === "READY" || state === "STALE";
+  }, [identity, locale]);
+  const visibleState = identity.status === "valid" ? state : "ERROR";
+  const ready = visibleState === "READY" || visibleState === "STALE";
   return (
-    <div className="ai-radar-status" data-ai-status={state}>
+    <div className="ai-radar-status" data-ai-status={visibleState}>
       <span>{ui.radarLabel}</span>
-      <StatusBadge tone={availabilityTone(state)}>{availabilityLabel(state, locale)}</StatusBadge>
+      <StatusBadge tone={availabilityTone(visibleState)}>{availabilityLabel(visibleState, locale)}</StatusBadge>
       {onOpen && <ActionButton variant="tertiary" onClick={onOpen}>{ready ? ui.radarOpen : ui.radarDetails}</ActionButton>}
     </div>
   );
@@ -186,75 +170,117 @@ export function AIResearchRadarStatus({
 function applyRenderReviewOverride(value: AIResearchBriefLookup): AIResearchBriefLookup {
   if (!value.brief?.render_preview || typeof window === "undefined") return value;
   const reviewState = new URLSearchParams(window.location.search).get("ai_review_state");
-  if (reviewState === "absent") return { ...value, availability: "ABSENT", brief: null };
-  if (reviewState === "generating") return { ...value, availability: "GENERATING", brief: null };
-  if (reviewState === "stale") return { ...value, availability: "STALE" };
-  if (reviewState === "provider-disabled") return { ...value, availability: "PROVIDER_DISABLED", brief: null };
-  if (reviewState === "error") return { ...value, availability: "ERROR", brief: null, error_code: "VALIDATION_FAILURE" };
+  if (reviewState === "absent") return { ...value, availability: "ABSENT", queue_status: "ABSENT", brief: null };
+  if (reviewState === "queued") return { ...value, availability: "QUEUED", queue_status: "QUEUED", brief: null };
+  if (reviewState === "processing") return { ...value, availability: "PROCESSING", queue_status: "PROCESSING", brief: null };
+  if (reviewState === "stale") return { ...value, availability: "STALE", queue_status: "QUEUED", is_last_known_good: true };
+  if (reviewState === "failed") return { ...value, availability: "FAILED", queue_status: "FAILED", error_code: "PROVIDER_ERROR", is_last_known_good: true };
+  if (reviewState === "suspended") return { ...value, availability: "SUSPENDED", queue_status: "SUSPENDED", error_code: "WORKER_SUSPENDED", brief: null };
+  if (reviewState === "cooldown") return { ...value, availability: "COOLDOWN", queue_status: "FAILED", request_outcome: "COOLDOWN", retry_after_seconds: 60, brief: null };
   return value;
 }
 
 function availabilityLabel(value: AIResearchBriefLookup["availability"], locale: "pl" | "en") {
   const labels: Record<AIResearchBriefLookup["availability"], [string, string]> = {
-    ABSENT: ["No analysis", "Brak analizy"], GENERATING: ["Generating", "Generowanie"], READY: ["Ready", "Gotowa"], STALE: ["Stale", "Nieaktualna"], PROVIDER_DISABLED: ["Unavailable", "Niedostępna"], INSUFFICIENT_DATA: ["Insufficient data", "Niewystarczające dane"], RATE_LIMITED: ["Temporarily limited", "Limit czasowy"], ERROR: ["Error", "Błąd"],
+    ABSENT: ["Not available", "Brak analizy"],
+    QUEUED: ["Queued", "W kolejce"],
+    PROCESSING: ["Preparing", "Przygotowywana"],
+    READY: ["Available", "Dostępna"],
+    STALE: ["Last analysis", "Ostatnia analiza"],
+    FAILED: ["Temporarily unavailable", "Chwilowo niedostępna"],
+    SUSPENDED: ["Suspended", "Wstrzymana"],
+    COOLDOWN: ["Cooldown", "Czas oczekiwania"],
+    PROVIDER_DISABLED: ["Unavailable", "Niedostępna"],
+    INSUFFICIENT_DATA: ["Insufficient data", "Niewystarczające dane"],
+    RATE_LIMITED: ["Temporarily limited", "Limit czasowy"],
+    ERROR: ["Unavailable", "Niedostępna"],
   };
   return labels[value][locale === "pl" ? 1 : 0];
 }
 
 function availabilityTone(value: AIResearchBriefLookup["availability"]): "neutral" | "accent" | "ready" | "partial" | "warning" | "not-ready" {
   if (value === "READY") return "ready";
-  if (value === "GENERATING") return "accent";
-  if (value === "STALE" || value === "RATE_LIMITED" || value === "INSUFFICIENT_DATA") return "warning";
-  if (value === "ERROR") return "not-ready";
-  if (value === "PROVIDER_DISABLED") return "partial";
+  if (value === "QUEUED" || value === "PROCESSING") return "accent";
+  if (["STALE", "COOLDOWN", "RATE_LIMITED", "INSUFFICIENT_DATA"].includes(value)) return "warning";
+  if (value === "FAILED" || value === "ERROR") return "not-ready";
+  if (value === "SUSPENDED" || value === "PROVIDER_DISABLED") return "partial";
   return "neutral";
 }
 
 function stateTitle(value: AIResearchBriefLookup["availability"], locale: "pl" | "en") {
   const pl = locale === "pl";
-  if (value === "READY") return pl ? "Brief badawczy jest gotowy" : "Research brief is ready";
-  if (value === "STALE") return pl ? "Dane zmieniły się od ostatniej analizy" : "Data changed since the last analysis";
-  if (value === "GENERATING") return pl ? "Trwa porządkowanie danych" : "Organizing available data";
-  if (value === "PROVIDER_DISABLED") return pl ? "AI provider niedostępny" : "AI provider unavailable";
-  if (value === "INSUFFICIENT_DATA") return pl ? "Za mało danych do briefu" : "Not enough data for a brief";
-  if (value === "RATE_LIMITED") return pl ? "Generowanie jest chwilowo ograniczone" : "Generation is temporarily limited";
-  if (value === "ERROR") return pl ? "Nie udało się przygotować briefu" : "The brief could not be prepared";
-  return pl ? "Analiza nie została jeszcze wygenerowana" : "Analysis has not been generated yet";
+  if (value === "READY") return pl ? "Analiza dostępna" : "Analysis available";
+  if (value === "QUEUED") return pl ? "Analiza oczekuje w kolejce" : "Analysis is waiting in the queue";
+  if (value === "PROCESSING") return pl ? "Analiza jest przygotowywana" : "Analysis is being prepared";
+  if (value === "STALE") return pl ? "Ostatnia analiza dostępna" : "Last analysis available";
+  if (value === "FAILED" || value === "ERROR" || value === "PROVIDER_DISABLED") return pl ? "Analiza chwilowo niedostępna" : "Analysis temporarily unavailable";
+  if (value === "SUSPENDED") return pl ? "Przygotowanie analizy zostało wstrzymane" : "Analysis preparation has been suspended";
+  if (value === "COOLDOWN" || value === "RATE_LIMITED") return pl ? "Zgłoszenie jest chwilowo ograniczone" : "Requests are temporarily limited";
+  if (value === "INSUFFICIENT_DATA") return pl ? "Za mało danych do analizy" : "Not enough data for analysis";
+  return pl ? "Analiza nie została jeszcze przygotowana" : "Analysis has not been prepared yet";
 }
 
-function stateDetail(value: AIResearchBriefLookup["availability"], error: string | null, retry: number | null, locale: "pl" | "en") {
+function stateDetail(
+  value: AIResearchBriefLookup["availability"],
+  error: string | null,
+  retry: number | null,
+  locale: "pl" | "en",
+  hasBrief: boolean,
+) {
   const pl = locale === "pl";
-  if (error === "LIVE_CALL_BUDGET_EXHAUSTED") return pl ? "Limit jednego płatnego wywołania został wykorzystany. Istniejący cache pozostaje dostępny." : "The one paid-call budget has been used. Existing cache remains available.";
-  if (error === "LIVE_CALL_BUDGET_INVALID") return pl ? "Konfiguracja limitu live call jest nieprawidłowa; żaden request nie zostanie wykonany." : "The live-call budget is invalid; no request will be made.";
-  if (error === "REVIEW_STORE_REQUIRED") return pl ? "Tryb live-one wymaga izolowanego store review; żaden request nie zostanie wykonany." : "Live-one requires the isolated review store; no request will be made.";
-  if (value === "READY") return pl ? "Otwórz deterministyczny Canvas z ryzykami, brakami i kolejnym krokiem badawczym." : "Open the deterministic Canvas with risks, gaps and the next research step.";
-  if (value === "STALE" && error) return pl ? `Nie udało się zaktualizować analizy (${safeErrorLabel(error, locale)}). Poprzedni brief pozostaje dostępny.` : `The analysis could not be updated (${safeErrorLabel(error, locale)}). The previous brief remains available.`;
-  if (value === "STALE") return pl ? "Poprzedni brief pozostaje dostępny. Wygeneruj nowy dopiero na żądanie." : "The previous brief remains available. Generate a new one only on demand.";
-  if (value === "GENERATING") return pl ? "Jedno żądanie pracuje dla tego fingerprintu; równoległe żądania współdzielą wynik." : "One request is running for this fingerprint; concurrent requests share the result.";
-  if (value === "PROVIDER_DISABLED" && error === "MISSING_API_KEY") return pl ? "Brak OPENAI_API_KEY. Generowanie jest zablokowane i nie wykonano requestu." : "OPENAI_API_KEY is missing. Generation is blocked and no request was made.";
-  if (value === "PROVIDER_DISABLED" && error === "MODEL_NOT_CONFIGURED") return pl ? "Brak CRYPTO_EDGE_AI_RESEARCH_MODEL. Generowanie jest zablokowane i nie wykonano requestu." : "CRYPTO_EDGE_AI_RESEARCH_MODEL is missing. Generation is blocked and no request was made.";
-  if (value === "PROVIDER_DISABLED") return pl ? "Tryb domyślny to DISABLED. Konfiguracja lub osobna zgoda ownera jest wymagana przed prawdziwym wywołaniem." : "The default mode is DISABLED. Configuration or separate owner approval is required before a real call.";
-  if (value === "INSUFFICIENT_DATA") return pl ? "Produkt nie posiada danych pozwalających przygotować wiarygodny brief dla tego obszaru." : "The product has no data that can prepare a reliable brief for this area.";
-  if (value === "RATE_LIMITED") return pl ? `Spróbuj ponownie${retry ? ` za ${retry} s` : " później"}. Poprawny cache nie został usunięty.` : `Try again${retry ? ` in ${retry} sec` : " later"}. The valid cache was preserved.`;
-  if (value === "ERROR") return pl ? `Żądanie zakończyło się bez zapisu${error ? ` (${safeErrorLabel(error, locale)})` : ""}.` : `The request ended without saving${error ? ` (${safeErrorLabel(error, locale)})` : ""}.`;
-  return pl ? "Generowanie następuje wyłącznie po jawnym kliknięciu i nie zmienia lifecycle." : "Generation happens only after an explicit click and does not change lifecycle.";
+  if (value === "READY") return pl ? "Otwórz wspólny, zwalidowany Canvas z ryzykami, brakami i kolejnym krokiem badawczym." : "Open the shared validated Canvas with risks, gaps and the next research step.";
+  if (value === "QUEUED") return pl ? "Zgłoszenie zostało zapisane. Centralny worker podejmie je zgodnie z kolejnością i limitami." : "The request was recorded. The central worker will pick it up according to queue order and limits.";
+  if (value === "PROCESSING") return pl ? "Centralny worker przygotowuje jeden wspólny wynik dla tego stanu danych." : "The central worker is preparing one shared result for this data state.";
+  if (value === "STALE") return pl ? "Dane zmieniły się, a aktualizacja jest przygotowywana. Poprzedni prawidłowy wynik pozostaje dostępny." : "Data changed and an update is being prepared. The previous valid result remains available.";
+  if (value === "FAILED" && hasBrief) return pl ? "Aktualizacja nie powiodła się. Poprzedni prawidłowy wynik nie został usunięty." : "The update failed. The previous valid result was not removed.";
+  if (value === "FAILED") return pl ? "Worker nie opublikował niezwalidowanego wyniku. Ponowne zgłoszenie będzie możliwe po cooldownie." : "The worker did not publish an unvalidated result. A new request will be possible after cooldown.";
+  if (value === "SUSPENDED") return pl ? "Circuit breaker zatrzymał płatne wywołania do czasu jawnego wznowienia przez ownera." : "The circuit breaker stopped paid calls until the owner explicitly resumes them.";
+  if (value === "COOLDOWN" || value === "RATE_LIMITED") return pl
+    ? `Ponowne zgłoszenie będzie możliwe${retry ? ` za ${retry} s` : " później"}. Nie utworzono drugiej analizy.`
+    : `Another request will be possible${retry ? ` in ${retry} sec` : " later"}. No duplicate analysis was created.`;
+  if (value === "PROVIDER_DISABLED") return pl ? "Centralny worker providera jest wyłączony. Przeglądarka nie wykonuje wywołań OpenAI." : "The central provider worker is disabled. The browser does not call OpenAI.";
+  if (value === "INSUFFICIENT_DATA") return pl ? "Serwer nie posiada zwalidowanych danych pozwalających przygotować wiarygodny brief." : "The server has no validated data that can prepare a reliable brief.";
+  if (value === "ERROR") return pl ? `Nie udało się odczytać stanu analizy${error ? ` (${safeErrorLabel(error, locale)})` : ""}.` : `The analysis state could not be read${error ? ` (${safeErrorLabel(error, locale)})` : ""}.`;
+  return pl ? "Możesz zgłosić potrzebę przygotowania wspólnej analizy." : "You can request preparation of the shared analysis.";
 }
 
 function safeErrorLabel(value: string, locale: "pl" | "en") {
-  if (value === "LIVE_CALL_BUDGET_EXHAUSTED") return locale === "pl" ? "limit jednego wywołania został wykorzystany" : "the one-call budget has been used";
-  if (value === "LIVE_CALL_BUDGET_INVALID") return locale === "pl" ? "nieprawidłowy limit live call" : "invalid live-call budget";
-  if (value === "REVIEW_STORE_REQUIRED") return locale === "pl" ? "wymagany izolowany store review" : "isolated review store required";
-  if (value === "SAME_ORIGIN_REQUIRED") return locale === "pl" ? "żądanie odrzucone przez kontrolę bezpieczeństwa" : "request rejected by the origin security check";
-  if (value === "PROVIDER_TIMEOUT") return locale === "pl" ? "przekroczono czas oczekiwania na provider" : "provider request timed out";
-  if (value === "PROVIDER_ERROR") return locale === "pl" ? "provider jest chwilowo niedostępny" : "provider is temporarily unavailable";
-  if (value === "MISSING_API_KEY") return locale === "pl" ? "brak konfiguracji klucza API" : "API key is not configured";
-  if (value === "MODEL_NOT_CONFIGURED") return locale === "pl" ? "brak konfiguracji modelu" : "model is not configured";
-  if (value === "VALIDATION_FAILURE") return locale === "pl" ? "wynik nie przeszedł walidacji" : "result failed validation";
-  if (value === "STORE_UNAVAILABLE") return locale === "pl" ? "store niedostępny" : "store unavailable";
-  return locale === "pl" ? "analiza niedostępna" : "analysis unavailable";
+  const pl = locale === "pl";
+  if (value === "SAME_ORIGIN_REQUIRED") return pl ? "żądanie odrzucone przez kontrolę bezpieczeństwa" : "request rejected by origin security";
+  if (value === "PROVIDER_TIMEOUT") return pl ? "przekroczono czas providera" : "provider timed out";
+  if (value === "PROVIDER_ERROR") return pl ? "provider chwilowo niedostępny" : "provider temporarily unavailable";
+  if (value === "VALIDATION_FAILURE") return pl ? "wynik nie przeszedł walidacji" : "result failed validation";
+  if (value === "STORE_UNAVAILABLE") return pl ? "store niedostępny" : "store unavailable";
+  return pl ? "analiza niedostępna" : "analysis unavailable";
 }
 
 const COPY = {
-  pl: { title: "Analiza badawcza AI", intro: "Uporządkowanie dostępnych danych i kolejnego kroku badawczego — bez sygnałów transakcyjnych.", generate: "Wygeneruj analizę AI", generating: "Generowanie…", generatingStatus: "Generowanie analizy AI trwa.", open: "Otwórz analizę AI", close: "Zamknij analizę AI", update: "Zaktualizuj analizę AI", radarLabel: "Analiza AI", radarOpen: "Otwórz analizę AI", radarDetails: "Przejdź do szczegółów, aby wygenerować", openaiGenerated: "Analiza wygenerowana przez OpenAI" },
-  en: { title: "AI Research Brief", intro: "Organization of available data and the next research step — without trading signals.", generate: "Generate AI analysis", generating: "Generating…", generatingStatus: "AI analysis generation is in progress.", open: "Open AI analysis", close: "Close AI analysis", update: "Update AI analysis", radarLabel: "AI analysis", radarOpen: "Open AI analysis", radarDetails: "Go to details to generate", openaiGenerated: "Analysis generated by OpenAI" },
+  pl: {
+    title: "Analiza badawcza AI",
+    intro: "Wspólna analiza zwalidowanych danych — bez sygnałów transakcyjnych.",
+    request: "Zgłoś przygotowanie analizy",
+    requesting: "Zapisywanie zgłoszenia…",
+    requestingStatus: "Zgłoszenie trafia do wspólnej kolejki.",
+    open: "Otwórz analizę AI",
+    close: "Zamknij analizę AI",
+    radarLabel: "Analiza AI",
+    radarOpen: "Otwórz analizę AI",
+    radarDetails: "Przejdź do szczegółów analizy",
+    openaiGenerated: "Analiza przygotowana przez centralnego workera AI",
+    sharedQueue: "Zgłoszenie nie uruchamia OpenAI natychmiast. Trafia do wspólnej kolejki; wszyscy użytkownicy otrzymają ten sam wynik, a ponowne zgłoszenie nie utworzy duplikatu.",
+  },
+  en: {
+    title: "AI Research Brief",
+    intro: "A shared analysis of validated data — without trading signals.",
+    request: "Request analysis preparation",
+    requesting: "Recording request…",
+    requestingStatus: "The request is being added to the shared queue.",
+    open: "Open AI analysis",
+    close: "Close AI analysis",
+    radarLabel: "AI analysis",
+    radarOpen: "Open AI analysis",
+    radarDetails: "Open analysis details",
+    openaiGenerated: "Analysis prepared by the central AI worker",
+    sharedQueue: "A request does not start OpenAI immediately. It enters the shared queue; all users receive the same result, and repeated requests do not create duplicates.",
+  },
 } as const;
