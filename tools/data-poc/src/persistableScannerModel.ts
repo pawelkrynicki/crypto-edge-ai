@@ -5,8 +5,10 @@ import {
 } from "./provenanceManifest.js";
 import type { CombinedScannerFinalLabel, CombinedScannerOutput } from "./types.js";
 
-export const SCANNER_SCHEMA_VERSION = "scanner_snapshot_v1";
-export const SCANNER_GENERATOR_VERSION = "data_poc_persistable_scanner_v1";
+export const LEGACY_SCANNER_SCHEMA_VERSION = "scanner_snapshot_v1";
+export const LEGACY_SCANNER_GENERATOR_VERSION = "data_poc_persistable_scanner_v1";
+export const SCANNER_SCHEMA_VERSION = "scanner_snapshot_v2";
+export const SCANNER_GENERATOR_VERSION = "data_poc_persistable_scanner_v2";
 
 export type PersistableScannerOutput = {
   provenance?: SnapshotProvenanceManifest;

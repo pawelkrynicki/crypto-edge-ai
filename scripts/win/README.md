@@ -110,6 +110,15 @@ scripts\win\unregister-central-automation-task.cmd --uninstall
 scripts\win\rollback-central-automation-task-config.cmd --rollback-config
 ```
 
+Application-level circuit-breaker resume is separate from Task Scheduler and preview-first:
+
+```cmd
+scripts\win\resume-central-automation-state.cmd
+scripts\win\resume-central-automation-state.cmd --confirm-owner-resume
+```
+
+The first command is read-only. The explicit confirmation clears only the application suspension markers; it does not reset the failure counter, run the collector, call providers, or enable/change the Windows task.
+
 No mutating Task Scheduler command is part of automated validation. The DATA.1 one-cycle launcher is dry-run by default; `--run-once-live` performs exactly one backed-up cycle and `--rollback <backup_id>` is explicit. Full contract and runbook: `docs/central_data_cycle.md`. VPS deployment, Cloudflare changes, Task Scheduler activation, port `4173`, `PUBLIC_BETA`, and external tester access remain outside this sprint.
 
 ## Product Radar owner review

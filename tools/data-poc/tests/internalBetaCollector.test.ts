@@ -7,6 +7,7 @@ import {
   assertInternalBetaCollectorEnvironment,
   runInternalBetaCollector,
 } from "../src/internalBetaCollector.js";
+import { collectInternalBetaContext } from "../src/internalBetaContextCollection.js";
 import { validateDisplayEligibleContextSnapshot } from "../src/contextSnapshotValidator.js";
 import { validateDisplayEligibleScannerSnapshot } from "../src/displaySnapshotValidator.js";
 import {
@@ -44,6 +45,80 @@ describe("INTERNAL_BETA live collector", () => {
       CRYPTO_EDGE_RUNTIME_MODE: "INTERNAL_BETA",
       ALLOW_LIVE_PROVIDER_CALLS: "1",
     }), /COLLECTOR_DATA_ENV_INVALID/);
+  });
+
+  it("publishes a scanner snapshot while reusing validated context that is not due", async () => {
+    const root = await tempRoot();
+    const previous = await collectInternalBetaContext({
+      now: NOW,
+      runId: "approved_sources_previous_validated",
+      fetchImpl: async (input) => {
+        const url = String(input);
+        if (url === "https://api.alternative.me/fng/?limit=1") {
+          return Response.json({ data: [{ value: "40", value_classification: "Fear", timestamp: "1784203200", time_until_update: "3600" }] });
+        }
+        if (url === "https://api.llama.fi/protocols") {
+          return Response.json([{ name: "Lido", chain: "Ethereum", tvl: 1_000_000, change_1d: 1, change_7d: 2, url: "https://lido.fi" }]);
+        }
+        throw new Error(`unexpected previous-context URL ${url}`);
+      },
+    });
+    let contextProviderCalls = 0;
+
+    const result = await runInternalBetaCollector({
+      env: {
+        CRYPTO_EDGE_DATA_ENV: "INTERNAL_BETA",
+        CRYPTO_EDGE_RUNTIME_MODE: "INTERNAL_BETA",
+        ALLOW_LIVE_PROVIDER_CALLS: "1",
+      },
+      outputDir: root,
+      seedLimit: 3,
+      securityCandidateLimit: 1,
+      now: new Date("2026-07-16T12:15:00.000Z"),
+      establishedUniverse: establishedUniverse([]),
+      contextDueSourceIds: [],
+      previousContext: previous.context,
+      previousContextRunId: previous.context.run_id,
+      fetchImpl: async (input) => {
+        const url = String(input);
+        if (url.includes("alternative.me") || url === "https://api.llama.fi/protocols") {
+          contextProviderCalls += 1;
+          throw new Error(`non-due context provider called: ${url}`);
+        }
+        if (url.endsWith("/token-profiles/latest/v1")) return Response.json([
+          { chainId: "base", tokenAddress: "0xnew1" },
+          { chainId: "base", tokenAddress: "0xnew2" },
+          { chainId: "base", tokenAddress: "0xnew3" },
+        ]);
+        if (url.includes("/token-pairs/v1/base/0xnew")) {
+          const address = decodeURIComponent(url.split("/").at(-1) ?? "");
+          return Response.json([dexPair(address, `pair-${address}`, 60_000)]);
+        }
+        throw new Error(`unexpected scanner URL ${url}`);
+      },
+    });
+
+    assert.equal(contextProviderCalls, 0);
+    assert.equal(result.request_counts.alternative_me_fng, 0);
+    assert.equal(result.request_counts.defillama_api, 0);
+    assert.deepEqual(result.scanner.provenance?.metadata?.context_provenance, {
+      contract_version: "scanner_context_provenance_v1",
+      linked_context_run_id: result.context_run_id,
+      linked_context_validation_status: "VALIDATED",
+      sources: {
+        alternative_me_fng: {
+          mode: "REUSED_VALIDATED",
+          refreshed_in_cycle: false,
+          validated_context_run_id: previous.context.run_id,
+        },
+        defillama_api: {
+          mode: "REUSED_VALIDATED",
+          refreshed_in_cycle: false,
+          validated_context_run_id: previous.context.run_id,
+        },
+      },
+    });
+    assert.doesNotThrow(() => validateDisplayEligibleScannerSnapshot(result.scanner));
   });
 
   it("runs discovery, filters before security, and publishes normalized live snapshots", async () => {
@@ -119,6 +194,21 @@ describe("INTERNAL_BETA live collector", () => {
     assert.equal(result.scanner.scorecards.length, 0);
     assert.equal(result.context.sources.every((source) => source.mode === "live" && source.records.length > 0), true);
     assert.deepEqual(result.scanner.provenance?.metadata?.attribution, { provider: "GoPlus Security" });
+    assert.deepEqual(
+      (result.scanner.provenance?.metadata?.context_provenance as Record<string, unknown>)?.sources,
+      {
+        alternative_me_fng: {
+          mode: "REFRESHED",
+          refreshed_in_cycle: true,
+          validated_context_run_id: result.context_run_id,
+        },
+        defillama_api: {
+          mode: "REFRESHED",
+          refreshed_in_cycle: true,
+          validated_context_run_id: result.context_run_id,
+        },
+      },
+    );
     assert.equal(result.scanner.candidates.find((candidate) => candidate.symbol === "REAL")?.observation_only, true);
     assert.equal(result.scanner.candidates.find((candidate) => candidate.pair_address === "pair-established")?.discovery_basket, "established");
     assert.deepEqual(
@@ -141,6 +231,24 @@ describe("INTERNAL_BETA live collector", () => {
     };
     unsafeContext.sources[0].raw_payload = { secret: true };
     assert.throws(() => validateDisplayEligibleContextSnapshot(unsafeContext), /CONTEXT_UNKNOWN_FIELD/);
+
+    const invalidRefreshedCount = structuredClone(result.scanner);
+    assert.ok(invalidRefreshedCount.provenance?.metadata);
+    (invalidRefreshedCount.provenance.metadata.request_counts as Record<string, number>).alternative_me_fng = 0;
+    assert.throws(() => validateDisplayEligibleScannerSnapshot(invalidRefreshedCount), /SCANNER_METADATA_INVALID/);
+
+    const zeroWithoutReuse = structuredClone(result.scanner);
+    assert.ok(zeroWithoutReuse.provenance?.metadata);
+    (zeroWithoutReuse.provenance.metadata.request_counts as Record<string, number>).alternative_me_fng = 0;
+    delete zeroWithoutReuse.provenance.metadata.context_provenance;
+    assert.throws(() => validateDisplayEligibleScannerSnapshot(zeroWithoutReuse), /SCANNER_METADATA_INVALID/);
+
+    const legacyLastKnownGood = structuredClone(result.scanner);
+    assert.ok(legacyLastKnownGood.provenance?.metadata);
+    legacyLastKnownGood.provenance.schema_version = "scanner_snapshot_v1";
+    legacyLastKnownGood.provenance.generator_version = "data_poc_persistable_scanner_v1";
+    delete legacyLastKnownGood.provenance.metadata.context_provenance;
+    assert.doesNotThrow(() => validateDisplayEligibleScannerSnapshot(legacyLastKnownGood));
   });
 
   it("keeps new/emerging operational when the established universe is empty", async () => {
@@ -225,7 +333,7 @@ describe("INTERNAL_BETA live collector", () => {
     assert.equal(result.follow_up.validation_status, "invalid");
     assert.equal(result.follow_up.store_updated, false);
     assert.equal(result.discovery.new_emerging.candidates_before_filters, 3);
-    assert.equal((await readFile(result.scanner_publish.output_file, "utf8")).includes("scanner_snapshot_v1"), true);
+    assert.equal((await readFile(result.scanner_publish.output_file, "utf8")).includes("scanner_snapshot_v2"), true);
     assert.equal(await readFile(followUpStorePath, "utf8"), "{corrupt");
   });
 

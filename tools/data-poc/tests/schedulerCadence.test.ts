@@ -185,12 +185,19 @@ describe("central scheduler decision", () => {
 
   it("keeps v1 state files compatible and rejects corrupt state", () => {
     const legacy = createInitialAutomationState() as unknown as Record<string, unknown>;
+    legacy.schema_version = "central_automation_state_v1";
     for (const key of [
       "scheduler_schema_version", "last_scheduler_check_at", "last_decision", "next_scanner_run_at",
       "next_alternative_me_run_at", "next_defillama_run_at", "last_scanner_success_at",
       "last_context_success_at", "last_scanner_run_id", "last_context_run_id", "missed_schedule_count",
+      "consecutive_failure_count", "automation_suspended", "suspended_at", "suspended_reason",
+      "last_failure_class", "resume_required",
     ]) delete legacy[key];
-    assert.equal(normalizeAutomationState(legacy).missed_schedule_count, 0);
+    const migrated = normalizeAutomationState(legacy);
+    assert.equal(migrated.schema_version, "central_automation_state_v2");
+    assert.equal(migrated.missed_schedule_count, 0);
+    assert.equal(migrated.automation_suspended, false);
+    assert.equal(migrated.consecutive_failure_count, 0);
     assert.throws(() => normalizeAutomationState({ broken: true }), /AUTOMATION_STATE_INVALID/);
   });
 });

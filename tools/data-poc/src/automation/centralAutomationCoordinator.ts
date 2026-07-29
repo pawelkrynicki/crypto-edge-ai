@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
   createAutomationStateStore,
+  type AutomationFailureClass,
   type AutomationRequestCounts,
   type AutomationSourceStatus,
   type AutomationState,
@@ -46,7 +47,10 @@ export type CentralAutomationResult<T extends CentralAutomationRunnerResult> =
   | { status: "SUCCESS"; run_id: string; result: T }
   | { status: "PARTIAL"; run_id: string; result: T }
   | { status: "FAILED"; run_id: string; error_code: string }
+  | { status: "AUTOMATION_SUSPENDED"; reason: string }
   | { status: "RUN_ALREADY_IN_PROGRESS"; active_run_id: string };
+
+export const MAX_CONSECUTIVE_TRANSIENT_FAILURES = 3;
 
 export class CentralAutomationError extends Error {
   readonly code: string;
@@ -81,6 +85,9 @@ export async function runCentralAutomation<T extends CentralAutomationRunnerResu
 
   try {
     const previous = await readStateFailClosed(stateStore);
+    if (previous.automation_suspended) {
+      return { status: "AUTOMATION_SUSPENDED", reason: previous.suspended_reason ?? "OWNER_RESUME_REQUIRED" };
+    }
     await options.beforeRun?.(runId);
     const attemptAt = now().toISOString();
     await writeStateFailClosed(stateStore, {
@@ -111,10 +118,15 @@ export async function runCentralAutomation<T extends CentralAutomationRunnerResu
       if (heartbeatError) throw new CentralAutomationError("COLLECTOR_LOCK_HEARTBEAT_FAILED");
     } catch (error) {
       const errorCode = safeErrorCode(error);
+      const failureClass = classifyAutomationFailure(errorCode);
+      const consecutiveFailureCount = previous.consecutive_failure_count + 1;
+      const shouldSuspend = failureClass === "DETERMINISTIC"
+        || consecutiveFailureCount >= MAX_CONSECUTIVE_TRANSIENT_FAILURES;
+      const failureAt = now().toISOString();
       await writeStateFailClosed(stateStore, {
         ...previous,
         last_attempt_at: attemptAt,
-        last_failure_at: now().toISOString(),
+        last_failure_at: failureAt,
         last_run_id: runId,
         active_run_id: null,
         last_result: "FAILED",
@@ -131,6 +143,12 @@ export async function runCentralAutomation<T extends CentralAutomationRunnerResu
         source_statuses: {},
         failure_code: errorCode,
         safe_error: safeErrorDescription(errorCode),
+        consecutive_failure_count: consecutiveFailureCount,
+        automation_suspended: shouldSuspend,
+        suspended_at: shouldSuspend ? failureAt : null,
+        suspended_reason: shouldSuspend ? errorCode : null,
+        last_failure_class: failureClass,
+        resume_required: shouldSuspend,
       });
       return { status: "FAILED", run_id: runId, error_code: errorCode };
     }
@@ -203,6 +221,7 @@ function buildCompletedState<T extends CentralAutomationRunnerResult>(
     next_defillama_run_at: refreshedDefillama
       ? nextRunAt(successAt, SOURCE_CADENCE_MS.defillama_api)
       : previous.next_defillama_run_at,
+    consecutive_failure_count: 0,
   };
 }
 
@@ -282,6 +301,15 @@ function safeErrorCode(error: unknown): string {
       : "AUTOMATION_RUNNER_FAILED";
   const normalized = candidate.toUpperCase().replace(/[^A-Z0-9_]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 96);
   return normalized || "AUTOMATION_RUNNER_FAILED";
+}
+
+export function classifyAutomationFailure(errorCode: string): AutomationFailureClass {
+  if (
+    errorCode === "SCANNER_METADATA_INVALID"
+    || /_METADATA_INVALID$/.test(errorCode)
+    || /(?:^|_)(?:SCHEMA|CONTRACT|LINEAGE|VERSION|PROVENANCE)(?:_|$)/.test(errorCode)
+  ) return "DETERMINISTIC";
+  return "TRANSIENT";
 }
 
 function formatRunTimestamp(date: Date): string {

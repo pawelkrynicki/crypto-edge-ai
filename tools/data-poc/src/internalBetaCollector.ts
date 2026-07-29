@@ -48,6 +48,7 @@ import {
 import { normalizeSecurity } from "./normalizeSecurity.js";
 import { buildPersistableScannerOutput, type PersistableScannerOutput } from "./persistableScannerModel.js";
 import { APPROVED_SOURCES_OUTPUT_FILENAME } from "./sources/runApprovedSourcesPoc.js";
+import { buildScannerContextProvenance } from "./scannerContextProvenance.js";
 import {
   collectInternalBetaContext,
   type ContextSourceId,
@@ -244,6 +245,14 @@ export async function runInternalBetaCollector(
     ...contextCollection.request_counts,
   };
   validateDisplayEligibleContextSnapshot(context);
+  const contextProvenance = buildScannerContextProvenance({
+    linkedContextRunId: contextRunId,
+    previousValidatedContextRunId: options.previousContext?.provenance.run_id
+      ?? options.previousContextRunId
+      ?? null,
+    requestCounts: contextCollection.request_counts,
+    refreshedSourceIds: contextCollection.refreshed_source_ids,
+  });
 
   const securityRequested = securityResults.size;
   const securityAvailable = [...securityResults.values()].filter((result) => result.availability === "available").length;
@@ -278,6 +287,7 @@ export async function runInternalBetaCollector(
       security_candidates_requested: securityRequested,
       request_counts: requestCounts,
       source_health: sourceHealth,
+      context_provenance: contextProvenance,
       ...(requestCounts.goplus_security > 0
         ? { attribution: { provider: GOPLUS_ATTRIBUTION_PROVIDER } }
         : {}),

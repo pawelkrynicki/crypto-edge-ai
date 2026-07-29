@@ -1,10 +1,13 @@
 import { getSourcePolicyDecision } from "./sourcePolicy.js";
 import {
+  LEGACY_SCANNER_GENERATOR_VERSION,
+  LEGACY_SCANNER_SCHEMA_VERSION,
   SCANNER_GENERATOR_VERSION,
   SCANNER_SCHEMA_VERSION,
   type PersistableScannerOutput,
 } from "./persistableScannerModel.js";
 import { REAL_DATA_CONTRACT_VERSION } from "./provenanceManifest.js";
+import { SCANNER_CONTEXT_PROVENANCE_CONTRACT_VERSION } from "./scannerContextProvenance.js";
 
 const CANDIDATE_FIELDS = new Set([
   "run_id", "candidate_id", "symbol", "name", "chain", "contract_address", "pair_address", "dex",
@@ -31,10 +34,11 @@ const SCAN_RUN_FIELDS = new Set([
   "passed_basic_filter", "rejected_basic_filter", "security_checked", "security_passed",
   "needs_manual_verification", "critical_risk", "watchlist_candidates", "errors",
 ]);
-const METADATA_FIELDS = new Set([
+const LEGACY_METADATA_FIELDS = new Set([
   "discovery_architecture", "new_emerging", "established", "readiness",
   "security_candidate_limit", "security_candidates_requested", "request_counts", "source_health", "attribution",
 ]);
+const METADATA_FIELDS = new Set([...LEGACY_METADATA_FIELDS, "context_provenance"]);
 const NEW_EMERGING_FIELDS = new Set([
   "discovery_method", "seed_count", "pair_requests_succeeded", "pair_requests_failed", "pairs_loaded",
   "candidates_before_filters", "candidates_after_filters", "discovery_status", "failure_reason_counts",
@@ -56,6 +60,12 @@ const SOURCE_HEALTH_FIELDS = new Set([
   "dexscreener", "goplus_security", "alternative_me_fng", "defillama_api",
 ]);
 const ATTRIBUTION_FIELDS = new Set(["provider"]);
+const CONTEXT_PROVENANCE_FIELDS = new Set([
+  "contract_version", "linked_context_run_id", "linked_context_validation_status", "sources",
+]);
+const CONTEXT_SOURCE_PROVENANCE_FIELDS = new Set([
+  "mode", "refreshed_in_cycle", "validated_context_run_id",
+]);
 const FORBIDDEN_MARKER = /fixture|sample|mock|demo/i;
 
 export class DisplaySnapshotValidationError extends Error {
@@ -73,11 +83,13 @@ export function validateDisplayEligibleScannerSnapshot(output: PersistableScanne
   const manifest = output.provenance;
   if (!manifest) fail("SCANNER_MANIFEST_MISSING");
   assertExactFields(manifest, MANIFEST_FIELDS);
-  if (
-    manifest.schema_version !== SCANNER_SCHEMA_VERSION
-    || manifest.contract_version !== REAL_DATA_CONTRACT_VERSION
-    || manifest.generator_version !== SCANNER_GENERATOR_VERSION
-  ) fail("SCANNER_MANIFEST_VERSION_UNSUPPORTED");
+  const legacyManifest = manifest.schema_version === LEGACY_SCANNER_SCHEMA_VERSION
+    && manifest.generator_version === LEGACY_SCANNER_GENERATOR_VERSION;
+  const currentManifest = manifest.schema_version === SCANNER_SCHEMA_VERSION
+    && manifest.generator_version === SCANNER_GENERATOR_VERSION;
+  if ((!legacyManifest && !currentManifest) || manifest.contract_version !== REAL_DATA_CONTRACT_VERSION) {
+    fail("SCANNER_MANIFEST_VERSION_UNSUPPORTED");
+  }
   if (manifest.environment !== "INTERNAL_BETA") fail("SCANNER_ENVIRONMENT_INVALID");
   if (manifest.mode !== "live" || output.scan_run.mode !== "live") fail("SCANNER_MODE_INVALID");
   if (manifest.fixture_used !== false) fail("SCANNER_FIXTURE_FORBIDDEN");
@@ -108,7 +120,7 @@ export function validateDisplayEligibleScannerSnapshot(output: PersistableScanne
 
   if (!isRecord(manifest.metadata)) fail("SCANNER_METADATA_INVALID");
   const metadata = manifest.metadata;
-  const requestCounts = validateScannerMetadata(metadata);
+  const requestCounts = validateScannerMetadata(metadata, legacyManifest);
   const goplusInvoked = isNonNegativeInteger(requestCounts.goplus_security) && requestCounts.goplus_security > 0;
   if (goplusInvoked !== sourceIds.includes("goplus_security")) fail("SCANNER_LINEAGE_MISMATCH");
 
@@ -173,9 +185,9 @@ export function validateDisplayEligibleScannerSnapshot(output: PersistableScanne
   if (/([A-Za-z]:\\|\/Users\/|\/home\/)/.test(serialized)) fail("SCANNER_ABSOLUTE_PATH_FORBIDDEN");
 }
 
-function validateScannerMetadata(value: unknown): Record<string, unknown> {
+function validateScannerMetadata(value: unknown, legacyManifest: boolean): Record<string, unknown> {
   if (!isRecord(value)) fail("SCANNER_METADATA_INVALID");
-  assertExactFields(value, METADATA_FIELDS);
+  assertExactFields(value, legacyManifest ? LEGACY_METADATA_FIELDS : METADATA_FIELDS);
   if (value.discovery_architecture !== "two_basket_discovery_v1") fail("SCANNER_METADATA_INVALID");
   const newEmerging = validateNewEmergingMetadata(value.new_emerging);
   const established = validateEstablishedMetadata(value.established);
@@ -210,11 +222,17 @@ function validateScannerMetadata(value: unknown): Record<string, unknown> {
     (value.request_counts.dexscreener as number) < 1 + seedCount
     || (value.request_counts.dexscreener as number) > dexBudget
     || (value.request_counts.goplus_security as number) > goPlusBudget
-    || (value.request_counts.alternative_me_fng as number) < 1
-    || (value.request_counts.alternative_me_fng as number) > 2
-    || (value.request_counts.defillama_api as number) < 1
-    || (value.request_counts.defillama_api as number) > 2
   ) fail("SCANNER_METADATA_INVALID");
+  if (legacyManifest) {
+    if (
+      (value.request_counts.alternative_me_fng as number) < 1
+      || (value.request_counts.alternative_me_fng as number) > 2
+      || (value.request_counts.defillama_api as number) < 1
+      || (value.request_counts.defillama_api as number) > 2
+    ) fail("SCANNER_METADATA_INVALID");
+  } else {
+    validateContextProvenance(value.context_provenance, value.request_counts);
+  }
 
   if (!isRecord(value.source_health)) fail("SCANNER_METADATA_INVALID");
   assertExactFields(value.source_health, SOURCE_HEALTH_FIELDS);
@@ -233,6 +251,47 @@ function validateScannerMetadata(value: unknown): Record<string, unknown> {
     fail("SCANNER_METADATA_INVALID");
   }
   return value.request_counts;
+}
+
+function validateContextProvenance(
+  value: unknown,
+  requestCounts: Record<string, unknown>,
+): void {
+  if (!isRecord(value)) fail("SCANNER_METADATA_INVALID");
+  assertExactFields(value, CONTEXT_PROVENANCE_FIELDS);
+  if (
+    value.contract_version !== SCANNER_CONTEXT_PROVENANCE_CONTRACT_VERSION
+    || value.linked_context_validation_status !== "VALIDATED"
+    || !isSafeRunId(value.linked_context_run_id)
+    || !isRecord(value.sources)
+  ) fail("SCANNER_METADATA_INVALID");
+  assertExactFields(value.sources, new Set(["alternative_me_fng", "defillama_api"]));
+
+  for (const sourceId of ["alternative_me_fng", "defillama_api"] as const) {
+    const source = value.sources[sourceId];
+    const requestCount = requestCounts[sourceId];
+    if (!isRecord(source)) fail("SCANNER_METADATA_INVALID");
+    assertExactFields(source, CONTEXT_SOURCE_PROVENANCE_FIELDS);
+    if (!isSafeRunId(source.validated_context_run_id)) fail("SCANNER_METADATA_INVALID");
+    if (source.mode === "REFRESHED") {
+      if (
+        source.refreshed_in_cycle !== true
+        || !isPositiveInteger(requestCount)
+        || Number(requestCount) > 2
+        || source.validated_context_run_id !== value.linked_context_run_id
+      ) fail("SCANNER_METADATA_INVALID");
+      continue;
+    }
+    if (source.mode === "REUSED_VALIDATED") {
+      if (
+        source.refreshed_in_cycle !== false
+        || requestCount !== 0
+        || source.validated_context_run_id === value.linked_context_run_id
+      ) fail("SCANNER_METADATA_INVALID");
+      continue;
+    }
+    fail("SCANNER_METADATA_INVALID");
+  }
 }
 
 function validateNewEmergingMetadata(value: unknown): Record<string, unknown> {
@@ -404,6 +463,10 @@ function isNonNegativeInteger(value: unknown): value is number {
 
 function isPositiveInteger(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value > 0;
+}
+
+function isSafeRunId(value: unknown): value is string {
+  return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(value);
 }
 
 function fail(code: string): never {

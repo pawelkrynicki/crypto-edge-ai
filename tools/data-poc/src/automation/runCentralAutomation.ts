@@ -24,7 +24,7 @@ export type RunCentralSchedulerOnceOptions = {
 export type RunCentralSchedulerOnceResult = {
   decision: SchedulerDecisionCode;
   run_mode: CentralAutomationRunMode | null;
-  run_status: "SUCCESS" | "PARTIAL" | "FAILED" | "RUN_ALREADY_IN_PROGRESS" | null;
+  run_status: "SUCCESS" | "PARTIAL" | "FAILED" | "RUN_ALREADY_IN_PROGRESS" | "AUTOMATION_SUSPENDED" | null;
   run_id?: string;
   active_run_id?: string;
   error_code?: string;
@@ -36,6 +36,7 @@ async function main(): Promise<void> {
   console.log(JSON.stringify(result, null, 2));
   if (result.run_status === "FAILED" || result.decision === "STATE_UNAVAILABLE") process.exitCode = 1;
   else if (result.run_status === "PARTIAL") process.exitCode = 2;
+  else if (result.run_status === "AUTOMATION_SUSPENDED") process.exitCode = 3;
 }
 
 export function assertExplicitLiveAutomationOptIn(env: NodeJS.ProcessEnv): void {
@@ -86,8 +87,13 @@ export async function runCentralSchedulerOnce(
     return {
       decision: schedule.decision,
       run_mode: null,
-      run_status: schedule.decision === "RUN_ALREADY_IN_PROGRESS" ? "RUN_ALREADY_IN_PROGRESS" : null,
+      run_status: schedule.decision === "RUN_ALREADY_IN_PROGRESS"
+        ? "RUN_ALREADY_IN_PROGRESS"
+        : schedule.decision === "AUTOMATION_SUSPENDED" ? "AUTOMATION_SUSPENDED" : null,
       ...(schedule.active_run_id ? { active_run_id: schedule.active_run_id } : {}),
+      ...(schedule.decision === "AUTOMATION_SUSPENDED"
+        ? { error_code: state.suspended_reason ?? "OWNER_RESUME_REQUIRED" }
+        : {}),
     };
   }
 
@@ -117,6 +123,14 @@ export async function runCentralSchedulerOnce(
       run_mode: mode,
       run_status: coordinated.status,
       active_run_id: coordinated.active_run_id,
+    };
+  }
+  if (coordinated.status === "AUTOMATION_SUSPENDED") {
+    return {
+      decision: "AUTOMATION_SUSPENDED",
+      run_mode: null,
+      run_status: "AUTOMATION_SUSPENDED",
+      error_code: coordinated.reason,
     };
   }
   return {
@@ -152,6 +166,14 @@ export async function runCentralLiveCycleOnce(options: {
       run_mode: "scanner_and_context",
       run_status: "RUN_ALREADY_IN_PROGRESS",
       active_run_id: coordinated.active_run_id,
+    };
+  }
+  if (coordinated.status === "AUTOMATION_SUSPENDED") {
+    return {
+      decision: "AUTOMATION_SUSPENDED",
+      run_mode: null,
+      run_status: "AUTOMATION_SUSPENDED",
+      error_code: coordinated.reason,
     };
   }
   return {
