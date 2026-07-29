@@ -1,13 +1,14 @@
 import type { AutomationState } from "./automationState.js";
 import { planSourceCadence, type SourceCadencePlan } from "./sourceCadence.js";
 
-export const SCHEDULER_SCHEMA_VERSION = "central_source_scheduler_v1";
+export const SCHEDULER_SCHEMA_VERSION = "central_source_scheduler_v2";
 
 export type SchedulerDecisionCode =
   | "RUN_SCANNER_AND_CONTEXT"
   | "RUN_CONTEXT_ONLY"
   | "NOTHING_DUE"
   | "RUN_ALREADY_IN_PROGRESS"
+  | "AUTOMATION_SUSPENDED"
   | "AUTOMATION_DISABLED"
   | "STATE_UNAVAILABLE";
 
@@ -62,6 +63,7 @@ export function decideCentralSchedule(input: SchedulerDecisionInput): SchedulerD
   let decision: SchedulerDecisionCode;
   if (!input.enabled) decision = "AUTOMATION_DISABLED";
   else if (input.state_available === false || state === null) decision = "STATE_UNAVAILABLE";
+  else if (state.automation_suspended) decision = "AUTOMATION_SUSPENDED";
   else if (activeRunId) decision = "RUN_ALREADY_IN_PROGRESS";
   else if (cadence.requires_scanner_and_context) decision = "RUN_SCANNER_AND_CONTEXT";
   else if (cadence.requires_context_only) decision = "RUN_CONTEXT_ONLY";

@@ -111,7 +111,18 @@ Persistable scanner and approved context generators now attach a versioned `prov
 - source IDs;
 - per-source decisions for `live_fetch`, `normalized_storage`, `user_display`, and `raw_storage`.
 
-Scanner uses `scanner_snapshot_v1` / `data_poc_persistable_scanner_v1`. Approved context uses `context_snapshot_v1` / `approved_sources_poc_v1`.
+Scanner writes `scanner_snapshot_v2` / `data_poc_persistable_scanner_v2`. The reader keeps controlled compatibility with `scanner_snapshot_v1` / `data_poc_persistable_scanner_v1` last-known-good snapshots. Approved context uses `context_snapshot_v1` / `approved_sources_poc_v1`.
+
+DATA.1C adds `metadata.context_provenance` with this closed contract:
+
+- `contract_version=scanner_context_provenance_v1`;
+- `linked_context_run_id` and `linked_context_validation_status=VALIDATED`;
+- exact `sources.alternative_me_fng` and `sources.defillama_api` entries;
+- per source: `mode`, `refreshed_in_cycle`, and `validated_context_run_id`.
+
+`REFRESHED` requires 1-2 requests, `refreshed_in_cycle=true`, and a reference to the linked validated context run. `REUSED_VALIDATED` requires exactly 0 requests, `refreshed_in_cycle=false`, and a reference to the prior validated context run. A zero count without this explicit reuse provenance remains invalid.
+
+The central automation state is migrated on read from `central_automation_state_v1` to `central_automation_state_v2`. It records `consecutive_failure_count`, `automation_suspended`, `suspended_at`, `suspended_reason`, `last_failure_class`, and `resume_required`. Contract/schema/metadata/lineage/version/provenance failures suspend immediately; transient failures suspend on the third consecutive failed cycle. Only `SUCCESS` or `PARTIAL` resets the counter. A suspended scheduler tick returns `AUTOMATION_SUSPENDED` before runner or provider execution.
 
 Fixture commands produce an explicit `DEVELOPMENT_DEMO`, `mode=fixture`, `fixture_used=true` manifest. Those artifacts remain valid for tests/demo but are rejected by the `INTERNAL_BETA` reader. A future live run is not display-eligible merely because it has `mode=live`: its manifest must say `INTERNAL_BETA`, contain no fixture marker, have all required policy decisions, and agree with checked-in runtime policy.
 

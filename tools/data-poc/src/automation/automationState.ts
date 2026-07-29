@@ -3,20 +3,24 @@ import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { getDefaultAutomationDirectory } from "./automationPaths.js";
 
-export const AUTOMATION_STATE_SCHEMA_VERSION = "central_automation_state_v1";
-export const AUTOMATION_SCHEDULER_SCHEMA_VERSION = "central_source_scheduler_v1";
+export const LEGACY_AUTOMATION_STATE_SCHEMA_VERSION = "central_automation_state_v1";
+export const AUTOMATION_STATE_SCHEMA_VERSION = "central_automation_state_v2";
+export const LEGACY_AUTOMATION_SCHEDULER_SCHEMA_VERSION = "central_source_scheduler_v1";
+export const AUTOMATION_SCHEDULER_SCHEMA_VERSION = "central_source_scheduler_v2";
 
 export type AutomationSchedulerDecision =
   | "RUN_SCANNER_AND_CONTEXT"
   | "RUN_CONTEXT_ONLY"
   | "NOTHING_DUE"
   | "RUN_ALREADY_IN_PROGRESS"
+  | "AUTOMATION_SUSPENDED"
   | "AUTOMATION_DISABLED"
   | "STATE_UNAVAILABLE";
 
 export type AutomationRequestCounts = Record<string, number>;
 export type AutomationSourceStatus = "READY" | "DEGRADED" | "UNAVAILABLE" | "NOT_INVOKED";
 export type AutomationCycleStatus = "IN_PROGRESS" | "SUCCESS" | "PARTIAL" | "FAILED" | null;
+export type AutomationFailureClass = "DETERMINISTIC" | "TRANSIENT";
 
 export type AutomationState = {
   schema_version: typeof AUTOMATION_STATE_SCHEMA_VERSION;
@@ -54,6 +58,12 @@ export type AutomationState = {
   last_scanner_run_id: string | null;
   last_context_run_id: string | null;
   missed_schedule_count: number;
+  consecutive_failure_count: number;
+  automation_suspended: boolean;
+  suspended_at: string | null;
+  suspended_reason: string | null;
+  last_failure_class: AutomationFailureClass | null;
+  resume_required: boolean;
 };
 
 export type AutomationStateStore = {
@@ -108,6 +118,12 @@ export function createInitialAutomationState(): AutomationState {
     last_scanner_run_id: null,
     last_context_run_id: null,
     missed_schedule_count: 0,
+    consecutive_failure_count: 0,
+    automation_suspended: false,
+    suspended_at: null,
+    suspended_reason: null,
+    last_failure_class: null,
+    resume_required: false,
   };
 }
 
@@ -154,9 +170,22 @@ export function normalizeAutomationState(value: unknown): AutomationState {
     throw new AutomationStateError("AUTOMATION_STATE_INVALID");
   }
   const record = value as Record<string, unknown>;
-  if (record.schema_version !== AUTOMATION_STATE_SCHEMA_VERSION) {
+  if (
+    record.schema_version !== AUTOMATION_STATE_SCHEMA_VERSION
+    && record.schema_version !== LEGACY_AUTOMATION_STATE_SCHEMA_VERSION
+  ) {
     throw new AutomationStateError("AUTOMATION_STATE_INVALID");
   }
+
+  const automationSuspended = optionalBoolean(record.automation_suspended, false);
+  const suspendedAt = optionalNullableIso(record.suspended_at);
+  const suspendedReason = optionalNullableSafeText(record.suspended_reason);
+  const resumeRequired = optionalBoolean(record.resume_required, automationSuspended);
+  if (
+    automationSuspended !== resumeRequired
+    || (automationSuspended && (suspendedAt === null || suspendedReason === null))
+    || (!automationSuspended && (suspendedAt !== null || suspendedReason !== null))
+  ) invalidState();
 
   const state: AutomationState = {
     schema_version: AUTOMATION_STATE_SCHEMA_VERSION,
@@ -196,12 +225,22 @@ export function normalizeAutomationState(value: unknown): AutomationState {
     last_scanner_run_id: optionalNullableSafeText(record.last_scanner_run_id),
     last_context_run_id: optionalNullableSafeText(record.last_context_run_id),
     missed_schedule_count: optionalNonNegativeInteger(record.missed_schedule_count),
+    consecutive_failure_count: optionalNonNegativeInteger(record.consecutive_failure_count),
+    automation_suspended: automationSuspended,
+    suspended_at: suspendedAt,
+    suspended_reason: suspendedReason,
+    last_failure_class: optionalFailureClass(record.last_failure_class),
+    resume_required: resumeRequired,
   };
   return state;
 }
 
 function optionalSchedulerVersion(value: unknown): typeof AUTOMATION_SCHEDULER_SCHEMA_VERSION {
-  if (value === undefined || value === AUTOMATION_SCHEDULER_SCHEMA_VERSION) return AUTOMATION_SCHEDULER_SCHEMA_VERSION;
+  if (
+    value === undefined
+    || value === AUTOMATION_SCHEDULER_SCHEMA_VERSION
+    || value === LEGACY_AUTOMATION_SCHEDULER_SCHEMA_VERSION
+  ) return AUTOMATION_SCHEDULER_SCHEMA_VERSION;
   return invalidState();
 }
 
@@ -209,8 +248,20 @@ function optionalDecision(value: unknown): AutomationSchedulerDecision | null {
   if (value === undefined || value === null) return null;
   if ([
     "RUN_SCANNER_AND_CONTEXT", "RUN_CONTEXT_ONLY", "NOTHING_DUE",
-    "RUN_ALREADY_IN_PROGRESS", "AUTOMATION_DISABLED", "STATE_UNAVAILABLE",
+    "RUN_ALREADY_IN_PROGRESS", "AUTOMATION_SUSPENDED", "AUTOMATION_DISABLED", "STATE_UNAVAILABLE",
   ].includes(String(value))) return value as AutomationSchedulerDecision;
+  return invalidState();
+}
+
+function optionalBoolean(value: unknown, fallback: boolean): boolean {
+  if (value === undefined) return fallback;
+  if (typeof value === "boolean") return value;
+  return invalidState();
+}
+
+function optionalFailureClass(value: unknown): AutomationFailureClass | null {
+  if (value === undefined || value === null) return null;
+  if (value === "DETERMINISTIC" || value === "TRANSIENT") return value;
   return invalidState();
 }
 

@@ -92,6 +92,7 @@ describe("Windows Task Scheduler scripts", () => {
       "unregister-central-automation-task.cmd", "preview-central-automation-task.cmd",
       "status-central-automation-task.cmd", "last-result-central-automation-task.cmd",
       "start-central-automation-task.cmd", "disable-central-automation-task.cmd",
+      "resume-central-automation-state.cmd",
       "rollback-central-automation-task-config.cmd", "rollback-central-automation-task-config.ps1",
     ];
     const joined = (await Promise.all(names.map(source))).join("\n");
@@ -100,6 +101,10 @@ describe("Windows Task Scheduler scripts", () => {
     }
     assert.doesNotMatch(joined, /--apply/);
     assert.doesNotMatch(joined, /cloudflared|4173|api[_-]?key|token=|password/i);
+    const resume = await source("resume-central-automation-state.cmd");
+    assert.match(resume, /Mode: PREVIEW/);
+    assert.match(resume, /--confirm-owner-resume/);
+    assert.doesNotMatch(resume, /Enable-ScheduledTask|Start-ScheduledTask|--apply/i);
     const wrapper = await source("run-central-automation.cmd");
     assert.match(wrapper, /CRYPTO_EDGE_DATA_ENV=INTERNAL_BETA/);
     assert.match(wrapper, /CRYPTO_EDGE_AUTOMATION_ENABLED=1/);
