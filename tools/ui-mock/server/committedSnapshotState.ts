@@ -13,7 +13,10 @@ export async function readCommittedSnapshotState(
   const parsed = JSON.parse(await readFile(statePath, "utf8")) as unknown;
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("AUTOMATION_STATE_INVALID");
   const state = parsed as Record<string, unknown>;
-  if (state.schema_version !== "central_automation_state_v1") throw new Error("AUTOMATION_STATE_INVALID");
+  if (
+    state.schema_version !== "central_automation_state_v1"
+    && state.schema_version !== "central_automation_state_v2"
+  ) throw new Error("AUTOMATION_STATE_INVALID");
   return {
     scanner_run_id: nullableRunId(state.last_published_scanner_run_id),
     context_run_id: nullableRunId(state.last_published_context_run_id),

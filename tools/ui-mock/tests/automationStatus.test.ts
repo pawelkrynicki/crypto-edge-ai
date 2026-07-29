@@ -10,7 +10,7 @@ describe("automation status API", () => {
     let reads = 0;
     let runnerCalls = 0;
     const state = {
-      schema_version: "central_automation_state_v1",
+      schema_version: "central_automation_state_v2",
       active_run_id: null,
       last_result: "SUCCESS",
       last_error_code: null,
@@ -54,6 +54,7 @@ describe("automation status API", () => {
       assert.equal(body.next_due_at, "2026-07-21T12:16:00.000Z");
       assert.equal(body.next_scanner_run_at, "2026-07-21T12:16:00.000Z");
       assert.equal(body.next_context_run_at, "2026-07-21T14:01:00.000Z");
+      assert.equal(body.scheduler_status, "NOTHING_DUE");
       assert.equal(body.last_published_scanner_run_id, "scan_safe");
       assert.equal(body.last_published_context_run_id, "context_safe");
       assert.deepEqual(body.request_counts, { dexscreener: 4, goplus_security: 1 });
@@ -87,6 +88,26 @@ describe("automation status API", () => {
       assert.equal(body.next_due_at, "2026-07-21T12:16:00.000Z");
       assert.equal(body.next_scanner_run_at, "2026-07-21T12:16:00.000Z");
       assert.equal(body.next_context_run_at, "2026-07-21T14:01:00.000Z");
+    } finally {
+      await close(server);
+    }
+  });
+
+  it("accepts the v2 automation-suspended scheduler decision as read-only status", async () => {
+    const server = createScannerApiServer({
+      runtimeMode: "INTERNAL_BETA",
+      automation: {
+        enabled: true,
+        readState: async () => ({
+          schema_version: "central_automation_state_v2",
+          last_decision: "AUTOMATION_SUSPENDED",
+        }),
+      },
+    });
+    await listen(server);
+    try {
+      const body = await fetchBody(server);
+      assert.equal(body.scheduler_status, "AUTOMATION_SUSPENDED");
     } finally {
       await close(server);
     }

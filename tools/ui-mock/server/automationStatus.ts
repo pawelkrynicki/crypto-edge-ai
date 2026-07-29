@@ -55,7 +55,10 @@ export async function readAutomationStatus(options: AutomationStatusOptions = {}
   }
   try {
     const state = asRecord(raw);
-    if (state.schema_version !== "central_automation_state_v1") throw new Error("STATE_INVALID");
+    if (
+      state.schema_version !== "central_automation_state_v1"
+      && state.schema_version !== "central_automation_state_v2"
+    ) throw new Error("STATE_INVALID");
     const nextScanner = nullableIso(state.next_scanner_run_at);
     const nextAlternative = nullableIso(state.next_alternative_me_run_at);
     const nextDefillama = nullableIso(state.next_defillama_run_at);
@@ -237,7 +240,7 @@ function safeSchedulerStatus(value: unknown): string {
   if (value === undefined || value === null) return "NOT_YET_RUN";
   const allowed = new Set([
     "RUN_SCANNER_AND_CONTEXT", "RUN_CONTEXT_ONLY", "NOTHING_DUE", "RUN_ALREADY_IN_PROGRESS",
-    "AUTOMATION_DISABLED", "STATE_UNAVAILABLE",
+    "AUTOMATION_SUSPENDED", "AUTOMATION_DISABLED", "STATE_UNAVAILABLE",
   ]);
   if (typeof value === "string" && allowed.has(value)) return value;
   throw new Error("STATE_INVALID");
