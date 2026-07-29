@@ -30,10 +30,11 @@ export function AIResearchSection({
   const { locale } = useProductLocale();
   const ui = COPY[locale];
   const identity = useMemo(() => resolveTokenIdentity(chain, contractAddress), [chain, contractAddress]);
-  const [lookup, setLookup] = useState<AIResearchBriefLookup | null>(initialLookup ?? null);
+  const resolvedInitialLookup = initialLookup == null ? initialLookup : applyRenderReviewOverride(initialLookup);
+  const [lookup, setLookup] = useState<AIResearchBriefLookup | null>(resolvedInitialLookup ?? null);
   const [loading, setLoading] = useState(initialLookup === undefined);
   const [requesting, setRequesting] = useState(false);
-  const [expanded, setExpanded] = useState(Boolean(initialLookup?.brief?.render_preview));
+  const [expanded, setExpanded] = useState(Boolean(resolvedInitialLookup?.brief?.render_preview));
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [retryAfter, setRetryAfter] = useState<number | null>(null);
   const [reviewMetrics, setReviewMetrics] = useState<AIResearchReviewMetrics | null>(null);

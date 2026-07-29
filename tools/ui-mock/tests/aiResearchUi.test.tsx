@@ -214,6 +214,73 @@ describe("AI.1 responsive and accessibility contracts", () => {
 });
 
 describe("AI.3 shared queue UI", () => {
+  it("applies failed review state to an initial render-preview lookup", () => {
+    const markup = withReviewSearch("?ai_review_state=failed", () => render("en", (
+      <AIResearchSection
+        chain="base"
+        contractAddress={ADDRESS}
+        symbol="SCOOBERT"
+        name="Scoobert"
+        initialLookup={renderPreviewLookup()}
+      />
+    )));
+
+    assert.match(markup, />Temporarily unavailable</);
+    assert.doesNotMatch(markup, />Preparing</);
+    assert.match(markup, /The update failed\. The previous valid result was not removed\./);
+  });
+
+  it("renders every owner review state from an initial render-preview lookup", () => {
+    const cases: Array<{
+      reviewState: string | null;
+      expectedLabel: RegExp;
+      expectedCanvas: boolean;
+    }> = [
+      { reviewState: null, expectedLabel: />Available</, expectedCanvas: true },
+      { reviewState: "absent", expectedLabel: />Not available</, expectedCanvas: false },
+      { reviewState: "queued", expectedLabel: />Queued</, expectedCanvas: false },
+      { reviewState: "processing", expectedLabel: />Preparing</, expectedCanvas: false },
+      { reviewState: "stale", expectedLabel: />Last analysis</, expectedCanvas: true },
+      { reviewState: "failed", expectedLabel: />Temporarily unavailable</, expectedCanvas: true },
+      { reviewState: "suspended", expectedLabel: />Suspended</, expectedCanvas: false },
+      { reviewState: "cooldown", expectedLabel: />Cooldown</, expectedCanvas: false },
+    ];
+
+    for (const { reviewState, expectedLabel, expectedCanvas } of cases) {
+      const search = reviewState ? `?ai_review_state=${reviewState}` : "";
+      const markup = withReviewSearch(search, () => render("en", (
+        <AIResearchSection
+          chain="base"
+          contractAddress={ADDRESS}
+          symbol="SCOOBERT"
+          name="Scoobert"
+          initialLookup={renderPreviewLookup()}
+        />
+      )));
+      assert.match(markup, expectedLabel, reviewState ?? "default READY");
+      assert.equal(markup.includes("ai-research-canvas"), expectedCanvas, reviewState ?? "default READY");
+    }
+  });
+
+  it("ignores review state for an ordinary non-preview runtime lookup", () => {
+    const ordinaryLookup = renderPreviewLookup();
+    ordinaryLookup.brief = ordinaryLookup.brief
+      ? { ...ordinaryLookup.brief, render_preview: false }
+      : null;
+    const markup = withReviewSearch("?ai_review_state=failed", () => render("en", (
+      <AIResearchSection
+        chain="base"
+        contractAddress={ADDRESS}
+        symbol="SCOOBERT"
+        name="Scoobert"
+        initialLookup={ordinaryLookup}
+      />
+    )));
+
+    assert.match(markup, />Available</);
+    assert.doesNotMatch(markup, />Temporarily unavailable</);
+  });
+
   it("moves a failed queue submission without a brief to visible unavailable state", () => {
     const failure = applyAIResearchGenerationFailure({
       schema_version: "ai_research_lookup_v1",
@@ -319,6 +386,34 @@ describe("AI.3 shared queue UI", () => {
     assert.doesNotMatch(queued, /Zgłoś przygotowanie analizy/);
   });
 });
+
+function renderPreviewLookup(): AIResearchBriefLookup {
+  return {
+    schema_version: "ai_research_lookup_v1",
+    availability: "READY",
+    provider_mode: "DISABLED",
+    brief: { ...briefEn, render_preview: true },
+    retry_after_seconds: null,
+    error_code: null,
+    queue_status: "READY",
+    shared_result: true,
+    is_last_known_good: false,
+  };
+}
+
+function withReviewSearch<T>(search: string, callback: () => T): T {
+  const previousWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+  Object.defineProperty(globalThis, "window", {
+    configurable: true,
+    value: { location: { search } },
+  });
+  try {
+    return callback();
+  } finally {
+    if (previousWindow) Object.defineProperty(globalThis, "window", previousWindow);
+    else Reflect.deleteProperty(globalThis, "window");
+  }
+}
 
 function render(locale: ProductLocale, element: React.ReactElement): string {
   return renderToStaticMarkup(<ProductLocaleProvider initialLocale={locale}>{element}</ProductLocaleProvider>);
