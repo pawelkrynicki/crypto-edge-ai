@@ -521,6 +521,10 @@ The review database persists the one-call reservation even after an API/validati
 
 ```cmd
 scripts\win\start-ai3-shared-queue-review.cmd
+scripts\win\start-ai3-shared-queue-review.cmd --state cooldown
+scripts\win\start-ai3-shared-queue-review.cmd --all-states
 ```
 
-The launcher uses the newest validated local token identity, a deterministic mock and an isolated temporary queue SQLite file. It opens `ABSENT`, `QUEUED`, `PROCESSING`, `READY`, `STALE`, `FAILED`, `SUSPENDED` and `COOLDOWN` views. It performs zero OpenAI calls, zero data-provider calls and does not mutate canonical AI, feedback, Follow-up, Established, lifecycle or Task Scheduler state.
+Domyślna komenda otwiera dokładnie jedną kartę `READY`. Parametr `--state` otwiera dokładnie jedną kartę wybranego stanu: `ready`, `absent`, `queued`, `processing`, `stale`, `failed`, `suspended` albo `cooldown`. Wszystkie osiem kart można otworzyć wyłącznie jawnie przez `--all-states`. Nieznany parametr, brak wartości `--state`, nieznany stan albo połączenie `--state` z `--all-states` kończy się kodem błędu i pokazuje użycie przed uruchomieniem produktu lub przeglądarki.
+
+Launcher używa najnowszej zwalidowanej lokalnej tożsamości tokena, deterministycznego mocka i izolowanego tymczasowego pliku SQLite kolejki. Wykonuje zero OpenAI calls, zero data-provider calls, zero collector calls i nie zmienia kanonicznego AI store, feedback, Follow-up, Established, lifecycle ani Task Scheduler.

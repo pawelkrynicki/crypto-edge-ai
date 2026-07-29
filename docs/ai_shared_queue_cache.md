@@ -125,9 +125,13 @@ Zwykły użytkownik widzi spokojne stany „Analiza dostępna”, „Analiza ocz
 
 ```cmd
 scripts\win\start-ai3-shared-queue-review.cmd
+scripts\win\start-ai3-shared-queue-review.cmd --state cooldown
+scripts\win\start-ai3-shared-queue-review.cmd --all-states
 ```
 
-Launcher używa aktualnej rzeczywistej identity tokena z lokalnego zwalidowanego snapshotu, podmienia wyłącznie renderowany stan kolejki, ustawia deterministyczny mock i izolowany SQLite pod `%TEMP%`. Otwiera `ABSENT`, `QUEUED`, `PROCESSING`, `READY`, `STALE`, `FAILED`, `SUSPENDED` i `COOLDOWN`. Wykonuje 0 OpenAI calls, 0 data-provider calls, 0 collector calls i nie zmienia kanonicznego AI store, feedback, Follow-up, Established, lifecycle ani Task Scheduler.
+Bez parametrów launcher otwiera dokładnie jedną kartę kanonicznego stanu `READY`. `--state <nazwa>` otwiera dokładnie jedną kartę wybranego stanu; obsługiwane są `ready`, `absent`, `queued`, `processing`, `stale`, `failed`, `suspended` i `cooldown`. Pełny zestaw ośmiu kart jest dostępny wyłącznie przez jawne `--all-states`. Nieznane albo sprzeczne argumenty kończą się kodem błędu i drukują poprawne użycie, zanim zostaną uruchomione API, UI lub przeglądarka.
+
+Launcher używa aktualnej rzeczywistej identity tokena z lokalnego zwalidowanego snapshotu, podmienia wyłącznie renderowany stan kolejki, ustawia deterministyczny mock i izolowany SQLite pod `%TEMP%`. Wykonuje 0 OpenAI calls, 0 data-provider calls, 0 collector calls i nie zmienia kanonicznego AI store, feedback, Follow-up, Established, lifecycle ani Task Scheduler.
 
 Wszystkie automatyczne testy AI.3 używają mock providerów. Zakazane są `--live-one`, realne OpenAI calls, live source checks i centralny live data cycle.
 
