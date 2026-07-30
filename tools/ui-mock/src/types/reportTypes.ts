@@ -79,6 +79,12 @@ export type ReportDefiSnapshot = {
 };
 
 export type ReportDetail = ReportListItem & {
+  analysis_id?: string;
+  localized_research?: {
+    pl: string;
+    en: string;
+  };
+  transaction_signal?: "NONE";
   research_summary: {
     candidates_count: number;
     review_entries_count: number;

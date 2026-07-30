@@ -1,6 +1,6 @@
 # Standalone Roadmap To Trusted Tester
 
-> Aktualizacja AI.3: etap kontrolowanego `--live-one` został zakończony i wycofany. Publiczne żądania wyłącznie kolejkują analizę, a provider może uruchomić tylko osobny centralny worker. Bieżący kontrakt opisuje `docs/ai_shared_queue_cache.md`; sekcja AI.2 poniżej pozostaje historią zrealizowanej walidacji.
+> Aktualizacja E2E.1: AI.3, UX.2, UX.3, UX.4 i lokalna powierzchnia Trusted Tester Preview są zakończone. E2E.1 jest bieżącą bramką pełnego przepływu produktu; AFF.1 pozostaje odłożone na końcówkę. Publiczne żądania AI wyłącznie kolejkują analizę, a provider może uruchomić tylko osobny centralny worker. Kontrakty opisują `docs/ai_shared_queue_cache.md` i `docs/full_product_e2e.md`.
 
 ## AI.2 — Controlled OpenAI Live Validation
 

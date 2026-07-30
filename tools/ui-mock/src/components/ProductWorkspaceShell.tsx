@@ -54,6 +54,7 @@ type ProductWorkspaceShellProps = {
   readinessReasonCode?: string | null;
   dataUnavailableMessage?: string | null;
   dataUnavailableReasonCode?: string | null;
+  lastKnownGoodRefreshError?: boolean;
   onRefresh: () => void;
   automationStatus?: AutomationStatus | null;
   establishedUniverseStatus?: EstablishedUniverseStatus | null;
@@ -77,6 +78,7 @@ export function ProductWorkspaceShell({
   freshnessStatus,
   sourceHealth,
   dataUnavailableMessage,
+  lastKnownGoodRefreshError = false,
   onRefresh,
   automationStatus,
   children,
@@ -90,6 +92,7 @@ export function ProductWorkspaceShell({
     sourceHealth,
     automationStatus,
     dataUnavailable: Boolean(dataUnavailableMessage),
+    lastKnownGoodRefreshError,
     locale,
   });
 
@@ -192,7 +195,7 @@ export function ProductWorkspaceShell({
         </aside>
 
         <div className="workspace-main">
-          {clientDataAlert && <div className="product-client-data-alert" role="status"><strong>{clientDataAlert.title}</strong><p>{clientDataAlert.detail}</p></div>}
+          {clientDataAlert && <div className="product-client-data-alert" role="status"><strong>{clientDataAlert.title}</strong>{clientDataAlert.detail && <p>{clientDataAlert.detail}</p>}</div>}
 
           <main className="workspace-content">{children}</main>
         </div>
@@ -212,6 +215,7 @@ function resolveClientDataAlert({
   sourceHealth,
   automationStatus,
   dataUnavailable,
+  lastKnownGoodRefreshError,
   locale,
 }: {
   resolvedSource: ResolvedScannerSource;
@@ -219,9 +223,16 @@ function resolveClientDataAlert({
   sourceHealth: ProductSourceHealthResolution;
   automationStatus: AutomationStatus | null | undefined;
   dataUnavailable: boolean;
+  lastKnownGoodRefreshError: boolean;
   locale: ProductLocale;
-}): { title: string; detail: string } | null {
+}): { title: string; detail: string | null } | null {
   const pl = locale === "pl";
+  if (lastKnownGoodRefreshError) {
+    return {
+      title: PRODUCT_TRANSLATIONS[locale]["app.refreshLastKnownGood"],
+      detail: null,
+    };
+  }
   if (dataUnavailable || resolvedSource === "unavailable" || sourceHealth.status === "unavailable") {
     return {
       title: pl ? "Dane są chwilowo niedostępne." : "Data is temporarily unavailable.",

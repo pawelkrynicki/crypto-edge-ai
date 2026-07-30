@@ -60,8 +60,20 @@ export function ReportsLibrary({
 
   useEffect(() => {
     if (initialStatus !== undefined) return;
-    void refresh();
-  }, [initialStatus, refresh]);
+    let active = true;
+    void Promise.all([
+      loadReportsLibraryStatus(),
+      loadReportsList(),
+    ]).then(([nextStatus, nextReports]) => {
+      if (!active) return;
+      setStatus(nextStatus);
+      setReports(nextReports ?? []);
+      setLoading(false);
+    });
+    return () => {
+      active = false;
+    };
+  }, [initialStatus]);
 
   const openReport = useCallback(async (reportId: string) => {
     setDetailLoading(true);
@@ -240,6 +252,7 @@ function ReportDetailView({
       <TechnicalDetails label={copy.technicalDetails}>
         <dl className="report-metadata-grid technical">
           <div><dt>{copy.reportId}</dt><dd>{detail.report_id}</dd></div>
+          {detail.analysis_id && <div><dt>Analysis ID</dt><dd>{detail.analysis_id}</dd></div>}
           <div><dt>{copy.scannerRun}</dt><dd>{detail.scanner_run_id ?? copy.notAvailable}</dd></div>
           {detail.contract_address && <div><dt>{copy.contract}</dt><dd><code>{detail.contract_address}</code></dd></div>}
           <div><dt>{copy.format}</dt><dd>{detail.report_format.toUpperCase()}</dd></div>
@@ -247,6 +260,14 @@ function ReportDetailView({
       </TechnicalDetails>
 
       <ReportSection title={copy.researchSummary}>
+        {detail.localized_research && (
+          <>
+            <p>{detail.localized_research[locale]}</p>
+            {detail.transaction_signal === "NONE" && (
+              <p>{locale === "pl" ? "Raport nie zawiera instrukcji transakcyjnej." : "The report contains no transaction instruction."}</p>
+            )}
+          </>
+        )}
         <dl className="report-inline-facts">
           <div><dt>{copy.candidates}</dt><dd>{detail.research_summary.candidates_count}</dd></div>
           <div><dt>{copy.reviewEntries}</dt><dd>{detail.research_summary.review_entries_count}</dd></div>

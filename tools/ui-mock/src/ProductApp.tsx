@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 void React; // Required by the Node TSX test runtime's classic JSX transform.
-import { mapPersistableScannerOutputToUiCandidates } from "./adapters/scannerOutputAdapter";
 import type { CandidateDetailTabId } from "./candidateDetailTabs";
 import {
   resolveDetailTab,
@@ -49,10 +48,18 @@ import type { ReportDetail } from "./types/reportTypes";
 import type { FeedbackScreenContext, FeedbackSubjectRef } from "./services/feedbackDataSource";
 import type {
   ProductReadinessOutput,
-  ScannerApiOutput,
   ScannerDiscoveryMetadata,
   UiTokenCandidate,
 } from "./types/scannerTypes";
+import {
+  createEmptyProductScannerViewState,
+  resolveProductScannerRefreshState,
+} from "./productRefreshState";
+
+export {
+  getAcceptedProductRefreshTimestamps,
+  resolveScannerSnapshotTimestamp,
+} from "./productRefreshState";
 
 const HASH_TO_SECTION: Record<string, ProductSectionId> = {
   "#candidate-results": "candidate-results",
@@ -82,9 +89,37 @@ export default function ProductApp() {
   );
 }
 
-export function ProductAppContent() {
+export type ProductAppDataSources = {
+  loadScanner: typeof loadScannerApiDataSourceResult;
+  loadReadiness: typeof loadScannerReadinessResult;
+  loadAutomation: typeof loadAutomationStatus;
+  loadEstablishedUniverse: typeof loadEstablishedUniverseStatus;
+  loadControlCenter: typeof loadControlCenterStatus;
+  loadFollowUpStatus: typeof loadFollowUpStatus;
+  loadFollowUpList: typeof loadFollowUpList;
+  now: () => string;
+};
+
+const DEFAULT_PRODUCT_APP_DATA_SOURCES: ProductAppDataSources = {
+  loadScanner: loadScannerApiDataSourceResult,
+  loadReadiness: loadScannerReadinessResult,
+  loadAutomation: loadAutomationStatus,
+  loadEstablishedUniverse: loadEstablishedUniverseStatus,
+  loadControlCenter: loadControlCenterStatus,
+  loadFollowUpStatus,
+  loadFollowUpList,
+  now: () => new Date().toISOString(),
+};
+
+export function ProductAppContent({
+  dataSources = DEFAULT_PRODUCT_APP_DATA_SOURCES,
+  runtimeModeOverride,
+}: {
+  dataSources?: ProductAppDataSources;
+  runtimeModeOverride?: ReturnType<typeof getProductRuntimeMode>;
+} = {}) {
   const { t } = useProductLocale();
-  const runtimeMode = getProductRuntimeMode();
+  const runtimeMode = runtimeModeOverride ?? getProductRuntimeMode();
   const [activeSection, setActiveSection] = useState<ProductSectionId>(() => resolveSection());
   const [candidates, setCandidates] = useState<UiTokenCandidate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -118,6 +153,8 @@ export function ProductAppContent() {
   const [feedbackRefreshRevision, setFeedbackRefreshRevision] = useState(0);
   const [selectedReportContext, setSelectedReportContext] = useState<ReportDetail | null>(null);
   const refreshPromiseRef = useRef<Promise<void> | null>(null);
+  const scannerViewStateRef = useRef(createEmptyProductScannerViewState());
+  const [lastKnownGoodRefreshError, setLastKnownGoodRefreshError] = useState(false);
 
   const navItems = useMemo<ProductNavItem[]>(() => [
     { id: "candidate-results", label: t("nav.radar"), icon: "R", description: t("nav.radarDescription"), groupLabel: t("nav.groupProductFlow"), groupDescription: t("nav.groupProductFlowDescription") },
@@ -177,18 +214,15 @@ export function ProductAppContent() {
 
     const refresh = (async () => {
       setLoading(true);
-      setReasonCode(null);
-      setReadinessReasonCode(null);
-      setUnavailableMessage(null);
 
       const [scannerResult, readinessResult, automationResult, universeStatusResult, controlCenterResult, followUpStatusResult, followUpListResult] = await Promise.all([
-        loadScannerApiDataSourceResult({ runtimeMode }),
-        loadScannerReadinessResult({ runtimeMode }),
-        loadAutomationStatus(),
-        loadEstablishedUniverseStatus(),
-        loadControlCenterStatus(),
-        loadFollowUpStatus(),
-        loadFollowUpList(),
+        dataSources.loadScanner({ runtimeMode }),
+        dataSources.loadReadiness({ runtimeMode }),
+        dataSources.loadAutomation(),
+        dataSources.loadEstablishedUniverse(),
+        dataSources.loadControlCenter(),
+        dataSources.loadFollowUpStatus(),
+        dataSources.loadFollowUpList(),
       ]);
       setAutomationStatus(automationResult);
       setEstablishedUniverseStatus(universeStatusResult);
@@ -197,38 +231,35 @@ export function ProductAppContent() {
       setFollowUpStatus(followUpStatusResult);
       setFollowUpEntries(followUpListResult?.entries ?? []);
 
-      if (readinessResult.status === "ready") {
-        setReadiness(readinessResult.output);
-      } else {
-        setReadiness(null);
-        setReadinessReasonCode(readinessResult.reasonCode);
+      const hadAcceptedSnapshot = scannerViewStateRef.current.hasAcceptedSnapshot;
+      if (scannerResult.status === "ready" || !hadAcceptedSnapshot) {
+        if (readinessResult.status === "ready") {
+          setReadiness(readinessResult.output);
+          setReadinessReasonCode(null);
+        } else {
+          setReadiness(null);
+          setReadinessReasonCode(readinessResult.reasonCode);
+        }
       }
 
-      if (scannerResult.status === "error") {
-        setCandidates([]);
-        setResolvedSource("unavailable");
-        setRunId(null);
-        setGeneratedAt(null);
-        setAgeSeconds(null);
-        setFreshnessStatus(null);
-        setSourceIds([]);
-        setMetadata(null);
-        setReasonCode(scannerResult.reasonCode);
-        setUnavailableMessage(scannerResult.error);
-        return;
-      }
-
-      const output = scannerResult.output;
-      const acceptedTimestamps = getAcceptedProductRefreshTimestamps(output, new Date().toISOString());
-      setCandidates(mapPersistableScannerOutputToUiCandidates(output));
-      setResolvedSource(scannerResult.resolvedSource);
-      setRunId(output.scan_run.run_id ?? null);
-      setGeneratedAt(acceptedTimestamps.generatedAt);
-      setViewRefreshedAt(acceptedTimestamps.viewRefreshedAt);
-      setAgeSeconds(output._source_meta?.age_seconds ?? null);
-      setFreshnessStatus(output._source_meta?.freshness_status ?? null);
-      setSourceIds(output._source_meta?.source_ids ?? output.provenance?.source_ids ?? []);
-      setMetadata(output.provenance?.metadata ?? null);
+      const nextScannerView = resolveProductScannerRefreshState(
+        scannerViewStateRef.current,
+        scannerResult,
+        dataSources.now(),
+      );
+      scannerViewStateRef.current = nextScannerView;
+      setCandidates(nextScannerView.candidates);
+      setResolvedSource(nextScannerView.resolvedSource);
+      setRunId(nextScannerView.runId);
+      setGeneratedAt(nextScannerView.generatedAt);
+      setViewRefreshedAt(nextScannerView.viewRefreshedAt);
+      setAgeSeconds(nextScannerView.ageSeconds);
+      setFreshnessStatus(nextScannerView.freshnessStatus);
+      setSourceIds(nextScannerView.sourceIds);
+      setMetadata(nextScannerView.metadata);
+      setReasonCode(nextScannerView.reasonCode);
+      setUnavailableMessage(nextScannerView.unavailableMessage);
+      setLastKnownGoodRefreshError(nextScannerView.lastKnownGoodRefreshError);
     })().finally(() => {
       setLoading(false);
       refreshPromiseRef.current = null;
@@ -236,7 +267,7 @@ export function ProductAppContent() {
 
     refreshPromiseRef.current = refresh;
     return refresh;
-  }, [runtimeMode]);
+  }, [dataSources, runtimeMode]);
 
   const refreshControlCenterAfterFeedback = useCallback(() => {
     void loadControlCenterStatus().then((value) => {
@@ -467,6 +498,7 @@ export function ProductAppContent() {
       readinessReasonCode={readinessReasonCode}
       dataUnavailableMessage={unavailableMessage}
       dataUnavailableReasonCode={reasonCode}
+      lastKnownGoodRefreshError={lastKnownGoodRefreshError}
       onRefresh={() => void loadData()}
       automationStatus={automationStatus}
       establishedUniverseStatus={establishedUniverseStatus}
@@ -486,18 +518,4 @@ export function selectAIResearchReviewCandidate(candidates: UiTokenCandidate[]):
 function resolveSection(): ProductSectionId {
   if (typeof window === "undefined") return "candidate-results";
   return HASH_TO_SECTION[window.location.hash.trim().toLowerCase()] ?? "candidate-results";
-}
-
-export function resolveScannerSnapshotTimestamp(output: ScannerApiOutput): string | null {
-  return output.provenance?.generated_at ?? output.scan_run.finished_at ?? null;
-}
-
-export function getAcceptedProductRefreshTimestamps(
-  output: ScannerApiOutput,
-  viewRefreshedAt: string,
-): { generatedAt: string | null; viewRefreshedAt: string } {
-  return {
-    generatedAt: resolveScannerSnapshotTimestamp(output),
-    viewRefreshedAt,
-  };
 }

@@ -1250,7 +1250,15 @@ async function resolveFeedbackSubject(
     };
   }
   const report = await readReportDetail(subjectRef.id, reportsOptions);
-  return report ? { report_id: report.report_id } : null;
+  return report ? {
+    report_id: report.report_id,
+    ...(report.chain && report.contract_address ? {
+      candidate_identity: {
+        chain: report.chain,
+        contract_address: report.contract_address,
+      },
+    } : {}),
+  } : null;
 }
 
 function getRequestPath(url: string | undefined): string {

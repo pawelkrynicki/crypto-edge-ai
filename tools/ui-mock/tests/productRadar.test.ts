@@ -981,6 +981,7 @@ describe("Product Radar owner acceptance", () => {
   it("keeps locale switching fetch-free and refresh first-party only", async () => {
     const localeSource = await readFile(resolve(productRoot, "src", "productI18n.tsx"), "utf8");
     const appSource = await readFile(resolve(productRoot, "src", "ProductApp.tsx"), "utf8");
+    const refreshStateSource = await readFile(resolve(productRoot, "src", "productRefreshState.ts"), "utf8");
     const scannerSource = await readFile(resolve(productRoot, "src", "services", "scannerDataSource.ts"), "utf8");
     const automationSource = await readFile(resolve(productRoot, "src", "services", "automationStatusDataSource.ts"), "utf8");
     const apiSource = await readFile(resolve(productRoot, "server", "scannerApiServer.ts"), "utf8");
@@ -988,10 +989,14 @@ describe("Product Radar owner acceptance", () => {
     assert.equal(PRODUCT_TRANSLATIONS.en["app.refresh"], "Refresh view");
     assert.equal(PRODUCT_TRANSLATIONS.pl["app.refresh"], "Odśwież widok");
     assert.match(appSource, /refreshPromiseRef\.current/);
-    assert.match(appSource, /getAcceptedProductRefreshTimestamps\(output, new Date\(\)\.toISOString\(\)\)/);
+    assert.match(appSource, /resolveProductScannerRefreshState/);
+    assert.doesNotMatch(appSource, /setCandidates\(\[\]\)/);
+    assert.match(refreshStateSource, /getAcceptedProductRefreshTimestamps\(output, refreshedAt\)/);
+    assert.match(refreshStateSource, /current\.hasAcceptedSnapshot/);
+    assert.match(refreshStateSource, /lastKnownGoodRefreshError: true/);
     assert.doesNotMatch(appSource, /finally\(\(\) => \{[\s\S]*?setViewRefreshedAt/);
     assert.doesNotMatch(appSource, /dexscreenerClient|goplusClient|internalBetaCollector/);
-    assert.match(appSource, /loadAutomationStatus\(\)/);
+    assert.match(appSource, /dataSources\.loadAutomation\(\)/);
     assert.doesNotMatch(appSource, /CRYPTO_EDGE_AUTOMATION_ENABLED|runCentralAutomation|automation\/(?:run|enable|activate)/);
     assert.match(scannerSource, /\/api\/scanner\/latest/);
     assert.match(scannerSource, /\/api\/readiness/);
