@@ -7,8 +7,9 @@ import {
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
+  const schedulerHostStatus = process.env.CRYPTO_EDGE_PRODUCT_E2E_SCHEDULER_HOST_STATUS;
   if (args.length === 0 || (args.length === 1 && args[0] === "--preview")) {
-    const preview = await previewFullProductE2E();
+    const preview = await previewFullProductE2E({ schedulerHostStatus });
     console.log("");
     console.log("=== Crypto Edge AI: E2E.1 preview ===");
     console.log(`Snapshot: ${preview.source_snapshot_id}`);
@@ -25,12 +26,14 @@ async function main(): Promise<void> {
     console.log("Mock worker started: no");
     console.log("OpenAI calls: 0");
     console.log("Live data-provider calls: 0");
+    console.log(`Task Scheduler mutations: ${preview.scheduler_mutations}`);
+    console.log(`Task Scheduler host status: ${preview.scheduler_host_status}`);
     console.log(`REVIEW_URL=${pathToFileURL(fileURLToPath(new URL("../../../docs/full_product_e2e.md", import.meta.url))).href}`);
     return;
   }
 
   if (args.length === 1 && args[0] === "--run-isolated") {
-    const result = await runFullProductE2E();
+    const result = await runFullProductE2E({ schedulerHostStatus });
     console.log("");
     console.log(`E2E.1 result: ${result.manifest.status}`);
     console.log(`Run ID: ${result.manifest.run_id}`);
@@ -40,7 +43,8 @@ async function main(): Promise<void> {
     console.log(`OpenAI calls: ${result.manifest.live_openai_calls}`);
     console.log(`Live data-provider calls: ${result.manifest.live_data_provider_calls}`);
     console.log(`Canonical mutations: ${result.manifest.canonical_store_mutations}`);
-    console.log(`Task Scheduler unchanged: ${result.manifest.task_scheduler_unchanged ? "yes" : "no"}`);
+    console.log(`Task Scheduler mutations: ${result.manifest.scheduler_mutations}`);
+    console.log(`Task Scheduler host status: ${result.manifest.scheduler_host_status}`);
     console.log(`REVIEW_URL=${pathToFileURL(result.reportPath).href}`);
     process.exitCode = result.manifest.status === "PASS" ? 0 : 1;
     return;

@@ -20,12 +20,13 @@ Jeżeli snapshot nie zawiera takiej tożsamości, przebieg kończy się fail-clo
 ## Przebieg
 
 1. **Nowe** — token jest odczytywany z aktualnego snapshotu i widoczny w Radarze przed wpisem Follow-up.
-2. **Dalsza obserwacja** — kontrolowany ingest zapisuje token do izolowanego Follow-up według znormalizowanego `chain + contract_address`. Powtórzenie ingestu nie tworzy duplikatu. Plan checkpointów pozostaje dokładnie `1 / 3 / 7 / 14 / 30`.
-3. **Kandydat** — izolowany recheck zachowuje tożsamość i wszystkie metryki z bieżącego snapshotu. Jedyną kontrolowaną projekcją E2E jest pochodny wynik kwalifikacji `passed_basic_filter`; nie jest to nowa dana rynkowa ani mutacja snapshotu. Rekord przechodzi do `CANDIDATE_FOR_ESTABLISHED`, ale nie do Established.
-4. **Established** — brak decyzji ownera pozostawia wersję universe bez zmian. Jawna operacja `product-e2e-owner` tworzy dokładnie jedną nową wersję, audit i aktywny wpis wyłącznie w izolowanym Established Universe.
-5. **Analiza AI** — publiczny `POST /api/v1/ai-analyses/requests` wyłącznie kolejkuje. Drugi POST współdzieli ten sam `analysis_id`. Osobny owner-controlled worker używa deterministycznego mocka i wykonuje dokładnie jeden happy-path call: `QUEUED → PROCESSING → READY`. Osobna zła odpowiedź mocka potwierdza, że brief nie jest publikowany.
-6. **Raport** — gotowy `ai_research_brief_v1` jest warunkiem utworzenia izolowanego raportu. Raport zachowuje identity, posiada treść PL/EN, `transaction_signal=NONE`, `lifecycle_mutation=false` i pojawia się w istniejącej Reports Library.
-7. **Feedback** — właściwy publiczny POST zapisuje opinię w izolowanym SQLite i wiąże ją z raportem oraz identity. Feedback nie zmienia Follow-up, Established, analizy ani raportu.
+2. **Refresh View** — poprawna migawka jest przechowywana jako session last-known-good. Chwilowy błąd odświeżenia zachowuje listę, wybrany token, `chain + contract_address`, zakładkę, `run_id`, czas migawki, source metadata i freshness. Pokazywany jest nietechniczny alert PL/EN. Kolejny poprawny wynik atomowo zastępuje listę i usuwa alert. Pierwszy błąd bez poprawnej migawki pozostaje pusty i fail-closed. Podwójne kliknięcie współdzieli jeden request, a refresh nie uruchamia collectora ani providera.
+3. **Dalsza obserwacja** — kontrolowany ingest zapisuje token do izolowanego Follow-up według znormalizowanego `chain + contract_address`. Powtórzenie ingestu nie tworzy duplikatu. Plan checkpointów pozostaje dokładnie `1 / 3 / 7 / 14 / 30`.
+4. **Kandydat** — izolowany recheck zachowuje tożsamość i wszystkie metryki z bieżącego snapshotu. Jedyną kontrolowaną projekcją E2E jest pochodny wynik kwalifikacji `passed_basic_filter`; nie jest to nowa dana rynkowa ani mutacja snapshotu. Rekord przechodzi do `CANDIDATE_FOR_ESTABLISHED`, ale nie do Established.
+5. **Established** — brak decyzji ownera pozostawia wersję universe bez zmian. Jawna operacja `product-e2e-owner` tworzy dokładnie jedną nową wersję, audit i aktywny wpis wyłącznie w izolowanym Established Universe.
+6. **Analiza AI** — publiczny `POST /api/v1/ai-analyses/requests` wyłącznie kolejkuje. Drugi POST współdzieli ten sam `analysis_id`. Osobny owner-controlled worker używa deterministycznego mocka i wykonuje dokładnie jeden happy-path call: `QUEUED → PROCESSING → READY`. Osobna zła odpowiedź mocka potwierdza, że brief nie jest publikowany.
+7. **Raport** — gotowy `ai_research_brief_v1` jest warunkiem utworzenia izolowanego raportu. Raport zachowuje identity, posiada treść PL/EN, `transaction_signal=NONE`, `lifecycle_mutation=false` i pojawia się w istniejącej Reports Library.
+8. **Feedback** — właściwy publiczny POST zapisuje opinię w izolowanym SQLite i wiąże ją z raportem oraz identity. Feedback nie zmienia Follow-up, Established, analizy ani raportu.
 
 Testy renderują rzeczywiste widoki Radar, Candidate Detail (Podsumowanie, Obserwacja i Analiza AI), Główny Radar, Reports oraz Feedback. Istniejący kontrakt Tabbed Detail potwierdza Back/Forward, aktywną zakładkę, PL/EN i mobile bez overflow.
 
@@ -111,8 +112,7 @@ Przed przebiegiem i po nim runner porównuje SHA-256:
 - kanonicznego Feedback SQLite wraz z `-wal`, `-shm` i backupem;
 - kanonicznego Follow-up wraz z backupem;
 - centralnego pliku pointerów `automation-state.json`;
-- kanonicznego AI SQLite wraz z `-wal`, `-shm` i backupem;
-- niezmiennej konfiguracji i statusu zadania `Crypto Edge AI Central Automation`.
+- kanonicznego AI SQLite wraz z `-wal`, `-shm` i backupem.
 
 Po każdym izolowanym etapie mutującym wykonywana jest dodatkowa kontrola plików kanonicznych. Naruszenie:
 
@@ -121,7 +121,7 @@ Po każdym izolowanym etapie mutującym wykonywana jest dodatkowa kontrola plik�
 - zapisuje bezpieczny kod `CANONICAL_*_MUTATION`;
 - nie próbuje automatycznej naprawy.
 
-Task Scheduler jest tylko odczytywany. Launcher nie rejestruje, nie uruchamia, nie wyłącza i nie zmienia zadania.
+Task Scheduler nie jest częścią hasha kanonicznego i jego stan nie wpływa na PASS. Kontrakt gwarantuje `scheduler_mutations=0`. Bezpośredni runner zapisuje `scheduler_host_status=HOST_STATUS_NOT_OBSERVED`, ponieważ środowisko uruchomieniowe nie jest źródłem prawdy o komputerze ownera. Launcher owner review może wykonać dokładnie jeden read-only `Get-ScheduledTask` na komputerze, na którym został uruchomiony, i przekazać faktycznie odczytany status. Nie rejestruje, nie uruchamia, nie zatrzymuje, nie włącza, nie wyłącza ani nie modyfikuje zadania. Nieudany lub niewiarygodny odczyt pozostaje `HOST_STATUS_NOT_OBSERVED`.
 
 ## Manifest i raport ownera
 
@@ -137,7 +137,9 @@ Task Scheduler jest tylko odczytywany. Launcher nie rejestruje, nie uruchamia, n
 - `live_openai_calls=0`;
 - `live_data_provider_calls=0`;
 - `canonical_store_mutations`;
-- hashe before/after i status Task Scheduler;
+- hashe before/after magazynów kanonicznych;
+- `scheduler_mutations=0` i osobny `scheduler_host_status`;
+- wynik kroku `refresh-view-last-known-good` oraz szczegóły `navigation.refresh_view`;
 - wyniki idempotencji;
 - granice user/owner;
 - ścieżkę do raportu Markdown.
@@ -150,7 +152,7 @@ Znaczenie statusów:
 
 - **PASS** — wszystkie obowiązkowe kroki i wszystkie granice przeszły, live calls i kanoniczne mutacje wynoszą zero.
 - **PARTIAL** — obowiązkowy rdzeń jest poprawny, ale jawnie opcjonalny krok prezentacyjny został pominięty. Obecny happy path nie pomija kroków.
-- **FAILED** — obowiązkowy krok, fail-closed boundary, ochrona kanoniczna lub odczyt Task Scheduler nie przeszedł.
+- **FAILED** — obowiązkowy krok, fail-closed boundary albo ochrona kanoniczna nie przeszły. Brak obserwacji statusu hosta schedulera sam w sobie nie jest błędem.
 
 ## Owner review
 
@@ -168,6 +170,8 @@ Preview:
 - nie uruchamia workera;
 - wykonuje zero mutacji;
 - otwiera dokładnie jedną kartę z tym runbookiem.
+
+Launcher dodatkowo wykonuje wyłącznie read-only odczyt statusu `Crypto Edge AI Central Automation` na bieżącym hoście. W trybie plan-only i przy braku wiarygodnego odczytu raportuje `HOST_STATUS_NOT_OBSERVED`; nie wyciąga wniosków o komputerze ownera ze środowiska Codexa.
 
 Pełny kontrolowany run:
 

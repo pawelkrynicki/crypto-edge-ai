@@ -544,6 +544,6 @@ scripts\win\start-full-product-e2e-review.cmd
 scripts\win\start-full-product-e2e-review.cmd --run-isolated
 ```
 
-Bez parametrów launcher tylko odczytuje aktualny zwalidowany snapshot, pokazuje rzeczywistą identity, plan i ścieżki przyszłych store pod `%TEMP%`. Nie tworzy store, nie uruchamia workera i otwiera dokładnie jedną kartę runbooka.
+Bez parametrów launcher tylko odczytuje aktualny zwalidowany snapshot, pokazuje rzeczywistą identity, plan i ścieżki przyszłych store pod `%TEMP%`. Nie tworzy store, nie uruchamia workera i otwiera dokładnie jedną kartę runbooka. Może wykonać wyłącznie `Get-ScheduledTask` dla statusu zadania na bieżącym hoście; brak wiarygodnej obserwacji jest zapisywany jako `HOST_STATUS_NOT_OBSERVED`.
 
-`--run-isolated` uruchamia jeden przepływ Nowe → Follow-up → Kandydat → Established → AI.3 → Reports → Feedback na osobnych magazynach Follow-up, Established, AI SQLite, Feedback SQLite i Reports. Używa deterministycznego mocka, wykonuje 0 OpenAI calls, 0 live data-provider calls, 0 centralnych live cycles i 0 zmian Task Scheduler. Przed i po porównuje chronione hashe kanoniczne. Kontrakt i interpretacja raportu: `docs/full_product_e2e.md`.
+`--run-isolated` uruchamia jeden przepływ Nowe → bezpieczny Refresh View → Follow-up → Kandydat → Established → AI.3 → Reports → Feedback na osobnych magazynach Follow-up, Established, AI SQLite, Feedback SQLite i Reports. Używa deterministycznego mocka, wykonuje 0 OpenAI calls, 0 live data-provider calls, 0 centralnych live cycles i `scheduler_mutations=0`. Przed i po porównuje chronione hashe kanoniczne. Kontrakt i interpretacja raportu: `docs/full_product_e2e.md`.

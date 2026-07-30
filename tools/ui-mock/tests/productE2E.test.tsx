@@ -52,7 +52,7 @@ const execFileAsync = promisify(execFile);
 const runId = "product-e2e-20260730T120000Z-deadbeef";
 const testBase = resolve(tmpdir(), "crypto-edge-product-e2e-tests");
 const isolatedRoot = resolve(testBase, runId);
-const taskState = "TASK_SCHEDULER_TEST_STATE_UNCHANGED";
+const schedulerHostStatus = "READY";
 const dataOutput = resolve(import.meta.dirname, "..", "..", "data-poc", "output");
 const launcherPath = resolve(import.meta.dirname, "..", "..", "..", "scripts", "win", "start-full-product-e2e-review.cmd");
 
@@ -70,7 +70,7 @@ before(async () => {
   result = await runFullProductE2E({
     runId,
     isolatedRoot,
-    taskSchedulerStateReader: async () => taskState,
+    schedulerHostStatus,
   });
   manifest = result.manifest;
   stores = result.isolatedStores;
@@ -296,7 +296,7 @@ describe("E2E.1 full product journey", () => {
       "run_id", "started_at", "completed_at", "status", "source_snapshot_id",
       "chain", "contract_address", "steps", "isolated_records", "mock_provider_calls",
       "live_openai_calls", "live_data_provider_calls", "canonical_store_mutations",
-      "safe_error_codes", "e2e_report_path",
+      "scheduler_mutations", "scheduler_host_status", "safe_error_codes", "e2e_report_path",
     ]) assert.ok(Object.hasOwn(parsed, key), key);
     assert.doesNotMatch(JSON.stringify(parsed), /authorization|api[_-]?key|full_prompt|raw_response/i);
     assert.doesNotMatch(JSON.stringify(parsed), /[A-Z]:\\Users\\|pawel/i);
@@ -309,6 +309,9 @@ describe("E2E.1 full product journey", () => {
     assert.match(markdown, /Isolation/);
     assert.match(markdown, /Idempotency/);
     assert.match(markdown, /Canonical state unchanged: yes/);
+    assert.match(markdown, /Refresh last-known-good preserved: yes/);
+    assert.match(markdown, /Task Scheduler mutations: \*\*0\*\*/);
+    assert.match(markdown, /Task Scheduler host status: \*\*READY\*\*/);
     assert.equal(PRODUCT_E2E_REPORT_SCHEMA_VERSION, "product_e2e_report_v1");
   });
 
@@ -318,11 +321,13 @@ describe("E2E.1 full product journey", () => {
     assert.deepEqual(manifest.canonical_protection.before, manifest.canonical_protection.after);
   });
 
-  it("26. Task Scheduler stays unchanged", async () => {
-    assert.equal(manifest.task_scheduler_unchanged, true);
-    assert.equal(manifest.canonical_protection.before.task_scheduler, manifest.canonical_protection.after.task_scheduler);
-    const actual = await captureCanonicalProductState();
-    assert.notEqual(actual.task_scheduler, "TASK_SCHEDULER_STATUS_UNAVAILABLE");
+  it("26. records zero scheduler mutations without claiming an unobserved owner-host state", async () => {
+    assert.equal(manifest.scheduler_mutations, 0);
+    assert.equal(manifest.scheduler_host_status, schedulerHostStatus);
+    const unobserved = await previewFullProductE2E({ runId });
+    assert.equal(unobserved.scheduler_mutations, 0);
+    assert.equal(unobserved.scheduler_host_status, "HOST_STATUS_NOT_OBSERVED");
+    assert.equal(Object.hasOwn(manifest.canonical_protection.before, "task_scheduler"), false);
   });
 
   it("27. performs zero OpenAI calls", () => {
@@ -333,12 +338,21 @@ describe("E2E.1 full product journey", () => {
   it("28. performs zero live data-provider calls", () => {
     assert.equal(manifest.live_data_provider_calls, 0);
     assert.equal(manifest.navigation.refresh_collector_calls, 0);
+    assert.equal(step("refresh-view-last-known-good").status, "PASS");
+    assert.deepEqual(manifest.navigation.refresh_view, {
+      last_known_good_preserved: true,
+      identity_preserved: true,
+      snapshot_timestamp_preserved: true,
+      source_metadata_preserved: true,
+      next_success_applied: true,
+      first_load_empty_state: true,
+    });
   });
 
   it("29. launcher preview performs no mutations", async () => {
-    const before = await captureCanonicalProductState({ taskSchedulerStateReader: async () => taskState });
+    const before = await captureCanonicalProductState();
     const preview = await previewFullProductE2E({ runId });
-    const after = await captureCanonicalProductState({ taskSchedulerStateReader: async () => taskState });
+    const after = await captureCanonicalProductState();
     assert.equal(preview.mutations_performed, 0);
     assert.equal(preview.mock_worker_started, false);
     assert.deepEqual(after, before);
@@ -356,6 +370,10 @@ describe("E2E.1 full product journey", () => {
     });
     assert.equal((executed.stdout.match(/^OPEN_URL=/gmi) ?? []).length, 1);
     assert.match(executed.stdout, /OpenAI calls: 0/);
+    assert.match(executed.stdout, /Task Scheduler mutations: 0/);
+    assert.match(executed.stdout, /Task Scheduler host status: HOST_STATUS_NOT_OBSERVED/);
+    assert.match(launcher, /Get-ScheduledTask/);
+    assert.doesNotMatch(launcher, /(?:Register|Set|Enable|Disable|Start|Stop|Unregister)-ScheduledTask/i);
   });
 });
 

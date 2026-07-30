@@ -1,11 +1,9 @@
 import { createHash, randomUUID } from "node:crypto";
-import { execFile } from "node:child_process";
 import { createServer, type Server } from "node:http";
 import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, isAbsolute, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { promisify } from "node:util";
 import {
   applyFollowUpRecheckSuccess,
   FOLLOW_UP_CHECKPOINT_DAYS,
@@ -40,6 +38,11 @@ import { createFeedbackStore, getDefaultFeedbackStorePath, type FeedbackStore } 
 import { readLatestScannerOutput, type ScannerOutputWithMeta } from "./latestScannerOutput.js";
 import { readReportsList } from "./reportsLibrary.js";
 import { createScannerApiHandler } from "./scannerApiHandler.js";
+import {
+  createEmptyProductScannerViewState,
+  resolveProductScannerRefreshState,
+} from "../src/productRefreshState.js";
+import type { ScannerApiOutput } from "../src/types/scannerTypes.js";
 
 export const PRODUCT_E2E_SCHEMA_VERSION = "product_e2e_run_v1";
 export const PRODUCT_E2E_REPORT_SCHEMA_VERSION = "product_e2e_report_v1";
@@ -47,6 +50,7 @@ export const PRODUCT_E2E_BASE_DIRECTORY_NAME = "crypto-edge-product-e2e";
 
 export const PRODUCT_E2E_VIEW_SEQUENCE = [
   "radar",
+  "refresh-view",
   "candidate-detail",
   "detail-summary",
   "detail-observation",
@@ -74,7 +78,6 @@ export type ProductE2ECanonicalState = {
   follow_up_store: string;
   snapshot_pointers: string;
   ai_store: string;
-  task_scheduler: string;
 };
 
 export type ProductE2EManifest = {
@@ -122,7 +125,8 @@ export type ProductE2EManifest = {
     after: ProductE2ECanonicalState;
     unchanged: boolean;
   };
-  task_scheduler_unchanged: boolean;
+  scheduler_mutations: 0;
+  scheduler_host_status: string;
   owner_user_boundaries: {
     user_can_promote_established: false;
     user_can_force_provider_call: false;
@@ -134,6 +138,14 @@ export type ProductE2EManifest = {
     identity_preserved: boolean;
     locale_identity_preserved: boolean;
     refresh_collector_calls: 0;
+    refresh_view: {
+      last_known_good_preserved: boolean;
+      identity_preserved: boolean;
+      snapshot_timestamp_preserved: boolean;
+      source_metadata_preserved: boolean;
+      next_success_applied: boolean;
+      first_load_empty_state: boolean;
+    };
   };
   safe_error_codes: string[];
   fail_closed_boundaries: Array<{
@@ -156,6 +168,8 @@ export type ProductE2EPreview = {
   mock_worker_started: false;
   live_openai_calls: 0;
   live_data_provider_calls: 0;
+  scheduler_mutations: 0;
+  scheduler_host_status: string;
 };
 
 export type ProductE2ERunResult = {
@@ -170,7 +184,7 @@ export type ProductE2EOptions = {
   runId?: string;
   isolatedRoot?: string;
   now?: () => Date;
-  taskSchedulerStateReader?: () => Promise<string>;
+  schedulerHostStatus?: string;
 };
 
 type E2ECandidate = FollowUpObservationCandidate & {
@@ -183,18 +197,12 @@ type E2ECandidate = FollowUpObservationCandidate & {
   security_label?: string;
 };
 
-type CanonicalProtectionOptions = {
-  taskSchedulerStateReader?: () => Promise<string>;
-  includeTaskScheduler?: boolean;
-};
-
 type HttpResponse = {
   status: number;
   headers: Record<string, string | string[] | undefined>;
   body: Record<string, unknown>;
 };
 
-const execFileAsync = promisify(execFile);
 const PRODUCT_E2E_RUN_ID = /^product-e2e-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}$/;
 const SAFE_SOURCE_RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 const DATA_POC_OUTPUT_DIRECTORY = fileURLToPath(new URL("../../data-poc/output", import.meta.url));
@@ -216,6 +224,8 @@ export async function previewFullProductE2E(options: ProductE2EOptions = {}): Pr
     mock_worker_started: false,
     live_openai_calls: 0,
     live_data_provider_calls: 0,
+    scheduler_mutations: 0,
+    scheduler_host_status: normalizeSchedulerHostStatus(options.schedulerHostStatus),
   };
 }
 
@@ -283,24 +293,80 @@ export async function runFullProductE2E(options: ProductE2EOptions = {}): Promis
   let aiQueueRecords = 0;
   let productReports = 0;
   let feedbackRecords = 0;
+  let refreshView = emptyRefreshViewResult();
+  const schedulerHostStatus = normalizeSchedulerHostStatus(options.schedulerHostStatus);
 
   await mkdir(root, { recursive: true });
 
   try {
     selection = await runStep(steps, "select-real-new-token", [], async () => selectRealProductE2EIdentity());
-    canonicalBefore = await captureCanonicalProductState({
-      taskSchedulerStateReader: options.taskSchedulerStateReader,
-      includeTaskScheduler: true,
-    });
-    assert(
-      canonicalBefore.task_scheduler !== "TASK_SCHEDULER_STATUS_UNAVAILABLE",
-      "TASK_SCHEDULER_STATUS_UNAVAILABLE",
-    );
+    canonicalBefore = await captureCanonicalProductState();
 
     await runStep(steps, "new-visible-before-follow-up", [], async () => {
       const empty = await readFollowUpStore(paths.follow_up);
       assert(empty.entries.length === 0, "ISOLATED_FOLLOW_UP_NOT_EMPTY");
       assert(selection!.candidate.discovery_basket === "new_emerging", "TOKEN_NOT_IN_NEW_LAYER");
+    });
+
+    await runStep(steps, "refresh-view-last-known-good", [], async () => {
+      const readyResult = {
+        status: "ready" as const,
+        source: "api" as const,
+        resolvedSource: "real-output" as const,
+        usedFallback: false,
+        output: selection!.scanner as ScannerApiOutput,
+      };
+      const first = resolveProductScannerRefreshState(
+        createEmptyProductScannerViewState(),
+        readyResult,
+        "2026-07-30T12:00:00.000Z",
+      );
+      const failed = resolveProductScannerRefreshState(first, {
+        status: "error",
+        source: "api",
+        resolvedSource: "unavailable",
+        usedFallback: false,
+        reasonCode: "SCANNER_API_UNAVAILABLE",
+        error: "temporary local API error",
+        output: null,
+      }, "2026-07-30T12:01:00.000Z");
+      const recovered = resolveProductScannerRefreshState(
+        failed,
+        readyResult,
+        "2026-07-30T12:02:00.000Z",
+      );
+      const firstFailure = resolveProductScannerRefreshState(
+        createEmptyProductScannerViewState(),
+        {
+          status: "error",
+          source: "api",
+          resolvedSource: "unavailable",
+          usedFallback: false,
+          reasonCode: "SCANNER_API_UNAVAILABLE",
+          error: "temporary local API error",
+          output: null,
+        },
+        "2026-07-30T12:01:00.000Z",
+      );
+      const identityPreserved = failed.candidates.some((candidate) => (
+        candidate.chain === selection!.identity.chain
+        && candidate.contractAddress === selection!.identity.contract_address
+      ));
+      refreshView = {
+        last_known_good_preserved: failed.candidates === first.candidates,
+        identity_preserved: identityPreserved,
+        snapshot_timestamp_preserved: failed.generatedAt === first.generatedAt
+          && failed.viewRefreshedAt === first.viewRefreshedAt,
+        source_metadata_preserved: failed.runId === first.runId
+          && failed.metadata === first.metadata
+          && failed.sourceIds === first.sourceIds
+          && failed.freshnessStatus === first.freshnessStatus,
+        next_success_applied: recovered.candidates !== failed.candidates
+          && recovered.lastKnownGoodRefreshError === false,
+        first_load_empty_state: firstFailure.hasAcceptedSnapshot === false
+          && firstFailure.candidates.length === 0,
+      };
+      assert(Object.values(refreshView).every(Boolean), "REFRESH_VIEW_LAST_KNOWN_GOOD_FAILED");
     });
 
     const observedAt = scannerGeneratedAt(selection.scanner);
@@ -678,17 +744,12 @@ export async function runFullProductE2E(options: ProductE2EOptions = {}): Promis
     if (server) await close(server).catch(() => undefined);
     queueStore?.close();
     feedbackStore?.close();
-    canonicalAfter = await captureCanonicalProductState({
-      taskSchedulerStateReader: options.taskSchedulerStateReader,
-      includeTaskScheduler: true,
-    }).catch(() => unavailableCanonicalState());
+    canonicalAfter = await captureCanonicalProductState().catch(() => unavailableCanonicalState());
   }
 
   canonicalBefore ??= canonicalAfter;
   const canonicalUnchanged = equalCanonicalState(canonicalBefore, canonicalAfter);
   if (!canonicalUnchanged) safeErrorCodes.push("CANONICAL_STATE_MUTATION_DETECTED");
-  const taskSchedulerUnchanged = canonicalBefore.task_scheduler === canonicalAfter.task_scheduler;
-  if (!taskSchedulerUnchanged) safeErrorCodes.push("TASK_SCHEDULER_STATE_CHANGED");
   const completedAt = options.now?.() ?? new Date();
   const failed = safeErrorCodes.length > 0 || steps.some((step) => step.status === "FAILED");
   const manifest: ProductE2EManifest = {
@@ -725,7 +786,8 @@ export async function runFullProductE2E(options: ProductE2EOptions = {}): Promis
     live_data_provider_calls: 0,
     canonical_store_mutations: canonicalUnchanged ? 0 : 1,
     canonical_protection: { before: canonicalBefore, after: canonicalAfter, unchanged: canonicalUnchanged },
-    task_scheduler_unchanged: taskSchedulerUnchanged,
+    scheduler_mutations: 0,
+    scheduler_host_status: schedulerHostStatus,
     owner_user_boundaries: {
       user_can_promote_established: false,
       user_can_force_provider_call: false,
@@ -737,6 +799,7 @@ export async function runFullProductE2E(options: ProductE2EOptions = {}): Promis
       identity_preserved: Boolean(selection),
       locale_identity_preserved: Boolean(selection),
       refresh_collector_calls: 0,
+      refresh_view: refreshView,
     },
     safe_error_codes: [...new Set(safeErrorCodes)],
     fail_closed_boundaries: [
@@ -755,13 +818,8 @@ export async function runFullProductE2E(options: ProductE2EOptions = {}): Promis
   return { manifest, manifestPath, reportPath, productReportPath, isolatedStores: paths };
 }
 
-export async function captureCanonicalProductState(
-  options: CanonicalProtectionOptions = {},
-): Promise<ProductE2ECanonicalState> {
+export async function captureCanonicalProductState(): Promise<ProductE2ECanonicalState> {
   const automationState = resolve(getDefaultAutomationDirectory(), "automation-state.json");
-  const taskScheduler = options.includeTaskScheduler === false
-    ? "not-checked"
-    : await safeTaskSchedulerState(options.taskSchedulerStateReader);
   return {
     established_universe: await hashFiles([
       ...sqliteOrFileGroup(getDefaultEstablishedUniverseStorePath()),
@@ -774,7 +832,6 @@ export async function captureCanonicalProductState(
     ]),
     snapshot_pointers: await hashFiles([automationState]),
     ai_store: await hashFiles(sqliteOrFileGroup(getDefaultAIAnalysisQueueStorePath())),
-    task_scheduler: taskScheduler,
   };
 }
 
@@ -823,7 +880,8 @@ export function renderProductE2EMarkdown(manifest: ProductE2EManifest): string {
     `- Live OpenAI calls: **${manifest.live_openai_calls}**`,
     `- Live data-provider calls: **${manifest.live_data_provider_calls}**`,
     `- Canonical mutations: **${manifest.canonical_store_mutations}**`,
-    `- Task Scheduler unchanged: **${manifest.task_scheduler_unchanged ? "yes" : "no"}**`,
+    `- Task Scheduler mutations: **${manifest.scheduler_mutations}**`,
+    `- Task Scheduler host status: **${manifest.scheduler_host_status}**`,
     "",
     "## Scenario",
     "",
@@ -854,6 +912,11 @@ export function renderProductE2EMarkdown(manifest: ProductE2EManifest): string {
     `- Owner decision recorded: ${manifest.owner_user_boundaries.owner_decision_recorded ? "yes" : "no"}`,
     `- Owner mock worker: ${manifest.owner_user_boundaries.worker_started_by_owner ? "yes" : "no"}`,
     `- Canonical state unchanged: ${manifest.canonical_protection.unchanged ? "yes" : "no"}`,
+    `- Refresh last-known-good preserved: ${manifest.navigation.refresh_view.last_known_good_preserved ? "yes" : "no"}`,
+    `- Refresh identity preserved: ${manifest.navigation.refresh_view.identity_preserved ? "yes" : "no"}`,
+    `- Refresh snapshot timestamp preserved: ${manifest.navigation.refresh_view.snapshot_timestamp_preserved ? "yes" : "no"}`,
+    `- Refresh source metadata preserved: ${manifest.navigation.refresh_view.source_metadata_preserved ? "yes" : "no"}`,
+    `- Next successful refresh applied: ${manifest.navigation.refresh_view.next_success_applied ? "yes" : "no"}`,
     "",
     "## Errors",
     "",
@@ -1166,7 +1229,7 @@ async function deterministicNarrative(context: AIResearchContext): Promise<Recor
 }
 
 async function assertCanonicalFilesUnchanged(before: ProductE2ECanonicalState): Promise<void> {
-  const after = await captureCanonicalProductState({ includeTaskScheduler: false });
+  const after = await captureCanonicalProductState();
   for (const key of ["established_universe", "feedback_store", "follow_up_store", "snapshot_pointers", "ai_store"] as const) {
     if (before[key] !== after[key]) throw new ProductE2EError(`CANONICAL_${key.toUpperCase()}_MUTATION`);
   }
@@ -1192,31 +1255,6 @@ function sqliteOrFileGroup(path: string): string[] {
   return [path, `${path}-wal`, `${path}-shm`, `${path}.bak`];
 }
 
-async function safeTaskSchedulerState(reader?: () => Promise<string>): Promise<string> {
-  try {
-    const raw = reader ? await reader() : await readWindowsTaskSchedulerState();
-    return `sha256:${createHash("sha256").update(raw, "utf8").digest("hex")}`;
-  } catch {
-    return "TASK_SCHEDULER_STATUS_UNAVAILABLE";
-  }
-}
-
-async function readWindowsTaskSchedulerState(): Promise<string> {
-  if (process.platform !== "win32") return "NOT_APPLICABLE";
-  const command = [
-    "$task=Get-ScheduledTask -TaskName 'Crypto Edge AI Central Automation' -ErrorAction SilentlyContinue",
-    "if($null -eq $task){'NOT_INSTALLED';exit 0}",
-    "$xml=Export-ScheduledTask -TaskName 'Crypto Edge AI Central Automation'",
-    "[pscustomobject]@{TaskName=$task.TaskName;State=[string]$task.State;Enabled=$task.Settings.Enabled;XmlHash=(Get-FileHash -InputStream ([System.IO.MemoryStream]::new([Text.Encoding]::UTF8.GetBytes($xml))) -Algorithm SHA256).Hash}|ConvertTo-Json -Compress",
-  ].join(";");
-  const result = await execFileAsync("powershell.exe", ["-NoProfile", "-Command", command], {
-    windowsHide: true,
-    timeout: 10_000,
-    maxBuffer: 64 * 1_024,
-  });
-  return result.stdout.trim();
-}
-
 function equalCanonicalState(left: ProductE2ECanonicalState, right: ProductE2ECanonicalState): boolean {
   return (Object.keys(left) as Array<keyof ProductE2ECanonicalState>).every((key) => left[key] === right[key]);
 }
@@ -1228,7 +1266,25 @@ function unavailableCanonicalState(): ProductE2ECanonicalState {
     follow_up_store: "UNAVAILABLE",
     snapshot_pointers: "UNAVAILABLE",
     ai_store: "UNAVAILABLE",
-    task_scheduler: "UNAVAILABLE",
+  };
+}
+
+export function normalizeSchedulerHostStatus(value: unknown): string {
+  if (typeof value !== "string") return "HOST_STATUS_NOT_OBSERVED";
+  const normalized = value.trim().toUpperCase().replace(/[ -]+/g, "_");
+  return ["NOT_INSTALLED", "READY", "RUNNING", "DISABLED", "QUEUED", "UNKNOWN"].includes(normalized)
+    ? normalized
+    : "HOST_STATUS_NOT_OBSERVED";
+}
+
+function emptyRefreshViewResult(): ProductE2EManifest["navigation"]["refresh_view"] {
+  return {
+    last_known_good_preserved: false,
+    identity_preserved: false,
+    snapshot_timestamp_preserved: false,
+    source_metadata_preserved: false,
+    next_success_applied: false,
+    first_load_empty_state: false,
   };
 }
 

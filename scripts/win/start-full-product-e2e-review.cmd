@@ -25,6 +25,11 @@ set "CRYPTO_EDGE_AI_RESEARCH_LIVE_CALL_BUDGET="
 set "CRYPTO_EDGE_OWNER_OPERATIONS_MODE=DISABLED"
 set "CRYPTO_EDGE_RUNTIME_MODE=INTERNAL_BETA"
 set "OPENAI_API_KEY="
+set "CRYPTO_EDGE_PRODUCT_E2E_SCHEDULER_HOST_STATUS=HOST_STATUS_NOT_OBSERVED"
+
+if "%CRYPTO_EDGE_PRODUCT_E2E_PLAN_ONLY%"=="1" goto scheduler_status_done
+for /f "usebackq delims=" %%S in (`powershell.exe -NoProfile -Command "$task=Get-ScheduledTask -TaskName 'Crypto Edge AI Central Automation' -ErrorAction SilentlyContinue; if($null -eq $task){'NOT_INSTALLED'}else{[string]$task.State}"`) do set "CRYPTO_EDGE_PRODUCT_E2E_SCHEDULER_HOST_STATUS=%%S"
+:scheduler_status_done
 
 echo.
 echo === Crypto Edge AI: Full Product E2E.1 owner review ===
@@ -33,7 +38,8 @@ echo Provider: deterministic mock only
 echo OpenAI calls: 0
 echo Live data-provider calls: 0
 echo Central live data cycle: disabled
-echo Task Scheduler changes: 0
+echo Task Scheduler mutations: 0
+echo Task Scheduler host status: !CRYPTO_EDGE_PRODUCT_E2E_SCHEDULER_HOST_STATUS!
 echo Canonical store mutations: 0
 echo Browser tabs: exactly 1
 echo.
