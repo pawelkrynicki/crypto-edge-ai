@@ -149,16 +149,34 @@ describe("AI.1 Visual Candidate Research Canvas", () => {
     }
   });
 
-  it("places AI Research after lifecycle in Candidate Detail and adds compact Radar and Verification actions", () => {
+  it("places AI Research in Summary and the dedicated tab while keeping Radar and Verification actions", () => {
     const detail = render("pl", <CandidateDetailView candidate={candidate} followUpStatus={null} />);
-    assert.ok(detail.indexOf("Przepływ obserwacji") < detail.indexOf("Analiza badawcza AI"));
-    assert.ok(detail.indexOf("Analiza badawcza AI") < detail.indexOf("Dane rynkowe"));
+    assert.ok(detail.indexOf('id="candidate-tab-observation"') < detail.indexOf('id="candidate-tab-ai"'));
+    assert.ok(detail.indexOf('id="candidate-tab-ai"') < detail.indexOf('id="candidate-tab-data"'));
+    assert.match(detail, /role="tablist"/);
+    assert.equal((detail.match(/role="tabpanel"/g) ?? []).length, 1);
+    assert.match(detail, /data-detail-module="ai"/);
     const radar = render("pl", <AIResearchRadarStatus chain="base" contractAddress={ADDRESS} onOpen={() => undefined} />);
     assert.match(radar, /ai-radar-status/);
     assert.match(radar, /Przejdź do szczegółów analizy/);
     const verification = render("pl", <ExternalVerificationLinksView candidate={candidate} onOpenResearchBrief={() => undefined} />);
     assert.match(verification, /Analiza AI uzupełnia, ale nie zastępuje ręcznej weryfikacji/);
     assert.match(verification, /data-action-variant="secondary"[^>]*>[\s\S]*Otwórz analizę AI/);
+  });
+
+  it("opens a READY Canvas directly in the dedicated detail tab with provider-neutral copy", () => {
+    const lookup: AIResearchBriefLookup = {
+      schema_version: "ai_research_lookup_v1",
+      availability: "READY",
+      provider_mode: "OPENAI",
+      brief: { ...briefPl, render_preview: false },
+      retry_after_seconds: null,
+      error_code: null,
+    };
+    const markup = render("pl", <AIResearchSection chain="base" contractAddress={ADDRESS} symbol="PASS" name="Pass Token" initialLookup={lookup} mode="detail" />);
+    assert.match(markup, /ai-research-canvas/);
+    assert.match(markup, /Analiza została przygotowana na podstawie zwalidowanych danych/);
+    assert.doesNotMatch(markup, /OpenAI|gpt-5-mini|provider mode/i);
   });
 
   it("keeps unknown security distinct from low risk and uses server-provided targets", () => {
@@ -358,10 +376,11 @@ describe("AI.3 shared queue UI", () => {
     const markup = render("pl", <AIResearchSection chain="base" contractAddress={ADDRESS} symbol="SCOOBERT" name="Scoobert" initialLookup={failure} />);
     assert.match(markup, /Ostatnia analiza/);
     assert.match(markup, /Poprzedni prawidłowy wynik pozostaje dostępny/);
-    assert.match(markup, /Otwórz analizę AI/);
+    assert.match(markup, /Zamknij analizę AI/);
+    assert.match(markup, /ai-research-canvas/);
   });
 
-  it("shows central-worker provenance and owner-only technical metrics without raw payload", () => {
+  it("shows neutral preparation provenance and owner-only technical metrics without raw payload", () => {
     const brief = { ...semanticBriefPl, render_preview: false, model: "configured-test-model" };
     const metrics: AIResearchReviewMetrics = {
       schema_version: "ai_research_review_metrics_v1",
@@ -394,7 +413,8 @@ describe("AI.3 shared queue UI", () => {
       retry_after_seconds: null,
       error_code: null,
     }} />);
-    assert.match(section, /Analiza przygotowana przez centralnego workera AI/);
+    assert.match(section, /Analiza została przygotowana na podstawie zwalidowanych danych/);
+    assert.doesNotMatch(section, /OpenAI|gpt-5-mini|provider mode/i);
   });
 
   it("separates SUSPENDED and QUEUED from the ordinary request action", () => {

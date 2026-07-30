@@ -2,23 +2,20 @@ import React, { useEffect, useState, type ReactNode } from "react";
 
 void React; // Required by the Node TSX test runtime's classic JSX transform.
 import {
-  formatProductAge,
   formatProductDateTime,
   PRODUCT_TRANSLATIONS,
   useProductLocale,
   type ProductLocale,
 } from "../productI18n";
-import { formatProductRuntimeMode, formatStatusReason } from "../productPresentation";
 import {
   type ProductSourceHealthResolution,
 } from "../productSourceHealth";
-import { presentProductSourceHealth } from "../productSourceHealthPresentation";
 import type { ResolvedProductRuntimeMode } from "../runtimeMode";
 import type { ResolvedScannerSource } from "../services/scannerDataSource";
 import type { AutomationStatus } from "../services/automationStatusDataSource";
 import type { EstablishedUniverseStatus } from "../services/establishedUniverseStatusDataSource";
 import type { ProductReadinessOutput } from "../types/scannerTypes";
-import { ActionButton, TechnicalDetails } from "./ProductUi";
+import { ActionButton } from "./ProductUi";
 
 export type ProductSectionId =
   | "candidate-results"
@@ -67,42 +64,34 @@ type ProductWorkspaceSectionProps = {
   title: string;
   description: string;
   children: ReactNode;
+  workspaceMode?: "default" | "tabbed";
 };
 
 export function ProductWorkspaceShell({
   navItems,
   activeSection,
   onSectionChange,
-  onSendFeedback,
   loading,
-  runtimeMode,
   resolvedSource,
-  runId,
   generatedAt,
-  ageSeconds,
-  viewRefreshedAt,
-  sourceIds,
+  freshnessStatus,
   sourceHealth,
-  readiness,
-  readinessReasonCode,
   dataUnavailableMessage,
-  dataUnavailableReasonCode,
   onRefresh,
   automationStatus,
-  establishedUniverseStatus,
   children,
 }: ProductWorkspaceShellProps) {
   const { locale, setLocale, t } = useProductLocale();
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
-  const apiPresentation = getApiReadinessPresentation(loading, resolvedSource, readiness, locale);
-  const sourcePresentation = presentProductSourceHealth(sourceHealth, locale, "header");
-  const cyclePresentation = dataCyclePresentation(automationStatus, t);
-  const technicalCodes = unique([
-    readinessReasonCode,
-    dataUnavailableReasonCode,
-    ...(readiness?.reason_codes ?? []),
-  ].filter((value): value is string => Boolean(value)));
   const activeNavItem = navItems.find((item) => item.id === activeSection);
+  const clientDataAlert = resolveClientDataAlert({
+    resolvedSource,
+    freshnessStatus,
+    sourceHealth,
+    automationStatus,
+    dataUnavailable: Boolean(dataUnavailableMessage),
+    locale,
+  });
 
   useEffect(() => {
     setMobileNavigationOpen(false);
@@ -119,29 +108,13 @@ export function ProductWorkspaceShell({
             </svg>
           </div>
           <div className="min-w-0">
-            <span className="product-mark-eyebrow">{t("app.productEyebrow")}</span>
             <h1>Crypto Edge AI</h1>
-            <p>{t("app.tagline")}</p>
           </div>
-          <span className="product-runtime-badge">{formatProductRuntimeMode(runtimeMode, locale)}</span>
         </div>
 
-        <div className="product-header-status" aria-label={t("app.statusLabel")}>
-          <HeaderFact label={t("app.api")} value={apiPresentation.value} tone={apiPresentation.tone} />
-          <HeaderFact
-            label={t("app.freshness")}
-            value={ageSeconds == null ? t("app.noData") : formatProductAge(ageSeconds, locale)}
-          />
-          <HeaderFact label={t("automation.dataStatus")} value={cyclePresentation.value} tone={cyclePresentation.tone} />
-          <HeaderFact label={t("app.sources")} value={sourcePresentation.value} tone={sourcePresentation.tone} />
-          <HeaderFact
-            label={t("app.generated")}
-            value={generatedAt ? formatProductDateTime(generatedAt, locale) : t("app.noData")}
-          />
-          <HeaderFact
-            label={t("app.viewRefreshed")}
-            value={viewRefreshedAt ? formatProductDateTime(viewRefreshedAt, locale) : t("app.noData")}
-          />
+        <div className="product-header-update" aria-label={t("app.generated")}>
+          <span>{t("app.generated")}</span>
+          <strong>{generatedAt ? formatProductDateTime(generatedAt, locale) : t("app.noData")}</strong>
         </div>
 
         <div className="product-header-actions">
@@ -168,36 +141,9 @@ export function ProductWorkspaceShell({
               </button>
             ))}
           </div>
-          <ActionButton variant="secondary" className="product-feedback-button" onClick={onSendFeedback}>
-            {t("feedback.quickAction")}
-          </ActionButton>
           <ActionButton variant="primary" icon="refresh" className="product-refresh-button" onClick={onRefresh} loading={loading} loadingLabel={t("app.refreshing")}>
             {t("app.refresh")}
           </ActionButton>
-          <TechnicalDetails label={t("app.technicalDetails")} className="product-header-technical">
-            <dl>
-              <div><dt>{t("app.environment")}</dt><dd>{runtimeMode}</dd></div>
-              <div><dt>{t("app.runId")}</dt><dd>{runId ?? t("app.noData")}</dd></div>
-              <div><dt>{t("app.sources")}</dt><dd>{sourceIds.length > 0 ? sourceIds.join(", ") : t("app.noData")}</dd></div>
-              <div><dt>{t("radar.universeVersion")}</dt><dd>{establishedUniverseStatus?.universe_version ?? t("app.noData")}</dd></div>
-              <div><dt>{t("radar.activeEntries")}</dt><dd>{establishedUniverseStatus?.entries_enabled ?? t("app.noData")}</dd></div>
-              <div><dt>{t("radar.validationStatus")}</dt><dd>{establishedUniverseStatus?.validation_status ?? t("app.noData")}</dd></div>
-              {technicalCodes.length > 0 && <div><dt>{t("app.codes")}</dt><dd>{technicalCodes.join(", ")}</dd></div>}
-              <div><dt>{t("automation.title")}</dt><dd>{automationPresentation(automationStatus, t)}</dd></div>
-              <div><dt>{t("automation.lastAttempt")}</dt><dd>{automationStatus?.last_attempt_at ? formatProductDateTime(automationStatus.last_attempt_at, locale) : t("app.noData")}</dd></div>
-              <div><dt>{t("automation.lastSuccess")}</dt><dd>{automationStatus?.last_success_at ? formatProductDateTime(automationStatus.last_success_at, locale) : t("app.noData")}</dd></div>
-              <div><dt>{t("automation.snapshotGenerated")}</dt><dd>{automationStatus?.snapshot_generated_at ? formatProductDateTime(automationStatus.snapshot_generated_at, locale) : generatedAt ? formatProductDateTime(generatedAt, locale) : t("app.noData")}</dd></div>
-              <div><dt>{t("app.viewRefreshed")}</dt><dd>{viewRefreshedAt ? formatProductDateTime(viewRefreshedAt, locale) : t("app.noData")}</dd></div>
-              <div><dt>{t("automation.cycleStatus")}</dt><dd>{cycleOutcomePresentation(automationStatus, t)}</dd></div>
-              <div><dt>{t("automation.nextRun")}</dt><dd>{nextAutomationRunPresentation(automationStatus, locale, t)}</dd></div>
-              {automationStatus && !automationStatus.enabled && automationStatus.next_due_at && (
-                <div>
-                  <dt>{t("automation.nextDueAfterActivation")}</dt>
-                  <dd>{formatProductDateTime(automationStatus.next_due_at, locale)}</dd>
-                </div>
-              )}
-            </dl>
-          </TechnicalDetails>
         </div>
       </header>
 
@@ -246,19 +192,7 @@ export function ProductWorkspaceShell({
         </aside>
 
         <div className="workspace-main">
-          {dataUnavailableMessage && (
-            <div className="product-global-error" role="alert">
-              <div>
-                <strong>{t("app.unavailableTitle")}</strong>
-                <p>{formatStatusReason(dataUnavailableReasonCode, locale)}</p>
-              </div>
-              <p>{t("app.unavailableMessage")}</p>
-              <TechnicalDetails label={t("app.technicalDetails")}>
-                <code>{dataUnavailableReasonCode ?? "SCANNER_OUTPUT_UNAVAILABLE"}</code>
-                <p>{dataUnavailableMessage}</p>
-              </TechnicalDetails>
-            </div>
-          )}
+          {clientDataAlert && <div className="product-client-data-alert" role="status"><strong>{clientDataAlert.title}</strong><p>{clientDataAlert.detail}</p></div>}
 
           <main className="workspace-content">{children}</main>
         </div>
@@ -272,48 +206,41 @@ export function ProductWorkspaceShell({
   );
 }
 
-function dataCyclePresentation(
-  status: AutomationStatus | null | undefined,
-  t: (key: keyof typeof PRODUCT_TRANSLATIONS.en) => string,
-): { value: string; tone: "neutral" | "ready" | "warning" | "error" } {
-  if (!status?.data_status) return { value: t("status.unavailable"), tone: "warning" };
-  if (status.data_status === "FRESH") return { value: t("status.current"), tone: "ready" };
-  if (status.data_status === "STALE") return { value: t("status.delayed"), tone: "warning" };
-  if (status.data_status === "PARTIAL") return { value: t("automation.partial"), tone: "warning" };
-  if (status.data_status === "LAST_KNOWN_GOOD") return { value: t("automation.lastKnownGood"), tone: "error" };
-  if (status.data_status === "IN_PROGRESS") return { value: t("automation.inProgress"), tone: "neutral" };
-  return { value: t("status.unavailable"), tone: "error" };
-}
-
-function cycleOutcomePresentation(
-  status: AutomationStatus | null | undefined,
-  t: (key: keyof typeof PRODUCT_TRANSLATIONS.en) => string,
-): string {
-  if (status?.cycle_status === "IN_PROGRESS") return t("automation.inProgress");
-  if (status?.cycle_status === "FAILED") return t("automation.lastCycleFailed");
-  if (status?.cycle_status === "PARTIAL") return t("automation.partial");
-  if (status?.cycle_status === "SUCCESS") return t("control.value.success");
-  return t("app.noData");
-}
-
-function automationPresentation(
-  status: AutomationStatus | null | undefined,
-  t: (key: keyof typeof PRODUCT_TRANSLATIONS.en) => string,
-): string {
-  if (!status || !status.enabled) return t("automation.disabled");
-  if (status.active_run_id) return t("automation.inProgress");
-  if (status.last_result === "FAILED" || status.scheduler_status === "STATE_UNAVAILABLE") return t("automation.error");
-  return t("automation.active");
-}
-
-function nextAutomationRunPresentation(
-  status: AutomationStatus | null | undefined,
-  locale: ProductLocale,
-  t: (key: keyof typeof PRODUCT_TRANSLATIONS.en) => string,
-): string {
-  if (!status) return t("app.noData");
-  if (!status.enabled) return t("automation.notScheduled");
-  return status.next_run_at ? formatProductDateTime(status.next_run_at, locale) : t("app.noData");
+function resolveClientDataAlert({
+  resolvedSource,
+  freshnessStatus,
+  sourceHealth,
+  automationStatus,
+  dataUnavailable,
+  locale,
+}: {
+  resolvedSource: ResolvedScannerSource;
+  freshnessStatus: "FRESH" | "STALE" | null;
+  sourceHealth: ProductSourceHealthResolution;
+  automationStatus: AutomationStatus | null | undefined;
+  dataUnavailable: boolean;
+  locale: ProductLocale;
+}): { title: string; detail: string } | null {
+  const pl = locale === "pl";
+  if (dataUnavailable || resolvedSource === "unavailable" || sourceHealth.status === "unavailable") {
+    return {
+      title: pl ? "Dane są chwilowo niedostępne." : "Data is temporarily unavailable.",
+      detail: pl ? "Spróbuj ponownie później lub sprawdź ostatni prawidłowy widok." : "Try again later or use the last valid view.",
+    };
+  }
+  if (sourceHealth.status === "partial" || automationStatus?.data_status === "PARTIAL") {
+    return {
+      title: pl ? "Część danych jest chwilowo niedostępna." : "Some data is temporarily unavailable.",
+      detail: pl ? "Braki są oznaczone bez ukrywania dostępnych informacji." : "Missing fields are marked without hiding the available information.",
+    };
+  }
+  if (freshnessStatus === "STALE" || ["STALE", "LAST_KNOWN_GOOD"].includes(automationStatus?.data_status ?? "")) {
+    return {
+      title: pl ? "Dane mogą być nieaktualne." : "Data may be out of date.",
+      detail: pl ? "Wyświetlany jest ostatni prawidłowy stan." : "The last valid state remains visible.",
+    };
+  }
+  return null;
 }
 
 export function getApiReadinessPresentation(
@@ -344,33 +271,15 @@ export function getFreshnessPresentation(
   return { value: copy["status.unavailable"], tone: "warning" };
 }
 
-function HeaderFact({
-  label,
-  value,
-  detail,
-  tone = "neutral",
-}: {
-  label: string;
-  value: string;
-  detail?: string;
-  tone?: "neutral" | "accent" | "ready" | "warning" | "error";
-}) {
-  return (
-    <div className={`product-header-fact ${tone}`} title={detail}>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  );
-}
-
 export function ProductWorkspaceSection({
   title,
   description,
   children,
+  workspaceMode = "default",
 }: ProductWorkspaceSectionProps) {
   const { t } = useProductLocale();
   return (
-    <section className="workspace-section">
+    <section className={`workspace-section ${workspaceMode === "tabbed" ? "tabbed-workspace-section" : ""}`}>
       <header className="workspace-section-header">
         <div className="min-w-0">
           <span className="workspace-section-eyebrow">{t("app.workspaceEyebrow")}</span>
@@ -391,10 +300,6 @@ function ProductNavIcon({ id }: { id: ProductSectionId }) {
   if (id === "feedback") return <svg viewBox="0 0 24 24"><path d="M4 5h16v12H9l-5 4z" /><path d="M8 9h8M8 13h5" /></svg>;
   if (id === "methodology") return <svg viewBox="0 0 24 24"><path d="M5 4h14v16H5z" /><path d="M8 8h8M8 12h8M8 16h5" /></svg>;
   return <svg viewBox="0 0 24 24"><path d="M4 12h4l2-5 4 10 2-5h4" /></svg>;
-}
-
-function unique(values: string[]): string[] {
-  return [...new Set(values)];
 }
 
 function groupProductNavItems(items: ProductNavItem[]): Array<{

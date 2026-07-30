@@ -205,9 +205,11 @@ describe("FLOW.1 visible token lifecycle contracts", () => {
       candidate,
       followUp: entry,
       followUpStatus: followUpStatus(),
+      initialActiveTab: "observation",
     }));
     assert.ok(markup.indexOf("Przepływ obserwacji") > markup.indexOf("Tożsamość"));
-    assert.ok(markup.indexOf("Przepływ obserwacji") < markup.indexOf("Dane rynkowe"));
+    assert.match(markup, /data-active-detail-tab="observation"/);
+    assert.doesNotMatch(markup, /id="market-heading"/);
     assert.match(markup, /Co nastąpi automatycznie/);
     assert.match(markup, /Co wymaga decyzji/);
     assert.match(markup, /Najbliższy termin/);
@@ -219,16 +221,18 @@ describe("FLOW.1 visible token lifecycle contracts", () => {
     const valid = render("pl", React.createElement(CandidateDetailView, {
       candidate: productCandidate({ addressIdentityVerified: false }),
       followUpStatus: followUpStatus({ entries_total: 0 }),
+      initialActiveTab: "summary",
     }));
     assert.match(valid, /Tożsamość techniczna[\s\S]*Poprawna/);
     assert.match(valid, /Weryfikacja źródłowa[\s\S]*Wymagana/);
     assert.doesNotMatch(valid, /OBSERWACJA — NOWY PROJEKT/);
     assert.doesNotMatch(valid, /Tożsamość adresu[\s\S]*Niezweryfikowana/);
-    assert.match(valid, /Oczekuje na zapis do dalszej obserwacji/);
+    assert.match(valid, /Automatyczny zapis w najbliższym centralnym cyklu danych/);
 
     const invalid = render("pl", React.createElement(CandidateDetailView, {
       candidate: productCandidate({ contractAddress: "not-an-address", addressIdentityVerified: false }),
       followUpStatus: followUpStatus({ entries_total: 0 }),
+      initialActiveTab: "summary",
     }));
     assert.match(invalid, /Tożsamość techniczna[\s\S]*Niepoprawna/);
     assert.match(invalid, /Brak poprawnego adresu kontraktu/);

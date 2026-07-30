@@ -373,7 +373,8 @@ describe("Product Radar owner acceptance", () => {
 
   it("shows one shared not-invoked security meaning for BEANS in Details and Verification", () => {
     for (const locale of ["en", "pl"] as const) {
-      const details = renderWithLocale(locale, React.createElement(CandidateDetailView, { candidate: beansCandidate }));
+      const details = renderWithLocale(locale, React.createElement(CandidateDetailView, { candidate: beansCandidate, initialActiveTab: "security" }));
+      const filtersDetails = renderWithLocale(locale, React.createElement(CandidateDetailView, { candidate: beansCandidate, initialActiveTab: "filters" }));
       const verification = renderWithLocale(locale, React.createElement(ExternalVerificationLinksView, { candidate: beansCandidate }));
       const detailsWithoutTechnical = details.replace(/<details\b[^>]*>[\s\S]*?<\/details>/g, "");
 
@@ -403,7 +404,7 @@ describe("Product Radar owner acceptance", () => {
         PRODUCT_TRANSLATIONS[locale]["filter.pairAgeMinimum"],
       ];
       for (const label of basicConditionLabels) {
-        assert.equal((details.match(new RegExp(escapeRegExp(label), "g")) ?? []).length, 1, `${label} must appear in exactly one condition state`);
+        assert.equal((filtersDetails.match(new RegExp(escapeRegExp(label), "g")) ?? []).length, 1, `${label} must appear in exactly one condition state`);
       }
     }
   });
@@ -424,9 +425,9 @@ describe("Product Radar owner acceptance", () => {
     partial.security.coverageStatus = "PARTIAL SECURITY COVERAGE";
     partial.securityLabel = "PARTIAL SECURITY COVERAGE";
 
-    const unavailableDetails = renderWithLocale("pl", React.createElement(CandidateDetailView, { candidate: unavailable }));
+    const unavailableDetails = renderWithLocale("pl", React.createElement(CandidateDetailView, { candidate: unavailable, initialActiveTab: "security" }));
     const unavailableVerification = renderWithLocale("pl", React.createElement(ExternalVerificationLinksView, { candidate: unavailable }));
-    const partialDetails = renderWithLocale("pl", React.createElement(CandidateDetailView, { candidate: partial }));
+    const partialDetails = renderWithLocale("pl", React.createElement(CandidateDetailView, { candidate: partial, initialActiveTab: "security" }));
     const partialVerification = renderWithLocale("pl", React.createElement(ExternalVerificationLinksView, { candidate: partial }));
 
     assert.match(unavailableDetails, /Dane bezpieczeństwa są niedostępne\. Wymagana jest ręczna weryfikacja\./);
@@ -447,7 +448,7 @@ describe("Product Radar owner acceptance", () => {
     checked.security.coverageStatus = null;
     checked.security.checkedAt = "2026-07-21T08:00:00.000Z";
     checked.securityLabel = "SECURITY_PASSED";
-    const details = renderWithLocale("en", React.createElement(CandidateDetailView, { candidate: checked }));
+    const details = renderWithLocale("en", React.createElement(CandidateDetailView, { candidate: checked, initialActiveTab: "security" }));
     const verification = renderWithLocale("en", React.createElement(ExternalVerificationLinksView, { candidate: checked }));
     assert.equal(resolveProductSecurityState(checked).state, "checked");
     assert.match(details, /Security checked — Manual Review Only/);
@@ -505,7 +506,7 @@ describe("Product Radar owner acceptance", () => {
     assert.doesNotMatch(markup, /fixture-fallback|Built-in sample|Radar cannot read a valid scan/);
   });
 
-  it("uses one canonical source-health resolution in the header and Radar summary", () => {
+  it("keeps source health in content while the client header stays nontechnical", () => {
     const readyMetadata = structuredClone(emptyMetadata);
     readyMetadata.source_health = {
       dexscreener: "READY",
@@ -633,24 +634,20 @@ describe("Product Radar owner acceptance", () => {
       const partialSummary = renderSurfaces(locale, partialResolution, defillamaDegraded, emptyReadiness, 60, "FRESH");
       const fallback = renderSurfaces(locale, fallbackResolution, noDetailedMetadata, fallbackPartialReadiness, 60, "FRESH");
       if (locale === "en") {
-        assert.match(ready.header, /<span>Sources<\/span><strong>Available<\/strong>/);
+        assert.doesNotMatch(ready.header, /<span>Sources<\/span>|Snapshot freshness|API connectivity|Technical details/);
         assert.match(ready.summary, /<span>Source status<\/span><strong>Available<\/strong>/);
-        assert.match(partialHeader.header, /<span>Sources<\/span><strong>Partially available<\/strong>/);
+        assert.match(partialHeader.header, /Some data is temporarily unavailable/);
         assert.match(partialSummary.summary, /<span>Source status<\/span><strong>Source partially available<\/strong><p>DefiLlama<\/p>/);
-        assert.match(partialHeader.header, /Snapshot freshness<\/span><strong>2 hr<\/strong>/);
-        assert.doesNotMatch(partialHeader.header, /Snapshot freshness<\/span><strong>Delayed<\/strong>/);
         assert.doesNotMatch(partialHeader.summary, /product-freshness/);
-        assert.match(fallback.header, /<span>Sources<\/span><strong>Partially available<\/strong>/);
+        assert.match(fallback.header, /Some data is temporarily unavailable/);
         assert.match(fallback.summary, /<span>Source status<\/span><strong>Source partially available<\/strong><p>Source details unavailable<\/p>/);
       } else {
-        assert.match(ready.header, /<span>Źródła<\/span><strong>Dostępne<\/strong>/);
+        assert.doesNotMatch(ready.header, /<span>Źródła<\/span>|Aktualność danych|Połączenie z API|Szczegóły techniczne/);
         assert.match(ready.summary, /<span>Stan źródeł<\/span><strong>Dostępne<\/strong>/);
-        assert.match(partialHeader.header, /<span>Źródła<\/span><strong>Częściowo dostępne<\/strong>/);
+        assert.match(partialHeader.header, /Część danych jest chwilowo niedostępna/);
         assert.match(partialSummary.summary, /<span>Stan źródeł<\/span><strong>Źródło częściowo dostępne<\/strong><p>DefiLlama<\/p>/);
-        assert.match(partialHeader.header, /Aktualność danych<\/span><strong>2 godz\.<\/strong>/);
-        assert.doesNotMatch(partialHeader.header, /Aktualność danych<\/span><strong>Opóźnione<\/strong>/);
         assert.doesNotMatch(partialHeader.summary, /product-freshness/);
-        assert.match(fallback.header, /<span>Źródła<\/span><strong>Częściowo dostępne<\/strong>/);
+        assert.match(fallback.header, /Część danych jest chwilowo niedostępna/);
         assert.match(fallback.summary, /<span>Stan źródeł<\/span><strong>Źródło częściowo dostępne<\/strong><p>Brak szczegółów źródeł<\/p>/);
       }
     }
@@ -664,7 +661,7 @@ describe("Product Radar owner acceptance", () => {
     assert.match(markup, />0</);
   });
 
-  it("separates inactive cadence from a scheduled run in EN and PL Technical details", () => {
+  it("keeps automation cadence out of the client-facing header", () => {
     const lastRunAt = "2026-07-21T12:00:00.000Z";
     const nextDueAt = "2026-07-21T12:16:00.000Z";
     const render = (locale: ProductLocale, enabled: boolean) => renderWithLocale(locale, React.createElement(ProductWorkspaceShell, {
@@ -707,22 +704,10 @@ describe("Product Radar owner acceptance", () => {
     const enabledEnglish = render("en", true);
     const enabledPolish = render("pl", true);
 
-    assert.match(disabledEnglish, /Automation<\/dt><dd>Disabled/);
-    assert.match(disabledEnglish, /Next run<\/dt><dd>Not scheduled/);
-    assert.match(disabledEnglish, new RegExp(`Last cycle attempt<\\/dt><dd>${escapeRegExp(formatProductDateTime(lastRunAt, "en"))}`));
-    assert.match(disabledEnglish, new RegExp(`Next due after activation<\\/dt><dd>${escapeRegExp(formatProductDateTime(nextDueAt, "en"))}`));
-    assert.match(disabledPolish, /Automatyzacja<\/dt><dd>Nieaktywna/);
-    assert.match(disabledPolish, /Następny run<\/dt><dd>Nie zaplanowano/);
-    assert.match(disabledPolish, new RegExp(`Ostatnia próba cyklu<\\/dt><dd>${escapeRegExp(formatProductDateTime(lastRunAt, "pl"))}`));
-    assert.match(disabledPolish, new RegExp(`Najbliższy termin po aktywacji<\\/dt><dd>${escapeRegExp(formatProductDateTime(nextDueAt, "pl"))}`));
-
-    assert.match(enabledEnglish, /Automation<\/dt><dd>Active/);
-    assert.match(enabledEnglish, new RegExp(`Next run<\\/dt><dd>${escapeRegExp(formatProductDateTime(nextDueAt, "en"))}`));
-    assert.doesNotMatch(enabledEnglish, /Next due after activation/);
-    assert.match(enabledPolish, /Automatyzacja<\/dt><dd>Aktywna/);
-    assert.match(enabledPolish, new RegExp(`Następny run<\\/dt><dd>${escapeRegExp(formatProductDateTime(nextDueAt, "pl"))}`));
-    assert.doesNotMatch(enabledPolish, /Najbliższy termin po aktywacji/);
-    assert.doesNotMatch(disabledEnglish, /Run collector|Start collector/);
+    for (const markup of [disabledEnglish, disabledPolish, enabledEnglish, enabledPolish]) {
+      assert.doesNotMatch(markup, /Automation<\/dt>|Automatyzacja<\/dt>|Next run<\/dt>|Następny run<\/dt>|Last cycle attempt<\/dt>|Ostatnia próba cyklu<\/dt>/);
+      assert.doesNotMatch(markup, new RegExp(`${escapeRegExp(formatProductDateTime(lastRunAt, "en"))}|${escapeRegExp(formatProductDateTime(nextDueAt, "en"))}`));
+    }
   });
 
   it("does not turn configured Established empty into a global error", () => {
@@ -826,14 +811,14 @@ describe("Product Radar owner acceptance", () => {
       const snapshotTime = formatProductDateTime(first.generatedAt!, locale);
       assert.match(firstMarkup, new RegExp(escapeRegExp(snapshotTime)));
       assert.match(rereadMarkup, new RegExp(escapeRegExp(snapshotTime)));
-      assert.match(firstMarkup, new RegExp(escapeRegExp(formatProductDateTime(first.viewRefreshedAt, locale))));
-      assert.match(rereadMarkup, new RegExp(escapeRegExp(formatProductDateTime(sameSnapshot.viewRefreshedAt, locale))));
+      assert.doesNotMatch(firstMarkup, new RegExp(escapeRegExp(formatProductDateTime(first.viewRefreshedAt, locale))));
+      assert.doesNotMatch(rereadMarkup, new RegExp(escapeRegExp(formatProductDateTime(sameSnapshot.viewRefreshedAt, locale))));
       assert.match(rereadMarkup, locale === "en" ? /Refresh view/ : /Odśwież widok/);
     }
   });
 
   it("does not present security-not-invoked as security passed", () => {
-    const markup = renderToStaticMarkup(React.createElement(CandidateDetailView, { candidate: newCandidate }));
+    const markup = renderToStaticMarkup(React.createElement(CandidateDetailView, { candidate: newCandidate, initialActiveTab: "security" }));
     assert.match(markup, /Security check was not run/);
     assert.match(markup, /No check does not mean no risk/);
     assert.doesNotMatch(markup, /SECURITY_PASSED/);

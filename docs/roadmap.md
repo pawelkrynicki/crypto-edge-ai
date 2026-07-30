@@ -1,5 +1,11 @@
 # Roadmap
 
+## Current stage: UX.2 + UX.3 + UX.4 — Tabbed Detail Workspace and Provider-neutral Client
+
+Candidate Detail działa jako kompaktowy nagłówek tokena → siedem poziomych zakładek → jeden szeroki panel aktywnej treści. Desktop wykorzystuje pełną szerokość obszaru roboczego, a mobile zachowuje poziomo przewijany pasek zakładek, pełnoszeroką aktywną treść i brak overflow całej strony. URL odtwarza `chain + contract_address` oraz allowlistowaną zakładkę, domyślnie `summary`. Nagłówek klienta pokazuje tylko ostatnią aktualizację, EN/PL i odświeżenie; techniczne dane pozostają w Control Center i endpointach ownera. Zakładka AI zachowuje AI.3, ale klient nie pokazuje nazwy providera ani modelu. Kontrakt: `docs/tabbed_detail_workspace.md`.
+
+Ten etap nie zmienia collectora, schedulera, Follow-up, Established, feedback, lifecycle, fingerprintu, cache key ani workera i nie wykonuje live calls.
+
 ## Current stage: AI.2 — Controlled OpenAI Live Validation
 
 AI.1 dostarczył generowaną na żądanie, research-only Analizę badawczą AI. AI.2 zachowuje cały ten kontrakt i dodaje bezpieczną ścieżkę pierwszego owner-run: provider domyślnie `DISABLED`, osobny store `ai-research-openai-review.sqlite`, wymagany model i klucz z environment, Responses API z `store: false`, `background: false`, strict Structured Outputs, `maxRetries: 0` i atomowym budżetem jednego call’a. Start i nawigacja wykonują 0 calls; pierwszy płatny request następuje dopiero po jawnym kliknięciu ownera. Implementacja i testy Codexa nie wykonują live call.

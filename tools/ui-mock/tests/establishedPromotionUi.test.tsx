@@ -40,6 +40,7 @@ describe("Established promotion Candidate Detail UI", () => {
     const markup = render("en", React.createElement(CandidateDetailView, {
       candidate,
       initialOwnerPromotionStatus: visibleStatus("REVIEW_SAFE"),
+      initialActiveTab: "security",
     }));
     assert.match(markup, /Owner decision/);
     assert.match(markup, /Consider for Established/);

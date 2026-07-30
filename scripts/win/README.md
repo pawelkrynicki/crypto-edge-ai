@@ -528,3 +528,11 @@ scripts\win\start-ai3-shared-queue-review.cmd --all-states
 Domyślna komenda otwiera dokładnie jedną kartę `READY`. Parametr `--state` otwiera dokładnie jedną kartę wybranego stanu: `ready`, `absent`, `queued`, `processing`, `stale`, `failed`, `suspended` albo `cooldown`. Wszystkie osiem kart można otworzyć wyłącznie jawnie przez `--all-states`. Nieznany parametr, brak wartości `--state`, nieznany stan albo połączenie `--state` z `--all-states` kończy się kodem błędu i pokazuje użycie przed uruchomieniem produktu lub przeglądarki.
 
 Launcher używa najnowszej zwalidowanej lokalnej tożsamości tokena, deterministycznego mocka i izolowanego tymczasowego pliku SQLite kolejki. Wykonuje zero OpenAI calls, zero data-provider calls, zero collector calls i nie zmienia kanonicznego AI store, feedback, Follow-up, Established, lifecycle ani Task Scheduler.
+
+## UX.2 + UX.3 + UX.4 Tabbed Detail Workspace Review
+
+```cmd
+scripts\win\start-tabbed-detail-review.cmd
+```
+
+Launcher uruchamia zwykły fixture-free `INTERNAL_BETA` z bieżącym rzeczywistym snapshotem, wybiera istniejącą obsługiwaną tożsamość `chain + contract_address` i otwiera dokładnie jedną kartę `#candidate-detail` z `detail=summary`. Widok używa jednego szerokiego panelu oraz siedmiu zakładek. Provider AI, live-source opt-in, automation, owner operations i feedback submission są wyłączone. Launcher nie uruchamia collectora lub workera, nie tworzy sztucznego tokena i nie zmienia Follow-up, Established, feedback, lifecycle ani Task Scheduler. Pełny kontrakt: `docs/tabbed_detail_workspace.md`.

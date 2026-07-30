@@ -28,6 +28,8 @@ Current direction:
 
 This repo is not a second platform beside AIKINTEL. It is a working space for the Crypto Edge AI module before integration.
 
+The current client UX uses a wide Tabbed Detail Workspace, a compact nontechnical header and provider-neutral AI presentation. Product and owner boundaries, responsive behavior and the safe review command are documented in [`docs/tabbed_detail_workspace.md`](docs/tabbed_detail_workspace.md).
+
 ## What Crypto Edge AI Is
 
 - A trader-facing crypto intelligence module.

@@ -2,6 +2,13 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 void React; // Required by the Node TSX test runtime's classic JSX transform.
 import { mapPersistableScannerOutputToUiCandidates } from "./adapters/scannerOutputAdapter";
+import type { CandidateDetailTabId } from "./candidateDetailTabs";
+import {
+  resolveDetailTab,
+  resolveRouteTokenIdentity,
+  writeCandidateDetailRoute,
+  type RouteTokenIdentity,
+} from "./candidateDetailRoute";
 import { CandidateDetailView } from "./components/CandidateDetailView";
 import { CandidateResultsView } from "./components/CandidateResultsView";
 import { ExternalVerificationLinksView } from "./components/ExternalVerificationLinksView";
@@ -94,6 +101,8 @@ export function ProductAppContent() {
   const [reasonCode, setReasonCode] = useState<string | null>(null);
   const [unavailableMessage, setUnavailableMessage] = useState<string | null>(null);
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
+  const [routeTokenIdentity, setRouteTokenIdentity] = useState<RouteTokenIdentity | null>(() => resolveRouteTokenIdentity());
+  const [activeDetailTab, setActiveDetailTab] = useState<CandidateDetailTabId>(() => resolveDetailTab());
   const [verificationCandidateId, setVerificationCandidateId] = useState<string | null>(null);
   const [automationStatus, setAutomationStatus] = useState<AutomationStatus | null>(null);
   const [establishedUniverseStatus, setEstablishedUniverseStatus] = useState<EstablishedUniverseStatus | null>(null);
@@ -130,14 +139,24 @@ export function ProductAppContent() {
     "control-center": { title: t("nav.controlCenter"), description: t("section.controlCenterDescription") },
   }), [t]);
 
-  const explicitlySelectedFollowUp = followUpEntries.find((entry) => entry.entry_id === selectedFollowUpEntryId) ?? null;
+  const routedFollowUp = routeTokenIdentity
+    ? followUpEntries.find((entry) => isSameTokenIdentity(entry, routeTokenIdentity)) ?? null
+    : null;
+  const explicitlySelectedFollowUp = followUpEntries.find((entry) => entry.entry_id === selectedFollowUpEntryId) ?? routedFollowUp;
   const reviewPreviewCandidate = selectAIResearchReviewCandidate(candidates);
+  const routedCandidate = routeTokenIdentity
+    ? candidates.find((candidate) => isSameTokenIdentity(
+      { chain: candidate.chain, contract_address: candidate.contractAddress },
+      routeTokenIdentity,
+    )) ?? null
+    : null;
   const selectedCandidate = explicitlySelectedFollowUp
     ? candidates.find((candidate) => isSameTokenIdentity(
       explicitlySelectedFollowUp,
       { chain: candidate.chain, contract_address: candidate.contractAddress },
     )) ?? null
-    : reviewPreviewCandidate
+    : routedCandidate
+      ?? reviewPreviewCandidate
       ?? candidates.find((candidate) => candidate.id === selectedCandidateId)
       ?? candidates.find((candidate) => candidate.discoveryBasket === "established" && candidate.finalLabel === "WATCHLIST")
       ?? candidates.find((candidate) => candidate.discoveryBasket === "established")
@@ -230,9 +249,19 @@ export function ProductAppContent() {
   }, [loadData]);
 
   useEffect(() => {
-    const handleHashChange = () => setActiveSection(resolveSection());
+    const handleRouteChange = () => {
+      setActiveSection(resolveSection());
+      setRouteTokenIdentity(resolveRouteTokenIdentity());
+      setActiveDetailTab(resolveDetailTab());
+    };
+    const handleHashChange = () => handleRouteChange();
+    const handlePopState = () => handleRouteChange();
     window.addEventListener("hashchange", handleHashChange);
-    return () => window.removeEventListener("hashchange", handleHashChange);
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("hashchange", handleHashChange);
+      window.removeEventListener("popstate", handlePopState);
+    };
   }, []);
 
   const navigate = useCallback((section: ProductSectionId) => {
@@ -259,10 +288,19 @@ export function ProductAppContent() {
   }, [activeSection, feedbackContext, navigate, selectedCandidate, selectedReportContext]);
 
   const openCandidate = useCallback((candidateId: string) => {
+    const candidate = candidates.find((entry) => entry.id === candidateId);
     setSelectedFollowUpEntryId(null);
     setSelectedCandidateId(candidateId);
+    setActiveDetailTab("summary");
+    if (candidate) {
+      const identity = { chain: candidate.chain, contract_address: candidate.contractAddress };
+      setRouteTokenIdentity(identity);
+      writeCandidateDetailRoute(identity, "summary");
+      setActiveSection("candidate-detail");
+      return;
+    }
     navigate("candidate-detail");
-  }, [navigate]);
+  }, [candidates, navigate]);
 
   const openFollowUp = useCallback((entryId: string) => {
     const entry = followUpEntries.find((candidate) => candidate.entry_id === entryId);
@@ -274,8 +312,30 @@ export function ProductAppContent() {
       : null;
     setSelectedFollowUpEntryId(entryId);
     setSelectedCandidateId(matchingCandidate?.id ?? null);
+    setActiveDetailTab("summary");
+    if (entry) {
+      const identity = { chain: entry.chain, contract_address: entry.contract_address };
+      setRouteTokenIdentity(identity);
+      writeCandidateDetailRoute(identity, "summary");
+      setActiveSection("candidate-detail");
+      return;
+    }
     navigate("candidate-detail");
   }, [candidates, followUpEntries, navigate]);
+
+  const changeDetailTab = useCallback((tab: CandidateDetailTabId) => {
+    setActiveDetailTab(tab);
+    const identity = selectedCandidate
+      ? { chain: selectedCandidate.chain, contract_address: selectedCandidate.contractAddress }
+      : selectedFollowUp
+        ? { chain: selectedFollowUp.chain, contract_address: selectedFollowUp.contract_address }
+        : routeTokenIdentity;
+    if (identity) {
+      setRouteTokenIdentity(identity);
+      writeCandidateDetailRoute(identity, tab);
+      setActiveSection("candidate-detail");
+    }
+  }, [routeTokenIdentity, selectedCandidate, selectedFollowUp]);
 
   const openVerification = useCallback((candidate: UiTokenCandidate) => {
     setSelectedCandidateId(candidate.id);
@@ -347,13 +407,15 @@ export function ProductAppContent() {
 
     if (activeSection === "candidate-detail") {
       return (
-        <ProductWorkspaceSection {...copy}>
+        <ProductWorkspaceSection {...copy} workspaceMode="tabbed">
           <CandidateDetailView
             candidate={selectedCandidate}
             followUp={selectedFollowUp}
             followUpStatus={followUpStatus}
             onBackToResults={() => navigate("candidate-results")}
             onOpenExternalChecks={openVerification}
+            activeTab={activeDetailTab}
+            onActiveTabChange={changeDetailTab}
           />
         </ProductWorkspaceSection>
       );

@@ -167,8 +167,8 @@ describe("Follow-up read-only product boundary", () => {
     const polishBasket = render("pl", React.createElement(MaturingFollowUpBasket, { entries: [entry], status: publicStatus() }));
     assert.match(englishBasket, /Candidate for an owner decision\. It has not been added to Established automatically\./);
     assert.match(polishBasket, /Kandydat do ręcznej decyzji ownera\. Nie został automatycznie dodany do Established\./);
-    const englishDetail = render("en", React.createElement(CandidateDetailView, { candidate, followUp: entry }));
-    const polishDetail = render("pl", React.createElement(CandidateDetailView, { candidate, followUp: entry }));
+    const englishDetail = render("en", React.createElement(CandidateDetailView, { candidate, followUp: entry, initialActiveTab: "observation" }));
+    const polishDetail = render("pl", React.createElement(CandidateDetailView, { candidate, followUp: entry, initialActiveTab: "observation" }));
     assert.match(englishDetail, /Candidate for Established/);
     assert.match(polishDetail, /Kandydat do Established/);
     assert.doesNotMatch(polishDetail, /CANDIDATE_FOR_ESTABLISHED|CANDIDATE FOR ESTABLISHED/);
