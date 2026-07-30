@@ -18,6 +18,7 @@ import {
   type FollowUpObservationCandidate,
 } from "../../data-poc/src/followUpBasket.js";
 import {
+  ESTABLISHED_ADDRESS_UNIVERSE_CONFIG_PATH,
   getDefaultEstablishedUniverseStorePath,
   universeIdentityKey,
 } from "../../data-poc/src/establishedAddressUniverse.js";
@@ -78,6 +79,7 @@ export type ProductE2ECanonicalState = {
 
 export type ProductE2EManifest = {
   schema_version: typeof PRODUCT_E2E_SCHEMA_VERSION;
+  report_schema_version: typeof PRODUCT_E2E_REPORT_SCHEMA_VERSION;
   run_id: string;
   started_at: string;
   completed_at: string;
@@ -111,6 +113,7 @@ export type ProductE2EManifest = {
   };
   mock_provider_calls: number;
   happy_path_mock_provider_calls: number;
+  ai_status_trace: Array<"QUEUED" | "PROCESSING" | "READY">;
   live_openai_calls: 0;
   live_data_provider_calls: 0;
   canonical_store_mutations: number;
@@ -133,6 +136,10 @@ export type ProductE2EManifest = {
     refresh_collector_calls: 0;
   };
   safe_error_codes: string[];
+  fail_closed_boundaries: Array<{
+    code: string;
+    blocked: boolean;
+  }>;
   e2e_report_path: string;
 };
 
@@ -156,6 +163,7 @@ export type ProductE2ERunResult = {
   manifestPath: string;
   reportPath: string;
   productReportPath: string | null;
+  isolatedStores: ProductE2EManifest["isolated_stores"];
 };
 
 export type ProductE2EOptions = {
@@ -190,6 +198,7 @@ const execFileAsync = promisify(execFile);
 const PRODUCT_E2E_RUN_ID = /^product-e2e-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}$/;
 const SAFE_SOURCE_RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 const DATA_POC_OUTPUT_DIRECTORY = fileURLToPath(new URL("../../data-poc/output", import.meta.url));
+const REPO_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
 
 export async function previewFullProductE2E(options: ProductE2EOptions = {}): Promise<ProductE2EPreview> {
   const selection = await selectRealProductE2EIdentity();
@@ -202,7 +211,7 @@ export async function previewFullProductE2E(options: ProductE2EOptions = {}): Pr
     contract_address: selection.identity.contract_address,
     symbol: selection.candidate.symbol,
     plan: PRODUCT_E2E_VIEW_SEQUENCE,
-    isolated_stores: isolatedStorePaths(resolveIsolatedRoot(runId, options.isolatedRoot)),
+    isolated_stores: safeIsolatedStorePaths(runId),
     mutations_performed: 0,
     mock_worker_started: false,
     live_openai_calls: 0,
@@ -266,6 +275,7 @@ export async function runFullProductE2E(options: ProductE2EOptions = {}): Promis
   let productReportPath: string | null = null;
   let mockProviderCalls = 0;
   let happyPathMockProviderCalls = 0;
+  const aiStatusTrace: Array<"QUEUED" | "PROCESSING" | "READY"> = [];
   let ownerDecisionRecorded = false;
   let workerStartedByOwner = false;
   let followUpRecords = 0;
@@ -447,6 +457,20 @@ export async function runFullProductE2E(options: ProductE2EOptions = {}): Promis
       assert(await hashFiles([paths.established]) === before, "USER_PROMOTION_MUTATED_ESTABLISHED");
     });
 
+    await runStep(steps, "ai-unvalidated-data-boundary", [], async () => {
+      const response = await httpJson(server!, "POST", "/api/v1/ai-analyses/requests", {
+        origin,
+        "content-type": "application/json",
+      }, {
+        chain: "base",
+        contract_address: "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        locale: "pl",
+        idempotency_key: `${runId.replaceAll("-", "_")}_unvalidated`,
+      });
+      assert(response.status === 404, "UNVALIDATED_DATA_DID_NOT_BLOCK_AI");
+      assert(queueStore!.stats().records === 0, "UNVALIDATED_DATA_CREATED_AI_JOB");
+    });
+
     const queued = await runStep(steps, "public-ai-post-queues-only", [], async () => {
       const response = await httpJson(server!, "POST", "/api/v1/ai-analyses/requests", {
         origin,
@@ -460,6 +484,7 @@ export async function runFullProductE2E(options: ProductE2EOptions = {}): Promis
       assert(response.status === 202, "AI_PUBLIC_POST_FAILED");
       assert(response.body.queue_status === "QUEUED", "AI_PUBLIC_POST_DID_NOT_QUEUE");
       assert(mockProviderCalls === 0, "AI_PUBLIC_POST_CALLED_PROVIDER");
+      aiStatusTrace.push("QUEUED");
       return response;
     });
     analysisId = typeof queued.body.analysis_id === "string" ? queued.body.analysis_id : null;
@@ -483,6 +508,8 @@ export async function runFullProductE2E(options: ProductE2EOptions = {}): Promis
     const validProvider = deterministicMockProvider(async (context) => {
       mockProviderCalls += 1;
       happyPathMockProviderCalls += 1;
+      assert(queueStore!.findByAnalysisId(analysisId!)?.status === "PROCESSING", "AI_PROCESSING_STATE_MISSING");
+      aiStatusTrace.push("PROCESSING");
       return deterministicNarrative(context);
     });
     const { createAIResearchWorker } = await import("./aiResearchWorker.js");
@@ -499,6 +526,8 @@ export async function runFullProductE2E(options: ProductE2EOptions = {}): Promis
       const cycle = await worker.runCycle();
       assert(cycle.claimed === 1 && cycle.completed === 1, "AI_WORKER_DID_NOT_COMPLETE_EXACTLY_ONE");
       assert(cycle.provider_calls === 1 && happyPathMockProviderCalls === 1, "AI_WORKER_CALL_COUNT_INVALID");
+      assert(queueStore!.findByAnalysisId(analysisId!)?.status === "READY", "AI_READY_STATE_MISSING");
+      aiStatusTrace.push("READY");
     });
     aiQueueRecords = queueStore.stats().records;
 
@@ -665,6 +694,7 @@ export async function runFullProductE2E(options: ProductE2EOptions = {}): Promis
   const failed = safeErrorCodes.length > 0 || steps.some((step) => step.status === "FAILED");
   const manifest: ProductE2EManifest = {
     schema_version: PRODUCT_E2E_SCHEMA_VERSION,
+    report_schema_version: PRODUCT_E2E_REPORT_SCHEMA_VERSION,
     run_id: runId,
     started_at: startedAt.toISOString(),
     completed_at: completedAt.toISOString(),
@@ -681,7 +711,7 @@ export async function runFullProductE2E(options: ProductE2EOptions = {}): Promis
       report_id: reportId,
       feedback_id: feedbackId,
     },
-    isolated_stores: paths,
+    isolated_stores: safeIsolatedStorePaths(runId),
     idempotency: {
       follow_up_records: followUpRecords,
       established_versions_created: establishedVersionsCreated,
@@ -691,6 +721,7 @@ export async function runFullProductE2E(options: ProductE2EOptions = {}): Promis
     },
     mock_provider_calls: mockProviderCalls,
     happy_path_mock_provider_calls: happyPathMockProviderCalls,
+    ai_status_trace: aiStatusTrace,
     live_openai_calls: 0,
     live_data_provider_calls: 0,
     canonical_store_mutations: canonicalUnchanged ? 0 : 1,
@@ -709,11 +740,20 @@ export async function runFullProductE2E(options: ProductE2EOptions = {}): Promis
       refresh_collector_calls: 0,
     },
     safe_error_codes: [...new Set(safeErrorCodes)],
-    e2e_report_path: reportPath,
+    fail_closed_boundaries: [
+      { code: "INVALID_CONTRACT_ADDRESS", blocked: stepPassed(steps, "fail-closed-identity-boundaries") },
+      { code: "UNSUPPORTED_CHAIN", blocked: stepPassed(steps, "fail-closed-identity-boundaries") },
+      { code: "OWNER_DECISION_REQUIRED", blocked: stepPassed(steps, "owner-decision-required") },
+      { code: "CANDIDATE_NOT_FOUND", blocked: stepPassed(steps, "ai-unvalidated-data-boundary") },
+      { code: "VALIDATION_FAILURE", blocked: stepPassed(steps, "invalid-mock-fails-closed") },
+      { code: "READY_ANALYSIS_REQUIRED_FOR_REPORT", blocked: stepPassed(steps, "product-report") },
+      { code: "FEEDBACK_LIFECYCLE_IMMUTABLE", blocked: stepPassed(steps, "feedback") },
+    ],
+    e2e_report_path: safeE2EPath(runId, "product-e2e-report.md"),
   };
   await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
   await writeFile(reportPath, renderProductE2EMarkdown(manifest), "utf8");
-  return { manifest, manifestPath, reportPath, productReportPath };
+  return { manifest, manifestPath, reportPath, productReportPath, isolatedStores: paths };
 }
 
 export async function captureCanonicalProductState(
@@ -724,7 +764,10 @@ export async function captureCanonicalProductState(
     ? "not-checked"
     : await safeTaskSchedulerState(options.taskSchedulerStateReader);
   return {
-    established_universe: await hashFiles(sqliteOrFileGroup(getDefaultEstablishedUniverseStorePath())),
+    established_universe: await hashFiles([
+      ...sqliteOrFileGroup(getDefaultEstablishedUniverseStorePath()),
+      resolve(REPO_ROOT, ESTABLISHED_ADDRESS_UNIVERSE_CONFIG_PATH),
+    ]),
     feedback_store: await hashFiles(sqliteOrFileGroup(getDefaultFeedbackStorePath())),
     follow_up_store: await hashFiles([
       getDefaultFollowUpStorePath(),
@@ -898,6 +941,21 @@ function isolatedStorePaths(root: string): ProductE2EManifest["isolated_stores"]
     feedback: resolve(root, "feedback", "feedback.sqlite"),
     reports: resolve(root, "reports"),
   };
+}
+
+function safeIsolatedStorePaths(runId: string): ProductE2EManifest["isolated_stores"] {
+  return {
+    root: safeE2EPath(runId),
+    follow_up: safeE2EPath(runId, "follow-up", "store.json"),
+    established: safeE2EPath(runId, "established", "store.json"),
+    ai_queue: safeE2EPath(runId, "ai", "queue.sqlite"),
+    feedback: safeE2EPath(runId, "feedback", "feedback.sqlite"),
+    reports: safeE2EPath(runId, "reports"),
+  };
+}
+
+function safeE2EPath(runId: string, ...segments: string[]): string {
+  return ["%TEMP%", PRODUCT_E2E_BASE_DIRECTORY_NAME, runId, ...segments].join("\\");
 }
 
 function resolveIsolatedRoot(runId: string, configured?: string): string {
@@ -1200,6 +1258,10 @@ function safeErrorCode(error: unknown): string {
     : error instanceof Error ? error.message : "PRODUCT_E2E_FAILED";
   const normalized = value.split(":", 1)[0]?.trim().toUpperCase().replace(/[^A-Z0-9_]/g, "_");
   return normalized && normalized.length <= 120 ? normalized : "PRODUCT_E2E_FAILED";
+}
+
+function stepPassed(steps: ProductE2EStep[], id: string): boolean {
+  return steps.find((step) => step.id === id)?.status === "PASS";
 }
 
 function listen(server: Server): Promise<void> {

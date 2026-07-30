@@ -536,3 +536,14 @@ scripts\win\start-tabbed-detail-review.cmd
 ```
 
 Launcher uruchamia zwykły fixture-free `INTERNAL_BETA` z bieżącym rzeczywistym snapshotem, wybiera istniejącą obsługiwaną tożsamość `chain + contract_address` i otwiera dokładnie jedną kartę `#candidate-detail` z `detail=summary`. Widok używa jednego szerokiego panelu oraz siedmiu zakładek. Provider AI, live-source opt-in, automation, owner operations i feedback submission są wyłączone. Launcher nie uruchamia collectora lub workera, nie tworzy sztucznego tokena i nie zmienia Follow-up, Established, feedback, lifecycle ani Task Scheduler. Pełny kontrakt: `docs/tabbed_detail_workspace.md`.
+
+## E2E.1 Full Product Journey Review
+
+```cmd
+scripts\win\start-full-product-e2e-review.cmd
+scripts\win\start-full-product-e2e-review.cmd --run-isolated
+```
+
+Bez parametrów launcher tylko odczytuje aktualny zwalidowany snapshot, pokazuje rzeczywistą identity, plan i ścieżki przyszłych store pod `%TEMP%`. Nie tworzy store, nie uruchamia workera i otwiera dokładnie jedną kartę runbooka.
+
+`--run-isolated` uruchamia jeden przepływ Nowe → Follow-up → Kandydat → Established → AI.3 → Reports → Feedback na osobnych magazynach Follow-up, Established, AI SQLite, Feedback SQLite i Reports. Używa deterministycznego mocka, wykonuje 0 OpenAI calls, 0 live data-provider calls, 0 centralnych live cycles i 0 zmian Task Scheduler. Przed i po porównuje chronione hashe kanoniczne. Kontrakt i interpretacja raportu: `docs/full_product_e2e.md`.

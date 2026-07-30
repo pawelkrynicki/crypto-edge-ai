@@ -1,6 +1,22 @@
 # Roadmap
 
-## Current stage: UX.2 + UX.3 + UX.4 — Tabbed Detail Workspace and Provider-neutral Client
+## Current stage: E2E.1 — Full Product Journey
+
+E2E.1 łączy zaakceptowane powierzchnie w jeden kontrolowany przebieg **Nowe → Dalsza obserwacja → Kandydat do Established → Established → Analiza AI → Raport → Feedback**. Tożsamość i metryki rynkowe pochodzą z aktualnego zwalidowanego snapshotu, a wszystkie mutacje odbywają się wyłącznie w izolowanych store pod `%TEMP%`.
+
+Publiczny POST AI wyłącznie kolejkuje; owner uruchamia deterministycznego mock workera. Manifest `product_e2e_run_v1`, raport Markdown, porównanie hashy kanonicznych i status Task Scheduler tworzą fail-closed audit. Launcher jest preview-first i otwiera dokładnie jedną kartę. Kontrakt: `docs/full_product_e2e.md`.
+
+Status domkniętych etapów:
+
+- AI.3 — zakończone;
+- UX.2, UX.3 i UX.4 — zakończone;
+- Trusted Tester Preview — zakończony jako lokalna powierzchnia produktu; zewnętrzny dostęp nadal wymaga osobnej decyzji;
+- AFF.1 — odłożone na końcówkę po E2E/release-candidate gates;
+- bieżący etap — E2E.1.
+
+E2E.1 nie wykonuje live OpenAI calls, live data-provider calls, centralnego live cycle ani zmian Task Scheduler, VPS, Cloudflare, AIKINTEL lub kanonicznych store.
+
+## Completed: UX.2 + UX.3 + UX.4 — Tabbed Detail Workspace and Provider-neutral Client
 
 Candidate Detail działa jako kompaktowy nagłówek tokena → siedem poziomych zakładek → jeden szeroki panel aktywnej treści. Desktop wykorzystuje pełną szerokość obszaru roboczego, a mobile zachowuje poziomo przewijany pasek zakładek, pełnoszeroką aktywną treść i brak overflow całej strony. URL odtwarza `chain + contract_address` oraz allowlistowaną zakładkę, domyślnie `summary`. Nagłówek klienta pokazuje tylko ostatnią aktualizację, EN/PL i odświeżenie; techniczne dane pozostają w Control Center i endpointach ownera. Zakładka AI zachowuje AI.3, ale klient nie pokazuje nazwy providera ani modelu. Kontrakt: `docs/tabbed_detail_workspace.md`.
 

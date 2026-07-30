@@ -58,6 +58,7 @@ const launcherPath = resolve(import.meta.dirname, "..", "..", "..", "scripts", "
 
 let result: ProductE2ERunResult;
 let manifest: ProductE2EManifest;
+let stores: ProductE2EManifest["isolated_stores"];
 let candidate: UiTokenCandidate;
 let reportDetail: ReportDetail;
 let readyBrief: AIResearchBrief;
@@ -72,6 +73,7 @@ before(async () => {
     taskSchedulerStateReader: async () => taskState,
   });
   manifest = result.manifest;
+  stores = result.isolatedStores;
   assert.equal(manifest.status, "PASS", JSON.stringify({
     errors: manifest.safe_error_codes,
     steps: manifest.steps,
@@ -89,23 +91,23 @@ before(async () => {
     ))!;
   assert.ok(candidate);
 
-  const universe = await readEstablishedUniverseStore(manifest.isolated_stores.established);
+  const universe = await readEstablishedUniverseStore(stores.established);
   followUp = await readFollowUpList({
-    storePath: manifest.isolated_stores.follow_up,
+    storePath: stores.follow_up,
     establishedUniverse: universe.current,
   });
   followUpStatus = await readFollowUpStatus({
-    storePath: manifest.isolated_stores.follow_up,
+    storePath: stores.follow_up,
     establishedUniverse: universe.current,
   });
 
-  const list = await readReportsList({ reportsRootPath: manifest.isolated_stores.reports });
+  const list = await readReportsList({ reportsRootPath: stores.reports });
   reportDetail = (await readReportDetail(list.reports[0]!.report_id, {
-    reportsRootPath: manifest.isolated_stores.reports,
+    reportsRootPath: stores.reports,
   }))!;
   assert.ok(reportDetail);
 
-  const queue = await createAIAnalysisQueueStore({ databaseFilePath: manifest.isolated_stores.ai_queue });
+  const queue = await createAIAnalysisQueueStore({ databaseFilePath: stores.ai_queue });
   try {
     readyBrief = queue.findByAnalysisId(manifest.isolated_records.analysis_id!)!.result!;
   } finally {
@@ -142,7 +144,7 @@ describe("E2E.1 full product journey", () => {
   });
 
   it("4. preserves checkpoints 1, 3, 7, 14 and 30", async () => {
-    const store = await readFollowUpStore(manifest.isolated_stores.follow_up);
+    const store = await readFollowUpStore(stores.follow_up);
     assert.deepEqual(store.entries[0]?.completed_checkpoints, [...FOLLOW_UP_CHECKPOINT_DAYS]);
   });
 
@@ -152,7 +154,7 @@ describe("E2E.1 full product journey", () => {
   });
 
   it("6. records one owner decision and isolated Established version", async () => {
-    const universe = await readEstablishedUniverseStore(manifest.isolated_stores.established);
+    const universe = await readEstablishedUniverseStore(stores.established);
     assert.equal(manifest.owner_user_boundaries.owner_decision_recorded, true);
     assert.equal(universe.current.universe_version, manifest.isolated_records.established_universe_version);
     assert.equal(universe.audit_log[0]?.actor, "product-e2e-owner");
@@ -170,6 +172,7 @@ describe("E2E.1 full product journey", () => {
 
   it("9. mock worker completes exactly one happy-path job", () => {
     assert.equal(manifest.happy_path_mock_provider_calls, 1);
+    assert.deepEqual(manifest.ai_status_trace, ["QUEUED", "PROCESSING", "READY"]);
     assert.equal(step("owner-mock-worker").status, "PASS");
   });
 
@@ -204,7 +207,7 @@ describe("E2E.1 full product journey", () => {
   });
 
   it("14. feedback is visible only in the isolated store", async () => {
-    const store = await createFeedbackStore({ databaseFilePath: manifest.isolated_stores.feedback });
+    const store = await createFeedbackStore({ databaseFilePath: stores.feedback });
     try {
       const record = store.get(manifest.isolated_records.feedback_id!);
       assert.equal(store.health(true).total_count, 1);
@@ -260,20 +263,25 @@ describe("E2E.1 full product journey", () => {
 
   it("19. invalid contract address stops the flow", () => {
     assert.equal(step("fail-closed-identity-boundaries").status, "PASS");
+    assert.equal(boundary("INVALID_CONTRACT_ADDRESS").blocked, true);
   });
 
   it("20. unsupported network stops Follow-up", () => {
     assert.equal(step("fail-closed-identity-boundaries").status, "PASS");
+    assert.equal(boundary("UNSUPPORTED_CHAIN").blocked, true);
   });
 
   it("21. lack of owner decision stops Established", () => {
     assert.equal(step("owner-decision-required").safe_error_code, null);
     assert.ok(stepIndex("owner-decision-required") < stepIndex("owner-established-promotion"));
+    assert.equal(boundary("OWNER_DECISION_REQUIRED").blocked, true);
   });
 
   it("22. invalid mock response publishes no brief", () => {
     assert.equal(step("invalid-mock-fails-closed").status, "PASS");
     assert.equal(manifest.mock_provider_calls, 2);
+    assert.equal(step("ai-unvalidated-data-boundary").status, "PASS");
+    assert.equal(boundary("CANDIDATE_NOT_FOUND").blocked, true);
     assert.throws(
       () => assertReadyAnalysisForProductReport({ queue_status: "FAILED", brief: null }),
       /READY_ANALYSIS_REQUIRED_FOR_REPORT/,
@@ -283,6 +291,7 @@ describe("E2E.1 full product journey", () => {
   it("23. JSON manifest is complete and versioned", async () => {
     const parsed = JSON.parse(await readFile(result.manifestPath, "utf8")) as ProductE2EManifest;
     assert.equal(parsed.schema_version, PRODUCT_E2E_SCHEMA_VERSION);
+    assert.equal(parsed.report_schema_version, PRODUCT_E2E_REPORT_SCHEMA_VERSION);
     for (const key of [
       "run_id", "started_at", "completed_at", "status", "source_snapshot_id",
       "chain", "contract_address", "steps", "isolated_records", "mock_provider_calls",
@@ -290,6 +299,8 @@ describe("E2E.1 full product journey", () => {
       "safe_error_codes", "e2e_report_path",
     ]) assert.ok(Object.hasOwn(parsed, key), key);
     assert.doesNotMatch(JSON.stringify(parsed), /authorization|api[_-]?key|full_prompt|raw_response/i);
+    assert.doesNotMatch(JSON.stringify(parsed), /[A-Z]:\\Users\\|pawel/i);
+    assert.ok(Object.values(parsed.isolated_stores).every((value) => value.startsWith("%TEMP%\\")));
   });
 
   it("24. Markdown owner report is complete", async () => {
@@ -307,9 +318,11 @@ describe("E2E.1 full product journey", () => {
     assert.deepEqual(manifest.canonical_protection.before, manifest.canonical_protection.after);
   });
 
-  it("26. Task Scheduler stays unchanged", () => {
+  it("26. Task Scheduler stays unchanged", async () => {
     assert.equal(manifest.task_scheduler_unchanged, true);
     assert.equal(manifest.canonical_protection.before.task_scheduler, manifest.canonical_protection.after.task_scheduler);
+    const actual = await captureCanonicalProductState();
+    assert.notEqual(actual.task_scheduler, "TASK_SCHEDULER_STATUS_UNAVAILABLE");
   });
 
   it("27. performs zero OpenAI calls", () => {
@@ -360,7 +373,7 @@ describe("E2E.1 real product views", () => {
     }));
     assert.match(establishedMarkup, /Główny Radar|Established/);
 
-    const reportStatus = await readReportsLibraryStatus({ reportsRootPath: manifest.isolated_stores.reports });
+    const reportStatus = await readReportsLibraryStatus({ reportsRootPath: stores.reports });
     const reportsMarkup = renderLocale("pl", React.createElement(ReportsLibrary, {
       candidates: [candidate],
       onOpenCandidate: () => undefined,
@@ -409,6 +422,12 @@ function step(id: string) {
 
 function stepIndex(id: string): number {
   return manifest.steps.findIndex((value) => value.id === id);
+}
+
+function boundary(code: string) {
+  const found = manifest.fail_closed_boundaries.find((value) => value.code === code);
+  assert.ok(found, code);
+  return found;
 }
 
 function renderDetail(locale: "pl" | "en", tab: "summary" | "observation" | "ai"): string {

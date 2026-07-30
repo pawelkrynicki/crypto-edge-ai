@@ -30,6 +30,8 @@ This repo is not a second platform beside AIKINTEL. It is a working space for th
 
 The current client UX uses a wide Tabbed Detail Workspace, a compact nontechnical header and provider-neutral AI presentation. Product and owner boundaries, responsive behavior and the safe review command are documented in [`docs/tabbed_detail_workspace.md`](docs/tabbed_detail_workspace.md).
 
+E2E.1 joins the accepted lifecycle, AI.3 queue, Reports and Feedback surfaces into one reproducible journey backed by a current real token identity and isolated stores. The preview-first owner command and audit contract are documented in [`docs/full_product_e2e.md`](docs/full_product_e2e.md).
+
 ## What Crypto Edge AI Is
 
 - A trader-facing crypto intelligence module.
