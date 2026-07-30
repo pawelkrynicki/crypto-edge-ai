@@ -20,9 +20,9 @@ describe("Premium UI.2 presentation contracts", () => {
     ]);
     assert.match(component, /const overallStatus = status\?\.overallStatus \?\? "NOT_READY"/);
     assert.match(component, /status=\{status\.feedback\.status\}/);
-    assert.match(component, /status\?\.unmetGates/);
+    assert.match(component, /status\.unmetGates/);
     assert.match(component, /Gotowość danych/);
-    assert.match(component, /Możliwości produktu/);
+    assert.match(component, /Gotowość funkcjonalna produktu/);
     assert.match(component, /Dostęp i wdrożenie/);
     assert.doesNotMatch(component, /setOverallStatus|overallStatus\s*=\s*"READY"/);
     assert.match(resolver, /if \(feedbackStatus !== "READY"\) unmetGates\.push\("PERSISTENT_FEEDBACK_CAPTURE"\)/);
@@ -135,7 +135,7 @@ describe("Premium UI.2 presentation contracts", () => {
       assert.match(i18n, new RegExp(label));
     }
     assert.match(methodology, /Cykl obserwacji/);
-    assert.match(methodology, /dostawców danych/);
+    assert.match(methodology, /opublikowanej migawki/);
     const polishMethodology = methodology.slice(methodology.indexOf("  pl:"), methodology.indexOf("  en:"));
     const polishMethodCopy = i18n.slice(
       i18n.indexOf('"method.eyebrow"', i18n.indexOf("const PL: TranslationTable")),
@@ -149,7 +149,7 @@ describe("Premium UI.2 presentation contracts", () => {
 
   it("keeps Run ID in Candidate Detail technical details and renders readable failed-condition rows", async () => {
     const detail = await source("src/components/CandidateDetailView.tsx");
-    const freshnessSection = detail.slice(detail.indexOf('aria-labelledby="freshness-heading"'), detail.indexOf('aria-labelledby="filters-heading"'));
+    const freshnessSection = detail.slice(detail.indexOf('aria-labelledby="freshness-heading"'), detail.indexOf('aria-labelledby="sources-heading"'));
     assert.doesNotMatch(freshnessSection, /DetailField label=\{t\("detail\.runId"\)\}/);
     assert.match(freshnessSection, /TechnicalDetails label=\{t\("app\.technicalDetails"\)\}/);
     assert.match(freshnessSection, /<dt>\{t\("detail\.runId"\)\}<\/dt>/);

@@ -119,7 +119,7 @@ async function runCandidateDetailFlow(testCase: {
     await act(async () => {
       renderer = create(
         <ProductLocaleProvider initialLocale="pl">
-          <CandidateDetailView candidate={candidate} followUpStatus={null} />
+          <CandidateDetailView candidate={candidate} followUpStatus={null} initialActiveLayer="ai" />
         </ProductLocaleProvider>,
       );
     });

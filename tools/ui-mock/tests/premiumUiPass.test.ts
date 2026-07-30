@@ -89,19 +89,24 @@ describe("Premium UI.1 presentation contract", () => {
     assert.equal((markup.match(/data-lifecycle-layer=/g) ?? []).length, 3);
   });
 
-  it("keeps the complete Candidate Detail sequence and backend-gated owner controls", async () => {
+  it("keeps all Candidate Detail modules in one-layer navigation and backend-gated owner controls", async () => {
     const detail = await source("src/components/CandidateDetailView.tsx");
-    for (const heading of [
-      "identity-heading",
-      "market-heading",
-      "freshness-heading",
-      "filters-heading",
-      "security-heading",
-      "follow-up-heading",
-      "next-heading",
+    for (const layer of [
+      "identity",
+      "observation",
+      "market",
+      "filters",
+      "security",
+      "ai",
+      "data",
+      "sources",
     ]) {
-      assert.match(detail, new RegExp(`aria-labelledby="${heading}"`));
+      assert.match(detail, new RegExp(`"${layer}"`));
     }
+    assert.match(detail, /data-active-detail-layer=\{activeLayer \?\? "summary"\}/);
+    assert.match(detail, /activeLayer === "identity"/);
+    assert.match(detail, /activeLayer === "sources"/);
+    assert.equal((detail.match(/className="candidate-layer-body"/g) ?? []).length, 2);
     assert.match(detail, /status\?\.owner_controls_visible \? status : null/);
     assert.match(detail, /ownerPromotionStatus\?\.owner_controls_visible/);
     assert.doesNotMatch(detail, /owner_controls_visible\s*=\s*true/);
