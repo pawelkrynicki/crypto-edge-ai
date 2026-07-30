@@ -1113,6 +1113,8 @@ function nextScannerFixture(current: ScannerApiOutput, runId: string, symbol: st
   next.scan_run.finished_at = "2026-07-30T12:05:00.000Z";
   next.candidates[0]!.run_id = runId;
   next.candidates[0]!.symbol = symbol;
+  next.security_checks = next.security_checks.map((securityCheck) => ({ ...securityCheck, run_id: runId }));
+  next.scorecards = next.scorecards.map((scorecard) => ({ ...scorecard, run_id: runId }));
   next.provenance!.run_id = runId;
   next.provenance!.generated_at = "2026-07-30T12:05:00.000Z";
   next.provenance!.finished_at = "2026-07-30T12:05:00.000Z";
