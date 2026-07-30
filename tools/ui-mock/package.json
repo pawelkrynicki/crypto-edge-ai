@@ -28,6 +28,8 @@
     "test:tabbed-detail": "node --import tsx --test tests/tabbedDetailWorkspace.test.tsx",
     "test:e2e1": "node --import tsx --test tests/productE2E.test.tsx",
     "e2e:product": "node --import tsx scripts/runFullProductE2E.ts",
+    "test:stab1": "node --import tsx --test tests/resilienceFailureDrills.test.tsx",
+    "stab1:drills": "node --import tsx scripts/runResilienceFailureDrills.ts",
     "test:ai-semantic": "node --import tsx --test tests/aiResearchSemanticQuality.test.ts",
     "test:control-center": "node --import tsx --test tests/controlCenter.test.ts",
     "test:reports": "node --import tsx --test tests/reportsLibrary.test.ts",
