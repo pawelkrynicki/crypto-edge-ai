@@ -507,25 +507,23 @@ function buildReportId(relativeIdentity: string): string {
 }
 
 function toSummary(detail: ReportDetail): ReportListItem {
-  const {
-    analysis_id: _analysisId,
-    localized_research: _localizedResearch,
-    transaction_signal: _transactionSignal,
-    research_summary: _researchSummary,
-    source_freshness: _sourceFreshness,
-    source_coverage: _sourceCoverage,
-    market_context: _marketContext,
-    security_observations: _securityObservations,
-    risk_flags: _riskFlags,
-    manual_verification_requirements: _manualVerificationRequirements,
-    candidates: _candidates,
-    review_notes: _reviewNotes,
-    open_questions: _openQuestions,
-    next_review_step: _nextReviewStep,
-    missing_sections: _missingSections,
-    ...summary
-  } = detail;
-  return summary;
+  return {
+    report_id: detail.report_id,
+    report_version: detail.report_version,
+    title: detail.title,
+    generated_at: detail.generated_at,
+    candidate_name: detail.candidate_name,
+    project_name: detail.project_name,
+    symbol: detail.symbol,
+    chain: detail.chain,
+    contract_address: detail.contract_address,
+    basket: detail.basket,
+    scanner_run_id: detail.scanner_run_id,
+    review_status: detail.review_status,
+    report_format: detail.report_format,
+    detail_available: detail.detail_available,
+    validation_status: detail.validation_status,
+  };
 }
 
 function compareReports(left: ReportListItem, right: ReportListItem): number {
@@ -573,7 +571,13 @@ function normalizeOptionalDate(value: unknown): string | null | undefined {
 
 function boundedString(value: unknown, maxLength: number): string | null {
   if (typeof value !== "string" || value.length > maxLength || /\0/.test(value)) return null;
-  const normalized = value.replace(/[\u0001-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "").trim();
+  const normalized = [...value]
+    .filter((character) => {
+      const codePoint = character.codePointAt(0) ?? 0;
+      return codePoint === 9 || codePoint === 10 || codePoint === 13 || (codePoint >= 32 && codePoint !== 127);
+    })
+    .join("")
+    .trim();
   return normalized.length > 0 ? normalized : null;
 }
 

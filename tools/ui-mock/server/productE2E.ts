@@ -262,7 +262,7 @@ export async function runFullProductE2E(options: ProductE2EOptions = {}): Promis
   const safeErrorCodes: string[] = [];
   let selection: Awaited<ReturnType<typeof selectRealProductE2EIdentity>> | null = null;
   let canonicalBefore: ProductE2ECanonicalState | null = null;
-  let canonicalAfter: ProductE2ECanonicalState | null = null;
+  let canonicalAfter: ProductE2ECanonicalState;
   let queueStore: AIAnalysisQueueStore | null = null;
   let feedbackStore: FeedbackStore | null = null;
   let server: Server | null = null;
@@ -684,8 +684,7 @@ export async function runFullProductE2E(options: ProductE2EOptions = {}): Promis
     }).catch(() => unavailableCanonicalState());
   }
 
-  canonicalBefore ??= canonicalAfter ?? unavailableCanonicalState();
-  canonicalAfter ??= unavailableCanonicalState();
+  canonicalBefore ??= canonicalAfter;
   const canonicalUnchanged = equalCanonicalState(canonicalBefore, canonicalAfter);
   if (!canonicalUnchanged) safeErrorCodes.push("CANONICAL_STATE_MUTATION_DETECTED");
   const taskSchedulerUnchanged = canonicalBefore.task_scheduler === canonicalAfter.task_scheduler;

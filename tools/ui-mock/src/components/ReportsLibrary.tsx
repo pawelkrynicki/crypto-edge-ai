@@ -60,8 +60,20 @@ export function ReportsLibrary({
 
   useEffect(() => {
     if (initialStatus !== undefined) return;
-    void refresh();
-  }, [initialStatus, refresh]);
+    let active = true;
+    void Promise.all([
+      loadReportsLibraryStatus(),
+      loadReportsList(),
+    ]).then(([nextStatus, nextReports]) => {
+      if (!active) return;
+      setStatus(nextStatus);
+      setReports(nextReports ?? []);
+      setLoading(false);
+    });
+    return () => {
+      active = false;
+    };
+  }, [initialStatus]);
 
   const openReport = useCallback(async (reportId: string) => {
     setDetailLoading(true);

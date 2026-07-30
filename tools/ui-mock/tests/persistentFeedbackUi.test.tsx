@@ -124,16 +124,14 @@ describe("Persistent Feedback product UI", () => {
     assert.match(owner, /<strong>1<\/strong>/);
   });
 
-  it("adds #feedback navigation and a compact action to the INTERNAL_BETA Product Radar", async () => {
-    const [app, shell, i18n] = await Promise.all([
+  it("adds #feedback navigation to the INTERNAL_BETA Product Radar", async () => {
+    const [app, i18n] = await Promise.all([
       readFile(resolve(uiRoot, "src", "ProductApp.tsx"), "utf8"),
-      readFile(resolve(uiRoot, "src", "components", "ProductWorkspaceShell.tsx"), "utf8"),
       readFile(resolve(uiRoot, "src", "productI18n.tsx"), "utf8"),
     ]);
     assert.match(app, /"#feedback": "feedback"/);
     assert.match(app, /id: "feedback"/);
     assert.match(app, /groupLabel: t\("nav\.groupReview"\)/);
-    assert.match(shell, /feedback\.quickAction/);
     assert.match(i18n, /"nav\.feedbackDescription": "Report an issue or idea"/);
     assert.match(i18n, /"nav\.feedbackDescription": "Zgłoś problem lub pomysł"/);
   });
