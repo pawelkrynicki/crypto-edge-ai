@@ -158,7 +158,7 @@ export function AIResearchBriefCanvas({
         <p className="ai-source-boundary">{ui.noExternalCalls}</p>
       </section>
 
-      {!brief.render_preview && (
+      {reviewMetrics && !brief.render_preview && (
         <details className="ai-research-technical product-technical-details">
           <summary>{ui.technicalDetails}</summary>
           <dl className="ai-research-technical-grid product-technical-details-content">
