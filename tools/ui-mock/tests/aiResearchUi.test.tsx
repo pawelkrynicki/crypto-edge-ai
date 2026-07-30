@@ -245,7 +245,8 @@ describe("AI.3 shared queue UI", () => {
 
     assert.match(markup, />Temporarily unavailable</);
     assert.doesNotMatch(markup, />Preparing</);
-    assert.match(markup, /The update failed\. The previous valid result was not removed\./);
+    assert.match(markup, /The analysis could not be prepared right now\./);
+    assert.match(markup, /Try again later\. The last valid result remains available\./);
   });
 
   it("renders every owner review state from an initial render-preview lookup", () => {
@@ -351,7 +352,8 @@ describe("AI.3 shared queue UI", () => {
     assert.equal(failure.brief, null);
     const markup = render("pl", <AIResearchSection chain="base" contractAddress={ADDRESS} symbol="SCOOBERT" name="Scoobert" initialLookup={failure} />);
     assert.match(markup, /Niedostępna/);
-    assert.match(markup, /Analiza chwilowo niedostępna/);
+    assert.match(markup, /Analiza nie mogła zostać teraz przygotowana\./);
+    assert.match(markup, /Spróbuj ponownie później\./);
     assert.match(markup, /Zgłoś przygotowanie analizy/);
     assert.doesNotMatch(markup, /Wygeneruj analizę AI/);
     assert.doesNotMatch(markup, /Brak analizy/);
@@ -427,7 +429,8 @@ describe("AI.3 shared queue UI", () => {
       error_code: "WORKER_SUSPENDED",
       queue_status: "SUSPENDED",
     }} />);
-    assert.match(suspended, /Przygotowanie analizy zostało wstrzymane/);
+    assert.match(suspended, /Analiza nie mogła zostać teraz przygotowana\./);
+    assert.match(suspended, /Spróbuj ponownie później\./);
     assert.doesNotMatch(suspended, /Zgłoś przygotowanie analizy/);
 
     const queued = render("pl", <AIResearchSection chain="base" contractAddress={ADDRESS} symbol="SCOOBERT" name="Scoobert" initialLookup={{

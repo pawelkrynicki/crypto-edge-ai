@@ -269,16 +269,17 @@ function stateTitle(value: AIResearchBriefLookup["availability"], locale: "pl" |
   if (value === "QUEUED") return pl ? "Analiza oczekuje w kolejce" : "Analysis is waiting in the queue";
   if (value === "PROCESSING") return pl ? "Analiza jest przygotowywana" : "Analysis is being prepared";
   if (value === "STALE") return pl ? "Ostatnia analiza dostępna" : "Last analysis available";
-  if (value === "FAILED" || value === "ERROR" || value === "PROVIDER_DISABLED") return pl ? "Analiza chwilowo niedostępna" : "Analysis temporarily unavailable";
-  if (value === "SUSPENDED") return pl ? "Przygotowanie analizy zostało wstrzymane" : "Analysis preparation has been suspended";
-  if (value === "COOLDOWN" || value === "RATE_LIMITED") return pl ? "Zgłoszenie jest chwilowo ograniczone" : "Requests are temporarily limited";
+  if (["FAILED", "ERROR", "PROVIDER_DISABLED", "SUSPENDED"].includes(value)) {
+    return pl ? "Analiza nie mogła zostać teraz przygotowana." : "The analysis could not be prepared right now.";
+  }
+  if (value === "COOLDOWN" || value === "RATE_LIMITED") return pl ? "Spróbuj ponownie później." : "Try again later.";
   if (value === "INSUFFICIENT_DATA") return pl ? "Za mało danych do analizy" : "Not enough data for analysis";
   return pl ? "Analiza nie została jeszcze przygotowana" : "Analysis has not been prepared yet";
 }
 
 function stateDetail(
   value: AIResearchBriefLookup["availability"],
-  error: string | null,
+  _error: string | null,
   retry: number | null,
   locale: "pl" | "en",
   hasBrief: boolean,
@@ -288,26 +289,15 @@ function stateDetail(
   if (value === "QUEUED") return pl ? "Zgłoszenie zostało zapisane. Centralny system podejmie je zgodnie z kolejnością i limitami." : "The request was recorded. The central system will process it according to queue order and limits.";
   if (value === "PROCESSING") return pl ? "Centralny system przygotowuje jeden wspólny wynik dla tego stanu danych." : "The central system is preparing one shared result for this data state.";
   if (value === "STALE") return pl ? "Dane zmieniły się, a aktualizacja jest przygotowywana. Poprzedni prawidłowy wynik pozostaje dostępny." : "Data changed and an update is being prepared. The previous valid result remains available.";
-  if (value === "FAILED" && hasBrief) return pl ? "Aktualizacja nie powiodła się. Poprzedni prawidłowy wynik nie został usunięty." : "The update failed. The previous valid result was not removed.";
-  if (value === "FAILED") return pl ? "Nie opublikowano niezwalidowanego wyniku. Ponowne zgłoszenie będzie możliwe po czasie oczekiwania." : "No unvalidated result was published. A new request will be possible after the waiting period.";
-  if (value === "SUSPENDED") return pl ? "Przygotowanie nowych analiz zostało czasowo wstrzymane." : "Preparation of new analyses has been temporarily suspended.";
+  if (value === "FAILED" && hasBrief) return pl ? "Spróbuj ponownie później. Ostatni poprawny wynik pozostaje dostępny." : "Try again later. The last valid result remains available.";
+  if (value === "FAILED" || value === "SUSPENDED") return pl ? "Spróbuj ponownie później." : "Try again later.";
   if (value === "COOLDOWN" || value === "RATE_LIMITED") return pl
     ? `Ponowne zgłoszenie będzie możliwe${retry ? ` za ${retry} s` : " później"}. Nie utworzono drugiej analizy.`
     : `Another request will be possible${retry ? ` in ${retry} sec` : " later"}. No duplicate analysis was created.`;
-  if (value === "PROVIDER_DISABLED") return pl ? "Centralny system analizy jest chwilowo niedostępny." : "The central analysis system is temporarily unavailable.";
+  if (value === "PROVIDER_DISABLED") return pl ? "Spróbuj ponownie później." : "Try again later.";
   if (value === "INSUFFICIENT_DATA") return pl ? "Serwer nie posiada zwalidowanych danych pozwalających przygotować wiarygodny brief." : "The server has no validated data that can prepare a reliable brief.";
-  if (value === "ERROR") return pl ? `Nie udało się odczytać stanu analizy${error ? ` (${safeErrorLabel(error, locale)})` : ""}.` : `The analysis state could not be read${error ? ` (${safeErrorLabel(error, locale)})` : ""}.`;
+  if (value === "ERROR") return pl ? "Spróbuj ponownie później." : "Try again later.";
   return pl ? "Możesz zgłosić potrzebę przygotowania wspólnej analizy." : "You can request preparation of the shared analysis.";
-}
-
-function safeErrorLabel(value: string, locale: "pl" | "en") {
-  const pl = locale === "pl";
-  if (value === "SAME_ORIGIN_REQUIRED") return pl ? "żądanie odrzucone przez kontrolę bezpieczeństwa" : "request rejected by origin security";
-  if (value === "PROVIDER_TIMEOUT") return pl ? "przekroczono czas przygotowania" : "preparation timed out";
-  if (value === "PROVIDER_ERROR") return pl ? "system analizy chwilowo niedostępny" : "analysis system temporarily unavailable";
-  if (value === "VALIDATION_FAILURE") return pl ? "wynik nie przeszedł walidacji" : "result failed validation";
-  if (value === "STORE_UNAVAILABLE") return pl ? "stan analizy niedostępny" : "analysis state unavailable";
-  return pl ? "analiza niedostępna" : "analysis unavailable";
 }
 
 const COPY = {

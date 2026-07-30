@@ -289,14 +289,18 @@ export async function inspectFollowUpStore(
 
 export async function updateFollowUpStore(
   mutation: (store: FollowUpStore) => FollowUpStore,
-  options: { storePath?: string; now?: Date } = {},
+  options: {
+    storePath?: string;
+    now?: Date;
+    atomicWrite?: (path: string, store: FollowUpStore, previous: FollowUpStore) => Promise<void>;
+  } = {},
 ): Promise<FollowUpStore> {
   const path = resolve(options.storePath ?? getDefaultFollowUpStorePath());
   const lock = await acquireFollowUpLock(path);
   try {
     const current = await readFollowUpStore(path);
     const next = finalizeStore(mutation(current), options.now ?? new Date());
-    await writeFollowUpStoreAtomic(path, next, current);
+    await (options.atomicWrite ?? writeFollowUpStoreAtomic)(path, next, current);
     return next;
   } finally {
     await lock.release();

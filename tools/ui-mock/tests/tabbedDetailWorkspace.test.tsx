@@ -224,7 +224,8 @@ describe("UX.3 client header and UX.4 provider-neutral AI", () => {
       error_code: null,
     };
     const client = render("en", <AIResearchSection chain="base" contractAddress={ADDRESS_A} symbol="PASS" name="Pass" initialLookup={lookup} mode="summary" />);
-    assert.match(client, /central analysis system is temporarily unavailable/i);
+    assert.match(client, /The analysis could not be prepared right now\./);
+    assert.match(client, /Try again later\./);
     assert.doesNotMatch(client, /OpenAI|gpt-5-mini|provider mode|PROVIDER_DISABLED/i);
 
     const canvas = await source("src/components/AIResearchBriefCanvas.tsx");

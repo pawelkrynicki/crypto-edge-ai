@@ -58,16 +58,16 @@ describe("AI.3 real owner-review launcher flow", () => {
     const cases = [
       {
         search: "?ai_review_state=cooldown",
-        expected: ["Czas oczekiwania", "Zgłoszenie jest chwilowo ograniczone", "Spróbuj ponownie za 60 s"],
+        expected: ["Czas oczekiwania", "Spróbuj ponownie później.", "Spróbuj ponownie za 60 s"],
         disabledCta: "Spróbuj ponownie za 60 s",
       },
       {
         search: "?ai_review_state=failed",
-        expected: ["Chwilowo niedostępna", "Analiza chwilowo niedostępna"],
+        expected: ["Chwilowo niedostępna", "Analiza nie mogła zostać teraz przygotowana."],
       },
       {
         search: "?ai_review_state=suspended",
-        expected: ["Wstrzymana", "Przygotowanie analizy zostało wstrzymane"],
+        expected: ["Wstrzymana", "Analiza nie mogła zostać teraz przygotowana."],
       },
       {
         search: "",

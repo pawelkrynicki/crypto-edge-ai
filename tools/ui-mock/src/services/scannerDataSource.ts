@@ -67,15 +67,12 @@ async function fetchJson(url: string): Promise<ScannerApiOutput> {
     throw new ScannerDataSourceHttpError(reasonCode, `HTTP ${res.status} ${res.statusText} - ${url}`);
   }
 
-  if (!isRecord(body)) {
-    throw new ScannerDataSourceHttpError("SCANNER_RESPONSE_INVALID", "Scanner API response was not a JSON object.");
-  }
-
-  return body as ScannerApiOutput;
+  return validateScannerApiOutput(body);
 }
 
-export function interpretScannerApiOutput(output: ScannerApiOutput): ScannerDataSourceResult {
-  const meta = output._source_meta;
+export function interpretScannerApiOutput(output: unknown): ScannerDataSourceResult {
+  const validated = validateScannerApiOutput(output);
+  const meta = validated._source_meta;
 
   if (meta?.source === "real-output") {
     return {
@@ -83,7 +80,7 @@ export function interpretScannerApiOutput(output: ScannerApiOutput): ScannerData
       source: "api",
       resolvedSource: "real-output",
       usedFallback: false,
-      output,
+      output: validated,
     };
   }
 
@@ -93,8 +90,52 @@ export function interpretScannerApiOutput(output: ScannerApiOutput): ScannerData
     resolvedSource: "fixture-fallback",
     usedFallback: true,
     fallbackReason: meta?.reason ?? "API response did not include scanner source metadata.",
-    output,
+    output: validated,
   };
+}
+
+export function validateScannerApiOutput(value: unknown): ScannerApiOutput {
+  if (!isRecord(value)
+    || !isRecord(value.scan_run)
+    || !Array.isArray(value.candidates)
+    || !Array.isArray(value.security_checks)
+    || !Array.isArray(value.scorecards)
+    || !isSafeString(value.scan_run.run_id)
+    || !isIsoTimestamp(value.scan_run.finished_at)
+    || value.candidates.some((candidate) => !isScannerCandidate(candidate))) {
+    throw new ScannerDataSourceHttpError(
+      "SCANNER_RESPONSE_INVALID",
+      "Scanner API response did not satisfy the scanner snapshot contract.",
+    );
+  }
+
+  if (value.provenance !== undefined && (!isRecord(value.provenance)
+    || !isSafeString(value.provenance.schema_version)
+    || !isSafeString(value.provenance.contract_version)
+    || !isSafeString(value.provenance.run_id)
+    || !isIsoTimestamp(value.provenance.generated_at)
+    || !Array.isArray(value.provenance.source_ids)
+    || value.provenance.source_ids.some((sourceId) => !isSafeString(sourceId)))) {
+    throw new ScannerDataSourceHttpError(
+      "SCANNER_RESPONSE_INVALID",
+      "Scanner API response provenance did not satisfy the scanner snapshot contract.",
+    );
+  }
+
+  if (value._source_meta !== undefined && (!isRecord(value._source_meta)
+    || !["real-output", "fixture-fallback"].includes(String(value._source_meta.source))
+    || !isSafeString(value._source_meta.reason)
+    || (value._source_meta.selected_run_id !== null && !isSafeString(value._source_meta.selected_run_id))
+    || !isIsoTimestamp(value._source_meta.loaded_at)
+    || (value._source_meta.freshness_status !== undefined
+      && !["FRESH", "STALE"].includes(String(value._source_meta.freshness_status))))) {
+    throw new ScannerDataSourceHttpError(
+      "SCANNER_RESPONSE_INVALID",
+      "Scanner API response source metadata did not satisfy the scanner snapshot contract.",
+    );
+  }
+
+  return value as ScannerApiOutput;
 }
 
 export async function loadScannerDataSourceResult(
@@ -237,6 +278,32 @@ async function parseJsonResponse(response: Response): Promise<unknown> {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function isScannerCandidate(value: unknown): boolean {
+  return isRecord(value)
+    && isSafeString(value.run_id)
+    && isSafeString(value.candidate_id)
+    && isSafeString(value.symbol)
+    && (value.name === null || isSafeString(value.name))
+    && isSafeString(value.chain)
+    && (value.contract_address === null || isSafeString(value.contract_address))
+    && isSafeString(value.source)
+    && isSafeString(value.basic_filter_status)
+    && isSafeString(value.final_label)
+    && Array.isArray(value.filter_reasons)
+    && value.filter_reasons.every((reason) => isSafeString(reason))
+    && Array.isArray(value.final_reasons)
+    && value.final_reasons.every((reason) => isSafeString(reason))
+    && isIsoTimestamp(value.created_at);
+}
+
+function isSafeString(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0 && value.length <= 4_000 && !value.includes("\0");
+}
+
+function isIsoTimestamp(value: unknown): value is string {
+  return typeof value === "string" && Number.isFinite(Date.parse(value));
 }
 
 function isProductReadinessOutput(value: unknown): value is ProductReadinessOutput {

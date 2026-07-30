@@ -26,6 +26,7 @@ const DEFAULT_REPORTS_ROOT = fileURLToPath(new URL("../.local/reports", import.m
 const REPORT_FILE_PATTERN = /^analyst-report-[A-Za-z0-9_-]+\.json$/;
 const REPORT_ID_PATTERN = /^rpt_[a-f0-9]{40}$/;
 const AUXILIARY_REPORT_FILE_PATTERN = /^analyst-report-[A-Za-z0-9_-]+\.md$/;
+const TEMPORARY_REPORT_FILE_PATTERN = /^\.analyst-report-[A-Za-z0-9_.-]+\.tmp$/;
 const DANGEROUS_KEYS = new Set(["__proto__", "prototype", "constructor"]);
 const MAX_TEXT_LENGTH = 4_000;
 const MAX_SHORT_TEXT_LENGTH = 300;
@@ -105,7 +106,9 @@ export async function buildReportsLibraryIndex(
   const maxArtifacts = normalizeLimit(options.maxArtifacts, DEFAULT_MAX_REPORT_ARTIFACTS);
   const maxReportBytes = normalizeLimit(options.maxReportBytes, DEFAULT_MAX_REPORT_BYTES);
   const candidateEntries = entries
-    .filter((entry) => entry.name !== ".gitkeep" && !AUXILIARY_REPORT_FILE_PATTERN.test(entry.name))
+    .filter((entry) => entry.name !== ".gitkeep"
+      && !AUXILIARY_REPORT_FILE_PATTERN.test(entry.name)
+      && !TEMPORARY_REPORT_FILE_PATTERN.test(entry.name))
     .sort((left, right) => compareText(left.name, right.name));
   let skippedReportCount = Math.max(candidateEntries.length - maxArtifacts, 0);
   const indexedEntries = candidateEntries.slice(0, maxArtifacts);
