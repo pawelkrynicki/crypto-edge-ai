@@ -126,7 +126,7 @@ export function AIResearchSection({
     return (
       <button
         type="button"
-        className={`candidate-summary-module ai-summary-module ${active ? "active" : ""}`}
+        className={`ai-summary-card ${active ? "active" : ""}`}
         aria-pressed={active}
         aria-label={`${locale === "pl" ? "Otwórz" : "Open"}: ${ui.title}`}
         data-detail-module="ai"
@@ -326,7 +326,7 @@ const COPY = {
     radarDetails: "Przejdź do szczegółów analizy",
     analysisPrepared: "Analiza została przygotowana na podstawie zwalidowanych danych.",
     sharedQueue: "Zgłoszenie trafia do wspólnej kolejki analizy. Ponowne zgłoszenie nie utworzy drugiego wyniku.",
-    summaryNextStep: "Otwórz warstwę analizy, aby zobaczyć pełny Canvas i kolejny krok.",
+    summaryNextStep: "Otwórz zakładkę analizy, aby zobaczyć pełny Canvas i kolejny krok.",
   },
   en: {
     title: "AI Research Brief",
@@ -343,6 +343,6 @@ const COPY = {
     radarDetails: "Open analysis details",
     analysisPrepared: "The analysis was prepared from validated data.",
     sharedQueue: "The request enters the shared analysis queue. Repeating it will not create a second result.",
-    summaryNextStep: "Open the analysis layer to see the full Canvas and next step.",
+    summaryNextStep: "Open the analysis tab to see the full Canvas and next step.",
   },
 } as const;

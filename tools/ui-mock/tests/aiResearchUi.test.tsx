@@ -149,10 +149,12 @@ describe("AI.1 Visual Candidate Research Canvas", () => {
     }
   });
 
-  it("places AI Research in the summary modules and adds compact Radar and Verification actions", () => {
+  it("places AI Research in Summary and the dedicated tab while keeping Radar and Verification actions", () => {
     const detail = render("pl", <CandidateDetailView candidate={candidate} followUpStatus={null} />);
-    assert.ok(detail.indexOf("Przepływ obserwacji") < detail.indexOf("Analiza badawcza AI"));
-    assert.ok(detail.indexOf("Analiza badawcza AI") < detail.indexOf("Dane i aktualność"));
+    assert.ok(detail.indexOf('id="candidate-tab-observation"') < detail.indexOf('id="candidate-tab-ai"'));
+    assert.ok(detail.indexOf('id="candidate-tab-ai"') < detail.indexOf('id="candidate-tab-data"'));
+    assert.match(detail, /role="tablist"/);
+    assert.equal((detail.match(/role="tabpanel"/g) ?? []).length, 1);
     assert.match(detail, /data-detail-module="ai"/);
     const radar = render("pl", <AIResearchRadarStatus chain="base" contractAddress={ADDRESS} onOpen={() => undefined} />);
     assert.match(radar, /ai-radar-status/);
@@ -162,7 +164,7 @@ describe("AI.1 Visual Candidate Research Canvas", () => {
     assert.match(verification, /data-action-variant="secondary"[^>]*>[\s\S]*Otwórz analizę AI/);
   });
 
-  it("opens a READY Canvas directly in the dedicated detail layer with provider-neutral copy", () => {
+  it("opens a READY Canvas directly in the dedicated detail tab with provider-neutral copy", () => {
     const lookup: AIResearchBriefLookup = {
       schema_version: "ai_research_lookup_v1",
       availability: "READY",

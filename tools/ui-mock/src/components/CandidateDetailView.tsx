@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   formatFollowUpLifecycleStatus,
   formatProductDateTime,
@@ -24,7 +24,7 @@ import {
 } from "../tokenLifecycle";
 import type { UiTokenCandidate } from "../types/scannerTypes";
 import type { FollowUpPublicEntry, FollowUpPublicStatus } from "../types/followUpTypes";
-import type { CandidateDetailLayerId } from "../candidateDetailLayers";
+import { CANDIDATE_DETAIL_TAB_IDS, type CandidateDetailTabId } from "../candidateDetailTabs";
 import {
   loadEstablishedPromotionStatus,
   type EstablishedPromotionStatus,
@@ -47,9 +47,9 @@ interface CandidateDetailViewProps {
   onBackToResults?: () => void;
   onOpenExternalChecks?: (candidate: UiTokenCandidate) => void;
   initialOwnerPromotionStatus?: EstablishedPromotionStatus | null;
-  activeLayer?: CandidateDetailLayerId | null;
-  initialActiveLayer?: CandidateDetailLayerId | null;
-  onActiveLayerChange?: (layer: CandidateDetailLayerId | null) => void;
+  activeTab?: CandidateDetailTabId;
+  initialActiveTab?: CandidateDetailTabId;
+  onActiveTabChange?: (tab: CandidateDetailTabId) => void;
 }
 
 export const CandidateDetailView: React.FC<CandidateDetailViewProps> = (props) => {
@@ -64,34 +64,17 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
   onBackToResults,
   onOpenExternalChecks,
   initialOwnerPromotionStatus,
-  activeLayer: controlledActiveLayer,
-  initialActiveLayer = null,
-  onActiveLayerChange,
+  activeTab: controlledActiveTab,
+  initialActiveTab = "summary",
+  onActiveTabChange,
 }) => {
   const { locale, t } = useProductLocale();
-  const [internalActiveLayer, setInternalActiveLayer] = useState<CandidateDetailLayerId | null>(initialActiveLayer);
-  const activeLayer = controlledActiveLayer === undefined ? internalActiveLayer : controlledActiveLayer;
-  const layerColumnRef = useRef<HTMLElement>(null);
-  const setActiveLayer = useCallback((layer: CandidateDetailLayerId | null) => {
-    if (controlledActiveLayer === undefined) setInternalActiveLayer(layer);
-    onActiveLayerChange?.(layer);
-  }, [controlledActiveLayer, onActiveLayerChange]);
-
-  useEffect(() => {
-    if (!activeLayer) return;
-    layerColumnRef.current?.focus();
-  }, [activeLayer]);
-
-  useEffect(() => {
-    if (!activeLayer || typeof window === "undefined" || typeof window.addEventListener !== "function") return;
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      event.preventDefault();
-      setActiveLayer(null);
-    };
-    window.addEventListener("keydown", handleEscape);
-    return () => window.removeEventListener("keydown", handleEscape);
-  }, [activeLayer, setActiveLayer]);
+  const [internalActiveTab, setInternalActiveTab] = useState<CandidateDetailTabId>(initialActiveTab);
+  const activeTab = controlledActiveTab ?? internalActiveTab;
+  const setActiveTab = useCallback((tab: CandidateDetailTabId) => {
+    if (controlledActiveTab === undefined) setInternalActiveTab(tab);
+    onActiveTabChange?.(tab);
+  }, [controlledActiveTab, onActiveTabChange]);
   const [ownerPromotionStatus, setOwnerPromotionStatus] = useState<EstablishedPromotionStatus | null>(
     initialOwnerPromotionStatus ?? null,
   );
@@ -139,9 +122,8 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
         ownerPromotionStatus={ownerPromotionStatus}
         onOwnerPromotionStatusChange={setOwnerPromotionStatus}
         onBackToResults={onBackToResults}
-        activeLayer={activeLayer}
-        onActiveLayerChange={setActiveLayer}
-        layerColumnRef={layerColumnRef}
+        activeTab={activeTab}
+        onActiveTabChange={setActiveTab}
       />
     );
   }
@@ -172,7 +154,7 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
   const showSecurityDetails = securityResolution.state === "partial"
     || isCompletedProductSecurityState(securityResolution.state);
 
-  const workspaceCopy = getColumnWorkspaceCopy(locale);
+  const workspaceCopy = getTabbedWorkspaceCopy(locale);
   const missingMarketValues = [
     candidate.priceUsd,
     candidate.marketCap,
@@ -195,42 +177,48 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
         ? workspaceCopy.verificationRequired
         : workspaceCopy.noCurrentBlockers;
   const nextStep = lifecycleActionLabel(lifecycle.next_action_type, locale);
-  const layerTitle = activeLayer ? workspaceCopy.layers[activeLayer] : workspaceCopy.chooseLayer;
-
-  let activeLayerContent: React.ReactNode = null;
-  if (activeLayer === "identity") {
-    activeLayerContent = (
-      <section className="product-detail-section" aria-labelledby="identity-heading">
-        <SectionHeader id="identity-heading" index="1" title={t("detail.identity")} />
-        <div className="product-detail-grid">
-          <DetailField label={t("detail.contract")} value={candidate.contractAddress || t("radar.missingData")} copyValue={candidate.contractAddress} copyLabel={t("verification.copyContract")} mono />
-          <DetailField label={t("detail.pairAddress")} value={candidate.pairAddress || t("radar.missingData")} copyValue={candidate.pairAddress} copyLabel={t("verification.copyPair")} mono />
-          <DetailField label={t("detail.chain")} value={candidate.chain || t("radar.missingData")} />
-          <DetailField
-            label={t("detail.technicalIdentity")}
-            value={technicalIdentity.status === "valid" ? t("detail.technicalIdentityValid") : t("detail.technicalIdentityInvalid")}
-            tone={technicalIdentity.status === "valid" ? "ready" : "warning"}
-          />
-          <DetailField
-            label={t("detail.sourceVerification")}
-            value={candidate.addressIdentityVerified ? t("detail.sourceVerificationConfirmed") : t("detail.sourceVerificationRequired")}
-            tone={candidate.addressIdentityVerified ? "ready" : "warning"}
-          />
+  let activeTabContent: React.ReactNode = null;
+  if (activeTab === "summary") {
+    activeTabContent = (
+      <section className="candidate-summary-tab" aria-labelledby="candidate-summary-heading">
+        <header className="candidate-tab-content-heading">
+          <h3 id="candidate-summary-heading">{workspaceCopy.tabs.summary}</h3>
+          <p>{workspaceCopy.summaryIntro}</p>
+        </header>
+        <div className="candidate-summary-facts">
+          <SummaryFact label={workspaceCopy.whatIsIt} value={`${candidate.symbol} · ${candidate.name || candidate.chain}`} />
+          <SummaryFact label={workspaceCopy.radarLayer} value={lifecycleStageLabel(lifecycle.current_stage, locale)} />
+          <SummaryFact label={workspaceCopy.dataCompleteness} value={completeness} tone={completeness === workspaceCopy.complete ? "ready" : "warning"} />
+          <SummaryFact label={workspaceCopy.blockers} value={blockingSummary} tone={blockingSummary === workspaceCopy.noCurrentBlockers ? "ready" : "warning"} />
+          <SummaryFact label={workspaceCopy.nextResearchStep} value={nextStep} />
         </div>
+        <div className="candidate-summary-supporting-grid">
+          <section className="candidate-summary-identity" aria-labelledby="summary-identity-heading">
+            <h4 id="summary-identity-heading">{t("detail.identity")}</h4>
+            <div className="product-detail-grid">
+              <DetailField label={t("detail.contract")} value={candidate.contractAddress || t("radar.missingData")} copyValue={candidate.contractAddress} copyLabel={t("verification.copyContract")} mono />
+              <DetailField label={t("detail.chain")} value={candidate.chain || t("radar.missingData")} />
+              <DetailField label={t("detail.technicalIdentity")} value={technicalIdentity.status === "valid" ? t("detail.technicalIdentityValid") : t("detail.technicalIdentityInvalid")} tone={technicalIdentity.status === "valid" ? "ready" : "warning"} />
+              <DetailField label={t("detail.sourceVerification")} value={candidate.addressIdentityVerified ? t("detail.sourceVerificationConfirmed") : t("detail.sourceVerificationRequired")} tone={candidate.addressIdentityVerified ? "ready" : "warning"} />
+            </div>
+          </section>
+          <AIResearchSection chain={candidate.chain} contractAddress={candidate.contractAddress} symbol={candidate.symbol} name={candidate.name} mode="summary" onOpen={() => setActiveTab("ai")} />
+        </div>
+        {onOpenExternalChecks && <div className="candidate-summary-actions"><ActionButton variant="secondary" onClick={() => onOpenExternalChecks(candidate)}>{t("detail.openVerification")}</ActionButton></div>}
       </section>
     );
-  } else if (activeLayer === "observation") {
-    activeLayerContent = (
+  } else if (activeTab === "observation") {
+    activeTabContent = (
       <LifecycleDetailSection
         model={lifecycle}
         followUp={followUp}
         universeVersion={candidate.discoveryBasket === "established" ? candidate.universeVersion : null}
       />
     );
-  } else if (activeLayer === "market") {
-    activeLayerContent = (
+  } else if (activeTab === "market") {
+    activeTabContent = (
       <section className="product-detail-section" aria-labelledby="market-heading">
-        <SectionHeader id="market-heading" index="3" title={t("detail.marketData")} />
+        <SectionHeader id="market-heading" title={t("detail.marketData")} />
         <div className="product-detail-grid market">
           <DetailField label={t("radar.price")} value={formatPrice(candidate.priceUsd, t("radar.missingData"))} />
           <DetailField label={t("radar.marketCap")} value={formatProductUsd(candidate.marketCap, locale, t("radar.missingData"))} />
@@ -242,10 +230,10 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
         </div>
       </section>
     );
-  } else if (activeLayer === "filters") {
-    activeLayerContent = (
+  } else if (activeTab === "filters") {
+    activeTabContent = (
       <section className="product-detail-section" aria-labelledby="filters-heading">
-        <SectionHeader id="filters-heading" index="4" title={t("detail.filters")} />
+        <SectionHeader id="filters-heading" title={t("detail.filters")} />
         <div className="product-filter-summary">
           <DetailField
             label={t("detail.status")}
@@ -269,11 +257,11 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
         )}
       </section>
     );
-  } else if (activeLayer === "security") {
-    activeLayerContent = (
+  } else if (activeTab === "security") {
+    activeTabContent = (
       <>
         <section className="product-detail-section" aria-labelledby="security-heading">
-          <SectionHeader id="security-heading" index="5" title={t("detail.security")} />
+          <SectionHeader id="security-heading" title={t("detail.security")} />
           <div className={`security-state-panel ${securityResolution.state}`}>
             <strong>{getSecurityStateTitle(securityResolution.state, t)}</strong>
             <p>{getSecurityStateDetail(securityResolution.state, candidate.basicFilterStatus, t)}</p>
@@ -304,100 +292,74 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
               </div>
             </>
           )}
+          {onOpenExternalChecks && <div className="product-detail-actions"><ActionButton variant="primary" icon="arrow" iconPosition="end" onClick={() => onOpenExternalChecks(candidate)}>{t("detail.openVerification")}</ActionButton></div>}
         </section>
         {ownerPromotionStatus?.owner_controls_visible && <EstablishedPromotionPanel initialStatus={ownerPromotionStatus} onStatusChange={setOwnerPromotionStatus} />}
       </>
     );
-  } else if (activeLayer === "ai") {
-    activeLayerContent = <AIResearchSection chain={candidate.chain} contractAddress={candidate.contractAddress} symbol={candidate.symbol} name={candidate.name} mode="detail" />;
-  } else if (activeLayer === "data") {
-    activeLayerContent = (
-      <section className="product-detail-section data-freshness" aria-labelledby="freshness-heading">
-        <SectionHeader id="freshness-heading" index="7" title={t("detail.dataFreshness")} />
-        <div className="product-detail-grid data">
-          <DetailField label={t("followUp.lastChecked")} value={formatProductDateTime(candidate.lastCheckedAt, locale)} />
-          <DetailField label={t("detail.pairCreated")} value={candidate.pairCreatedAt ? formatProductDateTime(candidate.pairCreatedAt, locale) : t("radar.missingData")} />
-          <DetailField label={t("detail.universeVersion")} value={candidate.discoveryBasket === "established" ? candidate.universeVersion ?? t("radar.missingData") : t("detail.notApplicable")} />
-          {candidate.universeEntryIndex != null && <DetailField label={t("detail.universeEntry")} value={String(candidate.universeEntryIndex)} />}
-        </div>
-        <TechnicalDetails label={t("app.technicalDetails")}>
-          <dl className="product-control-details"><div><dt>{t("detail.runId")}</dt><dd className="mono">{candidate.runId}</dd></div></dl>
-        </TechnicalDetails>
-      </section>
-    );
-  } else if (activeLayer === "sources") {
-    activeLayerContent = (
-      <section className="product-detail-section" aria-labelledby="sources-heading">
-        <SectionHeader id="sources-heading" index="8" title={workspaceCopy.layers.sources} />
-        <div className="product-detail-grid data">
-          <DetailField label={t("detail.source")} value={candidate.source ? formatProductSourceLabel(candidate.source) : t("radar.missingData")} />
-          <DetailField label={t("detail.discoveryMethod")} value={formatDiscoveryMethod(candidate.discoveryMethod, locale)} />
-          <DetailField label={t("detail.sourceVerification")} value={candidate.addressIdentityVerified ? t("detail.sourceVerificationConfirmed") : t("detail.sourceVerificationRequired")} tone={candidate.addressIdentityVerified ? "ready" : "warning"} />
-          <DetailField label={t("detail.checkedAt")} value={formatProductDateTime(candidate.lastCheckedAt, locale)} />
-        </div>
-        {onOpenExternalChecks && <div className="product-detail-actions"><ActionButton variant="primary" icon="arrow" iconPosition="end" onClick={() => onOpenExternalChecks(candidate)}>{t("detail.openVerification")}</ActionButton></div>}
-      </section>
+  } else if (activeTab === "ai") {
+    activeTabContent = <AIResearchSection chain={candidate.chain} contractAddress={candidate.contractAddress} symbol={candidate.symbol} name={candidate.name} mode="detail" />;
+  } else if (activeTab === "data") {
+    activeTabContent = (
+      <div className="candidate-data-sources-tab">
+        <section className="product-detail-section data-freshness" aria-labelledby="freshness-heading">
+          <SectionHeader id="freshness-heading" title={t("detail.dataFreshness")} />
+          <div className="product-detail-grid data">
+            <DetailField label={t("followUp.lastChecked")} value={formatProductDateTime(candidate.lastCheckedAt, locale)} />
+            <DetailField label={t("detail.pairCreated")} value={candidate.pairCreatedAt ? formatProductDateTime(candidate.pairCreatedAt, locale) : t("radar.missingData")} />
+            <DetailField label={t("detail.universeVersion")} value={candidate.discoveryBasket === "established" ? candidate.universeVersion ?? t("radar.missingData") : t("detail.notApplicable")} />
+            {candidate.universeEntryIndex != null && <DetailField label={t("detail.universeEntry")} value={String(candidate.universeEntryIndex)} />}
+          </div>
+        </section>
+        <section className="product-detail-section" aria-labelledby="sources-heading">
+          <SectionHeader id="sources-heading" title={workspaceCopy.tabs.data} />
+          <div className="product-detail-grid data">
+            <DetailField label={t("detail.contract")} value={candidate.contractAddress || t("radar.missingData")} copyValue={candidate.contractAddress} copyLabel={t("verification.copyContract")} mono />
+            <DetailField label={t("detail.pairAddress")} value={candidate.pairAddress || t("radar.missingData")} copyValue={candidate.pairAddress} copyLabel={t("verification.copyPair")} mono />
+            <DetailField label={t("detail.source")} value={candidate.source ? formatProductSourceLabel(candidate.source) : t("radar.missingData")} />
+            <DetailField label={t("detail.discoveryMethod")} value={formatDiscoveryMethod(candidate.discoveryMethod, locale)} />
+            <DetailField label={t("detail.sourceVerification")} value={candidate.addressIdentityVerified ? t("detail.sourceVerificationConfirmed") : t("detail.sourceVerificationRequired")} tone={candidate.addressIdentityVerified ? "ready" : "warning"} />
+            <DetailField label={t("detail.checkedAt")} value={formatProductDateTime(candidate.lastCheckedAt, locale)} />
+          </div>
+          <TechnicalDetails label={t("app.technicalDetails")}>
+            <dl className="product-control-details"><div><dt>{t("detail.runId")}</dt><dd className="mono">{candidate.runId}</dd></div></dl>
+          </TechnicalDetails>
+        </section>
+      </div>
     );
   }
 
   return (
-    <div className={`candidate-detail-workspace ${activeLayer ? "has-active-layer" : "is-summary"}`} data-active-detail-layer={activeLayer ?? "summary"}>
-      <aside className="candidate-workspace-column candidate-context-column" aria-label={workspaceCopy.tokenContext}>
-        <div className="candidate-column-heading"><span>{workspaceCopy.columnOne}</span><strong>{workspaceCopy.tokenContext}</strong></div>
-        <article className="candidate-context-card active" aria-current="true">
-          <span className="candidate-detail-eyebrow">{basketLabel}</span>
-          <h3>{candidate.symbol} <small>{candidate.name}</small></h3>
-          <div className="candidate-detail-token-line">
-            {candidate.discoveryBasket !== "new_emerging" && <StatusBadge tone={candidate.finalLabel === "WATCHLIST" ? "manual" : candidate.basicFilterStatus === "passed_basic_filter" ? "ready" : "warning"}>{status}</StatusBadge>}
-            <span>{candidate.chain || t("detail.networkMissing")}</span>
-            <span>{candidate.dex || t("detail.dexMissing")}</span>
+    <div className="token-detail-workspace" data-active-detail-tab={activeTab}>
+      <header className="token-detail-header">
+        <div className="token-detail-header-main">
+          {onBackToResults && <ActionButton variant="tertiary" className="token-detail-back" onClick={onBackToResults}>{t("detail.back")}</ActionButton>}
+          <div className="token-detail-title">
+            <span className="candidate-detail-eyebrow">{basketLabel}</span>
+            <h2>{candidate.symbol} <small>{candidate.name}</small></h2>
           </div>
-          <CopyableAddress value={candidate.contractAddress} displayValue={shortenAddress(candidate.contractAddress, t("radar.missingData"))} copyLabel={t("verification.copyContract")} copiedLabel={t("app.copied")} buttonLabel={t("app.copy")} className="candidate-detail-hero-address" />
-        </article>
-        {onBackToResults && <ActionButton variant="secondary" className="candidate-context-back" onClick={onBackToResults}>{t("detail.back")}</ActionButton>}
-      </aside>
-
-      <section className="candidate-workspace-column candidate-summary-column" aria-labelledby="candidate-summary-heading">
-        <header className="candidate-summary-header">
-          {onBackToResults && <ActionButton variant="tertiary" className="candidate-mobile-back" onClick={onBackToResults}>{workspaceCopy.backToList}</ActionButton>}
-          <span className="candidate-detail-eyebrow">{workspaceCopy.columnTwo}</span>
-          <h2 id="candidate-summary-heading">{candidate.symbol} · {workspaceCopy.summary}</h2>
-          <p>{workspaceCopy.summaryIntro}</p>
-        </header>
-        <div className="candidate-summary-facts">
-          <SummaryFact label={workspaceCopy.whatIsIt} value={`${candidate.symbol} · ${candidate.name || candidate.chain}`} />
-          <SummaryFact label={workspaceCopy.radarLayer} value={lifecycleStageLabel(lifecycle.current_stage, locale)} />
-          <SummaryFact label={workspaceCopy.dataCompleteness} value={completeness} tone={completeness === workspaceCopy.complete ? "ready" : "warning"} />
-          <SummaryFact label={workspaceCopy.blockers} value={blockingSummary} tone={blockingSummary === workspaceCopy.noCurrentBlockers ? "ready" : "warning"} />
-          <SummaryFact label={workspaceCopy.nextResearchStep} value={nextStep} />
+          {candidate.discoveryBasket !== "new_emerging" && <StatusBadge tone={candidate.finalLabel === "WATCHLIST" ? "manual" : candidate.basicFilterStatus === "passed_basic_filter" ? "ready" : "warning"}>{status}</StatusBadge>}
         </div>
-        <nav className="candidate-summary-modules" aria-label={workspaceCopy.modules}>
-          <SummaryModuleButton id="identity" title={workspaceCopy.layers.identity} status={technicalIdentity.status === "valid" ? workspaceCopy.available : workspaceCopy.verificationRequired} active={activeLayer === "identity"} onOpen={setActiveLayer} />
-          <SummaryModuleButton id="observation" title={workspaceCopy.layers.observation} status={lifecycleStageLabel(lifecycle.current_stage, locale)} active={activeLayer === "observation"} onOpen={setActiveLayer} />
-          <SummaryModuleButton id="market" title={workspaceCopy.layers.market} status={missingMarketValues === 0 ? workspaceCopy.available : workspaceCopy.partial} active={activeLayer === "market"} onOpen={setActiveLayer} />
-          <SummaryModuleButton id="filters" title={workspaceCopy.layers.filters} status={candidate.basicFilterStatus === "passed_basic_filter" ? t("detail.conditionsMet") : t("detail.conditionsNotMet")} active={activeLayer === "filters"} onOpen={setActiveLayer} />
-          <SummaryModuleButton id="security" title={workspaceCopy.layers.security} status={getSecurityStateTitle(securityResolution.state, t)} active={activeLayer === "security"} onOpen={setActiveLayer} />
-          {activeLayer === "ai"
-            ? <SummaryModuleButton id="ai" title={workspaceCopy.layers.ai} status={workspaceCopy.layerActive} active onOpen={setActiveLayer} />
-            : <AIResearchSection chain={candidate.chain} contractAddress={candidate.contractAddress} symbol={candidate.symbol} name={candidate.name} mode="summary" onOpen={() => setActiveLayer("ai")} />}
-          <SummaryModuleButton id="data" title={workspaceCopy.layers.data} status={candidate.lastCheckedAt ? workspaceCopy.available : workspaceCopy.missingData} active={activeLayer === "data"} onOpen={setActiveLayer} />
-          <SummaryModuleButton id="sources" title={workspaceCopy.layers.sources} status={candidate.source ? workspaceCopy.available : workspaceCopy.missingData} active={activeLayer === "sources"} onOpen={setActiveLayer} />
-        </nav>
-        <div className="candidate-summary-next-step"><strong>{t("detail.nextStep")}</strong><p>{nextStep}</p>{onOpenExternalChecks && <ActionButton variant="secondary" onClick={() => onOpenExternalChecks(candidate)}>{t("detail.openVerification")}</ActionButton>}</div>
-      </section>
+        <div className="token-detail-header-meta">
+          <HeaderFact label={workspaceCopy.radarLayer} value={lifecycleStageLabel(lifecycle.current_stage, locale)} />
+          <HeaderFact label={t("detail.chain")} value={candidate.chain || t("detail.networkMissing")} />
+          <HeaderFact label="DEX" value={candidate.dex || t("detail.dexMissing")} />
+          <HeaderFact label={workspaceCopy.dataCompleteness} value={completeness} tone={completeness === workspaceCopy.complete ? "ready" : "warning"} />
+          <CopyableAddress value={candidate.contractAddress} displayValue={shortenAddress(candidate.contractAddress, t("radar.missingData"))} copyLabel={t("verification.copyContract")} copiedLabel={t("app.copied")} buttonLabel={t("app.copy")} className="token-detail-address" />
+        </div>
+        <div className="token-detail-next-step"><span>{workspaceCopy.nextResearchStep}</span><strong>{nextStep}</strong></div>
+      </header>
 
-      <section ref={layerColumnRef} tabIndex={-1} className="candidate-workspace-column candidate-layer-column" aria-label={layerTitle} aria-live="polite">
-        {activeLayer ? (
-          <>
-            <header className="candidate-layer-header">
-              <ActionButton variant="tertiary" className="candidate-layer-back" onClick={() => setActiveLayer(null)}>{workspaceCopy.backToSummary}</ActionButton>
-              <div><span>{candidate.symbol} · {candidate.chain}</span><h2>{layerTitle}</h2></div>
-            </header>
-            <div className="candidate-layer-body">{activeLayerContent}</div>
-          </>
-        ) : (
-          <div className="candidate-layer-empty"><span>{workspaceCopy.columnThree}</span><h2>{workspaceCopy.chooseLayer}</h2><p>{workspaceCopy.chooseLayerDetail}</p></div>
-        )}
+      <CandidateDetailTabs activeTab={activeTab} onChange={setActiveTab} copy={workspaceCopy} />
+
+      <section
+        id={`candidate-panel-${activeTab}`}
+        role="tabpanel"
+        aria-labelledby={`candidate-tab-${activeTab}`}
+        tabIndex={0}
+        className="token-detail-tabpanel"
+      >
+        {activeTabContent}
       </section>
     </div>
   );
@@ -415,46 +377,60 @@ function SummaryFact({
   return <div className={`candidate-summary-fact ${tone}`}><span>{label}</span><strong>{value}</strong></div>;
 }
 
-function SummaryModuleButton({
-  id,
-  title,
-  status,
-  active,
-  onOpen,
+function HeaderFact({ label, value, tone = "neutral" }: { label: string; value: string; tone?: "neutral" | "ready" | "warning" }) {
+  return <span className={`token-detail-header-fact ${tone}`}><small>{label}</small><strong>{value}</strong></span>;
+}
+
+function CandidateDetailTabs({
+  activeTab,
+  onChange,
+  copy,
 }: {
-  id: CandidateDetailLayerId;
-  title: string;
-  status: string;
-  active: boolean;
-  onOpen: (layer: CandidateDetailLayerId) => void;
+  activeTab: CandidateDetailTabId;
+  onChange: (tab: CandidateDetailTabId) => void;
+  copy: ReturnType<typeof getTabbedWorkspaceCopy>;
 }) {
-  const { locale } = useProductLocale();
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, tab: CandidateDetailTabId) => {
+    const currentIndex = CANDIDATE_DETAIL_TAB_IDS.indexOf(tab);
+    let nextIndex: number;
+    if (event.key === "ArrowRight") nextIndex = (currentIndex + 1) % CANDIDATE_DETAIL_TAB_IDS.length;
+    else if (event.key === "ArrowLeft") nextIndex = (currentIndex - 1 + CANDIDATE_DETAIL_TAB_IDS.length) % CANDIDATE_DETAIL_TAB_IDS.length;
+    else if (event.key === "Home") nextIndex = 0;
+    else if (event.key === "End") nextIndex = CANDIDATE_DETAIL_TAB_IDS.length - 1;
+    else return;
+    event.preventDefault();
+    const nextTab = CANDIDATE_DETAIL_TAB_IDS[nextIndex]!;
+    onChange(nextTab);
+    event.currentTarget.parentElement?.querySelector<HTMLButtonElement>(`#candidate-tab-${nextTab}`)?.focus();
+  };
+
   return (
-    <button
-      type="button"
-      className={`candidate-summary-module ${active ? "active" : ""}`}
-      aria-pressed={active}
-      aria-label={`${locale === "pl" ? "Otwórz" : "Open"}: ${title}`}
-      data-detail-module={id}
-      onClick={() => onOpen(id)}
-    >
-      <span>{title}</span>
-      <strong>{status}</strong>
-      <small aria-hidden="true">→</small>
-    </button>
+    <div className="token-detail-tabs" role="tablist" aria-label={copy.tablistLabel}>
+      {CANDIDATE_DETAIL_TAB_IDS.map((tab) => (
+        <button
+          key={tab}
+          id={`candidate-tab-${tab}`}
+          type="button"
+          role="tab"
+          aria-selected={activeTab === tab}
+          aria-controls={`candidate-panel-${tab}`}
+          tabIndex={activeTab === tab ? 0 : -1}
+          className={activeTab === tab ? "active" : ""}
+          onClick={() => onChange(tab)}
+          onKeyDown={(event) => handleKeyDown(event, tab)}
+        >
+          {copy.tabs[tab]}
+        </button>
+      ))}
+    </div>
   );
 }
 
-function getColumnWorkspaceCopy(locale: ProductLocale) {
+function getTabbedWorkspaceCopy(locale: ProductLocale) {
   if (locale === "pl") {
     return {
-      columnOne: "01 · Kontekst",
-      columnTwo: "02 · Podsumowanie",
-      columnThree: "03 · Warstwa szczegółowa",
-      tokenContext: "Wybrany token",
-      summary: "podsumowanie",
-      summaryIntro: "Najważniejsze odpowiedzi i moduły prowadzące do jednej aktywnej warstwy szczegółowej.",
-      modules: "Moduły szczegółów tokena",
+      tablistLabel: "Zakładki szczegółów tokena",
+      summaryIntro: "Najważniejsze odpowiedzi o tokenie, kompletności danych, blokadach i następnym kroku.",
       whatIsIt: "Co to jest?",
       radarLayer: "Warstwa Radaru",
       dataCompleteness: "Kompletność danych",
@@ -466,31 +442,20 @@ function getColumnWorkspaceCopy(locale: ProductLocale) {
       verificationRequired: "Wymagana weryfikacja",
       noCurrentBlockers: "Brak bieżących blokad",
       available: "Dostępne",
-      layerActive: "Aktywna warstwa",
-      chooseLayer: "Wybierz moduł",
-      chooseLayerDetail: "Szczegóły otworzą się tutaj bez utraty kontekstu wybranego tokena.",
-      backToSummary: "Wstecz do podsumowania",
-      backToList: "Wstecz do listy",
-      layers: {
-        identity: "Tożsamość",
-        observation: "Przepływ obserwacji",
+      tabs: {
+        summary: "Podsumowanie",
+        observation: "Obserwacja",
         market: "Rynek",
         filters: "Filtry",
-        security: "Weryfikacja i bezpieczeństwo",
-        ai: "Analiza badawcza AI",
-        data: "Dane i aktualność",
-        sources: "Źródła",
+        security: "Bezpieczeństwo",
+        ai: "Analiza AI",
+        data: "Dane i źródła",
       },
     } as const;
   }
   return {
-    columnOne: "01 · Context",
-    columnTwo: "02 · Summary",
-    columnThree: "03 · Detail layer",
-    tokenContext: "Selected token",
-    summary: "summary",
-    summaryIntro: "The essential answers and modules leading to one active detail layer.",
-    modules: "Token detail modules",
+    tablistLabel: "Token detail tabs",
+    summaryIntro: "The essential answers about the token, data completeness, blockers and next step.",
     whatIsIt: "What is it?",
     radarLayer: "Radar layer",
     dataCompleteness: "Data completeness",
@@ -502,20 +467,14 @@ function getColumnWorkspaceCopy(locale: ProductLocale) {
     verificationRequired: "Verification required",
     noCurrentBlockers: "No current blockers",
     available: "Available",
-    layerActive: "Active layer",
-    chooseLayer: "Choose a module",
-    chooseLayerDetail: "Details open here without losing the selected token context.",
-    backToSummary: "Back to summary",
-    backToList: "Back to list",
-    layers: {
-      identity: "Identity",
-      observation: "Observation flow",
+    tabs: {
+      summary: "Summary",
+      observation: "Observation",
       market: "Market",
       filters: "Filters",
-      security: "Verification and security",
-      ai: "AI research analysis",
-      data: "Data and freshness",
-      sources: "Sources",
+      security: "Security",
+      ai: "AI analysis",
+      data: "Data and sources",
     },
   } as const;
 }
@@ -544,7 +503,7 @@ function LifecycleDetailSection({
   const howItGotHere = lifecycleOrigin(model, locale);
   return (
     <section className="product-detail-section lifecycle-detail-section" aria-labelledby="follow-up-heading">
-      <SectionHeader id="follow-up-heading" index="2" title={locale === "pl" ? "Przepływ obserwacji" : "Observation flow"} />
+      <SectionHeader id="follow-up-heading" title={locale === "pl" ? "Przepływ obserwacji" : "Observation flow"} />
       {model.owner_decision_required && (
         <p className="follow-up-candidate-boundary">{t("followUp.detailBoundary")}</p>
       )}
@@ -586,128 +545,28 @@ function FollowUpOnlyDetail({
   ownerPromotionStatus,
   onOwnerPromotionStatusChange,
   onBackToResults,
-  activeLayer,
-  onActiveLayerChange,
-  layerColumnRef,
+  activeTab,
+  onActiveTabChange,
 }: {
   followUp: FollowUpPublicEntry;
   lifecycle: TokenLifecycleViewModel;
   ownerPromotionStatus: EstablishedPromotionStatus | null;
   onOwnerPromotionStatusChange: (status: EstablishedPromotionStatus) => void;
   onBackToResults?: () => void;
-  activeLayer: CandidateDetailLayerId | null;
-  onActiveLayerChange: (layer: CandidateDetailLayerId | null) => void;
-  layerColumnRef: React.RefObject<HTMLElement | null>;
+  activeTab: CandidateDetailTabId;
+  onActiveTabChange: (tab: CandidateDetailTabId) => void;
 }) {
   const { locale, t } = useProductLocale();
-  const copy = getColumnWorkspaceCopy(locale);
+  const copy = getTabbedWorkspaceCopy(locale);
   const symbol = followUp.symbol ?? t("radar.missingData");
-  const layerTitle = activeLayer ? copy.layers[activeLayer] : copy.chooseLayer;
   const marketMissing = Object.values(followUp.market_metrics).filter((value) => value == null).length;
   const completeness = followUp.missing_data.length === 0 && marketMissing === 0 ? copy.complete : copy.partial;
   let content: React.ReactNode = null;
-  if (activeLayer === "identity") {
+  if (activeTab === "summary") {
     content = (
-      <section className="product-detail-section" aria-labelledby="identity-heading">
-        <SectionHeader id="identity-heading" index="1" title={t("detail.identity")} />
-        <div className="product-detail-grid">
-          <DetailField label={t("detail.contract")} value={followUp.contract_address} copyValue={followUp.contract_address} copyLabel={t("verification.copyContract")} mono />
-          <DetailField label={t("detail.chain")} value={followUp.chain} />
-        </div>
-      </section>
-    );
-  } else if (activeLayer === "observation") {
-    content = <LifecycleDetailSection model={lifecycle} followUp={followUp} universeVersion={null} />;
-  } else if (activeLayer === "market") {
-    content = (
-      <section className="product-detail-section" aria-labelledby="follow-up-data-heading">
-        <SectionHeader id="follow-up-data-heading" index="3" title={locale === "pl" ? "Bieżące dane obserwacji" : "Current observation data"} />
-        <div className="product-detail-grid market">
-          <DetailField label={t("radar.price")} value={formatPrice(followUp.market_metrics.price_usd, t("radar.missingData"))} />
-          <DetailField label={t("radar.marketCap")} value={formatProductUsd(followUp.market_metrics.market_cap_usd, locale, t("radar.missingData"))} />
-          <DetailField label={t("radar.liquidity")} value={formatProductUsd(followUp.market_metrics.liquidity_usd, locale, t("radar.missingData"))} />
-          <DetailField label={t("radar.volume24h")} value={formatProductUsd(followUp.market_metrics.volume_24h_usd, locale, t("radar.missingData"))} />
-        </div>
-      </section>
-    );
-  } else if (activeLayer === "filters") {
-    content = (
-      <section className="product-detail-section" aria-labelledby="filters-heading">
-        <SectionHeader id="filters-heading" index="4" title={t("detail.filters")} />
-        <DetailField label={t("followUp.filterStatus")} value={formatFollowUpFilterStatus(followUp.filter_status, locale)} tone={followUp.filter_status === "passed_basic_filter" ? "ready" : "warning"} />
-        <FlagList title={t("detail.missingData")} items={followUp.filter_reasons} empty={t("detail.noMissingData")} tone="warning" />
-      </section>
-    );
-  } else if (activeLayer === "security") {
-    content = (
-      <>
-        <section className="product-detail-section" aria-labelledby="security-heading">
-          <SectionHeader id="security-heading" index="5" title={t("detail.security")} />
-          <DetailField label={t("followUp.securityStatus")} value={formatFollowUpSecurityStatus(followUp.security_status, locale)} tone="warning" />
-          <FlagList title={t("detail.missingData")} items={followUp.missing_data} empty={t("detail.noMissingData")} tone="warning" />
-        </section>
-        {ownerPromotionStatus?.owner_controls_visible && (
-          <EstablishedPromotionPanel initialStatus={ownerPromotionStatus} onStatusChange={onOwnerPromotionStatusChange} />
-        )}
-      </>
-    );
-  } else if (activeLayer === "ai") {
-    content = (
-      <AIResearchSection
-        chain={followUp.chain}
-        contractAddress={followUp.contract_address}
-        symbol={followUp.symbol ?? ""}
-        name={followUp.display_name ?? followUp.symbol ?? ""}
-        mode="detail"
-      />
-    );
-  } else if (activeLayer === "data") {
-    content = (
-      <section className="product-detail-section" aria-labelledby="freshness-heading">
-        <SectionHeader id="freshness-heading" index="7" title={t("detail.dataFreshness")} />
-        <div className="product-detail-grid data">
-          <DetailField label={t("followUp.firstSeen")} value={formatProductDateTime(followUp.first_seen_at, locale)} />
-          <DetailField label={t("followUp.lastChecked")} value={followUp.last_checked_at ? formatProductDateTime(followUp.last_checked_at, locale) : t("app.noData")} />
-          <DetailField label={locale === "pl" ? "Następny checkpoint" : "Next checkpoint"} value={followUp.next_check_at ? formatProductDateTime(followUp.next_check_at, locale) : t("app.noData")} />
-        </div>
-      </section>
-    );
-  } else if (activeLayer === "sources") {
-    content = (
-      <section className="product-detail-section" aria-labelledby="sources-heading">
-        <SectionHeader id="sources-heading" index="8" title={copy.layers.sources} />
-        <DetailField label={t("detail.source")} value={copy.missingData} tone="warning" />
-        <p>{locale === "pl" ? "Rekord Follow-up zachowuje zwalidowaną tożsamość, ale nie publikuje osobnej listy źródeł." : "The Follow-up record keeps a validated identity but does not publish a separate source list."}</p>
-      </section>
-    );
-  }
-  return (
-    <div className={`candidate-detail-workspace follow-up-only-detail ${activeLayer ? "has-active-layer" : "is-summary"}`} data-active-detail-layer={activeLayer ?? "summary"}>
-      <aside className="candidate-workspace-column candidate-context-column" aria-label={copy.tokenContext}>
-        <div className="candidate-column-heading"><span>{copy.columnOne}</span><strong>{copy.tokenContext}</strong></div>
-        <article className="candidate-context-card active" aria-current="true">
-          <span className="candidate-detail-eyebrow">{locale === "pl" ? "Dalsza obserwacja" : "Follow-up"}</span>
-          <h3>{symbol} <small>{followUp.display_name ?? ""}</small></h3>
-          <StatusBadge tone={followUp.lifecycle_status === "CANDIDATE_FOR_ESTABLISHED" ? "manual" : "neutral"}>
-            {formatFollowUpLifecycleStatus(followUp.lifecycle_status, locale)}
-          </StatusBadge>
-          <CopyableAddress
-            value={followUp.contract_address}
-            displayValue={shortenAddress(followUp.contract_address, t("radar.missingData"))}
-            copyLabel={t("verification.copyContract")}
-            copiedLabel={t("app.copied")}
-            buttonLabel={t("app.copy")}
-            className="candidate-detail-hero-address"
-          />
-        </article>
-        {onBackToResults && <ActionButton variant="secondary" className="candidate-context-back" onClick={onBackToResults}>{t("detail.back")}</ActionButton>}
-      </aside>
-
-      <section className="candidate-workspace-column candidate-summary-column" aria-labelledby="candidate-summary-heading">
-        <header className="candidate-summary-header">
-          {onBackToResults && <ActionButton variant="tertiary" className="candidate-mobile-back" onClick={onBackToResults}>{copy.backToList}</ActionButton>}
-          <span className="candidate-detail-eyebrow">{copy.columnTwo}</span>
-          <h2 id="candidate-summary-heading">{symbol} · {copy.summary}</h2>
+      <section className="candidate-summary-tab" aria-labelledby="candidate-summary-heading">
+        <header className="candidate-tab-content-heading">
+          <h3 id="candidate-summary-heading">{copy.tabs.summary}</h3>
           <p>{copy.summaryIntro}</p>
         </header>
         <div className="candidate-summary-facts">
@@ -717,48 +576,115 @@ function FollowUpOnlyDetail({
           <SummaryFact label={copy.blockers} value={followUp.missing_data.length > 0 ? copy.verificationRequired : copy.noCurrentBlockers} tone={followUp.missing_data.length > 0 ? "warning" : "ready"} />
           <SummaryFact label={copy.nextResearchStep} value={lifecycleActionLabel(lifecycle.next_action_type, locale)} />
         </div>
-        <nav className="candidate-summary-modules" aria-label={copy.modules}>
-          <SummaryModuleButton id="identity" title={copy.layers.identity} status={copy.available} active={activeLayer === "identity"} onOpen={onActiveLayerChange} />
-          <SummaryModuleButton id="observation" title={copy.layers.observation} status={formatFollowUpLifecycleStatus(followUp.lifecycle_status, locale)} active={activeLayer === "observation"} onOpen={onActiveLayerChange} />
-          <SummaryModuleButton id="market" title={copy.layers.market} status={marketMissing === 0 ? copy.available : copy.partial} active={activeLayer === "market"} onOpen={onActiveLayerChange} />
-          <SummaryModuleButton id="filters" title={copy.layers.filters} status={formatFollowUpFilterStatus(followUp.filter_status, locale)} active={activeLayer === "filters"} onOpen={onActiveLayerChange} />
-          <SummaryModuleButton id="security" title={copy.layers.security} status={formatFollowUpSecurityStatus(followUp.security_status, locale)} active={activeLayer === "security"} onOpen={onActiveLayerChange} />
-          {activeLayer === "ai" ? (
-            <SummaryModuleButton id="ai" title={copy.layers.ai} status={copy.layerActive} active onOpen={onActiveLayerChange} />
-          ) : (
-            <AIResearchSection
-              chain={followUp.chain}
-              contractAddress={followUp.contract_address}
-              symbol={followUp.symbol ?? ""}
-              name={followUp.display_name ?? followUp.symbol ?? ""}
-              mode="summary"
-              onOpen={() => onActiveLayerChange("ai")}
-            />
-          )}
-          <SummaryModuleButton id="data" title={copy.layers.data} status={followUp.last_checked_at ? copy.available : copy.missingData} active={activeLayer === "data"} onOpen={onActiveLayerChange} />
-          <SummaryModuleButton id="sources" title={copy.layers.sources} status={copy.missingData} active={activeLayer === "sources"} onOpen={onActiveLayerChange} />
-        </nav>
+        <div className="candidate-summary-supporting-grid">
+          <section className="candidate-summary-identity" aria-labelledby="summary-identity-heading">
+            <h4 id="summary-identity-heading">{t("detail.identity")}</h4>
+            <div className="product-detail-grid">
+              <DetailField label={t("detail.contract")} value={followUp.contract_address} copyValue={followUp.contract_address} copyLabel={t("verification.copyContract")} mono />
+              <DetailField label={t("detail.chain")} value={followUp.chain} />
+            </div>
+          </section>
+          <AIResearchSection chain={followUp.chain} contractAddress={followUp.contract_address} symbol={followUp.symbol ?? ""} name={followUp.display_name ?? followUp.symbol ?? ""} mode="summary" onOpen={() => onActiveTabChange("ai")} />
+        </div>
       </section>
-
-      <section ref={layerColumnRef} tabIndex={-1} className="candidate-workspace-column candidate-layer-column" aria-label={layerTitle} aria-live="polite">
-        {activeLayer ? (
-          <>
-            <header className="candidate-layer-header">
-              <ActionButton variant="tertiary" className="candidate-layer-back" onClick={() => onActiveLayerChange(null)}>{copy.backToSummary}</ActionButton>
-              <div><span>{symbol} · {followUp.chain}</span><h2>{layerTitle}</h2></div>
-            </header>
-            <div className="candidate-layer-body">{content}</div>
-          </>
-        ) : (
-          <div className="candidate-layer-empty"><span>{copy.columnThree}</span><h2>{copy.chooseLayer}</h2><p>{copy.chooseLayerDetail}</p></div>
+    );
+  } else if (activeTab === "observation") {
+    content = <LifecycleDetailSection model={lifecycle} followUp={followUp} universeVersion={null} />;
+  } else if (activeTab === "market") {
+    content = (
+      <section className="product-detail-section" aria-labelledby="follow-up-data-heading">
+        <SectionHeader id="follow-up-data-heading" title={locale === "pl" ? "Bieżące dane obserwacji" : "Current observation data"} />
+        <div className="product-detail-grid market">
+          <DetailField label={t("radar.price")} value={formatPrice(followUp.market_metrics.price_usd, t("radar.missingData"))} />
+          <DetailField label={t("radar.marketCap")} value={formatProductUsd(followUp.market_metrics.market_cap_usd, locale, t("radar.missingData"))} />
+          <DetailField label={t("radar.liquidity")} value={formatProductUsd(followUp.market_metrics.liquidity_usd, locale, t("radar.missingData"))} />
+          <DetailField label={t("radar.volume24h")} value={formatProductUsd(followUp.market_metrics.volume_24h_usd, locale, t("radar.missingData"))} />
+        </div>
+      </section>
+    );
+  } else if (activeTab === "filters") {
+    content = (
+      <section className="product-detail-section" aria-labelledby="filters-heading">
+        <SectionHeader id="filters-heading" title={t("detail.filters")} />
+        <DetailField label={t("followUp.filterStatus")} value={formatFollowUpFilterStatus(followUp.filter_status, locale)} tone={followUp.filter_status === "passed_basic_filter" ? "ready" : "warning"} />
+        <FlagList title={t("detail.missingData")} items={followUp.filter_reasons} empty={t("detail.noMissingData")} tone="warning" />
+      </section>
+    );
+  } else if (activeTab === "security") {
+    content = (
+      <>
+        <section className="product-detail-section" aria-labelledby="security-heading">
+          <SectionHeader id="security-heading" title={t("detail.security")} />
+          <DetailField label={t("followUp.securityStatus")} value={formatFollowUpSecurityStatus(followUp.security_status, locale)} tone="warning" />
+          <FlagList title={t("detail.missingData")} items={followUp.missing_data} empty={t("detail.noMissingData")} tone="warning" />
+        </section>
+        {ownerPromotionStatus?.owner_controls_visible && (
+          <EstablishedPromotionPanel initialStatus={ownerPromotionStatus} onStatusChange={onOwnerPromotionStatusChange} />
         )}
+      </>
+    );
+  } else if (activeTab === "ai") {
+    content = (
+      <AIResearchSection
+        chain={followUp.chain}
+        contractAddress={followUp.contract_address}
+        symbol={followUp.symbol ?? ""}
+        name={followUp.display_name ?? followUp.symbol ?? ""}
+        mode="detail"
+      />
+    );
+  } else if (activeTab === "data") {
+    content = (
+      <div className="candidate-data-sources-tab">
+        <section className="product-detail-section" aria-labelledby="freshness-heading">
+          <SectionHeader id="freshness-heading" title={t("detail.dataFreshness")} />
+          <div className="product-detail-grid data">
+            <DetailField label={t("followUp.firstSeen")} value={formatProductDateTime(followUp.first_seen_at, locale)} />
+            <DetailField label={t("followUp.lastChecked")} value={followUp.last_checked_at ? formatProductDateTime(followUp.last_checked_at, locale) : t("app.noData")} />
+            <DetailField label={locale === "pl" ? "Następny checkpoint" : "Next checkpoint"} value={followUp.next_check_at ? formatProductDateTime(followUp.next_check_at, locale) : t("app.noData")} />
+          </div>
+        </section>
+        <section className="product-detail-section" aria-labelledby="sources-heading">
+          <SectionHeader id="sources-heading" title={copy.tabs.data} />
+          <div className="product-detail-grid data">
+            <DetailField label={t("detail.contract")} value={followUp.contract_address} copyValue={followUp.contract_address} copyLabel={t("verification.copyContract")} mono />
+            <DetailField label={t("detail.chain")} value={followUp.chain} />
+            <DetailField label={t("detail.source")} value={copy.missingData} tone="warning" />
+          </div>
+          <p>{locale === "pl" ? "Rekord Follow-up zachowuje zwalidowaną tożsamość, ale nie publikuje osobnej listy źródeł." : "The Follow-up record keeps a validated identity but does not publish a separate source list."}</p>
+        </section>
+      </div>
+    );
+  }
+  return (
+    <div className="token-detail-workspace follow-up-only-detail" data-active-detail-tab={activeTab}>
+      <header className="token-detail-header">
+        <div className="token-detail-header-main">
+          {onBackToResults && <ActionButton variant="tertiary" className="token-detail-back" onClick={onBackToResults}>{t("detail.back")}</ActionButton>}
+          <div className="token-detail-title">
+            <span className="candidate-detail-eyebrow">{locale === "pl" ? "Dalsza obserwacja" : "Follow-up"}</span>
+            <h2>{symbol} <small>{followUp.display_name ?? ""}</small></h2>
+          </div>
+          <StatusBadge tone={followUp.lifecycle_status === "CANDIDATE_FOR_ESTABLISHED" ? "manual" : "neutral"}>{formatFollowUpLifecycleStatus(followUp.lifecycle_status, locale)}</StatusBadge>
+        </div>
+        <div className="token-detail-header-meta">
+          <HeaderFact label={copy.radarLayer} value={lifecycleStageLabel(lifecycle.current_stage, locale)} />
+          <HeaderFact label={t("detail.chain")} value={followUp.chain} />
+          <HeaderFact label={copy.dataCompleteness} value={completeness} tone="warning" />
+          <CopyableAddress value={followUp.contract_address} displayValue={shortenAddress(followUp.contract_address, t("radar.missingData"))} copyLabel={t("verification.copyContract")} copiedLabel={t("app.copied")} buttonLabel={t("app.copy")} className="token-detail-address" />
+        </div>
+        <div className="token-detail-next-step"><span>{copy.nextResearchStep}</span><strong>{lifecycleActionLabel(lifecycle.next_action_type, locale)}</strong></div>
+      </header>
+      <CandidateDetailTabs activeTab={activeTab} onChange={onActiveTabChange} copy={copy} />
+      <section id={`candidate-panel-${activeTab}`} role="tabpanel" aria-labelledby={`candidate-tab-${activeTab}`} tabIndex={0} className="token-detail-tabpanel">
+        {content}
       </section>
     </div>
   );
 }
 
-function SectionHeader({ id, index, title }: { id: string; index: string; title: string }) {
-  return <header className="product-detail-section-header"><span>{index}</span><h3 id={id}>{title}</h3></header>;
+function SectionHeader({ id, title }: { id: string; title: string }) {
+  return <header className="product-detail-section-header"><h3 id={id}>{title}</h3></header>;
 }
 
 function DetailField({

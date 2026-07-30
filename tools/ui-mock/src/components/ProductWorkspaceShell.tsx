@@ -64,7 +64,7 @@ type ProductWorkspaceSectionProps = {
   title: string;
   description: string;
   children: ReactNode;
-  workspaceMode?: "default" | "columns";
+  workspaceMode?: "default" | "tabbed";
 };
 
 export function ProductWorkspaceShell({
@@ -279,7 +279,7 @@ export function ProductWorkspaceSection({
 }: ProductWorkspaceSectionProps) {
   const { t } = useProductLocale();
   return (
-    <section className={`workspace-section ${workspaceMode === "columns" ? "column-workspace-section" : ""}`}>
+    <section className={`workspace-section ${workspaceMode === "tabbed" ? "tabbed-workspace-section" : ""}`}>
       <header className="workspace-section-header">
         <div className="min-w-0">
           <span className="workspace-section-eyebrow">{t("app.workspaceEyebrow")}</span>

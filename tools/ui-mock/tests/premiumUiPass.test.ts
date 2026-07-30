@@ -89,24 +89,24 @@ describe("Premium UI.1 presentation contract", () => {
     assert.equal((markup.match(/data-lifecycle-layer=/g) ?? []).length, 3);
   });
 
-  it("keeps all Candidate Detail modules in one-layer navigation and backend-gated owner controls", async () => {
+  it("keeps all Candidate Detail sections in one semantic tab panel and backend-gated owner controls", async () => {
     const detail = await source("src/components/CandidateDetailView.tsx");
-    for (const layer of [
-      "identity",
+    for (const tab of [
+      "summary",
       "observation",
       "market",
       "filters",
       "security",
       "ai",
       "data",
-      "sources",
     ]) {
-      assert.match(detail, new RegExp(`"${layer}"`));
+      assert.match(detail, new RegExp(`"${tab}"`));
     }
-    assert.match(detail, /data-active-detail-layer=\{activeLayer \?\? "summary"\}/);
-    assert.match(detail, /activeLayer === "identity"/);
-    assert.match(detail, /activeLayer === "sources"/);
-    assert.equal((detail.match(/className="candidate-layer-body"/g) ?? []).length, 2);
+    assert.match(detail, /data-active-detail-tab=\{activeTab\}/);
+    assert.match(detail, /role="tablist"/);
+    assert.match(detail, /role="tab"/);
+    assert.equal((detail.match(/role="tabpanel"/g) ?? []).length, 2);
+    assert.doesNotMatch(detail, /candidate-(?:context|summary|layer)-column|candidate-layer-body/);
     assert.match(detail, /status\?\.owner_controls_visible \? status : null/);
     assert.match(detail, /ownerPromotionStatus\?\.owner_controls_visible/);
     assert.doesNotMatch(detail, /owner_controls_visible\s*=\s*true/);

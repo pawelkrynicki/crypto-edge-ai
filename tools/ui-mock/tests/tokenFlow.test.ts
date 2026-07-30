@@ -205,10 +205,10 @@ describe("FLOW.1 visible token lifecycle contracts", () => {
       candidate,
       followUp: entry,
       followUpStatus: followUpStatus(),
-      initialActiveLayer: "observation",
+      initialActiveTab: "observation",
     }));
     assert.ok(markup.indexOf("Przepływ obserwacji") > markup.indexOf("Tożsamość"));
-    assert.match(markup, /data-active-detail-layer="observation"/);
+    assert.match(markup, /data-active-detail-tab="observation"/);
     assert.doesNotMatch(markup, /id="market-heading"/);
     assert.match(markup, /Co nastąpi automatycznie/);
     assert.match(markup, /Co wymaga decyzji/);
@@ -221,7 +221,7 @@ describe("FLOW.1 visible token lifecycle contracts", () => {
     const valid = render("pl", React.createElement(CandidateDetailView, {
       candidate: productCandidate({ addressIdentityVerified: false }),
       followUpStatus: followUpStatus({ entries_total: 0 }),
-      initialActiveLayer: "identity",
+      initialActiveTab: "summary",
     }));
     assert.match(valid, /Tożsamość techniczna[\s\S]*Poprawna/);
     assert.match(valid, /Weryfikacja źródłowa[\s\S]*Wymagana/);
@@ -232,7 +232,7 @@ describe("FLOW.1 visible token lifecycle contracts", () => {
     const invalid = render("pl", React.createElement(CandidateDetailView, {
       candidate: productCandidate({ contractAddress: "not-an-address", addressIdentityVerified: false }),
       followUpStatus: followUpStatus({ entries_total: 0 }),
-      initialActiveLayer: "identity",
+      initialActiveTab: "summary",
     }));
     assert.match(invalid, /Tożsamość techniczna[\s\S]*Niepoprawna/);
     assert.match(invalid, /Brak poprawnego adresu kontraktu/);

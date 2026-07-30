@@ -18,10 +18,11 @@ set "CRYPTO_EDGE_FEEDBACK_SUBMISSION_ENABLED=0"
 set "OPENAI_API_KEY="
 
 echo.
-echo === Crypto Edge AI: column workspace owner review ===
+echo === Crypto Edge AI: tabbed token detail owner review ===
 echo Runtime: INTERNAL_BETA
 echo Snapshot: current validated real snapshot
 echo Identity: supported chain + contract_address from that snapshot
+echo Initial tab: summary
 echo Browser tabs: exactly 1
 echo OpenAI calls: 0
 echo Data provider calls: 0
@@ -32,7 +33,7 @@ echo Established and lifecycle mutations: 0
 echo Feedback mutations: 0
 echo Task Scheduler changes: 0
 
-if not exist "%UI_DIR%\scripts\resolveColumnWorkspaceReviewUrl.ts" (
+if not exist "%UI_DIR%\scripts\resolveTabbedDetailReviewUrl.ts" (
   echo ERROR: Brak resolvera URL owner review.
   exit /b 1
 )
@@ -42,7 +43,7 @@ if errorlevel 1 exit /b %ERRORLEVEL%
 
 set "REVIEW_URL="
 pushd "%UI_DIR%"
-for /f "usebackq delims=" %%U in (`call node --import tsx scripts\resolveColumnWorkspaceReviewUrl.ts`) do set "REVIEW_URL=%%U"
+for /f "usebackq delims=" %%U in (`call node --import tsx scripts\resolveTabbedDetailReviewUrl.ts`) do set "REVIEW_URL=%%U"
 popd
 
 if not defined REVIEW_URL (

@@ -1,4 +1,4 @@
-import { isCandidateDetailLayerId, type CandidateDetailLayerId } from "./candidateDetailLayers";
+import { isCandidateDetailTabId, type CandidateDetailTabId } from "./candidateDetailTabs";
 import { resolveTokenIdentity } from "./tokenLifecycle";
 
 export type RouteTokenIdentity = {
@@ -14,8 +14,18 @@ export function resolveRouteTokenIdentity(): RouteTokenIdentity | null {
   return { chain: identity.chain, contract_address: identity.contract_address };
 }
 
-export function resolveDetailLayer(): CandidateDetailLayerId | null {
-  if (typeof window === "undefined") return null;
+export function resolveDetailTab(): CandidateDetailTabId {
+  if (typeof window === "undefined") return "summary";
   const value = new URLSearchParams(window.location.search).get("detail");
-  return isCandidateDetailLayerId(value) ? value : null;
+  return isCandidateDetailTabId(value) ? value : "summary";
+}
+
+export function writeCandidateDetailRoute(identity: RouteTokenIdentity, tab: CandidateDetailTabId) {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  url.searchParams.set("chain", identity.chain);
+  url.searchParams.set("contract", identity.contract_address);
+  url.searchParams.set("detail", tab);
+  url.hash = "candidate-detail";
+  window.history.pushState(null, "", url);
 }

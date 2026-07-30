@@ -1,8 +1,8 @@
 # Roadmap
 
-## Current stage: UX.2 + UX.3 + UX.4 — Column Workspace and Provider-neutral Client
+## Current stage: UX.2 + UX.3 + UX.4 — Tabbed Detail Workspace and Provider-neutral Client
 
-Candidate Detail działa jako kontekst tokena → podsumowanie → jedna aktywna warstwa. Desktop używa trzech niezależnie przewijanych kolumn, węższy desktop prawego drawera, a mobile sekwencyjnych widoków z powrotem. URL odtwarza `chain + contract_address` oraz allowlistowaną warstwę. Nagłówek klienta pokazuje tylko ostatnią aktualizację, EN/PL i odświeżenie; techniczne dane pozostają w Control Center i endpointach ownera. Warstwa AI zachowuje AI.3, ale klient nie pokazuje nazwy providera ani modelu. Kontrakt: `docs/column_workspace_client_header.md`.
+Candidate Detail działa jako kompaktowy nagłówek tokena → siedem poziomych zakładek → jeden szeroki panel aktywnej treści. Desktop wykorzystuje pełną szerokość obszaru roboczego, a mobile zachowuje poziomo przewijany pasek zakładek, pełnoszeroką aktywną treść i brak overflow całej strony. URL odtwarza `chain + contract_address` oraz allowlistowaną zakładkę, domyślnie `summary`. Nagłówek klienta pokazuje tylko ostatnią aktualizację, EN/PL i odświeżenie; techniczne dane pozostają w Control Center i endpointach ownera. Zakładka AI zachowuje AI.3, ale klient nie pokazuje nazwy providera ani modelu. Kontrakt: `docs/tabbed_detail_workspace.md`.
 
 Ten etap nie zmienia collectora, schedulera, Follow-up, Established, feedback, lifecycle, fingerprintu, cache key ani workera i nie wykonuje live calls.
 

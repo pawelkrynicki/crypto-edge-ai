@@ -2,10 +2,11 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 void React; // Required by the Node TSX test runtime's classic JSX transform.
 import { mapPersistableScannerOutputToUiCandidates } from "./adapters/scannerOutputAdapter";
-import type { CandidateDetailLayerId } from "./candidateDetailLayers";
+import type { CandidateDetailTabId } from "./candidateDetailTabs";
 import {
-  resolveDetailLayer,
+  resolveDetailTab,
   resolveRouteTokenIdentity,
+  writeCandidateDetailRoute,
   type RouteTokenIdentity,
 } from "./candidateDetailRoute";
 import { CandidateDetailView } from "./components/CandidateDetailView";
@@ -101,7 +102,7 @@ export function ProductAppContent() {
   const [unavailableMessage, setUnavailableMessage] = useState<string | null>(null);
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
   const [routeTokenIdentity, setRouteTokenIdentity] = useState<RouteTokenIdentity | null>(() => resolveRouteTokenIdentity());
-  const [activeDetailLayer, setActiveDetailLayer] = useState<CandidateDetailLayerId | null>(() => resolveDetailLayer());
+  const [activeDetailTab, setActiveDetailTab] = useState<CandidateDetailTabId>(() => resolveDetailTab());
   const [verificationCandidateId, setVerificationCandidateId] = useState<string | null>(null);
   const [automationStatus, setAutomationStatus] = useState<AutomationStatus | null>(null);
   const [establishedUniverseStatus, setEstablishedUniverseStatus] = useState<EstablishedUniverseStatus | null>(null);
@@ -251,7 +252,7 @@ export function ProductAppContent() {
     const handleRouteChange = () => {
       setActiveSection(resolveSection());
       setRouteTokenIdentity(resolveRouteTokenIdentity());
-      setActiveDetailLayer(resolveDetailLayer());
+      setActiveDetailTab(resolveDetailTab());
     };
     const handleHashChange = () => handleRouteChange();
     const handlePopState = () => handleRouteChange();
@@ -290,11 +291,11 @@ export function ProductAppContent() {
     const candidate = candidates.find((entry) => entry.id === candidateId);
     setSelectedFollowUpEntryId(null);
     setSelectedCandidateId(candidateId);
-    setActiveDetailLayer(null);
+    setActiveDetailTab("summary");
     if (candidate) {
       const identity = { chain: candidate.chain, contract_address: candidate.contractAddress };
       setRouteTokenIdentity(identity);
-      writeCandidateDetailRoute(identity, null);
+      writeCandidateDetailRoute(identity, "summary");
       setActiveSection("candidate-detail");
       return;
     }
@@ -311,19 +312,19 @@ export function ProductAppContent() {
       : null;
     setSelectedFollowUpEntryId(entryId);
     setSelectedCandidateId(matchingCandidate?.id ?? null);
-    setActiveDetailLayer(null);
+    setActiveDetailTab("summary");
     if (entry) {
       const identity = { chain: entry.chain, contract_address: entry.contract_address };
       setRouteTokenIdentity(identity);
-      writeCandidateDetailRoute(identity, null);
+      writeCandidateDetailRoute(identity, "summary");
       setActiveSection("candidate-detail");
       return;
     }
     navigate("candidate-detail");
   }, [candidates, followUpEntries, navigate]);
 
-  const changeDetailLayer = useCallback((layer: CandidateDetailLayerId | null) => {
-    setActiveDetailLayer(layer);
+  const changeDetailTab = useCallback((tab: CandidateDetailTabId) => {
+    setActiveDetailTab(tab);
     const identity = selectedCandidate
       ? { chain: selectedCandidate.chain, contract_address: selectedCandidate.contractAddress }
       : selectedFollowUp
@@ -331,7 +332,7 @@ export function ProductAppContent() {
         : routeTokenIdentity;
     if (identity) {
       setRouteTokenIdentity(identity);
-      writeCandidateDetailRoute(identity, layer);
+      writeCandidateDetailRoute(identity, tab);
       setActiveSection("candidate-detail");
     }
   }, [routeTokenIdentity, selectedCandidate, selectedFollowUp]);
@@ -406,15 +407,15 @@ export function ProductAppContent() {
 
     if (activeSection === "candidate-detail") {
       return (
-        <ProductWorkspaceSection {...copy} workspaceMode="columns">
+        <ProductWorkspaceSection {...copy} workspaceMode="tabbed">
           <CandidateDetailView
             candidate={selectedCandidate}
             followUp={selectedFollowUp}
             followUpStatus={followUpStatus}
             onBackToResults={() => navigate("candidate-results")}
             onOpenExternalChecks={openVerification}
-            activeLayer={activeDetailLayer}
-            onActiveLayerChange={changeDetailLayer}
+            activeTab={activeDetailTab}
+            onActiveTabChange={changeDetailTab}
           />
         </ProductWorkspaceSection>
       );
@@ -480,17 +481,6 @@ export function selectAIResearchReviewCandidate(candidates: UiTokenCandidate[]):
   return candidates.find((candidate) => (
     resolveTokenIdentity(candidate.chain, candidate.contractAddress).status === "valid"
   )) ?? null;
-}
-
-function writeCandidateDetailRoute(identity: RouteTokenIdentity, layer: CandidateDetailLayerId | null) {
-  if (typeof window === "undefined") return;
-  const url = new URL(window.location.href);
-  url.searchParams.set("chain", identity.chain);
-  url.searchParams.set("contract", identity.contract_address);
-  if (layer) url.searchParams.set("detail", layer);
-  else url.searchParams.delete("detail");
-  url.hash = SECTION_TO_HASH["candidate-detail"];
-  window.history.pushState(null, "", url);
 }
 
 function resolveSection(): ProductSectionId {

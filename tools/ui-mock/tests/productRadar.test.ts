@@ -373,8 +373,8 @@ describe("Product Radar owner acceptance", () => {
 
   it("shows one shared not-invoked security meaning for BEANS in Details and Verification", () => {
     for (const locale of ["en", "pl"] as const) {
-      const details = renderWithLocale(locale, React.createElement(CandidateDetailView, { candidate: beansCandidate, initialActiveLayer: "security" }));
-      const filtersDetails = renderWithLocale(locale, React.createElement(CandidateDetailView, { candidate: beansCandidate, initialActiveLayer: "filters" }));
+      const details = renderWithLocale(locale, React.createElement(CandidateDetailView, { candidate: beansCandidate, initialActiveTab: "security" }));
+      const filtersDetails = renderWithLocale(locale, React.createElement(CandidateDetailView, { candidate: beansCandidate, initialActiveTab: "filters" }));
       const verification = renderWithLocale(locale, React.createElement(ExternalVerificationLinksView, { candidate: beansCandidate }));
       const detailsWithoutTechnical = details.replace(/<details\b[^>]*>[\s\S]*?<\/details>/g, "");
 
@@ -425,9 +425,9 @@ describe("Product Radar owner acceptance", () => {
     partial.security.coverageStatus = "PARTIAL SECURITY COVERAGE";
     partial.securityLabel = "PARTIAL SECURITY COVERAGE";
 
-    const unavailableDetails = renderWithLocale("pl", React.createElement(CandidateDetailView, { candidate: unavailable, initialActiveLayer: "security" }));
+    const unavailableDetails = renderWithLocale("pl", React.createElement(CandidateDetailView, { candidate: unavailable, initialActiveTab: "security" }));
     const unavailableVerification = renderWithLocale("pl", React.createElement(ExternalVerificationLinksView, { candidate: unavailable }));
-    const partialDetails = renderWithLocale("pl", React.createElement(CandidateDetailView, { candidate: partial, initialActiveLayer: "security" }));
+    const partialDetails = renderWithLocale("pl", React.createElement(CandidateDetailView, { candidate: partial, initialActiveTab: "security" }));
     const partialVerification = renderWithLocale("pl", React.createElement(ExternalVerificationLinksView, { candidate: partial }));
 
     assert.match(unavailableDetails, /Dane bezpieczeństwa są niedostępne\. Wymagana jest ręczna weryfikacja\./);
@@ -448,7 +448,7 @@ describe("Product Radar owner acceptance", () => {
     checked.security.coverageStatus = null;
     checked.security.checkedAt = "2026-07-21T08:00:00.000Z";
     checked.securityLabel = "SECURITY_PASSED";
-    const details = renderWithLocale("en", React.createElement(CandidateDetailView, { candidate: checked, initialActiveLayer: "security" }));
+    const details = renderWithLocale("en", React.createElement(CandidateDetailView, { candidate: checked, initialActiveTab: "security" }));
     const verification = renderWithLocale("en", React.createElement(ExternalVerificationLinksView, { candidate: checked }));
     assert.equal(resolveProductSecurityState(checked).state, "checked");
     assert.match(details, /Security checked — Manual Review Only/);
@@ -818,7 +818,7 @@ describe("Product Radar owner acceptance", () => {
   });
 
   it("does not present security-not-invoked as security passed", () => {
-    const markup = renderToStaticMarkup(React.createElement(CandidateDetailView, { candidate: newCandidate, initialActiveLayer: "security" }));
+    const markup = renderToStaticMarkup(React.createElement(CandidateDetailView, { candidate: newCandidate, initialActiveTab: "security" }));
     assert.match(markup, /Security check was not run/);
     assert.match(markup, /No check does not mean no risk/);
     assert.doesNotMatch(markup, /SECURITY_PASSED/);

@@ -15,6 +15,7 @@ async function main() {
   const url = new URL("http://127.0.0.1:5173/");
   url.searchParams.set("chain", candidate.chain);
   url.searchParams.set("contract", candidate.contractAddress);
+  url.searchParams.set("detail", "summary");
   url.hash = "candidate-detail";
   process.stdout.write(url.toString());
 }
