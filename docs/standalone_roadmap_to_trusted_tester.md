@@ -1,6 +1,6 @@
 # Standalone Roadmap To Trusted Tester
 
-> Aktualizacja E2E.1: AI.3, UX.2, UX.3, UX.4 i lokalna powierzchnia Trusted Tester Preview są zakończone. E2E.1 jest bieżącą bramką pełnego przepływu produktu; AFF.1 pozostaje odłożone na końcówkę. Publiczne żądania AI wyłącznie kolejkują analizę, a provider może uruchomić tylko osobny centralny worker. Kontrakty opisują `docs/ai_shared_queue_cache.md` i `docs/full_product_e2e.md`.
+> Aktualizacja STAB.1: E2E.1 i bezpieczny Refresh View są zakończone. Bieżącą bramką jest odporność produktu i kontrolowane failure drills; kolejnym osobnym etapem będzie backup/restore/rollback. AFF.1 pozostaje odłożone na końcówkę. Kontrakty opisują `docs/full_product_e2e.md` i `docs/resilience_failure_drills.md`.
 
 ## AI.2 — Controlled OpenAI Live Validation
 

@@ -1,6 +1,21 @@
 # Roadmap
 
-## Current stage: E2E.1 — Full Product Journey
+## Current stage: STAB.1 — Resilience and Controlled Failure Drills
+
+STAB.1 wykonuje 20 deterministycznych failure drills dla Refresh View, centralnego cyklu, Follow-up, Established, AI.3, Reports i Feedback. Wszystkie zapisy są izolowane pod `%TEMP%`; manifest `product_failure_drill_run_v1` i raport Markdown porównują chronione hashe przed/po. Kontrakt: `docs/resilience_failure_drills.md`.
+
+Status etapów:
+
+- E2E.1 — zakończone;
+- bezpieczny Refresh View — naprawiony i objęty last-known-good;
+- AI.3 i centralny cykl danych — zakończone i objęte failure drills;
+- bieżący etap — STAB.1;
+- następny etap — backup/restore/rollback;
+- AFF.1 — nadal odłożone na końcówkę po release-candidate gates.
+
+STAB.1 wykonuje 0 live OpenAI calls, 0 live data-provider calls, 0 centralnych live cycles, 0 zmian Task Scheduler i 0 mutacji kanonicznych.
+
+## Completed: E2E.1 — Full Product Journey
 
 E2E.1 łączy zaakceptowane powierzchnie w jeden kontrolowany przebieg **Nowe → Dalsza obserwacja → Kandydat do Established → Established → Analiza AI → Raport → Feedback**. Tożsamość i metryki rynkowe pochodzą z aktualnego zwalidowanego snapshotu, a wszystkie mutacje odbywają się wyłącznie w izolowanych store pod `%TEMP%`.
 

@@ -32,6 +32,8 @@ The current client UX uses a wide Tabbed Detail Workspace, a compact nontechnica
 
 E2E.1 joins the accepted lifecycle, session last-known-good Refresh View, AI.3 queue, Reports and Feedback surfaces into one reproducible journey backed by a current real token identity and isolated stores. Scheduler mutations are always zero, while host status is reported separately only when the owner launcher can observe it. The preview-first owner command and audit contract are documented in [`docs/full_product_e2e.md`](docs/full_product_e2e.md).
 
+STAB.1 exercises scanner, central-cycle, lifecycle, AI.3, Reports and Feedback failures on deterministic fixtures and isolated `%TEMP%` stores. The versioned `product_failure_drill_run_v1` audit proves last-known-good preservation, bounded recovery, zero canonical mutations and zero live calls. The preview-first owner workflow is documented in [`docs/resilience_failure_drills.md`](docs/resilience_failure_drills.md).
+
 ## What Crypto Edge AI Is
 
 - A trader-facing crypto intelligence module.
