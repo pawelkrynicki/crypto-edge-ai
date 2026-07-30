@@ -199,6 +199,7 @@ function validateAndMapReport(value: unknown, reportId: string): ReportDetail | 
   const marketContext = value.market_context_summary;
   const candidateSnapshot = value.candidate_snapshot;
   const compliance = value.compliance;
+  const productE2E = value.product_e2e === undefined ? null : mapProductE2ESubject(value.product_e2e);
 
   if (
     !generatedAt
@@ -212,6 +213,7 @@ function validateAndMapReport(value: unknown, reportId: string): ReportDetail | 
     || !isRecord(marketContext)
     || !isRecord(candidateSnapshot)
     || !isRecord(compliance)
+    || (value.product_e2e !== undefined && productE2E === null)
   ) return null;
 
   if (!hasRequiredCompliance(compliance)) return null;
@@ -256,10 +258,22 @@ function validateAndMapReport(value: unknown, reportId: string): ReportDetail | 
     report_format: "json",
     detail_available: true,
     validation_status: "VALID",
+    ...(productE2E ? {
+      candidate_name: productE2E.candidate_name,
+      symbol: productE2E.symbol,
+      chain: productE2E.chain,
+      contract_address: productE2E.contract_address,
+      basket: productE2E.basket,
+    } : {}),
   };
 
   return {
     ...summary,
+    ...(productE2E ? {
+      analysis_id: productE2E.analysis_id,
+      localized_research: productE2E.localized_summary,
+      transaction_signal: "NONE" as const,
+    } : {}),
     research_summary: {
       candidates_count: candidatesCount,
       review_entries_count: reviewEntriesCount,
@@ -288,7 +302,57 @@ function validateAndMapReport(value: unknown, reportId: string): ReportDetail | 
     review_notes: reviewNotes,
     open_questions: [],
     next_review_step: null,
-    missing_sections: ["open_questions", "next_review_step", "contract_address"],
+    missing_sections: productE2E
+      ? ["open_questions", "next_review_step"]
+      : ["open_questions", "next_review_step", "contract_address"],
+  };
+}
+
+function mapProductE2ESubject(value: unknown): {
+  analysis_id: string;
+  candidate_name: string;
+  symbol: string;
+  chain: string;
+  contract_address: string;
+  basket: string;
+  localized_summary: { pl: string; en: string };
+} | null {
+  if (!isRecord(value)) return null;
+  const fields = [
+    "schema_version", "run_id", "source_snapshot_id", "analysis_id", "candidate_id",
+    "candidate_name", "symbol", "chain", "contract_address", "basket",
+    "transaction_signal", "lifecycle_mutation", "localized_summary",
+  ];
+  if (Object.keys(value).sort().join("|") !== fields.sort().join("|")) return null;
+  if (
+    value.schema_version !== "product_e2e_report_subject_v1"
+    || typeof value.run_id !== "string"
+    || typeof value.source_snapshot_id !== "string"
+    || typeof value.analysis_id !== "string"
+    || !/^air_[0-9a-f-]{36}$/.test(value.analysis_id)
+    || typeof value.candidate_id !== "string"
+    || value.transaction_signal !== "NONE"
+    || value.lifecycle_mutation !== false
+    || !isRecord(value.localized_summary)
+  ) return null;
+  const candidateName = boundedString(value.candidate_name, MAX_SHORT_TEXT_LENGTH);
+  const symbol = boundedString(value.symbol, MAX_SHORT_TEXT_LENGTH);
+  const chain = boundedString(value.chain, MAX_SHORT_TEXT_LENGTH);
+  const contractAddress = chain && typeof value.contract_address === "string"
+    ? normalizeReportContractAddress(chain, value.contract_address)
+    : null;
+  const basket = boundedString(value.basket, MAX_SHORT_TEXT_LENGTH);
+  const pl = boundedString(value.localized_summary.pl, MAX_TEXT_LENGTH);
+  const en = boundedString(value.localized_summary.en, MAX_TEXT_LENGTH);
+  if (!candidateName || !symbol || !chain || !contractAddress || !basket || !pl || !en) return null;
+  return {
+    analysis_id: value.analysis_id,
+    candidate_name: candidateName,
+    symbol,
+    chain,
+    contract_address: contractAddress,
+    basket,
+    localized_summary: { pl, en },
   };
 }
 
@@ -444,6 +508,9 @@ function buildReportId(relativeIdentity: string): string {
 
 function toSummary(detail: ReportDetail): ReportListItem {
   const {
+    analysis_id: _analysisId,
+    localized_research: _localizedResearch,
+    transaction_signal: _transactionSignal,
     research_summary: _researchSummary,
     source_freshness: _sourceFreshness,
     source_coverage: _sourceCoverage,
