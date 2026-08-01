@@ -5,13 +5,22 @@ import { access, mkdir, open, readFile, readdir, rename, stat } from "node:fs/pr
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
-import { inspectActiveGlobalCollectorLock } from "../../data-poc/src/automation/globalCollectorLock.js";
+import {
+  acquireGlobalCollectorLock,
+  inspectActiveGlobalCollectorLock,
+} from "../../data-poc/src/automation/globalCollectorLock.js";
 import { getDefaultAutomationDirectory } from "../../data-poc/src/automation/automationPaths.js";
-import { createAutomationStateStore } from "../../data-poc/src/automation/automationState.js";
+import {
+  createAutomationStateStore,
+  type AutomationState,
+  type AutomationStateStore,
+} from "../../data-poc/src/automation/automationState.js";
 import { resumeAutomationState } from "../../data-poc/src/automation/resumeAutomationState.js";
 import { readFollowUpStore } from "../../data-poc/src/followUpBasket.js";
 import { readEstablishedUniverseStore } from "../../data-poc/src/establishedUniverseManager.js";
 import { loadEstablishedAddressUniverse } from "../../data-poc/src/establishedAddressUniverse.js";
+import { validateDisplayEligibleScannerSnapshot } from "../../data-poc/src/displaySnapshotValidator.js";
+import { validateDisplayEligibleContextSnapshot } from "../../data-poc/src/contextSnapshotValidator.js";
 import {
   createProductBackup,
   hashCanonicalProductState,
@@ -34,6 +43,7 @@ const execFileAsync = promisify(execFile);
 const UI_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REPO_ROOT = resolve(UI_ROOT, "..", "..");
 const SOAK_ROOT = resolve(UI_ROOT, ".local", "local-rc-soak");
+const DATA_OUTPUT_ROOT = resolve(REPO_ROOT, "tools", "data-poc", "output");
 const TASK_REGISTER_SCRIPT = resolve(REPO_ROOT, "scripts", "win", "register-local-rc-soak-task.ps1");
 const TASK_WAKEUP_SCRIPT = resolve(REPO_ROOT, "scripts", "win", "run-local-rc-soak-wakeup.cmd");
 const API_PATHS = [
@@ -78,7 +88,8 @@ export type LocalRcSoakManifest = {
   cycle_statuses: Record<string, number>;
   decisions: Record<string, number>;
   cycles: Array<{
-    wake_event_id: string;
+    trigger: "TEMPORARY_TASK" | "PRODUCTION_TASK";
+    wake_event_id: string | null;
     central_run_id: string;
     started_at: string;
     finished_at: string;
@@ -95,7 +106,8 @@ export type LocalRcSoakManifest = {
   honeypot_is_calls: 0;
   snapshot_ids: { scanner: string[]; context: string[] };
   pointer_history: Array<{
-    wake_event_id: string;
+    observation_id: string;
+    trigger: "TEMPORARY_TASK" | "PRODUCTION_TASK";
     observed_at: string;
     scanner_run_id: string | null;
     context_run_id: string | null;
@@ -188,6 +200,24 @@ type ApiAudit = {
   aiProviderModes: string[];
 };
 
+export type ObservedCentralCycle = {
+  trigger: "TEMPORARY_TASK" | "PRODUCTION_TASK";
+  wake_event_id: string | null;
+  central_run_id: string;
+  started_at: string;
+  finished_at: string;
+  mode: string | null;
+  status: "SUCCESS" | "PARTIAL" | "FAILED";
+  source_statuses: Record<string, string>;
+  request_counts: Record<string, number>;
+  error_code: string | null;
+  scanner_run_id: string | null;
+  context_run_id: string | null;
+  scanner_valid: boolean;
+  context_valid: boolean;
+  follow_up_ingested: number;
+};
+
 export function previewLocalRcSoak() {
   return {
     schema_version: LOCAL_RC_SOAK_SCHEMA_VERSION,
@@ -234,14 +264,22 @@ export async function runLocalRcSoak(options: {
   if (temporaryBefore.present) throw new Error("RC1_TEMPORARY_TASK_ALREADY_EXISTS");
   const lockBefore = await inspectActiveGlobalCollectorLock();
   const staleLockCandidateBefore = await collectorLockExists();
-  if (lockBefore) throw new Error(`RC1_ACTIVE_COLLECTOR_LOCK:${lockBefore}`);
 
   console.log(`RC1_PRE_SOAK_BACKUP run_id=${runId}`);
-  const preBackupResult = await createProductBackup({ runtimeMode: "LOCAL_RC1", commitSha });
-  await validateBackupBundle(preBackupResult.backupDirectory);
-  const hashesBefore = await hashCanonicalProductState();
-  const followUpBefore = await readFollowUpStore();
-  const providerBudgetLimits = await resolveProviderBudgetLimits();
+  const preSoak = await withCollectorQuiescence("prebackup", async () => {
+    const backupResult = await createProductBackup({ runtimeMode: "LOCAL_RC1", commitSha });
+    await validateBackupBundle(backupResult.backupDirectory);
+    return {
+      backupResult,
+      hashes: await hashCanonicalProductState(),
+      followUp: await readFollowUpStore(),
+      providerBudgetLimits: await resolveProviderBudgetLimits(),
+    };
+  });
+  const preBackupResult = preSoak.backupResult;
+  const hashesBefore = preSoak.hashes;
+  const followUpBefore = preSoak.followUp;
+  const providerBudgetLimits = preSoak.providerBudgetLimits;
   const preBackup = backupAudit(preBackupResult);
   const automationStore = createAutomationStateStore();
   const automationBeforeResume = await automationStore.read();
@@ -249,6 +287,8 @@ export async function runLocalRcSoak(options: {
   if (resumeResult.status !== "RESUMED" && resumeResult.status !== "NOT_SUSPENDED") {
     throw new Error("RC1_AUTOMATION_RESUME_FAILED");
   }
+  const automationAtSoakStart = await automationStore.read();
+  const observedCycles = new Map<string, ObservedCentralCycle>();
 
   const runtime = await startRuntime(commitSha);
   const apiAudit: ApiAudit = {
@@ -269,10 +309,10 @@ export async function runLocalRcSoak(options: {
   let soakStartedAt: Date | null = null;
   const orchestrationErrors: string[] = [];
   try {
+    soakStartedAt = new Date();
     await registerAndStartTask(runDirectory);
     taskCreated = true;
     createCount = 1;
-    soakStartedAt = new Date();
     console.log(`RC1_SOAK_STARTED started_at=${soakStartedAt.toISOString()} task=${LOCAL_RC_TASK_NAME}`);
     let lastProgressAt = 0;
     let lastApiProbeAt = 0;
@@ -280,12 +320,18 @@ export async function runLocalRcSoak(options: {
       const now = Date.now();
       const elapsed = now - soakStartedAt.getTime();
       const events = await readWakeupEvents(runDirectory);
+      await captureObservedCycle(
+        automationStore,
+        observedCycles,
+        soakStartedAt,
+        automationAtSoakStart.last_run_id,
+      );
       if (events.length > 0 && now - lastApiProbeAt >= apiProbeIntervalMs) {
         await probeApi(runtime.baseUrl, apiAudit);
         lastApiProbeAt = now;
       }
       if (now - lastProgressAt >= progressIntervalMs) {
-        console.log(`RC1_PROGRESS elapsed_minutes=${(elapsed / 60_000).toFixed(1)} wakeups=${events.length} cycles=${cycleCount(events)} api_failures=${apiAudit.failures.length}`);
+        console.log(`RC1_PROGRESS elapsed_minutes=${(elapsed / 60_000).toFixed(1)} wakeups=${events.length} cycles=${mergeCentralCycles(events, observedCycles).length} api_failures=${apiAudit.failures.length}`);
         lastProgressAt = now;
       }
       if (elapsed >= minimumSoakMs && events.length >= minimumWakeups) break;
@@ -310,6 +356,14 @@ export async function runLocalRcSoak(options: {
       await removeTask().catch((error: unknown) => orchestrationErrors.push(safeError(error)));
       deleteCount = (await observeTask(LOCAL_RC_TASK_NAME)).present ? 0 : 1;
     }
+    if (soakStartedAt) {
+      await captureObservedCycle(
+        automationStore,
+        observedCycles,
+        soakStartedAt,
+        automationAtSoakStart.last_run_id,
+      ).catch((error: unknown) => orchestrationErrors.push(safeError(error)));
+    }
     stoppingRuntime = true;
     await stopRuntime(runtime.child);
   }
@@ -317,36 +371,59 @@ export async function runLocalRcSoak(options: {
   const soakFinishedAt = new Date();
   const events = await readWakeupEvents(runDirectory);
   const temporaryAfter = await observeTask(LOCAL_RC_TASK_NAME);
+  const runtimeOrphaned = await isRuntimeReachable(runtime.baseUrl);
+  console.log(`RC1_POST_SOAK_BACKUP wakeups=${events.length} cycles=${mergeCentralCycles(events, observedCycles).length}`);
+  const postSoak = await withCollectorQuiescence("postbackup", async () => {
+    if (soakStartedAt) {
+      await captureObservedCycle(
+        automationStore,
+        observedCycles,
+        soakStartedAt,
+        automationAtSoakStart.last_run_id,
+        soakFinishedAt,
+      );
+    }
+    const backupResult = await createProductBackup({ runtimeMode: "LOCAL_RC1", commitSha });
+    await validateBackupBundle(backupResult.backupDirectory);
+    return {
+      backupResult,
+      hashes: await hashCanonicalProductState(),
+      followUp: await readFollowUpStore(),
+    };
+  });
+  const postBackupResult = postSoak.backupResult;
+  const hashesAfter = postSoak.hashes;
+  const followUpAfter = postSoak.followUp;
   const productionAfter = await observeTask(PRODUCTION_TASK_NAME);
   const lockAfter = await inspectActiveGlobalCollectorLock().catch(() => "LOCK_INSPECTION_FAILED");
-  const runtimeOrphaned = await isRuntimeReachable(runtime.baseUrl);
-  console.log(`RC1_POST_SOAK_BACKUP wakeups=${events.length} cycles=${cycleCount(events)}`);
-  const postBackupResult = await createProductBackup({ runtimeMode: "LOCAL_RC1", commitSha });
-  await validateBackupBundle(postBackupResult.backupDirectory);
-  const hashesAfter = await hashCanonicalProductState();
-  const followUpAfter = await readFollowUpStore();
   const postBackup = backupAudit(postBackupResult);
+  const cycles = mergeCentralCycles(events, observedCycles);
   const elapsedMs = soakStartedAt ? Math.max(0, soakFinishedAt.getTime() - soakStartedAt.getTime()) : 0;
   const changedStores = changedKeys(hashesBefore, hashesAfter);
   const expectedMutations = changedStores.filter((key) => EXPECTED_MUTATION_STORES.has(key));
   const unexpectedMutations = changedStores.filter((key) => !EXPECTED_MUTATION_STORES.has(key));
-  const eventErrors = events.flatMap((event) => event.error_code ? [event.error_code] : []);
-  const failures = events.filter((event) => event.run_status === "FAILED");
-  const partials = events.filter((event) => event.run_status === "PARTIAL");
+  const eventErrors = [
+    ...events.flatMap((event) => event.error_code ? [event.error_code] : []),
+    ...cycles.flatMap((cycle) => cycle.error_code ? [cycle.error_code] : []),
+  ];
+  const failures = cycles.filter((cycle) => cycle.status === "FAILED");
+  const partials = cycles.filter((cycle) => cycle.status === "PARTIAL");
   const overlaps = events.filter((event) => event.run_status === "RUN_ALREADY_IN_PROGRESS").length;
-  const pointerValidation = events.length > 0 && events.every((event) => event.scanner_snapshot_valid && event.context_snapshot_valid)
+  const pointerValidation = events.length > 0
+    && cycles.length > 0
+    && events.every((event) => event.scanner_snapshot_valid && event.context_snapshot_valid)
+    && cycles.every((cycle) => cycle.scanner_valid && cycle.context_valid)
     ? "PASS" as const : "FAIL" as const;
-  const lastKnownGood = events.every((event) => event.run_status !== "FAILED"
-    || (event.before.scanner_run_id === event.after.scanner_run_id && event.before.context_run_id === event.after.context_run_id))
+  const lastKnownGood = lastKnownGoodPreserved(cycles, automationAtSoakStart)
     ? "PRESERVED" as const : "LOST" as const;
-  const providerCalls = sumProviderCalls(events);
-  const budgetValidation = validateProviderBudgets(events, providerBudgetLimits);
+  const providerCalls = sumProviderCalls(cycles);
+  const budgetValidation = validateProviderBudgets(cycles, providerBudgetLimits);
   const cadenceValidation = validateCadence(events);
-  const recoveredFailures = failures.filter((failed) => events.some((candidate) =>
+  const recoveredFailures = failures.filter((failed) => cycles.some((candidate) =>
     Date.parse(candidate.started_at) > Date.parse(failed.started_at)
-    && candidate.run_status === "SUCCESS"));
-  const recoveredPartials = partials.filter((partial) => events.some((candidate) =>
-    Date.parse(candidate.started_at) > Date.parse(partial.started_at) && candidate.run_status === "SUCCESS"));
+    && candidate.status === "SUCCESS"));
+  const recoveredPartials = partials.filter((partial) => cycles.some((candidate) =>
+    Date.parse(candidate.started_at) > Date.parse(partial.started_at) && candidate.status === "SUCCESS"));
   const unresolvedFailed = failures.length - recoveredFailures.length;
   const partialPolicyPass = partials.length === 0 || (partials.length === 1 && recoveredPartials.length === 1);
   const duplicateIdentities = duplicateIdentityCount(followUpAfter.entries);
@@ -391,34 +468,28 @@ export async function runLocalRcSoak(options: {
     real_elapsed_ms: elapsedMs,
     real_elapsed_minutes: Number((elapsedMs / 60_000).toFixed(2)),
     wake_up_count: events.length,
-    cycle_count: cycleCount(events),
-    cycle_statuses: countBy(events.map((event) => event.run_status ?? "NOT_RUN")),
+    cycle_count: cycles.length,
+    cycle_statuses: countBy(cycles.map((cycle) => cycle.status)),
     decisions: countBy(events.map((event) => event.decision)),
-    cycles: events.filter((event) => event.central_run_id !== null).map((event) => ({
-      wake_event_id: event.event_id,
-      central_run_id: event.central_run_id as string,
-      started_at: event.started_at,
-      finished_at: event.finished_at,
-      mode: event.run_mode,
-      status: event.run_status ?? "UNKNOWN",
-      source_statuses: event.source_statuses,
-      request_counts: event.request_counts,
-      error_code: event.error_code,
+    cycles: cycles.map((cycle) => ({
+      trigger: cycle.trigger,
+      wake_event_id: cycle.wake_event_id,
+      central_run_id: cycle.central_run_id,
+      started_at: cycle.started_at,
+      finished_at: cycle.finished_at,
+      mode: cycle.mode,
+      status: cycle.status,
+      source_statuses: cycle.source_statuses,
+      request_counts: cycle.request_counts,
+      error_code: cycle.error_code,
     })),
     provider_calls_per_source: providerCalls,
     provider_budget_limits_per_cycle: providerBudgetLimits,
     provider_budget_validation: budgetValidation ? "PASS" : "FAIL",
     openai_calls: 0,
     honeypot_is_calls: 0,
-    snapshot_ids: collectSnapshotIds(events),
-    pointer_history: events.map((event) => ({
-      wake_event_id: event.event_id,
-      observed_at: event.finished_at,
-      scanner_run_id: event.after.scanner_run_id,
-      context_run_id: event.after.context_run_id,
-      scanner_valid: event.scanner_snapshot_valid,
-      context_valid: event.context_snapshot_valid,
-    })),
+    snapshot_ids: collectSnapshotIds(cycles, automationAtSoakStart),
+    pointer_history: createPointerHistory(events, cycles),
     pointer_validation: pointerValidation,
     last_known_good: lastKnownGood,
     cadence_validation: cadenceValidation ? "PASS" : "FAIL",
@@ -429,7 +500,7 @@ export async function runLocalRcSoak(options: {
       audit_before: followUpBefore.audit_log.length,
       audit_after: followUpAfter.audit_log.length,
       audit_delta: followUpAfter.audit_log.length - followUpBefore.audit_log.length,
-      ingested_total: events.reduce((sum, event) => sum + event.follow_up.ingested, 0),
+      ingested_total: cycles.reduce((sum, cycle) => sum + cycle.follow_up_ingested, 0),
       duplicate_identities: duplicateIdentities,
     },
     ai_queue: {
@@ -457,8 +528,8 @@ export async function runLocalRcSoak(options: {
     },
     errors,
     recovery: [
-      ...recoveredFailures.map((event) => `FAILED_RECOVERED_AFTER_${event.event_id}`),
-      ...recoveredPartials.map((event) => `PARTIAL_RECOVERED_AFTER_${event.event_id}`),
+      ...recoveredFailures.map((cycle) => `FAILED_RECOVERED_AFTER_${cycle.central_run_id}`),
+      ...recoveredPartials.map((cycle) => `PARTIAL_RECOVERED_AFTER_${cycle.central_run_id}`),
     ],
     runtime: {
       pid: runtime.child.pid ?? -1,
@@ -500,11 +571,11 @@ export async function runLocalRcSoak(options: {
 }
 
 export function validateProviderBudgets(
-  events: LocalRcSoakWakeupEvent[],
+  cycles: Array<{ request_counts: Record<string, number> }>,
   limits: Record<string, number>,
 ): boolean {
   const allowed = new Set(Object.keys(limits));
-  return events.every((event) => Object.entries(event.request_counts).every(([source, count]) =>
+  return cycles.every((cycle) => Object.entries(cycle.request_counts).every(([source, count]) =>
     allowed.has(source) && Number.isSafeInteger(count) && count >= 0 && count <= (limits[source] ?? -1)));
 }
 
@@ -545,6 +616,125 @@ function backupAudit(result: ProductBackupResult): BackupAudit {
     pointer_validation: result.operation.pointer_validation,
     sqlite_integrity: result.operation.sqlite_integrity,
   };
+}
+
+async function withCollectorQuiescence<T>(phase: "prebackup" | "postbackup", action: () => Promise<T>): Promise<T> {
+  const deadline = Date.now() + 4 * 60_000;
+  const lockRunId = `rc1_${phase}_${randomUUID().replaceAll("-", "").slice(0, 12)}`;
+  while (true) {
+    const lock = await acquireGlobalCollectorLock(lockRunId, { ttlMs: 5 * 60_000 });
+    if (lock.status === "ACQUIRED") {
+      try {
+        return await action();
+      } finally {
+        await lock.release();
+      }
+    }
+    if (Date.now() >= deadline) throw new Error(`RC1_${phase.toUpperCase()}_LOCK_TIMEOUT`);
+    await wait(1_000);
+  }
+}
+
+async function captureObservedCycle(
+  stateStore: AutomationStateStore,
+  observed: Map<string, ObservedCentralCycle>,
+  windowStart: Date,
+  baselineRunId: string | null,
+  windowEnd?: Date,
+): Promise<void> {
+  const state = await stateStore.read();
+  const runId = state.last_run_id;
+  if (!runId || runId === baselineRunId || observed.has(runId)) return;
+  if (state.cycle_status === "IN_PROGRESS" || !isFinalCycleStatus(state.last_result) || !state.last_attempt_at) return;
+  const startedAtMs = Date.parse(state.last_attempt_at);
+  if (startedAtMs < windowStart.getTime() || (windowEnd && startedAtMs > windowEnd.getTime())) return;
+  const validation = await validateAutomationPointers(state);
+  const finishedAtMs = startedAtMs + (state.cycle_duration_ms ?? 0);
+  observed.set(runId, {
+    trigger: "PRODUCTION_TASK",
+    wake_event_id: null,
+    central_run_id: runId,
+    started_at: state.last_attempt_at,
+    finished_at: new Date(finishedAtMs).toISOString(),
+    mode: inferCycleMode(state.request_counts),
+    status: state.last_result,
+    source_statuses: { ...state.source_statuses },
+    request_counts: { ...state.request_counts },
+    error_code: state.failure_code ?? state.last_error_code,
+    scanner_run_id: state.last_published_scanner_run_id,
+    context_run_id: state.last_published_context_run_id,
+    scanner_valid: validation.scanner,
+    context_valid: validation.context,
+    follow_up_ingested: state.follow_up_ingested,
+  });
+}
+
+export function mergeCentralCycles(
+  events: LocalRcSoakWakeupEvent[],
+  observed: ReadonlyMap<string, ObservedCentralCycle>,
+): ObservedCentralCycle[] {
+  const cycles = new Map(observed);
+  for (const event of events) {
+    if (!event.central_run_id || !isFinalCycleStatus(event.run_status)) continue;
+    cycles.set(event.central_run_id, {
+      trigger: "TEMPORARY_TASK",
+      wake_event_id: event.event_id,
+      central_run_id: event.central_run_id,
+      started_at: event.started_at,
+      finished_at: event.finished_at,
+      mode: event.run_mode,
+      status: event.run_status,
+      source_statuses: { ...event.source_statuses },
+      request_counts: { ...event.request_counts },
+      error_code: event.error_code,
+      scanner_run_id: event.after.scanner_run_id,
+      context_run_id: event.after.context_run_id,
+      scanner_valid: event.scanner_snapshot_valid,
+      context_valid: event.context_snapshot_valid,
+      follow_up_ingested: event.follow_up.ingested,
+    });
+  }
+  return [...cycles.values()].sort((left, right) => left.started_at.localeCompare(right.started_at));
+}
+
+function isFinalCycleStatus(value: unknown): value is ObservedCentralCycle["status"] {
+  return value === "SUCCESS" || value === "PARTIAL" || value === "FAILED";
+}
+
+function inferCycleMode(requestCounts: Record<string, number>): "scanner_and_context" | "context_only" | null {
+  if ((requestCounts.dexscreener ?? 0) > 0 || (requestCounts.goplus_security ?? 0) > 0) return "scanner_and_context";
+  if ((requestCounts.alternative_me_fng ?? 0) > 0 || (requestCounts.defillama_api ?? 0) > 0) return "context_only";
+  return null;
+}
+
+async function validateAutomationPointers(state: AutomationState): Promise<{ scanner: boolean; context: boolean }> {
+  return {
+    scanner: await validateSnapshotFile(
+      state.last_published_scanner_run_id,
+      "full_output.json",
+      (value) => validateDisplayEligibleScannerSnapshot(value as Parameters<typeof validateDisplayEligibleScannerSnapshot>[0]),
+    ),
+    context: await validateSnapshotFile(
+      state.last_published_context_run_id,
+      "approved_sources_output.json",
+      (value) => validateDisplayEligibleContextSnapshot(value as Parameters<typeof validateDisplayEligibleContextSnapshot>[0]),
+    ),
+  };
+}
+
+async function validateSnapshotFile(
+  runId: string | null,
+  fileName: "full_output.json" | "approved_sources_output.json",
+  validate: (value: unknown) => unknown,
+): Promise<boolean> {
+  if (!runId || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(runId)) return false;
+  try {
+    const value = JSON.parse(await readFile(resolve(DATA_OUTPUT_ROOT, runId, fileName), "utf8")) as unknown;
+    validate(value);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function startRuntime(commitSha: string): Promise<{ child: ChildProcess; baseUrl: string }> {
@@ -761,7 +951,7 @@ async function collectorLockExists(): Promise<boolean> {
   }
 }
 
-function sumProviderCalls(events: LocalRcSoakWakeupEvent[]): Record<string, number> {
+function sumProviderCalls(cycles: Array<{ request_counts: Record<string, number> }>): Record<string, number> {
   const totals: Record<string, number> = {
     dexscreener: 0,
     goplus_security: 0,
@@ -769,24 +959,64 @@ function sumProviderCalls(events: LocalRcSoakWakeupEvent[]): Record<string, numb
     defillama_api: 0,
     honeypot_is: 0,
   };
-  for (const event of events) {
-    for (const [source, count] of Object.entries(event.request_counts)) totals[source] = (totals[source] ?? 0) + count;
+  for (const cycle of cycles) {
+    for (const [source, count] of Object.entries(cycle.request_counts)) totals[source] = (totals[source] ?? 0) + count;
   }
   return totals;
 }
 
-function collectSnapshotIds(events: LocalRcSoakWakeupEvent[]): { scanner: string[]; context: string[] } {
+function collectSnapshotIds(
+  cycles: ObservedCentralCycle[],
+  baseline: AutomationState,
+): { scanner: string[]; context: string[] } {
   const scanner = new Set<string>();
   const context = new Set<string>();
-  for (const event of events) {
-    if (event.after.scanner_run_id && event.after.scanner_run_id !== event.before.scanner_run_id) scanner.add(event.after.scanner_run_id);
-    if (event.after.context_run_id && event.after.context_run_id !== event.before.context_run_id) context.add(event.after.context_run_id);
+  let scannerPointer = baseline.last_published_scanner_run_id;
+  let contextPointer = baseline.last_published_context_run_id;
+  for (const cycle of cycles) {
+    if (cycle.scanner_run_id && cycle.scanner_run_id !== scannerPointer) scanner.add(cycle.scanner_run_id);
+    if (cycle.context_run_id && cycle.context_run_id !== contextPointer) context.add(cycle.context_run_id);
+    scannerPointer = cycle.scanner_run_id;
+    contextPointer = cycle.context_run_id;
   }
   return { scanner: [...scanner], context: [...context] };
 }
 
-function cycleCount(events: LocalRcSoakWakeupEvent[]): number {
-  return events.filter((event) => event.central_run_id !== null).length;
+function createPointerHistory(
+  events: LocalRcSoakWakeupEvent[],
+  cycles: ObservedCentralCycle[],
+): LocalRcSoakManifest["pointer_history"] {
+  const temporary = events.map((event) => ({
+    observation_id: event.event_id,
+    trigger: "TEMPORARY_TASK" as const,
+    observed_at: event.finished_at,
+    scanner_run_id: event.after.scanner_run_id,
+    context_run_id: event.after.context_run_id,
+    scanner_valid: event.scanner_snapshot_valid,
+    context_valid: event.context_snapshot_valid,
+  }));
+  const production = cycles.filter((cycle) => cycle.trigger === "PRODUCTION_TASK").map((cycle) => ({
+    observation_id: cycle.central_run_id,
+    trigger: cycle.trigger,
+    observed_at: cycle.finished_at,
+    scanner_run_id: cycle.scanner_run_id,
+    context_run_id: cycle.context_run_id,
+    scanner_valid: cycle.scanner_valid,
+    context_valid: cycle.context_valid,
+  }));
+  return [...temporary, ...production].sort((left, right) => left.observed_at.localeCompare(right.observed_at));
+}
+
+function lastKnownGoodPreserved(cycles: ObservedCentralCycle[], baseline: AutomationState): boolean {
+  let scannerPointer = baseline.last_published_scanner_run_id;
+  let contextPointer = baseline.last_published_context_run_id;
+  for (const cycle of cycles) {
+    if (cycle.status === "FAILED"
+      && (cycle.scanner_run_id !== scannerPointer || cycle.context_run_id !== contextPointer)) return false;
+    scannerPointer = cycle.scanner_run_id;
+    contextPointer = cycle.context_run_id;
+  }
+  return true;
 }
 
 function countBy(values: Array<string | null>): Record<string, number> {
@@ -877,9 +1107,9 @@ function renderReport(manifest: LocalRcSoakManifest): string {
     "",
     "## Cycles",
     "",
-    "| Run ID | Mode | Status | Sources | Requests |",
-    "|---|---|---|---|---|",
-    ...manifest.cycles.map((cycle) => `| \`${cycle.central_run_id}\` | ${cycle.mode ?? "none"} | ${cycle.status} | ${JSON.stringify(cycle.source_statuses)} | ${JSON.stringify(cycle.request_counts)} |`),
+    "| Run ID | Trigger | Mode | Status | Sources | Requests |",
+    "|---|---|---|---|---|---|",
+    ...manifest.cycles.map((cycle) => `| \`${cycle.central_run_id}\` | ${cycle.trigger} | ${cycle.mode ?? "none"} | ${cycle.status} | ${JSON.stringify(cycle.source_statuses)} | ${JSON.stringify(cycle.request_counts)} |`),
     "",
     "## Backups and Task Scheduler",
     "",

@@ -7,6 +7,7 @@ import {
   LOCAL_RC_TASK_NAME,
   MINIMUM_SOAK_MS,
   MINIMUM_WAKEUPS,
+  mergeCentralCycles,
   previewLocalRcSoak,
   validateCadence,
   validateProviderBudgets,
@@ -109,6 +110,30 @@ describe("RC.1 local release candidate soak", () => {
     assert.equal(validateProviderBudgets([event({ request_counts: { unknown_provider: 1 } })], limits), false);
   });
 
+  it("merges production and temporary central cycles without double-counting", () => {
+    const sharedRunId = "automation_20260801100000_12345678";
+    const productionOnlyRunId = "automation_20260801101500_87654321";
+    const observed = new Map([
+      [sharedRunId, observedCycle(sharedRunId)],
+      [productionOnlyRunId, observedCycle(productionOnlyRunId, "2026-08-01T10:15:00.000Z")],
+    ]);
+    const temporary = event({
+      central_run_id: sharedRunId,
+      run_status: "SUCCESS",
+      decision: "RUN_SCANNER_AND_CONTEXT",
+      run_mode: "scanner_and_context",
+    });
+
+    const merged = mergeCentralCycles([temporary], observed);
+
+    assert.equal(merged.length, 2);
+    assert.equal(merged[0]?.central_run_id, sharedRunId);
+    assert.equal(merged[0]?.trigger, "TEMPORARY_TASK");
+    assert.equal(merged[0]?.wake_event_id, temporary.event_id);
+    assert.equal(merged[1]?.central_run_id, productionOnlyRunId);
+    assert.equal(merged[1]?.trigger, "PRODUCTION_TASK");
+  });
+
   it("publishes report before the final manifest and reuses STAB.2 backup", async () => {
     const source = await readFile(resolve(repoRoot, "tools", "ui-mock", "server", "localRcSoak.ts"), "utf8");
     assert.ok((source.match(/createProductBackup/g) ?? []).length >= 3);
@@ -122,8 +147,31 @@ describe("RC.1 local release candidate soak", () => {
     assert.match(source, /final_temporary_task_absent/);
     assert.match(source, /resumeAutomationState\(\{ ownerConfirmed: true/);
     assert.match(source, /events\.length > 0 && now - lastApiProbeAt/);
+    assert.match(source, /withCollectorQuiescence\("prebackup"/);
+    assert.match(source, /withCollectorQuiescence\("postbackup"/);
+    assert.match(source, /captureObservedCycle/);
   });
 });
+
+function observedCycle(centralRunId: string, startedAt = "2026-08-01T10:00:00.000Z") {
+  return {
+    trigger: "PRODUCTION_TASK" as const,
+    wake_event_id: null,
+    central_run_id: centralRunId,
+    started_at: startedAt,
+    finished_at: new Date(Date.parse(startedAt) + 1_000).toISOString(),
+    mode: "scanner_and_context",
+    status: "SUCCESS" as const,
+    source_statuses: { dexscreener: "READY" },
+    request_counts: { dexscreener: 1 },
+    error_code: null,
+    scanner_run_id: `scanner_${centralRunId}`,
+    context_run_id: `context_${centralRunId}`,
+    scanner_valid: true,
+    context_valid: true,
+    follow_up_ingested: 0,
+  };
+}
 
 function event(overrides: Partial<LocalRcSoakWakeupEvent> = {}): LocalRcSoakWakeupEvent {
   return {
