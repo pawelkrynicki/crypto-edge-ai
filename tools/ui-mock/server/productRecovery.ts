@@ -18,6 +18,7 @@ import { basename, dirname, isAbsolute, relative, resolve, sep } from "node:path
 import type { PersistableScannerOutput } from "../../data-poc/src/persistableScannerModel.js";
 import type { ApprovedSourcesRunOutput } from "../../data-poc/src/sources/sourceAdapterTypes.js";
 import { validatePersistableScannerOutput } from "../../data-poc/src/storageValidator.js";
+import { validateDisplayEligibleScannerSnapshot } from "../../data-poc/src/displaySnapshotValidator.js";
 import { validateDisplayEligibleContextSnapshot } from "../../data-poc/src/contextSnapshotValidator.js";
 import {
   getDefaultFollowUpStorePath,
@@ -736,8 +737,7 @@ async function validateSourceState(
       normalizeAutomationState(JSON.parse(raw) as unknown);
     } else if (item.logicalStoreId === "active_scanner_snapshot") {
       const output = JSON.parse(raw) as PersistableScannerOutput;
-      const result = validatePersistableScannerOutput(output);
-      if (!result.valid) throw new ProductRecoveryError("SCANNER_SNAPSHOT_INVALID");
+      validateRecoveryScannerSnapshot(output);
       const pointer = normalizeAutomationState(JSON.parse(await readFile(paths.automationState, "utf8")) as unknown).last_published_scanner_run_id;
       if (!pointer || output.scan_run?.run_id !== pointer) throw new ProductRecoveryError("SCANNER_POINTER_INCONSISTENT");
     } else if (item.logicalStoreId === "active_context_snapshot") {
@@ -849,8 +849,7 @@ async function validateBackupEntryContent(path: string, logicalStoreId: string):
   } else if (logicalStoreId === "central_automation_state") {
     normalizeAutomationState(parsed);
   } else if (logicalStoreId === "active_scanner_snapshot") {
-    const result = validatePersistableScannerOutput(parsed as PersistableScannerOutput);
-    if (!result.valid) throw new ProductRecoveryError("SCANNER_SNAPSHOT_INVALID");
+    validateRecoveryScannerSnapshot(parsed as PersistableScannerOutput);
   } else if (logicalStoreId === "active_context_snapshot") {
     validateDisplayEligibleContextSnapshot(parsed as ApprovedSourcesRunOutput);
   }
@@ -1173,6 +1172,16 @@ export function assertRecoveryTextSafe(value: string, logicalStoreId?: string): 
     const publicRegistryContact = matcher.code === "PERSONAL_EMAIL_DETECTED"
       && logicalStoreId === "data_source_registry";
     if (!publicRegistryContact && matcher.pattern.test(value)) throw new ProductRecoveryError(matcher.code);
+  }
+}
+
+export function validateRecoveryScannerSnapshot(output: PersistableScannerOutput): void {
+  try {
+    validateDisplayEligibleScannerSnapshot(output);
+    return;
+  } catch {
+    const storageValidation = validatePersistableScannerOutput(output);
+    if (!storageValidation.valid) throw new ProductRecoveryError("SCANNER_SNAPSHOT_INVALID");
   }
 }
 
