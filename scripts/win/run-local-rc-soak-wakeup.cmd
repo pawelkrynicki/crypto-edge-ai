@@ -16,7 +16,7 @@ set "CRYPTO_EDGE_AI_RESEARCH_MODEL="
 set "OPENAI_API_KEY="
 
 cd /d "%CRYPTO_EDGE_REPO_ROOT%"
-call pnpm --dir tools\ui-mock run rc1:wakeup -- --run-directory "%~2"
+call pnpm --dir tools\data-poc run rc1:wakeup -- --run-directory "%~2"
 exit /b %ERRORLEVEL%
 
 :usage_error

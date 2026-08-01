@@ -11,7 +11,7 @@ import {
   validateCadence,
   validateProviderBudgets,
 } from "../server/localRcSoak.js";
-import type { LocalRcSoakWakeupEvent } from "../scripts/runLocalRcSoakWakeup.js";
+import type { LocalRcSoakWakeupEvent } from "../../data-poc/src/automation/runLocalRcSoakWakeup.js";
 
 const repoRoot = resolve(import.meta.dirname, "..", "..", "..");
 
@@ -51,11 +51,13 @@ describe("RC.1 local release candidate soak", () => {
   });
 
   it("uses one forced full cycle and then the canonical scheduler", async () => {
-    const wakeup = await readFile(resolve(repoRoot, "tools", "ui-mock", "scripts", "runLocalRcSoakWakeup.ts"), "utf8");
+    const wakeup = await readFile(resolve(repoRoot, "tools", "data-poc", "src", "automation", "runLocalRcSoakWakeup.ts"), "utf8");
     assert.match(wakeup, /runCentralLiveCycleOnce/);
     assert.match(wakeup, /runCentralSchedulerOnce\(\{ enabled: true, stateStore \}\)/);
     assert.match(wakeup, /claimInitialFullCycle/);
     assert.match(wakeup, /RC1_OPENAI_NOT_DISABLED/);
+    assert.match(wakeup, /resolveDataPocRoot/);
+    assert.match(wakeup, /validateDisplayEligibleScannerSnapshot/);
     assert.match(wakeup, /while \(args\[0\] === "--"\) args\.shift\(\)/);
     assert.doesNotMatch(wakeup, /honeypot/i);
 

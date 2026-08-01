@@ -21,7 +21,7 @@ import {
 import {
   LOCAL_RC_SOAK_WAKEUP_SCHEMA_VERSION,
   type LocalRcSoakWakeupEvent,
-} from "../scripts/runLocalRcSoakWakeup.js";
+} from "../../data-poc/src/automation/runLocalRcSoakWakeup.js";
 
 export const LOCAL_RC_SOAK_SCHEMA_VERSION = "local_rc_soak_run_v1";
 export const LOCAL_RC_SOAK_CONTROL_SCHEMA_VERSION = "local_rc_soak_control_v1";

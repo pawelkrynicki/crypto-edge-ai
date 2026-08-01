@@ -1,24 +1,24 @@
 import { randomUUID } from "node:crypto";
 import { access, mkdir, open, readFile, rename } from "node:fs/promises";
-import { dirname, isAbsolute, relative, resolve } from "node:path";
+import { isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   assertExplicitLiveAutomationOptIn,
   runCentralLiveCycleOnce,
   runCentralSchedulerOnce,
   type RunCentralSchedulerOnceResult,
-} from "../../data-poc/src/automation/runCentralAutomation.js";
-import { createAutomationStateStore, type AutomationState } from "../../data-poc/src/automation/automationState.js";
-import { inspectActiveGlobalCollectorLock } from "../../data-poc/src/automation/globalCollectorLock.js";
-import { readFollowUpStore } from "../../data-poc/src/followUpBasket.js";
-import { validatePersistableScannerOutput } from "../../data-poc/src/storageValidator.js";
-import { validateDisplayEligibleContextSnapshot } from "../../data-poc/src/contextSnapshotValidator.js";
+} from "./runCentralAutomation.js";
+import { createAutomationStateStore, type AutomationState } from "./automationState.js";
+import { inspectActiveGlobalCollectorLock } from "./globalCollectorLock.js";
+import { readFollowUpStore } from "../followUpBasket.js";
+import { validateDisplayEligibleScannerSnapshot } from "../displaySnapshotValidator.js";
+import { validateDisplayEligibleContextSnapshot } from "../contextSnapshotValidator.js";
 
 export const LOCAL_RC_SOAK_WAKEUP_SCHEMA_VERSION = "local_rc_soak_wakeup_v1";
 
-const UI_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const SOAK_ROOT = resolve(UI_ROOT, ".local", "local-rc-soak");
-const OUTPUT_ROOT = resolve(UI_ROOT, "..", "data-poc", "output");
+const DATA_POC_ROOT = resolveDataPocRoot(fileURLToPath(import.meta.url));
+const SOAK_ROOT = resolve(DATA_POC_ROOT, "..", "ui-mock", ".local", "local-rc-soak");
+const OUTPUT_ROOT = resolve(DATA_POC_ROOT, "output");
 
 export type LocalRcSoakWakeupEvent = {
   schema_version: typeof LOCAL_RC_SOAK_WAKEUP_SCHEMA_VERSION;
@@ -205,7 +205,11 @@ async function claimInitialFullCycle(runDirectory: string): Promise<boolean> {
 }
 
 async function validatePointers(state: AutomationState): Promise<{ scanner: boolean; context: boolean }> {
-  const scanner = await validateSnapshot(state.last_published_scanner_run_id, "full_output.json", validatePersistableScannerOutput);
+  const scanner = await validateSnapshot(
+    state.last_published_scanner_run_id,
+    "full_output.json",
+    validateDisplayEligibleScannerSnapshot,
+  );
   const context = await validateSnapshot(
     state.last_published_context_run_id,
     "approved_sources_output.json",
@@ -262,6 +266,13 @@ function duplicateIdentityCount(entries: Array<{ chain: string; contract_address
 
 function stamp(value: Date): string {
   return value.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+}
+
+function resolveDataPocRoot(modulePath: string): string {
+  const marker = `${sep}tools${sep}data-poc${sep}`;
+  const index = modulePath.toLowerCase().indexOf(marker.toLowerCase());
+  if (index < 0) throw new Error("RC1_DATA_POC_ROOT_UNAVAILABLE");
+  return modulePath.slice(0, index + marker.length - 1);
 }
 
 function safeError(error: unknown): string {
