@@ -56,7 +56,11 @@ describe("RC.1 local release candidate soak", () => {
     assert.match(wakeup, /runCentralSchedulerOnce\(\{ enabled: true, stateStore \}\)/);
     assert.match(wakeup, /claimInitialFullCycle/);
     assert.match(wakeup, /RC1_OPENAI_NOT_DISABLED/);
+    assert.match(wakeup, /while \(args\[0\] === "--"\) args\.shift\(\)/);
     assert.doesNotMatch(wakeup, /honeypot/i);
+
+    const runner = await readFile(resolve(repoRoot, "tools", "ui-mock", "scripts", "runLocalRcSoak.ts"), "utf8");
+    assert.match(runner, /stripArgumentSeparators/);
 
     const initial = event({
       initial_full_cycle: true,

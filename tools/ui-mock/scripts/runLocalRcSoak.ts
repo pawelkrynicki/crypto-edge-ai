@@ -2,7 +2,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { previewLocalRcSoak, reportUrl, runLocalRcSoak } from "../server/localRcSoak.js";
 
 async function main(): Promise<void> {
-  const args = process.argv.slice(2);
+  const args = stripArgumentSeparators(process.argv.slice(2));
   if (args.length === 0 || (args.length === 1 && args[0] === "--preview")) {
     const preview = previewLocalRcSoak();
     console.log(JSON.stringify(preview, null, 2));
@@ -23,6 +23,12 @@ async function main(): Promise<void> {
     return;
   }
   throw new Error("Usage: runLocalRcSoak.ts [--preview|--run-live-local]");
+}
+
+function stripArgumentSeparators(args: string[]): string[] {
+  const normalized = [...args];
+  while (normalized[0] === "--") normalized.shift();
+  return normalized;
 }
 
 await main();

@@ -165,6 +165,7 @@ function assertLiveEnvironment(env: NodeJS.ProcessEnv): void {
 }
 
 function parseRunDirectory(args: string[]): string {
+  while (args[0] === "--") args.shift();
   if (args.length !== 2 || args[0] !== "--run-directory" || !args[1]) {
     throw new Error("RC1_WAKEUP_ARGUMENT_INVALID");
   }
