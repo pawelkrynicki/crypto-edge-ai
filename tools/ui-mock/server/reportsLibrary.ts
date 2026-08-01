@@ -37,6 +37,10 @@ const MAX_STRUCTURE_NODES = 10_000;
 const REPORT_TITLE = "Crypto Edge AI Analyst Report";
 const NOT_AVAILABLE = "not_available";
 
+export function getDefaultReportsRootPath(): string {
+  return resolve(DEFAULT_REPORTS_ROOT);
+}
+
 export type ReportsLibraryOptions = {
   reportsRootPath?: string;
   maxReportBytes?: number;
