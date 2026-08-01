@@ -76,6 +76,19 @@ describe("Persistent Feedback SQLite store", () => {
     assert.equal(reopened.health(false).feedback_status, "PARTIAL");
   });
 
+  it("does not mutate an up-to-date Feedback SQLite file when reopened", async () => {
+    const { store, databasePath } = await tempStore();
+    store.close();
+    stores.splice(stores.indexOf(store), 1);
+    const before = await readFile(databasePath);
+
+    const reopened = await createFeedbackStore({ databaseFilePath: databasePath });
+    reopened.close();
+    const after = await readFile(databasePath);
+
+    assert.deepEqual(after, before);
+  });
+
   it("persists feedback across a runtime restart", async () => {
     const { store, databasePath } = await tempStore();
     const service = serviceFor(store);
