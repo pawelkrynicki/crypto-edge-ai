@@ -36,6 +36,8 @@ describe("RC.1 local release candidate soak", () => {
     assert.match(launcher, /--run-live-local/);
     assert.match(launcher, /set "OPENAI_API_KEY="/);
     assert.match(launcher, /set "ALLOW_LIVE_PROVIDER_CALLS=0"/);
+    assert.match(launcher, /set "RUN_EXIT=1"/);
+    assert.match(launcher, /if "%%A"=="RC1_EXIT_CODE" set "RUN_EXIT=%%B"/);
     assert.equal((launcher.match(/start "" "!REVIEW_URL!"/g) ?? []).length, 1);
   });
 

@@ -18,6 +18,7 @@ async function main(): Promise<void> {
     console.log(`Cycles: ${result.manifest.cycle_count}`);
     console.log(`Manifest: ${result.manifestPath}`);
     console.log(`Report: ${result.reportPath}`);
+    console.log(`RC1_EXIT_CODE=${result.manifest.final_verdict === "PASS" ? 0 : 1}`);
     console.log(`REVIEW_URL=${reportUrl(result.reportPath)}`);
     process.exitCode = result.manifest.final_verdict === "PASS" ? 0 : 1;
     return;

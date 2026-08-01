@@ -56,11 +56,14 @@ if errorlevel 1 (
   popd
   exit /b 1
 )
+set "RUN_EXIT=1"
 for /f "usebackq delims=" %%L in (`call pnpm run rc1:soak -- --run-live-local`) do (
   echo %%L
-  for /f "tokens=1,* delims==" %%A in ("%%L") do if "%%A"=="REVIEW_URL" set "REVIEW_URL=%%B"
+  for /f "tokens=1,* delims==" %%A in ("%%L") do (
+    if "%%A"=="REVIEW_URL" set "REVIEW_URL=%%B"
+    if "%%A"=="RC1_EXIT_CODE" set "RUN_EXIT=%%B"
+  )
 )
-set "RUN_EXIT=!ERRORLEVEL!"
 popd
 if not "!RUN_EXIT!"=="0" exit /b !RUN_EXIT!
 if not defined REVIEW_URL (
