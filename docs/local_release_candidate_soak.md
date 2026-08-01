@@ -20,6 +20,8 @@ Tryb live wymusza `INTERNAL_BETA`, wyłącza worker i provider OpenAI oraz czyś
 
 Runner wykonuje co najmniej 60 minut rzeczywistego czasu i 12 pobudek, monitoruje lokalny UI/API, pointery, snapshoty, Follow-up, lock i AI queue przy wyłączonym OpenAI. Przed i po soak tworzy oraz ponownie waliduje pełny backup STAB.2. Zadanie tymczasowe jest usuwane przed końcowym audytem, również przy błędzie.
 
+Po poprawnym pre-backupie jawny tryb `--run-live-local` używa istniejącej procedury owner-confirmed resume, jeśli application circuit breaker jest zawieszony. Nie zmienia przy tym pointerów ani snapshotów; początkowy pełny cykl nadal musi odbudować prawidłowy stan przez zwykły coordinator. Preview nigdy nie wykonuje resume.
+
 Artefakty powstają pod `tools/ui-mock/.local/local-rc-soak/<run_id>/`. Raport Markdown jest stroną owner-only; nie jest routowany ani linkowany w zwykłym kliencie. `manifest.json` w formacie `local_rc_soak_run_v1` jest publikowany jako ostatni.
 
 ## Warunek PASS

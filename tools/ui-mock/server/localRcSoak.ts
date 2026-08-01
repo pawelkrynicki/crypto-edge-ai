@@ -7,6 +7,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import { inspectActiveGlobalCollectorLock } from "../../data-poc/src/automation/globalCollectorLock.js";
 import { getDefaultAutomationDirectory } from "../../data-poc/src/automation/automationPaths.js";
+import { createAutomationStateStore } from "../../data-poc/src/automation/automationState.js";
+import { resumeAutomationState } from "../../data-poc/src/automation/resumeAutomationState.js";
 import { readFollowUpStore } from "../../data-poc/src/followUpBasket.js";
 import { readEstablishedUniverseStore } from "../../data-poc/src/establishedUniverseManager.js";
 import { loadEstablishedAddressUniverse } from "../../data-poc/src/establishedAddressUniverse.js";
@@ -119,6 +121,12 @@ export type LocalRcSoakManifest = {
     store_hash_before: string | null;
     store_hash_after: string | null;
     unchanged: boolean;
+  };
+  automation_resume: {
+    was_suspended: boolean;
+    suspended_reason_before: string | null;
+    status: "RESUMED" | "NOT_SUSPENDED";
+    owner_confirmed: true;
   };
   expected_mutations: string[];
   mutation_explanations: Record<string, string>;
@@ -235,6 +243,12 @@ export async function runLocalRcSoak(options: {
   const followUpBefore = await readFollowUpStore();
   const providerBudgetLimits = await resolveProviderBudgetLimits();
   const preBackup = backupAudit(preBackupResult);
+  const automationStore = createAutomationStateStore();
+  const automationBeforeResume = await automationStore.read();
+  const resumeResult = await resumeAutomationState({ ownerConfirmed: true, stateStore: automationStore });
+  if (resumeResult.status !== "RESUMED" && resumeResult.status !== "NOT_SUSPENDED") {
+    throw new Error("RC1_AUTOMATION_RESUME_FAILED");
+  }
 
   const runtime = await startRuntime(commitSha);
   const apiAudit: ApiAudit = {
@@ -266,7 +280,7 @@ export async function runLocalRcSoak(options: {
       const now = Date.now();
       const elapsed = now - soakStartedAt.getTime();
       const events = await readWakeupEvents(runDirectory);
-      if (now - lastApiProbeAt >= apiProbeIntervalMs) {
+      if (events.length > 0 && now - lastApiProbeAt >= apiProbeIntervalMs) {
         await probeApi(runtime.baseUrl, apiAudit);
         lastApiProbeAt = now;
       }
@@ -424,6 +438,12 @@ export async function runLocalRcSoak(options: {
       store_hash_before: hashesBefore.ai_queue_cache_sqlite ?? null,
       store_hash_after: hashesAfter.ai_queue_cache_sqlite ?? null,
       unchanged: hashesBefore.ai_queue_cache_sqlite === hashesAfter.ai_queue_cache_sqlite,
+    },
+    automation_resume: {
+      was_suspended: automationBeforeResume.automation_suspended,
+      suspended_reason_before: automationBeforeResume.suspended_reason,
+      status: resumeResult.status,
+      owner_confirmed: true,
     },
     expected_mutations: expectedMutations,
     mutation_explanations: Object.fromEntries(expectedMutations.map((store) => [store, mutationExplanation(store)])),
@@ -825,6 +845,7 @@ function renderReport(manifest: LocalRcSoakManifest): string {
     line("AI provider mode", manifest.ai_queue.provider_mode),
     line("AI worker started", manifest.ai_queue.worker_started),
     line("AI queue unchanged", manifest.ai_queue.unchanged),
+    line("Automation resume", `${manifest.automation_resume.status} (was suspended: ${manifest.automation_resume.was_suspended})`),
     "",
     "## Mutations",
     "",

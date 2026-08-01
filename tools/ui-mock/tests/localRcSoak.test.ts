@@ -118,6 +118,8 @@ describe("RC.1 local release candidate soak", () => {
     assert.match(source, /schema_version: LOCAL_RC_SOAK_SCHEMA_VERSION/);
     assert.match(source, /unexpected_mutations/);
     assert.match(source, /final_temporary_task_absent/);
+    assert.match(source, /resumeAutomationState\(\{ ownerConfirmed: true/);
+    assert.match(source, /events\.length > 0 && now - lastApiProbeAt/);
   });
 });
 
