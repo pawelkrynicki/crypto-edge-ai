@@ -1,5 +1,11 @@
 # Roadmap
 
+## Current stage: OA.1 — Local Owner Acceptance
+
+STAB.2 i RC.1 są zakończone; RC.1 zamknął merge PR #87. Bieżący etap OA.1 przygotowuje krótką ręczną sesję ownera na istniejącym lokalnym `INTERNAL_BETA`, bez collectora, live provider calls, OpenAI calls i zmian Task Scheduler. Kontrakt: `docs/local_owner_acceptance.md`.
+
+Po ręcznym werdykcie `ACCEPT` następnym etapem jest dopuszczenie zaufanego testera. OA.1 nie ustawia werdyktu automatycznie i nie rozpoczyna etapu testera. Deadline pozostaje 15 sierpnia 2026.
+
 ## Current stage: STAB.2 — Backup, Restore and Rollback
 
 STAB.2 dodaje owner-only `product_backup_bundle_v1`, domyślny restore preview, jawny restore `--apply`, pre-restore safety backup, wersjonowany journal `product_recovery_operation_v1` i automatyczny rollback. Backup obejmuje Follow-up, Established z historią/audytem, oba SQLite, automation pointers i wskazywane snapshoty, Reports oraz bezpieczną konfigurację. Secret scan, dokładny file-set, SHA-256, SQLite `VACUUM INTO` + `integrity_check` i wspólny owner lock działają fail-closed. Kontrakt: `docs/backup_restore_rollback.md`.
