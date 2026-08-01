@@ -558,3 +558,14 @@ scripts\win\start-resilience-failure-drills-review.cmd --run-isolated
 Domyślny preview pokazuje 20 scenariuszy i przyszłe lokalizacje pod `%TEMP%`. Nie tworzy store, nie wykonuje awarii, nie uruchamia workera, wykonuje `scheduler_mutations=0` i otwiera dokładnie jedną kartę runbooka. Może wykonać wyłącznie read-only `Get-ScheduledTask` na hoście ownera.
 
 `--run-isolated` wykonuje kontrolowane awarie Refresh View, centralnego cyklu, Follow-up, Established, AI.3, Reports i Feedback. Używa deterministycznych mocków oraz oddzielnych plików/SQLite. Manifest `product_failure_drill_run_v1` i raport Markdown potwierdzają recovery, brak duplikatów, 0 OpenAI calls, 0 live data-provider calls, 0 kanonicznych mutacji i `scheduler_mutations=0`. Kontrakt: `docs/resilience_failure_drills.md`.
+
+## STAB.2 Backup, Restore and Rollback Review
+
+```cmd
+scripts\win\start-backup-restore-rollback-review.cmd
+scripts\win\start-backup-restore-rollback-review.cmd --run-isolated
+```
+
+Domyślnie launcher uruchamia wyłącznie preview: nie tworzy store, nie uruchamia workera, nie wykonuje restore ani rollbacku, czyści wszystkie live opt-ins i `OPENAI_API_KEY`, wykonuje 0 live calls i otwiera dokładnie jedną kartę runbooka. Może tylko odczytać status istniejącego zadania Task Scheduler; nigdy go nie instaluje, nie włącza, nie wyłącza ani nie modyfikuje.
+
+Jawne `--run-isolated` wykonuje 25 scenariuszy wyłącznie pod `%TEMP%\crypto-edge-backup-restore-rollback\<run_id>`. Manifest i raport potwierdzają backup/restore/rollback, restart z journala, fail-closed maintenance state oraz: canonical mutations 0, Task Scheduler mutations 0, OpenAI calls 0, live provider calls 0 i central live cycles 0. Pełny kontrakt: `docs/backup_restore_rollback.md`.
