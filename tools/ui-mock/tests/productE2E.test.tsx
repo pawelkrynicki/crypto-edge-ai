@@ -29,7 +29,11 @@ import {
   readReportsList,
 } from "../server/reportsLibrary.js";
 import { readEstablishedUniverseStore } from "../../data-poc/src/establishedUniverseManager.js";
-import { FOLLOW_UP_CHECKPOINT_DAYS, readFollowUpStore } from "../../data-poc/src/followUpBasket.js";
+import {
+  FOLLOW_UP_CHECKPOINT_DAYS,
+  followUpIdentity,
+  readFollowUpStore,
+} from "../../data-poc/src/followUpBasket.js";
 import { mapPersistableScannerOutputToUiCandidates } from "../src/adapters/scannerOutputAdapter.js";
 import {
   resolveDetailTab,
@@ -85,10 +89,14 @@ before(async () => {
     now: new Date(manifest.started_at),
   });
   candidate = mapPersistableScannerOutputToUiCandidates(scanner as ScannerApiOutput)
-    .find((value) => (
-      value.chain === manifest.chain
-      && value.contractAddress === manifest.contract_address
-    ))!;
+    .find((value) => {
+      try {
+        return followUpIdentity(value.chain, value.contractAddress).identity
+          === `${manifest.chain}:${manifest.contract_address}`;
+      } catch {
+        return false;
+      }
+    })!;
   assert.ok(candidate);
 
   const universe = await readEstablishedUniverseStore(stores.established);

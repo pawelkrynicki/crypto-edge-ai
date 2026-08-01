@@ -349,10 +349,14 @@ export async function runFullProductE2E(options: ProductE2EOptions = {}): Promis
         },
         "2026-07-30T12:01:00.000Z",
       );
-      const identityPreserved = failed.candidates.some((candidate) => (
-        candidate.chain === selection!.identity.chain
-        && candidate.contractAddress === selection!.identity.contract_address
-      ));
+      const identityPreserved = failed.candidates.some((candidate) => {
+        try {
+          return followUpIdentity(candidate.chain, candidate.contractAddress).identity
+            === selection!.identity.identity;
+        } catch {
+          return false;
+        }
+      });
       refreshView = {
         last_known_good_preserved: failed.candidates === first.candidates,
         identity_preserved: identityPreserved,
