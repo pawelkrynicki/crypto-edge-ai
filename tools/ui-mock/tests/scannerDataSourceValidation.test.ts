@@ -15,6 +15,8 @@ type SnapshotMutation = (snapshot: ScannerApiOutput) => void;
 
 const INVALID_VARIANTS: Record<string, SnapshotMutation> = {
   "scan_run source": (snapshot) => { scanRun(snapshot).source = "other-scanner"; },
+  "scan_run mode": (snapshot) => { scanRun(snapshot).mode = "preview"; },
+  "scan_run negative counter": (snapshot) => { scanRun(snapshot).rejected_basic_filter = -1; },
   "scan_run NaN counter": (snapshot) => { scanRun(snapshot).total_raw = Number.NaN; },
   "scan_run Infinity counter": (snapshot) => { scanRun(snapshot).security_checked = Number.POSITIVE_INFINITY; },
   "scan_run timestamp": (snapshot) => { scanRun(snapshot).finished_at = "not-a-timestamp"; },
@@ -76,6 +78,8 @@ describe("scanner response full contract validation", () => {
   });
 
   it("rejects an invalid scan_run field", () => assertVariantInvalid("scan_run source"));
+  it("rejects an invalid scan_run mode", () => assertVariantInvalid("scan_run mode"));
+  it("rejects a negative scan_run counter", () => assertVariantInvalid("scan_run negative counter"));
   it("rejects a NaN scan_run counter", () => assertVariantInvalid("scan_run NaN counter"));
   it("rejects an Infinity scan_run counter", () => assertVariantInvalid("scan_run Infinity counter"));
   it("rejects an invalid scan_run timestamp", () => assertVariantInvalid("scan_run timestamp"));
@@ -134,6 +138,18 @@ describe("scanner response full contract validation", () => {
     }
   });
 
+  it("preserves last-known-good after an invalid scan_run", () => {
+    assertLastKnownGoodPreserved("scan_run negative counter");
+  });
+
+  it("preserves last-known-good after an invalid Security Check", () => {
+    assertLastKnownGoodPreserved("security missing field");
+  });
+
+  it("preserves last-known-good after an invalid Scorecard", () => {
+    assertLastKnownGoodPreserved("scorecard missing checklist section");
+  });
+
   it("keeps the true empty state when the first snapshot is invalid", () => {
     const invalid = mutatedSnapshot(INVALID_VARIANTS["security non-object"]!);
     assertScannerInvalid(invalid);
@@ -190,6 +206,22 @@ function assertScannerInvalid(snapshot: unknown, label = "snapshot"): void {
       && error.reasonCode === "SCANNER_RESPONSE_INVALID",
     label,
   );
+}
+
+function assertLastKnownGoodPreserved(name: keyof typeof INVALID_VARIANTS): void {
+  const accepted = resolveProductScannerRefreshState(
+    createEmptyProductScannerViewState(),
+    readyResult(validSnapshot()),
+    "2026-07-30T12:00:05.000Z",
+  );
+  assertScannerInvalid(mutatedSnapshot(INVALID_VARIANTS[name]!), name);
+  const failed = resolveProductScannerRefreshState(accepted, errorResult(), "2026-07-30T12:01:05.000Z");
+
+  assert.deepEqual(failed.candidates, accepted.candidates);
+  assert.equal(failed.runId, accepted.runId);
+  assert.equal(failed.generatedAt, accepted.generatedAt);
+  assert.equal(failed.viewRefreshedAt, accepted.viewRefreshedAt);
+  assert.equal(failed.lastKnownGoodRefreshError, true);
 }
 
 function readyResult(output: ScannerApiOutput): ScannerDataSourceLoadResult {
