@@ -35,6 +35,7 @@ import {
 } from "./aiResearchQueueStore.js";
 import { createAIResearchService } from "./aiResearchService.js";
 import { createFeedbackStore, getDefaultFeedbackStorePath, type FeedbackStore } from "./feedbackStore.js";
+import { publishReportAtomically } from "./atomicReportPublisher.js";
 import { readLatestScannerOutput, type ScannerOutputWithMeta } from "./latestScannerOutput.js";
 import { readReportsList } from "./reportsLibrary.js";
 import { createScannerApiHandler } from "./scannerApiHandler.js";
@@ -1160,12 +1161,12 @@ async function writeProductJourneyReport(input: {
       },
     },
   };
-  const serialized = `${JSON.stringify(report, null, 2)}\n`;
-  const existing = await readFile(jsonPath, "utf8").catch(() => null);
-  if (existing !== null && existing !== serialized) throw new ProductE2EError("PRODUCT_REPORT_IDEMPOTENCY_CONFLICT");
-  if (existing === null) await writeFile(jsonPath, serialized, "utf8");
-  if (!(await fileExists(markdownPath))) {
-    await writeFile(markdownPath, [
+  try {
+    await publishReportAtomically({
+      jsonPath,
+      markdownPath,
+      json: report,
+      markdown: [
       `# ${input.candidate.name} (${input.candidate.symbol})`,
       "",
       `- Identity: \`${input.identity.identity}\``,
@@ -1175,7 +1176,13 @@ async function writeProductJourneyReport(input: {
       "- EN: Research report without a trading signal.",
       "- Lifecycle mutation: 0",
       "",
-    ].join("\n"), "utf8");
+      ].join("\n"),
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === "REPORT_IDEMPOTENCY_CONFLICT") {
+      throw new ProductE2EError("PRODUCT_REPORT_IDEMPOTENCY_CONFLICT");
+    }
+    throw error;
   }
   return { jsonPath, markdownPath };
 }
@@ -1364,10 +1371,6 @@ async function httpJson(
 function cookieHeader(value: string | string[] | undefined): string {
   const first = Array.isArray(value) ? value[0] : value;
   return first?.split(";", 1)[0] ?? "";
-}
-
-async function fileExists(path: string): Promise<boolean> {
-  return Boolean(await stat(path).catch(() => null));
 }
 
 function escapeMarkdown(value: string): string {

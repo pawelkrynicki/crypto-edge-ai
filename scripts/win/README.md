@@ -547,3 +547,14 @@ scripts\win\start-full-product-e2e-review.cmd --run-isolated
 Bez parametrów launcher tylko odczytuje aktualny zwalidowany snapshot, pokazuje rzeczywistą identity, plan i ścieżki przyszłych store pod `%TEMP%`. Nie tworzy store, nie uruchamia workera i otwiera dokładnie jedną kartę runbooka. Może wykonać wyłącznie `Get-ScheduledTask` dla statusu zadania na bieżącym hoście; brak wiarygodnej obserwacji jest zapisywany jako `HOST_STATUS_NOT_OBSERVED`.
 
 `--run-isolated` uruchamia jeden przepływ Nowe → bezpieczny Refresh View → Follow-up → Kandydat → Established → AI.3 → Reports → Feedback na osobnych magazynach Follow-up, Established, AI SQLite, Feedback SQLite i Reports. Używa deterministycznego mocka, wykonuje 0 OpenAI calls, 0 live data-provider calls, 0 centralnych live cycles i `scheduler_mutations=0`. Przed i po porównuje chronione hashe kanoniczne. Kontrakt i interpretacja raportu: `docs/full_product_e2e.md`.
+
+## STAB.1 Resilience Failure Drills Review
+
+```cmd
+scripts\win\start-resilience-failure-drills-review.cmd
+scripts\win\start-resilience-failure-drills-review.cmd --run-isolated
+```
+
+Domyślny preview pokazuje 20 scenariuszy i przyszłe lokalizacje pod `%TEMP%`. Nie tworzy store, nie wykonuje awarii, nie uruchamia workera, wykonuje `scheduler_mutations=0` i otwiera dokładnie jedną kartę runbooka. Może wykonać wyłącznie read-only `Get-ScheduledTask` na hoście ownera.
+
+`--run-isolated` wykonuje kontrolowane awarie Refresh View, centralnego cyklu, Follow-up, Established, AI.3, Reports i Feedback. Używa deterministycznych mocków oraz oddzielnych plików/SQLite. Manifest `product_failure_drill_run_v1` i raport Markdown potwierdzają recovery, brak duplikatów, 0 OpenAI calls, 0 live data-provider calls, 0 kanonicznych mutacji i `scheduler_mutations=0`. Kontrakt: `docs/resilience_failure_drills.md`.

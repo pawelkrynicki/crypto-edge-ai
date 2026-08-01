@@ -241,13 +241,13 @@ function resolveClientDataAlert({
   }
   if (sourceHealth.status === "partial" || automationStatus?.data_status === "PARTIAL") {
     return {
-      title: pl ? "Część danych jest chwilowo niedostępna." : "Some data is temporarily unavailable.",
+      title: pl ? "Część informacji jest chwilowo niedostępna." : "Some information is temporarily unavailable.",
       detail: pl ? "Braki są oznaczone bez ukrywania dostępnych informacji." : "Missing fields are marked without hiding the available information.",
     };
   }
   if (freshnessStatus === "STALE" || ["STALE", "LAST_KNOWN_GOOD"].includes(automationStatus?.data_status ?? "")) {
     return {
-      title: pl ? "Dane mogą być nieaktualne." : "Data may be out of date.",
+      title: pl ? "Dane są nieaktualne." : "The data is out of date.",
       detail: pl ? "Wyświetlany jest ostatni prawidłowy stan." : "The last valid state remains visible.",
     };
   }

@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
-import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rm } from "node:fs/promises";
 import type { AddressInfo } from "node:net";
 import { basename, dirname, extname, isAbsolute, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createScannerApiServer } from "../server/scannerApiServer.js";
+import { publishReportAtomically } from "../server/atomicReportPublisher.js";
 import { mapPersistableScannerOutputToUiCandidates } from "../src/adapters/scannerOutputAdapter";
 import {
   buildAnalystReportData,
@@ -144,8 +145,12 @@ async function writeReportFiles(
   await mkdir(outputDir, { recursive: true });
   assertReportOutputPath(paths.markdownPath, outputDir);
   assertReportOutputPath(paths.jsonPath, outputDir);
-  await writeFile(paths.markdownPath, markdown, "utf8");
-  await writeFile(paths.jsonPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
+  await publishReportAtomically({
+    markdownPath: paths.markdownPath,
+    jsonPath: paths.jsonPath,
+    markdown,
+    json: report,
+  });
 }
 
 function buildReportOutputPaths(outputDir: string, timestampSlug: string): ReportOutputPaths {
