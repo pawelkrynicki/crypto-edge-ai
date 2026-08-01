@@ -1,6 +1,6 @@
 # Standalone Roadmap To Trusted Tester
 
-> Aktualizacja STAB.1: E2E.1 i bezpieczny Refresh View są zakończone. Bieżącą bramką jest odporność produktu i kontrolowane failure drills; kolejnym osobnym etapem będzie backup/restore/rollback. AFF.1 pozostaje odłożone na końcówkę. Kontrakty opisują `docs/full_product_e2e.md` i `docs/resilience_failure_drills.md`.
+> Aktualizacja STAB.2: STAB.1 zakończyło się merge PR #85. Bieżąca bramka dostarcza owner-only backup, restore preview/apply, pre-restore safety backup, automatyczny rollback i 25 izolowanych recovery drills. Wszystkie drille działają pod `%TEMP%`, bez live calls, schedulera i mutacji kanonicznych. AFF.1 pozostaje odłożone, a deadline 15.08.2026 bez zmian. Kontrakt: `docs/backup_restore_rollback.md`.
 
 ## AI.2 — Controlled OpenAI Live Validation
 

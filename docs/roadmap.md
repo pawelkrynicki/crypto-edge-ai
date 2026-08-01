@@ -1,6 +1,12 @@
 # Roadmap
 
-## Current stage: STAB.1 — Resilience and Controlled Failure Drills
+## Current stage: STAB.2 — Backup, Restore and Rollback
+
+STAB.2 dodaje owner-only `product_backup_bundle_v1`, domyślny restore preview, jawny restore `--apply`, pre-restore safety backup, wersjonowany journal `product_recovery_operation_v1` i automatyczny rollback. Backup obejmuje Follow-up, Established z historią/audytem, oba SQLite, automation pointers i wskazywane snapshoty, Reports oraz bezpieczną konfigurację. Secret scan, dokładny file-set, SHA-256, SQLite `VACUUM INTO` + `integrity_check` i wspólny owner lock działają fail-closed. Kontrakt: `docs/backup_restore_rollback.md`.
+
+Wymagane recovery drills działają wyłącznie pod `%TEMP%\crypto-edge-backup-restore-rollback\<run_id>` i potwierdzają 0 mutacji kanonicznych, 0 zmian Task Scheduler, 0 OpenAI calls, 0 live provider calls i 0 centralnych live cycles. STAB.1 jest zakończone przez merge PR #85. AFF.1 pozostaje odłożone; deadline 15.08.2026 nie zmienia się.
+
+## Completed: STAB.1 — Resilience and Controlled Failure Drills
 
 STAB.1 wykonuje 20 deterministycznych failure drills dla Refresh View, centralnego cyklu, Follow-up, Established, AI.3, Reports i Feedback. Wszystkie zapisy są izolowane pod `%TEMP%`; manifest `product_failure_drill_run_v1` i raport Markdown porównują chronione hashe przed/po. Kontrakt: `docs/resilience_failure_drills.md`.
 
@@ -9,8 +15,8 @@ Status etapów:
 - E2E.1 — zakończone;
 - bezpieczny Refresh View — naprawiony i objęty last-known-good;
 - AI.3 i centralny cykl danych — zakończone i objęte failure drills;
-- bieżący etap — STAB.1;
-- następny etap — backup/restore/rollback;
+- STAB.1 — zakończone;
+- bieżący etap — STAB.2 backup/restore/rollback;
 - AFF.1 — nadal odłożone na końcówkę po release-candidate gates.
 
 STAB.1 wykonuje 0 live OpenAI calls, 0 live data-provider calls, 0 centralnych live cycles, 0 zmian Task Scheduler i 0 mutacji kanonicznych.

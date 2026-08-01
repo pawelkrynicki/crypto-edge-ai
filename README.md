@@ -34,6 +34,8 @@ E2E.1 joins the accepted lifecycle, session last-known-good Refresh View, AI.3 q
 
 STAB.1 exercises scanner, central-cycle, lifecycle, AI.3, Reports and Feedback failures on deterministic fixtures and isolated `%TEMP%` stores. The versioned `product_failure_drill_run_v1` audit proves last-known-good preservation, bounded recovery, zero canonical mutations and zero live calls. The preview-first owner workflow is documented in [`docs/resilience_failure_drills.md`](docs/resilience_failure_drills.md).
 
+STAB.2 adds an owner-only, manifest-last `product_backup_bundle_v1` for complete local product state, preview-first restore, explicit `--apply`, a pre-restore safety backup, versioned recovery journal and automatic reverse-order rollback. SQLite is copied consistently with `VACUUM INTO` and verified with `integrity_check`; secret-bearing or structurally unsafe bundles fail closed. The Windows review and 25 isolated recovery scenarios are documented in [`docs/backup_restore_rollback.md`](docs/backup_restore_rollback.md).
+
 ## What Crypto Edge AI Is
 
 - A trader-facing crypto intelligence module.
