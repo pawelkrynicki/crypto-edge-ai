@@ -140,6 +140,9 @@ export async function runProductRecoveryDrills(options: {
 
   const sourcePaths = createIsolatedRecoveryPaths(resolve(root, "source"));
   await seedIsolatedProductState(sourcePaths);
+  // The product reads the versioned Established config until its first dynamic store is published.
+  // Exercise that canonical initial-state fallback in every complete-bundle assertion.
+  await rm(sourcePaths.establishedStore, { force: true });
   let baseBackup = await createProductBackup({ paths: sourcePaths, commitSha: FIXTURE_COMMIT_SHA });
 
   await record(PRODUCT_RECOVERY_DRILL_SCENARIOS[0], async () => {

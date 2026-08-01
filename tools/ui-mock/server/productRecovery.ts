@@ -172,6 +172,7 @@ type StoreDescriptor = {
   storeType: ProductBackupFile["store_type"];
   required: boolean;
   dependencies: string[];
+  generatedContent?: string;
 };
 
 type RecoveryLock = { release: () => Promise<void> };
@@ -310,6 +311,8 @@ export async function createProductBackup(options: {
       await mkdir(dirname(destination), { recursive: true });
       if (descriptor.storeType === "sqlite") {
         await backupSqliteDatabase(descriptor.sourcePath, destination);
+      } else if (descriptor.generatedContent !== undefined) {
+        await writeTextDurable(destination, descriptor.generatedContent);
       } else {
         await copyRegularFile(descriptor.sourcePath, destination);
       }
@@ -626,10 +629,28 @@ async function buildStoreInventory(
   const allowEmptyState = Boolean(options.allowMissing && !anyCoreState);
   const automationRaw = await readRequiredJson(paths.automationState, "AUTOMATION_STATE_MISSING", allowEmptyState);
   const automation = automationRaw === null ? null : normalizeAutomationState(automationRaw);
+  const establishedStoreDescriptor = descriptor(
+    "established_universe_store",
+    paths.establishedStore,
+    "stores/established/store.json",
+    "json",
+    true,
+  );
+  if (!await exists(paths.establishedStore) && await exists(paths.establishedConfig)) {
+    const current = validateEstablishedAddressUniverse(
+      JSON.parse(await readFile(paths.establishedConfig, "utf8")) as unknown,
+    );
+    establishedStoreDescriptor.generatedContent = `${JSON.stringify({
+      schema_version: "established_universe_store_v1",
+      current,
+      history: [],
+      audit_log: [],
+    }, null, 2)}\n`;
+  }
   const descriptors: StoreDescriptor[] = [
     descriptor("follow_up_store", paths.followUpStore, "stores/follow-up/store.json", "json", true),
     descriptor("follow_up_backup", paths.followUpBackup, "stores/follow-up/store.json.bak", "json", true, ["follow_up_store"]),
-    descriptor("established_universe_store", paths.establishedStore, "stores/established/store.json", "json", true),
+    establishedStoreDescriptor,
     descriptor("established_address_config", paths.establishedConfig, "config/established_address_universe_v1.json", "config", true),
     descriptor("feedback_sqlite", paths.feedbackSqlite, "stores/sqlite/tester-feedback.sqlite", "sqlite", true),
     descriptor("ai_queue_cache_sqlite", paths.aiQueueSqlite, "stores/sqlite/ai-analysis-queue.sqlite", "sqlite", true),
@@ -674,10 +695,14 @@ async function buildStoreInventory(
   }
   if (allowEmptyState) {
     const filtered: StoreDescriptor[] = [];
-    for (const item of descriptors) if (await exists(item.sourcePath)) filtered.push(item);
+    for (const item of descriptors) if (item.generatedContent !== undefined || await exists(item.sourcePath)) filtered.push(item);
     return filtered;
   }
-  if (!options.skipValidation) for (const item of descriptors) await assertRegularSource(item.sourcePath, item.logicalStoreId);
+  if (!options.skipValidation) {
+    for (const item of descriptors) {
+      if (item.generatedContent === undefined) await assertRegularSource(item.sourcePath, item.logicalStoreId);
+    }
+  }
   return descriptors;
 }
 
@@ -699,7 +724,7 @@ async function validateSourceState(
       validations.push({ logical_store_id: item.logicalStoreId, status: "VALID", code: "SQLITE_INTEGRITY_OK", sqlite_integrity: "ok", sha256: await sha256File(item.sourcePath) });
       continue;
     }
-    const raw = await readFile(item.sourcePath, "utf8");
+    const raw = item.generatedContent ?? await readFile(item.sourcePath, "utf8");
     assertNoSecrets(raw);
     if (item.logicalStoreId === "follow_up_store" || item.logicalStoreId === "follow_up_backup") {
       validateFollowUpStore(JSON.parse(raw) as unknown);
@@ -721,7 +746,12 @@ async function validateSourceState(
       const pointer = normalizeAutomationState(JSON.parse(await readFile(paths.automationState, "utf8")) as unknown).last_published_context_run_id;
       if (!pointer || output.run_id !== pointer) throw new ProductRecoveryError("CONTEXT_POINTER_INCONSISTENT");
     }
-    validations.push({ logical_store_id: item.logicalStoreId, status: "VALID", code: "SOURCE_VALID", sha256: await sha256File(item.sourcePath) });
+    validations.push({
+      logical_store_id: item.logicalStoreId,
+      status: "VALID",
+      code: item.generatedContent === undefined ? "SOURCE_VALID" : "SOURCE_FALLBACK_VALID",
+      sha256: item.generatedContent === undefined ? await sha256File(item.sourcePath) : sha256Text(item.generatedContent),
+    });
   }
   const reportsRootExists = await exists(paths.reportsRoot);
   if (reportsRootExists) {
@@ -1426,11 +1456,11 @@ async function copyRegularFile(source: string, destination: string): Promise<voi
 async function hashLogicalState(descriptors: StoreDescriptor[], allowMissing = false): Promise<Record<string, string>> {
   const grouped = new Map<string, string[]>();
   for (const item of descriptors) {
-    if (!await exists(item.sourcePath)) {
+    if (item.generatedContent === undefined && !await exists(item.sourcePath)) {
       if (allowMissing) continue;
       throw new ProductRecoveryError("REQUIRED_STORE_MISSING");
     }
-    const hash = await sha256File(item.sourcePath);
+    const hash = item.generatedContent === undefined ? await sha256File(item.sourcePath) : sha256Text(item.generatedContent);
     grouped.set(item.logicalStoreId, [...(grouped.get(item.logicalStoreId) ?? []), `${item.payloadPath}:${hash}`]);
   }
   const result: Record<string, string> = {};
@@ -1471,10 +1501,14 @@ async function assertFreeSpace(path: string, requiredBytes: number, injected?: n
 }
 
 async function writeJsonDurable(path: string, value: unknown): Promise<void> {
+  await writeTextDurable(path, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+async function writeTextDurable(path: string, value: string): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
   const handle = await open(path, "wx");
   try {
-    await handle.writeFile(`${JSON.stringify(value, null, 2)}\n`, "utf8");
+    await handle.writeFile(value, "utf8");
     await handle.sync();
   } finally {
     await handle.close();

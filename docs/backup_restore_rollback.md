@@ -34,6 +34,8 @@ Inwentaryzacja jest budowana runtime’owo, bez zgadywania aktywnych snapshotów
 
 Metadane commit SHA, runtime mode, generator version i czas powstania są częścią manifestu, a nie osobnym plikiem payloadu. Review Session nie jest backupowany: jest store sesyjnym i podlega wykluczeniu.
 
+Jeżeli dynamiczny `established_universe_store` nie powstał jeszcze w poprawnej, początkowej instalacji, backup materializuje jego walidowany odpowiednik z wersjonowanej konfiguracji Established (`current` plus puste `history` i `audit_log`) wyłącznie wewnątrz bundle. Nie zapisuje przy tym pliku do kanonicznej ścieżki produktu.
+
 ## Backup
 
 Owner uruchamia backup lokalnym CLI:
