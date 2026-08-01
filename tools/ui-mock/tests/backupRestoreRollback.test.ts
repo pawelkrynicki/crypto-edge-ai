@@ -12,6 +12,7 @@ import {
 import {
   PRODUCT_BACKUP_SCHEMA_VERSION,
   PRODUCT_RECOVERY_OPERATION_SCHEMA_VERSION,
+  assertRecoveryTextSafe,
 } from "../server/productRecovery.js";
 
 const execFileAsync = promisify(execFile);
@@ -43,6 +44,21 @@ test("STAB.2 Windows launcher is preview-first and returns exactly one review UR
   assert.match(result.stdout, /OpenAI calls: 0/);
   assert.match(result.stdout, /Live provider calls: 0/);
   assert.match(result.stdout, /Central live cycles: 0/);
+});
+
+test("STAB.2 permits public registry contacts without weakening the secret boundary", () => {
+  assert.doesNotThrow(() => assertRecoveryTextSafe(
+    "Contact the documented vendor at security@example.vendor",
+    "data_source_registry",
+  ));
+  assert.throws(
+    () => assertRecoveryTextSafe("User contact: person@example.test", "follow_up_store"),
+    /PERSONAL_EMAIL_DETECTED/,
+  );
+  assert.throws(
+    () => assertRecoveryTextSafe("OPENAI_API_KEY=sk-example0123456789", "data_source_registry"),
+    /OPENAI_KEY_DETECTED/,
+  );
 });
 
 test("STAB.2 isolated recovery drill", async (t) => {
