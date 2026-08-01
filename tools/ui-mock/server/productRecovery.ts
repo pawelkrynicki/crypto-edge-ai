@@ -18,6 +18,7 @@ import { basename, dirname, isAbsolute, relative, resolve, sep } from "node:path
 import type { PersistableScannerOutput } from "../../data-poc/src/persistableScannerModel.js";
 import type { ApprovedSourcesRunOutput } from "../../data-poc/src/sources/sourceAdapterTypes.js";
 import { validatePersistableScannerOutput } from "../../data-poc/src/storageValidator.js";
+import { validateDisplayEligibleScannerSnapshot } from "../../data-poc/src/displaySnapshotValidator.js";
 import { validateDisplayEligibleContextSnapshot } from "../../data-poc/src/contextSnapshotValidator.js";
 import {
   getDefaultFollowUpStorePath,
@@ -316,7 +317,7 @@ export async function createProductBackup(options: {
       } else {
         await copyRegularFile(descriptor.sourcePath, destination);
       }
-      await scanPayloadFile(destination, descriptor.storeType);
+      await scanPayloadFile(destination, descriptor.storeType, descriptor.logicalStoreId);
       const metadata = await stat(destination);
       files.push({
         logical_store_id: descriptor.logicalStoreId,
@@ -388,7 +389,7 @@ export async function validateBackupBundle(
   const manifestInfo = await lstat(manifestPath).catch(() => null);
   if (!manifestInfo?.isFile() || manifestInfo.isSymbolicLink()) throw new ProductRecoveryError("BACKUP_MANIFEST_MISSING");
   const manifestRaw = await readFile(manifestPath, "utf8");
-  assertNoSecrets(manifestRaw);
+  assertRecoveryTextSafe(manifestRaw);
   const manifest = parseManifest(JSON.parse(manifestRaw) as unknown);
   const expected = new Set<string>();
   const logicalIds = new Set(manifest.logical_stores.map((store) => store.logical_store_id));
@@ -403,7 +404,7 @@ export async function validateBackupBundle(
     if (info.isSymbolicLink() || forced) throw new ProductRecoveryError("BACKUP_REPARSE_POINT_FORBIDDEN");
     if (info.size !== entry.size) throw new ProductRecoveryError("BACKUP_SIZE_MISMATCH");
     if (await sha256File(payloadPath) !== entry.sha256) throw new ProductRecoveryError("BACKUP_HASH_MISMATCH");
-    await scanPayloadFile(payloadPath, entry.store_type);
+    await scanPayloadFile(payloadPath, entry.store_type, entry.logical_store_id);
     if (entry.store_type === "sqlite") {
       await assertSqliteIntegrity(payloadPath);
       await assertSqliteLogicalSchema(payloadPath, entry.logical_store_id);
@@ -725,7 +726,7 @@ async function validateSourceState(
       continue;
     }
     const raw = item.generatedContent ?? await readFile(item.sourcePath, "utf8");
-    assertNoSecrets(raw);
+    assertRecoveryTextSafe(raw, item.logicalStoreId);
     if (item.logicalStoreId === "follow_up_store" || item.logicalStoreId === "follow_up_backup") {
       validateFollowUpStore(JSON.parse(raw) as unknown);
     } else if (item.logicalStoreId === "established_universe_store") {
@@ -736,8 +737,7 @@ async function validateSourceState(
       normalizeAutomationState(JSON.parse(raw) as unknown);
     } else if (item.logicalStoreId === "active_scanner_snapshot") {
       const output = JSON.parse(raw) as PersistableScannerOutput;
-      const result = validatePersistableScannerOutput(output);
-      if (!result.valid) throw new ProductRecoveryError("SCANNER_SNAPSHOT_INVALID");
+      validateRecoveryScannerSnapshot(output);
       const pointer = normalizeAutomationState(JSON.parse(await readFile(paths.automationState, "utf8")) as unknown).last_published_scanner_run_id;
       if (!pointer || output.scan_run?.run_id !== pointer) throw new ProductRecoveryError("SCANNER_POINTER_INCONSISTENT");
     } else if (item.logicalStoreId === "active_context_snapshot") {
@@ -849,8 +849,7 @@ async function validateBackupEntryContent(path: string, logicalStoreId: string):
   } else if (logicalStoreId === "central_automation_state") {
     normalizeAutomationState(parsed);
   } else if (logicalStoreId === "active_scanner_snapshot") {
-    const result = validatePersistableScannerOutput(parsed as PersistableScannerOutput);
-    if (!result.valid) throw new ProductRecoveryError("SCANNER_SNAPSHOT_INVALID");
+    validateRecoveryScannerSnapshot(parsed as PersistableScannerOutput);
   } else if (logicalStoreId === "active_context_snapshot") {
     validateDisplayEligibleContextSnapshot(parsed as ApprovedSourcesRunOutput);
   }
@@ -1143,7 +1142,7 @@ async function scanSqliteValues(path: string): Promise<void> {
       const values = database.prepare(`SELECT * FROM ${row.name}`).all();
       for (const value of values) {
         if (!isRecord(value)) continue;
-        for (const field of Object.values(value)) if (typeof field === "string") assertNoSecrets(field);
+        for (const field of Object.values(value)) if (typeof field === "string") assertRecoveryTextSafe(field);
       }
     }
   } finally {
@@ -1159,13 +1158,31 @@ async function loadNodeSqlite(): Promise<SqliteModule> {
   return { DatabaseSync: moduleValue.DatabaseSync as SqliteModule["DatabaseSync"] };
 }
 
-async function scanPayloadFile(path: string, type: ProductBackupFile["store_type"]): Promise<void> {
+async function scanPayloadFile(
+  path: string,
+  type: ProductBackupFile["store_type"],
+  logicalStoreId?: string,
+): Promise<void> {
   if (type === "sqlite") return scanSqliteValues(path);
-  assertNoSecrets(await readFile(path, "utf8"));
+  assertRecoveryTextSafe(await readFile(path, "utf8"), logicalStoreId);
 }
 
-function assertNoSecrets(value: string): void {
-  for (const matcher of SECRET_PATTERNS) if (matcher.pattern.test(value)) throw new ProductRecoveryError(matcher.code);
+export function assertRecoveryTextSafe(value: string, logicalStoreId?: string): void {
+  for (const matcher of SECRET_PATTERNS) {
+    const publicRegistryContact = matcher.code === "PERSONAL_EMAIL_DETECTED"
+      && logicalStoreId === "data_source_registry";
+    if (!publicRegistryContact && matcher.pattern.test(value)) throw new ProductRecoveryError(matcher.code);
+  }
+}
+
+export function validateRecoveryScannerSnapshot(output: PersistableScannerOutput): void {
+  try {
+    validateDisplayEligibleScannerSnapshot(output);
+    return;
+  } catch {
+    const storageValidation = validatePersistableScannerOutput(output);
+    if (!storageValidation.valid) throw new ProductRecoveryError("SCANNER_SNAPSHOT_INVALID");
+  }
 }
 
 async function acquireOwnerOperationLock(

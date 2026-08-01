@@ -32,6 +32,8 @@
     "stab1:drills": "node --import tsx scripts/runResilienceFailureDrills.ts",
     "test:stab2": "node --import tsx --test tests/backupRestoreRollback.test.ts",
     "stab2:drills": "node --import tsx scripts/runBackupRestoreRollback.ts --run-isolated",
+    "test:rc1": "node --import tsx --test tests/localRcSoak.test.ts",
+    "rc1:soak": "tsx scripts/runLocalRcSoak.ts",
     "recovery:owner": "node --import tsx scripts/productRecoveryCli.ts",
     "test:ai-semantic": "node --import tsx --test tests/aiResearchSemanticQuality.test.ts",
     "test:control-center": "node --import tsx --test tests/controlCenter.test.ts",

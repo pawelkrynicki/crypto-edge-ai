@@ -323,6 +323,7 @@ function migrate(database: SqliteDatabase, busyTimeoutMs: number): void {
   database.exec("PRAGMA foreign_keys = ON");
   const userVersion = readIntegerField(database.prepare("PRAGMA user_version").get(), "user_version");
   if (userVersion > FEEDBACK_SCHEMA_VERSION) throw new FeedbackStoreError("SCHEMA_INVALID");
+  if (userVersion === FEEDBACK_SCHEMA_VERSION) return;
 
   database.exec("BEGIN IMMEDIATE TRANSACTION");
   try {

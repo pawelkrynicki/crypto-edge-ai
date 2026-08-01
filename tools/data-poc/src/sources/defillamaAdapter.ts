@@ -66,10 +66,6 @@ export function normalizeDefillamaProtocolsResponse(
   if (!Array.isArray(payload)) {
     warnings.push("DefiLlama protocols response was not an array");
   }
-  if (protocols.length > DEFILLAMA_MAX_PROTOCOL_RECORDS) {
-    warnings.push(`DefiLlama protocols were capped at ${DEFILLAMA_MAX_PROTOCOL_RECORDS} records for lightweight context output`);
-  }
-
   const records = protocols
     .slice(0, DEFILLAMA_MAX_PROTOCOL_RECORDS)
     .map(toProtocolRecord)

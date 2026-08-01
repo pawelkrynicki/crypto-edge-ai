@@ -26,6 +26,7 @@
     "collect:internal-beta": "tsc && node dist/src/runInternalBetaCollector.js",
     "automation:run": "tsc && node dist/src/automation/runCentralAutomation.js",
     "automation:resume": "tsc && node dist/src/automation/resumeAutomationState.js",
+    "rc1:wakeup": "tsc && node dist/src/automation/runLocalRcSoakWakeup.js",
     "data-cycle": "tsc && node dist/src/automation/runDataCycleOperations.js",
     "discovery:diagnostic": "tsc && node dist/src/runDiscoveryDiagnostic.js",
     "discovery:archived-query-plan:diagnostic": "tsc && node dist/src/runEstablishedDiscoveryPrototype.js",

@@ -9,7 +9,13 @@ import {
   ALTERNATIVE_ME_FNG_URL,
   alternativeMeFngAdapter
 } from "../src/sources/alternativeMeFngAdapter.js";
-import { DEFILLAMA_PROTOCOLS_URL, DEFILLAMA_SOURCE_ID, defillamaAdapter } from "../src/sources/defillamaAdapter.js";
+import {
+  DEFILLAMA_MAX_PROTOCOL_RECORDS,
+  DEFILLAMA_PROTOCOLS_URL,
+  DEFILLAMA_SOURCE_ID,
+  defillamaAdapter,
+  normalizeDefillamaProtocolsResponse,
+} from "../src/sources/defillamaAdapter.js";
 import {
   APPROVED_SOURCES_OUTPUT_FILENAME,
   DEGRADED_EXTERNAL_SOURCE_STATUS,
@@ -70,6 +76,28 @@ describe("approved free source adapters", () => {
       change_7d: 3.4,
       url: "https://app.uniswap.org"
     });
+  });
+
+  it("caps a healthy DefiLlama response without degrading source health", () => {
+    const output = normalizeDefillamaProtocolsResponse(
+      Array.from({ length: DEFILLAMA_MAX_PROTOCOL_RECORDS + 2 }, (_, index) => ({
+        name: `Protocol ${index + 1}`,
+        chain: "Ethereum",
+        tvl: 1_000 - index,
+      })),
+      "live",
+      {
+        environment: "PUBLIC_BETA",
+        action: "live_fetch",
+        allowed: true,
+        reason: "approved test source",
+      },
+      new Date("2026-08-01T10:00:00.000Z"),
+    );
+
+    assert.equal(output.records.length, DEFILLAMA_MAX_PROTOCOL_RECORDS);
+    assert.deepEqual(output.warnings, []);
+    assert.deepEqual(output.errors, []);
   });
 
   it("allows approved free sources to live_fetch in PUBLIC_BETA", () => {
