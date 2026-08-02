@@ -997,10 +997,13 @@ function buildProductReadiness(
 ): ProductReadinessOutput {
   const discovery = buildDiscoveryReadiness(scanner, context);
   const scannerReadiness = publicScannerReadinessEntry(scanner);
+  const contextReadiness = publicContextReadinessEntry(context);
   const ready = scanner.ready;
   const degraded = ready && (
     scannerReadiness.freshness_status === "STALE"
-    || !context.ready
+    || !contextReadiness.ready
+    || contextReadiness.freshness_status === "STALE"
+    || Object.values(contextReadiness.source_statuses ?? {}).some((status) => status === "DEGRADED")
     || discovery.new_emerging.status === "degraded"
   );
 
@@ -1014,13 +1017,13 @@ function buildProductReadiness(
     ready,
     process: { ready: true, reason_code: null },
     scanner: scannerReadiness,
-    context: publicReadinessEntry(context),
+    context: contextReadiness,
     new_emerging: discovery.new_emerging,
     established: discovery.established,
     discovery,
     reason_codes: [
       scannerReadiness.reason_code,
-      context.reason_code,
+      contextReadiness.reason_code,
       discovery.new_emerging.reason_code,
       discovery.established.reason_code,
     ].filter(isString),
@@ -1132,10 +1135,6 @@ function isNonNegativeInteger(value: unknown): boolean {
   return Number.isSafeInteger(value) && Number(value) >= 0;
 }
 
-function publicReadinessEntry(entry: ReadinessEntry): { ready: boolean; reason_code: string | null } {
-  return { ready: entry.ready, reason_code: entry.reason_code };
-}
-
 function publicScannerReadinessEntry(entry: ReadinessEntry): {
   ready: boolean;
   status: "ready" | "stale" | "unavailable";
@@ -1164,6 +1163,27 @@ function publicScannerReadinessEntry(entry: ReadinessEntry): {
     freshness_status: freshnessStatus,
     generated_at: typeof provenance?.generated_at === "string" ? provenance.generated_at : null,
     age_seconds: typeof meta?.age_seconds === "number" ? meta.age_seconds : null,
+  };
+}
+
+function publicContextReadinessEntry(entry: ReadinessEntry): ProductReadinessOutput["context"] {
+  if (!entry.ready || !isRecord(entry.value)) {
+    return { ready: false, reason_code: entry.reason_code };
+  }
+  const meta = isRecord(entry.value._source_meta) ? entry.value._source_meta : null;
+  const sources = Array.isArray(entry.value.sources) ? entry.value.sources : [];
+  const sourceStatuses = Object.fromEntries(sources.flatMap((source) => {
+    if (!isRecord(source) || typeof source.source_id !== "string") return [];
+    return [[source.source_id, source.status === "DEGRADED" ? "DEGRADED" : "READY"]] as const;
+  }));
+  const freshnessStatus = meta?.freshness_status === "STALE" ? "STALE" : "FRESH";
+  return {
+    ready: true,
+    reason_code: freshnessStatus === "STALE" ? "CONTEXT_SNAPSHOT_STALE" : null,
+    run_id: typeof entry.value.run_id === "string" ? entry.value.run_id : null,
+    generated_at: typeof entry.value.generated_at === "string" ? entry.value.generated_at : null,
+    freshness_status: freshnessStatus,
+    source_statuses: sourceStatuses,
   };
 }
 
@@ -1208,7 +1228,7 @@ function buildDiscoveryReadiness(scanner: ReadinessEntry, context: ReadinessEntr
         status: readiness.established === "READY" ? "ready" : "unavailable",
         reason_code: readiness.established === "READY" ? null : "ESTABLISHED_UNAVAILABLE",
       },
-    context: publicReadinessEntry(context),
+    context: publicContextReadinessEntry(context),
   };
 }
 

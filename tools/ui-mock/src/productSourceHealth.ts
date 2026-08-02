@@ -23,8 +23,12 @@ export function resolveProductSourceHealth({
   readiness?: ProductReadinessOutput | null;
   sourceIds?: string[];
 }): ProductSourceHealthResolution {
-  const acceptedSourceIds = unique(sourceIds ?? []);
-  const detailedHealth = Object.entries(metadata?.source_health ?? {});
+  const contextHealth = readiness?.context.source_statuses ?? {};
+  const acceptedSourceIds = unique([...(sourceIds ?? []), ...Object.keys(contextHealth)]);
+  const detailedHealth = Object.entries({
+    ...(metadata?.source_health ?? {}),
+    ...contextHealth,
+  });
 
   if (detailedHealth.length > 0) {
     const invalidSourceIds = detailedHealth
@@ -43,7 +47,7 @@ export function resolveProductSourceHealth({
     if (usableSourceIds.length === 0) {
       return { status: "unavailable", detailSourceIds: affectedSourceIds, basis: "metadata" };
     }
-    if (affectedSourceIds.length > 0) {
+    if (affectedSourceIds.length > 0 || readiness?.context.ready === false) {
       return { status: "partial", detailSourceIds: affectedSourceIds, basis: "metadata" };
     }
 

@@ -7,6 +7,7 @@ export type ContextSourceMeta = {
   runtime_mode?: "DEVELOPMENT_DEMO" | "INTERNAL_BETA" | "UNCONFIGURED";
   age_seconds?: number | null;
   source_ids?: string[];
+  freshness_status?: "FRESH" | "STALE";
 };
 
 export type ContextPolicy = {
