@@ -428,6 +428,7 @@ export function ProductAppContent({
             scannerUnavailableReasonCode={reasonCode}
             followUpStatus={followUpStatus}
             followUpEntries={followUpEntries}
+            establishedUniverseStatus={establishedUniverseStatus}
             onOpenCandidate={openCandidate}
             onOpenFollowUp={openFollowUp}
             onOpenExternalChecks={openVerification}
