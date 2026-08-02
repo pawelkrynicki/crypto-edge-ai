@@ -143,9 +143,8 @@ describe("AI.1 Visual Candidate Research Canvas", () => {
       const markup = render("pl", <AIResearchSection chain="base" contractAddress={ADDRESS} symbol="PASS" name="Pass Token" initialLookup={lookup} />);
       assert.match(markup, label);
       assert.match(markup, /aria-live="polite"/);
-      if (["ABSENT", "ERROR", "STALE", "FAILED"].includes(availability)) {
-        assert.match(markup, /Zgłoś przygotowanie analizy/);
-      }
+      if (["ABSENT", "STALE"].includes(availability)) assert.match(markup, /Zleć analizę AI/);
+      if (["ERROR", "FAILED"].includes(availability)) assert.match(markup, /Ponów zlecenie analizy/);
     }
   });
 
@@ -279,9 +278,9 @@ describe("AI.3 shared queue UI", () => {
       assert.match(markup, expectedLabel, reviewState ?? "default READY");
       assert.equal(markup.includes("ai-research-canvas"), expectedCanvas, reviewState ?? "default READY");
       if (reviewState === null || ["queued", "processing", "suspended", "cooldown"].includes(reviewState)) {
-        assert.doesNotMatch(markup, />Request analysis preparation</, reviewState ?? "default READY");
+        assert.doesNotMatch(markup, />Request analysis preparation|>Retry analysis request</, reviewState ?? "default READY");
       }
-      if (reviewState === "failed") assert.match(markup, />Request analysis preparation</);
+      if (reviewState === "failed") assert.match(markup, />Retry analysis request</);
     }
   });
 
@@ -296,7 +295,7 @@ describe("AI.3 shared queue UI", () => {
       />
     )));
     assert.match(cooldown, /<button[^>]*disabled=""[^>]*>Spróbuj ponownie za 60 s<\/button>/);
-    assert.doesNotMatch(cooldown, />Zgłoś przygotowanie analizy<\/button>/);
+    assert.doesNotMatch(cooldown, />Zleć analizę AI<\/button>/);
 
     const rateLimitedLookup: AIResearchBriefLookup = {
       ...renderPreviewLookup(),
@@ -315,7 +314,7 @@ describe("AI.3 shared queue UI", () => {
       />
     ));
     assert.match(rateLimited, /<button[^>]*disabled=""[^>]*>Spróbuj ponownie później<\/button>/);
-    assert.doesNotMatch(rateLimited, />Zgłoś przygotowanie analizy<\/button>/);
+    assert.doesNotMatch(rateLimited, />Zleć analizę AI<\/button>/);
   });
 
   it("ignores review state for an ordinary non-preview runtime lookup", () => {
@@ -353,8 +352,8 @@ describe("AI.3 shared queue UI", () => {
     const markup = render("pl", <AIResearchSection chain="base" contractAddress={ADDRESS} symbol="SCOOBERT" name="Scoobert" initialLookup={failure} />);
     assert.match(markup, /Niedostępna/);
     assert.match(markup, /Analiza nie mogła zostać teraz przygotowana\./);
-    assert.match(markup, /Spróbuj ponownie później\./);
-    assert.match(markup, /Zgłoś przygotowanie analizy/);
+    assert.match(markup, /Spróbuj ponownie\. Ponowne zgłoszenie nie utworzy duplikatu\./);
+    assert.match(markup, /Ponów zlecenie analizy/);
     assert.doesNotMatch(markup, /Wygeneruj analizę AI/);
     assert.doesNotMatch(markup, /Brak analizy/);
   });
@@ -405,6 +404,7 @@ describe("AI.3 shared queue UI", () => {
     assert.match(canvas, /req_owner_review_123/);
     assert.match(canvas, /432 ms/);
     assert.match(canvas, /Fingerprint snapshotu/);
+    assert.doesNotMatch(canvas, /configured-test-model/);
     assert.doesNotMatch(canvas, /Podgląd formatu|raw prompt|raw completion|cost USD/i);
 
     const section = render("pl", <AIResearchSection chain="base" contractAddress={ADDRESS} symbol="SCOOBERT" name="Scoobert" initialLookup={{
@@ -429,9 +429,9 @@ describe("AI.3 shared queue UI", () => {
       error_code: "WORKER_SUSPENDED",
       queue_status: "SUSPENDED",
     }} />);
-    assert.match(suspended, /Analiza nie mogła zostać teraz przygotowana\./);
-    assert.match(suspended, /Spróbuj ponownie później\./);
-    assert.doesNotMatch(suspended, /Zgłoś przygotowanie analizy/);
+    assert.match(suspended, /Przygotowanie analizy jest wstrzymane/);
+    assert.match(suspended, /Wznowienie będzie możliwe po uruchomieniu kolejki analizy\./);
+    assert.doesNotMatch(suspended, /Zleć analizę AI|Ponów zlecenie analizy/);
 
     const queued = render("pl", <AIResearchSection chain="base" contractAddress={ADDRESS} symbol="SCOOBERT" name="Scoobert" initialLookup={{
       schema_version: "ai_research_lookup_v1",
@@ -443,7 +443,7 @@ describe("AI.3 shared queue UI", () => {
       queue_status: "QUEUED",
     }} />);
     assert.match(queued, /Analiza oczekuje w kolejce/);
-    assert.doesNotMatch(queued, /Zgłoś przygotowanie analizy/);
+    assert.doesNotMatch(queued, /Zleć analizę AI|Ponów zlecenie analizy/);
   });
 });
 

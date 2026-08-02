@@ -9,6 +9,8 @@ import { resolveCanonicalProductDataPaths } from "../server/canonicalProductData
 import { ProductAppContent, type ProductAppDataSources } from "../src/ProductApp.js";
 import { resolveDetailTab, resolveRouteTokenIdentity } from "../src/candidateDetailRoute.js";
 import { CandidateDetailView } from "../src/components/CandidateDetailView.js";
+import { AIResearchSection } from "../src/components/AIResearchSection.js";
+import { ExternalVerificationLinksView } from "../src/components/ExternalVerificationLinksView.js";
 import { CandidateResultsView, MaturingFollowUpBasket } from "../src/components/CandidateResultsView.js";
 import { ProductWorkspaceShell } from "../src/components/ProductWorkspaceShell.js";
 import { PERSISTABLE_SCANNER_SAMPLE } from "../src/fixtures/persistableScannerSample.js";
@@ -17,6 +19,7 @@ import { formatProductDateTime, ProductLocaleProvider } from "../src/productI18n
 import type { ScannerDataSourceLoadResult } from "../src/services/scannerDataSource.js";
 import type { FollowUpPublicEntry, FollowUpPublicStatus } from "../src/types/followUpTypes.js";
 import type { ProductReadinessOutput } from "../src/types/scannerTypes.js";
+import { resolveGlobalProductTimestamp } from "../src/productRefreshState.js";
 
 void React;
 
@@ -48,7 +51,7 @@ describe("P1.1 Radar operational usability", () => {
     assert.equal(resolved.contextRunId, contextRunId);
   });
 
-  it("ships one read-only INTERNAL_BETA visual-review command", async () => {
+  it("ships one provider-free INTERNAL_BETA visual-review command with local owner actions", async () => {
     const repoRoot = resolve(process.cwd(), "..", "..");
     const command = await readFile(resolve(repoRoot, "scripts", "win", "start-radar-visual-review.cmd"), "utf8");
     const launcher = await readFile(resolve(repoRoot, "scripts", "win", "start-radar-visual-review.ps1"), "utf8");
@@ -58,9 +61,57 @@ describe("P1.1 Radar operational usability", () => {
     assert.match(launcher, /ALLOW_LIVE_PROVIDER_CALLS = "0"/);
     assert.match(launcher, /CRYPTO_EDGE_AI_RESEARCH_PROVIDER = "DISABLED"/);
     assert.match(launcher, /OPENAI_API_KEY = ""/);
+    assert.match(launcher, /CRYPTO_EDGE_OWNER_OPERATIONS_MODE = "ENABLED"/);
     assert.match(launcher, /productVpsServer/);
     assert.equal((launcher.match(/Start-Process \$productUrl/g) ?? []).length, 1);
     assert.doesNotMatch(launcher, /run-central-data-cycle|collect:internal-beta|scanner_and_context|PASS|FAIL/i);
+  });
+
+  it("resolves the global last-update timestamp in scanner, context, Follow-up priority order", () => {
+    assert.equal(resolveGlobalProductTimestamp(GENERATED_AT, "2026-08-01T11:00:00.000Z", "2026-08-01T10:00:00.000Z"), GENERATED_AT);
+    assert.equal(resolveGlobalProductTimestamp(null, "2026-08-01T11:00:00.000Z", "2026-08-01T10:00:00.000Z"), "2026-08-01T11:00:00.000Z");
+    assert.equal(resolveGlobalProductTimestamp(null, null, "2026-08-01T10:00:00.000Z"), "2026-08-01T10:00:00.000Z");
+    assert.equal(resolveGlobalProductTimestamp("invalid", "also-invalid", null), null);
+  });
+
+  it("shows explicit disabled AI guidance and an actionable manual verification workspace", () => {
+    const candidate = mapPersistableScannerOutputToUiCandidates(PERSISTABLE_SCANNER_SAMPLE)[0]!;
+    const aiMarkup = renderToStaticMarkup(
+      <ProductLocaleProvider initialLocale="pl">
+        <AIResearchSection
+          chain={candidate.chain}
+          contractAddress={candidate.contractAddress}
+          symbol={candidate.symbol}
+          name={candidate.name}
+          mode="detail"
+          onOpenControlCenter={() => undefined}
+          initialLookup={{
+            schema_version: "ai_research_lookup_v1",
+            availability: "PROVIDER_DISABLED",
+            provider_mode: "DISABLED",
+            brief: null,
+            retry_after_seconds: null,
+            error_code: "PROVIDER_DISABLED",
+          }}
+        />
+      </ProductLocaleProvider>,
+    );
+    assert.match(aiMarkup, /Analiza AI jest wyłączona w tym trybie podglądu/);
+    assert.match(aiMarkup, /Aktywuj analizę AI w Centrum sterowania/);
+    assert.doesNotMatch(aiMarkup, /provider|model|api[_ -]?key/i);
+
+    const verificationMarkup = renderToStaticMarkup(
+      <ProductLocaleProvider initialLocale="pl">
+        <ExternalVerificationLinksView candidate={candidate} />
+      </ProductLocaleProvider>,
+    );
+    assert.match(verificationMarkup, new RegExp(escapeRegExp(candidate.contractAddress)));
+    assert.match(verificationMarkup, /Nazwa/);
+    assert.match(verificationMarkup, /Symbol/);
+    assert.match(verificationMarkup, /Źródła zewnętrzne/);
+    assert.match(verificationMarkup, /Lista ręcznej weryfikacji/);
+    assert.match(verificationMarkup, /Dostępne/);
+    assert.match(verificationMarkup, /Brakujące/);
   });
 
   it("shows real New data, the scanner timestamp, context source statuses, and unambiguous counters", () => {

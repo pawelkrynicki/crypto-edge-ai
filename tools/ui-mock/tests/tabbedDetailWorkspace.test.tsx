@@ -214,7 +214,7 @@ describe("UX.3 client header and UX.4 provider-neutral AI", () => {
     assert.doesNotMatch(header, /API connectivity|Snapshot freshness|Data status|Sources|Technical details|Environment|Run ID|Send feedback/);
   });
 
-  it("keeps client AI provider-neutral while owner-only metrics retain technical model data", async () => {
+  it("keeps client AI provider-neutral while technical model data remains server-side", async () => {
     const lookup: AIResearchBriefLookup = {
       schema_version: "ai_research_lookup_v1",
       availability: "PROVIDER_DISABLED",
@@ -224,15 +224,15 @@ describe("UX.3 client header and UX.4 provider-neutral AI", () => {
       error_code: null,
     };
     const client = render("en", <AIResearchSection chain="base" contractAddress={ADDRESS_A} symbol="PASS" name="Pass" initialLookup={lookup} mode="summary" />);
-    assert.match(client, /The analysis could not be prepared right now\./);
-    assert.match(client, /Try again later\./);
+    assert.match(client, /AI analysis is disabled in this preview mode/);
+    assert.match(client, /Enable AI analysis in Control Center\./);
     assert.doesNotMatch(client, /OpenAI|gpt-5-mini|provider mode|PROVIDER_DISABLED/i);
 
     const canvas = await source("src/components/AIResearchBriefCanvas.tsx");
     const handler = await source("server/scannerApiHandler.ts");
     const worker = await source("server/aiResearchWorker.ts");
     assert.match(canvas, /reviewMetrics && !brief\.render_preview/);
-    assert.match(canvas, /brief\.model/);
+    assert.doesNotMatch(canvas, /brief\.model/);
     assert.match(handler, /review-metrics[\s\S]*isLocalOwnerRequest/);
     assert.match(worker, /provider_mode: provider\.mode/);
     assert.match(worker, /model_id: provider\.model/);

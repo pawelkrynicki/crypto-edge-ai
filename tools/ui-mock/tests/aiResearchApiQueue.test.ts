@@ -102,7 +102,7 @@ describe("AI.3 versioned public queue API", () => {
     assert.doesNotMatch(service, /createAIResearchProvider|from "\.\/aiResearchProvider/);
     assert.doesNotMatch(handler, /createAIResearchProvider|OPENAI_API_KEY|api\.openai\.com/);
     assert.match(worker, /createAIResearchProvider/);
-    assert.match(component, /Zgłoś przygotowanie analizy/);
+    assert.match(component, /Zleć analizę AI/);
     assert.match(component, /wspólnej kolejki/);
     assert.doesNotMatch(component, /Wygeneruj analizę AI|Generate AI analysis/);
   });
