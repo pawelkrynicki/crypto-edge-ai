@@ -10,6 +10,7 @@ import {
 import {
   mutateEstablishedUniverse,
   readEstablishedUniverseStore,
+  type EstablishedOwnerDecisionAudit,
   type EstablishedUniverseStore,
   type UniverseMutationOptions,
   type UniverseMutationResult,
@@ -17,6 +18,8 @@ import {
 import {
   inspectFollowUpStore,
   resolveFollowUpStatusAt,
+  synchronizeFollowUpEstablishedMembership,
+  updateFollowUpStore,
   type FollowUpEntry,
   type FollowUpLifecycleStatus,
 } from "../../data-poc/src/followUpBasket.js";
@@ -33,7 +36,7 @@ import {
 } from "./ownerPreflight.js";
 
 export type EstablishedPromotionSourceLayer = "SCANNER" | "FOLLOW_UP" | "SCANNER_AND_FOLLOW_UP";
-export type EstablishedPromotionEligibility = "ELIGIBLE" | "BLOCKED" | "NO_ACTION";
+export type EstablishedPromotionEligibility = "ELIGIBLE" | "OVERRIDE_REQUIRED" | "BLOCKED" | "NO_ACTION";
 export type EstablishedPromotionMembership = "NOT_ESTABLISHED" | "ACTIVE" | "DISABLED";
 export type EstablishedPromotionActionPlan = "ADD" | "NO_ACTION" | "BLOCKED";
 
@@ -68,6 +71,11 @@ export type EstablishedPromotionStatus = {
   current_universe_version: string | null;
   current_universe_checksum: string | null;
   universe_validation_status: "valid" | "invalid" | "unavailable";
+  readiness_status: "CONDITIONS_MET" | "CONDITIONS_UNMET";
+  conditions_met: string[];
+  conditions_unmet: string[];
+  hard_block_reason_codes: string[];
+  manual_override_required: boolean;
 };
 
 export type EstablishedPromotionPreview = {
@@ -96,6 +104,11 @@ export type EstablishedPromotionPreview = {
   action_plan: EstablishedPromotionActionPlan;
   lock_available: boolean;
   owner_actions_enabled: boolean;
+  readiness_status: "CONDITIONS_MET" | "CONDITIONS_UNMET";
+  conditions_met: string[];
+  conditions_unmet: string[];
+  hard_block_reason_codes: string[];
+  manual_override_required: boolean;
 };
 
 export type EstablishedPromotionResult = {
@@ -109,6 +122,12 @@ export type EstablishedPromotionResult = {
   checksum: string;
   history_created: boolean;
   audit_created: boolean;
+  follow_up_synced: boolean;
+};
+
+export type EstablishedPromotionDecision = {
+  identity_confirmation?: string | null;
+  owner_reason?: string | null;
 };
 
 export type EstablishedPromotionOptions = {
@@ -127,6 +146,7 @@ export type EstablishedPromotionOptions = {
     options: UniverseMutationOptions,
   ) => Promise<UniverseMutationResult>;
   inspectUniverseLock?: () => Promise<boolean>;
+  syncFollowUpMembership?: (store: EstablishedUniverseStore, changedAt: string, sourceRunId: string) => Promise<boolean>;
 };
 
 type PromotionEvaluation = {
@@ -138,6 +158,10 @@ type PromotionEvaluation = {
   eligibilityStatus: EstablishedPromotionEligibility;
   reasonCodes: string[];
   actionPlan: EstablishedPromotionActionPlan;
+  conditionsMet: string[];
+  conditionsUnmet: string[];
+  hardBlockReasonCodes: string[];
+  manualOverrideRequired: boolean;
   lockAvailable: boolean;
   sourceFingerprint: string;
   eligibilityFingerprint: string;
@@ -262,6 +286,11 @@ export function createEstablishedPromotionService(options: EstablishedPromotionO
       action_plan: evaluation.actionPlan,
       lock_available: evaluation.lockAvailable,
       owner_actions_enabled: mode === "ENABLED",
+      readiness_status: evaluation.conditionsUnmet.length === 0 ? "CONDITIONS_MET" : "CONDITIONS_UNMET",
+      conditions_met: evaluation.conditionsMet,
+      conditions_unmet: evaluation.conditionsUnmet,
+      hard_block_reason_codes: evaluation.hardBlockReasonCodes,
+      manual_override_required: evaluation.manualOverrideRequired,
     };
   }
 
@@ -269,6 +298,7 @@ export function createEstablishedPromotionService(options: EstablishedPromotionO
     previewId: string,
     ownerSessionHeader: string,
     localOwnerRequest: boolean,
+    decision: EstablishedPromotionDecision = {},
   ): Promise<EstablishedPromotionResult> {
     requireEnabled(localOwnerRequest);
     if (ownerSessionHeader !== previewId) throw new EstablishedPromotionError("OWNER_SESSION_INVALID", 403);
@@ -303,16 +333,34 @@ export function createEstablishedPromotionService(options: EstablishedPromotionO
     if (evaluation.actionPlan !== "ADD" || !evaluation.store) {
       throw new EstablishedPromotionError("PROMOTION_NOT_ELIGIBLE", 409);
     }
+    const expectedIdentity = `${evaluation.record.chain}:${evaluation.record.contract_address}`;
+    if (evaluation.manualOverrideRequired && decision.identity_confirmation !== expectedIdentity) {
+      throw new EstablishedPromotionError("TOKEN_IDENTITY_CONFIRMATION_REQUIRED", 400);
+    }
+    const ownerReason = normalizeOwnerReason(decision.owner_reason, evaluation.manualOverrideRequired);
+    const ownerDecision: EstablishedOwnerDecisionAudit = {
+      actor: "owner",
+      previous_layer: "FOLLOW_UP",
+      new_layer: "ESTABLISHED",
+      chain: normalizeEstablishedChain(evaluation.record.chain),
+      contract_address: evaluation.record.contract_address,
+      conditions_met: [...evaluation.conditionsMet],
+      conditions_unmet: [...evaluation.conditionsUnmet],
+      owner_reason: ownerReason,
+    };
     promotionInProgress = true;
     try {
-      const result = await (options.mutateUniverse ?? mutateEstablishedUniverse)(addMutation(evaluation.record), {
+      const result = await (options.mutateUniverse ?? mutateEstablishedUniverse)(addMutation(evaluation.record, ownerReason), {
         apply: true,
         storePath,
-        actor: options.actor ?? "owner-established-promotion",
+        actor: options.actor ?? "owner",
         now,
         expectedCurrentVersion: payload.context.expected_universe_version ?? undefined,
         expectedCurrentChecksum: payload.context.expected_universe_checksum ?? undefined,
+        ownerDecision,
       });
+      const updatedStore = await (options.readUniverseStore ?? (() => readEstablishedUniverseStore(storePath)))();
+      const followUpSynced = await syncFollowUpMembership(updatedStore, now().toISOString(), `owner_promotion_${result.to_version}`);
       return {
         status: "ADDED",
         chain: payload.context.chain,
@@ -324,6 +372,7 @@ export function createEstablishedPromotionService(options: EstablishedPromotionO
         checksum: result.checksum,
         history_created: true,
         audit_created: true,
+        follow_up_synced: followUpSynced,
       };
     } catch (error) {
       const code = safeErrorCode(error);
@@ -361,25 +410,41 @@ export function createEstablishedPromotionService(options: EstablishedPromotionO
       ? "ESTABLISHED"
       : normalizedRecord.lifecycle_status;
     const lockAvailable = !promotionInProgress && await inspectLock();
-    const reasonCodes: string[] = [];
+    const conditionsMet: string[] = ["IDENTITY_VALID", "PRODUCT_RECORD_AVAILABLE"];
+    const softReasonCodes: string[] = [];
+    const hardBlockReasonCodes: string[] = [];
     let eligibilityStatus: EstablishedPromotionEligibility = "ELIGIBLE";
     let actionPlan: EstablishedPromotionActionPlan = "ADD";
 
     if (membership === "ACTIVE" || lifecycleStatus === "ESTABLISHED") {
       eligibilityStatus = "NO_ACTION";
       actionPlan = "NO_ACTION";
-      reasonCodes.push("ALREADY_ESTABLISHED");
+      conditionsMet.push("ALREADY_ESTABLISHED");
     } else {
-      if (universe.validationStatus !== "valid") reasonCodes.push("UNIVERSE_NOT_VALID");
-      if (membership === "DISABLED") reasonCodes.push("DISABLED_ENTRY_EXISTS");
-      if (lifecycleStatus !== "CANDIDATE_FOR_ESTABLISHED") reasonCodes.push(`LIFECYCLE_${lifecycleStatus}`);
-      if (normalizedRecord.basic_filter_status !== "passed_basic_filter") reasonCodes.push("BASIC_FILTER_NOT_PASSED");
-      if (!lockAvailable) reasonCodes.push("PROMOTION_ALREADY_IN_PROGRESS");
-      if (reasonCodes.length > 0) {
+      if (universe.validationStatus !== "valid") hardBlockReasonCodes.push("UNIVERSE_NOT_VALID");
+      else conditionsMet.push("UNIVERSE_VALID");
+      if (membership === "DISABLED") hardBlockReasonCodes.push("DISABLED_ENTRY_EXISTS");
+      else conditionsMet.push("NO_ESTABLISHED_DUPLICATE");
+      if (normalizedRecord.source_layer === "SCANNER") hardBlockReasonCodes.push("FOLLOW_UP_ENTRY_REQUIRED");
+      else conditionsMet.push("FOLLOW_UP_ENTRY_AVAILABLE");
+      if (lifecycleStatus !== "CANDIDATE_FOR_ESTABLISHED") softReasonCodes.push(`LIFECYCLE_${lifecycleStatus}`);
+      else conditionsMet.push("LIFECYCLE_READY");
+      if (normalizedRecord.basic_filter_status !== "passed_basic_filter") softReasonCodes.push("BASIC_FILTER_NOT_PASSED");
+      else conditionsMet.push("BASIC_FILTERS_PASSED");
+      if (requiresManualVerification(normalizedRecord.security_status)) softReasonCodes.push("MANUAL_VERIFICATION_MISSING");
+      else if (normalizedRecord.security_status === "CRITICAL_RISK") softReasonCodes.push("CRITICAL_RISK_REPORTED");
+      else conditionsMet.push("MANUAL_VERIFICATION_COMPLETED");
+      if (!lockAvailable) hardBlockReasonCodes.push("PROMOTION_ALREADY_IN_PROGRESS");
+      else conditionsMet.push("PROMOTION_LOCK_AVAILABLE");
+      if (hardBlockReasonCodes.length > 0) {
         eligibilityStatus = "BLOCKED";
         actionPlan = "BLOCKED";
+      } else if (softReasonCodes.length > 0) {
+        eligibilityStatus = "OVERRIDE_REQUIRED";
+        actionPlan = "ADD";
       }
     }
+    const reasonCodes = [...hardBlockReasonCodes, ...softReasonCodes];
     const sourceFingerprint = fingerprint({
       chain,
       contract_address: contractAddress,
@@ -398,6 +463,10 @@ export function createEstablishedPromotionService(options: EstablishedPromotionO
       universe_checksum: store?.current.checksum ?? null,
       universe_validation_status: universe.validationStatus,
       action_plan: actionPlan,
+      conditions_met: conditionsMet,
+      conditions_unmet: reasonCodes,
+      hard_block_reason_codes: hardBlockReasonCodes,
+      manual_override_required: softReasonCodes.length > 0 && hardBlockReasonCodes.length === 0,
     });
     return {
       record: normalizedRecord,
@@ -408,6 +477,10 @@ export function createEstablishedPromotionService(options: EstablishedPromotionO
       eligibilityStatus,
       reasonCodes,
       actionPlan,
+      conditionsMet,
+      conditionsUnmet: reasonCodes,
+      hardBlockReasonCodes,
+      manualOverrideRequired: softReasonCodes.length > 0 && hardBlockReasonCodes.length === 0,
       lockAvailable,
       sourceFingerprint,
       eligibilityFingerprint,
@@ -470,6 +543,27 @@ export function createEstablishedPromotionService(options: EstablishedPromotionO
     }
   }
 
+  async function syncFollowUpMembership(
+    universeStore: EstablishedUniverseStore,
+    changedAt: string,
+    sourceRunId: string,
+  ): Promise<boolean> {
+    if (options.syncFollowUpMembership) {
+      return options.syncFollowUpMembership(universeStore, changedAt, sourceRunId);
+    }
+    try {
+      await updateFollowUpStore((store) => synchronizeFollowUpEstablishedMembership(
+        store,
+        universeStore.current,
+        changedAt,
+        sourceRunId,
+      ), { storePath: options.followUp?.storePath, now: new Date(changedAt) });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   function requireVisible(localOwnerRequest: boolean): void {
     if (!localOwnerRequest || mode === "DISABLED" || sessionSecret === null) {
       throw new EstablishedPromotionError("OWNER_OPERATIONS_UNAVAILABLE", 404);
@@ -511,6 +605,11 @@ function statusFromEvaluation(
     current_universe_version: evaluation.store?.current.universe_version ?? null,
     current_universe_checksum: evaluation.store?.current.checksum ?? null,
     universe_validation_status: evaluation.universeValidationStatus,
+    readiness_status: evaluation.conditionsUnmet.length === 0 ? "CONDITIONS_MET" : "CONDITIONS_UNMET",
+    conditions_met: [...evaluation.conditionsMet],
+    conditions_unmet: [...evaluation.conditionsUnmet],
+    hard_block_reason_codes: [...evaluation.hardBlockReasonCodes],
+    manual_override_required: evaluation.manualOverrideRequired,
   };
 }
 
@@ -579,7 +678,7 @@ function scannerSecurityStatus(security: PersistableSecurityCheck | undefined): 
   return security.missing_data.length > 0 ? "PARTIAL" : "MANUAL_VERIFICATION_REQUIRED";
 }
 
-function addMutation(record: EstablishedPromotionProductRecord) {
+function addMutation(record: EstablishedPromotionProductRecord, ownerReason?: string | null) {
   return {
     operation: "add" as const,
     chain: record.chain,
@@ -587,6 +686,7 @@ function addMutation(record: EstablishedPromotionProductRecord) {
     enabled: true,
     ...(record.display_name ? { display_name: record.display_name } : {}),
     ...(record.symbol_hint ? { symbol_hint: record.symbol_hint } : {}),
+    ...(ownerReason ? { owner_note: ownerReason } : {}),
   };
 }
 
@@ -604,7 +704,19 @@ function noActionResult(evaluation: PromotionEvaluation): EstablishedPromotionRe
     checksum: current.checksum,
     history_created: false,
     audit_created: false,
+    follow_up_synced: false,
   };
+}
+
+function normalizeOwnerReason(value: string | null | undefined, required: boolean): string | null {
+  if (value === undefined || value === null || value.trim() === "") {
+    if (required) throw new EstablishedPromotionError("OWNER_REASON_REQUIRED", 400);
+    return null;
+  }
+  if (value.trim() !== value || value.length < 3 || value.length > 500) {
+    throw new EstablishedPromotionError("OWNER_REASON_INVALID", 400);
+  }
+  return value;
 }
 
 function fingerprint(value: unknown): string {

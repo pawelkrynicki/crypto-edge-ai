@@ -15,6 +15,7 @@ import {
   validateEstablishedAddressUniverse,
   type EstablishedAddressUniverse,
   type EstablishedAddressUniverseEntry,
+  type SupportedEstablishedChain,
 } from "./establishedAddressUniverse.js";
 import { resolveRepoFile } from "./sourceRegistryValidator.js";
 
@@ -31,6 +32,18 @@ export type EstablishedUniverseAuditEntry = {
   entry_id: string;
   identity: string;
   changed_fields: string[];
+  owner_decision?: EstablishedOwnerDecisionAudit;
+};
+
+export type EstablishedOwnerDecisionAudit = {
+  actor: "owner";
+  previous_layer: "FOLLOW_UP";
+  new_layer: "ESTABLISHED";
+  chain: SupportedEstablishedChain;
+  contract_address: string;
+  conditions_met: string[];
+  conditions_unmet: string[];
+  owner_reason: string | null;
 };
 
 export type EstablishedUniverseStore = {
@@ -70,6 +83,7 @@ export type UniverseMutationOptions = {
   expectedCurrentChecksum?: string;
   now?: () => Date;
   atomicWrite?: (path: string, value: EstablishedUniverseStore) => Promise<void>;
+  ownerDecision?: EstablishedOwnerDecisionAudit;
 };
 
 export type UniverseMutationResult = {
@@ -302,6 +316,7 @@ function buildMutation(
     entry_id: entryId,
     identity,
     changed_fields: changedFields,
+    ...(options.ownerDecision ? { owner_decision: validateOwnerDecision(options.ownerDecision, chain, address) } : {}),
   };
   const nextStore: EstablishedUniverseStore = {
     schema_version: ESTABLISHED_UNIVERSE_STORE_SCHEMA_VERSION,
@@ -328,7 +343,7 @@ function validateAuditEntry(value: unknown): EstablishedUniverseAuditEntry {
   if (!isRecord(value)) throw new Error("ESTABLISHED_UNIVERSE_AUDIT_INVALID");
   const fields = new Set([
     "audit_id", "changed_at", "actor", "operation", "from_version", "to_version",
-    "entry_id", "identity", "changed_fields",
+    "entry_id", "identity", "changed_fields", "owner_decision",
   ]);
   if (Object.keys(value).some((field) => !fields.has(field))) throw new Error("ESTABLISHED_UNIVERSE_AUDIT_INVALID");
   if (typeof value.audit_id !== "string" || !value.audit_id.startsWith("audit_")) throw new Error("ESTABLISHED_UNIVERSE_AUDIT_INVALID");
@@ -341,7 +356,62 @@ function validateAuditEntry(value: unknown): EstablishedUniverseAuditEntry {
   if (!Array.isArray(value.changed_fields) || value.changed_fields.some((field) => typeof field !== "string")) {
     throw new Error("ESTABLISHED_UNIVERSE_AUDIT_INVALID");
   }
-  return value as EstablishedUniverseAuditEntry;
+  const ownerDecision = value.owner_decision === undefined
+    ? undefined
+    : validateOwnerDecision(value.owner_decision);
+  return {
+    ...value,
+    ...(ownerDecision ? { owner_decision: ownerDecision } : {}),
+  } as EstablishedUniverseAuditEntry;
+}
+
+function validateOwnerDecision(
+  value: unknown,
+  expectedChain?: SupportedEstablishedChain,
+  expectedAddress?: string,
+): EstablishedOwnerDecisionAudit {
+  if (!isRecord(value)) throw new Error("ESTABLISHED_UNIVERSE_AUDIT_INVALID");
+  const fields = new Set([
+    "actor", "previous_layer", "new_layer", "chain", "contract_address",
+    "conditions_met", "conditions_unmet", "owner_reason",
+  ]);
+  if (Object.keys(value).some((field) => !fields.has(field))
+    || value.actor !== "owner"
+    || value.previous_layer !== "FOLLOW_UP"
+    || value.new_layer !== "ESTABLISHED") {
+    throw new Error("ESTABLISHED_UNIVERSE_AUDIT_INVALID");
+  }
+  let chain: SupportedEstablishedChain;
+  let address: string;
+  try {
+    chain = normalizeEstablishedChain(String(value.chain ?? ""));
+    address = normalizeEstablishedAddress(chain, String(value.contract_address ?? ""));
+  } catch {
+    throw new Error("ESTABLISHED_UNIVERSE_AUDIT_INVALID");
+  }
+  if (value.chain !== chain || value.contract_address !== address
+    || (expectedChain !== undefined && chain !== expectedChain)
+    || (expectedAddress !== undefined && address !== expectedAddress)) {
+    throw new Error("ESTABLISHED_UNIVERSE_AUDIT_INVALID");
+  }
+  if (!isAuditConditionList(value.conditions_met) || !isAuditConditionList(value.conditions_unmet)) {
+    throw new Error("ESTABLISHED_UNIVERSE_AUDIT_INVALID");
+  }
+  if (value.owner_reason !== null && (
+    typeof value.owner_reason !== "string"
+    || value.owner_reason.trim() !== value.owner_reason
+    || value.owner_reason.length < 3
+    || value.owner_reason.length > 500
+  )) {
+    throw new Error("ESTABLISHED_UNIVERSE_AUDIT_INVALID");
+  }
+  return value as EstablishedOwnerDecisionAudit;
+}
+
+function isAuditConditionList(value: unknown): value is string[] {
+  return Array.isArray(value)
+    && value.length <= 50
+    && value.every((entry) => typeof entry === "string" && entry.length > 0 && entry.length <= 160);
 }
 
 function incrementVersion(version: string): string {

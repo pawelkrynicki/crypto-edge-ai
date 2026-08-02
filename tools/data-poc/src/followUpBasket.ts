@@ -14,7 +14,7 @@ import type { PersistableCandidate, PersistableScannerOutput } from "./persistab
 
 export const FOLLOW_UP_STORE_SCHEMA_VERSION = "follow_up_store_v1";
 export const FOLLOW_UP_CHECKPOINT_DAYS = [1, 3, 7, 14, 30] as const;
-export const FOLLOW_UP_ENTRY_LIMIT = 500;
+export const FOLLOW_UP_ENTRY_LIMIT = 1_000;
 export const FOLLOW_UP_AUDIT_LIMIT = 200;
 export const DEFAULT_FOLLOW_UP_RECHECK_LIMIT = 5;
 export const FOLLOW_UP_LIST_LIMIT = 100;
@@ -82,11 +82,46 @@ export type FollowUpEntry = {
 export type FollowUpAuditEntry = {
   audit_id: string;
   changed_at: string;
-  operation: "INGEST" | "RECHECK" | "MEMBERSHIP_SYNC" | "BOOTSTRAP";
+  operation:
+    | "INGEST"
+    | "RECHECK"
+    | "MEMBERSHIP_SYNC"
+    | "BOOTSTRAP"
+    | "OWNER_MANUAL_INGEST"
+    | "OWNER_MANUAL_VERIFICATION";
   entry_id: string;
   from_status: FollowUpLifecycleStatus | null;
   to_status: FollowUpLifecycleStatus;
   source_run_id: string;
+  owner_decision?: FollowUpOwnerDecisionAudit;
+  manual_verification?: ManualVerificationRecord;
+};
+
+export type OwnerDecisionLayer = "NEW" | "FOLLOW_UP" | "ESTABLISHED";
+
+export type FollowUpOwnerDecisionAudit = {
+  actor: "owner";
+  previous_layer: OwnerDecisionLayer;
+  new_layer: OwnerDecisionLayer;
+  chain: SupportedEstablishedChain;
+  contract_address: string;
+  conditions_met: string[];
+  conditions_unmet: string[];
+  owner_reason: string | null;
+};
+
+export type ManualVerificationVerdict = "VERIFIED" | "NEEDS_MORE_DATA" | "CRITICAL_RISK" | "REJECT";
+
+export type ManualVerificationRecord = {
+  chain: SupportedEstablishedChain;
+  contract_address: string;
+  display_name: string | null;
+  symbol: string | null;
+  verdict: ManualVerificationVerdict;
+  note: string;
+  checked_at: string;
+  missing_data: string[];
+  available_data: string[];
 };
 
 export type FollowUpStore = {
@@ -155,6 +190,7 @@ const FILTER_FIELDS = new Set(["status", "reasons", "evaluated_at"]);
 const SECURITY_FIELDS = new Set(["status", "source", "checked_at", "missing_data", "risk_flags"]);
 const AUDIT_FIELDS = new Set([
   "audit_id", "changed_at", "operation", "entry_id", "from_status", "to_status", "source_run_id",
+  "owner_decision", "manual_verification",
 ]);
 const DEFAULT_FOLLOW_UP_STORE_PATH = resolve(resolveDataPocRoot(fileURLToPath(import.meta.url)), ".local/follow-up/store.json");
 
@@ -312,6 +348,7 @@ export function ingestScannerSnapshot(
   snapshot: Pick<PersistableScannerOutput, "candidates" | "scan_run" | "provenance">,
   establishedUniverse?: EstablishedAddressUniverse | null,
   operation: FollowUpAuditEntry["operation"] = "INGEST",
+  ownerDecision?: FollowUpOwnerDecisionAudit,
 ): FollowUpStore {
   const observedAt = requireIso(snapshot.provenance?.generated_at ?? snapshot.scan_run.finished_at);
   return ingestFollowUpObservations(
@@ -321,6 +358,7 @@ export function ingestScannerSnapshot(
     snapshot.scan_run.run_id,
     establishedUniverse,
     operation,
+    ownerDecision,
   );
 }
 
@@ -331,6 +369,7 @@ export function ingestFollowUpObservations(
   sourceRunId: string,
   establishedUniverse?: EstablishedAddressUniverse | null,
   operation: FollowUpAuditEntry["operation"] = "INGEST",
+  ownerDecision?: FollowUpOwnerDecisionAudit,
 ): FollowUpStore {
   requireIso(observedAt);
   assertSafeRunId(sourceRunId);
@@ -390,13 +429,74 @@ export function ingestFollowUpObservations(
         archived_at: null,
         last_valid_market_snapshot: marketSnapshot(candidate, observedAt),
         latest_filter_result: filterResult(candidate, observedAt),
-        latest_security_status: manualSecurityStatus(),
+        latest_security_status: manualVerificationSecurityStatus(
+          findLatestManualVerification(store, identity.chain, identity.contract_address),
+        ),
         source_run_id: sourceRunId,
       };
     entries.set(identity.identity, next);
-    audits.unshift(audit(operation, observedAt, next.entry_id, existing?.lifecycle_status ?? null, next.lifecycle_status, sourceRunId));
+    audits.unshift(audit(
+      operation,
+      observedAt,
+      next.entry_id,
+      existing?.lifecycle_status ?? null,
+      next.lifecycle_status,
+      sourceRunId,
+      ownerDecision,
+    ));
   }
   return rebuildStore([...entries.values()], audits, observedAt);
+}
+
+export function recordManualVerification(
+  store: FollowUpStore,
+  record: ManualVerificationRecord,
+  sourceRunId: string,
+  ownerDecision: FollowUpOwnerDecisionAudit,
+): FollowUpStore {
+  const identity = followUpIdentity(record.chain, record.contract_address);
+  const normalizedRecord = validateManualVerificationRecord({
+    ...record,
+    chain: identity.chain,
+    contract_address: identity.contract_address,
+  });
+  assertSafeRunId(sourceRunId);
+  const existing = store.entries.find((entry) => entry.entry_id === identity.entry_id);
+  const lifecycle = existing?.lifecycle_status ?? "NEW";
+  const entries = store.entries.map((entry) => entry.entry_id === identity.entry_id
+    ? {
+      ...entry,
+      latest_security_status: manualVerificationSecurityStatus(normalizedRecord),
+    }
+    : entry);
+  const audits = [audit(
+    "OWNER_MANUAL_VERIFICATION",
+    normalizedRecord.checked_at,
+    identity.entry_id,
+    lifecycle,
+    lifecycle,
+    sourceRunId,
+    ownerDecision,
+    normalizedRecord,
+  ), ...store.audit_log];
+  return rebuildStore(entries, audits, normalizedRecord.checked_at);
+}
+
+export function findLatestManualVerification(
+  store: FollowUpStore,
+  chain: string,
+  contractAddress: string,
+): ManualVerificationRecord | null {
+  const identity = followUpIdentity(chain, contractAddress).identity;
+  for (const entry of store.audit_log) {
+    if (entry.operation !== "OWNER_MANUAL_VERIFICATION" || !entry.manual_verification) continue;
+    const recordIdentity = universeIdentityKey(
+      entry.manual_verification.chain,
+      entry.manual_verification.contract_address,
+    );
+    if (recordIdentity === identity) return structuredClone(entry.manual_verification);
+  }
+  return null;
 }
 
 export function selectDueFollowUpEntries(
@@ -614,11 +714,27 @@ function validateSecurity(value: unknown): FollowUpSecurityStatus {
 function validateAuditEntry(value: unknown): FollowUpAuditEntry {
   if (!isRecord(value) || hasUnknownFields(value, AUDIT_FIELDS)) fail("FOLLOW_UP_STORE_INVALID");
   if (typeof value.audit_id !== "string" || !/^fua_[0-9a-f-]{36}$/.test(value.audit_id)) fail("FOLLOW_UP_STORE_INVALID");
-  if (!isIso(value.changed_at) || !["INGEST", "RECHECK", "MEMBERSHIP_SYNC", "BOOTSTRAP"].includes(String(value.operation))) fail("FOLLOW_UP_STORE_INVALID");
+  if (!isIso(value.changed_at) || ![
+    "INGEST", "RECHECK", "MEMBERSHIP_SYNC", "BOOTSTRAP", "OWNER_MANUAL_INGEST", "OWNER_MANUAL_VERIFICATION",
+  ].includes(String(value.operation))) fail("FOLLOW_UP_STORE_INVALID");
   if (typeof value.entry_id !== "string" || !/^fup_[0-9a-f]{16}$/.test(value.entry_id)) fail("FOLLOW_UP_STORE_INVALID");
   if (value.from_status !== null && !isLifecycle(value.from_status)) fail("FOLLOW_UP_STORE_INVALID");
   if (!isLifecycle(value.to_status) || !isSafeRunId(value.source_run_id)) fail("FOLLOW_UP_STORE_INVALID");
-  return value as FollowUpAuditEntry;
+  const ownerDecision = value.owner_decision === undefined
+    ? undefined
+    : validateOwnerDecisionAudit(value.owner_decision);
+  const manualVerification = value.manual_verification === undefined
+    ? undefined
+    : validateManualVerificationRecord(value.manual_verification);
+  if ((value.operation === "OWNER_MANUAL_INGEST" || value.operation === "OWNER_MANUAL_VERIFICATION") && !ownerDecision) {
+    fail("FOLLOW_UP_STORE_INVALID");
+  }
+  if (value.operation === "OWNER_MANUAL_VERIFICATION" && !manualVerification) fail("FOLLOW_UP_STORE_INVALID");
+  return {
+    ...value,
+    ...(ownerDecision ? { owner_decision: ownerDecision } : {}),
+    ...(manualVerification ? { manual_verification: manualVerification } : {}),
+  } as FollowUpAuditEntry;
 }
 
 function deduplicateObservations(candidates: FollowUpObservationCandidate[]): FollowUpObservationCandidate[] {
@@ -707,6 +823,29 @@ export function manualSecurityStatus(): FollowUpSecurityStatus {
   };
 }
 
+function manualVerificationSecurityStatus(record: ManualVerificationRecord | null): FollowUpSecurityStatus {
+  if (!record) return manualSecurityStatus();
+  if (record.verdict === "VERIFIED") {
+    return { status: "CHECKED", source: null, checked_at: record.checked_at, missing_data: [], risk_flags: [] };
+  }
+  if (record.verdict === "NEEDS_MORE_DATA") {
+    return {
+      status: "PARTIAL",
+      source: null,
+      checked_at: record.checked_at,
+      missing_data: [...record.missing_data],
+      risk_flags: [],
+    };
+  }
+  return {
+    status: "CRITICAL_RISK",
+    source: null,
+    checked_at: record.checked_at,
+    missing_data: [...record.missing_data],
+    risk_flags: [`owner_verdict_${record.verdict.toLowerCase()}`],
+  };
+}
+
 function audit(
   operation: FollowUpAuditEntry["operation"],
   changedAt: string,
@@ -714,6 +853,8 @@ function audit(
   fromStatus: FollowUpLifecycleStatus | null,
   toStatus: FollowUpLifecycleStatus,
   sourceRunId: string,
+  ownerDecision?: FollowUpOwnerDecisionAudit,
+  manualVerification?: ManualVerificationRecord,
 ): FollowUpAuditEntry {
   return {
     audit_id: `fua_${randomUUID()}`,
@@ -723,7 +864,57 @@ function audit(
     from_status: fromStatus,
     to_status: toStatus,
     source_run_id: sourceRunId,
+    ...(ownerDecision ? { owner_decision: validateOwnerDecisionAudit(ownerDecision) } : {}),
+    ...(manualVerification ? { manual_verification: validateManualVerificationRecord(manualVerification) } : {}),
   };
+}
+
+function validateOwnerDecisionAudit(value: unknown): FollowUpOwnerDecisionAudit {
+  if (!isRecord(value)) fail("FOLLOW_UP_STORE_INVALID");
+  const fields = new Set([
+    "actor", "previous_layer", "new_layer", "chain", "contract_address",
+    "conditions_met", "conditions_unmet", "owner_reason",
+  ]);
+  if (hasUnknownFields(value, fields) || value.actor !== "owner") fail("FOLLOW_UP_STORE_INVALID");
+  if (!["NEW", "FOLLOW_UP", "ESTABLISHED"].includes(String(value.previous_layer))
+    || !["NEW", "FOLLOW_UP", "ESTABLISHED"].includes(String(value.new_layer))) fail("FOLLOW_UP_STORE_INVALID");
+  let identity;
+  try {
+    identity = followUpIdentity(String(value.chain ?? ""), String(value.contract_address ?? ""));
+  } catch {
+    fail("FOLLOW_UP_STORE_INVALID");
+  }
+  if (value.chain !== identity.chain || value.contract_address !== identity.contract_address) fail("FOLLOW_UP_STORE_INVALID");
+  if (!isStringArray(value.conditions_met, 50, 160) || !isStringArray(value.conditions_unmet, 50, 160)) {
+    fail("FOLLOW_UP_STORE_INVALID");
+  }
+  if (value.owner_reason !== null && !isBoundedText(value.owner_reason, 500)) fail("FOLLOW_UP_STORE_INVALID");
+  return value as FollowUpOwnerDecisionAudit;
+}
+
+function validateManualVerificationRecord(value: unknown): ManualVerificationRecord {
+  if (!isRecord(value)) fail("FOLLOW_UP_STORE_INVALID");
+  const fields = new Set([
+    "chain", "contract_address", "display_name", "symbol", "verdict", "note",
+    "checked_at", "missing_data", "available_data",
+  ]);
+  if (hasUnknownFields(value, fields)) fail("FOLLOW_UP_STORE_INVALID");
+  let identity;
+  try {
+    identity = followUpIdentity(String(value.chain ?? ""), String(value.contract_address ?? ""));
+  } catch {
+    fail("FOLLOW_UP_STORE_INVALID");
+  }
+  if (value.chain !== identity.chain || value.contract_address !== identity.contract_address) fail("FOLLOW_UP_STORE_INVALID");
+  if (!isNullableBounded(value.display_name, 120) || !isNullableBounded(value.symbol, 120)) fail("FOLLOW_UP_STORE_INVALID");
+  if (!["VERIFIED", "NEEDS_MORE_DATA", "CRITICAL_RISK", "REJECT"].includes(String(value.verdict))) {
+    fail("FOLLOW_UP_STORE_INVALID");
+  }
+  if (!isBoundedText(value.note, 500) || !isIso(value.checked_at)) fail("FOLLOW_UP_STORE_INVALID");
+  if (!isStringArray(value.missing_data, 100, 160) || !isStringArray(value.available_data, 100, 160)) {
+    fail("FOLLOW_UP_STORE_INVALID");
+  }
+  return value as ManualVerificationRecord;
 }
 
 function rebuildStore(
@@ -865,6 +1056,10 @@ function isNullableFinite(value: unknown): value is number | null {
 
 function isNullableBounded(value: unknown, max: number): value is string | null {
   return value === null || (typeof value === "string" && value.trim() === value && value.length > 0 && value.length <= max);
+}
+
+function isBoundedText(value: unknown, max: number): value is string {
+  return typeof value === "string" && value.trim() === value && value.length > 0 && value.length <= max;
 }
 
 function isStringArray(value: unknown, maxItems: number, maxLength: number): value is string[] {
