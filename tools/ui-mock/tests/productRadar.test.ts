@@ -375,7 +375,7 @@ describe("Product Radar owner acceptance", () => {
     for (const locale of ["en", "pl"] as const) {
       const details = renderWithLocale(locale, React.createElement(CandidateDetailView, { candidate: beansCandidate, initialActiveTab: "security" }));
       const filtersDetails = renderWithLocale(locale, React.createElement(CandidateDetailView, { candidate: beansCandidate, initialActiveTab: "filters" }));
-      const verification = renderWithLocale(locale, React.createElement(ExternalVerificationLinksView, { candidate: beansCandidate }));
+      const verification = renderWithLocale(locale, React.createElement(ExternalVerificationLinksView, { candidate: beansCandidate, initialActiveTab: "security" }));
       const detailsWithoutTechnical = details.replace(/<details\b[^>]*>[\s\S]*?<\/details>/g, "");
 
       if (locale === "pl") {
@@ -426,9 +426,9 @@ describe("Product Radar owner acceptance", () => {
     partial.securityLabel = "PARTIAL SECURITY COVERAGE";
 
     const unavailableDetails = renderWithLocale("pl", React.createElement(CandidateDetailView, { candidate: unavailable, initialActiveTab: "security" }));
-    const unavailableVerification = renderWithLocale("pl", React.createElement(ExternalVerificationLinksView, { candidate: unavailable }));
+    const unavailableVerification = renderWithLocale("pl", React.createElement(ExternalVerificationLinksView, { candidate: unavailable, initialActiveTab: "security" }));
     const partialDetails = renderWithLocale("pl", React.createElement(CandidateDetailView, { candidate: partial, initialActiveTab: "security" }));
-    const partialVerification = renderWithLocale("pl", React.createElement(ExternalVerificationLinksView, { candidate: partial }));
+    const partialVerification = renderWithLocale("pl", React.createElement(ExternalVerificationLinksView, { candidate: partial, initialActiveTab: "security" }));
 
     assert.match(unavailableDetails, /Dane bezpieczeństwa są niedostępne\. Wymagana jest ręczna weryfikacja\./);
     assert.match(unavailableVerification, /Dane niedostępne — wymagana ręczna weryfikacja/);
@@ -449,7 +449,7 @@ describe("Product Radar owner acceptance", () => {
     checked.security.checkedAt = "2026-07-21T08:00:00.000Z";
     checked.securityLabel = "SECURITY_PASSED";
     const details = renderWithLocale("en", React.createElement(CandidateDetailView, { candidate: checked, initialActiveTab: "security" }));
-    const verification = renderWithLocale("en", React.createElement(ExternalVerificationLinksView, { candidate: checked }));
+    const verification = renderWithLocale("en", React.createElement(ExternalVerificationLinksView, { candidate: checked, initialActiveTab: "security" }));
     assert.equal(resolveProductSecurityState(checked).state, "checked");
     assert.match(details, /Security checked — Manual Review Only/);
     assert.match(verification, /Checked — Manual Review Only/);
@@ -920,7 +920,7 @@ describe("Product Radar owner acceptance", () => {
   });
 
   it("builds verification links only from the selected real candidate", () => {
-    const markup = renderToStaticMarkup(React.createElement(ExternalVerificationLinksView, { candidate: establishedCandidate }));
+    const markup = renderToStaticMarkup(React.createElement(ExternalVerificationLinksView, { candidate: establishedCandidate, initialActiveTab: "data" }));
     assert.match(markup, new RegExp(establishedCandidate.contractAddress));
     assert.match(markup, /target="_blank" rel="noreferrer noopener"/);
     assert.match(markup, /No automated Honeypot\.is/);

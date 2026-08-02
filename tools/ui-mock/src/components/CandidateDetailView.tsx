@@ -25,6 +25,7 @@ import {
 import type { UiTokenCandidate } from "../types/scannerTypes";
 import type { FollowUpPublicEntry, FollowUpPublicStatus } from "../types/followUpTypes";
 import { CANDIDATE_DETAIL_TAB_IDS, type CandidateDetailTabId } from "../candidateDetailTabs";
+import { TokenDetailTabPanel, TokenDetailTabs } from "./TokenDetailTabs";
 import {
   loadEstablishedPromotionStatus,
   type EstablishedPromotionStatus,
@@ -363,17 +364,10 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
         <div className="token-detail-next-step"><span>{workspaceCopy.nextResearchStep}</span><strong>{nextStep}</strong></div>
       </header>
 
-      <CandidateDetailTabs activeTab={activeTab} onChange={setActiveTab} copy={workspaceCopy} />
-
-      <section
-        id={`candidate-panel-${activeTab}`}
-        role="tabpanel"
-        aria-labelledby={`candidate-tab-${activeTab}`}
-        tabIndex={0}
-        className="token-detail-tabpanel"
-      >
+      <TokenDetailTabs tabs={CANDIDATE_DETAIL_TAB_IDS.map((id) => ({ id, label: workspaceCopy.tabs[id] }))} activeTab={activeTab} onChange={setActiveTab} idPrefix="candidate" ariaLabel={workspaceCopy.tablistLabel} />
+      <TokenDetailTabPanel activeTab={activeTab} idPrefix="candidate">
         {activeTabContent}
-      </section>
+      </TokenDetailTabPanel>
     </div>
   );
 };
@@ -392,51 +386,6 @@ function SummaryFact({
 
 function HeaderFact({ label, value, tone = "neutral" }: { label: string; value: string; tone?: "neutral" | "ready" | "warning" }) {
   return <span className={`token-detail-header-fact ${tone}`}><small>{label}</small><strong>{value}</strong></span>;
-}
-
-function CandidateDetailTabs({
-  activeTab,
-  onChange,
-  copy,
-}: {
-  activeTab: CandidateDetailTabId;
-  onChange: (tab: CandidateDetailTabId) => void;
-  copy: ReturnType<typeof getTabbedWorkspaceCopy>;
-}) {
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, tab: CandidateDetailTabId) => {
-    const currentIndex = CANDIDATE_DETAIL_TAB_IDS.indexOf(tab);
-    let nextIndex: number;
-    if (event.key === "ArrowRight") nextIndex = (currentIndex + 1) % CANDIDATE_DETAIL_TAB_IDS.length;
-    else if (event.key === "ArrowLeft") nextIndex = (currentIndex - 1 + CANDIDATE_DETAIL_TAB_IDS.length) % CANDIDATE_DETAIL_TAB_IDS.length;
-    else if (event.key === "Home") nextIndex = 0;
-    else if (event.key === "End") nextIndex = CANDIDATE_DETAIL_TAB_IDS.length - 1;
-    else return;
-    event.preventDefault();
-    const nextTab = CANDIDATE_DETAIL_TAB_IDS[nextIndex]!;
-    onChange(nextTab);
-    event.currentTarget.parentElement?.querySelector<HTMLButtonElement>(`#candidate-tab-${nextTab}`)?.focus();
-  };
-
-  return (
-    <div className="token-detail-tabs" role="tablist" aria-label={copy.tablistLabel}>
-      {CANDIDATE_DETAIL_TAB_IDS.map((tab) => (
-        <button
-          key={tab}
-          id={`candidate-tab-${tab}`}
-          type="button"
-          role="tab"
-          aria-selected={activeTab === tab}
-          aria-controls={`candidate-panel-${tab}`}
-          tabIndex={activeTab === tab ? 0 : -1}
-          className={activeTab === tab ? "active" : ""}
-          onClick={() => onChange(tab)}
-          onKeyDown={(event) => handleKeyDown(event, tab)}
-        >
-          {copy.tabs[tab]}
-        </button>
-      ))}
-    </div>
-  );
 }
 
 function getTabbedWorkspaceCopy(locale: ProductLocale) {
@@ -699,10 +648,10 @@ function FollowUpOnlyDetail({
         </div>
         <div className="token-detail-next-step"><span>{copy.nextResearchStep}</span><strong>{lifecycleActionLabel(lifecycle.next_action_type, locale)}</strong></div>
       </header>
-      <CandidateDetailTabs activeTab={activeTab} onChange={onActiveTabChange} copy={copy} />
-      <section id={`candidate-panel-${activeTab}`} role="tabpanel" aria-labelledby={`candidate-tab-${activeTab}`} tabIndex={0} className="token-detail-tabpanel">
+      <TokenDetailTabs tabs={CANDIDATE_DETAIL_TAB_IDS.map((id) => ({ id, label: copy.tabs[id] }))} activeTab={activeTab} onChange={onActiveTabChange} idPrefix="candidate" ariaLabel={copy.tablistLabel} />
+      <TokenDetailTabPanel activeTab={activeTab} idPrefix="candidate">
         {content}
-      </section>
+      </TokenDetailTabPanel>
     </div>
   );
 }

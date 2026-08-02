@@ -109,10 +109,9 @@ describe("P1.1 Radar operational usability", () => {
     assert.match(verificationMarkup, new RegExp(escapeRegExp(candidate.contractAddress)));
     assert.match(verificationMarkup, /Nazwa/);
     assert.match(verificationMarkup, /Symbol/);
-    assert.match(verificationMarkup, /Źródła zewnętrzne/);
-    assert.match(verificationMarkup, /Lista ręcznej weryfikacji/);
-    assert.match(verificationMarkup, /Dostępne/);
-    assert.match(verificationMarkup, /Brakujące/);
+    assert.match(verificationMarkup, /Dane i źródła/);
+    assert.match(verificationMarkup, /Decyzja weryfikacyjna/);
+    assert.match(verificationMarkup, /verification-panel-identity/);
   });
 
   it("keeps the Verification list visible and reuses the Details token drawer for a selected token", async () => {

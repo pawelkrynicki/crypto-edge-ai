@@ -6449,6 +6449,8 @@ button:disabled,
 }
 
 .token-detail-tabpanel:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.token-detail-drawer-body--tabbed { display: flex; min-height: 0; padding: 0; overflow: hidden; }
+.token-detail-drawer-body--tabbed > .token-detail-tabpanel { flex: 1 1 auto; }
 .token-detail-tabpanel > .product-detail-section,
 .token-detail-tabpanel > .ai-research-section,
 .token-detail-tabpanel .candidate-data-sources-tab > .product-detail-section { margin: 0; }

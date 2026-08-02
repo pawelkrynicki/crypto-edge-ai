@@ -103,6 +103,7 @@ export function VerificationTokenBrowser({
       <div className="verification-token-drawer-region" aria-live="polite">
         {selectedCandidate || selectedFollowUp ? (
           <ExternalVerificationLinksView
+            key={`${selectedCandidate?.chain ?? selectedFollowUp?.chain}:${selectedCandidate?.contractAddress ?? selectedFollowUp?.contract_address}`}
             candidate={selectedCandidate}
             followUp={selectedFollowUp}
             onClose={onCloseToken}

@@ -10,6 +10,8 @@ type TokenDetailDrawerProps = {
   meta?: ReactNode;
   onClose?: () => void;
   closeLabel?: string;
+  tabBar?: ReactNode;
+  bodyClassName?: string;
   children: ReactNode;
   className?: string;
 };
@@ -27,6 +29,8 @@ export function TokenDetailDrawer({
   meta,
   onClose,
   closeLabel = "Close token detail",
+  tabBar,
+  bodyClassName = "",
   children,
   className = "",
 }: TokenDetailDrawerProps) {
@@ -50,7 +54,8 @@ export function TokenDetailDrawer({
         {summary && <div className="detail-header-summary">{summary}</div>}
         {meta && <div className="detail-header-meta">{meta}</div>}
       </header>
-      <div className="detail-body token-detail-drawer-body">{children}</div>
+      {tabBar}
+      <div className={`detail-body token-detail-drawer-body ${bodyClassName}`.trim()}>{children}</div>
     </div>
   );
 }
