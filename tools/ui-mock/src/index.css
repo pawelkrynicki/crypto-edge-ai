@@ -4758,6 +4758,69 @@
   font-size: 11px;
 }
 
+.owner-follow-up-panel,
+.manual-verification-status {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+  background: linear-gradient(145deg, color-mix(in srgb, var(--bg-card) 94%, var(--accent)), var(--bg-card));
+}
+
+.owner-readiness-summary,
+.owner-decision-confirmation,
+.owner-verification-decision {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.owner-decision-confirmation label,
+.promotion-confirmed-identity,
+.owner-decision-reason,
+.owner-verification-decision > label {
+  display: grid;
+  gap: 6px;
+  color: var(--color-text-secondary);
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.owner-decision-confirmation input:not([type="checkbox"]),
+.owner-decision-confirmation textarea,
+.promotion-confirmed-identity input,
+.owner-decision-reason textarea,
+.owner-verification-decision select,
+.owner-verification-decision textarea {
+  width: 100%;
+  padding: 9px 10px;
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-sm);
+  outline: 0;
+  background: var(--color-surface-2);
+}
+
+.owner-decision-confirmation textarea,
+.owner-decision-reason textarea,
+.owner-verification-decision textarea { min-height: 84px; resize: vertical; }
+
+.manual-verification-status {
+  display: grid;
+  gap: 5px;
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-sm);
+}
+
+.manual-verification-status > span,
+.manual-verification-status small { color: var(--color-text-helper); font-size: 10px; }
+.manual-verification-status strong { color: var(--color-text-primary); }
+.manual-verification-status p { margin: 0; color: var(--color-text-secondary); font-size: 11px; }
+
+.verification-data-coverage .filter-condition-grid,
+.owner-verification-decision > label,
+.owner-verification-decision > button,
+.owner-verification-decision > p,
+.owner-verification-decision .owner-decision-confirmation { grid-column: 1 / -1; }
+
 .product-feedback-button,
 .product-primary-button {
   min-height: 34px;

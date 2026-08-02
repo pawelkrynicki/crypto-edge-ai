@@ -94,3 +94,14 @@ export function getAcceptedProductRefreshTimestamps(
     viewRefreshedAt,
   };
 }
+
+export function resolveGlobalProductTimestamp(
+  scannerGeneratedAt: string | null | undefined,
+  contextGeneratedAt: string | null | undefined,
+  followUpLastSeenAt: string | null | undefined,
+): string | null {
+  for (const value of [scannerGeneratedAt, contextGeneratedAt, followUpLastSeenAt]) {
+    if (typeof value === "string" && Number.isFinite(Date.parse(value))) return value;
+  }
+  return null;
+}

@@ -21,11 +21,24 @@ export function resolveDetailTab(): CandidateDetailTabId {
 }
 
 export function writeCandidateDetailRoute(identity: RouteTokenIdentity, tab: CandidateDetailTabId) {
+  writeTokenRoute(identity, "candidate-detail", tab);
+}
+
+export function writeVerificationRoute(identity: RouteTokenIdentity) {
+  writeTokenRoute(identity, "external-checks", null);
+}
+
+function writeTokenRoute(
+  identity: RouteTokenIdentity,
+  section: "candidate-detail" | "external-checks",
+  tab: CandidateDetailTabId | null,
+) {
   if (typeof window === "undefined") return;
   const url = new URL(window.location.href);
   url.searchParams.set("chain", identity.chain);
   url.searchParams.set("contract", identity.contract_address);
-  url.searchParams.set("detail", tab);
-  url.hash = "candidate-detail";
+  if (tab) url.searchParams.set("detail", tab);
+  else url.searchParams.delete("detail");
+  url.hash = section;
   window.history.pushState(null, "", url);
 }

@@ -84,24 +84,32 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
 }) => {
   const { locale, t } = useProductLocale();
   const newCandidates = useMemo(
-    () => candidates.filter((candidate) => candidate.discoveryBasket === "new_emerging"),
-    [candidates],
+    () => candidates.filter((candidate) => candidate.discoveryBasket === "new_emerging"
+      && findFollowUpByIdentity(followUpEntries, candidate) === null),
+    [candidates, followUpEntries],
   );
   const establishedCandidates = useMemo(
     () => candidates.filter((candidate) => candidate.discoveryBasket === "established"),
     [candidates],
   );
-  const displayedFollowUpEntries = followUpEntries;
+  const displayedFollowUpEntries = followUpEntries.filter((entry) => (
+    entry.lifecycle_status !== "ESTABLISHED"
+    && entry.lifecycle_status !== "ARCHIVED"
+    && !entry.established_membership
+  ));
+  const establishedFollowUpEntries = followUpEntries.filter((entry) => (
+    entry.lifecycle_status === "ESTABLISHED" || entry.established_membership
+  ));
   const [activeBasket, setActiveBasket] = useState<BasketId>(() => resolveInitialBasket(
     candidates,
-    displayedFollowUpEntries,
+    followUpEntries,
     Boolean(scannerUnavailableReasonCode),
   ));
   const [basketManuallySelected, setBasketManuallySelected] = useState(false);
   const [lifecycleGuideOpen, setLifecycleGuideOpen] = useState(false);
   const visibleBasket = basketManuallySelected
     ? activeBasket
-    : resolveInitialBasket(candidates, displayedFollowUpEntries, Boolean(scannerUnavailableReasonCode));
+    : resolveInitialBasket(candidates, followUpEntries, Boolean(scannerUnavailableReasonCode));
   const selectBasket = (basket: BasketId) => {
     setBasketManuallySelected(true);
     setActiveBasket(basket);
@@ -177,7 +185,7 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
         </button>
         <ol id="radar-lifecycle-guide-content" hidden={!lifecycleGuideOpen}>
           <li>{locale === "pl" ? "Nowy token zostaje wykryty." : "A new token is detected."}</li>
-          <li>{locale === "pl" ? "Poprawna tożsamość jest automatycznie zapisywana do dalszej obserwacji." : "A valid identity is enrolled in follow-up automatically."}</li>
+          <li>{locale === "pl" ? "Właściciel może dodać token do dalszej obserwacji po sprawdzeniu tożsamości i warunków." : "The owner may add the token to continued observation after reviewing identity and conditions."}</li>
           <li>{locale === "pl" ? "Token przechodzi checkpointy 1 / 3 / 7 / 14 / 30 dni." : "The token moves through 1 / 3 / 7 / 14 / 30-day checkpoints."}</li>
           <li>{locale === "pl" ? "Po spełnieniu filtrów może zostać kandydatem." : "After meeting the filters, it may become a candidate."}</li>
           <li>{locale === "pl" ? "Tylko właściciel może dodać go do Głównego Radaru." : "Only the owner can add it to the Main Radar."}</li>
@@ -221,7 +229,7 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
           data-lifecycle-layer="established"
         >
           <span>{t("radar.establishedBasket")}</span>
-          <strong>{establishedCandidates.length}</strong>
+          <strong>{establishedEntries}</strong>
           <small>{getEstablishedTabStatus(metadata, readiness, locale, establishedUniverseStatus)}</small>
         </button>
       </section>
@@ -254,7 +262,9 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
           metadata={metadata}
           readiness={readiness}
           universeStatus={establishedUniverseStatus}
+          followUpEntries={establishedFollowUpEntries}
           onOpenCandidate={onOpenCandidate}
+          onOpenFollowUp={onOpenFollowUp}
           onOpenExternalChecks={onOpenExternalChecks}
         />
       )}
@@ -521,17 +531,21 @@ export function EstablishedBasket({
   metadata,
   readiness,
   universeStatus,
+  followUpEntries = [],
   onOpenCandidate,
+  onOpenFollowUp,
   onOpenExternalChecks,
 }: {
   candidates: UiTokenCandidate[];
   metadata?: ScannerDiscoveryMetadata | null;
   readiness?: ProductReadinessOutput | null;
   universeStatus?: EstablishedUniverseStatus | null;
+  followUpEntries?: FollowUpPublicEntry[];
   onOpenCandidate?: (candidateId: string) => void;
+  onOpenFollowUp?: (entryId: string) => void;
   onOpenExternalChecks?: (candidate: UiTokenCandidate) => void;
 }) {
-  const { t } = useProductLocale();
+  const { locale, t } = useProductLocale();
   const state = getEstablishedState(metadata, readiness, candidates, universeStatus);
   if (state === "empty") {
     const universe = metadata?.established;
@@ -592,6 +606,26 @@ export function EstablishedBasket({
             onOpenCandidate={onOpenCandidate}
             onOpenExternalChecks={onOpenExternalChecks}
           />
+        ))}
+        {followUpEntries.filter((entry) => !candidates.some((candidate) => (
+          findFollowUpByIdentity([entry], candidate) !== null
+        ))).map((entry) => (
+          <article className="product-candidate-card ready established-follow-up-card" key={entry.entry_id}>
+            <header className="product-candidate-topline">
+              <div>
+                <span className="candidate-results-eyebrow">Established · {entry.chain.toUpperCase()}</span>
+                <h4>{entry.symbol ?? t("radar.missingData")} <small>{entry.display_name ?? ""}</small></h4>
+                <CopyableAddress value={entry.contract_address} displayValue={shortenAddress(entry.contract_address, t("radar.missingData"))} copyLabel={t("verification.copyContract")} copiedLabel={t("app.copied")} className="contract-line" />
+              </div>
+              <StatusBadge tone="ready">{t("radar.mainRadar")}</StatusBadge>
+            </header>
+            <div className="product-metrics-grid established">
+              <Metric label={t("radar.marketCap")} value={formatProductUsd(entry.market_metrics.market_cap_usd, locale, t("radar.missingData"))} />
+              <Metric label={t("radar.liquidity")} value={formatProductUsd(entry.market_metrics.liquidity_usd, locale, t("radar.missingData"))} />
+              <Metric label={t("followUp.lastChecked")} value={entry.last_checked_at ? formatProductDateTime(entry.last_checked_at, locale) : t("app.noData")} />
+            </div>
+            {onOpenFollowUp && <footer className="product-candidate-footer"><ActionButton variant="primary" onClick={() => onOpenFollowUp(entry.entry_id)}>{t("radar.openDetails")}</ActionButton></footer>}
+          </article>
         ))}
       </div>
     </section>
@@ -770,6 +804,9 @@ export function resolveInitialBasket(
   followUpEntries: FollowUpPublicEntry[] = [],
   scannerUnavailable = false,
 ): BasketId {
+  if (followUpEntries.some((entry) => entry.lifecycle_status === "ESTABLISHED" || entry.established_membership)) {
+    return "established";
+  }
   if (scannerUnavailable && followUpEntries.length > 0) return "maturing";
   return candidates.some((candidate) => candidate.discoveryBasket === "established")
     ? "established"
