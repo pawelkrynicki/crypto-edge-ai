@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import React, { useState } from "react";
 import type { MockCandidate } from "../mockData";
 import { LabelBadge } from "./LabelBadge";
@@ -6,6 +7,7 @@ import { CandidateReviewControls, ReviewStatusBadge } from "./CandidateReviewCon
 import type { MarketContextPanelState } from "./MarketContextPanel";
 import type { CandidateReviewInput, CandidateReviewRecord } from "../types/reviewSessionTypes";
 import { formatReasonText, formatSecurityFlag } from "../utils/displayText";
+import { TokenDetailDrawer } from "./TokenDetailDrawer";
 
 interface Props {
   candidate: MockCandidate;
@@ -158,30 +160,21 @@ export const CandidateDetail: React.FC<Props> = ({
   const toggle = (key: string) => setChecked((prev) => ({ ...prev, [key]: !prev[key] }));
 
   return (
-    <div className="detail-panel">
-      <header className="detail-header">
-        <div className="detail-header-top">
-          <div className="detail-title">
-            <strong>{c.symbol}</strong>
-            <span>{c.name}</span>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <LabelBadge label={c.final_label} />
-            {onClose && (
-              <button onClick={onClose} className="detail-close" aria-label="Close candidate detail">
-                x
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="detail-header-summary">
+    <TokenDetailDrawer
+      title={c.symbol}
+      subtitle={c.name}
+      badge={<LabelBadge label={c.final_label} />}
+      onClose={onClose}
+      closeLabel="Close candidate detail"
+      summary={(
+        <>
           <span>Candidate source output is read-only.</span>
           <span>Local review status is an analyst note layer and does not change scanner label.</span>
           <span>Research-only. Human Manual Review Required.</span>
-        </div>
-
-        <div className="detail-header-meta">
+        </>
+      )}
+      meta={(
+        <>
           <MetaPill label="Chain" value={c.chain.toUpperCase()} />
           <MetaPill label="DEX" value={c.dex || "--"} />
           <MetaPill label="Review" value={<ReviewStatusBadge status={reviewRecord?.status ?? "not_reviewed"} short />} />
@@ -190,10 +183,9 @@ export const CandidateDetail: React.FC<Props> = ({
               DexScreener
             </a>
           )}
-        </div>
-      </header>
-
-      <div className="detail-body">
+        </>
+      )}
+    >
         <section className="detail-section">
           <SectionTitle
             meta={<ReviewStatusBadge status={reviewRecord?.status ?? "not_reviewed"} />}
@@ -368,7 +360,6 @@ export const CandidateDetail: React.FC<Props> = ({
             ))}
           </div>
         </section>
-      </div>
-    </div>
+    </TokenDetailDrawer>
   );
 };

@@ -20,6 +20,7 @@ import {
   type ManualVerificationVerdict,
 } from "../services/manualOwnerActionsDataSource";
 import { ActionButton, CopyButton, ExternalLinkAction } from "./ProductUi";
+import { TokenDetailDrawer } from "./TokenDetailDrawer";
 
 interface ExternalVerificationLinksViewProps {
   candidate?: UiTokenCandidate | null;
@@ -27,6 +28,7 @@ interface ExternalVerificationLinksViewProps {
   onOpenResearchBrief?: () => void;
   onVerificationSaved?: (record: ManualVerificationRecord) => void;
   onReturnToDetail?: () => void;
+  onClose?: () => void;
 }
 
 export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksViewProps> = ({
@@ -35,6 +37,7 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
   onOpenResearchBrief,
   onVerificationSaved,
   onReturnToDetail,
+  onClose,
 }) => {
   const { locale, t } = useProductLocale();
   const ui = VERIFICATION_UI_COPY[locale];
@@ -141,18 +144,27 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
   };
 
   return (
-    <div className="external-checks-view product-verification">
-      <section className="external-checks-hero">
-        <div className="external-checks-hero-copy">
-          <span className="external-checks-eyebrow">{t("verification.manualEyebrow")}</span>
-          <h3>{symbol || t("radar.missingData")} <small>{displayName}</small></h3>
-          <p>{t("verification.intro")}</p>
-        </div>
-        <div className="external-checks-boundary">
-          <strong>{t("detail.boundaryManual")}</strong>
+    <TokenDetailDrawer
+      title={symbol || t("radar.missingData")}
+      subtitle={displayName}
+      badge={<span className="detail-verification-badge">{t("verification.manualEyebrow")}</span>}
+      onClose={onClose}
+      closeLabel={locale === "pl" ? "Zamknij kartę tokena" : "Close token card"}
+      summary={(
+        <>
+          <span>{t("verification.intro")}</span>
+          <span>{t("detail.boundaryManual")}</span>
           <span>{t("verification.boundary")}</span>
-        </div>
-      </section>
+        </>
+      )}
+      meta={(
+        <>
+          <span className="research-context-chip"><span>{t("verification.network")}</span><strong>{chain || t("radar.missingData")}</strong></span>
+          <span className="research-context-chip"><span>{t("verification.contractAddress")}</span><code>{contractAddress || t("radar.missingData")}</code></span>
+        </>
+      )}
+    >
+      <div className="external-checks-view product-verification">
 
       <section className="verification-identity" aria-labelledby="verification-identity-heading">
         <header><span>01</span><div><h3 id="verification-identity-heading">{t("verification.identity")}</h3><p>{ui.identityHelp}</p></div></header>
@@ -261,12 +273,13 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
       <section className="verification-return" aria-labelledby="verification-return-heading">
         <div><span className="external-checks-eyebrow">09</span><h3 id="verification-return-heading">{ui.returnTitle}</h3><p>{ui.returnHelp}</p></div>
         <ActionButton variant="primary" icon="arrow" iconPosition="end" className="product-primary-button" onClick={() => {
-          if (savedRecord) onVerificationSaved?.(savedRecord);
-          else if (onReturnToDetail) onReturnToDetail();
+          if (onReturnToDetail) onReturnToDetail();
+          else if (savedRecord) onVerificationSaved?.(savedRecord);
           else if (typeof window !== "undefined") window.location.hash = "candidate-detail";
         }}>{ui.returnAction}</ActionButton>
       </section>
     </div>
+    </TokenDetailDrawer>
   );
 };
 

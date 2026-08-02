@@ -11,6 +11,7 @@ import { resolveDetailTab, resolveRouteTokenIdentity } from "../src/candidateDet
 import { CandidateDetailView } from "../src/components/CandidateDetailView.js";
 import { AIResearchSection } from "../src/components/AIResearchSection.js";
 import { ExternalVerificationLinksView } from "../src/components/ExternalVerificationLinksView.js";
+import { VerificationTokenBrowser } from "../src/components/VerificationTokenBrowser.js";
 import { CandidateResultsView, MaturingFollowUpBasket } from "../src/components/CandidateResultsView.js";
 import { ProductWorkspaceShell } from "../src/components/ProductWorkspaceShell.js";
 import { PERSISTABLE_SCANNER_SAMPLE } from "../src/fixtures/persistableScannerSample.js";
@@ -112,6 +113,34 @@ describe("P1.1 Radar operational usability", () => {
     assert.match(verificationMarkup, /Lista ręcznej weryfikacji/);
     assert.match(verificationMarkup, /Dostępne/);
     assert.match(verificationMarkup, /Brakujące/);
+  });
+
+  it("keeps the Verification list visible and reuses the Details token drawer for a selected token", async () => {
+    const candidate = mapPersistableScannerOutputToUiCandidates(PERSISTABLE_SCANNER_SAMPLE)[0]!;
+    const markup = renderToStaticMarkup(
+      <ProductLocaleProvider initialLocale="pl">
+        <VerificationTokenBrowser
+          candidates={[candidate]}
+          followUpEntries={[]}
+          selectedCandidate={candidate}
+          onSelectToken={() => undefined}
+          onCloseToken={() => undefined}
+        />
+      </ProductLocaleProvider>,
+    );
+    const sourceRoot = resolve(process.cwd(), "src", "components");
+    const [detailsSource, verificationSource] = await Promise.all([
+      readFile(resolve(sourceRoot, "CandidateDetail.tsx"), "utf8"),
+      readFile(resolve(sourceRoot, "ExternalVerificationLinksView.tsx"), "utf8"),
+    ]);
+
+    assert.match(markup, /Tokeny z bieżącego Radaru/);
+    assert.match(markup, new RegExp(escapeRegExp(candidate.contractAddress)));
+    assert.match(markup, /data-token-detail-drawer="true"/);
+    assert.match(markup, /aria-label="Zamknij kartę tokena"/);
+    assert.match(detailsSource, /import \{ TokenDetailDrawer \} from "\.\/TokenDetailDrawer"/);
+    assert.match(verificationSource, /import \{ TokenDetailDrawer \} from "\.\/TokenDetailDrawer"/);
+    assert.doesNotMatch(markup, /queue|kolejka/i);
   });
 
   it("shows real New data, the scanner timestamp, context source statuses, and unambiguous counters", () => {

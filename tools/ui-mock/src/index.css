@@ -8796,6 +8796,76 @@ summary {
   .ai-radar-status .action-button { width: 100%; min-height: 44px; margin-left: 0; }
 }
 
+/* Verification keeps the Details card pattern and leaves the token list visible. */
+.verification-token-browser {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.42fr) minmax(0, 1fr);
+  align-items: start;
+  gap: 14px;
+}
+
+.verification-token-list,
+.verification-token-drawer-placeholder {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+}
+
+.verification-token-list { padding: 14px; }
+.verification-token-list > header > span,
+.detail-verification-badge {
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.verification-token-list h3,
+.verification-token-drawer-placeholder h3 { margin: 5px 0; color: var(--text-primary); font-size: 16px; }
+.verification-token-list p,
+.verification-token-drawer-placeholder p { margin: 0; color: var(--text-secondary); font-size: 12px; line-height: 1.5; }
+.verification-token-list-items { display: grid; gap: 7px; margin-top: 14px; }
+
+.verification-token-list-item {
+  display: grid;
+  width: 100%;
+  gap: 2px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  background: var(--bg-raised);
+  text-align: left;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+
+.verification-token-list-item:hover,
+.verification-token-list-item.selected { border-color: var(--accent-border); background: var(--accent-dim); }
+.verification-token-list-symbol { font-size: 13px; font-weight: 800; }
+.verification-token-list-name { overflow: hidden; color: var(--text-secondary); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.verification-token-list-meta { overflow-wrap: anywhere; color: var(--text-muted); font-family: var(--font-mono, monospace); font-size: 10px; }
+.verification-token-list-empty { margin-top: 14px !important; }
+
+.verification-token-drawer-region { min-width: 0; }
+.verification-token-drawer-region .token-detail-drawer { animation: verification-drawer-enter 180ms ease-out; }
+.verification-token-drawer-placeholder { min-height: 260px; padding: 24px; }
+
+.token-detail-drawer .detail-title strong,
+.token-detail-drawer .detail-title span,
+.token-detail-drawer .research-context-chip code { overflow-wrap: anywhere; word-break: break-word; }
+.detail-verification-badge { border: 1px solid var(--accent-border); border-radius: 999px; padding: 4px 7px; background: var(--accent-dim); }
+
+@keyframes verification-drawer-enter {
+  from { opacity: 0; transform: translateX(10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@media (max-width: 960px) {
+  .verification-token-browser { grid-template-columns: 1fr; }
+  .verification-token-drawer-region .token-detail-drawer { max-height: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ai-research-canvas,
   .ai-research-canvas *,
@@ -8805,4 +8875,6 @@ summary {
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
   }
+
+  .verification-token-drawer-region .token-detail-drawer { animation: none; }
 }

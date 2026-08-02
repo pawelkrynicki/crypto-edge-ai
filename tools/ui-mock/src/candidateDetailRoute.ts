@@ -28,6 +28,16 @@ export function writeVerificationRoute(identity: RouteTokenIdentity) {
   writeTokenRoute(identity, "external-checks", null);
 }
 
+export function writeVerificationListRoute() {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  url.searchParams.delete("chain");
+  url.searchParams.delete("contract");
+  url.searchParams.delete("detail");
+  url.hash = "external-checks";
+  window.history.pushState(null, "", url);
+}
+
 function writeTokenRoute(
   identity: RouteTokenIdentity,
   section: "candidate-detail" | "external-checks",

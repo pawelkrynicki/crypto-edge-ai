@@ -32,11 +32,35 @@ export function ManualVerificationStatusCard({
   contractAddress: string;
   initialRecord?: ManualVerificationRecord | null;
 }) {
+  const identityKey = `${chain.toLowerCase()}:${contractAddress.toLowerCase()}:${initialRecord?.checked_at ?? ""}`;
+  return (
+    <ManualVerificationStatusCardForIdentity
+      key={identityKey}
+      chain={chain}
+      contractAddress={contractAddress}
+      initialRecord={initialRecord}
+    />
+  );
+}
+
+function ManualVerificationStatusCardForIdentity({
+  chain,
+  contractAddress,
+  initialRecord = null,
+}: {
+  chain: string;
+  contractAddress: string;
+  initialRecord?: ManualVerificationRecord | null;
+}) {
   const { locale } = useProductLocale();
-  const [record, setRecord] = useState<ManualVerificationRecord | null>(initialRecord);
+  const [record, setRecord] = useState<ManualVerificationRecord | null>(() => (
+    matchesIdentity(initialRecord, chain, contractAddress) ? initialRecord : null
+  ));
 
   useEffect(() => {
-    if (initialRecord) return;
+    if (matchesIdentity(initialRecord, chain, contractAddress)) {
+      return;
+    }
     let cancelled = false;
     void loadManualVerification(chain, contractAddress).then((value) => {
       if (!cancelled) setRecord(value);
@@ -61,5 +85,17 @@ export function ManualVerificationStatusCard({
         </>
       )}
     </section>
+  );
+}
+
+function matchesIdentity(
+  record: ManualVerificationRecord | null | undefined,
+  chain: string,
+  contractAddress: string,
+): record is ManualVerificationRecord {
+  return Boolean(
+    record
+    && record.chain.toLowerCase() === chain.toLowerCase()
+    && record.contract_address.toLowerCase() === contractAddress.toLowerCase(),
   );
 }

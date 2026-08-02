@@ -7,12 +7,13 @@ import {
   resolveDetailTab,
   resolveRouteTokenIdentity,
   writeCandidateDetailRoute,
+  writeVerificationListRoute,
   writeVerificationRoute,
   type RouteTokenIdentity,
 } from "./candidateDetailRoute";
 import { CandidateDetailView } from "./components/CandidateDetailView";
 import { CandidateResultsView } from "./components/CandidateResultsView";
-import { ExternalVerificationLinksView } from "./components/ExternalVerificationLinksView";
+import { VerificationTokenBrowser } from "./components/VerificationTokenBrowser";
 import { Feedback } from "./components/Feedback";
 import { Methodology } from "./components/Methodology";
 import { ProductControlCenter } from "./components/ProductControlCenter";
@@ -213,14 +214,14 @@ export function ProductAppContent({
     ? candidates.find((candidate) => isSameTokenIdentity(
       { chain: candidate.chain, contract_address: candidate.contractAddress },
       routeTokenIdentity,
-    )) ?? selectedCandidate
-    : selectedCandidate;
+    )) ?? null
+    : null;
   const verificationFollowUp = routeTokenIdentity
     ? findFollowUpByIdentity(followUpEntries, {
       chain: routeTokenIdentity.chain,
       contractAddress: routeTokenIdentity.contract_address,
     })
-    : selectedFollowUp;
+    : null;
   const sourceHealth = useMemo(
     () => resolveProductSourceHealth({ metadata, readiness, sourceIds }),
     [metadata, readiness, sourceIds],
@@ -416,8 +417,12 @@ export function ProductAppContent({
     const identity = isFollowUp
       ? { chain: token.chain, contract_address: token.contract_address }
       : { chain: token.chain, contract_address: token.contractAddress };
-    if (isFollowUp) setSelectedFollowUpEntryId(token.entry_id);
-    else setSelectedCandidateId(token.id);
+    if (isFollowUp) {
+      setSelectedFollowUpEntryId(token.entry_id);
+    } else {
+      setSelectedFollowUpEntryId(null);
+      setSelectedCandidateId(token.id);
+    }
     setManualVerificationRecord(null);
     routeTokenIdentityRef.current = identity;
     setRouteTokenIdentity(identity);
@@ -425,15 +430,31 @@ export function ProductAppContent({
     setActiveSection("external-checks");
   }, []);
 
-  const returnFromVerification = useCallback((record: ManualVerificationRecord) => {
-    const identity = { chain: record.chain, contract_address: record.contract_address };
+  const saveVerificationInPlace = useCallback((record: ManualVerificationRecord) => {
     setManualVerificationRecord(record);
+  }, []);
+
+  const closeVerification = useCallback(() => {
+    routeTokenIdentityRef.current = null;
+    setRouteTokenIdentity(null);
+    writeVerificationListRoute();
+    setActiveSection("external-checks");
+  }, []);
+
+  const openDetailFromVerification = useCallback(() => {
+    const identity = routeTokenIdentity
+      ?? (verificationCandidate
+        ? { chain: verificationCandidate.chain, contract_address: verificationCandidate.contractAddress }
+        : verificationFollowUp
+          ? { chain: verificationFollowUp.chain, contract_address: verificationFollowUp.contract_address }
+          : null);
+    if (!identity) return;
     routeTokenIdentityRef.current = identity;
     setRouteTokenIdentity(identity);
     setActiveDetailTab("security");
     writeCandidateDetailRoute(identity, "security");
     setActiveSection("candidate-detail");
-  }, []);
+  }, [routeTokenIdentity, verificationCandidate, verificationFollowUp]);
 
   const renderSection = () => {
     const copy = sectionCopy[activeSection];
@@ -521,12 +542,16 @@ export function ProductAppContent({
     if (activeSection === "external-checks") {
       return (
         <ProductWorkspaceSection {...copy}>
-          <ExternalVerificationLinksView
-            candidate={verificationCandidate}
-            followUp={verificationFollowUp}
+          <VerificationTokenBrowser
+            candidates={candidates}
+            followUpEntries={followUpEntries}
+            selectedCandidate={verificationCandidate}
+            selectedFollowUp={verificationFollowUp}
+            onSelectToken={openVerification}
+            onCloseToken={closeVerification}
             onOpenResearchBrief={() => changeDetailTab("ai")}
-            onVerificationSaved={returnFromVerification}
-            onReturnToDetail={() => changeDetailTab("security")}
+            onVerificationSaved={saveVerificationInPlace}
+            onReturnToDetail={openDetailFromVerification}
           />
         </ProductWorkspaceSection>
       );
