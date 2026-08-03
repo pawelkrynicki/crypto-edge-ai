@@ -52,6 +52,16 @@ describe("P1.1 Radar operational usability", () => {
     assert.equal(resolved.contextRunId, contextRunId);
   });
 
+  it("preserves the validated scanner query required by the frontend contract", async () => {
+    const repoRoot = resolve(process.cwd(), "..", "..");
+    const [serverBoundary, clientBoundary] = await Promise.all([
+      readFile(resolve(repoRoot, "tools", "ui-mock", "server", "latestScannerOutput.ts"), "utf8"),
+      readFile(resolve(repoRoot, "tools", "ui-mock", "src", "services", "scannerDataSource.ts"), "utf8"),
+    ]);
+    assert.match(serverBoundary, /query: value\.query/);
+    assert.match(clientBoundary, /isSafeString\(value\.query\)/);
+  });
+
   it("ships one provider-free INTERNAL_BETA visual-review command with local owner actions", async () => {
     const repoRoot = resolve(process.cwd(), "..", "..");
     const command = await readFile(resolve(repoRoot, "scripts", "win", "start-radar-visual-review.cmd"), "utf8");

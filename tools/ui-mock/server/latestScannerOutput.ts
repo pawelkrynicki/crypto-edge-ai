@@ -707,6 +707,7 @@ function sanitizeScanRun(value: Record<string, unknown>): Record<string, unknown
     run_id: value.run_id,
     source: value.source,
     mode: "live",
+    query: value.query,
     started_at: value.started_at,
     finished_at: value.finished_at,
     ...Object.fromEntries(numericFields.map((field) => [field, value[field]])),
