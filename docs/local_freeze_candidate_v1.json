@@ -1,0 +1,79 @@
+{
+  "schema_version": "local_freeze_candidate_v1",
+  "freeze_id": "local_freeze_candidate_v1_20260803T125513Z_f0da8df",
+  "commit_sha": "f0da8df31bbc953eec8827e394ada56b721f020e",
+  "created_at": "2026-08-03T12:55:13.946Z",
+  "full_regression": {
+    "status": "PASS",
+    "test_count": 681,
+    "passed": 681,
+    "failed": 0,
+    "data_poc_tests": 251,
+    "ui_runtime_tests": 430,
+    "stab1_drill_run_id": "failure-drill-20260803T124031Z-3d7c4d98",
+    "stab2_drill_run_id": "recovery-drill-20260803T124034Z-20c39a7c",
+    "hour_soak_repeated": false
+  },
+  "typecheck": {
+    "ui": "PASS",
+    "data_poc": "PASS"
+  },
+  "scoped_eslint": "PASS",
+  "build_boundary": {
+    "status": "PASS",
+    "mode": "INTERNAL_BETA",
+    "modules": 64,
+    "demo_or_sample_surfaces": 0
+  },
+  "read_only_smoke": {
+    "status": "PASS",
+    "health": "PASS",
+    "real_timestamp": "PASS",
+    "new_and_follow_up": "PASS",
+    "candidate_detail": "PASS",
+    "candidate_detail_tabs": 7,
+    "verification_drawer": "PASS",
+    "verification_tabs": 6,
+    "polish_decision_labels": "PASS",
+    "owner_controls_boundary": "PASS",
+    "tester_read_only": "PASS",
+    "page_load_and_refresh_live_calls": 0
+  },
+  "backup": {
+    "backup_id": "backup_20260803T125337Z_6d8002d8",
+    "status": "BACKUP_READY",
+    "manifest_files": 13,
+    "payload_files": 13,
+    "hashes_and_sizes": "PASS",
+    "pointer_validation": "PASS",
+    "secret_scan": "PASS",
+    "sqlite_integrity": {
+      "feedback_sqlite": "ok",
+      "ai_queue_cache_sqlite": "ok"
+    },
+    "restore_attempted": false
+  },
+  "scanner_run_id": "scan_20260803125231_24858225",
+  "context_run_id": "approved_sources_20260803125231_17b6d3d9",
+  "active_timestamp": "2026-08-03T12:52:34.205Z",
+  "openai_calls": 0,
+  "provider_calls": 0,
+  "central_cycles": 0,
+  "task_scheduler_mutations": 0,
+  "canonical_restore_or_rollback": 0,
+  "vps_mutations": 0,
+  "cloudflare_mutations": 0,
+  "aikintel_mutations": 0,
+  "p0_p1": {
+    "p0_found": 0,
+    "p1_found": 2,
+    "p1_resolved": 2,
+    "open": 0
+  },
+  "deferred_p2_p3": [
+    "48 pre-existing findings from broad out-of-scope UI linting",
+    "Vite JavaScript chunk-size warning"
+  ],
+  "external_scheduler_observation": "An existing host schedule published a newer snapshot independently; the gate invoked zero central live cycles and made zero Task Scheduler mutations.",
+  "final_status": "READY_FOR_FINAL_INTEGRATION"
+}
