@@ -6427,7 +6427,7 @@ button:disabled,
 .token-detail-tabs [role="tab"]:hover { color: var(--text-primary); background: var(--accent-dim); }
 .token-detail-tabs [role="tab"][aria-selected="true"] {
   z-index: 1;
-  margin-bottom: -1px;
+  margin-bottom: 0;
   color: var(--accent);
   border-color: var(--accent-border);
   border-bottom: 1px solid var(--bg-panel);
@@ -8986,6 +8986,64 @@ summary {
 .token-detail-drawer .research-context-chip code { overflow-wrap: anywhere; word-break: break-word; }
 .detail-verification-badge { border: 1px solid var(--accent-border); border-radius: 999px; padding: 4px 7px; background: var(--accent-dim); }
 
+/* Verification keeps the token heading, metadata and tabs in natural stacked flow. */
+.verification-token-drawer > .detail-header,
+.verification-token-drawer > .detail-header-information,
+.verification-token-drawer > .detail-tab-bar {
+  position: relative;
+  top: auto;
+  z-index: auto;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.token-detail-drawer > .detail-header--with-information {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.token-detail-drawer > .detail-header-information {
+  display: grid;
+  flex: 0 0 auto;
+  min-width: 0;
+  width: 100%;
+  gap: 10px;
+  padding: 10px 16px 12px;
+  background: var(--bg-raised);
+  border-bottom: 1px solid var(--border);
+}
+
+.verification-token-drawer > .detail-header-information .detail-header-summary,
+.verification-token-drawer > .detail-header-information .detail-header-meta {
+  width: 100%;
+  min-width: 0;
+  margin-top: 0;
+}
+
+.verification-token-drawer > .detail-header-information .detail-header-meta {
+  align-items: flex-start;
+  overflow: visible;
+}
+
+.verification-token-drawer > .detail-header-information .research-context-chip {
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.verification-token-drawer > .detail-header-information .research-context-chip code {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.verification-token-drawer > .detail-tab-bar {
+  width: 100%;
+  padding-top: 14px;
+  background: var(--bg-raised);
+}
+
+.verification-token-drawer > .detail-tab-bar > .token-detail-tabs { position: static; }
+
 @keyframes verification-drawer-enter {
   from { opacity: 0; transform: translateX(10px); }
   to { opacity: 1; transform: translateX(0); }
@@ -8999,6 +9057,9 @@ summary {
 @media (max-width: 720px) {
   .verification-token-browser { grid-template-columns: 1fr; }
   .verification-token-drawer-region .token-detail-drawer { max-height: none; }
+  .verification-token-drawer > .detail-header-information { padding-inline: 10px; }
+  .verification-token-drawer > .detail-header-information .detail-header-meta { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .verification-token-drawer > .detail-header-information .research-context-chip { width: 100%; }
   .verification-identity-panel > .verification-identity-grid,
   .verification-tab-content .external-checks-review-grid,
   .verification-tab-content .product-detail-grid.data,

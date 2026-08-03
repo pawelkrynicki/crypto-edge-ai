@@ -34,9 +34,11 @@ export function TokenDetailDrawer({
   children,
   className = "",
 }: TokenDetailDrawerProps) {
+  const hasInformation = Boolean(summary || meta);
+
   return (
     <div className={`detail-panel token-detail-drawer ${className}`.trim()} data-token-detail-drawer="true">
-      <header className="detail-header">
+      <header className={`detail-header ${hasInformation ? "detail-header--with-information" : ""}`.trim()} data-token-drawer-section="token-header">
         <div className="detail-header-top">
           <div className="detail-title">
             <strong>{title}</strong>
@@ -51,10 +53,9 @@ export function TokenDetailDrawer({
             )}
           </div>
         </div>
-        {summary && <div className="detail-header-summary">{summary}</div>}
-        {meta && <div className="detail-header-meta">{meta}</div>}
       </header>
-      {tabBar}
+      {hasInformation && <div className="detail-header-information" data-token-drawer-section="metadata">{summary && <div className="detail-header-summary">{summary}</div>}{meta && <div className="detail-header-meta">{meta}</div>}</div>}
+      {tabBar && <div className="detail-tab-bar" data-token-drawer-section="tabs">{tabBar}</div>}
       <div className={`detail-body token-detail-drawer-body ${bodyClassName}`.trim()}>{children}</div>
     </div>
   );

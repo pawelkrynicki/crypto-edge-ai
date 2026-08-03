@@ -43,6 +43,32 @@ describe("Verification drawer tabs", () => {
     assert.match(JSON.stringify(renderer.toJSON()), new RegExp(candidate.contractAddress));
   });
 
+  it("stacks token heading, metadata and tabs without letting long metadata overlap the drawer tabs", async () => {
+    const longCandidate = {
+      ...candidate,
+      name: "Token with a deliberately long verification display name for header regression coverage",
+      contractAddress: `0x${"abcdef0123456789".repeat(10)}`,
+    };
+    const renderer = await render(<VerificationBrowserHarness selected token={longCandidate} />);
+    const drawer = renderer.root.findByProps({ "data-token-detail-drawer": "true" });
+    const sections = drawer.children.filter((node) => typeof node !== "string" && node.props["data-token-drawer-section"]);
+
+    assert.deepEqual(sections.map((node) => node.props["data-token-drawer-section"]), ["token-header", "metadata", "tabs"]);
+    assert.match(JSON.stringify(renderer.toJSON()), new RegExp(longCandidate.contractAddress));
+    for (const tab of ["identity", "market", "filters", "security", "data", "decision"]) {
+      await act(async () => { renderer.root.findByProps({ id: `verification-tab-${tab}` }).props.onClick(); });
+    }
+
+    const css = await readFile(resolve(process.cwd(), "src", "index.css"), "utf8");
+    assert.match(css, /\.verification-token-drawer > \.detail-tab-bar[\s\S]*padding-top: 14px/);
+    assert.match(css, /\.verification-token-drawer > \.detail-header-information[\s\S]*width: 100%/);
+    assert.match(css, /\.verification-token-drawer > \.detail-header-information \.research-context-chip code[\s\S]*overflow-wrap: anywhere/);
+    assert.match(css, /@media \(max-width: 720px\)[\s\S]*\.verification-token-drawer > \.detail-header-information \.detail-header-meta \{ display: grid; grid-template-columns: minmax\(0, 1fr\); \}/);
+    assert.match(css, /\.verification-token-browser[\s\S]*max-width:\s*100%[\s\S]*min-width:\s*0/);
+    const verificationHeaderCss = css.slice(css.indexOf("/* Verification keeps"), css.indexOf("@keyframes verification-drawer-enter"));
+    assert.doesNotMatch(verificationHeaderCss, /position:\s*absolute|margin-[^:]+:\s*-\d/);
+  });
+
   it("saves the Verification decision into Candidate Detail without provider or OpenAI calls", async () => {
     const originalFetch = globalThis.fetch;
     const externalCalls: string[] = [];
@@ -124,9 +150,9 @@ describe("Verification drawer tabs", () => {
   });
 });
 
-function VerificationBrowserHarness({ selected = false }: { selected?: boolean }) {
-  const [selection, setSelection] = useState(selected ? candidate : null);
-  return <ProductLocaleProvider initialLocale="pl"><VerificationTokenBrowser candidates={[candidate]} followUpEntries={[]} selectedCandidate={selection} onSelectToken={(token) => setSelection(token as typeof candidate)} onCloseToken={() => setSelection(null)} /></ProductLocaleProvider>;
+function VerificationBrowserHarness({ selected = false, token = candidate }: { selected?: boolean; token?: typeof candidate }) {
+  const [selection, setSelection] = useState(selected ? token : null);
+  return <ProductLocaleProvider initialLocale="pl"><VerificationTokenBrowser candidates={[token]} followUpEntries={[]} selectedCandidate={selection} onSelectToken={(selectedToken) => setSelection(selectedToken as typeof candidate)} onCloseToken={() => setSelection(null)} /></ProductLocaleProvider>;
 }
 
 function DecisionToDetailHarness() {
