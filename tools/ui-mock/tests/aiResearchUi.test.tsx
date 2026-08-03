@@ -158,7 +158,7 @@ describe("AI.1 Visual Candidate Research Canvas", () => {
     const radar = render("pl", <AIResearchRadarStatus chain="base" contractAddress={ADDRESS} onOpen={() => undefined} />);
     assert.match(radar, /ai-radar-status/);
     assert.match(radar, /Przejdź do szczegółów analizy/);
-    const verification = render("pl", <ExternalVerificationLinksView candidate={candidate} onOpenResearchBrief={() => undefined} />);
+    const verification = render("pl", <ExternalVerificationLinksView candidate={candidate} initialActiveTab="data" onOpenResearchBrief={() => undefined} />);
     assert.match(verification, /Analiza AI uzupełnia, ale nie zastępuje ręcznej weryfikacji/);
     assert.match(verification, /data-action-variant="secondary"[^>]*>[\s\S]*Otwórz analizę AI/);
   });

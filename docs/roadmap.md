@@ -1,6 +1,23 @@
 # Roadmap
 
-## Current stage: STAB.2 — Backup, Restore and Rollback
+## Current stage: Final Local Regression and Freeze Candidate
+
+Status bramki: **READY_FOR_FINAL_INTEGRATION**. Jednorazowa pełna regresja po P1.1, automatyczny read-only smoke na opublikowanych danych INTERNAL_BETA oraz końcowy backup STAB.2 są zakończone. Freeze candidate nie uruchamiał OpenAI, providerów, centralnego live cycle ani mutacji Task Scheduler; nie wykonano restore, deploymentu VPS ani zmian Cloudflare lub AIKINTEL.
+
+Stan etapów:
+
+- STAB.1 — zakończone;
+- STAB.2 — zakończone;
+- RC.1 — zakończone;
+- P1.1 Radar Operational Usability — zakończone przez merge PR #89;
+- trusted tester — zaakceptowany; etap nie jest powtarzany;
+- bieżąca bramka — final local regression and freeze;
+- następnie — końcowa integracja AIKINTEL i finalny VPS;
+- deadline — 15.08.2026.
+
+Kanoniczny raport bramki: `docs/final_local_regression_freeze.md`. Wersjonowany manifest: `docs/local_freeze_candidate_v1.json`.
+
+## Completed: STAB.2 — Backup, Restore and Rollback
 
 STAB.2 dodaje owner-only `product_backup_bundle_v1`, domyślny restore preview, jawny restore `--apply`, pre-restore safety backup, wersjonowany journal `product_recovery_operation_v1` i automatyczny rollback. Backup obejmuje Follow-up, Established z historią/audytem, oba SQLite, automation pointers i wskazywane snapshoty, Reports oraz bezpieczną konfigurację. Secret scan, dokładny file-set, SHA-256, SQLite `VACUUM INTO` + `integrity_check` i wspólny owner lock działają fail-closed. Kontrakt: `docs/backup_restore_rollback.md`.
 
@@ -16,7 +33,7 @@ Status etapów:
 - bezpieczny Refresh View — naprawiony i objęty last-known-good;
 - AI.3 i centralny cykl danych — zakończone i objęte failure drills;
 - STAB.1 — zakończone;
-- bieżący etap — STAB.2 backup/restore/rollback;
+- bieżący etap — final local regression and freeze;
 - AFF.1 — nadal odłożone na końcówkę po release-candidate gates.
 
 STAB.1 wykonuje 0 live OpenAI calls, 0 live data-provider calls, 0 centralnych live cycles, 0 zmian Task Scheduler i 0 mutacji kanonicznych.
