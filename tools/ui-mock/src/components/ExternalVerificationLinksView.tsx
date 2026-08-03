@@ -16,6 +16,7 @@ import {
 import { resolveProductFilterConditions, type BasicFilterCategory, type BasicFilterConditionState } from "../productFilterResolver";
 import { formatProductSourceLabel } from "../productPresentation";
 import { resolveProductSecurityState, type ProductSecurityState } from "../productSecurityResolver";
+import { manualVerificationVerdictLabel } from "../manualVerificationVerdictLabel";
 import type { UiTokenCandidate } from "../types/scannerTypes";
 import type { FollowUpPublicEntry } from "../types/followUpTypes";
 import {
@@ -69,6 +70,7 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
   const [preparing, setPreparing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
+  const [saveSucceeded, setSaveSucceeded] = useState(false);
   const [savedRecord, setSavedRecord] = useState<ManualVerificationRecord | null>(null);
 
   useEffect(() => {
@@ -127,6 +129,7 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
     if (note.trim().length < 3) return;
     setPreparing(true);
     setSaveError(false);
+    setSaveSucceeded(false);
     setConfirmed(false);
     try {
       setPreview(await createManualVerificationPreview({ chain, contractAddress, verdict, note: note.trim() }));
@@ -148,6 +151,7 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
       setOwnerStatus((current) => current ? { ...current, current_record: result.record } : current);
       setPreview(null);
       setConfirmed(false);
+      setSaveSucceeded(true);
       onVerificationSaved?.(result.record);
     } catch {
       setSaveError(true);
@@ -255,9 +259,9 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
         locale={locale}
         lastDecision={lastDecision}
         verdict={verdict}
-        onVerdictChange={(value) => { setVerdict(value); setPreview(null); }}
+        onVerdictChange={(value) => { setVerdict(value); setPreview(null); setSaveSucceeded(false); }}
         note={note}
-        onNoteChange={(value) => { setNote(value); setPreview(null); }}
+        onNoteChange={(value) => { setNote(value); setPreview(null); setSaveSucceeded(false); }}
         availableData={availableData}
         missingData={missingData}
         ownerStatus={ownerStatus}
@@ -270,6 +274,7 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
         canSave={canSave}
         saving={saving}
         saveError={saveError}
+        saveSucceeded={saveSucceeded}
         expectedIdentity={expectedIdentity}
         onPrepare={prepareSave}
         onSave={save}
@@ -317,6 +322,7 @@ function VerificationDecision({
   canSave,
   saving,
   saveError,
+  saveSucceeded,
   expectedIdentity,
   onPrepare,
   onSave,
@@ -342,6 +348,7 @@ function VerificationDecision({
   canSave: boolean;
   saving: boolean;
   saveError: boolean;
+  saveSucceeded: boolean;
   expectedIdentity: string;
   onPrepare: () => Promise<void>;
   onSave: () => Promise<void>;
@@ -354,14 +361,14 @@ function VerificationDecision({
     <VerificationSection heading={pl ? "Decyzja weryfikacyjna" : "Verification decision"} detail={pl ? "Zapis decyzji aktualizuje od razu Candidate Detail, bez opuszczania listy." : "Saving a decision updates Candidate Detail immediately without leaving the list."}>
       <section className="verification-decision-current" aria-label={pl ? "Aktualny status weryfikacji" : "Current verification status"}>
         <span>{pl ? "Aktualny status weryfikacji" : "Current verification status"}</span>
-        <strong data-verification-verdict={lastDecision?.verdict}>{lastDecision?.verdict ?? (pl ? "Brak zapisanej decyzji" : "No saved decision")}</strong>
+        <strong data-verification-verdict={lastDecision?.verdict}>{lastDecision ? manualVerificationVerdictLabel(lastDecision.verdict, locale) : (pl ? "Brak zapisanej decyzji" : "No saved decision")}</strong>
         {lastDecision && <p>{pl ? `Ostatnia decyzja: ${formatProductDateTime(lastDecision.checked_at, locale)}` : `Last decision: ${formatProductDateTime(lastDecision.checked_at, locale)}`}</p>}
       </section>
 
       <div className="verification-decision-options" role="radiogroup" aria-label={pl ? "Wybierz decyzję weryfikacyjną" : "Choose verification decision"}>
         {(["VERIFIED", "NEEDS_MORE_DATA", "CRITICAL_RISK", "REJECT"] as const).map((option) => (
           <button key={option} type="button" role="radio" aria-checked={verdict === option} className={verdict === option ? "selected" : ""} onClick={() => onVerdictChange(option)}>
-            {option}
+            {manualVerificationVerdictLabel(option, locale)}
           </button>
         ))}
       </div>
@@ -373,6 +380,8 @@ function VerificationDecision({
       <section className="verification-decision-coverage"><div className="condition-list ready"><strong>{pl ? "Dostępne" : "Available"}</strong><ul>{availableData.map((item) => <li key={item}>{formatCoverageItem(item, locale)}</li>)}</ul></div><div className="condition-list warning"><strong>{pl ? "Brakujące" : "Missing"}</strong>{missingData.length > 0 ? <ul>{missingData.map((item) => <li key={item}>{formatCoverageItem(item, locale)}</li>)}</ul> : <p>{pl ? "Brak" : "None"}</p>}</div></section>
 
       {ownerStatus && <section className="owner-verification-decision" aria-labelledby="verification-decision-heading"><header><h3 id="verification-decision-heading">{pl ? "Potwierdzenie zapisu" : "Save confirmation"}</h3></header><ActionButton variant="primary" onClick={() => void onPrepare()} loading={preparing} disabled={note.trim().length < 3}>{pl ? "Zapisz decyzję" : "Save decision"}</ActionButton>{preview && <div className="owner-decision-confirmation"><p>{pl ? `Potwierdź dokładną tożsamość: ${expectedIdentity}` : `Confirm the exact identity: ${expectedIdentity}`}</p><input aria-label={pl ? "Potwierdzenie tożsamości" : "Identity confirmation"} value={identityConfirmation} onChange={(event) => onIdentityConfirmationChange(event.target.value)} autoComplete="off" /><label className="owner-confirmation"><input type="checkbox" checked={confirmed} onChange={(event) => onConfirmedChange(event.target.checked)} /><span>{pl ? "Potwierdzam werdykt i zapis w audycie." : "I confirm the verdict and audit record."}</span></label><ActionButton variant="primary" onClick={() => void onSave()} loading={saving} disabled={!canSave}>{pl ? "Zapisz status weryfikacji" : "Save verification status"}</ActionButton></div>}{saveError && <p role="alert">{pl ? "Nie zapisano decyzji. Przygotuj nowy zapis i spróbuj ponownie." : "The decision was not saved. Prepare a new save and try again."}</p>}</section>}
+
+      {saveSucceeded && lastDecision && <p className="verification-decision-saved" role="status" data-verification-verdict={lastDecision.verdict}>{pl ? `Zapisano decyzję: ${manualVerificationVerdictLabel(lastDecision.verdict, locale)}` : `Saved decision: ${manualVerificationVerdictLabel(lastDecision.verdict, locale)}`}</p>}
 
       <section className="verification-return" aria-labelledby="verification-return-heading"><div><h3 id="verification-return-heading">{pl ? "Powrót do Candidate Detail" : "Return to Candidate Detail"}</h3><p>{pl ? "Lista Weryfikacji pozostaje zachowana po powrocie." : "The Verification list remains intact when returning."}</p></div><ActionButton variant="primary" icon="arrow" iconPosition="end" className="product-primary-button" onClick={() => { if (onReturnToDetail) onReturnToDetail(); else if (savedRecord) onVerificationSaved?.(savedRecord); else if (typeof window !== "undefined") window.location.hash = "candidate-detail"; }}>{pl ? "Wróć do szczegółów" : "Return to detail"}</ActionButton></section>
     </VerificationSection>

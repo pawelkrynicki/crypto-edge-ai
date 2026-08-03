@@ -43,6 +43,31 @@ describe("Verification drawer tabs", () => {
     assert.match(JSON.stringify(renderer.toJSON()), new RegExp(candidate.contractAddress));
   });
 
+  it("presents manual-verification verdicts in Polish and English without exposing backend enums", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      if (String(input).startsWith("/api/owner-operations/manual-verification/status")) return response(ownerStatus(savedRecord()));
+      return new Response("{}", { status: 404, headers: { "content-type": "application/json" } });
+    }) as typeof fetch;
+
+    try {
+      const polish = await render(<VerificationDecisionLocaleHarness locale="pl" />);
+      await act(async () => { await flushPromises(); });
+      const polishText = visibleText(polish.toJSON());
+      for (const label of ["Zweryfikowany", "Potrzebne dodatkowe dane", "Krytyczne ryzyko", "Odrzuć"]) assert.match(polishText, new RegExp(label));
+      assert.doesNotMatch(polishText, /\b(?:VERIFIED|NEEDS_MORE_DATA|CRITICAL_RISK|REJECT)\b/);
+      await act(async () => { polish.unmount(); });
+
+      const english = await render(<VerificationDecisionLocaleHarness locale="en" />);
+      await act(async () => { await flushPromises(); });
+      const englishText = visibleText(english.toJSON());
+      for (const label of ["Verified", "Needs more data", "Critical risk", "Reject"]) assert.match(englishText, new RegExp(label));
+      assert.doesNotMatch(englishText, /\b(?:VERIFIED|NEEDS_MORE_DATA|CRITICAL_RISK|REJECT)\b/);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   it("stacks token heading, metadata and tabs without letting long metadata overlap the drawer tabs", async () => {
     const longCandidate = {
       ...candidate,
@@ -72,11 +97,15 @@ describe("Verification drawer tabs", () => {
   it("saves the Verification decision into Candidate Detail without provider or OpenAI calls", async () => {
     const originalFetch = globalThis.fetch;
     const externalCalls: string[] = [];
-    globalThis.fetch = (async (input: RequestInfo | URL) => {
+    let previewPayload: Record<string, unknown> | null = null;
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (/provider|openai/i.test(url)) externalCalls.push(url);
       if (url.startsWith("/api/owner-operations/manual-verification/status")) return response(ownerStatus());
-      if (url === "/api/owner-operations/manual-verification-preview") return response({ ...ownerStatus(), preview_id: "preview-12345678", created_at: "2026-08-02T12:00:00.000Z", expires_at: "2026-08-02T12:10:00.000Z", one_time: true, verdict: "VERIFIED", note: "Identity checked", action_plan: "SAVE" });
+      if (url === "/api/owner-operations/manual-verification-preview") {
+        previewPayload = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+        return response({ ...ownerStatus(), preview_id: "preview-12345678", created_at: "2026-08-02T12:00:00.000Z", expires_at: "2026-08-02T12:10:00.000Z", one_time: true, verdict: "VERIFIED", note: "Identity checked", action_plan: "SAVE" });
+      }
       if (url === "/api/owner-operations/manual-verification") return response({ status: "SAVED", record: savedRecord(), audit_created: true });
       return new Response("{}", { status: 404, headers: { "content-type": "application/json" } });
     }) as typeof fetch;
@@ -87,6 +116,7 @@ describe("Verification drawer tabs", () => {
       const textarea = renderer.root.findByType("textarea");
       await act(async () => { textarea.props.onChange({ target: { value: "Identity checked" } }); });
       assert.equal(renderer.root.findAll((node) => node.props.role === "radio").length, 4);
+      await act(async () => { button(renderer, "Zweryfikowany").props.onClick(); });
       await act(async () => { button(renderer, "Zapisz decyzję").props.onClick(); await flushPromises(); });
       const confirmation = renderer.root.findByProps({ "aria-label": "Potwierdzenie tożsamości" });
       await act(async () => { confirmation.props.onChange({ target: { value: identity } }); });
@@ -96,6 +126,8 @@ describe("Verification drawer tabs", () => {
       await act(async () => { button(renderer, "Zapisz status weryfikacji").props.onClick(); await flushPromises(); });
 
       assert.equal(renderer.root.findAllByProps({ "data-verification-verdict": "VERIFIED" }).length >= 2, true);
+      assert.equal(previewPayload?.verdict, "VERIFIED");
+      assert.match(visibleText(renderer.toJSON()), /Zapisano decyzję: Zweryfikowany/);
       assert.deepEqual(externalCalls, []);
     } finally {
       globalThis.fetch = originalFetch;
@@ -160,6 +192,10 @@ function DecisionToDetailHarness() {
   return <ProductLocaleProvider initialLocale="pl"><ExternalVerificationLinksView candidate={candidate} initialActiveTab="decision" onVerificationSaved={setRecord} /><CandidateDetailView candidate={candidate} initialActiveTab="security" initialManualVerification={record} /></ProductLocaleProvider>;
 }
 
+function VerificationDecisionLocaleHarness({ locale }: { locale: "pl" | "en" }) {
+  return <ProductLocaleProvider initialLocale={locale}><ExternalVerificationLinksView candidate={candidate} initialActiveTab="decision" /></ProductLocaleProvider>;
+}
+
 async function render(node: React.ReactNode): Promise<ReturnType<typeof create>> {
   let renderer: ReturnType<typeof create> | undefined;
   await act(async () => { renderer = create(node); await flushPromises(); });
@@ -172,8 +208,8 @@ function button(renderer: ReturnType<typeof create>, label: string) {
   return found;
 }
 
-function ownerStatus() {
-  return { mode: "ENABLED", owner_controls_visible: true, owner_actions_enabled: true, chain: candidate.chain, contract_address: candidate.contractAddress, display_name: candidate.name, symbol: candidate.symbol, current_layer: "NEW", missing_data: [], available_data: ["chain", "contract_address"], current_record: null } as const;
+function ownerStatus(currentRecord: ReturnType<typeof savedRecord> | null = null) {
+  return { mode: "ENABLED", owner_controls_visible: true, owner_actions_enabled: true, chain: candidate.chain, contract_address: candidate.contractAddress, display_name: candidate.name, symbol: candidate.symbol, current_layer: "NEW", missing_data: [], available_data: ["chain", "contract_address"], current_record: currentRecord } as const;
 }
 
 function savedRecord() {
@@ -188,4 +224,11 @@ async function flushPromises(): Promise<void> {
   await Promise.resolve();
   await Promise.resolve();
   await Promise.resolve();
+}
+
+function visibleText(node: unknown): string {
+  if (typeof node === "string") return node;
+  if (Array.isArray(node)) return node.map(visibleText).join(" ");
+  if (node && typeof node === "object" && "children" in node) return visibleText((node as { children?: unknown }).children);
+  return "";
 }

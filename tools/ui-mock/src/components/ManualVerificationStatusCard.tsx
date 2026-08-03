@@ -2,26 +2,11 @@ import React, { useEffect, useState } from "react";
 
 void React;
 import { formatProductDateTime, useProductLocale } from "../productI18n";
+import { manualVerificationVerdictLabel } from "../manualVerificationVerdictLabel";
 import {
   loadManualVerification,
   type ManualVerificationRecord,
-  type ManualVerificationVerdict,
 } from "../services/manualOwnerActionsDataSource";
-
-const VERDICT_COPY: Record<"pl" | "en", Record<ManualVerificationVerdict, string>> = {
-  pl: {
-    VERIFIED: "Zweryfikowano",
-    NEEDS_MORE_DATA: "Potrzeba więcej danych",
-    CRITICAL_RISK: "Ryzyko krytyczne",
-    REJECT: "Odrzucono",
-  },
-  en: {
-    VERIFIED: "Verified",
-    NEEDS_MORE_DATA: "More data needed",
-    CRITICAL_RISK: "Critical risk",
-    REJECT: "Rejected",
-  },
-};
 
 export function ManualVerificationStatusCard({
   chain,
@@ -74,7 +59,7 @@ function ManualVerificationStatusCardForIdentity({
       <span>{pl ? "Status ręcznej weryfikacji" : "Manual verification status"}</span>
       {record ? (
         <>
-          <strong data-verification-verdict={record.verdict}>{VERDICT_COPY[locale][record.verdict]}</strong>
+          <strong data-verification-verdict={record.verdict}>{manualVerificationVerdictLabel(record.verdict, locale)}</strong>
           <p>{record.note}</p>
           <small>{formatProductDateTime(record.checked_at, locale)}</small>
         </>
