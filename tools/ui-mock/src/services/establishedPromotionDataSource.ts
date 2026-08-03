@@ -1,5 +1,5 @@
 export type OwnerOperationsMode = "DISABLED" | "REVIEW_SAFE" | "ENABLED";
-export type PromotionEligibilityStatus = "ELIGIBLE" | "BLOCKED" | "NO_ACTION";
+export type PromotionEligibilityStatus = "ELIGIBLE" | "OVERRIDE_REQUIRED" | "BLOCKED" | "NO_ACTION";
 export type PromotionActionPlan = "ADD" | "NO_ACTION" | "BLOCKED";
 
 export type EstablishedPromotionStatus = {
@@ -20,6 +20,11 @@ export type EstablishedPromotionStatus = {
   current_universe_version: string | null;
   current_universe_checksum: string | null;
   universe_validation_status: "valid" | "invalid" | "unavailable";
+  readiness_status: "CONDITIONS_MET" | "CONDITIONS_UNMET";
+  conditions_met: string[];
+  conditions_unmet: string[];
+  hard_block_reason_codes: string[];
+  manual_override_required: boolean;
 };
 
 export type EstablishedPromotionPreview = {
@@ -48,6 +53,11 @@ export type EstablishedPromotionPreview = {
   action_plan: PromotionActionPlan;
   lock_available: boolean;
   owner_actions_enabled: boolean;
+  readiness_status: "CONDITIONS_MET" | "CONDITIONS_UNMET";
+  conditions_met: string[];
+  conditions_unmet: string[];
+  hard_block_reason_codes: string[];
+  manual_override_required: boolean;
 };
 
 export type EstablishedPromotionResult = {
@@ -61,6 +71,7 @@ export type EstablishedPromotionResult = {
   checksum: string;
   history_created: boolean;
   audit_created: boolean;
+  follow_up_synced: boolean;
 };
 
 export async function loadEstablishedPromotionStatus(
@@ -89,6 +100,10 @@ export async function loadEstablishedPromotionPreview(
 
 export async function addToEstablished(
   preview: EstablishedPromotionPreview,
+  decision: { identityConfirmation: string | null; ownerReason: string | null } = {
+    identityConfirmation: null,
+    ownerReason: null,
+  },
 ): Promise<EstablishedPromotionResult> {
   const response = await fetch("/api/owner-operations/established-promotion", {
     method: "POST",
@@ -98,7 +113,12 @@ export async function addToEstablished(
       "content-type": "application/json",
       "x-crypto-edge-owner-session": preview.preview_id,
     },
-    body: JSON.stringify({ preview_id: preview.preview_id, confirmation: true }),
+    body: JSON.stringify({
+      preview_id: preview.preview_id,
+      confirmation: true,
+      identity_confirmation: decision.identityConfirmation,
+      owner_reason: decision.ownerReason,
+    }),
   });
   const value = await response.json() as unknown;
   if (!response.ok || !isEstablishedPromotionResult(value)) {
@@ -147,7 +167,10 @@ function isEstablishedPromotionStatus(value: unknown): value is EstablishedPromo
     && ["NOT_ESTABLISHED", "ACTIVE", "DISABLED"].includes(String(value.established_membership))
     && isNullableText(value.current_universe_version, 128)
     && isNullableText(value.current_universe_checksum, 128)
-    && ["valid", "invalid", "unavailable"].includes(String(value.universe_validation_status));
+    && ["valid", "invalid", "unavailable"].includes(String(value.universe_validation_status))
+    && isReadiness(value)
+    && isSafeTextArray(value.hard_block_reason_codes)
+    && typeof value.manual_override_required === "boolean";
 }
 
 function isEstablishedPromotionPreview(value: unknown): value is EstablishedPromotionPreview {
@@ -178,7 +201,10 @@ function isEstablishedPromotionPreview(value: unknown): value is EstablishedProm
     && typeof value.manual_verification_required === "boolean"
     && ["ADD", "NO_ACTION", "BLOCKED"].includes(String(value.action_plan))
     && typeof value.lock_available === "boolean"
-    && typeof value.owner_actions_enabled === "boolean";
+    && typeof value.owner_actions_enabled === "boolean"
+    && isReadiness(value)
+    && isSafeTextArray(value.hard_block_reason_codes)
+    && typeof value.manual_override_required === "boolean";
 }
 
 function isEstablishedPromotionResult(value: unknown): value is EstablishedPromotionResult {
@@ -192,7 +218,8 @@ function isEstablishedPromotionResult(value: unknown): value is EstablishedPromo
     && isCount(value.entries_enabled)
     && isSafeText(value.checksum, 128)
     && typeof value.history_created === "boolean"
-    && typeof value.audit_created === "boolean";
+    && typeof value.audit_created === "boolean"
+    && typeof value.follow_up_synced === "boolean";
 }
 
 function isMode(value: unknown): value is OwnerOperationsMode {
@@ -205,7 +232,13 @@ function isLifecycle(value: unknown): value is EstablishedPromotionStatus["lifec
 }
 
 function isEligibility(value: unknown): value is PromotionEligibilityStatus {
-  return value === "ELIGIBLE" || value === "BLOCKED" || value === "NO_ACTION";
+  return value === "ELIGIBLE" || value === "OVERRIDE_REQUIRED" || value === "BLOCKED" || value === "NO_ACTION";
+}
+
+function isReadiness(value: Record<string, unknown>): boolean {
+  return (value.readiness_status === "CONDITIONS_MET" || value.readiness_status === "CONDITIONS_UNMET")
+    && isSafeTextArray(value.conditions_met)
+    && isSafeTextArray(value.conditions_unmet);
 }
 
 function isBasicFilterStatus(value: unknown): value is EstablishedPromotionStatus["basic_filter_status"] {
@@ -217,6 +250,7 @@ function isNullableText(value: unknown, limit: number): value is string | null {
 }
 
 function isSafeText(value: unknown, limit: number): value is string {
+  // eslint-disable-next-line no-control-regex -- Reject every ASCII control character at the API boundary.
   return typeof value === "string" && value.length > 0 && value.length <= limit && !/[\u0000-\u001f]/.test(value);
 }
 

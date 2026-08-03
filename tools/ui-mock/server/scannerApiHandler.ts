@@ -57,6 +57,7 @@ import {
 } from "./reportsLibrary.js";
 import {
   readFollowUpDetail,
+  readFollowUpByIdentity,
   readFollowUpList,
   readFollowUpStatus,
   type FollowUpApiOptions,
@@ -90,6 +91,12 @@ import {
   type AIResearchApiOptions,
 } from "./aiResearchApi.js";
 import { createAIResearchService } from "./aiResearchService.js";
+import {
+  createManualOwnerActionsService,
+  ManualOwnerActionError,
+  type ManualOwnerActionsOptions,
+} from "./manualOwnerActions.js";
+import type { ManualVerificationVerdict } from "../../data-poc/src/followUpBasket.js";
 
 const DEMO_CORS_ORIGINS = new Set(["http://127.0.0.1:5173", "http://localhost:5173"]);
 
@@ -110,6 +117,7 @@ export type ScannerApiHandlerOptions = {
   establishedUniverse?: EstablishedUniverseStatusOptions;
   establishedPromotion?: EstablishedPromotionOptions;
   ownerOperations?: OwnerOperationsOptions;
+  manualOwnerActions?: ManualOwnerActionsOptions;
   reports?: ReportsLibraryOptions;
   followUp?: FollowUpApiOptions;
   aiResearch?: AIResearchApiOptions;
@@ -153,6 +161,13 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
     followUp: options.followUp,
     storePath: options.establishedUniverse?.storeFilePath,
     ...options.establishedPromotion,
+    mode: ownerMode,
+    sessionSecret: ownerSessionSecret,
+  });
+  const manualOwnerActions = createManualOwnerActionsService({
+    scanner: scannerOptions,
+    storePath: options.followUp?.storePath,
+    ...options.manualOwnerActions,
     mode: ownerMode,
     sessionSecret: ownerSessionSecret,
   });
@@ -390,10 +405,109 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
           body.preview_id,
           sessionHeader,
           isLocalOwnerRequest(req),
+          {
+            identity_confirmation: body.identity_confirmation,
+            owner_reason: body.owner_reason,
+          },
         );
         sendJson(req, res, 200, result, runtimeMode);
       } catch (error) {
         sendEstablishedPromotionError(req, res, error, runtimeMode);
+      }
+      return;
+    }
+
+    if (req.method === "GET" && path === "/api/owner-operations/follow-up-action/status") {
+      try {
+        const query = validateManualOwnerQuery(req.url);
+        sendJson(req, res, 200, await manualOwnerActions.getFollowUpStatus(
+          query.chain,
+          query.contract_address,
+          isLocalOwnerRequest(req),
+        ), runtimeMode);
+      } catch (error) {
+        sendManualOwnerActionError(req, res, error, runtimeMode);
+      }
+      return;
+    }
+
+    if (req.method === "GET" && path === "/api/owner-operations/follow-up-action/preview") {
+      try {
+        const query = validateManualOwnerQuery(req.url);
+        sendJson(req, res, 200, await manualOwnerActions.createFollowUpPreview(
+          query.chain,
+          query.contract_address,
+          isLocalOwnerRequest(req),
+        ), runtimeMode);
+      } catch (error) {
+        sendManualOwnerActionError(req, res, error, runtimeMode);
+      }
+      return;
+    }
+
+    if (req.method === "POST" && path === "/api/owner-operations/follow-up-action") {
+      try {
+        requireOwnerMutationRequest(req);
+        const body = validateManualOwnerConfirmation(await readOwnerJsonBody(req));
+        const sessionHeader = req.headers[OWNER_SESSION_HEADER];
+        if (typeof sessionHeader !== "string") throw new ManualOwnerActionError("OWNER_SESSION_REQUIRED", 403);
+        sendJson(req, res, 200, await manualOwnerActions.addToFollowUp(
+          body.preview_id,
+          sessionHeader,
+          body,
+          isLocalOwnerRequest(req),
+        ), runtimeMode);
+      } catch (error) {
+        sendManualOwnerActionError(req, res, error, runtimeMode);
+      }
+      return;
+    }
+
+    if (req.method === "GET" && path === "/api/owner-operations/manual-verification/status") {
+      try {
+        const query = validateManualOwnerQuery(req.url);
+        sendJson(req, res, 200, await manualOwnerActions.getVerificationStatus(
+          query.chain,
+          query.contract_address,
+          isLocalOwnerRequest(req),
+        ), runtimeMode);
+      } catch (error) {
+        sendManualOwnerActionError(req, res, error, runtimeMode);
+      }
+      return;
+    }
+
+    if (req.method === "POST" && path === "/api/owner-operations/manual-verification-preview") {
+      try {
+        requireOwnerMutationRequest(req);
+        const body = validateManualVerificationPreviewBody(await readOwnerJsonBody(req));
+        sendJson(req, res, 200, await manualOwnerActions.createVerificationPreview(
+          body.chain,
+          body.contract_address,
+          body.verdict,
+          body.note,
+          isLocalOwnerRequest(req),
+        ), runtimeMode);
+      } catch (error) {
+        sendManualOwnerActionError(req, res, error, runtimeMode);
+      }
+      return;
+    }
+
+    if (req.method === "POST" && path === "/api/owner-operations/manual-verification") {
+      try {
+        requireOwnerMutationRequest(req);
+        const body = validateManualOwnerConfirmation(await readOwnerJsonBody(req));
+        const sessionHeader = req.headers[OWNER_SESSION_HEADER];
+        if (typeof sessionHeader !== "string") throw new ManualOwnerActionError("OWNER_SESSION_REQUIRED", 403);
+        sendJson(req, res, 200, await manualOwnerActions.saveVerification(
+          body.preview_id,
+          sessionHeader,
+          body,
+          isLocalOwnerRequest(req),
+        ), runtimeMode);
+      } catch (error) {
+        sendManualOwnerActionError(req, res, error, runtimeMode);
       }
       return;
     }
@@ -445,6 +559,19 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
       return;
     }
 
+    if (req.method === "GET" && path === "/api/manual-verification") {
+      try {
+        const query = validateManualOwnerQuery(req.url);
+        sendJson(req, res, 200, {
+          schema_version: "manual_verification_lookup_v1",
+          record: await manualOwnerActions.getPublicVerification(query.chain, query.contract_address),
+        }, runtimeMode);
+      } catch (error) {
+        sendManualOwnerActionError(req, res, error, runtimeMode);
+      }
+      return;
+    }
+
     if (req.method === "GET" && path === "/api/follow-up/status") {
       sendJson(req, res, 200, await readFollowUpStatus(options.followUp), runtimeMode);
       return;
@@ -452,6 +579,21 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
 
     if (req.method === "GET" && path === "/api/follow-up") {
       sendJson(req, res, 200, await readFollowUpList(options.followUp), runtimeMode);
+      return;
+    }
+
+    if (req.method === "GET" && path === "/api/follow-up/identity") {
+      try {
+        const query = validateManualOwnerQuery(req.url);
+        const entry = await readFollowUpByIdentity(query.chain, query.contract_address, options.followUp);
+        if (!entry) {
+          sendJson(req, res, 404, { error: "follow_up_entry_not_found", message: "Follow-up entry not found" }, runtimeMode);
+          return;
+        }
+        sendJson(req, res, 200, entry, runtimeMode);
+      } catch {
+        sendJson(req, res, 400, { error: "follow_up_query_invalid", message: "Follow-up query invalid" }, runtimeMode);
+      }
       return;
     }
 
@@ -923,16 +1065,131 @@ function validateOwnerRefreshBody(value: unknown): { preflight_id: string; confi
   return { preflight_id: value.preflight_id, confirmation: true };
 }
 
-function validateEstablishedPromotionBody(value: unknown): { preview_id: string; confirmation: true } {
+function validateEstablishedPromotionBody(value: unknown): {
+  preview_id: string;
+  confirmation: true;
+  identity_confirmation: string | null;
+  owner_reason: string | null;
+} {
   if (!isRecord(value)) throw new EstablishedPromotionError("PROMOTION_BODY_INVALID", 400);
   const keys = Object.keys(value).sort();
-  if (keys.length !== 2 || keys[0] !== "confirmation" || keys[1] !== "preview_id") {
+  const legacy = keys.length === 2 && keys[0] === "confirmation" && keys[1] === "preview_id";
+  const current = keys.length === 4
+    && keys[0] === "confirmation"
+    && keys[1] === "identity_confirmation"
+    && keys[2] === "owner_reason"
+    && keys[3] === "preview_id";
+  if (!legacy && !current) {
     throw new EstablishedPromotionError("PROMOTION_BODY_INVALID", 400);
   }
   if (typeof value.preview_id !== "string" || value.preview_id.length === 0 || value.confirmation !== true) {
     throw new EstablishedPromotionError("PROMOTION_BODY_INVALID", 400);
   }
-  return { preview_id: value.preview_id, confirmation: true };
+  if (value.identity_confirmation !== undefined && value.identity_confirmation !== null
+    && (typeof value.identity_confirmation !== "string" || value.identity_confirmation.length > 180)) {
+    throw new EstablishedPromotionError("PROMOTION_BODY_INVALID", 400);
+  }
+  if (value.owner_reason !== undefined && value.owner_reason !== null
+    && (typeof value.owner_reason !== "string" || value.owner_reason.length > 500)) {
+    throw new EstablishedPromotionError("PROMOTION_BODY_INVALID", 400);
+  }
+  return {
+    preview_id: value.preview_id,
+    confirmation: true,
+    identity_confirmation: typeof value.identity_confirmation === "string" ? value.identity_confirmation : null,
+    owner_reason: typeof value.owner_reason === "string" ? value.owner_reason : null,
+  };
+}
+
+function validateManualOwnerConfirmation(value: unknown): {
+  preview_id: string;
+  confirmation: true;
+  identity_confirmation: string;
+  owner_reason: string | null;
+} {
+  if (!isRecord(value)) throw new ManualOwnerActionError("OWNER_ACTION_BODY_INVALID", 400);
+  const keys = Object.keys(value).sort();
+  if (keys.length !== 4
+    || keys[0] !== "confirmation"
+    || keys[1] !== "identity_confirmation"
+    || keys[2] !== "owner_reason"
+    || keys[3] !== "preview_id") {
+    throw new ManualOwnerActionError("OWNER_ACTION_BODY_INVALID", 400);
+  }
+  if (typeof value.preview_id !== "string" || value.preview_id.length === 0 || value.preview_id.length > 8_192
+    || value.confirmation !== true
+    || typeof value.identity_confirmation !== "string" || value.identity_confirmation.length > 180
+    || (value.owner_reason !== null && (typeof value.owner_reason !== "string" || value.owner_reason.length > 500))) {
+    throw new ManualOwnerActionError("OWNER_ACTION_BODY_INVALID", 400);
+  }
+  return {
+    preview_id: value.preview_id,
+    confirmation: true,
+    identity_confirmation: value.identity_confirmation,
+    owner_reason: value.owner_reason,
+  } as {
+    preview_id: string;
+    confirmation: true;
+    identity_confirmation: string;
+    owner_reason: string | null;
+  };
+}
+
+function validateManualVerificationPreviewBody(value: unknown): {
+  chain: string;
+  contract_address: string;
+  verdict: ManualVerificationVerdict;
+  note: string;
+} {
+  if (!isRecord(value)) throw new ManualOwnerActionError("VERIFICATION_BODY_INVALID", 400);
+  const keys = Object.keys(value).sort();
+  if (keys.length !== 4
+    || keys[0] !== "chain"
+    || keys[1] !== "contract_address"
+    || keys[2] !== "note"
+    || keys[3] !== "verdict") {
+    throw new ManualOwnerActionError("VERIFICATION_BODY_INVALID", 400);
+  }
+  if (typeof value.chain !== "string" || value.chain.length === 0 || value.chain.length > 32
+    || typeof value.contract_address !== "string" || value.contract_address.length === 0 || value.contract_address.length > 128
+    || !["VERIFIED", "NEEDS_MORE_DATA", "CRITICAL_RISK", "REJECT"].includes(String(value.verdict))
+    || typeof value.note !== "string" || value.note.length < 3 || value.note.length > 500) {
+    throw new ManualOwnerActionError("VERIFICATION_BODY_INVALID", 400);
+  }
+  return {
+    chain: value.chain,
+    contract_address: value.contract_address,
+    verdict: value.verdict,
+    note: value.note,
+  } as {
+    chain: string;
+    contract_address: string;
+    verdict: ManualVerificationVerdict;
+    note: string;
+  };
+}
+
+function validateManualOwnerQuery(url: string | undefined): { chain: string; contract_address: string } {
+  let parsed: URL;
+  try {
+    parsed = new URL(url ?? "/", "http://owner.local");
+  } catch {
+    throw new ManualOwnerActionError("OWNER_ACTION_QUERY_INVALID", 400);
+  }
+  const keys = [...parsed.searchParams.keys()].sort();
+  if (keys.length !== 2
+    || keys[0] !== "chain"
+    || keys[1] !== "contract_address"
+    || parsed.searchParams.getAll("chain").length !== 1
+    || parsed.searchParams.getAll("contract_address").length !== 1) {
+    throw new ManualOwnerActionError("OWNER_ACTION_QUERY_INVALID", 400);
+  }
+  const chain = parsed.searchParams.get("chain");
+  const contractAddress = parsed.searchParams.get("contract_address");
+  if (!chain || !contractAddress || chain.length > 32 || contractAddress.length > 128) {
+    throw new ManualOwnerActionError("OWNER_ACTION_QUERY_INVALID", 400);
+  }
+  return { chain, contract_address: contractAddress };
 }
 
 function validateEstablishedPromotionQuery(url: string | undefined): { chain: string; contract_address: string } {
@@ -997,10 +1254,13 @@ function buildProductReadiness(
 ): ProductReadinessOutput {
   const discovery = buildDiscoveryReadiness(scanner, context);
   const scannerReadiness = publicScannerReadinessEntry(scanner);
+  const contextReadiness = publicContextReadinessEntry(context);
   const ready = scanner.ready;
   const degraded = ready && (
     scannerReadiness.freshness_status === "STALE"
-    || !context.ready
+    || !contextReadiness.ready
+    || contextReadiness.freshness_status === "STALE"
+    || Object.values(contextReadiness.source_statuses ?? {}).some((status) => status === "DEGRADED")
     || discovery.new_emerging.status === "degraded"
   );
 
@@ -1014,13 +1274,13 @@ function buildProductReadiness(
     ready,
     process: { ready: true, reason_code: null },
     scanner: scannerReadiness,
-    context: publicReadinessEntry(context),
+    context: contextReadiness,
     new_emerging: discovery.new_emerging,
     established: discovery.established,
     discovery,
     reason_codes: [
       scannerReadiness.reason_code,
-      context.reason_code,
+      contextReadiness.reason_code,
       discovery.new_emerging.reason_code,
       discovery.established.reason_code,
     ].filter(isString),
@@ -1132,10 +1392,6 @@ function isNonNegativeInteger(value: unknown): boolean {
   return Number.isSafeInteger(value) && Number(value) >= 0;
 }
 
-function publicReadinessEntry(entry: ReadinessEntry): { ready: boolean; reason_code: string | null } {
-  return { ready: entry.ready, reason_code: entry.reason_code };
-}
-
 function publicScannerReadinessEntry(entry: ReadinessEntry): {
   ready: boolean;
   status: "ready" | "stale" | "unavailable";
@@ -1164,6 +1420,44 @@ function publicScannerReadinessEntry(entry: ReadinessEntry): {
     freshness_status: freshnessStatus,
     generated_at: typeof provenance?.generated_at === "string" ? provenance.generated_at : null,
     age_seconds: typeof meta?.age_seconds === "number" ? meta.age_seconds : null,
+  };
+}
+
+function sendManualOwnerActionError(
+  req: IncomingMessage,
+  res: ServerResponse,
+  error: unknown,
+  runtimeMode: ResolvedProductRuntimeMode,
+): void {
+  const actionError = error instanceof ManualOwnerActionError
+    ? error
+    : error instanceof OwnerOperationsError
+      ? new ManualOwnerActionError(error.code, error.httpStatus)
+      : new ManualOwnerActionError("OWNER_ACTION_REQUEST_REJECTED", 400);
+  sendJson(req, res, actionError.httpStatus, {
+    error: actionError.code,
+    message: "Owner token action rejected",
+  }, runtimeMode);
+}
+
+function publicContextReadinessEntry(entry: ReadinessEntry): ProductReadinessOutput["context"] {
+  if (!entry.ready || !isRecord(entry.value)) {
+    return { ready: false, reason_code: entry.reason_code };
+  }
+  const meta = isRecord(entry.value._source_meta) ? entry.value._source_meta : null;
+  const sources = Array.isArray(entry.value.sources) ? entry.value.sources : [];
+  const sourceStatuses = Object.fromEntries(sources.flatMap((source) => {
+    if (!isRecord(source) || typeof source.source_id !== "string") return [];
+    return [[source.source_id, source.status === "DEGRADED" ? "DEGRADED" : "READY"]] as const;
+  }));
+  const freshnessStatus = meta?.freshness_status === "STALE" ? "STALE" : "FRESH";
+  return {
+    ready: true,
+    reason_code: freshnessStatus === "STALE" ? "CONTEXT_SNAPSHOT_STALE" : null,
+    run_id: typeof entry.value.run_id === "string" ? entry.value.run_id : null,
+    generated_at: typeof entry.value.generated_at === "string" ? entry.value.generated_at : null,
+    freshness_status: freshnessStatus,
+    source_statuses: sourceStatuses,
   };
 }
 
@@ -1208,7 +1502,7 @@ function buildDiscoveryReadiness(scanner: ReadinessEntry, context: ReadinessEntr
         status: readiness.established === "READY" ? "ready" : "unavailable",
         reason_code: readiness.established === "READY" ? null : "ESTABLISHED_UNAVAILABLE",
       },
-    context: publicReadinessEntry(context),
+    context: publicContextReadinessEntry(context),
   };
 }
 

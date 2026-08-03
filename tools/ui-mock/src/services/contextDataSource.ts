@@ -205,6 +205,7 @@ function isContextSourceMeta(value: unknown): value is MarketContextApiOutput["_
     && (value.runtime_mode === undefined || value.runtime_mode === "DEVELOPMENT_DEMO" || value.runtime_mode === "INTERNAL_BETA" || value.runtime_mode === "UNCONFIGURED")
     && (value.age_seconds === undefined || isNullableNumber(value.age_seconds))
     && (value.source_ids === undefined || isStringArray(value.source_ids))
+    && (value.freshness_status === undefined || value.freshness_status === "FRESH" || value.freshness_status === "STALE")
   );
 }
 

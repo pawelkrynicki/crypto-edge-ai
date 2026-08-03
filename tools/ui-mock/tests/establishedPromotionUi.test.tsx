@@ -27,7 +27,7 @@ describe("Established promotion Candidate Detail UI", () => {
       candidate,
       initialOwnerPromotionStatus: null,
     }));
-    assert.doesNotMatch(markup, /Owner decision|Consider for Established|Preview addition plan|Add to Established/);
+    assert.doesNotMatch(markup, /Owner decision|Consider for Established|Preview addition plan|Move to Main Radar/);
     assert.doesNotMatch(markup, /owner_controls_visible|preview_id|owner session/i);
   });
 
@@ -43,11 +43,11 @@ describe("Established promotion Candidate Detail UI", () => {
       initialActiveTab: "security",
     }));
     assert.match(markup, /Owner decision/);
-    assert.match(markup, /Consider for Established/);
+    assert.match(markup, /Main Radar decision/);
     assert.match(markup, /Preview addition plan/);
-    assert.match(markup, /Only a token with Candidate for Established status can be considered/);
+    assert.match(markup, /the owner makes the final decision/);
     assert.match(markup, /Review-safe mode: adding to Established remains blocked/);
-    assert.match(markup, /<button[^>]*disabled=""[^>]*>Add to Established<\/button>/);
+    assert.match(markup, /<button[^>]*disabled=""[^>]*>Move to Main Radar<\/button>/);
     assert.match(markup, new RegExp(ADDRESS));
   });
 
@@ -72,16 +72,16 @@ describe("Established promotion Candidate Detail UI", () => {
       assert.doesNotMatch(value, /\b(?:Execute|Command|Shell|Terminal|Apply)\b/i);
       assert.doesNotMatch(value, /C:\\|\/home\/|session-secret|stack trace|lock path/i);
     }
-    assert.match(english, /currently New/);
+    assert.match(english, /current observation status is New/);
     assert.match(english, /Filters not passed/);
     assert.match(english, /Partial data/);
     assert.match(english, /Not in Established/);
     assert.match(english, /Review-safe mode/);
-    assert.match(polish, /obecnie status Nowe/);
+    assert.match(polish, /Bieżący status obserwacji to Nowe/);
     assert.match(polish, /Filtry niespełnione/);
     assert.match(polish, /Częściowe dane/);
     assert.match(polish, /Nie znajduje się w Established/);
-    assert.match(polish, /Bezpieczny tryb przeglądu/);
+    assert.match(polish, /Tryb bezpiecznego przeglądu/);
     assert.match(english, /Adding it creates a new Established Universe version and audit entry/);
     assert.match(english, /does not verify token safety and is not an investment recommendation/);
     assert.match(english, /Missing security data requires manual verification/);
@@ -154,16 +154,16 @@ describe("Established promotion Candidate Detail UI", () => {
     }));
     for (const value of [blocked, reviewSafe]) {
       assert.match(value, /<input[^>]*type="checkbox"[^>]*disabled=""/);
-      assert.match(value, /<button[^>]*disabled=""[^>]*>[^<]*Add to Established|<button[^>]*disabled=""[^>]*>[^<]*Dodaj do Established/);
+      assert.match(value, /<button[^>]*disabled=""[^>]*>[^<]*Move to Main Radar|<button[^>]*disabled=""[^>]*>[^<]*Przenieś do Głównego Radaru/);
     }
     assert.match(blocked, /Dodanie jest niedostępne, ponieważ token nie spełnia warunków kwalifikacji/);
     assert.match(reviewSafe, /Review-safe mode: adding to Established remains blocked/);
 
     const componentSource = await readFile(resolve(process.cwd(), "src", "components", "EstablishedPromotionPanel.tsx"), "utf8");
-    const guardIndex = componentSource.indexOf("if (!canAdd || !preview");
-    const postIndex = componentSource.indexOf("await addToEstablished(preview)");
+    const guardIndex = componentSource.indexOf("if (!canAdd || !decisionComplete || !preview");
+    const postIndex = componentSource.indexOf("await addToEstablished(preview, {");
     assert.ok(guardIndex >= 0 && postIndex > guardIndex, "the click handler must return before the POST helper when disabled");
-    assert.match(componentSource, /disabled=\{!canAdd\}/);
+    assert.match(componentSource, /disabled=\{!canAdd \|\| !decisionComplete\}/);
   });
 
   it("forces the owner launcher to open #candidate-detail in REVIEW_SAFE without preview, writes or providers", async () => {
@@ -172,7 +172,7 @@ describe("Established promotion Candidate Detail UI", () => {
     const productLauncher = await readFile(resolve(root, "scripts", "win", "start-product-radar-review.cmd"), "utf8");
     assert.match(launcher, /%\* --established-promotion-review --candidate-detail/);
     assert.match(productLauncher, /if "%ESTABLISHED_PROMOTION_REVIEW%"=="1" set "RADAR_VIEW=candidate-detail"/);
-    assert.match(productLauncher, /RADAR_URL=http:\/\/127\.0\.0\.1:5173\/#\!RADAR_VIEW\!/);
+    assert.match(productLauncher, /RADAR_URL=http:\/\/127\.0\.0\.1:5173\/#!RADAR_VIEW!/);
     assert.match(productLauncher, /CRYPTO_EDGE_RUNTIME_MODE=INTERNAL_BETA/);
     assert.match(productLauncher, /CRYPTO_EDGE_OWNER_OPERATIONS_MODE=REVIEW_SAFE/);
     for (const value of [launcher, productLauncher]) {
@@ -205,7 +205,8 @@ describe("Established promotion Candidate Detail UI", () => {
     assert.doesNotMatch(backend, /node:child_process|execFile|execSync|spawnSync|cmd\.exe|powershell/i);
     assert.doesNotMatch(app, /established-promotion-preview|established-promotion"/);
     assert.doesNotMatch(detail, /loadEstablishedPromotionPreview|addToEstablished/);
-    assert.match(dataSource, /JSON\.stringify\(\{ preview_id: preview\.preview_id, confirmation: true \}\)/);
+    assert.match(dataSource, /identity_confirmation: decision\.identityConfirmation/);
+    assert.match(dataSource, /owner_reason: decision\.ownerReason/);
     assert.doesNotMatch(dataSource, /owner_note|added_by|--apply|command|path:/i);
     assert.match(launcher, /--established-promotion-review --candidate-detail/);
     assert.match(launcher, /REVIEW_SAFE/);
@@ -235,6 +236,11 @@ function visibleStatus(
     current_universe_version: "established-universe-v000001",
     current_universe_checksum: `sha256:${"a".repeat(64)}`,
     universe_validation_status: "valid",
+    readiness_status: "CONDITIONS_UNMET",
+    conditions_met: ["IDENTITY_VALID", "FOLLOW_UP_ENTRY_AVAILABLE", "BASIC_FILTERS_PASSED"],
+    conditions_unmet: ["MANUAL_VERIFICATION_REQUIRED"],
+    hard_block_reason_codes: [],
+    manual_override_required: true,
     ...overrides,
     mode,
     owner_actions_enabled: mode === "ENABLED",
@@ -268,6 +274,11 @@ function blockedPreview(): EstablishedPromotionPreview {
     action_plan: "BLOCKED",
     lock_available: true,
     owner_actions_enabled: true,
+    readiness_status: "CONDITIONS_UNMET",
+    conditions_met: ["IDENTITY_VALID", "FOLLOW_UP_ENTRY_AVAILABLE"],
+    conditions_unmet: ["LIFECYCLE_NEW", "BASIC_FILTER_NOT_PASSED", "MANUAL_VERIFICATION_REQUIRED"],
+    hard_block_reason_codes: ["UNIVERSE_NOT_VALID"],
+    manual_override_required: false,
   };
 }
 
@@ -282,6 +293,11 @@ function addPreview(): EstablishedPromotionPreview {
     lifecycle_status: "CANDIDATE_FOR_ESTABLISHED",
     basic_filter_status: "passed_basic_filter",
     action_plan: "ADD",
+    readiness_status: "CONDITIONS_UNMET",
+    conditions_met: ["IDENTITY_VALID", "FOLLOW_UP_ENTRY_AVAILABLE", "BASIC_FILTERS_PASSED"],
+    conditions_unmet: ["MANUAL_VERIFICATION_REQUIRED"],
+    hard_block_reason_codes: [],
+    manual_override_required: true,
   };
 }
 

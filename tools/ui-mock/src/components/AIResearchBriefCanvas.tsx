@@ -163,7 +163,6 @@ export function AIResearchBriefCanvas({
           <summary>{ui.technicalDetails}</summary>
           <dl className="ai-research-technical-grid product-technical-details-content">
             <div><dt>{ui.analysisId}</dt><dd><code>{brief.analysis_id}</code></dd></div>
-            <div><dt>{ui.model}</dt><dd>{brief.model}</dd></div>
             <div><dt>{ui.promptVersion}</dt><dd>{brief.prompt_version}</dd></div>
             <div><dt>{ui.snapshotFingerprint}</dt><dd><code>{brief.snapshot_fingerprint}</code></dd></div>
             <div><dt>{ui.analysisTime}</dt><dd>{formatProductDateTime(brief.generated_at, locale)}</dd></div>

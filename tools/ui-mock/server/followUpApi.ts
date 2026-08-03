@@ -120,6 +120,25 @@ export async function readFollowUpDetail(
   return entry ? publicEntry(entry, options.now?.() ?? new Date(), resolveUniverse(options)) : null;
 }
 
+export async function readFollowUpByIdentity(
+  chain: string,
+  contractAddress: string,
+  options: FollowUpApiOptions = {},
+): Promise<FollowUpPublicEntry | null> {
+  let identity: string;
+  try {
+    identity = followUpIdentity(chain, contractAddress).identity;
+  } catch {
+    return null;
+  }
+  const diagnostics = await inspectFollowUpStore(options.storePath);
+  if (!diagnostics.store_available) return null;
+  const entry = diagnostics.store.entries.find((candidate) => (
+    followUpIdentity(candidate.chain, candidate.contract_address).identity === identity
+  ));
+  return entry ? publicEntry(entry, options.now?.() ?? new Date(), resolveUniverse(options)) : null;
+}
+
 function publicEntry(
   entry: FollowUpEntry,
   now: Date,
@@ -129,7 +148,7 @@ function publicEntry(
   const enabled = new Set((universe?.entries ?? []).filter((candidate) => candidate.enabled).map((candidate) => (
     followUpIdentity(candidate.chain, candidate.contract_address).identity
   )));
-  const establishedMembership = enabled.has(identity);
+  const establishedMembership = enabled.has(identity) || entry.lifecycle_status === "ESTABLISHED";
   const lifecycle = establishedMembership ? "ESTABLISHED" : resolveFollowUpStatusAt(entry, now.toISOString());
   const market = entry.last_valid_market_snapshot;
   const missing = [
@@ -172,11 +191,11 @@ function publicEntry(
 
 function comparePublicEntries(left: FollowUpPublicEntry, right: FollowUpPublicEntry, now: Date): number {
   const rank = (entry: FollowUpPublicEntry): number => {
-    if (entry.lifecycle_status === "CANDIDATE_FOR_ESTABLISHED") return 0;
-    if (entry.lifecycle_status === "MATURING" && entry.next_check_at && Date.parse(entry.next_check_at) <= now.getTime()) return 1;
-    if (entry.lifecycle_status === "MATURING") return 2;
-    if (entry.lifecycle_status === "NEW") return 3;
-    if (entry.lifecycle_status === "ESTABLISHED") return 4;
+    if (entry.lifecycle_status === "ESTABLISHED") return 0;
+    if (entry.lifecycle_status === "CANDIDATE_FOR_ESTABLISHED") return 1;
+    if (entry.lifecycle_status === "MATURING" && entry.next_check_at && Date.parse(entry.next_check_at) <= now.getTime()) return 2;
+    if (entry.lifecycle_status === "MATURING") return 3;
+    if (entry.lifecycle_status === "NEW") return 4;
     return 5;
   };
   return rank(left) - rank(right)

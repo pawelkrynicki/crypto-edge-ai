@@ -16,6 +16,7 @@ import {
   type ResolvedProductRuntimeMode,
 } from "../src/runtimeMode.js";
 import { readCommittedSnapshotState } from "./committedSnapshotState.js";
+import { resolveCanonicalProductDataPaths } from "./canonicalProductDataPaths.js";
 
 export const SCANNER_OUTPUT_UNAVAILABLE = "SCANNER_OUTPUT_UNAVAILABLE";
 export const INVALID_SCANNER_OUTPUT = "SCANNER_SCHEMA_INVALID";
@@ -101,7 +102,6 @@ export async function readLatestScannerOutput(
   options: LatestScannerOutputOptions = {},
 ): Promise<ScannerOutputWithMeta> {
   const runtimeMode = resolveProductRuntimeMode(options.runtimeMode);
-  const outputDirPath = options.outputDirPath ?? defaultOutputDirPath;
   const fixturePath = options.fixturePath ?? defaultFixturePath;
   const now = options.now ?? new Date();
 
@@ -109,9 +109,19 @@ export async function readLatestScannerOutput(
     throw new ScannerOutputError("RUNTIME_MODE_UNCONFIGURED");
   }
 
+  const canonical = runtimeMode === "INTERNAL_BETA" && options.outputDirPath === undefined
+    ? await resolveCanonicalProductDataPaths().catch(() => {
+      throw new ScannerOutputError("SCANNER_CANONICAL_PATHS_UNAVAILABLE");
+    })
+    : null;
+  const outputDirPath = options.outputDirPath ?? canonical?.outputDirPath ?? defaultOutputDirPath;
+  const selectionOptions = canonical && options.committedRunId === undefined && options.automationStatePath === undefined
+    ? { ...options, committedRunId: canonical.scannerRunId }
+    : options;
+
   const allCandidates = await findCandidateRuns(outputDirPath);
   const candidates = runtimeMode === "INTERNAL_BETA"
-    ? await selectCommittedScannerCandidates(allCandidates, options)
+    ? await selectCommittedScannerCandidates(allCandidates, selectionOptions)
     : allCandidates;
 
   if (runtimeMode === "DEVELOPMENT_DEMO") {
@@ -160,17 +170,25 @@ export async function getScannerSourcesDiagnostics(
   options: LatestScannerOutputOptions = {},
 ): Promise<ScannerSourcesDiagnostics> {
   const runtimeMode = resolveProductRuntimeMode(options.runtimeMode);
-  const outputDirPath = options.outputDirPath ?? defaultOutputDirPath;
   const fixturePath = options.fixturePath ?? defaultFixturePath;
   const now = options.now ?? new Date();
 
   if (runtimeMode === "UNCONFIGURED") {
     throw new ScannerOutputError("RUNTIME_MODE_UNCONFIGURED");
   }
+  const canonical = runtimeMode === "INTERNAL_BETA" && options.outputDirPath === undefined
+    ? await resolveCanonicalProductDataPaths().catch(() => {
+      throw new ScannerOutputError("SCANNER_CANONICAL_PATHS_UNAVAILABLE");
+    })
+    : null;
+  const outputDirPath = options.outputDirPath ?? canonical?.outputDirPath ?? defaultOutputDirPath;
+  const selectionOptions = canonical && options.committedRunId === undefined && options.automationStatePath === undefined
+    ? { ...options, committedRunId: canonical.scannerRunId }
+    : options;
   const outputDirExists = await pathExists(outputDirPath);
   const allCandidates = await findCandidateRuns(outputDirPath);
   const candidates = runtimeMode === "INTERNAL_BETA"
-    ? await selectCommittedScannerCandidates(allCandidates, options).catch(() => [])
+    ? await selectCommittedScannerCandidates(allCandidates, selectionOptions).catch(() => [])
     : allCandidates;
 
   const runs = candidates.slice(0, 10).map((candidate) => {

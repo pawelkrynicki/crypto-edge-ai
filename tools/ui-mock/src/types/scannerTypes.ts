@@ -226,6 +226,13 @@ export type ProductScannerReadiness = ProductReadinessEntry & {
   age_seconds?: number | null;
 };
 
+export type ProductContextReadiness = ProductReadinessEntry & {
+  run_id?: string | null;
+  generated_at?: string | null;
+  freshness_status?: "FRESH" | "STALE";
+  source_statuses?: Record<string, "READY" | "DEGRADED">;
+};
+
 export type ProductBasketReadiness = ProductReadinessEntry & {
   configured?: boolean;
   status: "ready" | "degraded" | "empty_configured" | "unavailable";
@@ -237,13 +244,13 @@ export type ProductReadinessOutput = {
   runtime_mode?: "DEVELOPMENT_DEMO" | "INTERNAL_BETA" | "UNCONFIGURED";
   process?: ProductReadinessEntry;
   scanner: ProductScannerReadiness;
-  context: ProductReadinessEntry;
+  context: ProductContextReadiness;
   new_emerging?: ProductBasketReadiness;
   established?: ProductBasketReadiness;
   discovery: {
     new_emerging: ProductBasketReadiness;
     established: ProductBasketReadiness;
-    context?: ProductReadinessEntry;
+    context?: ProductContextReadiness;
   };
   reason_codes: string[];
 };

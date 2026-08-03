@@ -17,6 +17,15 @@ export async function loadFollowUpList(): Promise<FollowUpPublicList | null> {
   return loadJson("/api/follow-up", isFollowUpList);
 }
 
+export async function loadFollowUpByIdentity(
+  chain: string,
+  contractAddress: string,
+): Promise<FollowUpPublicEntry | null> {
+  if (!chain || !contractAddress) return null;
+  const query = new URLSearchParams({ chain, contract_address: contractAddress });
+  return loadJson(`/api/follow-up/identity?${query.toString()}`, isFollowUpEntry);
+}
+
 async function loadJson<T>(path: string, validate: (value: unknown) => value is T): Promise<T | null> {
   try {
     const response = await fetch(`${getApiBaseUrl()}${path}`, { method: "GET", headers: { accept: "application/json" } });

@@ -25,12 +25,16 @@ import {
 import type { UiTokenCandidate } from "../types/scannerTypes";
 import type { FollowUpPublicEntry, FollowUpPublicStatus } from "../types/followUpTypes";
 import { CANDIDATE_DETAIL_TAB_IDS, type CandidateDetailTabId } from "../candidateDetailTabs";
+import { TokenDetailTabPanel, TokenDetailTabs } from "./TokenDetailTabs";
 import {
   loadEstablishedPromotionStatus,
   type EstablishedPromotionStatus,
 } from "../services/establishedPromotionDataSource";
 import { EstablishedPromotionPanel } from "./EstablishedPromotionPanel";
 import { AIResearchSection } from "./AIResearchSection";
+import { ManualVerificationStatusCard } from "./ManualVerificationStatusCard";
+import { OwnerFollowUpActionPanel } from "./OwnerFollowUpActionPanel";
+import type { ManualVerificationRecord } from "../services/manualOwnerActionsDataSource";
 import { ActionButton, CopyButton, CopyableAddress, StatusBadge, TechnicalDetails } from "./ProductUi";
 import {
   lifecycleActionLabel,
@@ -46,6 +50,10 @@ interface CandidateDetailViewProps {
   followUpStatus?: FollowUpPublicStatus | null;
   onBackToResults?: () => void;
   onOpenExternalChecks?: (candidate: UiTokenCandidate) => void;
+  onOpenFollowUpExternalChecks?: (followUp: FollowUpPublicEntry) => void;
+  onOpenControlCenter?: () => void;
+  initialManualVerification?: ManualVerificationRecord | null;
+  onLifecycleChanged?: () => void | Promise<void>;
   initialOwnerPromotionStatus?: EstablishedPromotionStatus | null;
   activeTab?: CandidateDetailTabId;
   initialActiveTab?: CandidateDetailTabId;
@@ -63,6 +71,10 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
   followUpStatus,
   onBackToResults,
   onOpenExternalChecks,
+  onOpenFollowUpExternalChecks,
+  onOpenControlCenter,
+  initialManualVerification,
+  onLifecycleChanged,
   initialOwnerPromotionStatus,
   activeTab: controlledActiveTab,
   initialActiveTab = "summary",
@@ -80,17 +92,12 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
   );
   useEffect(() => {
     if (initialOwnerPromotionStatus !== undefined) {
-      setOwnerPromotionStatus(initialOwnerPromotionStatus);
       return;
     }
     const chain = candidate?.chain ?? followUp?.chain;
     const contractAddress = candidate?.contractAddress ?? followUp?.contract_address;
-    if (!chain || !contractAddress) {
-      setOwnerPromotionStatus(null);
-      return;
-    }
+    if (!chain || !contractAddress) return;
     let cancelled = false;
-    setOwnerPromotionStatus(null);
     void loadEstablishedPromotionStatus(chain, contractAddress).then((status) => {
       if (!cancelled) setOwnerPromotionStatus(status?.owner_controls_visible ? status : null);
     });
@@ -122,6 +129,10 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
         ownerPromotionStatus={ownerPromotionStatus}
         onOwnerPromotionStatusChange={setOwnerPromotionStatus}
         onBackToResults={onBackToResults}
+        onOpenFollowUpExternalChecks={onOpenFollowUpExternalChecks}
+        onOpenControlCenter={onOpenControlCenter}
+        initialManualVerification={initialManualVerification}
+        onLifecycleChanged={onLifecycleChanged}
         activeTab={activeTab}
         onActiveTabChange={setActiveTab}
       />
@@ -153,6 +164,7 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
     .map((condition) => formatBasicFilterCategory(condition.category, t));
   const showSecurityDetails = securityResolution.state === "partial"
     || isCompletedProductSecurityState(securityResolution.state);
+  const hasFollowUpOwnership = Boolean(followUp || (ownerPromotionStatus && ownerPromotionStatus.source_layer !== "SCANNER"));
 
   const workspaceCopy = getTabbedWorkspaceCopy(locale);
   const missingMarketValues = [
@@ -202,7 +214,7 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
               <DetailField label={t("detail.sourceVerification")} value={candidate.addressIdentityVerified ? t("detail.sourceVerificationConfirmed") : t("detail.sourceVerificationRequired")} tone={candidate.addressIdentityVerified ? "ready" : "warning"} />
             </div>
           </section>
-          <AIResearchSection chain={candidate.chain} contractAddress={candidate.contractAddress} symbol={candidate.symbol} name={candidate.name} mode="summary" onOpen={() => setActiveTab("ai")} />
+          <AIResearchSection chain={candidate.chain} contractAddress={candidate.contractAddress} symbol={candidate.symbol} name={candidate.name} mode="summary" onOpen={() => setActiveTab("ai")} onOpenControlCenter={onOpenControlCenter} />
         </div>
         {onOpenExternalChecks && <div className="candidate-summary-actions"><ActionButton variant="secondary" onClick={() => onOpenExternalChecks(candidate)}>{t("detail.openVerification")}</ActionButton></div>}
       </section>
@@ -293,12 +305,14 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
             </>
           )}
           {onOpenExternalChecks && <div className="product-detail-actions"><ActionButton variant="primary" icon="arrow" iconPosition="end" onClick={() => onOpenExternalChecks(candidate)}>{t("detail.openVerification")}</ActionButton></div>}
+          <ManualVerificationStatusCard chain={candidate.chain} contractAddress={candidate.contractAddress} initialRecord={initialManualVerification} />
         </section>
-        {ownerPromotionStatus?.owner_controls_visible && <EstablishedPromotionPanel initialStatus={ownerPromotionStatus} onStatusChange={setOwnerPromotionStatus} />}
+        {!hasFollowUpOwnership && <OwnerFollowUpActionPanel candidate={candidate} onLifecycleChanged={onLifecycleChanged} />}
+        {hasFollowUpOwnership && ownerPromotionStatus?.owner_controls_visible && <EstablishedPromotionPanel initialStatus={ownerPromotionStatus} onStatusChange={setOwnerPromotionStatus} onLifecycleChanged={onLifecycleChanged} />}
       </>
     );
   } else if (activeTab === "ai") {
-    activeTabContent = <AIResearchSection chain={candidate.chain} contractAddress={candidate.contractAddress} symbol={candidate.symbol} name={candidate.name} mode="detail" />;
+    activeTabContent = <AIResearchSection chain={candidate.chain} contractAddress={candidate.contractAddress} symbol={candidate.symbol} name={candidate.name} mode="detail" onOpenControlCenter={onOpenControlCenter} />;
   } else if (activeTab === "data") {
     activeTabContent = (
       <div className="candidate-data-sources-tab">
@@ -350,17 +364,10 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
         <div className="token-detail-next-step"><span>{workspaceCopy.nextResearchStep}</span><strong>{nextStep}</strong></div>
       </header>
 
-      <CandidateDetailTabs activeTab={activeTab} onChange={setActiveTab} copy={workspaceCopy} />
-
-      <section
-        id={`candidate-panel-${activeTab}`}
-        role="tabpanel"
-        aria-labelledby={`candidate-tab-${activeTab}`}
-        tabIndex={0}
-        className="token-detail-tabpanel"
-      >
+      <TokenDetailTabs tabs={CANDIDATE_DETAIL_TAB_IDS.map((id) => ({ id, label: workspaceCopy.tabs[id] }))} activeTab={activeTab} onChange={setActiveTab} idPrefix="candidate" ariaLabel={workspaceCopy.tablistLabel} />
+      <TokenDetailTabPanel activeTab={activeTab} idPrefix="candidate">
         {activeTabContent}
-      </section>
+      </TokenDetailTabPanel>
     </div>
   );
 };
@@ -379,51 +386,6 @@ function SummaryFact({
 
 function HeaderFact({ label, value, tone = "neutral" }: { label: string; value: string; tone?: "neutral" | "ready" | "warning" }) {
   return <span className={`token-detail-header-fact ${tone}`}><small>{label}</small><strong>{value}</strong></span>;
-}
-
-function CandidateDetailTabs({
-  activeTab,
-  onChange,
-  copy,
-}: {
-  activeTab: CandidateDetailTabId;
-  onChange: (tab: CandidateDetailTabId) => void;
-  copy: ReturnType<typeof getTabbedWorkspaceCopy>;
-}) {
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, tab: CandidateDetailTabId) => {
-    const currentIndex = CANDIDATE_DETAIL_TAB_IDS.indexOf(tab);
-    let nextIndex: number;
-    if (event.key === "ArrowRight") nextIndex = (currentIndex + 1) % CANDIDATE_DETAIL_TAB_IDS.length;
-    else if (event.key === "ArrowLeft") nextIndex = (currentIndex - 1 + CANDIDATE_DETAIL_TAB_IDS.length) % CANDIDATE_DETAIL_TAB_IDS.length;
-    else if (event.key === "Home") nextIndex = 0;
-    else if (event.key === "End") nextIndex = CANDIDATE_DETAIL_TAB_IDS.length - 1;
-    else return;
-    event.preventDefault();
-    const nextTab = CANDIDATE_DETAIL_TAB_IDS[nextIndex]!;
-    onChange(nextTab);
-    event.currentTarget.parentElement?.querySelector<HTMLButtonElement>(`#candidate-tab-${nextTab}`)?.focus();
-  };
-
-  return (
-    <div className="token-detail-tabs" role="tablist" aria-label={copy.tablistLabel}>
-      {CANDIDATE_DETAIL_TAB_IDS.map((tab) => (
-        <button
-          key={tab}
-          id={`candidate-tab-${tab}`}
-          type="button"
-          role="tab"
-          aria-selected={activeTab === tab}
-          aria-controls={`candidate-panel-${tab}`}
-          tabIndex={activeTab === tab ? 0 : -1}
-          className={activeTab === tab ? "active" : ""}
-          onClick={() => onChange(tab)}
-          onKeyDown={(event) => handleKeyDown(event, tab)}
-        >
-          {copy.tabs[tab]}
-        </button>
-      ))}
-    </div>
-  );
 }
 
 function getTabbedWorkspaceCopy(locale: ProductLocale) {
@@ -545,6 +507,10 @@ function FollowUpOnlyDetail({
   ownerPromotionStatus,
   onOwnerPromotionStatusChange,
   onBackToResults,
+  onOpenFollowUpExternalChecks,
+  onOpenControlCenter,
+  initialManualVerification,
+  onLifecycleChanged,
   activeTab,
   onActiveTabChange,
 }: {
@@ -553,6 +519,10 @@ function FollowUpOnlyDetail({
   ownerPromotionStatus: EstablishedPromotionStatus | null;
   onOwnerPromotionStatusChange: (status: EstablishedPromotionStatus) => void;
   onBackToResults?: () => void;
+  onOpenFollowUpExternalChecks?: (followUp: FollowUpPublicEntry) => void;
+  onOpenControlCenter?: () => void;
+  initialManualVerification?: ManualVerificationRecord | null;
+  onLifecycleChanged?: () => void | Promise<void>;
   activeTab: CandidateDetailTabId;
   onActiveTabChange: (tab: CandidateDetailTabId) => void;
 }) {
@@ -584,7 +554,7 @@ function FollowUpOnlyDetail({
               <DetailField label={t("detail.chain")} value={followUp.chain} />
             </div>
           </section>
-          <AIResearchSection chain={followUp.chain} contractAddress={followUp.contract_address} symbol={followUp.symbol ?? ""} name={followUp.display_name ?? followUp.symbol ?? ""} mode="summary" onOpen={() => onActiveTabChange("ai")} />
+          <AIResearchSection chain={followUp.chain} contractAddress={followUp.contract_address} symbol={followUp.symbol ?? ""} name={followUp.display_name ?? followUp.symbol ?? ""} mode="summary" onOpen={() => onActiveTabChange("ai")} onOpenControlCenter={onOpenControlCenter} />
         </div>
       </section>
     );
@@ -617,9 +587,11 @@ function FollowUpOnlyDetail({
           <SectionHeader id="security-heading" title={t("detail.security")} />
           <DetailField label={t("followUp.securityStatus")} value={formatFollowUpSecurityStatus(followUp.security_status, locale)} tone="warning" />
           <FlagList title={t("detail.missingData")} items={followUp.missing_data} empty={t("detail.noMissingData")} tone="warning" />
+          {onOpenFollowUpExternalChecks && <div className="product-detail-actions"><ActionButton variant="primary" icon="arrow" iconPosition="end" onClick={() => onOpenFollowUpExternalChecks(followUp)}>{t("detail.openVerification")}</ActionButton></div>}
+          <ManualVerificationStatusCard chain={followUp.chain} contractAddress={followUp.contract_address} initialRecord={initialManualVerification} />
         </section>
         {ownerPromotionStatus?.owner_controls_visible && (
-          <EstablishedPromotionPanel initialStatus={ownerPromotionStatus} onStatusChange={onOwnerPromotionStatusChange} />
+          <EstablishedPromotionPanel initialStatus={ownerPromotionStatus} onStatusChange={onOwnerPromotionStatusChange} onLifecycleChanged={onLifecycleChanged} />
         )}
       </>
     );
@@ -631,6 +603,7 @@ function FollowUpOnlyDetail({
         symbol={followUp.symbol ?? ""}
         name={followUp.display_name ?? followUp.symbol ?? ""}
         mode="detail"
+        onOpenControlCenter={onOpenControlCenter}
       />
     );
   } else if (activeTab === "data") {
@@ -675,10 +648,10 @@ function FollowUpOnlyDetail({
         </div>
         <div className="token-detail-next-step"><span>{copy.nextResearchStep}</span><strong>{lifecycleActionLabel(lifecycle.next_action_type, locale)}</strong></div>
       </header>
-      <CandidateDetailTabs activeTab={activeTab} onChange={onActiveTabChange} copy={copy} />
-      <section id={`candidate-panel-${activeTab}`} role="tabpanel" aria-labelledby={`candidate-tab-${activeTab}`} tabIndex={0} className="token-detail-tabpanel">
+      <TokenDetailTabs tabs={CANDIDATE_DETAIL_TAB_IDS.map((id) => ({ id, label: copy.tabs[id] }))} activeTab={activeTab} onChange={onActiveTabChange} idPrefix="candidate" ariaLabel={copy.tablistLabel} />
+      <TokenDetailTabPanel activeTab={activeTab} idPrefix="candidate">
         {content}
-      </section>
+      </TokenDetailTabPanel>
     </div>
   );
 }

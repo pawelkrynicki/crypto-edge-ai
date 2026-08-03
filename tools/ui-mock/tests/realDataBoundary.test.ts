@@ -621,16 +621,22 @@ describe("INTERNAL_BETA context freshness boundary", () => {
     await expectContextCode(output, "CONTEXT_METADATA_INVALID");
   });
 
-  it("rejects Alternative.me after 30 hours", async () => {
+  it("keeps a validated Alternative.me snapshot visible after 30 hours and marks it stale", async () => {
     const output = makeContextOutput();
     output.sources[0].fetched_at = "2026-07-15T05:59:00.000Z";
-    await expectContextCode(output, "CONTEXT_ALTERNATIVE_ME_STALE");
+    const result = await readContext(output);
+    assert.equal(result.sources[0].status, "DEGRADED");
+    assert.ok(result.sources[0].warnings.includes("stale_snapshot"));
+    assert.equal(result._source_meta.freshness_status, "STALE");
   });
 
-  it("rejects DefiLlama after 6 hours", async () => {
+  it("keeps a validated DefiLlama snapshot visible after 6 hours and marks it stale", async () => {
     const output = makeContextOutput();
     output.sources[1].fetched_at = "2026-07-16T05:59:00.000Z";
-    await expectContextCode(output, "CONTEXT_DEFILLAMA_STALE");
+    const result = await readContext(output);
+    assert.equal(result.sources[1].status, "DEGRADED");
+    assert.ok(result.sources[1].warnings.includes("stale_snapshot"));
+    assert.equal(result._source_meta.freshness_status, "STALE");
   });
 
   it("keeps last-known-good inside SLA explicitly DEGRADED", async () => {

@@ -5,7 +5,7 @@ import {
   containsFixtureMarker,
   isRecord,
   isStringArray,
-  requireFreshTimestamp,
+  requireValidTimestamp,
   validateProvenanceManifest,
   type RealDataProvenanceManifest,
 } from "./realDataBoundary.js";
@@ -15,6 +15,7 @@ import {
   type ResolvedProductRuntimeMode,
 } from "../src/runtimeMode.js";
 import { readCommittedSnapshotState } from "./committedSnapshotState.js";
+import { resolveCanonicalProductDataPaths } from "./canonicalProductDataPaths.js";
 
 const APPROVED_CONTEXT_FILENAME = "approved_sources_output.json";
 const APPROVED_CONTEXT_PREFIX = "approved_sources_";
@@ -35,6 +36,7 @@ type ContextSourceMeta = {
   runtime_mode: ResolvedProductRuntimeMode;
   age_seconds: number | null;
   source_ids: string[];
+  freshness_status?: "FRESH" | "STALE";
 };
 
 type ContextPolicy = {
@@ -136,7 +138,6 @@ export async function readLatestContextOutput(
   options: LatestContextOutputOptions = {},
 ): Promise<ContextLatestOutput> {
   const runtimeMode = resolveProductRuntimeMode(options.runtimeMode);
-  const outputDirPath = options.outputDirPath ?? defaultOutputDirPath;
   const fixturePath = options.fixturePath ?? defaultFixturePath;
   const now = options.now ?? new Date();
 
@@ -144,9 +145,19 @@ export async function readLatestContextOutput(
     throw new ContextOutputError("RUNTIME_MODE_UNCONFIGURED");
   }
 
+  const canonical = runtimeMode === "INTERNAL_BETA" && options.outputDirPath === undefined
+    ? await resolveCanonicalProductDataPaths().catch(() => {
+      throw new ContextOutputError("CONTEXT_CANONICAL_PATHS_UNAVAILABLE");
+    })
+    : null;
+  const outputDirPath = options.outputDirPath ?? canonical?.outputDirPath ?? defaultOutputDirPath;
+  const selectionOptions = canonical && options.committedRunId === undefined && options.automationStatePath === undefined
+    ? { ...options, committedRunId: canonical.contextRunId }
+    : options;
+
   const allCandidates = await findContextCandidates(outputDirPath);
   const candidates = runtimeMode === "INTERNAL_BETA"
-    ? await selectCommittedContextCandidates(allCandidates, options)
+    ? await selectCommittedContextCandidates(allCandidates, selectionOptions)
     : allCandidates;
 
   if (runtimeMode === "DEVELOPMENT_DEMO") {
@@ -234,18 +245,18 @@ function sanitizeInternalBetaContextOutput(value: unknown, now: Date, directoryR
     throw new RealDataBoundaryError("CONTEXT_FIXTURE_MARKER_DETECTED");
   }
 
-  const generatedFreshness = requireFreshTimestamp(value.generated_at, now, ALTERNATIVE_ME_MAX_AGE_MS, {
+  const generatedFreshness = requireValidTimestamp(value.generated_at, now, ALTERNATIVE_ME_MAX_AGE_MS, {
     missing: "CONTEXT_TIMESTAMP_MISSING",
     invalid: "CONTEXT_TIMESTAMP_INVALID",
     future: "CONTEXT_TIMESTAMP_FUTURE",
     stale: "CONTEXT_SNAPSHOT_STALE",
-  });
-  requireFreshTimestamp(manifest.finished_at, now, ALTERNATIVE_ME_MAX_AGE_MS, {
+  }, { allowStale: true });
+  const finishedFreshness = requireValidTimestamp(manifest.finished_at, now, ALTERNATIVE_ME_MAX_AGE_MS, {
     missing: "CONTEXT_TIMESTAMP_MISSING",
     invalid: "CONTEXT_TIMESTAMP_INVALID",
     future: "CONTEXT_TIMESTAMP_FUTURE",
     stale: "CONTEXT_SNAPSHOT_STALE",
-  });
+  }, { allowStale: true });
 
   if (!Array.isArray(value.sources) || value.sources.length !== APPROVED_SOURCE_IDS.length) {
     throw new RealDataBoundaryError("CONTEXT_SOURCE_REQUIRED");
@@ -269,6 +280,11 @@ function sanitizeInternalBetaContextOutput(value: unknown, now: Date, directoryR
   const contextMetadata = sanitizeContextMetadata(manifest.metadata, normalizedSources);
 
   const degradedSources = normalizedSources.filter((source) => source.status === "DEGRADED").length;
+  const freshnessStatus = generatedFreshness.freshnessStatus === "STALE"
+    || finishedFreshness.freshnessStatus === "STALE"
+    || normalizedSources.some((source) => source.status === "DEGRADED" && source.warnings.includes("stale_snapshot"))
+    ? "STALE" as const
+    : "FRESH" as const;
   const summary: ContextSummary = {
     sources_requested: APPROVED_SOURCE_IDS.length,
     sources_allowed: normalizedSources.filter((source) => source.policy.allowed).length,
@@ -294,6 +310,7 @@ function sanitizeInternalBetaContextOutput(value: unknown, now: Date, directoryR
     runtime_mode: "INTERNAL_BETA",
     age_seconds: generatedFreshness.ageSeconds,
     source_ids: manifest.source_ids,
+    freshness_status: freshnessStatus,
   });
 }
 
@@ -333,13 +350,14 @@ function sanitizeInternalSource(value: unknown, now: Date): NormalizedContextSou
     ? ALTERNATIVE_ME_MAX_AGE_MS
     : DEFILLAMA_MAX_AGE_MS;
   const sourceCode = value.source_id === "alternative_me_fng" ? "ALTERNATIVE_ME" : "DEFILLAMA";
-  const freshness = requireFreshTimestamp(value.fetched_at, now, maxAgeMs, {
+  const freshness = requireValidTimestamp(value.fetched_at, now, maxAgeMs, {
     missing: "CONTEXT_TIMESTAMP_MISSING",
     invalid: "CONTEXT_TIMESTAMP_INVALID",
     future: "CONTEXT_TIMESTAMP_FUTURE",
     stale: `CONTEXT_${sourceCode}_STALE`,
-  });
-  const degraded = value.health_status === "degraded_external_source" || warnings.length > 0 || errors.length > 0;
+  }, { allowStale: true });
+  const stale = freshness.freshnessStatus === "STALE";
+  const degraded = stale || value.health_status === "degraded_external_source" || warnings.length > 0 || errors.length > 0;
 
   return {
     source_id: value.source_id,
@@ -352,7 +370,7 @@ function sanitizeInternalSource(value: unknown, now: Date): NormalizedContextSou
     policy,
     data_category: value.data_category,
     records: records as NormalizedContextRecord[],
-    warnings,
+    warnings: stale ? [...new Set([...warnings, "stale_snapshot"])] : warnings,
     errors,
   };
 }

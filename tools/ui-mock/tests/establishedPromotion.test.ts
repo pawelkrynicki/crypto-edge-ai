@@ -79,7 +79,7 @@ describe("owner established promotion capability", () => {
       assert.equal(statusBody.mode, "REVIEW_SAFE");
       assert.equal(statusBody.owner_controls_visible, true);
       assert.equal(statusBody.owner_actions_enabled, false);
-      assert.equal(statusBody.eligibility_status, "ELIGIBLE");
+      assert.equal(statusBody.eligibility_status, "OVERRIDE_REQUIRED");
 
       const preview = await getPreview(harness.server);
       assert.equal(preview.action_plan, "ADD");
@@ -120,9 +120,9 @@ describe("owner established promotion capability", () => {
 
   it("explains lifecycle and duplicate outcomes without inventing planned versions", async () => {
     for (const [lifecycle, action, reason] of [
-      ["NEW", "BLOCKED", "LIFECYCLE_NEW"],
-      ["MATURING", "BLOCKED", "LIFECYCLE_MATURING"],
-      ["ARCHIVED", "BLOCKED", "LIFECYCLE_ARCHIVED"],
+      ["NEW", "ADD", "LIFECYCLE_NEW"],
+      ["MATURING", "ADD", "LIFECYCLE_MATURING"],
+      ["ARCHIVED", "ADD", "LIFECYCLE_ARCHIVED"],
       ["ESTABLISHED", "NO_ACTION", "ALREADY_ESTABLISHED"],
     ] as const) {
       const harness = await createHarness("REVIEW_SAFE", { lifecycle_status: lifecycle });
@@ -130,9 +130,13 @@ describe("owner established promotion capability", () => {
       try {
         const preview = await getPreview(harness.server);
         assert.equal(preview.action_plan, action);
-        assert.ok(preview.reason_codes.includes(reason));
-        assert.equal(preview.planned_universe_version, null);
-        assert.equal(preview.planned_entries_total, null);
+        if (action === "ADD") assert.ok(preview.reason_codes.includes(reason));
+        assert.equal(preview.planned_universe_version === null, action === "NO_ACTION");
+        assert.equal(preview.planned_entries_total === null, action === "NO_ACTION");
+        if (action === "ADD") {
+          assert.equal(preview.eligibility_status, "OVERRIDE_REQUIRED");
+          assert.equal(preview.manual_override_required, true);
+        }
       } finally {
         await close(harness.server);
       }
@@ -309,6 +313,12 @@ describe("owner established promotion mutation security", () => {
     assert.equal(after.audit_log.length, before.audit_log.length + 1);
     assert.equal(after.current.entries.length, before.current.entries.length + 1);
     assert.equal(after.audit_log[0].operation, "add");
+    assert.equal(after.audit_log[0].actor, "owner");
+    assert.equal(after.audit_log[0].owner_decision?.previous_layer, "FOLLOW_UP");
+    assert.equal(after.audit_log[0].owner_decision?.new_layer, "ESTABLISHED");
+    assert.equal(after.audit_log[0].owner_decision?.chain, "ethereum");
+    assert.equal(after.audit_log[0].owner_decision?.contract_address, ADDRESS);
+    assert.equal(after.audit_log[0].owner_decision?.owner_reason, "Owner override confirmed for the selected token.");
     assert.equal(after.current.entries.filter((entry) => entry.contract_address === ADDRESS).length, 1);
   });
 
@@ -420,7 +430,7 @@ describe("owner established promotion mutation security", () => {
     assert.equal(detail?.established_membership, true);
     assert.equal(status.candidate_count, 0);
     assert.equal(status.established_count, 1);
-    assert.equal(await readFile(followUpPath, "utf8"), beforeFollowUp);
+    assert.notEqual(await readFile(followUpPath, "utf8"), beforeFollowUp);
   });
 });
 
@@ -526,7 +536,12 @@ function postPromotion(server: Server, preview: EstablishedPromotionPreview) {
   return requestApi(server, "POST", promotionPostPath(), {
     ...ownerHeaders(server),
     "x-crypto-edge-owner-session": preview.preview_id,
-  }, JSON.stringify({ preview_id: preview.preview_id, confirmation: true }));
+  }, JSON.stringify({
+    preview_id: preview.preview_id,
+    confirmation: true,
+    identity_confirmation: `${preview.chain}:${preview.contract_address}`,
+    owner_reason: preview.manual_override_required ? "Owner override confirmed for the selected token." : null,
+  }));
 }
 
 function ownerHeaders(server: Server): Record<string, string> {

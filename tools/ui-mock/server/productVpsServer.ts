@@ -96,6 +96,7 @@ export function createProductVpsServer(options: ProductVpsServerOptions): Server
     automation: options.automation,
     establishedUniverse: options.establishedUniverse,
     establishedPromotion: options.establishedPromotion,
+    manualOwnerActions: options.manualOwnerActions,
     followUp: options.followUp,
     reports: options.reports,
     aiResearch: options.aiResearch,

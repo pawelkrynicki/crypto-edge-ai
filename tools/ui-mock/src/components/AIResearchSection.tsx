@@ -24,6 +24,7 @@ export function AIResearchSection({
   mode = "detail",
   active = false,
   onOpen,
+  onOpenControlCenter,
 }: {
   chain: string;
   contractAddress: string;
@@ -33,6 +34,7 @@ export function AIResearchSection({
   mode?: "summary" | "detail";
   active?: boolean;
   onOpen?: () => void;
+  onOpenControlCenter?: () => void;
 }) {
   const { locale } = useProductLocale();
   const ui = COPY[locale];
@@ -165,8 +167,11 @@ export function AIResearchSection({
               disabled={!canRequest}
               onClick={() => void requestPreparation()}
             >
-              {ui.request}
+              {availability === "FAILED" || availability === "ERROR" ? ui.retry : ui.request}
             </ActionButton>
+          )}
+          {availability === "PROVIDER_DISABLED" && onOpenControlCenter && (
+            <ActionButton variant="secondary" onClick={onOpenControlCenter}>{ui.openControlCenter}</ActionButton>
           )}
           {waitingToRetry && (
             <ActionButton variant="secondary" disabled>
@@ -269,7 +274,9 @@ function stateTitle(value: AIResearchBriefLookup["availability"], locale: "pl" |
   if (value === "QUEUED") return pl ? "Analiza oczekuje w kolejce" : "Analysis is waiting in the queue";
   if (value === "PROCESSING") return pl ? "Analiza jest przygotowywana" : "Analysis is being prepared";
   if (value === "STALE") return pl ? "Ostatnia analiza dostępna" : "Last analysis available";
-  if (["FAILED", "ERROR", "PROVIDER_DISABLED", "SUSPENDED"].includes(value)) {
+  if (value === "PROVIDER_DISABLED") return pl ? "Analiza AI jest wyłączona w tym trybie podglądu" : "AI analysis is disabled in this preview mode";
+  if (value === "SUSPENDED") return pl ? "Przygotowanie analizy jest wstrzymane" : "Analysis preparation is paused";
+  if (["FAILED", "ERROR"].includes(value)) {
     return pl ? "Analiza nie mogła zostać teraz przygotowana." : "The analysis could not be prepared right now.";
   }
   if (value === "COOLDOWN" || value === "RATE_LIMITED") return pl ? "Spróbuj ponownie później." : "Try again later.";
@@ -290,13 +297,14 @@ function stateDetail(
   if (value === "PROCESSING") return pl ? "Centralny system przygotowuje jeden wspólny wynik dla tego stanu danych." : "The central system is preparing one shared result for this data state.";
   if (value === "STALE") return pl ? "Dane zmieniły się, a aktualizacja jest przygotowywana. Poprzedni prawidłowy wynik pozostaje dostępny." : "Data changed and an update is being prepared. The previous valid result remains available.";
   if (value === "FAILED" && hasBrief) return pl ? "Spróbuj ponownie później. Ostatni poprawny wynik pozostaje dostępny." : "Try again later. The last valid result remains available.";
-  if (value === "FAILED" || value === "SUSPENDED") return pl ? "Spróbuj ponownie później." : "Try again later.";
+  if (value === "FAILED") return pl ? "Spróbuj ponownie. Wspólna kolejka nie utworzy duplikatu analizy." : "Try again. The shared queue will not create a duplicate analysis.";
+  if (value === "SUSPENDED") return pl ? "Wznowienie będzie możliwe po uruchomieniu kolejki analizy." : "Preparation can resume when the analysis queue is enabled.";
   if (value === "COOLDOWN" || value === "RATE_LIMITED") return pl
     ? `Ponowne zgłoszenie będzie możliwe${retry ? ` za ${retry} s` : " później"}. Nie utworzono drugiej analizy.`
     : `Another request will be possible${retry ? ` in ${retry} sec` : " later"}. No duplicate analysis was created.`;
-  if (value === "PROVIDER_DISABLED") return pl ? "Spróbuj ponownie później." : "Try again later.";
+  if (value === "PROVIDER_DISABLED") return pl ? "Aktywuj analizę AI w Centrum sterowania." : "Enable AI analysis in Control Center.";
   if (value === "INSUFFICIENT_DATA") return pl ? "Serwer nie posiada zwalidowanych danych pozwalających przygotować wiarygodny brief." : "The server has no validated data that can prepare a reliable brief.";
-  if (value === "ERROR") return pl ? "Spróbuj ponownie później." : "Try again later.";
+  if (value === "ERROR") return pl ? "Spróbuj ponownie. Ponowne zgłoszenie nie utworzy duplikatu." : "Try again. A repeated request will not create a duplicate.";
   return pl ? "Możesz zgłosić potrzebę przygotowania wspólnej analizy." : "You can request preparation of the shared analysis.";
 }
 
@@ -304,7 +312,9 @@ const COPY = {
   pl: {
     title: "Analiza badawcza AI",
     intro: "Wspólna analiza zwalidowanych danych — bez sygnałów transakcyjnych.",
-    request: "Zgłoś przygotowanie analizy",
+    request: "Zleć analizę AI",
+    retry: "Ponów zlecenie analizy",
+    openControlCenter: "Aktywuj analizę AI w Centrum sterowania",
     requesting: "Zapisywanie zgłoszenia…",
     requestingStatus: "Zgłoszenie trafia do wspólnej kolejki.",
     tryAgainLater: "Spróbuj ponownie później",
@@ -322,6 +332,8 @@ const COPY = {
     title: "AI Research Brief",
     intro: "A shared analysis of validated data — without trading signals.",
     request: "Request analysis preparation",
+    retry: "Retry analysis request",
+    openControlCenter: "Enable AI analysis in Control Center",
     requesting: "Recording request…",
     requestingStatus: "The request is being added to the shared queue.",
     tryAgainLater: "Try again later",

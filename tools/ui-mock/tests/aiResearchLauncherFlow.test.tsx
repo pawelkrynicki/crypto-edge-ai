@@ -67,7 +67,7 @@ describe("AI.3 real owner-review launcher flow", () => {
       },
       {
         search: "?ai_review_state=suspended",
-        expected: ["Wstrzymana", "Analiza nie mogła zostać teraz przygotowana."],
+        expected: ["Wstrzymana", "Przygotowanie analizy jest wstrzymane", "Wznowienie będzie możliwe po uruchomieniu kolejki analizy."],
       },
       {
         search: "",
