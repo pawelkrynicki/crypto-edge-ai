@@ -168,7 +168,7 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
   if (activeTab === "identity") {
     activeContent = (
       <VerificationSection heading={tabCopy.identity} detail={locale === "pl" ? "Potwierdź tożsamość tokena przed oceną danych i ryzyka." : "Confirm the token identity before evaluating market data and risk."}>
-        <div className="product-detail-grid data">
+        <div className="product-detail-grid data verification-identity-grid">
           <VerificationMetric label={locale === "pl" ? "Nazwa" : "Name"} value={displayName || missingText} />
           <VerificationMetric label={locale === "pl" ? "Symbol" : "Symbol"} value={symbol || missingText} />
           <VerificationMetric label={t("verification.network")} value={normalizedInput.chain || missingText} />
@@ -176,7 +176,7 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
           <VerificationMetric label={locale === "pl" ? "Pierwsze wykrycie" : "First seen"} value={firstSeen ? formatProductDateTime(firstSeen, locale) : missingText} />
           <VerificationMetric label={locale === "pl" ? "Ostatnie wykrycie" : "Last seen"} value={lastSeen ? formatProductDateTime(lastSeen, locale) : missingText} />
         </div>
-        <div className="verification-contract"><span>{t("verification.contractAddress")}</span><code title={normalizedInput.contractAddress}>{normalizedInput.contractAddress || missingText}</code>{normalizedInput.contractAddress && <CopyButton value={normalizedInput.contractAddress} label={t("verification.copyContract")} copiedLabel={t("app.copied")} />}</div>
+        <div className="verification-contract verification-contract-panel"><span>{t("verification.contractAddress")}</span><code title={normalizedInput.contractAddress}>{normalizedInput.contractAddress || missingText}</code>{normalizedInput.contractAddress && <CopyButton value={normalizedInput.contractAddress} label={t("verification.copyContract")} copiedLabel={t("app.copied")} />}</div>
       </VerificationSection>
     );
   } else if (activeTab === "market") {
@@ -249,6 +249,37 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
     );
   }
 
+  if (activeTab === "decision") {
+    activeContent = (
+      <VerificationDecision
+        locale={locale}
+        lastDecision={lastDecision}
+        verdict={verdict}
+        onVerdictChange={(value) => { setVerdict(value); setPreview(null); }}
+        note={note}
+        onNoteChange={(value) => { setNote(value); setPreview(null); }}
+        availableData={availableData}
+        missingData={missingData}
+        ownerStatus={ownerStatus}
+        preparing={preparing}
+        preview={preview}
+        identityConfirmation={identityConfirmation}
+        onIdentityConfirmationChange={setIdentityConfirmation}
+        confirmed={confirmed}
+        onConfirmedChange={setConfirmed}
+        canSave={canSave}
+        saving={saving}
+        saveError={saveError}
+        expectedIdentity={expectedIdentity}
+        onPrepare={prepareSave}
+        onSave={save}
+        onReturnToDetail={onReturnToDetail}
+        onVerificationSaved={onVerificationSaved}
+        savedRecord={savedRecord}
+      />
+    );
+  }
+
   return (
     <TokenDetailDrawer
       title={symbol || missingText}
@@ -266,8 +297,99 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
   );
 };
 
+function VerificationDecision({
+  locale,
+  lastDecision,
+  verdict,
+  onVerdictChange,
+  note,
+  onNoteChange,
+  availableData,
+  missingData,
+  ownerStatus,
+  preparing,
+  preview,
+  identityConfirmation,
+  onIdentityConfirmationChange,
+  confirmed,
+  onConfirmedChange,
+  canSave,
+  saving,
+  saveError,
+  expectedIdentity,
+  onPrepare,
+  onSave,
+  onReturnToDetail,
+  onVerificationSaved,
+  savedRecord,
+}: {
+  locale: ProductLocale;
+  lastDecision: ManualVerificationRecord | null;
+  verdict: ManualVerificationVerdict;
+  onVerdictChange: (value: ManualVerificationVerdict) => void;
+  note: string;
+  onNoteChange: (value: string) => void;
+  availableData: string[];
+  missingData: string[];
+  ownerStatus: ManualVerificationOwnerStatus | null;
+  preparing: boolean;
+  preview: ManualVerificationPreview | null;
+  identityConfirmation: string;
+  onIdentityConfirmationChange: (value: string) => void;
+  confirmed: boolean;
+  onConfirmedChange: (value: boolean) => void;
+  canSave: boolean;
+  saving: boolean;
+  saveError: boolean;
+  expectedIdentity: string;
+  onPrepare: () => Promise<void>;
+  onSave: () => Promise<void>;
+  onReturnToDetail?: () => void;
+  onVerificationSaved?: (record: ManualVerificationRecord) => void;
+  savedRecord: ManualVerificationRecord | null;
+}) {
+  const pl = locale === "pl";
+  return (
+    <VerificationSection heading={pl ? "Decyzja weryfikacyjna" : "Verification decision"} detail={pl ? "Zapis decyzji aktualizuje od razu Candidate Detail, bez opuszczania listy." : "Saving a decision updates Candidate Detail immediately without leaving the list."}>
+      <section className="verification-decision-current" aria-label={pl ? "Aktualny status weryfikacji" : "Current verification status"}>
+        <span>{pl ? "Aktualny status weryfikacji" : "Current verification status"}</span>
+        <strong data-verification-verdict={lastDecision?.verdict}>{lastDecision?.verdict ?? (pl ? "Brak zapisanej decyzji" : "No saved decision")}</strong>
+        {lastDecision && <p>{pl ? `Ostatnia decyzja: ${formatProductDateTime(lastDecision.checked_at, locale)}` : `Last decision: ${formatProductDateTime(lastDecision.checked_at, locale)}`}</p>}
+      </section>
+
+      <div className="verification-decision-options" role="radiogroup" aria-label={pl ? "Wybierz decyzję weryfikacyjną" : "Choose verification decision"}>
+        {(["VERIFIED", "NEEDS_MORE_DATA", "CRITICAL_RISK", "REJECT"] as const).map((option) => (
+          <button key={option} type="button" role="radio" aria-checked={verdict === option} className={verdict === option ? "selected" : ""} onClick={() => onVerdictChange(option)}>
+            {option}
+          </button>
+        ))}
+      </div>
+
+      <label className="verification-decision-note"><span>{pl ? "Krótka notatka ownera" : "Short owner note"}</span><textarea value={note} onChange={(event) => onNoteChange(event.target.value)} minLength={3} maxLength={500} rows={4} /></label>
+
+      <section className="verification-decision-impact"><strong>{pl ? "Podsumowanie skutków decyzji" : "Decision impact summary"}</strong><p>{decisionImpactCopy(verdict, locale)}</p></section>
+
+      <section className="verification-decision-coverage"><div className="condition-list ready"><strong>{pl ? "Dostępne" : "Available"}</strong><ul>{availableData.map((item) => <li key={item}>{formatCoverageItem(item, locale)}</li>)}</ul></div><div className="condition-list warning"><strong>{pl ? "Brakujące" : "Missing"}</strong>{missingData.length > 0 ? <ul>{missingData.map((item) => <li key={item}>{formatCoverageItem(item, locale)}</li>)}</ul> : <p>{pl ? "Brak" : "None"}</p>}</div></section>
+
+      {ownerStatus && <section className="owner-verification-decision" aria-labelledby="verification-decision-heading"><header><h3 id="verification-decision-heading">{pl ? "Potwierdzenie zapisu" : "Save confirmation"}</h3></header><ActionButton variant="primary" onClick={() => void onPrepare()} loading={preparing} disabled={note.trim().length < 3}>{pl ? "Zapisz decyzję" : "Save decision"}</ActionButton>{preview && <div className="owner-decision-confirmation"><p>{pl ? `Potwierdź dokładną tożsamość: ${expectedIdentity}` : `Confirm the exact identity: ${expectedIdentity}`}</p><input aria-label={pl ? "Potwierdzenie tożsamości" : "Identity confirmation"} value={identityConfirmation} onChange={(event) => onIdentityConfirmationChange(event.target.value)} autoComplete="off" /><label className="owner-confirmation"><input type="checkbox" checked={confirmed} onChange={(event) => onConfirmedChange(event.target.checked)} /><span>{pl ? "Potwierdzam werdykt i zapis w audycie." : "I confirm the verdict and audit record."}</span></label><ActionButton variant="primary" onClick={() => void onSave()} loading={saving} disabled={!canSave}>{pl ? "Zapisz status weryfikacji" : "Save verification status"}</ActionButton></div>}{saveError && <p role="alert">{pl ? "Nie zapisano decyzji. Przygotuj nowy zapis i spróbuj ponownie." : "The decision was not saved. Prepare a new save and try again."}</p>}</section>}
+
+      <section className="verification-return" aria-labelledby="verification-return-heading"><div><h3 id="verification-return-heading">{pl ? "Powrót do Candidate Detail" : "Return to Candidate Detail"}</h3><p>{pl ? "Lista Weryfikacji pozostaje zachowana po powrocie." : "The Verification list remains intact when returning."}</p></div><ActionButton variant="primary" icon="arrow" iconPosition="end" className="product-primary-button" onClick={() => { if (onReturnToDetail) onReturnToDetail(); else if (savedRecord) onVerificationSaved?.(savedRecord); else if (typeof window !== "undefined") window.location.hash = "candidate-detail"; }}>{pl ? "Wróć do szczegółów" : "Return to detail"}</ActionButton></section>
+    </VerificationSection>
+  );
+}
+
 function VerificationSection({ heading, detail, children }: { heading: string; detail: string; children: React.ReactNode }) {
-  return <section className="verification-research-section"><header><div><h3>{heading}</h3><p>{detail}</p></div></header>{children}</section>;
+  const isIdentity = heading === "Tożsamość" || heading === "Identity";
+  const isDecision = heading === "Decyzja weryfikacyjna" || heading === "Verification decision";
+  return <section className={`verification-research-section ${isIdentity ? "verification-identity-panel" : ""} ${isDecision ? "verification-decision-panel" : ""}`.trim()}><header><div><h3>{heading}</h3><p>{detail}</p></div></header>{children}</section>;
+}
+
+function decisionImpactCopy(verdict: ManualVerificationVerdict, locale: ProductLocale): string {
+  const pl = locale === "pl";
+  if (verdict === "VERIFIED") return pl ? "Werdykt zostanie zapisany jako ręcznie zweryfikowany dla tej tożsamości tokena." : "The verdict will be saved as manually verified for this token identity.";
+  if (verdict === "CRITICAL_RISK") return pl ? "Werdykt wskaże krytyczne ryzyko do dalszej ręcznej oceny." : "The verdict will mark critical risk for further manual assessment.";
+  if (verdict === "REJECT") return pl ? "Werdykt wskaże odrzucenie tej tożsamości w historii ręcznej weryfikacji." : "The verdict will mark this identity as rejected in manual-verification history.";
+  return pl ? "Werdykt wskaże, że przed decyzją potrzebne są dodatkowe dane." : "The verdict will mark that more data is needed before a decision.";
 }
 
 function VerificationFilterRow({ category, state, value, reasons, locale }: { category: BasicFilterCategory; state: BasicFilterConditionState; value: string; reasons: string[]; locale: ProductLocale }) {

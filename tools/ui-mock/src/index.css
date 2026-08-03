@@ -8801,7 +8801,10 @@ summary {
 /* Verification keeps the Details card pattern and leaves the token list visible. */
 .verification-token-browser {
   display: grid;
-  grid-template-columns: minmax(240px, 0.42fr) minmax(0, 1fr);
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  grid-template-columns: clamp(240px, 22%, 280px) minmax(0, 1fr);
   align-items: start;
   gap: 14px;
 }
@@ -8813,7 +8816,7 @@ summary {
   background: var(--bg-card);
 }
 
-.verification-token-list { padding: 14px; }
+.verification-token-list { min-width: 0; padding: 14px; }
 .verification-token-list > header > span,
 .detail-verification-badge {
   color: var(--accent);
@@ -8849,9 +8852,134 @@ summary {
 .verification-token-list-meta { overflow-wrap: anywhere; color: var(--text-muted); font-family: var(--font-mono, monospace); font-size: 10px; }
 .verification-token-list-empty { margin-top: 14px !important; }
 
-.verification-token-drawer-region { min-width: 0; }
+.verification-token-drawer-region { min-width: 0; width: 100%; }
 .verification-token-drawer-region .token-detail-drawer { animation: verification-drawer-enter 180ms ease-out; }
 .verification-token-drawer-placeholder { min-height: 260px; padding: 24px; }
+
+.verification-tab-content .verification-research-section {
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+}
+
+.verification-tab-content .verification-research-section > header {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+}
+
+.verification-tab-content .verification-research-section > header > div { min-width: 0; }
+.verification-tab-content .verification-research-section > header p { max-width: none; overflow-wrap: normal; word-break: normal; }
+
+.verification-identity-panel > .verification-identity-grid {
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  gap: var(--space-3);
+}
+
+.verification-tab-content .external-checks-review-grid,
+.verification-tab-content .product-detail-grid.data {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-3);
+}
+
+.verification-tab-content .filter-condition-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-3);
+}
+
+.verification-tab-content .external-check-metric strong {
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+.verification-identity-panel > .verification-contract-panel {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-column: 1 / -1;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+}
+
+.verification-identity-panel > .verification-contract-panel > code {
+  min-width: 0;
+  max-width: none;
+  overflow: visible;
+  color: var(--color-text-primary);
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.verification-decision-panel { align-content: start; }
+.verification-decision-current,
+.verification-decision-impact {
+  display: grid;
+  width: 100%;
+  gap: 5px;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+}
+.verification-decision-current > span,
+.verification-decision-impact > strong { color: var(--color-text-helper); font-size: 10px; font-weight: 800; text-transform: uppercase; }
+.verification-decision-current > strong { color: var(--color-text-primary); font-size: 15px; }
+.verification-decision-current > p,
+.verification-decision-impact > p { margin: 0; color: var(--color-text-secondary); font-size: 12px; line-height: 1.55; }
+
+.verification-decision-options {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+.verification-decision-options > button {
+  min-width: 0;
+  min-height: 58px;
+  padding: var(--space-3) var(--space-4);
+  color: var(--color-text-primary);
+  font-size: 12px;
+  font-weight: 800;
+  text-align: left;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+  cursor: pointer;
+}
+.verification-decision-options > button:hover,
+.verification-decision-options > button.selected { border-color: var(--color-border-active); background: var(--color-accent-soft); }
+.verification-decision-options > button.selected { box-shadow: inset 3px 0 0 var(--color-accent); }
+
+.verification-decision-note {
+  display: grid;
+  width: 100%;
+  gap: 6px;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 750;
+}
+.verification-decision-note textarea {
+  width: 100%;
+  min-height: 112px;
+  padding: var(--space-3);
+  color: var(--color-text-primary);
+  line-height: 1.5;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-sm);
+  outline: 0;
+  resize: vertical;
+  background: var(--color-surface-2);
+}
+.verification-decision-coverage { display: grid; width: 100%; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+.verification-decision-panel .owner-verification-decision { width: 100%; }
+.verification-decision-panel .owner-verification-decision > header { display: block; }
+.verification-decision-panel .owner-verification-decision > .action-button { justify-self: start; min-width: 170px; }
+.verification-decision-panel .verification-return { width: 100%; }
 
 .token-detail-drawer .detail-title strong,
 .token-detail-drawer .detail-title span,
@@ -8863,9 +8991,22 @@ summary {
   to { opacity: 1; transform: translateX(0); }
 }
 
-@media (max-width: 960px) {
+@media (max-width: 1180px) {
+  .verification-token-browser { grid-template-columns: 220px minmax(0, 1fr); }
+  .verification-identity-panel > .verification-identity-grid { grid-template-columns: repeat(2, minmax(150px, 1fr)); }
+}
+
+@media (max-width: 720px) {
   .verification-token-browser { grid-template-columns: 1fr; }
   .verification-token-drawer-region .token-detail-drawer { max-height: none; }
+  .verification-identity-panel > .verification-identity-grid,
+  .verification-tab-content .external-checks-review-grid,
+  .verification-tab-content .product-detail-grid.data,
+  .verification-tab-content .filter-condition-grid,
+  .verification-decision-options,
+  .verification-decision-coverage { grid-template-columns: 1fr; }
+  .verification-identity-panel > .verification-contract-panel { grid-template-columns: minmax(0, 1fr); align-items: start; }
+  .verification-identity-panel > .verification-contract-panel > .copy-button-control { justify-self: start; }
 }
 
 @media (prefers-reduced-motion: reduce) {

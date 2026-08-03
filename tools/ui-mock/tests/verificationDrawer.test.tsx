@@ -60,7 +60,8 @@ describe("Verification drawer tabs", () => {
       await act(async () => { await flushPromises(); });
       const textarea = renderer.root.findByType("textarea");
       await act(async () => { textarea.props.onChange({ target: { value: "Identity checked" } }); });
-      await act(async () => { button(renderer, "Przygotuj zapis decyzji").props.onClick(); await flushPromises(); });
+      assert.equal(renderer.root.findAll((node) => node.props.role === "radio").length, 4);
+      await act(async () => { button(renderer, "Zapisz decyzję").props.onClick(); await flushPromises(); });
       const confirmation = renderer.root.findByProps({ "aria-label": "Potwierdzenie tożsamości" });
       await act(async () => { confirmation.props.onChange({ target: { value: identity } }); });
       const checkbox = renderer.root.findAllByType("input").find((input) => input.props.type === "checkbox");
@@ -101,13 +102,25 @@ describe("Verification drawer tabs", () => {
     }
   });
 
-  it("uses the shared horizontally scrollable tab strip without page-width overflow rules", async () => {
+  it("keeps the list narrow and gives every Verification drawer panel readable desktop and mobile geometry", async () => {
     const css = await readFile(resolve(process.cwd(), "src", "index.css"), "utf8");
     const component = await readFile(resolve(process.cwd(), "src", "components", "ExternalVerificationLinksView.tsx"), "utf8");
     assert.match(component, /TokenDetailTabs/);
+    assert.match(css, /\.verification-token-browser[\s\S]*grid-template-columns:\s*clamp\(240px, 22%, 280px\) minmax\(0, 1fr\)/);
+    assert.match(css, /@media \(max-width: 1180px\)[\s\S]*\.verification-token-browser \{ grid-template-columns: 220px minmax\(0, 1fr\);/);
+    assert.match(component, /verification-identity-grid/);
+    assert.match(component, /verification-contract-panel/);
+    assert.match(css, /\.verification-tab-content \.verification-research-section > header[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\)/);
+    assert.match(css, /\.verification-identity-panel > \.verification-identity-grid[\s\S]*repeat\(4, minmax\(150px, 1fr\)\)/);
+    assert.match(css, /\.verification-identity-panel > \.verification-contract-panel[\s\S]*grid-column: 1 \/ -1/);
+    assert.match(component, /verification-decision-options/);
+    assert.match(component, /verification-decision-note/);
+    assert.match(css, /\.verification-decision-options[\s\S]*repeat\(2, minmax\(0, 1fr\)\)/);
+    assert.match(css, /\.verification-decision-note textarea[\s\S]*min-height: 112px/);
     assert.match(css, /\.token-detail-tabs[\s\S]*overflow-x:\s*auto/);
-    assert.match(css, /@media \(max-width:\s*760px\)[\s\S]*\.token-detail-tabs/);
-    assert.match(css, /\.token-detail-drawer-body--tabbed/);
+    assert.match(css, /\.verification-token-browser[\s\S]*max-width:\s*100%[\s\S]*min-width:\s*0/);
+    assert.match(css, /@media \(max-width: 720px\)[\s\S]*\.verification-token-browser \{ grid-template-columns: 1fr;/);
+    assert.match(css, /@media \(max-width: 720px\)[\s\S]*\.verification-decision-options[\s\S]*grid-template-columns: 1fr/);
   });
 });
 
