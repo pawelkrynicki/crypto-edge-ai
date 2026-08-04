@@ -26,9 +26,11 @@ import {
 } from "../../data-poc/src/followUpBasket.js";
 import {
   getDefaultLifecycleAuditStorePath,
+  getDefaultLifecycleCycleReceiptPath,
   getDefaultLifecycleOperationJournalPath,
   getDefaultNewInboxStorePath,
   validateLifecycleAuditStore,
+  validateLifecycleCycleReceiptStore,
   validateLifecycleOperationJournalStore,
   validateNewInboxStore,
 } from "../../data-poc/src/systemLifecycle.js";
@@ -67,6 +69,7 @@ export type ProductRecoveryPaths = {
   followUpBackup: string;
   newInboxStore: string;
   lifecycleAuditStore: string;
+  lifecycleCycleReceipt: string;
   lifecycleOperationJournal: string;
   establishedStore: string;
   establishedConfig: string;
@@ -240,6 +243,7 @@ export async function resolveProductRecoveryPaths(
     followUpBackup: `${getDefaultFollowUpStorePath(env)}.bak`,
     newInboxStore: getDefaultNewInboxStorePath(env),
     lifecycleAuditStore: getDefaultLifecycleAuditStorePath(env),
+    lifecycleCycleReceipt: getDefaultLifecycleCycleReceiptPath(env),
     lifecycleOperationJournal: getDefaultLifecycleOperationJournalPath(env),
     establishedStore: getDefaultEstablishedUniverseStorePath(env),
     establishedConfig: resolveRepoFile("config/established_address_universe_v1.json"),
@@ -637,6 +641,7 @@ async function buildStoreInventory(
     paths.followUpBackup,
     paths.newInboxStore,
     paths.lifecycleAuditStore,
+    paths.lifecycleCycleReceipt,
     paths.lifecycleOperationJournal,
     paths.establishedStore,
     paths.establishedConfig,
@@ -674,6 +679,7 @@ async function buildStoreInventory(
     descriptor("follow_up_backup", paths.followUpBackup, "stores/follow-up/store.json.bak", "json", true, ["follow_up_store"]),
     descriptor("new_inbox_store", paths.newInboxStore, "stores/lifecycle/new-inbox.json", "json", true),
     descriptor("lifecycle_audit_store", paths.lifecycleAuditStore, "stores/lifecycle/audit.json", "json", true, ["new_inbox_store"]),
+    descriptor("lifecycle_cycle_receipt", paths.lifecycleCycleReceipt, "stores/lifecycle/cycle-receipts.json", "json", true, ["new_inbox_store", "lifecycle_audit_store"]),
     descriptor("lifecycle_operation_journal", paths.lifecycleOperationJournal, "stores/lifecycle/operation-journal.json", "json", true, ["new_inbox_store", "lifecycle_audit_store"]),
     establishedStoreDescriptor,
     descriptor("established_address_config", paths.establishedConfig, "config/established_address_universe_v1.json", "config", true),
@@ -758,6 +764,8 @@ async function validateSourceState(
       validateNewInboxStore(JSON.parse(raw) as unknown);
     } else if (item.logicalStoreId === "lifecycle_audit_store") {
       validateLifecycleAuditStore(JSON.parse(raw) as unknown);
+    } else if (item.logicalStoreId === "lifecycle_cycle_receipt") {
+      validateLifecycleCycleReceiptStore(JSON.parse(raw) as unknown);
     } else if (item.logicalStoreId === "lifecycle_operation_journal") {
       validateLifecycleOperationJournalStore(JSON.parse(raw) as unknown);
     } else if (item.logicalStoreId === "established_universe_store") {
@@ -831,6 +839,7 @@ async function assertRestoreManifestComplete(
     "follow_up_backup",
     "new_inbox_store",
     "lifecycle_audit_store",
+    "lifecycle_cycle_receipt",
     "lifecycle_operation_journal",
     "established_universe_store",
     "established_address_config",
@@ -898,6 +907,7 @@ async function mapManifestToTargets(manifest: ProductBackupManifest, paths: Prod
     follow_up_backup: paths.followUpBackup,
     new_inbox_store: paths.newInboxStore,
     lifecycle_audit_store: paths.lifecycleAuditStore,
+    lifecycle_cycle_receipt: paths.lifecycleCycleReceipt,
     lifecycle_operation_journal: paths.lifecycleOperationJournal,
     established_universe_store: paths.establishedStore,
     established_address_config: paths.establishedConfig,
@@ -996,7 +1006,7 @@ function groupTargetMappings(
   const priority = [
     "active_scanner_snapshot", "active_context_snapshot", "follow_up_store", "follow_up_backup",
     "established_universe_store", "established_address_config", "feedback_sqlite",
-    "ai_queue_cache_sqlite", "user_workspace_sqlite", "new_inbox_store", "lifecycle_audit_store", "lifecycle_operation_journal", "reports_library", "runtime_policy_config",
+    "ai_queue_cache_sqlite", "user_workspace_sqlite", "new_inbox_store", "lifecycle_audit_store", "lifecycle_cycle_receipt", "lifecycle_operation_journal", "reports_library", "runtime_policy_config",
     "established_discovery_query_plan", "data_source_registry", "central_run_once_receipt",
     "central_automation_state",
   ];

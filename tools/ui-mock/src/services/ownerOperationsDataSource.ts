@@ -45,9 +45,12 @@ export type OwnerRefreshResult = {
     valid: number;
     rejected: number;
     new_inbox: number;
+    new_inbox_updated: number;
     promoted_to_follow_up: number;
     promoted_to_main_radar: number;
     duplicates: number;
+    lifecycle_cycle_id: string | null;
+    lifecycle_status: "SUCCESS" | "PARTIAL" | "FAILED" | null;
     source_errors: string[];
     snapshot_at: string | null;
     honeypot_is_calls: 0;
@@ -143,9 +146,11 @@ function isOwnerRefreshResult(value: unknown): value is OwnerRefreshResult {
 
 function isLifecycleReceipt(value: unknown): boolean {
   return isRecord(value)
-    && ["found", "valid", "rejected", "new_inbox", "promoted_to_follow_up", "promoted_to_main_radar", "duplicates"].every((key) => Number.isSafeInteger(value[key]) && Number(value[key]) >= 0)
+    && ["found", "valid", "rejected", "new_inbox", "new_inbox_updated", "promoted_to_follow_up", "promoted_to_main_radar", "duplicates"].every((key) => Number.isSafeInteger(value[key]) && Number(value[key]) >= 0)
     && isStringArray(value.source_errors)
     && isNullableIso(value.snapshot_at)
+    && (value.lifecycle_cycle_id === null || isSafeText(value.lifecycle_cycle_id))
+    && (value.lifecycle_status === null || ["SUCCESS", "PARTIAL", "FAILED"].includes(String(value.lifecycle_status)))
     && value.honeypot_is_calls === 0;
 }
 

@@ -41,7 +41,7 @@ import {
 } from "./services/establishedUniverseStatusDataSource";
 import { loadControlCenterStatus } from "./services/controlCenterStatusDataSource";
 import { loadFollowUpByIdentity, loadFollowUpList, loadFollowUpStatus } from "./services/followUpDataSource";
-import { loadLifecycleRadar, loadLifecycleSummary } from "./services/lifecycleDataSource";
+import { loadLifecycleRadar } from "./services/lifecycleDataSource";
 import type { LifecycleRadarView, LifecycleSummary } from "./types/lifecycleTypes";
 import type { FollowUpPublicEntry, FollowUpPublicStatus } from "./types/followUpTypes";
 import {
@@ -106,7 +106,6 @@ export type ProductAppDataSources = {
   loadFollowUpStatus: typeof loadFollowUpStatus;
   loadFollowUpList: typeof loadFollowUpList;
   loadFollowUpByIdentity?: typeof loadFollowUpByIdentity;
-  loadLifecycleSummary?: typeof loadLifecycleSummary;
   loadLifecycleRadar?: typeof loadLifecycleRadar;
   now: () => string;
 };
@@ -120,7 +119,6 @@ const DEFAULT_PRODUCT_APP_DATA_SOURCES: ProductAppDataSources = {
   loadFollowUpStatus,
   loadFollowUpList,
   loadFollowUpByIdentity,
-  loadLifecycleSummary,
   loadLifecycleRadar,
   now: () => new Date().toISOString(),
 };
@@ -246,39 +244,20 @@ export function ProductAppContent({
     const refresh = (async () => {
       setLoading(true);
 
-      const [scannerResult, readinessResult, automationResult, universeStatusResult, controlCenterResult, followUpStatusResult, followUpListResult, lifecycleSummaryResult, lifecycleRadarResult] = await Promise.all([
+      const [scannerResult, readinessResult, automationResult, universeStatusResult, controlCenterResult, lifecycleRadarResult] = await Promise.all([
         dataSources.loadScanner({ runtimeMode }),
         dataSources.loadReadiness({ runtimeMode }),
         dataSources.loadAutomation(),
         dataSources.loadEstablishedUniverse(),
         dataSources.loadControlCenter(),
-        dataSources.loadFollowUpStatus(),
-        dataSources.loadFollowUpList(),
-        dataSources.loadLifecycleSummary?.() ?? Promise.resolve(null),
         dataSources.loadLifecycleRadar?.() ?? Promise.resolve(null),
       ]);
       setAutomationStatus(automationResult);
       setEstablishedUniverseStatus(universeStatusResult);
       setControlCenterStatus(controlCenterResult);
       setFeedbackRefreshRevision((value) => value + 1);
-      setFollowUpStatus(followUpStatusResult);
       setLifecycleRadar(lifecycleRadarResult);
-      setLifecycleSummary(lifecycleRadarResult?.summary ?? lifecycleSummaryResult);
-      let nextFollowUpEntries = followUpListResult?.entries ?? [];
-      const routedIdentity = routeTokenIdentityRef.current;
-      if (routedIdentity
-        && dataSources.loadFollowUpByIdentity
-        && !findFollowUpByIdentity(nextFollowUpEntries, {
-          chain: routedIdentity.chain,
-          contractAddress: routedIdentity.contract_address,
-        })) {
-        const routedEntry = await dataSources.loadFollowUpByIdentity(
-          routedIdentity.chain,
-          routedIdentity.contract_address,
-        );
-        if (routedEntry) nextFollowUpEntries = [routedEntry, ...nextFollowUpEntries];
-      }
-      setFollowUpEntries(nextFollowUpEntries);
+      setLifecycleSummary(lifecycleRadarResult?.summary ?? null);
 
       const hadAcceptedSnapshot = scannerViewStateRef.current.hasAcceptedSnapshot;
       if (scannerResult.status === "ready" || !hadAcceptedSnapshot) {
@@ -318,6 +297,22 @@ export function ProductAppContent({
     return refresh;
   }, [dataSources, runtimeMode]);
 
+  const loadFollowUpDetails = useCallback((): void => {
+    const routedIdentity = routeTokenIdentityRef.current;
+    void Promise.all([dataSources.loadFollowUpStatus(), dataSources.loadFollowUpList()]).then(async ([status, list]) => {
+      setFollowUpStatus(status);
+      let entries = list?.entries ?? [];
+      if (routedIdentity && dataSources.loadFollowUpByIdentity && !findFollowUpByIdentity(entries, {
+        chain: routedIdentity.chain,
+        contractAddress: routedIdentity.contract_address,
+      })) {
+        const entry = await dataSources.loadFollowUpByIdentity(routedIdentity.chain, routedIdentity.contract_address);
+        if (entry) entries = [entry, ...entries];
+      }
+      setFollowUpEntries(entries);
+    });
+  }, [dataSources]);
+
   const loadMoreLifecycleRadar = useCallback((cursor: string): void => {
     if (!dataSources.loadLifecycleRadar) return;
     void dataSources.loadLifecycleRadar(cursor).then((next) => {
@@ -335,6 +330,11 @@ export function ProductAppContent({
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    if (activeSection !== "candidate-detail" && activeSection !== "external-checks" && routeTokenIdentity === null) return;
+    loadFollowUpDetails();
+  }, [activeSection, loadFollowUpDetails, routeTokenIdentity]);
 
   useEffect(() => {
     const handleRouteChange = () => {

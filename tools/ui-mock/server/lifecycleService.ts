@@ -3,10 +3,12 @@ import {
   buildLifecycleSummary,
   evaluateFollowUpToMainRadar,
   evaluateNewToFollowUp,
-  getDefaultLifecycleAuditStorePath,
+  getDefaultLifecycleCycleReceiptPath,
   getDefaultNewInboxStorePath,
-  readLifecycleAuditStore,
+  readLatestLifecycleCycleReceipt,
   readNewInboxStore,
+  type LifecycleCycleReceipt,
+  type LifecycleEvaluationContext,
   type LifecycleConditions,
   type LifecycleSummary,
   type SystemLifecycleStatus,
@@ -63,6 +65,7 @@ export function createLifecycleService(options: {
   establishedStorePath?: string;
   newInboxStorePath?: string;
   auditStorePath?: string;
+  cycleReceiptPath?: string;
   workspace?: UserWorkspaceRepository;
   workspaceDatabasePath?: string;
 } = {}) {
@@ -75,16 +78,17 @@ export function createLifecycleService(options: {
     followUp: options.followUpStorePath,
     established: options.establishedStorePath ?? getDefaultEstablishedUniverseStorePath(),
     inbox: options.newInboxStorePath ?? getDefaultNewInboxStorePath(),
-    audit: options.auditStorePath ?? getDefaultLifecycleAuditStorePath(),
+    receipt: options.cycleReceiptPath ?? getDefaultLifecycleCycleReceiptPath(),
   };
 
   async function resolveToken(chainInput: string, addressInput: string, session: Pc1SessionContext): Promise<LifecycleTokenView> {
     const identity = normalizeIdentity(chainInput, addressInput);
-    const [inbox, followUp, universe, scanner, workspaceRepository] = await Promise.all([
+    const [inbox, followUp, universe, scanner, receipt, workspaceRepository] = await Promise.all([
       readNewInboxStore(paths.inbox),
       readFollowUpStore(paths.followUp),
       readEstablishedUniverseStore(paths.established),
       readLatestScannerOutput(options.scanner).catch(() => null),
+      readLatestLifecycleCycleReceipt(paths.receipt),
       workspace(),
     ]);
     const followUpEntry = followUp.entries.find((entry) => universeIdentityKey(entry.chain, entry.contract_address) === identity.identity) ?? null;
@@ -94,7 +98,13 @@ export function createLifecycleService(options: {
     const candidate = snapshot?.candidates.find((entry) => entry.contract_address !== null && safeIdentity(entry.chain, entry.contract_address) === identity.identity) ?? null;
     const systemStatus: SystemLifecycleStatus = main ? "MAIN_RADAR" : followUpEntry && followUpEntry.lifecycle_status !== "ARCHIVED" ? "FOLLOW_UP" : inboxEntry?.system_status ?? "NEW";
     const conditions = systemStatus === "FOLLOW_UP" && followUpEntry
-      ? evaluateFollowUpToMainRadar(followUpEntry, main)
+      ? evaluateFollowUpToMainRadar(followUpEntry, lifecycleEvaluationContext({
+        receipt,
+        scannerRunId: snapshot?.scan_run.run_id ?? null,
+        evaluatedAt: new Date(),
+        manualVerification: findLatestManualVerification(followUp, followUpEntry.chain, followUpEntry.contract_address),
+        establishedMembership: main,
+      }))
       : candidate && snapshot
         ? evaluateNewToFollowUp(candidate, snapshot, { inFollowUp: Boolean(followUpEntry), inMainRadar: main })
         : unavailableConditions();
@@ -138,20 +148,21 @@ export function createLifecycleService(options: {
   }
 
   async function summary(): Promise<LifecycleSummary> {
-    const [inbox, followUp, audit, universe] = await Promise.all([readNewInboxStore(paths.inbox), readFollowUpStore(paths.followUp), readLifecycleAuditStore(paths.audit), readEstablishedUniverseStore(paths.established)]);
-    return buildLifecycleSummary(inbox, followUp, audit, universe.current.entries.filter((entry) => entry.enabled).length);
+    const [inbox, followUp, universe, receipt] = await Promise.all([readNewInboxStore(paths.inbox), readFollowUpStore(paths.followUp), readEstablishedUniverseStore(paths.established), readLatestLifecycleCycleReceipt(paths.receipt)]);
+    return buildLifecycleSummary(inbox, followUp, universe.current.entries.filter((entry) => entry.enabled).length, receipt);
   }
 
   async function inbox(): Promise<Awaited<ReturnType<typeof readNewInboxStore>>> { return readNewInboxStore(paths.inbox); }
+  async function latestReceipt() { return readLatestLifecycleCycleReceipt(paths.receipt); }
   async function workspaceIntegrity() { return (await workspace()).integrity(); }
 
   async function radar(session: Pc1SessionContext, input: { limit: number; cursor: RadarCursor | null }): Promise<LifecycleRadarView> {
-    const [inbox, followUp, audit, universe, scanner, workspaceRepository] = await Promise.all([
+    const [inbox, followUp, universe, scanner, receipt, workspaceRepository] = await Promise.all([
       readNewInboxStore(paths.inbox),
       readFollowUpStore(paths.followUp),
-      readLifecycleAuditStore(paths.audit),
       readEstablishedUniverseStore(paths.established),
       readLatestScannerOutput(options.scanner).catch(() => null),
+      readLatestLifecycleCycleReceipt(paths.receipt),
       workspace(),
     ]);
     const now = new Date();
@@ -171,7 +182,13 @@ export function createLifecycleService(options: {
       if (!chain || !contractAddress) throw new LifecycleServiceError("LIFECYCLE_RECORD_INVALID", 503);
       const main = mainIdentities.has(identity);
       const conditions = followEntry
-        ? evaluateFollowUpToMainRadar(followEntry, main, true, { now, manualVerification: findLatestManualVerification(followUp, chain, contractAddress) })
+        ? evaluateFollowUpToMainRadar(followEntry, lifecycleEvaluationContext({
+          receipt,
+          scannerRunId: snapshot?.scan_run.run_id ?? null,
+          evaluatedAt: now,
+          manualVerification: findLatestManualVerification(followUp, chain, contractAddress),
+          establishedMembership: main,
+        }))
         : candidate && snapshot
           ? evaluateNewToFollowUp(candidate, snapshot, { inFollowUp: false, inMainRadar: main })
           : inboxEntry?.last_evaluation ?? unavailableConditions();
@@ -218,11 +235,11 @@ export function createLifecycleService(options: {
     const dueGroup = pageRadarGroup(due, cursor.action_due, input.limit, "action_due", cursor);
     const readyGroup = pageRadarGroup(ready, cursor.candidates_ready, input.limit, "candidates_ready", cursor);
     const observedGroup = pageRadarGroup(observed, cursor.observed, input.limit, "observed", cursor);
-    const summary = buildLifecycleSummary(inbox, followUp, audit, mainIdentities.size);
+    const summary = buildLifecycleSummary(inbox, followUp, mainIdentities.size, receipt, now);
     summary.follow_up_displayed = dueGroup.displayed + readyGroup.displayed + observedGroup.displayed;
     return { schema_version: "lifecycle_radar_view_v1", summary, actor, new_inbox: newGroup, follow_up: { action_due: dueGroup, candidates_ready: readyGroup, observed: observedGroup }, main_radar: { total: mainIdentities.size } };
   }
-  return { resolveToken, transition, summary, inbox, workspaceIntegrity, radar };
+  return { resolveToken, transition, summary, inbox, latestReceipt, workspaceIntegrity, radar };
 }
 
 export type RadarCursor = { new_inbox: number; action_due: number; candidates_ready: number; observed: number };
@@ -271,6 +288,22 @@ function normalizeIdentity(chain: string, address: string): { identity: string }
   } catch { throw new LifecycleServiceError("LIFECYCLE_IDENTITY_INVALID", 400); }
 }
 function safeIdentity(chain: string, address: string): string | null { try { return normalizeIdentity(chain, address).identity; } catch { return null; } }
+function lifecycleEvaluationContext(input: {
+  receipt: LifecycleCycleReceipt | null;
+  scannerRunId: string | null;
+  evaluatedAt: Date;
+  manualVerification: LifecycleEvaluationContext["latestManualVerification"];
+  establishedMembership: boolean;
+}): LifecycleEvaluationContext {
+  return {
+    lastCompletedCentralCycleId: input.receipt?.central_cycle_id ?? null,
+    currentScannerRunId: input.scannerRunId,
+    evaluatedAt: input.evaluatedAt,
+    latestManualVerification: input.manualVerification,
+    establishedMembership: input.establishedMembership,
+    universeValid: true,
+  };
+}
 function unavailableConditions(): LifecycleConditions { return { conditions_met: [], conditions_unmet: ["VALIDATED_LIFECYCLE_RECORD_REQUIRED"], missing_data: ["LIFECYCLE_RECORD"], risks: [], readiness: "CONDITIONS_UNMET", security_state: "UNKNOWN", verification_state: "UNKNOWN" }; }
 function scannerOutput(value: unknown): PersistableScannerOutput | null {
   if (!isRecord(value) || !isRecord(value.scan_run) || !Array.isArray(value.candidates) || !Array.isArray(value.security_checks) || !Array.isArray(value.scorecards)) return null;

@@ -7,7 +7,7 @@ import { ActionButton, StatusBadge } from "./ProductUi";
 
 void React;
 
-export function PersonalRadarPanel({ chain, contractAddress, onChanged, initialView, compact = false }: { chain: string; contractAddress: string; onChanged?: () => void; initialView?: LifecycleTokenView | null; compact?: boolean }) {
+export function PersonalRadarPanel({ chain, contractAddress, onChanged, initialView, compact = false, unavailable = false }: { chain: string; contractAddress: string; onChanged?: () => void; initialView?: LifecycleTokenView | null; compact?: boolean; unavailable?: boolean }) {
   const { locale } = useProductLocale();
   const copy = lifecycleCopy(locale);
   const [view, setView] = useState<LifecycleTokenView | null>(null);
@@ -17,11 +17,14 @@ export function PersonalRadarPanel({ chain, contractAddress, onChanged, initialV
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
+    if (unavailable) return;
     if (initialView) return;
     let active = true;
     void loadLifecycleToken(chain, contractAddress).then((next) => { if (active) setView(next); });
     return () => { active = false; };
-  }, [chain, contractAddress, initialView]);
+  }, [chain, contractAddress, initialView, unavailable]);
+
+  if (unavailable) return null;
   const resolvedView = view ?? initialView;
   if (!resolvedView) return null;
   const canWrite = resolvedView.actor.capabilities.includes("CAMP_USER_WORKSPACE_WRITE");

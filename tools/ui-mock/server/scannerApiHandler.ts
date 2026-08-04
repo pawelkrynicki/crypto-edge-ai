@@ -97,6 +97,7 @@ import {
   type ManualOwnerActionsOptions,
 } from "./manualOwnerActions.js";
 import type { ManualVerificationVerdict } from "../../data-poc/src/followUpBasket.js";
+import type { LifecycleCycleReceipt } from "../../data-poc/src/systemLifecycle.js";
 import { createLifecycleService, LifecycleServiceError, parseRadarCursor } from "./lifecycleService.js";
 import { createPc1SessionContextService } from "./lifecycleSession.js";
 import { getDefaultUserWorkspaceDatabasePath, type UserWorkspaceRepository } from "./userWorkspaceRepository.js";
@@ -127,6 +128,7 @@ export type ScannerApiHandlerOptions = {
   lifecycle?: {
     newInboxStorePath?: string;
     auditStorePath?: string;
+    cycleReceiptPath?: string;
     workspaceDatabasePath?: string;
     workspace?: UserWorkspaceRepository;
   };
@@ -216,6 +218,7 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
     establishedStorePath: options.establishedUniverse?.storeFilePath,
     newInboxStorePath: options.lifecycle?.newInboxStorePath,
     auditStorePath: options.lifecycle?.auditStorePath,
+    cycleReceiptPath: options.lifecycle?.cycleReceiptPath,
     workspace: options.lifecycle?.workspace,
     workspaceDatabasePath: options.lifecycle?.workspaceDatabasePath ?? getDefaultUserWorkspaceDatabasePath(),
   });
@@ -325,8 +328,10 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
         if (!session.context.capabilities.includes("LIFECYCLE_SCAN_NOW")) throw new LifecycleServiceError("LIFECYCLE_SCAN_FORBIDDEN", 403);
         const body = validateOwnerRefreshBody(await readOwnerJsonBody(req));
         const result = await ownerOperations.refresh(body.preflight_id, body.preflight_id, isLocalOwnerRequest(req));
-        const scanner = await readLatestScannerOutput(scannerOptions).catch(() => null);
-        const summary = await lifecycle.summary();
+        const [scanner, lifecycleReceipt] = await Promise.all([
+          readLatestScannerOutput(scannerOptions).catch(() => null),
+          lifecycle.latestReceipt(),
+        ]);
         const scannerReceipt = lifecycleScannerReceipt(scanner);
         sendJson(req, res, result.status === "FAILED" ? 500 : 200, {
           ...result,
@@ -334,10 +339,7 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
             found: scannerReceipt.found,
             valid: scannerReceipt.valid,
             rejected: scannerReceipt.rejected,
-            new_inbox: summary.last_change_summary.added,
-            promoted_to_follow_up: summary.last_change_summary.promoted_to_follow_up,
-            promoted_to_main_radar: summary.last_change_summary.promoted_to_main_radar,
-            duplicates: summary.last_change_summary.duplicate_noop,
+            ...lastCompletedLifecycleReceipt(lifecycleReceipt, scannerReceipt.snapshot_at),
             source_errors: scannerReceipt.source_errors,
             snapshot_at: scannerReceipt.snapshot_at,
             honeypot_is_calls: 0,
@@ -690,17 +692,16 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
           sessionHeader,
           isLocalOwnerRequest(req),
         );
-        const scanner = await readLatestScannerOutput(scannerOptions).catch(() => null);
-        const summary = await lifecycle.summary();
+        const [scanner, lifecycleReceipt] = await Promise.all([
+          readLatestScannerOutput(scannerOptions).catch(() => null),
+          lifecycle.latestReceipt(),
+        ]);
         const receipt = lifecycleScannerReceipt(scanner);
         sendJson(req, res, result.status === "FAILED" ? 500 : 200, {
           ...result,
           lifecycle_receipt: {
             ...receipt,
-            new_inbox: summary.last_change_summary.added,
-            promoted_to_follow_up: summary.last_change_summary.promoted_to_follow_up,
-            promoted_to_main_radar: summary.last_change_summary.promoted_to_main_radar,
-            duplicates: summary.last_change_summary.duplicate_noop,
+            ...lastCompletedLifecycleReceipt(lifecycleReceipt, receipt.snapshot_at),
             honeypot_is_calls: 0,
           },
         }, runtimeMode);
@@ -1673,6 +1674,28 @@ function lifecycleScannerReceipt(value: unknown): {
     snapshot_at: typeof provenance?.generated_at === "string"
       ? provenance.generated_at
       : typeof run.finished_at === "string" ? run.finished_at : null,
+  };
+}
+
+function lastCompletedLifecycleReceipt(receipt: LifecycleCycleReceipt | null, fallbackSnapshotAt: string | null): {
+  new_inbox: number;
+  new_inbox_updated: number;
+  promoted_to_follow_up: number;
+  promoted_to_main_radar: number;
+  duplicates: number;
+  lifecycle_cycle_id: string | null;
+  lifecycle_status: LifecycleCycleReceipt["status"] | null;
+  snapshot_at: string | null;
+} {
+  return {
+    new_inbox: receipt?.new_inbox_added ?? 0,
+    new_inbox_updated: receipt?.new_inbox_updated ?? 0,
+    promoted_to_follow_up: receipt?.promoted_to_follow_up ?? 0,
+    promoted_to_main_radar: receipt?.promoted_to_main_radar ?? 0,
+    duplicates: receipt?.duplicate_noop ?? 0,
+    lifecycle_cycle_id: receipt?.central_cycle_id ?? null,
+    lifecycle_status: receipt?.status ?? null,
+    snapshot_at: receipt?.snapshot_timestamp ?? fallbackSnapshotAt,
   };
 }
 

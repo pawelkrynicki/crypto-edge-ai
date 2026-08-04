@@ -266,12 +266,13 @@ function OwnerResult({
 function ScanReceipt({ receipt, locale }: { receipt: OwnerRefreshResult["lifecycle_receipt"]; locale: ProductLocale }) {
   if (!receipt) return null;
   const copy = locale === "pl"
-    ? { title: "Wynik skanu", found: "Znalezione", valid: "Poprawne", rejected: "Odrzucone", inbox: "New Inbox", follow: "Automatycznie do Follow-up", main: "Do Głównego Radaru", duplicates: "Duplikaty", errors: "Błędy źródeł", snapshot: "Snapshot", none: "brak" }
-    : { title: "Scan receipt", found: "Found", valid: "Valid", rejected: "Rejected", inbox: "New Inbox", follow: "Automatically to Follow-up", main: "To Main Radar", duplicates: "Duplicates", errors: "Source errors", snapshot: "Snapshot", none: "none" };
+    ? { title: "Wynik skanu", found: "Znalezione", valid: "Poprawne", rejected: "Odrzucone", inbox: "New Inbox", inboxUpdated: "New Inbox zaktualizowane", follow: "Automatycznie do Follow-up", main: "Do Głównego Radaru", duplicates: "Duplikaty", cycle: "Cykl lifecycle", errors: "Błędy źródeł", snapshot: "Snapshot", none: "brak" }
+    : { title: "Scan receipt", found: "Found", valid: "Valid", rejected: "Rejected", inbox: "New Inbox", inboxUpdated: "New Inbox updated", follow: "Automatically to Follow-up", main: "To Main Radar", duplicates: "Duplicates", cycle: "Lifecycle cycle", errors: "Source errors", snapshot: "Snapshot", none: "none" };
   return <div className="owner-operation-receipt" role="status">
     <strong>{copy.title}</strong>
     <span>{copy.found}: {receipt.found}; {copy.valid}: {receipt.valid}; {copy.rejected}: {receipt.rejected}.</span>
-    <span>{copy.inbox}: {receipt.new_inbox}; {copy.follow}: {receipt.promoted_to_follow_up}; {copy.main}: {receipt.promoted_to_main_radar}; {copy.duplicates}: {receipt.duplicates}.</span>
+    <span>{copy.inbox}: {receipt.new_inbox}; {copy.inboxUpdated}: {receipt.new_inbox_updated}; {copy.follow}: {receipt.promoted_to_follow_up}; {copy.main}: {receipt.promoted_to_main_radar}; {copy.duplicates}: {receipt.duplicates}.</span>
+    <span>{copy.cycle}: {receipt.lifecycle_cycle_id ?? copy.none} ({receipt.lifecycle_status ?? copy.none}).</span>
     <span>Honeypot.is: 0; {copy.errors}: {receipt.source_errors.join(", ") || copy.none}; {copy.snapshot}: {receipt.snapshot_at ?? copy.none}.</span>
   </div>;
 }

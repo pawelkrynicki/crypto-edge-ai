@@ -124,7 +124,8 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
     setActiveBasket(basket);
   };
 
-  const establishedEntries = establishedUniverseStatus?.entries_enabled
+  const establishedEntries = lifecycleRadar?.main_radar.total
+    ?? establishedUniverseStatus?.entries_enabled
     ?? metadata?.established?.entries_enabled
     ?? establishedCandidates.length;
   const followUpTotal = lifecycleSummary?.system_follow_up_total ?? followUpStatus?.entries_total ?? 0;
@@ -160,11 +161,11 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
       {lifecycleRadar && isReviewMode() && <LifecycleReviewSwitch role={lifecycleRadar.actor.role} locale={locale} />}
 
       <section className="product-summary-grid primary" aria-label={t("radar.summary")}>
-        <SummaryCard label={t("radar.newProjects")} value={String(lifecycleSummary?.system_new_total ?? newCandidates.length)} detail={lifecycleSummary ? "Trwały New Inbox" : t("radar.observationOnly")} />
-        <SummaryCard label={"Łącznie obserwowane"} value={String(followUpTotal)} detail={t("followUp.totalCountDetail")} />
-        <SummaryCard label={"Do działania teraz"} value={String(lifecycleSummary?.follow_up_action_due ?? followUpStatus?.due_count ?? 0)} detail="Checkpointy wymagające działania" />
-        <SummaryCard label={"Kandydaci do Głównego Radaru"} value={String(lifecycleSummary?.follow_up_candidates_ready ?? followUpStatus?.candidate_count ?? 0)} detail={t("followUp.candidateCountDetail")} tone="accent" />
-        <SummaryCard label={"Wyświetlane teraz"} value={String(followUpDisplayed)} detail={t("followUp.displayedCountDetail")} />
+        <SummaryCard label={t("radar.newProjects")} value={String(lifecycleSummary?.system_new_total ?? newCandidates.length)} detail={lifecycleSummary ? t("lifecycle.persistentNewInbox") : t("radar.observationOnly")} />
+        <SummaryCard label={t("lifecycle.totalObserved")} value={String(followUpTotal)} detail={t("followUp.totalCountDetail")} />
+        <SummaryCard label={t("lifecycle.actionDueNow")} value={String(lifecycleSummary?.follow_up_action_due ?? followUpStatus?.due_count ?? 0)} detail={t("lifecycle.checkpointsAction")} />
+        <SummaryCard label={t("lifecycle.mainRadarCandidates")} value={String(lifecycleSummary?.follow_up_candidates_ready ?? followUpStatus?.candidate_count ?? 0)} detail={t("followUp.candidateCountDetail")} tone="accent" />
+        <SummaryCard label={t("lifecycle.displayedNow")} value={String(followUpDisplayed)} detail={t("followUp.displayedCountDetail")} />
         <SummaryCard label={t("radar.establishedEntries")} value={String(establishedEntries)} detail={t("radar.activeUniverseAddresses")} />
         <SummaryCard
           label={t("app.generated")}
@@ -245,14 +246,16 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
         </button>
       </section>
 
-      {visibleBasket === "new_emerging" && scannerUnavailableReasonCode ? (
+      {lifecycleRadar && scannerUnavailableReasonCode && <section className="product-partial-data lifecycle-scanner-warning" role="status"><strong>{t("status.delayed")}</strong><span>{t("lifecycle.scannerUnavailable")}</span></section>}
+      {!lifecycleRadar && visibleBasket !== "established" && <p className="product-inline-warning personal-radar-unavailable" role="status">{t("lifecycle.privateStatusesUnavailable")}</p>}
+      {visibleBasket === "new_emerging" && lifecycleRadar ? (
+        <NewInboxRadarBasket cards={lifecycleRadar.new_inbox.cards} total={lifecycleRadar.new_inbox.total} nextCursor={lifecycleRadar.new_inbox.next_cursor} locale={locale} onLoadMore={onLoadMoreLifecycle} />
+      ) : visibleBasket === "new_emerging" && scannerUnavailableReasonCode ? (
         <BasketUnavailable
           title={t("radar.unavailableTitle")}
           reasonCode={scannerUnavailableReasonCode}
           detail={t("radar.unavailableDetail")}
         />
-      ) : visibleBasket === "new_emerging" && lifecycleRadar ? (
-        <NewInboxRadarBasket cards={lifecycleRadar.new_inbox.cards} total={lifecycleRadar.new_inbox.total} nextCursor={lifecycleRadar.new_inbox.next_cursor} locale={locale} onLoadMore={onLoadMoreLifecycle} />
       ) : visibleBasket === "new_emerging" ? (
         <NewEmergingBasket
           candidates={newCandidates}
@@ -262,6 +265,7 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
           followUpStatus={followUpStatus}
           onOpenCandidate={onOpenCandidate}
           onOpenExternalChecks={onOpenExternalChecks}
+          privateStatusesUnavailable={!lifecycleRadar}
         />
       ) : visibleBasket === "maturing" && lifecycleRadar ? (
         <LifecycleFollowUpQueues radar={lifecycleRadar} locale={locale} onLoadMore={onLoadMoreLifecycle} />
@@ -270,6 +274,7 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
           entries={displayedFollowUpEntries}
           status={followUpStatus}
           onOpenFollowUp={onOpenFollowUp}
+          privateStatusesUnavailable={!lifecycleRadar}
         />
       ) : (
         <EstablishedBasket
@@ -332,10 +337,12 @@ export function MaturingFollowUpBasket({
   entries,
   status,
   onOpenFollowUp,
+  privateStatusesUnavailable = false,
 }: {
   entries: FollowUpPublicEntry[];
   status?: FollowUpPublicStatus | null;
   onOpenFollowUp?: (entryId: string) => void;
+  privateStatusesUnavailable?: boolean;
 }) {
   const { locale, t } = useProductLocale();
   if (status && (!status.store_available || status.validation_status === "invalid" || status.validation_status === "unavailable")) {
@@ -415,7 +422,7 @@ export function MaturingFollowUpBasket({
               contractAddress={entry.contract_address}
               onOpen={onOpenFollowUp ? () => onOpenFollowUp(entry.entry_id) : undefined}
             />
-            <PersonalRadarPanel chain={entry.chain} contractAddress={entry.contract_address} />
+            <PersonalRadarPanel chain={entry.chain} contractAddress={entry.contract_address} unavailable={privateStatusesUnavailable} />
             {onOpenFollowUp && (
               <footer className="product-candidate-footer follow-up-actions">
                 <p>{entry.lifecycle_status === "CANDIDATE_FOR_ESTABLISHED"
@@ -441,6 +448,7 @@ export function NewEmergingBasket({
   followUpStatus,
   onOpenCandidate,
   onOpenExternalChecks,
+  privateStatusesUnavailable = false,
 }: {
   candidates: UiTokenCandidate[];
   metadata?: ScannerDiscoveryMetadata["new_emerging"];
@@ -449,6 +457,7 @@ export function NewEmergingBasket({
   followUpStatus?: FollowUpPublicStatus | null;
   onOpenCandidate?: (candidateId: string) => void;
   onOpenExternalChecks?: (candidate: UiTokenCandidate) => void;
+  privateStatusesUnavailable?: boolean;
 }) {
   const { t } = useProductLocale();
   const state = readiness?.discovery.new_emerging;
@@ -500,6 +509,7 @@ export function NewEmergingBasket({
             followUpStatus={followUpStatus}
             onOpenCandidate={onOpenCandidate}
             onOpenExternalChecks={onOpenExternalChecks}
+            privateStatusesUnavailable={privateStatusesUnavailable}
           />
         ))}
       </div>
@@ -513,12 +523,14 @@ function NewCandidateCard({
   followUpStatus,
   onOpenCandidate,
   onOpenExternalChecks,
+  privateStatusesUnavailable,
 }: {
   candidate: UiTokenCandidate;
   followUp?: FollowUpPublicEntry | null;
   followUpStatus?: FollowUpPublicStatus | null;
   onOpenCandidate?: (candidateId: string) => void;
   onOpenExternalChecks?: (candidate: UiTokenCandidate) => void;
+  privateStatusesUnavailable: boolean;
 }) {
   const { locale, t } = useProductLocale();
   const lifecycle = resolveTokenLifecycle({ candidate, followUp, followUpStatus });
@@ -569,7 +581,7 @@ function NewCandidateCard({
         contractAddress={candidate.contractAddress}
         onOpen={onOpenCandidate ? () => onOpenCandidate(candidate.id) : undefined}
       />
-      <PersonalRadarPanel chain={candidate.chain} contractAddress={candidate.contractAddress} />
+      <PersonalRadarPanel chain={candidate.chain} contractAddress={candidate.contractAddress} unavailable={privateStatusesUnavailable} />
 
       <footer className="product-candidate-footer">
         <div>
