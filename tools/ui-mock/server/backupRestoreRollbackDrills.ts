@@ -149,7 +149,7 @@ export async function runProductRecoveryDrills(options: {
     const required = new Set(baseBackup.manifest.logical_stores.map((store) => store.logical_store_id));
     for (const id of [
       "follow_up_store", "follow_up_backup", "established_universe_store", "established_address_config",
-      "feedback_sqlite", "ai_queue_cache_sqlite", "central_automation_state", "active_scanner_snapshot",
+      "new_inbox_store", "lifecycle_audit_store", "user_workspace_sqlite", "feedback_sqlite", "ai_queue_cache_sqlite", "central_automation_state", "active_scanner_snapshot",
       "active_context_snapshot", "reports_library", "runtime_policy_config",
     ]) if (!required.has(id)) throw new Error(`STORE_NOT_BACKED_UP_${id}`);
     return "BACKUP_READY";

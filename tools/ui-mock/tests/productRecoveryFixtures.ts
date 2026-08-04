@@ -4,11 +4,16 @@ import {
   createEmptyFollowUpStore,
 } from "../../data-poc/src/followUpBasket.js";
 import {
+  createEmptyLifecycleAuditStore,
+  createEmptyNewInboxStore,
+} from "../../data-poc/src/systemLifecycle.js";
+import {
   validateEstablishedAddressUniverse,
 } from "../../data-poc/src/establishedAddressUniverse.js";
 import { createInitialAutomationState } from "../../data-poc/src/automation/automationState.js";
 import { createFeedbackStore } from "../server/feedbackStore.js";
 import { createAIAnalysisQueueStore } from "../server/aiResearchQueueStore.js";
+import { createUserWorkspaceRepository } from "../server/userWorkspaceRepository.js";
 import type { ProductRecoveryPaths } from "../server/productRecovery.js";
 
 const FIXTURE_COMMIT_SHA = "738483d4d5fa267f70e3d87e6753c3a6cbae3461";
@@ -24,10 +29,13 @@ export function createIsolatedRecoveryPaths(root: string): ProductRecoveryPaths 
     outputRoot: resolve(productRoot, "tools", "data-poc", "output"),
     followUpStore: resolve(productRoot, "tools", "data-poc", ".local", "follow-up", "store.json"),
     followUpBackup: resolve(productRoot, "tools", "data-poc", ".local", "follow-up", "store.json.bak"),
+    newInboxStore: resolve(productRoot, "tools", "data-poc", ".local", "lifecycle", "new-inbox.json"),
+    lifecycleAuditStore: resolve(productRoot, "tools", "data-poc", ".local", "lifecycle", "audit.json"),
     establishedStore: resolve(productRoot, "tools", "data-poc", ".local", "established-universe", "store.json"),
     establishedConfig: resolve(productRoot, "config", "established_address_universe_v1.json"),
     feedbackSqlite: resolve(productRoot, "tools", "ui-mock", ".local", "tester-feedback.sqlite"),
     aiQueueSqlite: resolve(productRoot, "tools", "ui-mock", ".local", "ai-analysis-queue.sqlite"),
+    userWorkspaceSqlite: resolve(productRoot, "tools", "ui-mock", ".local", "user-workspace.sqlite"),
     automationState: resolve(productRoot, "tools", "data-poc", ".local", "automation", "automation-state.json"),
     runOnceReceipt: resolve(productRoot, "tools", "data-poc", ".local", "data-cycle", "last-run-once.json"),
     reportsRoot: resolve(productRoot, "tools", "ui-mock", ".local", "reports"),
@@ -49,6 +57,8 @@ export async function seedIsolatedProductState(paths: ProductRecoveryPaths): Pro
   const followUp = createEmptyFollowUpStore(new Date(FIXTURE_TIME));
   await writeJson(paths.followUpStore, followUp);
   await writeJson(paths.followUpBackup, followUp);
+  await writeJson(paths.newInboxStore, createEmptyNewInboxStore(new Date(FIXTURE_TIME)));
+  await writeJson(paths.lifecycleAuditStore, createEmptyLifecycleAuditStore(new Date(FIXTURE_TIME)));
 
   await mkdir(resolve(paths.establishedConfig, ".."), { recursive: true });
   await copyFile(resolve(repositoryRoot, "config", "established_address_universe_v1.json"), paths.establishedConfig);
@@ -68,6 +78,8 @@ export async function seedIsolatedProductState(paths: ProductRecoveryPaths): Pro
   feedback.close();
   const aiQueue = await createAIAnalysisQueueStore({ databaseFilePath: paths.aiQueueSqlite });
   aiQueue.close();
+  const workspace = await createUserWorkspaceRepository({ databaseFilePath: paths.userWorkspaceSqlite });
+  workspace.close();
 
   const automation = {
     ...createInitialAutomationState(),

@@ -25,6 +25,12 @@ import {
   validateFollowUpStore,
 } from "../../data-poc/src/followUpBasket.js";
 import {
+  getDefaultLifecycleAuditStorePath,
+  getDefaultNewInboxStorePath,
+  validateLifecycleAuditStore,
+  validateNewInboxStore,
+} from "../../data-poc/src/systemLifecycle.js";
+import {
   getDefaultEstablishedUniverseStorePath,
   validateEstablishedAddressUniverse,
 } from "../../data-poc/src/establishedAddressUniverse.js";
@@ -35,6 +41,7 @@ import { resolveCanonicalDataPaths } from "../../data-poc/src/automation/dataCyc
 import { resolveRepoFile } from "../../data-poc/src/sourceRegistryValidator.js";
 import { resolveFeedbackDatabasePath } from "./feedbackStore.js";
 import { resolveAIAnalysisQueueDatabasePath } from "./aiResearchQueueStore.js";
+import { getDefaultUserWorkspaceDatabasePath } from "./userWorkspaceRepository.js";
 import { buildReportsLibraryIndex, getDefaultReportsRootPath } from "./reportsLibrary.js";
 
 export const PRODUCT_BACKUP_SCHEMA_VERSION = "product_backup_bundle_v1";
@@ -56,10 +63,13 @@ export type ProductRecoveryPaths = {
   outputRoot: string;
   followUpStore: string;
   followUpBackup: string;
+  newInboxStore: string;
+  lifecycleAuditStore: string;
   establishedStore: string;
   establishedConfig: string;
   feedbackSqlite: string;
   aiQueueSqlite: string;
+  userWorkspaceSqlite: string;
   automationState: string;
   runOnceReceipt: string;
   reportsRoot: string;
@@ -225,10 +235,13 @@ export async function resolveProductRecoveryPaths(
     outputRoot: resolve(dataPocRoot, "output"),
     followUpStore: getDefaultFollowUpStorePath(env),
     followUpBackup: `${getDefaultFollowUpStorePath(env)}.bak`,
+    newInboxStore: getDefaultNewInboxStorePath(env),
+    lifecycleAuditStore: getDefaultLifecycleAuditStorePath(env),
     establishedStore: getDefaultEstablishedUniverseStorePath(env),
     establishedConfig: resolveRepoFile("config/established_address_universe_v1.json"),
     feedbackSqlite: resolveFeedbackDatabasePath(env.CRYPTO_EDGE_FEEDBACK_SQLITE_PATH),
     aiQueueSqlite: resolveAIAnalysisQueueDatabasePath(env.CRYPTO_EDGE_AI_QUEUE_SQLITE_PATH),
+    userWorkspaceSqlite: getDefaultUserWorkspaceDatabasePath(env),
     automationState: canonical.automation_state,
     runOnceReceipt: canonical.run_once_receipt,
     reportsRoot: getDefaultReportsRootPath(),
@@ -618,10 +631,13 @@ async function buildStoreInventory(
   const corePaths = [
     paths.followUpStore,
     paths.followUpBackup,
+    paths.newInboxStore,
+    paths.lifecycleAuditStore,
     paths.establishedStore,
     paths.establishedConfig,
     paths.feedbackSqlite,
     paths.aiQueueSqlite,
+    paths.userWorkspaceSqlite,
     paths.automationState,
     paths.reportsRoot,
   ];
@@ -651,10 +667,13 @@ async function buildStoreInventory(
   const descriptors: StoreDescriptor[] = [
     descriptor("follow_up_store", paths.followUpStore, "stores/follow-up/store.json", "json", true),
     descriptor("follow_up_backup", paths.followUpBackup, "stores/follow-up/store.json.bak", "json", true, ["follow_up_store"]),
+    descriptor("new_inbox_store", paths.newInboxStore, "stores/lifecycle/new-inbox.json", "json", true),
+    descriptor("lifecycle_audit_store", paths.lifecycleAuditStore, "stores/lifecycle/audit.json", "json", true, ["new_inbox_store"]),
     establishedStoreDescriptor,
     descriptor("established_address_config", paths.establishedConfig, "config/established_address_universe_v1.json", "config", true),
     descriptor("feedback_sqlite", paths.feedbackSqlite, "stores/sqlite/tester-feedback.sqlite", "sqlite", true),
     descriptor("ai_queue_cache_sqlite", paths.aiQueueSqlite, "stores/sqlite/ai-analysis-queue.sqlite", "sqlite", true),
+    descriptor("user_workspace_sqlite", paths.userWorkspaceSqlite, "stores/sqlite/user-workspace.sqlite", "sqlite", true),
     descriptor("central_automation_state", paths.automationState, "stores/automation/automation-state.json", "json", true),
   ];
   for (const config of paths.safeConfigFiles) {
@@ -729,6 +748,10 @@ async function validateSourceState(
     assertRecoveryTextSafe(raw, item.logicalStoreId);
     if (item.logicalStoreId === "follow_up_store" || item.logicalStoreId === "follow_up_backup") {
       validateFollowUpStore(JSON.parse(raw) as unknown);
+    } else if (item.logicalStoreId === "new_inbox_store") {
+      validateNewInboxStore(JSON.parse(raw) as unknown);
+    } else if (item.logicalStoreId === "lifecycle_audit_store") {
+      validateLifecycleAuditStore(JSON.parse(raw) as unknown);
     } else if (item.logicalStoreId === "established_universe_store") {
       validateEstablishedUniverseStore(JSON.parse(raw) as unknown);
     } else if (item.logicalStoreId === "established_address_config") {
@@ -798,10 +821,13 @@ async function assertRestoreManifestComplete(
   const required = [
     "follow_up_store",
     "follow_up_backup",
+    "new_inbox_store",
+    "lifecycle_audit_store",
     "established_universe_store",
     "established_address_config",
     "feedback_sqlite",
     "ai_queue_cache_sqlite",
+    "user_workspace_sqlite",
     "central_automation_state",
     "runtime_policy_config",
     "established_discovery_query_plan",
@@ -861,10 +887,13 @@ async function mapManifestToTargets(manifest: ProductBackupManifest, paths: Prod
   const staticTargets: Record<string, string> = {
     follow_up_store: paths.followUpStore,
     follow_up_backup: paths.followUpBackup,
+    new_inbox_store: paths.newInboxStore,
+    lifecycle_audit_store: paths.lifecycleAuditStore,
     established_universe_store: paths.establishedStore,
     established_address_config: paths.establishedConfig,
     feedback_sqlite: paths.feedbackSqlite,
     ai_queue_cache_sqlite: paths.aiQueueSqlite,
+    user_workspace_sqlite: paths.userWorkspaceSqlite,
     central_automation_state: paths.automationState,
     central_run_once_receipt: paths.runOnceReceipt,
   };
@@ -957,7 +986,7 @@ function groupTargetMappings(
   const priority = [
     "active_scanner_snapshot", "active_context_snapshot", "follow_up_store", "follow_up_backup",
     "established_universe_store", "established_address_config", "feedback_sqlite",
-    "ai_queue_cache_sqlite", "reports_library", "runtime_policy_config",
+    "ai_queue_cache_sqlite", "user_workspace_sqlite", "new_inbox_store", "lifecycle_audit_store", "reports_library", "runtime_policy_config",
     "established_discovery_query_plan", "data_source_registry", "central_run_once_receipt",
     "central_automation_state",
   ];
@@ -969,7 +998,7 @@ async function publishGroup(group: PublishGroup, operation: ProductRecoveryOpera
   for (const file of group.files) if (await exists(file.targetPath)) existing = true;
   const log = { logical_store_id: group.logicalStoreId, target_existed: existing, published: false, rolled_back: false };
   operation.publication_log.push(log);
-  if (group.logicalStoreId === "feedback_sqlite" || group.logicalStoreId === "ai_queue_cache_sqlite") {
+  if (group.logicalStoreId === "feedback_sqlite" || group.logicalStoreId === "ai_queue_cache_sqlite" || group.logicalStoreId === "user_workspace_sqlite") {
     for (const file of group.files) await quiesceAndPreserveSqliteSidecars(file.targetPath, file.previousPath);
   }
   for (const file of group.files) {
@@ -1126,6 +1155,11 @@ async function assertSqliteLogicalSchema(path: string, logicalStoreId: string): 
       || !tables.has("crypto_ai_analysis_request_log")
       || !tables.has("crypto_ai_worker_state")
     )) throw new ProductRecoveryError("AI_QUEUE_SQLITE_SCHEMA_INVALID");
+    if (logicalStoreId === "user_workspace_sqlite" && (
+      !tables.has("user_workspace_status")
+      || !tables.has("user_workspace_audit")
+      || !tables.has("user_workspace_meta")
+    )) throw new ProductRecoveryError("USER_WORKSPACE_SQLITE_SCHEMA_INVALID");
   } finally {
     database.close();
   }

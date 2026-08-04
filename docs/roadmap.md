@@ -1,6 +1,16 @@
 # Roadmap
 
-## Current stage: Final Local Regression and Freeze Candidate
+## Current stage: PC.1 — System Lifecycle, Private Radar and Operational Data Flow
+
+The accepted Final Local Regression and Freeze remains the technical base, not a
+product-completion claim. The current status is **PRODUCT_COMPLETION_REQUIRED**;
+PC.1 adds the operational lifecycle needed before AI, Research Playbook, CAMP
+accounts/users and final VPS work. Target: 15.08.2026; hard limit: 20.08.2026;
+CAMP start: 12.09.2026. Details: `docs/product_completion_status.md`,
+`docs/system_lifecycle_policy_v1.md` and
+`docs/pc1_lifecycle_operational_radar.md`.
+
+## Historical technical base: Final Local Regression and Freeze Candidate
 
 Status bramki: **READY_FOR_FINAL_INTEGRATION**. Jednorazowa pełna regresja po P1.1, automatyczny read-only smoke na opublikowanych danych INTERNAL_BETA oraz końcowy backup STAB.2 są zakończone. Freeze candidate nie uruchamiał OpenAI, providerów, centralnego live cycle ani mutacji Task Scheduler; nie wykonano restore, deploymentu VPS ani zmian Cloudflare lub AIKINTEL.
 
