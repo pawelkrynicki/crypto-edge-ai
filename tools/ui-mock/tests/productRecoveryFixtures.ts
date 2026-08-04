@@ -5,6 +5,7 @@ import {
 } from "../../data-poc/src/followUpBasket.js";
 import {
   createEmptyLifecycleAuditStore,
+  createEmptyLifecycleOperationJournalStore,
   createEmptyNewInboxStore,
 } from "../../data-poc/src/systemLifecycle.js";
 import {
@@ -31,6 +32,7 @@ export function createIsolatedRecoveryPaths(root: string): ProductRecoveryPaths 
     followUpBackup: resolve(productRoot, "tools", "data-poc", ".local", "follow-up", "store.json.bak"),
     newInboxStore: resolve(productRoot, "tools", "data-poc", ".local", "lifecycle", "new-inbox.json"),
     lifecycleAuditStore: resolve(productRoot, "tools", "data-poc", ".local", "lifecycle", "audit.json"),
+    lifecycleOperationJournal: resolve(productRoot, "tools", "data-poc", ".local", "lifecycle", "operation-journal.json"),
     establishedStore: resolve(productRoot, "tools", "data-poc", ".local", "established-universe", "store.json"),
     establishedConfig: resolve(productRoot, "config", "established_address_universe_v1.json"),
     feedbackSqlite: resolve(productRoot, "tools", "ui-mock", ".local", "tester-feedback.sqlite"),
@@ -59,6 +61,7 @@ export async function seedIsolatedProductState(paths: ProductRecoveryPaths): Pro
   await writeJson(paths.followUpBackup, followUp);
   await writeJson(paths.newInboxStore, createEmptyNewInboxStore(new Date(FIXTURE_TIME)));
   await writeJson(paths.lifecycleAuditStore, createEmptyLifecycleAuditStore(new Date(FIXTURE_TIME)));
+  await writeJson(paths.lifecycleOperationJournal, createEmptyLifecycleOperationJournalStore(new Date(FIXTURE_TIME)));
 
   await mkdir(resolve(paths.establishedConfig, ".."), { recursive: true });
   await copyFile(resolve(repositoryRoot, "config", "established_address_universe_v1.json"), paths.establishedConfig);

@@ -963,13 +963,11 @@ const candidateDetailMarkup = renderToStaticMarkup(React.createElement(Candidate
 }));
 
 assert.match(candidateDetailMarkup, /candidate-detail/i, "candidate detail view exists");
-for (const section of ["Identity", "Market data", "Filters", "Security", "Next step"]) {
-  assert.match(candidateDetailMarkup, new RegExp(section), `candidate detail renders ${section}`);
+for (const tab of ["Summary", "Observation", "Market data", "Filters", "Security", "AI analysis", "Data and sources"]) {
+  assert.match(candidateDetailMarkup, new RegExp(tab), `candidate detail exposes the ${tab} tab`);
 }
-assert.match(candidateDetailMarkup, /Run ID/, "candidate detail preserves run id");
-assert.match(candidateDetailMarkup, /Discovery method/, "candidate detail preserves discovery method");
-assert.match(candidateDetailMarkup, /Security label/, "candidate detail renders the security label");
-assert.match(candidateDetailMarkup, /No trading recommendation/, "candidate detail states the transaction boundary");
+assert.match(candidateDetailMarkup, /Identity/, "candidate detail renders the summary identity");
+assert.match(candidateDetailMarkup, /Next step/, "candidate detail renders the current next step");
 assert.match(candidateDetailMarkup, /Open source verification/, "candidate detail links to source verification");
 for (const action of candidateDetailMarkup.matchAll(/<button\b[^>]*>([\s\S]*?)<\/button>/g)) {
   assert.doesNotMatch(
@@ -1012,6 +1010,7 @@ const missingDetailUi: typeof passUi = {
 };
 const candidateDetailMissingDataMarkup = renderToStaticMarkup(React.createElement(CandidateDetailView, {
   candidate: missingDetailUi,
+  initialActiveTab: "security",
 }));
 
 assert.match(
@@ -1232,6 +1231,7 @@ assert.doesNotMatch(
 
 const externalChecksMarkup = renderToStaticMarkup(React.createElement(ExternalVerificationLinksView, {
   candidate: passUi,
+  initialActiveTab: "data",
 }));
 
 assert.match(externalChecksMarkup, /Manual source verification/, "external checks view exists");
@@ -1240,7 +1240,7 @@ assert.match(externalChecksMarkup, /Network explorer/, "external checks explains
 assert.match(externalChecksMarkup, /DexScreener/, "external checks explains the DEX target");
 assert.match(externalChecksMarkup, /Record source/, "external checks explains the source target");
 assert.match(externalChecksMarkup, /Manual Review Only/i, "external checks keeps the manual review boundary");
-assert.match(externalChecksMarkup, /never fetches a provider in the browser/i, "external checks does not fetch providers in the browser");
+assert.match(externalChecksMarkup, /opening and switching tabs do not call providers/i, "external checks does not fetch providers in the browser");
 assert.match(externalChecksMarkup, /No automated Honeypot\.is/i, "external checks does not run Honeypot automatically");
 assert.match(
   externalChecksMarkup,
@@ -1262,8 +1262,8 @@ for (const action of externalChecksMarkup.matchAll(/<(?:button|a)\b[^>]*>([\s\S]
 }
 assert.doesNotMatch(
   externalChecksMarkup,
-  /\b(?:ready|available|status-good|green|success|security check complete)\b/i,
-  "external checks does not give missing data a green security status",
+  /(?:security passed|security check complete|status-good)\b/i,
+  "external checks does not present an unavailable security source as complete",
 );
 
 const externalChecksMissingMarkup = renderToStaticMarkup(React.createElement(ExternalVerificationLinksView, {

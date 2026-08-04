@@ -80,9 +80,38 @@ inputs. It reports before counts, duplicate snapshot identities, planned New Inb
 identities, expected store versions and a rollback requirement: STAB.2 backup before
 any later canonical apply. This PR supplies no canonical apply path.
 
-STAB.2 now includes `new_inbox_store`, `lifecycle_audit_store` and
+STAB.2 now includes `new_inbox_store`, `lifecycle_audit_store`,
+`lifecycle_operation_journal` and
 `user_workspace_sqlite`, validates both JSON stores, runs SQLite integrity/schema
 checks, and includes them in restore completeness and isolated drills.
+
+## P1 review corrections: canonical Radar read
+
+`lifecycle_radar_view_v1` is the single bounded, session-aware Radar read. It reads
+New Inbox, Follow-up, Established Universe, scanner snapshot and the actor's SQLite
+workspace once, then returns only sanitized cards and pagination metadata. It never
+returns checksums, technical audit rows or local paths to a normal user. Raw New
+Inbox and workspace-integrity endpoints are owner/admin checks.
+
+The New basket is now built from durable Inbox entries rather than the latest
+snapshot. A missing snapshot enriches no market values but leaves the card visible
+with its stored identity, name/symbol, first/last seen facts and an explicit absence
+notice. The toggle count is `system_new_total`, matching the available paged cards.
+
+Follow-up is returned as deterministic queues: action due, Main Radar candidates,
+and other observed records. Each gives `total`, `displayed`, bounded `limit` and a
+validated opaque cursor. `follow_up_displayed` is exactly the cards returned in the
+current Radar view. `system_main_radar_total` is the enabled Established Universe
+count, never an Inbox-derived count. Delta fields (`summary_as_of`,
+`last_completed_cycle_id`, `last_completed_cycle_at`, `delta_source`) describe one
+last completed cycle rather than the whole audit history.
+
+Cards receive precomputed system conditions, actor capabilities and private status
+from the same Radar read; list cards pass that data to compact private actions rather
+than issuing `GET /api/lifecycle/token` per card. Candidate Detail remains allowed
+one selected-token request. The owner/CAMP visual-review control is global and
+appears once. PL/EN display maps prevent lifecycle machine codes from reaching
+normal users.
 
 ## Explicit boundaries
 

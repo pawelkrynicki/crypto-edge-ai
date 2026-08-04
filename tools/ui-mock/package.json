@@ -31,7 +31,7 @@
     "test:verification": "node --import tsx --test tests/verificationDrawer.test.tsx",
     "test:e2e1": "node --import tsx --test tests/productE2E.test.tsx",
     "e2e:product": "node --import tsx scripts/runFullProductE2E.ts",
-    "test:stab1": "node --import tsx --test tests/scannerDataSourceValidation.test.ts tests/resilienceFailureDrills.test.tsx",
+    "test:stab1": "pnpm --dir ../data-poc run test:pc1 && node --import tsx --test tests/scannerDataSourceValidation.test.ts tests/resilienceFailureDrills.test.tsx",
     "stab1:drills": "node --import tsx scripts/runResilienceFailureDrills.ts",
     "test:stab2": "node --import tsx --test tests/backupRestoreRollback.test.ts",
     "stab2:drills": "node --import tsx scripts/runBackupRestoreRollback.ts --run-isolated",

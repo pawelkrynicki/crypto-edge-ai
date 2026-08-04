@@ -15,9 +15,10 @@ workflow was finished. The historical manifest
 [`local_freeze_candidate_v1.json`](local_freeze_candidate_v1.json) is intentionally
 unchanged.
 
-PC.1 completes the operational lifecycle layer: durable system New Inbox,
-versioned automatic promotion, private per-actor Radar status, auditable workspace
-writes, stable lifecycle counters, and an isolated review launcher. It does not
+PC.1 implementation now includes the operational lifecycle layer: durable system
+New Inbox-backed Radar cards, versioned automatic promotion, private per-actor
+Radar status, auditable workspace writes, bounded stable counters and an isolated
+review launcher. It remains pending code review and acceptance. It does not
 start AI, Research Playbook, CAMP account/user management, AIKINTEL integration,
 VPS deployment, Cloudflare, or scheduler changes.
 

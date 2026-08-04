@@ -3,12 +3,13 @@ import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { afterEach, describe, it } from "node:test";
-import { applyFollowUpRecheckSuccess, readFollowUpStore, updateFollowUpStore } from "../src/followUpBasket.js";
+import { applyFollowUpRecheckSuccess, readFollowUpStore, recordManualVerification, updateFollowUpStore } from "../src/followUpBasket.js";
 import { previewLifecycleMigration } from "../src/lifecycleMigrationPreview.js";
 import {
   SYSTEM_LIFECYCLE_POLICY_VERSION,
   applySystemLifecycle,
   readLifecycleAuditStore,
+  readLifecycleOperationJournalStore,
   readNewInboxStore,
   type SystemLifecycleRunResult,
 } from "../src/systemLifecycle.js";
@@ -91,6 +92,82 @@ describe("PC.1 system lifecycle policy", () => {
     const audit = await readLifecycleAuditStore(paths.audit);
     assert.equal(audit.entries.some((entry) => entry.policy_version === SYSTEM_LIFECYCLE_POLICY_VERSION && entry.scanner_run_id === "scan_20260804100000"), true);
     assert.equal(JSON.stringify(audit).toLowerCase().includes("openai"), false);
+  });
+
+  it("uses a current-cycle recheck, manual verification, and archived protection for automatic Main Radar promotion", async () => {
+    const paths = await isolatedPaths();
+    await run(candidate(), paths, "2026-08-01T10:00:00.000Z");
+    const followUp = await readFollowUpStore(paths.followUp);
+    const entry = followUp.entries[0]!;
+    await updateFollowUpStore((store) => applyFollowUpRecheckSuccess(store, {
+      entry_id: entry.entry_id,
+      candidate: candidate(),
+      checked_at: "2026-08-31T10:00:00.000Z",
+      source_run_id: "scan_20260831100000",
+      security_status: { status: "CHECKED", source: "goplus_security", checked_at: "2026-08-31T10:00:00.000Z", missing_data: [], risk_flags: [] },
+    }), { storePath: paths.followUp, now: new Date("2026-08-31T10:00:00.000Z") });
+    const stale = await run(null, paths, "2026-08-31T11:00:00.000Z");
+    assert.equal(stale.promoted_to_main_radar, 0);
+    await updateFollowUpStore((store) => recordManualVerification(store, {
+      chain: "base", contract_address: ADDRESS, display_name: "PC1 Token", symbol: "PC1", verdict: "NEEDS_MORE_DATA", note: "Needs a source check", checked_at: "2026-08-31T11:00:00.000Z", missing_data: ["security_context"], available_data: [],
+    }, "scan_20260831110000", { actor: "owner", previous_layer: "FOLLOW_UP", new_layer: "FOLLOW_UP", chain: "base", contract_address: ADDRESS, conditions_met: [], conditions_unmet: ["MANUAL_VERIFICATION"], owner_reason: "test" }), { storePath: paths.followUp, now: new Date("2026-08-31T11:00:00.000Z") });
+    const blocked = await run(null, paths, "2026-08-31T11:00:00.000Z");
+    assert.equal(blocked.promoted_to_main_radar, 0);
+  });
+
+  it("keeps an incomplete journal recoverable and makes identical snapshots write no Inbox or audit change", async () => {
+    const paths = await isolatedPaths();
+    await assert.rejects(
+      applySystemLifecycle(scanner(candidate(), "2026-08-04T10:00:00.000Z"), { ...lifecycleOptions(paths, new Date("2026-08-04T10:00:00.000Z")), failureInjection: (stage) => { if (stage === "TARGET_STORE_APPLIED") throw new Error("INJECTED_FAILURE"); } }),
+      /INJECTED_FAILURE/,
+    );
+    const journal = await readLifecycleOperationJournalStore(resolve(paths.inbox, "..", "operation-journal.json"));
+    assert.equal(journal.entries.some((entry) => entry.stage === "TARGET_STORE_APPLIED"), true);
+    const recovered = await run(candidate(), paths, "2026-08-04T10:00:00.000Z");
+    assert.equal(recovered.promoted_to_follow_up, 0);
+    assert.equal((await readNewInboxStore(paths.inbox)).entries[0]?.system_status, "FOLLOW_UP");
+    const beforeInbox = await readFile(paths.inbox, "utf8");
+    const beforeAudit = await readFile(paths.audit, "utf8");
+    await run(candidate(), paths, "2026-08-04T10:00:00.000Z");
+    assert.equal(await readFile(paths.inbox, "utf8"), beforeInbox);
+    assert.equal(await readFile(paths.audit, "utf8"), beforeAudit);
+    assert.equal((await readLifecycleOperationJournalStore(resolve(paths.inbox, "..", "operation-journal.json"))).entries.every((entry) => entry.stage === "COMMITTED"), true);
+  });
+
+  it("recovers every New-to-Follow-up journal failure stage without duplicate final state", async () => {
+    for (const stage of ["PLAN_CREATED", "TARGET_STORE_APPLIED", "NEW_INBOX_APPLIED", "AUDIT_APPLIED"] as const) {
+      const paths = await isolatedPaths();
+      await assert.rejects(
+        applySystemLifecycle(scanner(candidate(), "2026-08-04T10:00:00.000Z"), { ...lifecycleOptions(paths, new Date("2026-08-04T10:00:00.000Z")), failureInjection: (actual) => { if (actual === stage) throw new Error(`INJECTED_${stage}`); } }),
+        new RegExp(`INJECTED_${stage}`),
+      );
+      await run(candidate(), paths, "2026-08-04T10:00:00.000Z");
+      assert.equal((await readFollowUpStore(paths.followUp)).entries.length, 1, stage);
+      assert.equal((await readNewInboxStore(paths.inbox)).entries[0]?.system_status, "FOLLOW_UP", stage);
+      assert.equal((await readLifecycleOperationJournalStore(resolve(paths.inbox, "..", "operation-journal.json"))).entries.every((entry) => entry.stage === "COMMITTED"), true, stage);
+    }
+  });
+
+  it("recovers every Follow-up-to-Main journal failure stage without a partial lifecycle", async () => {
+    for (const stage of ["PLAN_CREATED", "TARGET_STORE_APPLIED", "FOLLOW_UP_SYNCED", "NEW_INBOX_APPLIED", "AUDIT_APPLIED"] as const) {
+      const paths = await isolatedPaths();
+      await run(candidate(), paths, "2026-08-01T10:00:00.000Z");
+      const entry = (await readFollowUpStore(paths.followUp)).entries[0]!;
+      await updateFollowUpStore((store) => applyFollowUpRecheckSuccess(store, {
+        entry_id: entry.entry_id,
+        candidate: candidate(),
+        checked_at: "2026-08-31T10:00:00.000Z",
+        source_run_id: "scan_20260831100000",
+        security_status: { status: "CHECKED", source: "goplus_security", checked_at: "2026-08-31T10:00:00.000Z", missing_data: [], risk_flags: [] },
+      }), { storePath: paths.followUp, now: new Date("2026-08-31T10:00:00.000Z") });
+      await assert.rejects(
+        applySystemLifecycle(scanner(null, "2026-08-31T10:00:00.000Z"), { ...lifecycleOptions(paths, new Date("2026-08-31T10:00:00.000Z")), failureInjection: (actual) => { if (actual === stage) throw new Error(`INJECTED_${stage}`); } }),
+        new RegExp(`INJECTED_${stage}`),
+      );
+      await run(null, paths, "2026-08-31T10:00:00.000Z");
+      assert.equal((await readNewInboxStore(paths.inbox)).entries[0]?.system_status, "MAIN_RADAR", stage);
+      assert.equal((await readLifecycleOperationJournalStore(resolve(paths.inbox, "..", "operation-journal.json"))).entries.every((entry) => entry.stage === "COMMITTED"), true, stage);
+    }
   });
 
   it("creates a deterministic, read-only migration preview and retains existing Follow-up and Main stores", async () => {
