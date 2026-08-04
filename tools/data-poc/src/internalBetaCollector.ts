@@ -35,11 +35,11 @@ import {
 } from "./goplusClient.js";
 import {
   DEFAULT_FOLLOW_UP_RECHECK_LIMIT,
-  ingestScannerSnapshot,
   synchronizeFollowUpEstablishedMembership,
   updateFollowUpStore,
   type FollowUpSecurityStatus,
 } from "./followUpBasket.js";
+import { applySystemLifecycle } from "./systemLifecycle.js";
 import {
   applyFollowUpRecheckBatch,
   collectDueFollowUpRechecks,
@@ -80,6 +80,9 @@ export type InternalBetaCollectorOptions = {
   previousContext?: ApprovedSourcesRunOutput;
   previousContextRunId?: string | null;
   followUpStorePath?: string;
+  newInboxStorePath?: string;
+  lifecycleAuditStorePath?: string;
+  establishedStorePath?: string;
   followUpRecheckLimit?: number;
 };
 
@@ -118,6 +121,13 @@ export type InternalBetaCollectorResult = {
     ingested: number;
     checkpoints_processed: number;
     error_code: string | null;
+  };
+  lifecycle: {
+    new_inbox_added: number;
+    new_inbox_updated: number;
+    promoted_to_follow_up: number;
+    promoted_to_main_radar: number;
+    duplicate_noop: number;
   };
 };
 
@@ -315,20 +325,42 @@ export async function runInternalBetaCollector(
   let followUpErrorCode: string | null = null;
   let followUpIngested = 0;
   let checkpointsProcessed = 0;
+  let lifecycle = {
+    new_inbox_added: 0,
+    new_inbox_updated: 0,
+    promoted_to_follow_up: 0,
+    promoted_to_main_radar: 0,
+    duplicate_noop: 0,
+  };
   try {
     const beforeStore = followUpPreparation.diagnostics.store_available
       ? followUpPreparation.diagnostics.store
       : null;
     const updatedStore = await updateFollowUpStore((current) => {
       const membershipSynced = synchronizeFollowUpEstablishedMembership(current, universe, finishedAt, runId);
-      const rechecked = applyFollowUpRecheckBatch(membershipSynced, followUpRechecks, universe);
-      return ingestScannerSnapshot(rechecked, scanner, universe);
+      return applyFollowUpRecheckBatch(membershipSynced, followUpRechecks, universe);
     }, { storePath: followUpStorePath, now: new Date(finishedAt) });
+    const lifecycleResult = await applySystemLifecycle(scanner, {
+      followUpStorePath,
+      newInboxStorePath: options.newInboxStorePath,
+      auditStorePath: options.lifecycleAuditStorePath,
+      establishedStorePath: options.establishedStorePath,
+      centralCycleId: runId,
+      contextRunId,
+      now: new Date(finishedAt),
+    });
     followUpStoreUpdated = true;
-    followUpIngested = beforeStore ? Math.max(0, updatedStore.entries.length - beforeStore.entries.length) : 0;
+    followUpIngested = lifecycleResult.promoted_to_follow_up;
     checkpointsProcessed = beforeStore
       ? Math.max(0, completedCheckpointCount(updatedStore) - completedCheckpointCount(beforeStore))
       : 0;
+    lifecycle = {
+      new_inbox_added: lifecycleResult.new_inbox_added,
+      new_inbox_updated: lifecycleResult.new_inbox_updated,
+      promoted_to_follow_up: lifecycleResult.promoted_to_follow_up,
+      promoted_to_main_radar: lifecycleResult.promoted_to_main_radar,
+      duplicate_noop: lifecycleResult.duplicate_noop,
+    };
   } catch (error) {
     followUpErrorCode = safeFollowUpErrorCode(error);
   }
@@ -375,6 +407,7 @@ export async function runInternalBetaCollector(
       checkpoints_processed: checkpointsProcessed,
       error_code: followUpErrorCode,
     },
+    lifecycle,
   };
 }
 
