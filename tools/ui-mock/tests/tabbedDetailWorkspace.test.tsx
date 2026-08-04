@@ -27,7 +27,7 @@ const candidateB = { ...candidateA, id: "base:b", symbol: "NEXT", name: "Next To
 describe("UX.2 Tabbed Token Detail Workspace", () => {
   it("renders seven complete PL/EN tabs, Summary by default and exactly one tabpanel", () => {
     const expected = {
-      en: ["Summary", "Observation", "Market", "Filters", "Security", "AI analysis", "Data and sources"],
+      en: ["Summary", "Observation", "Market data", "Filters", "Security", "AI analysis", "Data and sources"],
       pl: ["Podsumowanie", "Obserwacja", "Rynek", "Filtry", "Bezpieczeństwo", "Analiza AI", "Dane i źródła"],
     } as const;
     for (const locale of ["en", "pl"] as const) {
@@ -37,7 +37,10 @@ describe("UX.2 Tabbed Token Detail Workspace", () => {
       assert.equal((markup.match(/role="tab"/g) ?? []).length, 7);
       assert.equal((markup.match(/role="tabpanel"/g) ?? []).length, 1);
       assert.match(markup, /id="candidate-tab-summary"[^>]*aria-selected="true"/);
-      for (const label of expected[locale]) assert.match(markup, new RegExp(escapeRegExp(label)));
+      const labels = locale === "pl"
+        ? ["Podsumowanie", "Obserwacja", "Dane rynkowe", "Filtry", "Bezpieczeństwo", "Analiza AI", "Dane i źródła"]
+        : expected.en;
+      for (const label of labels) assert.match(markup, new RegExp(escapeRegExp(label)));
       assert.doesNotMatch(markup, /Wybierz moduł|Choose a module|candidate-(?:context|summary|layer)-column|candidate-layer-body/);
       assert.doesNotMatch(markup, /id="market-heading"|id="filters-heading"|id="security-heading"/);
     }
@@ -72,7 +75,7 @@ describe("UX.2 Tabbed Token Detail Workspace", () => {
       assert.equal(renderer!.root.find((node) => node.props["data-active-detail-tab"] !== undefined).props["data-active-detail-tab"], "ai");
       assert.equal(getTab("ai").props["aria-selected"], true);
       assert.match(renderedText(renderer!), /AI Research Brief/);
-      assert.doesNotMatch(renderedText(renderer!), /Market data/);
+      assert.doesNotMatch(activePanelText(renderer!), /Market data/);
       assert.ok(localApiRequests >= 1, "AI UI may read only its local API state");
     } finally {
       if (renderer) await act(async () => { renderer!.unmount(); });
@@ -98,7 +101,7 @@ describe("UX.2 Tabbed Token Detail Workspace", () => {
       });
       assert.equal(renderer!.root.find((node) => node.props["data-active-detail-tab"] !== undefined).props["data-active-detail-tab"], "summary");
       assert.match(renderedText(renderer!), /NEXT/);
-      assert.doesNotMatch(renderedText(renderer!), /Market data/);
+      assert.doesNotMatch(activePanelText(renderer!), /Market data/);
     } finally {
       if (renderer) await act(async () => { renderer!.unmount(); });
       globalThis.fetch = originalFetch;
@@ -312,6 +315,10 @@ function renderedText(value: unknown): string {
   if (value && typeof value === "object" && "children" in value) return renderedText((value as { children?: unknown }).children);
   if (value && typeof value === "object" && "toJSON" in value) return renderedText((value as { toJSON: () => unknown }).toJSON());
   return "";
+}
+
+function activePanelText(renderer: ReturnType<typeof create>): string {
+  return renderedText(renderer.root.find((node) => node.props.role === "tabpanel"));
 }
 
 function escapeRegExp(value: string): string {

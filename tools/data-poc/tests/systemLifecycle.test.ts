@@ -4,11 +4,14 @@ import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { afterEach, describe, it } from "node:test";
 import { applyFollowUpRecheckSuccess, readFollowUpStore, recordManualVerification, updateFollowUpStore } from "../src/followUpBasket.js";
+import { mutateEstablishedUniverse, readEstablishedUniverseStore } from "../src/establishedUniverseManager.js";
 import { previewLifecycleMigration } from "../src/lifecycleMigrationPreview.js";
 import {
   SYSTEM_LIFECYCLE_POLICY_VERSION,
   applySystemLifecycle,
+  bootstrapLifecycleReview,
   readLifecycleAuditStore,
+  readLifecycleCycleReceiptStore,
   readLifecycleOperationJournalStore,
   readNewInboxStore,
   type SystemLifecycleRunResult,
@@ -92,6 +95,27 @@ describe("PC.1 system lifecycle policy", () => {
     const audit = await readLifecycleAuditStore(paths.audit);
     assert.equal(audit.entries.some((entry) => entry.policy_version === SYSTEM_LIFECYCLE_POLICY_VERSION && entry.scanner_run_id === "scan_20260804100000"), true);
     assert.equal(JSON.stringify(audit).toLowerCase().includes("openai"), false);
+    const receiptPath = resolve(paths.inbox, "..", "cycle-receipts.json");
+    const beforeReceipt = await readFile(receiptPath, "utf8");
+    await run(candidate(), paths, "2026-08-04T10:00:00.000Z");
+    assert.equal(await readFile(receiptPath, "utf8"), beforeReceipt);
+  });
+
+  it("writes a versioned receipt for zero, added, and updated lifecycle cycles", async () => {
+    const paths = await isolatedPaths();
+    const zero = await run(null, paths, "2026-08-04T09:00:00.000Z");
+    assert.equal(zero.lifecycle_receipt.new_inbox_added, 0);
+    assert.equal(zero.lifecycle_receipt.promoted_to_follow_up, 0);
+    assert.equal(zero.summary.last_completed_cycle_id, zero.lifecycle_receipt.central_cycle_id);
+    const added = await run(candidate({ basic_filter_status: "rejected_basic_filter" }), paths, "2026-08-04T10:00:00.000Z");
+    assert.equal(added.lifecycle_receipt.new_inbox_added, 1);
+    const updated = await run(candidate({ basic_filter_status: "rejected_basic_filter", name: "PC1 Updated" }), paths, "2026-08-04T11:00:00.000Z");
+    assert.equal(updated.lifecycle_receipt.new_inbox_updated, 1);
+    const receipts = await readLifecycleCycleReceiptStore(resolve(paths.inbox, "..", "cycle-receipts.json"));
+    assert.equal(receipts.entries[0]?.central_cycle_id, updated.lifecycle_receipt.central_cycle_id);
+    assert.deepEqual(updated.summary.last_change_summary, {
+      added: 0, updated: 1, promoted_to_follow_up: 0, promoted_to_main_radar: 0, archived: 0, rejected: 0, duplicate_noop: 0,
+    });
   });
 
   it("uses a current-cycle recheck, manual verification, and archived protection for automatic Main Radar promotion", async () => {
@@ -168,6 +192,50 @@ describe("PC.1 system lifecycle policy", () => {
       assert.equal((await readNewInboxStore(paths.inbox)).entries[0]?.system_status, "MAIN_RADAR", stage);
       assert.equal((await readLifecycleOperationJournalStore(resolve(paths.inbox, "..", "operation-journal.json"))).entries.every((entry) => entry.stage === "COMMITTED"), true, stage);
     }
+  });
+
+  it("reconciles an Established duplicate before committing the Main Radar journal", async () => {
+    const paths = await isolatedPaths();
+    await run(candidate(), paths, "2026-08-01T10:00:00.000Z");
+    const entry = (await readFollowUpStore(paths.followUp)).entries[0]!;
+    await updateFollowUpStore((store) => applyFollowUpRecheckSuccess(store, {
+      entry_id: entry.entry_id,
+      candidate: candidate(),
+      checked_at: "2026-08-31T10:00:00.000Z",
+      source_run_id: "scan_20260831100000",
+      security_status: { status: "CHECKED", source: "goplus_security", checked_at: "2026-08-31T10:00:00.000Z", missing_data: [], risk_flags: [] },
+    }), { storePath: paths.followUp, now: new Date("2026-08-31T10:00:00.000Z") });
+    let inserted = false;
+    const result = await applySystemLifecycle(scanner(null, "2026-08-31T10:00:00.000Z"), {
+      ...lifecycleOptions(paths, new Date("2026-08-31T10:00:00.000Z")),
+      failureInjection: async (stage) => {
+        if (stage !== "PLAN_CREATED" || inserted) return;
+        inserted = true;
+        await mutateEstablishedUniverse({ operation: "add", chain: "base", contract_address: ADDRESS, display_name: "PC1 Token", symbol_hint: "PC1", owner_note: "duplicate race" }, { apply: true, storePath: paths.established, actor: "test", now: () => new Date("2026-08-31T10:00:00.000Z") });
+      },
+    });
+    assert.equal(result.duplicate_noop, 1);
+    assert.equal((await readEstablishedUniverseStore(paths.established)).current.entries.some((item) => item.enabled && item.contract_address === ADDRESS), true);
+    assert.equal((await readFollowUpStore(paths.followUp)).entries[0]?.lifecycle_status, "ESTABLISHED");
+    assert.equal((await readNewInboxStore(paths.inbox)).entries[0]?.system_status, "MAIN_RADAR");
+    assert.equal((await readLifecycleAuditStore(paths.audit)).entries.some((item) => item.dedupe_result === "DUPLICATE_NOOP" && item.reason === "MAIN_RADAR_DUPLICATE_RECONCILED"), true);
+  });
+
+  it("bootstraps durable New Inbox records only inside the isolated review paths", async () => {
+    const paths = await isolatedPaths();
+    const result = await bootstrapLifecycleReview(scanner(candidate(), "2026-08-04T10:00:00.000Z"), {
+      newInboxStorePath: paths.inbox,
+      followUpStorePath: paths.followUp,
+      establishedStorePath: paths.established,
+      cycleReceiptPath: resolve(paths.inbox, "..", "cycle-receipts.json"),
+      now: new Date("2026-08-04T10:00:00.000Z"),
+    });
+    assert.equal(result.new_inbox_records, 1);
+    assert.equal(result.follow_up_records, 0);
+    assert.equal(result.canonical_mutations, 0);
+    assert.equal(result.provider_calls, 0);
+    assert.equal((await readNewInboxStore(paths.inbox)).entries[0]?.system_status, "NEW");
+    assert.equal((await readLifecycleCycleReceiptStore(resolve(paths.inbox, "..", "cycle-receipts.json"))).entries[0]?.central_cycle_id, "review_scan_20260804100000");
   });
 
   it("creates a deterministic, read-only migration preview and retains existing Follow-up and Main stores", async () => {
