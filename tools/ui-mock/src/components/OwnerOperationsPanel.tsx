@@ -236,7 +236,7 @@ export function OwnerOperationsPanel({ initialStatus }: { initialStatus: OwnerOp
         {copy.run}
       </ActionButton>
 
-      {result && <OwnerResult result={result} copy={copy} />}
+      {result && <OwnerResult result={result} copy={copy} locale={locale} />}
     </section>
   );
 }
@@ -248,26 +248,31 @@ function OwnerFact({ label, value }: { label: string; value: string }) {
 function OwnerResult({
   result,
   copy,
+  locale,
 }: {
   result: OwnerRefreshResult | "ERROR";
   copy: typeof COPY.en | typeof COPY.pl;
+  locale: ProductLocale;
 }) {
   if (result === "ERROR") return <p className="owner-operation-result failed" role="alert">{copy.failed}</p>;
-  if (result.status === "SUCCESS") return <><p className="owner-operation-result success" role="status">{copy.success}</p><ScanReceipt receipt={result.lifecycle_receipt} /></>;
-  if (result.status === "PARTIAL") return <><p className="owner-operation-result" role="status">{copy.partial}</p><ScanReceipt receipt={result.lifecycle_receipt} /></>;
-  if (result.status === "NO_ACTION") return <><p className="owner-operation-result" role="status">{copy.noActionResult}</p><ScanReceipt receipt={result.lifecycle_receipt} /></>;
+  if (result.status === "SUCCESS") return <><p className="owner-operation-result success" role="status">{copy.success}</p><ScanReceipt receipt={result.lifecycle_receipt} locale={locale} /></>;
+  if (result.status === "PARTIAL") return <><p className="owner-operation-result" role="status">{copy.partial}</p><ScanReceipt receipt={result.lifecycle_receipt} locale={locale} /></>;
+  if (result.status === "NO_ACTION") return <><p className="owner-operation-result" role="status">{copy.noActionResult}</p><ScanReceipt receipt={result.lifecycle_receipt} locale={locale} /></>;
   if (result.status === "RUN_ALREADY_IN_PROGRESS") return <p className="owner-operation-result" role="status">{copy.inProgress}</p>;
   if (result.status === "FAILED") return <p className="owner-operation-result failed" role="alert">{copy.failed} {result.last_known_good_preserved ? copy.preserved : ""}</p>;
   return null;
 }
 
-function ScanReceipt({ receipt }: { receipt: OwnerRefreshResult["lifecycle_receipt"] }) {
+function ScanReceipt({ receipt, locale }: { receipt: OwnerRefreshResult["lifecycle_receipt"]; locale: ProductLocale }) {
   if (!receipt) return null;
+  const copy = locale === "pl"
+    ? { title: "Wynik skanu", found: "Znalezione", valid: "Poprawne", rejected: "Odrzucone", inbox: "New Inbox", follow: "Automatycznie do Follow-up", main: "Do Głównego Radaru", duplicates: "Duplikaty", errors: "Błędy źródeł", snapshot: "Snapshot", none: "brak" }
+    : { title: "Scan receipt", found: "Found", valid: "Valid", rejected: "Rejected", inbox: "New Inbox", follow: "Automatically to Follow-up", main: "To Main Radar", duplicates: "Duplicates", errors: "Source errors", snapshot: "Snapshot", none: "none" };
   return <div className="owner-operation-receipt" role="status">
-    <strong>Wynik skanu / Scan receipt</strong>
-    <span>Znalezione: {receipt.found}; poprawne: {receipt.valid}; odrzucone: {receipt.rejected}.</span>
-    <span>New Inbox: {receipt.new_inbox}; automatycznie do Follow-up: {receipt.promoted_to_follow_up}; do Głównego Radaru: {receipt.promoted_to_main_radar}; duplikaty: {receipt.duplicates}.</span>
-    <span>Honeypot.is: 0; błędy źródeł: {receipt.source_errors.join(", ") || "brak"}; snapshot: {receipt.snapshot_at ?? "brak"}.</span>
+    <strong>{copy.title}</strong>
+    <span>{copy.found}: {receipt.found}; {copy.valid}: {receipt.valid}; {copy.rejected}: {receipt.rejected}.</span>
+    <span>{copy.inbox}: {receipt.new_inbox}; {copy.follow}: {receipt.promoted_to_follow_up}; {copy.main}: {receipt.promoted_to_main_radar}; {copy.duplicates}: {receipt.duplicates}.</span>
+    <span>Honeypot.is: 0; {copy.errors}: {receipt.source_errors.join(", ") || copy.none}; {copy.snapshot}: {receipt.snapshot_at ?? copy.none}.</span>
   </div>;
 }
 

@@ -12,6 +12,14 @@ set "REVIEW_UI=%REVIEW_ROOT%\ui-mock"
 set "SCANNER_API_PORT=5277"
 set "UI_PORT=5273"
 
+for %%P in (%UI_PORT% %SCANNER_API_PORT%) do (
+  netstat -ano | findstr /R /C:":%%P .*LISTENING" >nul
+  if not errorlevel 1 (
+    echo ERROR: Port %%P jest juĹĽ zajÄ™ty. Zamknij poprzedni isolated review runtime i uruchom launcher ponownie.
+    exit /b 1
+  )
+)
+
 if not exist "%UI_DIR%\node_modules\.bin\tsx.cmd" (
   echo ERROR: Brak tools\ui-mock\node_modules. Uruchom pnpm install w tools\ui-mock.
   exit /b 1
@@ -36,6 +44,7 @@ set "CRYPTO_EDGE_ESTABLISHED_UNIVERSE_STORE_PATH=%REVIEW_DATA_POC%\.local\establ
 set "CRYPTO_EDGE_ESTABLISHED_UNIVERSE_CONFIG_PATH=%REVIEW_DATA_POC%\config\established_address_universe_v1.json"
 set "CRYPTO_EDGE_NEW_INBOX_STORE_PATH=%REVIEW_DATA_POC%\.local\lifecycle\new-inbox.json"
 set "CRYPTO_EDGE_LIFECYCLE_AUDIT_STORE_PATH=%REVIEW_DATA_POC%\.local\lifecycle\audit.json"
+set "CRYPTO_EDGE_LIFECYCLE_OPERATION_JOURNAL_PATH=%REVIEW_DATA_POC%\.local\lifecycle\operation-journal.json"
 set "CRYPTO_EDGE_USER_WORKSPACE_SQLITE_PATH=%REVIEW_UI%\user-workspace.sqlite"
 set "CRYPTO_EDGE_FEEDBACK_SQLITE_PATH=%REVIEW_UI%\tester-feedback.sqlite"
 set "CRYPTO_EDGE_AI_QUEUE_SQLITE_PATH=%REVIEW_UI%\ai-analysis-queue.sqlite"
@@ -60,6 +69,7 @@ call :copy_file "%DATA_POC_DIR%\.local\follow-up\store.json.bak" "%REVIEW_DATA_P
 call :copy_file "%DATA_POC_DIR%\.local\established-universe\store.json" "%REVIEW_DATA_POC%\.local\established-universe\store.json"
 call :copy_file "%DATA_POC_DIR%\.local\lifecycle\new-inbox.json" "%REVIEW_DATA_POC%\.local\lifecycle\new-inbox.json"
 call :copy_file "%DATA_POC_DIR%\.local\lifecycle\audit.json" "%REVIEW_DATA_POC%\.local\lifecycle\audit.json"
+call :copy_file "%DATA_POC_DIR%\.local\lifecycle\operation-journal.json" "%REVIEW_DATA_POC%\.local\lifecycle\operation-journal.json"
 call :copy_file "%REPO_ROOT%\config\established_address_universe_v1.json" "%REVIEW_DATA_POC%\config\established_address_universe_v1.json"
 call :copy_file "%REPO_ROOT%\tools\ui-mock\.local\tester-feedback.sqlite" "%REVIEW_UI%\tester-feedback.sqlite"
 call :copy_file "%REPO_ROOT%\tools\ui-mock\.local\ai-analysis-queue.sqlite" "%REVIEW_UI%\ai-analysis-queue.sqlite"

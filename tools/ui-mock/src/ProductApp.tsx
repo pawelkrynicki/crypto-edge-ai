@@ -41,8 +41,8 @@ import {
 } from "./services/establishedUniverseStatusDataSource";
 import { loadControlCenterStatus } from "./services/controlCenterStatusDataSource";
 import { loadFollowUpByIdentity, loadFollowUpList, loadFollowUpStatus } from "./services/followUpDataSource";
-import { loadLifecycleSummary } from "./services/lifecycleDataSource";
-import type { LifecycleSummary } from "./types/lifecycleTypes";
+import { loadLifecycleRadar, loadLifecycleSummary } from "./services/lifecycleDataSource";
+import type { LifecycleRadarView, LifecycleSummary } from "./types/lifecycleTypes";
 import type { FollowUpPublicEntry, FollowUpPublicStatus } from "./types/followUpTypes";
 import {
   findFollowUpByIdentity,
@@ -107,6 +107,7 @@ export type ProductAppDataSources = {
   loadFollowUpList: typeof loadFollowUpList;
   loadFollowUpByIdentity?: typeof loadFollowUpByIdentity;
   loadLifecycleSummary?: typeof loadLifecycleSummary;
+  loadLifecycleRadar?: typeof loadLifecycleRadar;
   now: () => string;
 };
 
@@ -120,6 +121,7 @@ const DEFAULT_PRODUCT_APP_DATA_SOURCES: ProductAppDataSources = {
   loadFollowUpList,
   loadFollowUpByIdentity,
   loadLifecycleSummary,
+  loadLifecycleRadar,
   now: () => new Date().toISOString(),
 };
 
@@ -155,6 +157,7 @@ export function ProductAppContent({
   const [controlCenterStatus, setControlCenterStatus] = useState<ControlCenterStatus | null>(null);
   const [followUpStatus, setFollowUpStatus] = useState<FollowUpPublicStatus | null>(null);
   const [lifecycleSummary, setLifecycleSummary] = useState<LifecycleSummary | null>(null);
+  const [lifecycleRadar, setLifecycleRadar] = useState<LifecycleRadarView | null>(null);
   const [followUpEntries, setFollowUpEntries] = useState<FollowUpPublicEntry[]>([]);
   const [selectedFollowUpEntryId, setSelectedFollowUpEntryId] = useState<string | null>(null);
   const [manualVerificationRecord, setManualVerificationRecord] = useState<ManualVerificationRecord | null>(null);
@@ -243,7 +246,7 @@ export function ProductAppContent({
     const refresh = (async () => {
       setLoading(true);
 
-      const [scannerResult, readinessResult, automationResult, universeStatusResult, controlCenterResult, followUpStatusResult, followUpListResult, lifecycleSummaryResult] = await Promise.all([
+      const [scannerResult, readinessResult, automationResult, universeStatusResult, controlCenterResult, followUpStatusResult, followUpListResult, lifecycleSummaryResult, lifecycleRadarResult] = await Promise.all([
         dataSources.loadScanner({ runtimeMode }),
         dataSources.loadReadiness({ runtimeMode }),
         dataSources.loadAutomation(),
@@ -252,13 +255,15 @@ export function ProductAppContent({
         dataSources.loadFollowUpStatus(),
         dataSources.loadFollowUpList(),
         dataSources.loadLifecycleSummary?.() ?? Promise.resolve(null),
+        dataSources.loadLifecycleRadar?.() ?? Promise.resolve(null),
       ]);
       setAutomationStatus(automationResult);
       setEstablishedUniverseStatus(universeStatusResult);
       setControlCenterStatus(controlCenterResult);
       setFeedbackRefreshRevision((value) => value + 1);
       setFollowUpStatus(followUpStatusResult);
-      setLifecycleSummary(lifecycleSummaryResult);
+      setLifecycleRadar(lifecycleRadarResult);
+      setLifecycleSummary(lifecycleRadarResult?.summary ?? lifecycleSummaryResult);
       let nextFollowUpEntries = followUpListResult?.entries ?? [];
       const routedIdentity = routeTokenIdentityRef.current;
       if (routedIdentity
@@ -312,6 +317,14 @@ export function ProductAppContent({
     refreshPromiseRef.current = refresh;
     return refresh;
   }, [dataSources, runtimeMode]);
+
+  const loadMoreLifecycleRadar = useCallback((cursor: string): void => {
+    if (!dataSources.loadLifecycleRadar) return;
+    void dataSources.loadLifecycleRadar(cursor).then((next) => {
+      if (!next) return;
+      setLifecycleRadar((current) => mergeLifecycleRadar(current, next));
+    });
+  }, [dataSources]);
 
   const refreshControlCenterAfterFeedback = useCallback(() => {
     void loadControlCenterStatus().then((value) => {
@@ -517,6 +530,8 @@ export function ProductAppContent({
             scannerUnavailableReasonCode={reasonCode}
             followUpStatus={followUpStatus}
             lifecycleSummary={lifecycleSummary}
+            lifecycleRadar={lifecycleRadar}
+            onLoadMoreLifecycle={loadMoreLifecycleRadar}
             followUpEntries={followUpEntries}
             establishedUniverseStatus={establishedUniverseStatus}
             onOpenCandidate={openCandidate}
@@ -608,6 +623,20 @@ export function ProductAppContent({
       {renderSection()}
     </ProductWorkspaceShell>
   );
+}
+
+function mergeLifecycleRadar(current: LifecycleRadarView | null, next: LifecycleRadarView): LifecycleRadarView {
+  if (!current) return next;
+  const mergeGroup = <T extends { identity: string }>(left: { cards: T[]; total: number; displayed: number; limit: number; next_cursor: string | null }, right: typeof left) => {
+    const cards = [...left.cards, ...right.cards].filter((card, index, values) => values.findIndex((value) => value.identity === card.identity) === index);
+    return { ...right, cards, displayed: cards.length, total: Math.max(left.total, right.total), next_cursor: right.next_cursor };
+  };
+  const newInbox = mergeGroup(current.new_inbox, next.new_inbox);
+  const actionDue = mergeGroup(current.follow_up.action_due, next.follow_up.action_due);
+  const candidatesReady = mergeGroup(current.follow_up.candidates_ready, next.follow_up.candidates_ready);
+  const observed = mergeGroup(current.follow_up.observed, next.follow_up.observed);
+  const summary = { ...next.summary, follow_up_displayed: actionDue.displayed + candidatesReady.displayed + observed.displayed };
+  return { ...next, summary, new_inbox: newInbox, follow_up: { action_due: actionDue, candidates_ready: candidatesReady, observed } };
 }
 
 export function selectAIResearchReviewCandidate(candidates: UiTokenCandidate[]): UiTokenCandidate | null {

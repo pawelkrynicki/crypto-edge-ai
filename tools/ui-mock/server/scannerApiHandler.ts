@@ -97,7 +97,7 @@ import {
   type ManualOwnerActionsOptions,
 } from "./manualOwnerActions.js";
 import type { ManualVerificationVerdict } from "../../data-poc/src/followUpBasket.js";
-import { createLifecycleService, LifecycleServiceError } from "./lifecycleService.js";
+import { createLifecycleService, LifecycleServiceError, parseRadarCursor } from "./lifecycleService.js";
 import { createPc1SessionContextService } from "./lifecycleSession.js";
 import { getDefaultUserWorkspaceDatabasePath, type UserWorkspaceRepository } from "./userWorkspaceRepository.js";
 
@@ -251,13 +251,33 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
       return;
     }
 
+    if (req.method === "GET" && path === "/api/lifecycle/radar") {
+      try {
+        const session = pc1Sessions.resolve(req);
+        if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
+        const query = validateLifecycleRadarQuery(req.url);
+        sendJson(req, res, 200, await lifecycle.radar(session.context, query), runtimeMode);
+      } catch (error) { sendLifecycleError(req, res, error, runtimeMode); }
+      return;
+    }
+
     if (req.method === "GET" && path === "/api/lifecycle/new-inbox") {
-      try { sendJson(req, res, 200, await lifecycle.inbox(), runtimeMode); } catch (error) { sendLifecycleError(req, res, error, runtimeMode); }
+      try {
+        const session = pc1Sessions.resolve(req);
+        if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
+        if (!session.context.capabilities.includes("LIFECYCLE_SCAN_NOW")) throw new LifecycleServiceError("LIFECYCLE_OWNER_ONLY", 403);
+        sendJson(req, res, 200, await lifecycle.inbox(), runtimeMode);
+      } catch (error) { sendLifecycleError(req, res, error, runtimeMode); }
       return;
     }
 
     if (req.method === "GET" && path === "/api/lifecycle/workspace/integrity") {
-      try { sendJson(req, res, 200, await lifecycle.workspaceIntegrity(), runtimeMode); } catch (error) { sendLifecycleError(req, res, error, runtimeMode); }
+      try {
+        const session = pc1Sessions.resolve(req);
+        if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
+        if (!session.context.capabilities.includes("LIFECYCLE_SCAN_NOW")) throw new LifecycleServiceError("LIFECYCLE_OWNER_ONLY", 403);
+        sendJson(req, res, 200, await lifecycle.workspaceIntegrity(), runtimeMode);
+      } catch (error) { sendLifecycleError(req, res, error, runtimeMode); }
       return;
     }
 
@@ -1605,6 +1625,17 @@ function sendManualOwnerActionError(
     error: actionError.code,
     message: "Owner token action rejected",
   }, runtimeMode);
+}
+
+function validateLifecycleRadarQuery(url: string | undefined): { limit: number; cursor: ReturnType<typeof parseRadarCursor> } {
+  let parsed: URL;
+  try { parsed = new URL(url ?? "/", "http://radar.local"); } catch { throw new LifecycleServiceError("LIFECYCLE_QUERY_INVALID", 400); }
+  const keys = [...parsed.searchParams.keys()].sort();
+  if (!keys.every((key) => key === "limit" || key === "cursor") || parsed.searchParams.getAll("limit").length > 1 || parsed.searchParams.getAll("cursor").length > 1) throw new LifecycleServiceError("LIFECYCLE_QUERY_INVALID", 400);
+  const limitText = parsed.searchParams.get("limit");
+  const limit = limitText === null ? 24 : Number(limitText);
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) throw new LifecycleServiceError("LIFECYCLE_LIMIT_INVALID", 400);
+  return { limit, cursor: parseRadarCursor(parsed.searchParams.get("cursor")) };
 }
 
 function sendLifecycleError(

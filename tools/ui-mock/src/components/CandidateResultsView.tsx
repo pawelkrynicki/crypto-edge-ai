@@ -34,11 +34,12 @@ import type {
   UiTokenCandidate,
 } from "../types/scannerTypes";
 import type { FollowUpPublicEntry, FollowUpPublicStatus } from "../types/followUpTypes";
-import type { LifecycleSummary } from "../types/lifecycleTypes";
+import type { LifecycleRadarCard, LifecycleRadarView, LifecycleSummary } from "../types/lifecycleTypes";
 import type { EstablishedUniverseStatus } from "../services/establishedUniverseStatusDataSource";
 import { ActionButton, CopyableAddress, ReadOnlyCard, StatusBadge, TechnicalDetails } from "./ProductUi";
 import { AIResearchRadarStatus } from "./AIResearchSection";
 import { PersonalRadarPanel } from "./PersonalRadarPanel";
+import { setLifecycleReviewRole } from "../services/lifecycleDataSource";
 import {
   lifecycleStageLabel,
   TokenCheckpointAxis,
@@ -61,6 +62,8 @@ interface CandidateResultsViewProps {
   scannerUnavailableReasonCode?: string | null;
   followUpStatus?: FollowUpPublicStatus | null;
   lifecycleSummary?: LifecycleSummary | null;
+  lifecycleRadar?: LifecycleRadarView | null;
+  onLoadMoreLifecycle?: (cursor: string) => void;
   followUpEntries?: FollowUpPublicEntry[];
   establishedUniverseStatus?: EstablishedUniverseStatus | null;
   onOpenCandidate?: (candidateId: string) => void;
@@ -80,6 +83,8 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
   scannerUnavailableReasonCode = null,
   followUpStatus = null,
   lifecycleSummary = null,
+  lifecycleRadar = null,
+  onLoadMoreLifecycle,
   followUpEntries = [],
   establishedUniverseStatus = null,
   onOpenCandidate,
@@ -123,7 +128,7 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
     ?? metadata?.established?.entries_enabled
     ?? establishedCandidates.length;
   const followUpTotal = lifecycleSummary?.system_follow_up_total ?? followUpStatus?.entries_total ?? 0;
-  const followUpDisplayed = lifecycleSummary?.follow_up_displayed ?? displayedFollowUpEntries.length;
+  const followUpDisplayed = lifecycleRadar?.summary.follow_up_displayed ?? lifecycleSummary?.follow_up_displayed ?? displayedFollowUpEntries.length;
   const establishedAfterFilters = metadata?.established?.candidates_after_filters
     ?? establishedCandidates.filter((candidate) => candidate.basicFilterStatus === "passed_basic_filter").length;
   const securityChecked = establishedCandidates.filter((candidate) => (
@@ -152,6 +157,7 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
           <p>{t("radar.intro")}</p>
         </div>
       </section>
+      {lifecycleRadar && isReviewMode() && <LifecycleReviewSwitch role={lifecycleRadar.actor.role} locale={locale} />}
 
       <section className="product-summary-grid primary" aria-label={t("radar.summary")}>
         <SummaryCard label={t("radar.newProjects")} value={String(lifecycleSummary?.system_new_total ?? newCandidates.length)} detail={lifecycleSummary ? "Trwały New Inbox" : t("radar.observationOnly")} />
@@ -190,10 +196,10 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
         </button>
         <ol id="radar-lifecycle-guide-content" hidden={!lifecycleGuideOpen}>
           <li>{locale === "pl" ? "Nowy token zostaje wykryty." : "A new token is detected."}</li>
-          <li>{locale === "pl" ? "Właściciel może dodać token do dalszej obserwacji po sprawdzeniu tożsamości i warunków." : "The owner may add the token to continued observation after reviewing identity and conditions."}</li>
+          <li>{locale === "pl" ? "System automatycznie awansuje projekt po spełnieniu jawnych warunków; użytkownik może wcześniej przesunąć go w swoim prywatnym Radarze." : "The system promotes a project after explicit conditions are met; a user may move it earlier in their private Radar."}</li>
           <li>{locale === "pl" ? "Token przechodzi checkpointy 1 / 3 / 7 / 14 / 30 dni." : "The token moves through 1 / 3 / 7 / 14 / 30-day checkpoints."}</li>
           <li>{locale === "pl" ? "Po spełnieniu filtrów może zostać kandydatem." : "After meeting the filters, it may become a candidate."}</li>
-          <li>{locale === "pl" ? "Tylko właściciel może dodać go do Głównego Radaru." : "Only the owner can add it to the Main Radar."}</li>
+          <li>{locale === "pl" ? "Prywatny ruch nie zmienia statusu innych użytkowników, a owner/admin nie wykonuje codziennych ręcznych przesunięć." : "A private move does not change other users’ status, and owner/admin do not perform daily manual moves."}</li>
         </ol>
       </section>
 
@@ -212,7 +218,7 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
           data-lifecycle-layer="observation"
         >
           <span>{t("radar.newBasket")}</span>
-          <strong>{newCandidates.length}</strong>
+          <strong>{lifecycleRadar?.new_inbox.total ?? lifecycleSummary?.system_new_total ?? newCandidates.length}</strong>
           <small>{t("radar.newBasketDescription")}</small>
         </button>
         <button
@@ -245,6 +251,8 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
           reasonCode={scannerUnavailableReasonCode}
           detail={t("radar.unavailableDetail")}
         />
+      ) : visibleBasket === "new_emerging" && lifecycleRadar ? (
+        <NewInboxRadarBasket cards={lifecycleRadar.new_inbox.cards} total={lifecycleRadar.new_inbox.total} nextCursor={lifecycleRadar.new_inbox.next_cursor} locale={locale} onLoadMore={onLoadMoreLifecycle} />
       ) : visibleBasket === "new_emerging" ? (
         <NewEmergingBasket
           candidates={newCandidates}
@@ -255,6 +263,8 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
           onOpenCandidate={onOpenCandidate}
           onOpenExternalChecks={onOpenExternalChecks}
         />
+      ) : visibleBasket === "maturing" && lifecycleRadar ? (
+        <LifecycleFollowUpQueues radar={lifecycleRadar} locale={locale} onLoadMore={onLoadMoreLifecycle} />
       ) : visibleBasket === "maturing" ? (
         <MaturingFollowUpBasket
           entries={displayedFollowUpEntries}
@@ -276,6 +286,47 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
     </div>
   );
 };
+
+function NewInboxRadarBasket({ cards, total, nextCursor, locale, onLoadMore }: { cards: LifecycleRadarCard[]; total: number; nextCursor: string | null; locale: ProductLocale; onLoadMore?: (cursor: string) => void }) {
+  const copy = locale === "pl"
+    ? { title: "Nowe projekty", absent: "Projekt nie wystąpił w ostatnim skanie, ale pozostaje w New Inbox.", more: "Pokaż więcej", empty: "Brak projektów w trwałym New Inbox." }
+    : { title: "New projects", absent: "This project was not present in the latest scan, but remains in the New Inbox.", more: "Show more", empty: "No projects in the durable New Inbox." };
+  return <section className="basket-content new-inbox-basket" aria-label={copy.title}>
+    <header className="basket-heading"><div><span>{copy.title}</span><h3>{total}</h3></div></header>
+    {cards.length === 0 ? <BasketEmpty title={copy.title} detail={copy.empty} code="NEW_INBOX_EMPTY" /> : cards.map((card) => <LifecycleRadarCardView key={card.identity} card={card} locale={locale} absentNotice={copy.absent} />)}
+    {nextCursor && <button type="button" className="product-secondary-action" data-lifecycle-more="new_inbox" onClick={() => onLoadMore?.(nextCursor)}>{copy.more}</button>}
+  </section>;
+}
+
+function LifecycleReviewSwitch({ role, locale }: { role: LifecycleRadarView["actor"]["role"]; locale: ProductLocale }) {
+  const copy = locale === "pl" ? { label: "Visual review", camp: "Przełącz na CAMP_USER", owner: "Przełącz na ownera" } : { label: "Visual review", camp: "Switch to CAMP_USER", owner: "Switch to owner" };
+  const switchTo = (next: "CAMP_USER" | "OWNER") => { void setLifecycleReviewRole(next).then((changed) => { if (changed) window.location.reload(); }); };
+  return <section className="personal-radar-review-switch" data-pc1-review-switch="global"><span>{copy.label}: {role}</span>{role !== "CAMP_USER" && <button type="button" onClick={() => switchTo("CAMP_USER")}>{copy.camp}</button>}{role !== "OWNER" && <button type="button" onClick={() => switchTo("OWNER")}>{copy.owner}</button>}</section>;
+}
+function isReviewMode(): boolean { return typeof window !== "undefined" && new URLSearchParams(window.location.search).get("pc1_review") === "1"; }
+
+function LifecycleFollowUpQueues({ radar, locale, onLoadMore }: { radar: LifecycleRadarView; locale: ProductLocale; onLoadMore?: (cursor: string) => void }) {
+  const copy = locale === "pl"
+    ? { due: "Do działania teraz", ready: "Kandydaci do Głównego Radaru", observed: "Pozostałe obserwowane", more: "Pokaż więcej" }
+    : { due: "Action due now", ready: "Main Radar candidates", observed: "Other observed projects", more: "Show more" };
+  const groups: Array<[keyof typeof copy, LifecycleRadarView["follow_up"]["action_due"]]> = [["due", radar.follow_up.action_due], ["ready", radar.follow_up.candidates_ready], ["observed", radar.follow_up.observed]];
+  return <section className="basket-content follow-up-basket lifecycle-queues" aria-label={locale === "pl" ? "Kolejka Follow-up" : "Follow-up queue"}>
+    {groups.map(([key, group]) => <section key={key} className="lifecycle-queue-group" data-lifecycle-queue={key}>
+      <header><h3>{copy[key]} <small>{group.displayed}/{group.total}</small></h3></header>
+      {group.cards.map((card) => <LifecycleRadarCardView key={card.identity} card={card} locale={locale} />)}
+      {group.next_cursor && <button type="button" className="product-secondary-action" data-lifecycle-more={key} onClick={() => onLoadMore?.(group.next_cursor!)}>{copy.more}</button>}
+    </section>)}
+  </section>;
+}
+
+function LifecycleRadarCardView({ card, locale, absentNotice }: { card: LifecycleRadarCard; locale: ProductLocale; absentNotice?: string }) {
+  return <article className="product-candidate-card lifecycle-radar-card" data-lifecycle-card={card.identity}>
+    <header><div><span className="candidate-results-eyebrow">{card.chain}</span><h3>{card.symbol ?? card.display_name ?? card.contract_address}</h3><p>{card.display_name ?? card.contract_address}</p></div></header>
+    <div className="candidate-metrics compact"><Metric label={locale === "pl" ? "Pierwsze wykrycie" : "First seen"} value={formatProductDateTime(card.first_seen_at, locale)} /><Metric label={locale === "pl" ? "Ostatnie wykrycie" : "Last seen"} value={formatProductDateTime(card.last_seen_at, locale)} /></div>
+    {card.snapshot_absence_notice && absentNotice && <p className="product-inline-warning">{absentNotice}</p>}
+    <PersonalRadarPanel chain={card.chain} contractAddress={card.contract_address} initialView={card} compact />
+  </article>;
+}
 
 export function MaturingFollowUpBasket({
   entries,
