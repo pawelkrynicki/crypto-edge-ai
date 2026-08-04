@@ -41,6 +41,8 @@ import {
 } from "./services/establishedUniverseStatusDataSource";
 import { loadControlCenterStatus } from "./services/controlCenterStatusDataSource";
 import { loadFollowUpByIdentity, loadFollowUpList, loadFollowUpStatus } from "./services/followUpDataSource";
+import { loadLifecycleSummary } from "./services/lifecycleDataSource";
+import type { LifecycleSummary } from "./types/lifecycleTypes";
 import type { FollowUpPublicEntry, FollowUpPublicStatus } from "./types/followUpTypes";
 import {
   findFollowUpByIdentity,
@@ -104,6 +106,7 @@ export type ProductAppDataSources = {
   loadFollowUpStatus: typeof loadFollowUpStatus;
   loadFollowUpList: typeof loadFollowUpList;
   loadFollowUpByIdentity?: typeof loadFollowUpByIdentity;
+  loadLifecycleSummary?: typeof loadLifecycleSummary;
   now: () => string;
 };
 
@@ -116,6 +119,7 @@ const DEFAULT_PRODUCT_APP_DATA_SOURCES: ProductAppDataSources = {
   loadFollowUpStatus,
   loadFollowUpList,
   loadFollowUpByIdentity,
+  loadLifecycleSummary,
   now: () => new Date().toISOString(),
 };
 
@@ -150,6 +154,7 @@ export function ProductAppContent({
   const [establishedUniverseStatus, setEstablishedUniverseStatus] = useState<EstablishedUniverseStatus | null>(null);
   const [controlCenterStatus, setControlCenterStatus] = useState<ControlCenterStatus | null>(null);
   const [followUpStatus, setFollowUpStatus] = useState<FollowUpPublicStatus | null>(null);
+  const [lifecycleSummary, setLifecycleSummary] = useState<LifecycleSummary | null>(null);
   const [followUpEntries, setFollowUpEntries] = useState<FollowUpPublicEntry[]>([]);
   const [selectedFollowUpEntryId, setSelectedFollowUpEntryId] = useState<string | null>(null);
   const [manualVerificationRecord, setManualVerificationRecord] = useState<ManualVerificationRecord | null>(null);
@@ -238,7 +243,7 @@ export function ProductAppContent({
     const refresh = (async () => {
       setLoading(true);
 
-      const [scannerResult, readinessResult, automationResult, universeStatusResult, controlCenterResult, followUpStatusResult, followUpListResult] = await Promise.all([
+      const [scannerResult, readinessResult, automationResult, universeStatusResult, controlCenterResult, followUpStatusResult, followUpListResult, lifecycleSummaryResult] = await Promise.all([
         dataSources.loadScanner({ runtimeMode }),
         dataSources.loadReadiness({ runtimeMode }),
         dataSources.loadAutomation(),
@@ -246,12 +251,14 @@ export function ProductAppContent({
         dataSources.loadControlCenter(),
         dataSources.loadFollowUpStatus(),
         dataSources.loadFollowUpList(),
+        dataSources.loadLifecycleSummary?.() ?? Promise.resolve(null),
       ]);
       setAutomationStatus(automationResult);
       setEstablishedUniverseStatus(universeStatusResult);
       setControlCenterStatus(controlCenterResult);
       setFeedbackRefreshRevision((value) => value + 1);
       setFollowUpStatus(followUpStatusResult);
+      setLifecycleSummary(lifecycleSummaryResult);
       let nextFollowUpEntries = followUpListResult?.entries ?? [];
       const routedIdentity = routeTokenIdentityRef.current;
       if (routedIdentity
@@ -509,6 +516,7 @@ export function ProductAppContent({
             sourceHealth={sourceHealth}
             scannerUnavailableReasonCode={reasonCode}
             followUpStatus={followUpStatus}
+            lifecycleSummary={lifecycleSummary}
             followUpEntries={followUpEntries}
             establishedUniverseStatus={establishedUniverseStatus}
             onOpenCandidate={openCandidate}

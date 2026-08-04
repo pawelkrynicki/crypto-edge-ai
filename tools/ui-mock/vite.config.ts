@@ -33,7 +33,10 @@ export default defineConfig(({ mode }) => {
     server: {
       allowedHosts: true,
       proxy: {
-        "/api": LOCAL_API_PROXY,
+        "/api": {
+          ...LOCAL_API_PROXY,
+          target: `http://127.0.0.1:${process.env.SCANNER_API_PORT ?? "5177"}`,
+        },
       },
     },
   };

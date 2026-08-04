@@ -34,9 +34,11 @@ import type {
   UiTokenCandidate,
 } from "../types/scannerTypes";
 import type { FollowUpPublicEntry, FollowUpPublicStatus } from "../types/followUpTypes";
+import type { LifecycleSummary } from "../types/lifecycleTypes";
 import type { EstablishedUniverseStatus } from "../services/establishedUniverseStatusDataSource";
 import { ActionButton, CopyableAddress, ReadOnlyCard, StatusBadge, TechnicalDetails } from "./ProductUi";
 import { AIResearchRadarStatus } from "./AIResearchSection";
+import { PersonalRadarPanel } from "./PersonalRadarPanel";
 import {
   lifecycleStageLabel,
   TokenCheckpointAxis,
@@ -58,6 +60,7 @@ interface CandidateResultsViewProps {
   sourceHealth?: ProductSourceHealthResolution;
   scannerUnavailableReasonCode?: string | null;
   followUpStatus?: FollowUpPublicStatus | null;
+  lifecycleSummary?: LifecycleSummary | null;
   followUpEntries?: FollowUpPublicEntry[];
   establishedUniverseStatus?: EstablishedUniverseStatus | null;
   onOpenCandidate?: (candidateId: string) => void;
@@ -76,6 +79,7 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
   sourceHealth,
   scannerUnavailableReasonCode = null,
   followUpStatus = null,
+  lifecycleSummary = null,
   followUpEntries = [],
   establishedUniverseStatus = null,
   onOpenCandidate,
@@ -118,8 +122,8 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
   const establishedEntries = establishedUniverseStatus?.entries_enabled
     ?? metadata?.established?.entries_enabled
     ?? establishedCandidates.length;
-  const followUpTotal = followUpStatus?.entries_total ?? 0;
-  const followUpDisplayed = displayedFollowUpEntries.length;
+  const followUpTotal = lifecycleSummary?.system_follow_up_total ?? followUpStatus?.entries_total ?? 0;
+  const followUpDisplayed = lifecycleSummary?.follow_up_displayed ?? displayedFollowUpEntries.length;
   const establishedAfterFilters = metadata?.established?.candidates_after_filters
     ?? establishedCandidates.filter((candidate) => candidate.basicFilterStatus === "passed_basic_filter").length;
   const securityChecked = establishedCandidates.filter((candidate) => (
@@ -150,10 +154,11 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
       </section>
 
       <section className="product-summary-grid primary" aria-label={t("radar.summary")}>
-        <SummaryCard label={t("radar.newProjects")} value={String(newCandidates.length)} detail={t("radar.observationOnly")} />
-        <SummaryCard label={t("followUp.totalCount")} value={String(followUpTotal)} detail={t("followUp.totalCountDetail")} />
-        <SummaryCard label={t("followUp.displayedCount")} value={String(followUpDisplayed)} detail={t("followUp.displayedCountDetail")} />
-        <SummaryCard label={t("followUp.candidateCount")} value={String(followUpStatus?.candidate_count ?? 0)} detail={t("followUp.candidateCountDetail")} tone="accent" />
+        <SummaryCard label={t("radar.newProjects")} value={String(lifecycleSummary?.system_new_total ?? newCandidates.length)} detail={lifecycleSummary ? "Trwały New Inbox" : t("radar.observationOnly")} />
+        <SummaryCard label={"Łącznie obserwowane"} value={String(followUpTotal)} detail={t("followUp.totalCountDetail")} />
+        <SummaryCard label={"Do działania teraz"} value={String(lifecycleSummary?.follow_up_action_due ?? followUpStatus?.due_count ?? 0)} detail="Checkpointy wymagające działania" />
+        <SummaryCard label={"Kandydaci do Głównego Radaru"} value={String(lifecycleSummary?.follow_up_candidates_ready ?? followUpStatus?.candidate_count ?? 0)} detail={t("followUp.candidateCountDetail")} tone="accent" />
+        <SummaryCard label={"Wyświetlane teraz"} value={String(followUpDisplayed)} detail={t("followUp.displayedCountDetail")} />
         <SummaryCard label={t("radar.establishedEntries")} value={String(establishedEntries)} detail={t("radar.activeUniverseAddresses")} />
         <SummaryCard
           label={t("app.generated")}
@@ -359,6 +364,7 @@ export function MaturingFollowUpBasket({
               contractAddress={entry.contract_address}
               onOpen={onOpenFollowUp ? () => onOpenFollowUp(entry.entry_id) : undefined}
             />
+            <PersonalRadarPanel chain={entry.chain} contractAddress={entry.contract_address} />
             {onOpenFollowUp && (
               <footer className="product-candidate-footer follow-up-actions">
                 <p>{entry.lifecycle_status === "CANDIDATE_FOR_ESTABLISHED"
@@ -512,6 +518,7 @@ function NewCandidateCard({
         contractAddress={candidate.contractAddress}
         onOpen={onOpenCandidate ? () => onOpenCandidate(candidate.id) : undefined}
       />
+      <PersonalRadarPanel chain={candidate.chain} contractAddress={candidate.contractAddress} />
 
       <footer className="product-candidate-footer">
         <div>

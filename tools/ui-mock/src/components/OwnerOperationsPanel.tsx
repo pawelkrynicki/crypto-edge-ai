@@ -16,8 +16,8 @@ import { ActionButton } from "./ProductUi";
 const COPY = {
   en: {
     eyebrow: "Owner operations",
-    title: "One-time data refresh",
-    intro: "Review the current cadence plan before starting one controlled refresh cycle.",
+    title: "Run scan now",
+    intro: "Review the current controlled scan plan before starting one central lifecycle cycle.",
     browserBoundary: "The browser does not connect directly to data providers.",
     currentStatus: "Current status",
     mode: "Owner operations mode",
@@ -32,15 +32,15 @@ const COPY = {
     reviewOnly: "Review-safe mode: the real refresh remains blocked.",
     previewFirst: "Preview the current refresh plan before confirming this action.",
     confirmFirst: "Confirm the cadence-controlled cycle to enable this action.",
-    preview: "Preview refresh plan",
+    preview: "Preview scan plan",
     previewUnavailable: "The refresh plan could not be loaded.",
     mayCall: "Sources that may be contacted",
     willNotCall: "Sources that will not be contacted",
     expires: "Preflight valid until",
     noAction: "No refresh is due under the current cadence.",
     confirm: "I confirm this is one cadence-controlled refresh cycle.",
-    run: "Run one-time refresh",
-    dialog: "Start one controlled refresh cycle using this current preflight plan?",
+    run: "Run scan now",
+    dialog: "Start one controlled scan and lifecycle cycle using this current preflight plan?",
     success: "The one-time refresh completed successfully.",
     partial: "The refresh completed with partial source data. Last-known-good data was preserved.",
     noActionResult: "No action was needed. No provider was contacted.",
@@ -59,8 +59,8 @@ const COPY = {
   },
   pl: {
     eyebrow: "Operacje właściciela",
-    title: "Jednorazowe odświeżenie danych",
-    intro: "Przed uruchomieniem jednego kontrolowanego cyklu sprawdź aktualny harmonogram.",
+    title: "Uruchom skan teraz",
+    intro: "Przed uruchomieniem jednego kontrolowanego cyklu skanu i lifecycle sprawdź aktualny harmonogram.",
     browserBoundary: "Przeglądarka nie łączy się bezpośrednio ze źródłami danych.",
     currentStatus: "Bieżący status",
     mode: "Tryb operacji właściciela",
@@ -75,15 +75,15 @@ const COPY = {
     reviewOnly: "Tryb bezpiecznego przeglądu: prawdziwe odświeżenie pozostaje zablokowane.",
     previewFirst: "Najpierw sprawdź bieżący plan odświeżenia.",
     confirmFirst: "Potwierdź cykl zgodny z harmonogramem, aby aktywować tę akcję.",
-    preview: "Sprawdź plan odświeżenia",
-    previewUnavailable: "Nie udało się pobrać planu odświeżenia.",
+    preview: "Sprawdź plan skanu",
+    previewUnavailable: "Nie udało się pobrać planu skanu.",
     mayCall: "Źródła, które mogą zostać wywołane",
     willNotCall: "Źródła, które nie zostaną wywołane",
     expires: "Plan ważny do",
     noAction: "Zgodnie z aktualnym harmonogramem nic nie wymaga odświeżenia.",
     confirm: "Potwierdzam jeden cykl odświeżenia zgodny z harmonogramem.",
-    run: "Uruchom jednorazowe odświeżenie",
-    dialog: "Uruchomić jeden kontrolowany cykl odświeżenia według aktualnego planu?",
+    run: "Uruchom skan teraz",
+    dialog: "Uruchomić jeden kontrolowany cykl skanu i lifecycle według aktualnego planu?",
     success: "Jednorazowe odświeżenie zakończyło się powodzeniem.",
     partial: "Odświeżenie zakończyło się z częściowymi danymi źródłowymi. Zachowano ostatnie prawidłowe dane.",
     noActionResult: "Nie było nic do zrobienia. Nie wywołano żadnego źródła danych.",
@@ -207,6 +207,7 @@ export function OwnerOperationsPanel({ initialStatus }: { initialStatus: OwnerOp
           <OwnerFact label={copy.lock} value={preview.lock_available ? copy.available : copy.busy} />
           <OwnerFact label={copy.mayCall} value={sourceList(preview.sources_may_be_called, copy.none)} />
           <OwnerFact label={copy.willNotCall} value={sourceList(preview.sources_not_called, copy.none)} />
+          <OwnerFact label="Honeypot.is" value={preview.sources_not_called.includes("honeypot_is") ? (locale === "pl" ? "Nie jest uruchamiany" : "Not invoked") : copy.missing} />
           <OwnerFact label={copy.expires} value={dateValue(preview.expires_at, locale, copy.missing)} />
           {preview.planned_mode === "no_action" && <p className="owner-no-action">{copy.noAction}</p>}
         </div>
@@ -252,11 +253,22 @@ function OwnerResult({
   copy: typeof COPY.en | typeof COPY.pl;
 }) {
   if (result === "ERROR") return <p className="owner-operation-result failed" role="alert">{copy.failed}</p>;
-  if (result.status === "SUCCESS") return <p className="owner-operation-result success" role="status">{copy.success}</p>;
-  if (result.status === "PARTIAL") return <p className="owner-operation-result" role="status">{copy.partial}</p>;
-  if (result.status === "NO_ACTION") return <p className="owner-operation-result" role="status">{copy.noActionResult}</p>;
+  if (result.status === "SUCCESS") return <><p className="owner-operation-result success" role="status">{copy.success}</p><ScanReceipt receipt={result.lifecycle_receipt} /></>;
+  if (result.status === "PARTIAL") return <><p className="owner-operation-result" role="status">{copy.partial}</p><ScanReceipt receipt={result.lifecycle_receipt} /></>;
+  if (result.status === "NO_ACTION") return <><p className="owner-operation-result" role="status">{copy.noActionResult}</p><ScanReceipt receipt={result.lifecycle_receipt} /></>;
   if (result.status === "RUN_ALREADY_IN_PROGRESS") return <p className="owner-operation-result" role="status">{copy.inProgress}</p>;
-  return <p className="owner-operation-result failed" role="alert">{copy.failed} {result.last_known_good_preserved ? copy.preserved : ""}</p>;
+  if (result.status === "FAILED") return <p className="owner-operation-result failed" role="alert">{copy.failed} {result.last_known_good_preserved ? copy.preserved : ""}</p>;
+  return null;
+}
+
+function ScanReceipt({ receipt }: { receipt: OwnerRefreshResult["lifecycle_receipt"] }) {
+  if (!receipt) return null;
+  return <div className="owner-operation-receipt" role="status">
+    <strong>Wynik skanu / Scan receipt</strong>
+    <span>Znalezione: {receipt.found}; poprawne: {receipt.valid}; odrzucone: {receipt.rejected}.</span>
+    <span>New Inbox: {receipt.new_inbox}; automatycznie do Follow-up: {receipt.promoted_to_follow_up}; do Głównego Radaru: {receipt.promoted_to_main_radar}; duplikaty: {receipt.duplicates}.</span>
+    <span>Honeypot.is: 0; błędy źródeł: {receipt.source_errors.join(", ") || "brak"}; snapshot: {receipt.snapshot_at ?? "brak"}.</span>
+  </div>;
 }
 
 function yesNo(value: boolean, copy: typeof COPY.en | typeof COPY.pl): string {

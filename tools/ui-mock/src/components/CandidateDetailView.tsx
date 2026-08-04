@@ -34,6 +34,7 @@ import { EstablishedPromotionPanel } from "./EstablishedPromotionPanel";
 import { AIResearchSection } from "./AIResearchSection";
 import { ManualVerificationStatusCard } from "./ManualVerificationStatusCard";
 import { OwnerFollowUpActionPanel } from "./OwnerFollowUpActionPanel";
+import { PersonalRadarPanel } from "./PersonalRadarPanel";
 import type { ManualVerificationRecord } from "../services/manualOwnerActionsDataSource";
 import { ActionButton, CopyButton, CopyableAddress, StatusBadge, TechnicalDetails } from "./ProductUi";
 import {
@@ -363,7 +364,7 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
         </div>
         <div className="token-detail-next-step"><span>{workspaceCopy.nextResearchStep}</span><strong>{nextStep}</strong></div>
       </header>
-
+      <PersonalRadarPanel chain={candidate.chain} contractAddress={candidate.contractAddress} onChanged={onLifecycleChanged} />
       <TokenDetailTabs tabs={CANDIDATE_DETAIL_TAB_IDS.map((id) => ({ id, label: workspaceCopy.tabs[id] }))} activeTab={activeTab} onChange={setActiveTab} idPrefix="candidate" ariaLabel={workspaceCopy.tablistLabel} />
       <TokenDetailTabPanel activeTab={activeTab} idPrefix="candidate">
         {activeTabContent}
@@ -648,6 +649,7 @@ function FollowUpOnlyDetail({
         </div>
         <div className="token-detail-next-step"><span>{copy.nextResearchStep}</span><strong>{lifecycleActionLabel(lifecycle.next_action_type, locale)}</strong></div>
       </header>
+      <PersonalRadarPanel chain={followUp.chain} contractAddress={followUp.contract_address} onChanged={onLifecycleChanged} />
       <TokenDetailTabs tabs={CANDIDATE_DETAIL_TAB_IDS.map((id) => ({ id, label: copy.tabs[id] }))} activeTab={activeTab} onChange={onActiveTabChange} idPrefix="candidate" ariaLabel={copy.tablistLabel} />
       <TokenDetailTabPanel activeTab={activeTab} idPrefix="candidate">
         {content}
