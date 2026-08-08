@@ -36,5 +36,5 @@ export function presentLifecycleConditions(conditions: LifecycleConditions, loca
     { label: copy.unmet, values: conditions.conditions_unmet.map((value) => lifecycleConditionLabel(value, locale)) },
     { label: copy.missing, values: conditions.missing_data.map((value) => lifecycleConditionLabel(value, locale)) },
     { label: copy.risks, values: conditions.risks.map((value) => lifecycleConditionLabel(value, locale)) },
-  ].filter((entry) => entry.values.length > 0);
+  ];
 }

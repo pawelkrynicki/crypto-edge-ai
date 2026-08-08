@@ -80,10 +80,10 @@ export function PersonalRadarPanel({
         </ActionButton>
       )}
       {reviewOpen && target && canWrite && (
-        <TechnicalDetails label={copy.confirmAction} className="personal-radar-confirmation">
+        <TechnicalDetails label={copy.confirmAction} className="personal-radar-confirmation" initialOpen>
           {needsReason && <p>{copy.needsReason}</p>}
           {presentLifecycleConditions(resolvedView.conditions, locale).map((entry) => (
-            <p key={entry.label}><strong>{entry.label}:</strong> {entry.values.join(", ")}</p>
+            <p key={entry.label}><strong>{entry.label}:</strong> {entry.values.length > 0 ? entry.values.join(", ") : "—"}</p>
           ))}
           {needsReason && <label>{copy.reason}<textarea value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} /></label>}
           <label><input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} /> {copy.confirm}</label>

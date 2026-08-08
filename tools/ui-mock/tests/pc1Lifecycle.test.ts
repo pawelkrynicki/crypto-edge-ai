@@ -14,8 +14,9 @@ import { createScannerApiServer } from "../server/scannerApiServer.js";
 import { createUserWorkspaceRepository, UserWorkspaceError } from "../server/userWorkspaceRepository.js";
 import { ProductAppContent, type ProductAppDataSources } from "../src/ProductApp.js";
 import { CandidateResultsView } from "../src/components/CandidateResultsView.js";
+import { PersonalRadarPanel } from "../src/components/PersonalRadarPanel.js";
 import { ProductLocaleProvider } from "../src/productI18n.js";
-import type { LifecycleRadarCard, LifecycleRadarView } from "../src/types/lifecycleTypes.js";
+import type { LifecycleRadarCard, LifecycleRadarView, LifecycleTokenView } from "../src/types/lifecycleTypes.js";
 import type { UiTokenCandidate } from "../src/types/scannerTypes.js";
 
 const ADDRESS = "0x1111111111111111111111111111111111111111";
@@ -86,6 +87,10 @@ describe("PC.1 bounded lifecycle Radar API", () => {
       const first = await requestApi(server, "POST", "/api/lifecycle/review-session/camp-user");
       const moved = await requestApi(server, "POST", "/api/lifecycle/token/status", { cookie: cookie(first), "content-type": "application/json" }, JSON.stringify({ chain: "base", contract_address: ADDRESS, target_status: "FOLLOW_UP", override_reason: "early private review", confirmation: true }));
       assert.equal(moved.status, 200, moved.body);
+      const firstView = JSON.parse(moved.body) as { system_status: string; user_status: string; user_status_is_override: boolean };
+      assert.equal(firstView.system_status, "NEW");
+      assert.equal(firstView.user_status, "FOLLOW_UP");
+      assert.equal(firstView.user_status_is_override, true);
       const second = await requestApi(server, "POST", "/api/lifecycle/review-session/camp-user");
       const view = await requestApi(server, "GET", `/api/lifecycle/token?chain=base&contract_address=${ADDRESS}`, { cookie: cookie(second) });
       const body = JSON.parse(view.body) as { user_status: string; user_status_is_override: boolean };
@@ -179,6 +184,80 @@ describe("PC.1 bounded lifecycle Radar API", () => {
     assert.match(presentation, /Status systemowy/);
     assert.match(presentation, /System status/);
     assert.doesNotMatch(component, /conditions_met\.join/);
+  });
+
+  it("opens private manual moves immediately and advances only the CAMP user's status", async () => {
+    const originalFetch = globalThis.fetch;
+    const submitted: Array<{ target_status: string; override_reason: string | null }> = [];
+    const initial: LifecycleTokenView = {
+      identity: IDENTITY,
+      system_status: "NEW",
+      user_status: "NEW",
+      user_status_is_override: false,
+      conditions: { ...UNMET, risks: ["NO_CRITICAL_IDENTITY_OR_CONTRACT_RISK"] },
+      actor: { role: "CAMP_USER", capabilities: ["CAMP_USER_WORKSPACE_WRITE"] },
+    };
+    const afterFollowUp: LifecycleTokenView = { ...initial, user_status: "FOLLOW_UP", user_status_is_override: true, conditions: MET };
+    const afterMainRadar: LifecycleTokenView = { ...afterFollowUp, user_status: "MAIN_RADAR" };
+    globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      submitted.push(JSON.parse(String(init?.body)) as { target_status: string; override_reason: string | null });
+      const next = submitted.length === 1 ? afterFollowUp : afterMainRadar;
+      return new Response(JSON.stringify(next), { status: 200, headers: { "content-type": "application/json" } });
+    }) as typeof fetch;
+    let renderer: ReturnType<typeof create> | undefined;
+    try {
+      await act(async () => {
+        renderer = create(React.createElement(ProductLocaleProvider, { initialLocale: "en" }, React.createElement(PersonalRadarPanel, { chain: "base", contractAddress: ADDRESS, initialView: initial })));
+      });
+      const action = () => renderer!.root.findAllByType("button").find((node) => node.props["aria-expanded"] === false)!;
+      await act(async () => { action().props.onClick(); });
+      const confirmation = renderer!.root.findByType("details");
+      assert.equal(confirmation.props.open, true);
+      assert.equal(confirmation.findByType("summary").props["aria-expanded"], true);
+      const confirmationMarkup = JSON.stringify(renderer!.toJSON());
+      assert.match(confirmationMarkup, /Conditions met/);
+      assert.match(confirmationMarkup, /Unmet conditions/);
+      assert.match(confirmationMarkup, /Missing data/);
+      assert.match(confirmationMarkup, /Risks/);
+      assert.equal(renderer!.root.findAllByType("textarea").length, 1);
+      let saveButton = renderer!.root.findAllByType("button").find((node) => node.props["data-action-variant"] === "primary")!;
+      assert.equal(saveButton.props.disabled, true);
+      await act(async () => {
+        renderer!.root.findByType("textarea").props.onChange({ target: { value: "Early private review" } });
+        renderer!.root.findByType("input").props.onChange({ target: { checked: true } });
+      });
+      saveButton = renderer!.root.findAllByType("button").find((node) => node.props["data-action-variant"] === "primary")!;
+      assert.equal(saveButton.props.disabled, false);
+      await act(async () => { saveButton.props.onClick(); await flush(); });
+      let markup = JSON.stringify(renderer!.toJSON());
+      assert.match(markup, /System status[\s\S]*New/);
+      assert.match(markup, /Your status[\s\S]*Follow-up/);
+      assert.match(markup, /Move to my Main Radar/);
+      assert.equal(renderer!.root.findAllByType("details").length, 0);
+      await act(async () => { action().props.onClick(); });
+      assert.equal(renderer!.root.findByType("details").props.open, true);
+      assert.equal(renderer!.root.findAllByType("textarea").length, 0);
+      const followUpConfirmationMarkup = JSON.stringify(renderer!.toJSON());
+      assert.match(followUpConfirmationMarkup, /Conditions met/);
+      assert.match(followUpConfirmationMarkup, /Unmet conditions/);
+      assert.match(followUpConfirmationMarkup, /Missing data/);
+      assert.match(followUpConfirmationMarkup, /Risks/);
+      await act(async () => { renderer!.root.findByType("input").props.onChange({ target: { checked: true } }); });
+      saveButton = renderer!.root.findAllByType("button").find((node) => node.props["data-action-variant"] === "primary")!;
+      assert.equal(saveButton.props.disabled, false);
+      await act(async () => { saveButton.props.onClick(); await flush(); });
+      markup = JSON.stringify(renderer!.toJSON());
+      assert.match(markup, /System status[\s\S]*New/);
+      assert.match(markup, /Your status[\s\S]*Main Radar/);
+      assert.equal(renderer!.root.findAllByType("details").length, 0);
+      assert.deepEqual(submitted.map(({ target_status, override_reason }) => ({ target_status, override_reason })), [
+        { target_status: "FOLLOW_UP", override_reason: "Early private review" },
+        { target_status: "MAIN_RADAR", override_reason: null },
+      ]);
+    } finally {
+      if (renderer) await act(async () => { renderer!.unmount(); });
+      globalThis.fetch = originalFetch;
+    }
   });
 
   it("loads exactly one lifecycle Radar request on entry and never falls back to per-card requests", async () => {

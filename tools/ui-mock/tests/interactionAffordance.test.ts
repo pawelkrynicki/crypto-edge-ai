@@ -62,10 +62,18 @@ describe("UX.1 interaction affordance contracts", () => {
       const markup = render(React.createElement(TechnicalDetails, { label: locale === "pl" ? "Szczegóły techniczne" : "Technical details" }, "content"), locale);
       assert.match(markup, /^<details/);
       assert.match(markup, /data-interaction="disclosure"/);
+      assert.doesNotMatch(markup, /<details[^>]*\sopen=""/);
       assert.match(markup, /<summary aria-expanded="false">/);
       assert.match(markup, /<svg[^>]*aria-hidden="true"/);
       assert.match(markup, locale === "pl" ? /Rozwiń/ : /Expand/);
     }
+  });
+
+  it("supports an opt-in initially expanded disclosure without changing the default", () => {
+    const markup = render(React.createElement(TechnicalDetails, { label: "Confirm decision", initialOpen: true }, "content"));
+    assert.match(markup, /<details[^>]*\sopen=""/);
+    assert.match(markup, /<summary aria-expanded="true">/);
+    assert.match(markup, /Collapse/);
   });
 
   it("keeps status badges and read-only cards non-focusable and non-interactive", () => {
@@ -178,7 +186,7 @@ describe("UX.1 interaction affordance contracts", () => {
     assert.match(control, /product-control-release-checklist/);
     assert.match(control, /data-interaction="read-only"/);
     assert.doesNotMatch(control.match(/<section className="control-section product-control-blockers"[\s\S]*?<\/section>/)?.[0] ?? "", /onClick|tabIndex|role="button"/);
-    for (const label of ["Tryb podglądu zaufanego testera", "Wdrożenie na VPS", "Test domeny i Cloudflare Access", "Test rollbacku\/wycofania", "Zgoda właściciela na dostęp testera"]) {
+    for (const label of ["Tryb podglądu zaufanego testera", "Wdrożenie na VPS", "Test domeny i Cloudflare Access", "Test rollbacku/wycofania", "Zgoda właściciela na dostęp testera"]) {
       assert.match(translations, new RegExp(label));
     }
   });
