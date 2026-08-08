@@ -42,7 +42,7 @@ import {
 import { loadControlCenterStatus } from "./services/controlCenterStatusDataSource";
 import { loadFollowUpByIdentity, loadFollowUpList, loadFollowUpStatus } from "./services/followUpDataSource";
 import { loadLifecycleRadar, setLifecycleReviewRole } from "./services/lifecycleDataSource";
-import type { LifecycleRadarView, LifecycleSummary } from "./types/lifecycleTypes";
+import type { LifecycleRadarCard, LifecycleRadarView, LifecycleSummary } from "./types/lifecycleTypes";
 import type { FollowUpPublicEntry, FollowUpPublicStatus } from "./types/followUpTypes";
 import {
   findFollowUpByIdentity,
@@ -202,18 +202,21 @@ export function ProductAppContent({
       routeTokenIdentity,
     )) ?? null
     : null;
+  const routedLifecycleCard = findLifecycleRadarCard(lifecycleRadar, routeTokenIdentity);
+  const routedLifecycleCandidate = routedLifecycleCard ? lifecycleCardToCandidate(routedLifecycleCard) : null;
   const selectedCandidate = explicitlySelectedFollowUp
     ? candidates.find((candidate) => isSameTokenIdentity(
       explicitlySelectedFollowUp,
       { chain: candidate.chain, contract_address: candidate.contractAddress },
     )) ?? null
-    : routedCandidate
-      ?? reviewPreviewCandidate
-      ?? candidates.find((candidate) => candidate.id === selectedCandidateId)
-      ?? candidates.find((candidate) => candidate.discoveryBasket === "established" && candidate.finalLabel === "WATCHLIST")
-      ?? candidates.find((candidate) => candidate.discoveryBasket === "established")
-      ?? candidates[0]
-      ?? null;
+    : routeTokenIdentity
+      ? routedCandidate ?? routedLifecycleCandidate
+      : reviewPreviewCandidate
+        ?? candidates.find((candidate) => candidate.id === selectedCandidateId)
+        ?? candidates.find((candidate) => candidate.discoveryBasket === "established" && candidate.finalLabel === "WATCHLIST")
+        ?? candidates.find((candidate) => candidate.discoveryBasket === "established")
+        ?? candidates[0]
+        ?? null;
   const selectedFollowUp = explicitlySelectedFollowUp
     ?? (selectedCandidate ? findFollowUpByIdentity(followUpEntries, selectedCandidate) : null);
   const verificationCandidate = routeTokenIdentity
@@ -394,6 +397,17 @@ export function ProductAppContent({
     navigate("candidate-detail");
   }, [candidates, navigate]);
 
+  const openLifecycleCard = useCallback((identity: RouteTokenIdentity) => {
+    setSelectedFollowUpEntryId(null);
+    setSelectedCandidateId(null);
+    setManualVerificationRecord(null);
+    setActiveDetailTab("summary");
+    routeTokenIdentityRef.current = identity;
+    setRouteTokenIdentity(identity);
+    writeCandidateDetailRoute(identity, "summary");
+    setActiveSection("candidate-detail");
+  }, []);
+
   const openFollowUp = useCallback((entryId: string) => {
     const entry = followUpEntries.find((candidate) => candidate.entry_id === entryId);
     const matchingCandidate = entry
@@ -536,6 +550,7 @@ export function ProductAppContent({
             establishedUniverseStatus={establishedUniverseStatus}
             onOpenCandidate={openCandidate}
             onOpenFollowUp={openFollowUp}
+            onOpenLifecycleCard={openLifecycleCard}
             onOpenExternalChecks={openVerification}
           />
         </ProductWorkspaceSection>
@@ -654,6 +669,74 @@ function mergeLifecycleRadar(current: LifecycleRadarView | null, next: Lifecycle
   const observed = mergeGroup(current.follow_up.observed, next.follow_up.observed);
   const summary = { ...next.summary, follow_up_displayed: actionDue.displayed + candidatesReady.displayed + observed.displayed };
   return { ...next, summary, new_inbox: newInbox, follow_up: { action_due: actionDue, candidates_ready: candidatesReady, observed } };
+}
+
+export function findLifecycleRadarCard(
+  radar: LifecycleRadarView | null,
+  identity: RouteTokenIdentity | null,
+): LifecycleRadarCard | null {
+  if (!radar || !identity) return null;
+  return [
+    ...radar.new_inbox.cards,
+    ...radar.follow_up.action_due.cards,
+    ...radar.follow_up.candidates_ready.cards,
+    ...radar.follow_up.observed.cards,
+  ].find((card) => isSameTokenIdentity(card, identity)) ?? null;
+}
+
+export function lifecycleCardToCandidate(card: LifecycleRadarCard): UiTokenCandidate {
+  const conditionsMet = card.conditions.readiness === "CONDITIONS_MET";
+  const missingData = [...new Set([
+    ...card.conditions.missing_data,
+    ...(card.follow_up?.missing_data ?? []),
+  ])];
+  const riskFlags = [...new Set([
+    ...card.conditions.risks,
+    ...(card.follow_up?.risk_flags ?? []),
+  ])];
+  const unresolved = [...card.conditions.conditions_unmet, ...missingData];
+  return {
+    id: `lifecycle:${card.identity}`,
+    runId: "lifecycle-radar",
+    symbol: card.symbol ?? card.display_name ?? card.contract_address,
+    name: card.display_name ?? card.symbol ?? card.contract_address,
+    chain: card.chain,
+    dex: "",
+    source: "lifecycle_radar",
+    contractAddress: card.contract_address,
+    pairAddress: "",
+    sourceUrl: "",
+    discoveryBasket: "new_emerging",
+    discoveryMethod: "dexscreener_latest_token_profiles",
+    observationOnly: true,
+    establishedEligible: false,
+    universeVersion: null,
+    universeEntryIndex: null,
+    addressIdentityVerified: card.conditions.conditions_met.includes("IDENTITY_VALID"),
+    priceUsd: card.market?.price_usd ?? null,
+    marketCap: card.market?.market_cap_usd ?? null,
+    fdvUsd: card.market?.market_cap_usd ?? null,
+    liquidity: card.market?.liquidity_usd ?? null,
+    volume24h: card.market?.volume_24h_usd ?? null,
+    volumeMarketCapRatio: card.market?.market_cap_usd && card.market.market_cap_usd > 0 && card.market.volume_24h_usd != null
+      ? card.market.volume_24h_usd / card.market.market_cap_usd
+      : null,
+    pairCreatedAt: card.first_seen_at,
+    pairAgeDays: null,
+    basicFilterStatus: conditionsMet ? "passed_basic_filter" : "not_evaluated",
+    securityLabel: card.conditions.security_state,
+    finalLabel: conditionsMet ? "WATCHLIST" : "NEEDS_MANUAL_VERIFICATION",
+    mainReason: unresolved[0] ?? "LIFECYCLE_RADAR_RECORD",
+    filterReasons: card.conditions.conditions_unmet,
+    criticalReasons: riskFlags,
+    warningReasons: missingData,
+    finalReasons: unresolved,
+    missingData,
+    riskFlags,
+    security: null,
+    scorecard: null,
+    lastCheckedAt: card.follow_up?.last_checked_at ?? card.last_seen_at,
+  };
 }
 
 export function selectAIResearchReviewCandidate(candidates: UiTokenCandidate[]): UiTokenCandidate | null {

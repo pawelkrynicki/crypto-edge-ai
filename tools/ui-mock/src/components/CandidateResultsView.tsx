@@ -67,6 +67,7 @@ interface CandidateResultsViewProps {
   establishedUniverseStatus?: EstablishedUniverseStatus | null;
   onOpenCandidate?: (candidateId: string) => void;
   onOpenFollowUp?: (entryId: string) => void;
+  onOpenLifecycleCard?: (identity: { chain: string; contract_address: string }) => void;
   onOpenExternalChecks?: (candidate: UiTokenCandidate) => void;
 }
 
@@ -88,6 +89,7 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
   establishedUniverseStatus = null,
   onOpenCandidate,
   onOpenFollowUp,
+  onOpenLifecycleCard,
   onOpenExternalChecks,
 }) => {
   const { locale, t } = useProductLocale();
@@ -247,7 +249,7 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
       {lifecycleRadar && scannerUnavailableReasonCode && <section className="product-partial-data lifecycle-scanner-warning" role="status"><strong>{t("status.delayed")}</strong><span>{t("lifecycle.scannerUnavailable")}</span></section>}
       {!lifecycleRadar && visibleBasket !== "established" && <p className="product-inline-warning personal-radar-unavailable" role="status">{t("lifecycle.privateStatusesUnavailable")}</p>}
       {visibleBasket === "new_emerging" && lifecycleRadar ? (
-        <NewInboxRadarBasket cards={lifecycleRadar.new_inbox.cards} total={lifecycleRadar.new_inbox.total} nextCursor={lifecycleRadar.new_inbox.next_cursor} locale={locale} onLoadMore={onLoadMoreLifecycle} />
+        <NewInboxRadarBasket cards={lifecycleRadar.new_inbox.cards} total={lifecycleRadar.new_inbox.total} nextCursor={lifecycleRadar.new_inbox.next_cursor} locale={locale} onLoadMore={onLoadMoreLifecycle} onOpenDetails={onOpenLifecycleCard} />
       ) : visibleBasket === "new_emerging" && scannerUnavailableReasonCode ? (
         <BasketUnavailable
           title={t("radar.unavailableTitle")}
@@ -266,7 +268,7 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
           privateStatusesUnavailable={!lifecycleRadar}
         />
       ) : visibleBasket === "maturing" && lifecycleRadar ? (
-        <LifecycleFollowUpQueues radar={lifecycleRadar} locale={locale} onLoadMore={onLoadMoreLifecycle} />
+        <LifecycleFollowUpQueues radar={lifecycleRadar} locale={locale} onLoadMore={onLoadMoreLifecycle} onOpenDetails={onOpenLifecycleCard} />
       ) : visibleBasket === "maturing" ? (
         <MaturingFollowUpBasket
           entries={displayedFollowUpEntries}
@@ -290,18 +292,18 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
   );
 };
 
-function NewInboxRadarBasket({ cards, total, nextCursor, locale, onLoadMore }: { cards: LifecycleRadarCard[]; total: number; nextCursor: string | null; locale: ProductLocale; onLoadMore?: (cursor: string) => void }) {
+function NewInboxRadarBasket({ cards, total, nextCursor, locale, onLoadMore, onOpenDetails }: { cards: LifecycleRadarCard[]; total: number; nextCursor: string | null; locale: ProductLocale; onLoadMore?: (cursor: string) => void; onOpenDetails?: (identity: { chain: string; contract_address: string }) => void }) {
   const copy = locale === "pl"
     ? { title: "Nowe projekty", absent: "Projekt nie wystąpił w ostatnim skanie, ale pozostaje w New Inbox.", more: "Pokaż więcej", empty: "Brak projektów w trwałym New Inbox." }
     : { title: "New projects", absent: "This project was not present in the latest scan, but remains in the New Inbox.", more: "Show more", empty: "No projects in the durable New Inbox." };
   return <section className="basket-content new-inbox-basket" aria-label={copy.title}>
     <header className="basket-heading"><div><span>{copy.title}</span><h3>{total}</h3></div></header>
-    {cards.length === 0 ? <BasketEmpty title={copy.title} detail={copy.empty} code="NEW_INBOX_EMPTY" /> : <div className="product-candidate-list">{cards.map((card) => <LifecycleRadarCardView key={card.identity} card={card} locale={locale} absentNotice={copy.absent} />)}</div>}
+    {cards.length === 0 ? <BasketEmpty title={copy.title} detail={copy.empty} code="NEW_INBOX_EMPTY" /> : <div className="product-candidate-list">{cards.map((card) => <LifecycleRadarCardView key={card.identity} card={card} locale={locale} absentNotice={copy.absent} onOpenDetails={onOpenDetails} />)}</div>}
     {nextCursor && <button type="button" className="product-secondary-action" data-lifecycle-more="new_inbox" onClick={() => onLoadMore?.(nextCursor)}>{copy.more}</button>}
   </section>;
 }
 
-function LifecycleFollowUpQueues({ radar, locale, onLoadMore }: { radar: LifecycleRadarView; locale: ProductLocale; onLoadMore?: (cursor: string) => void }) {
+function LifecycleFollowUpQueues({ radar, locale, onLoadMore, onOpenDetails }: { radar: LifecycleRadarView; locale: ProductLocale; onLoadMore?: (cursor: string) => void; onOpenDetails?: (identity: { chain: string; contract_address: string }) => void }) {
   const copy = locale === "pl"
     ? { due: "Do działania teraz", ready: "Kandydaci do Głównego Radaru", observed: "Pozostałe obserwowane", more: "Pokaż więcej" }
     : { due: "Action due now", ready: "Main Radar candidates", observed: "Other observed projects", more: "Show more" };
@@ -309,13 +311,14 @@ function LifecycleFollowUpQueues({ radar, locale, onLoadMore }: { radar: Lifecyc
   return <section className="basket-content follow-up-basket lifecycle-queues" aria-label={locale === "pl" ? "Kolejka Follow-up" : "Follow-up queue"}>
     {groups.map(([key, group]) => <section key={key} className="lifecycle-queue-group" data-lifecycle-queue={key}>
       <header className="basket-heading"><div><span>{copy[key]}</span><h3>{group.displayed}/{group.total}</h3></div></header>
-      <div className="product-candidate-list">{group.cards.map((card) => <LifecycleRadarCardView key={card.identity} card={card} locale={locale} />)}</div>
+      <div className="product-candidate-list">{group.cards.map((card) => <LifecycleRadarCardView key={card.identity} card={card} locale={locale} onOpenDetails={onOpenDetails} />)}</div>
       {group.next_cursor && <button type="button" className="product-secondary-action" data-lifecycle-more={key} onClick={() => onLoadMore?.(group.next_cursor!)}>{copy.more}</button>}
     </section>)}
   </section>;
 }
 
-function LifecycleRadarCardView({ card, locale, absentNotice }: { card: LifecycleRadarCard; locale: ProductLocale; absentNotice?: string }) {
+function LifecycleRadarCardView({ card, locale, absentNotice, onOpenDetails }: { card: LifecycleRadarCard; locale: ProductLocale; absentNotice?: string; onOpenDetails?: (identity: { chain: string; contract_address: string }) => void }) {
+  const { t } = useProductLocale();
   const copy = locale === "pl"
     ? { firstSeen: "Pierwsze wykrycie", lastSeen: "Ostatnie wykrycie", price: "Cena", marketCap: "Kapitalizacja", liquidity: "Płynność", volume: "Wolumen 24h", snapshot: "Snapshot", nextCheck: "Następne sprawdzenie", missingData: "Brakujące dane", none: "Brak" }
     : { firstSeen: "First seen", lastSeen: "Last seen", price: "Price", marketCap: "Market cap", liquidity: "Liquidity", volume: "24h volume", snapshot: "Snapshot", nextCheck: "Next check", missingData: "Missing data", none: "None" };
@@ -335,7 +338,21 @@ function LifecycleRadarCardView({ card, locale, absentNotice }: { card: Lifecycl
       <Explanation label={copy.missingData} value={card.follow_up?.missing_data.length ? card.follow_up.missing_data.join(", ") : copy.none} />
     </div>
     {card.snapshot_absence_notice && absentNotice && <p className="product-inline-warning">{absentNotice}</p>}
-    <footer className="product-candidate-footer"><PersonalRadarPanel chain={card.chain} contractAddress={card.contract_address} initialView={card} /></footer>
+    <footer className="product-candidate-footer">
+      <div>
+        <span>{copy.lastSeen}</span>
+        <strong>{formatProductDateTime(card.last_seen_at, locale)}</strong>
+        <small>{card.snapshot_present ? copy.snapshot : (locale === "pl" ? "Brak w ostatnim skanie" : "Absent from latest scan")}</small>
+      </div>
+      <PersonalRadarPanel chain={card.chain} contractAddress={card.contract_address} initialView={card} />
+      {onOpenDetails && (
+        <div className="product-card-actions">
+          <ActionButton variant="primary" icon="arrow" iconPosition="end" onClick={() => onOpenDetails({ chain: card.chain, contract_address: card.contract_address })}>
+            {t("radar.openDetails")}
+          </ActionButton>
+        </div>
+      )}
+    </footer>
   </article>;
 }
 

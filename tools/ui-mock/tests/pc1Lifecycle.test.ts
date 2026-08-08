@@ -12,9 +12,10 @@ import { findLatestManualVerification, readFollowUpStore } from "../../data-poc/
 import type { PersistableCandidate, PersistableScannerOutput } from "../../data-poc/src/persistableScannerModel.js";
 import { createScannerApiServer } from "../server/scannerApiServer.js";
 import { createUserWorkspaceRepository, UserWorkspaceError } from "../server/userWorkspaceRepository.js";
-import { ProductAppContent, type ProductAppDataSources } from "../src/ProductApp.js";
+import { ProductAppContent, lifecycleCardToCandidate, type ProductAppDataSources } from "../src/ProductApp.js";
 import { CandidateResultsView } from "../src/components/CandidateResultsView.js";
 import { PersonalRadarPanel } from "../src/components/PersonalRadarPanel.js";
+import { TechnicalDetails } from "../src/components/ProductUi.js";
 import { ProductLocaleProvider } from "../src/productI18n.js";
 import type { LifecycleRadarCard, LifecycleRadarView, LifecycleTokenView } from "../src/types/lifecycleTypes.js";
 import type { UiTokenCandidate } from "../src/types/scannerTypes.js";
@@ -91,6 +92,12 @@ describe("PC.1 bounded lifecycle Radar API", () => {
       assert.equal(firstView.system_status, "NEW");
       assert.equal(firstView.user_status, "FOLLOW_UP");
       assert.equal(firstView.user_status_is_override, true);
+      const mainRadar = await requestApi(server, "POST", "/api/lifecycle/token/status", { cookie: cookie(first), "content-type": "application/json" }, JSON.stringify({ chain: "base", contract_address: ADDRESS, target_status: "MAIN_RADAR", override_reason: "Private escalation after review", confirmation: true }));
+      assert.equal(mainRadar.status, 200, mainRadar.body);
+      const mainRadarView = JSON.parse(mainRadar.body) as { system_status: string; user_status: string; user_status_is_override: boolean };
+      assert.equal(mainRadarView.system_status, "NEW");
+      assert.equal(mainRadarView.user_status, "MAIN_RADAR");
+      assert.equal(mainRadarView.user_status_is_override, true);
       const second = await requestApi(server, "POST", "/api/lifecycle/review-session/camp-user");
       const view = await requestApi(server, "GET", `/api/lifecycle/token?chain=base&contract_address=${ADDRESS}`, { cookie: cookie(second) });
       const body = JSON.parse(view.body) as { user_status: string; user_status_is_override: boolean };
@@ -328,6 +335,85 @@ describe("PC.1 bounded lifecycle Radar API", () => {
       assert.match(markup, /Token 0/);
       assert.match(markup, /Action due now/);
       assert.doesNotMatch(markup, /Do działania teraz|Łącznie obserwowane|Wyświetlane teraz/);
+    } finally {
+      renderer?.unmount();
+    }
+  });
+
+  it("keeps independent private and details actions on a durable New card without mutating lifecycle", async () => {
+    const radar = lifecycleRadar(1);
+    const card = { ...radar.new_inbox.cards[0]!, actor: { role: "CAMP_USER" as const, capabilities: ["CAMP_USER_WORKSPACE_WRITE"] } };
+    const writableRadar = { ...radar, actor: card.actor, new_inbox: { ...radar.new_inbox, cards: [card] } };
+    let opened: { chain: string; contract_address: string } | null = null;
+    let renderer: ReturnType<typeof create> | undefined;
+    try {
+      await act(async () => {
+        renderer = create(React.createElement(ProductLocaleProvider, { initialLocale: "en" }, React.createElement(CandidateResultsView, {
+          candidates: [],
+          lifecycleRadar: writableRadar,
+          onOpenLifecycleCard: (identity) => { opened = identity; },
+        })));
+        await flush();
+      });
+      const markup = JSON.stringify(renderer!.toJSON());
+      assert.match(markup, /Add to Follow-up/);
+      assert.match(markup, /Open details/);
+      const detailsButton = renderer!.root.findAllByType("button").find((node) => node.props["data-action-variant"] === "primary");
+      assert.ok(detailsButton);
+      await act(async () => { detailsButton.props.onClick(); });
+      assert.deepEqual(opened, { chain: card.chain, contract_address: card.contract_address });
+      assert.equal(renderer!.root.findAllByType("details").length, 0);
+    } finally {
+      renderer?.unmount();
+    }
+  });
+
+  it("opens a durable New card in Candidate Detail by identity when it is absent from scanner candidates", async () => {
+    const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+    const radar = lifecycleRadar(1);
+    const card = radar.new_inbox.cards[0]!;
+    const routedWindow = productWindow();
+    routedWindow.location = {
+      href: `http://127.0.0.1:5173/?chain=${card.chain}&contract=${card.contract_address}&detail=summary#candidate-detail`,
+      hash: "#candidate-detail",
+      search: `?chain=${card.chain}&contract=${card.contract_address}&detail=summary`,
+    };
+    Object.defineProperty(globalThis, "window", { configurable: true, value: routedWindow });
+    const dataSources = {
+      loadScanner: async () => ({ status: "error", source: "api", resolvedSource: "unavailable", usedFallback: false, reasonCode: "SCANNER_OUTPUT_UNAVAILABLE", error: "unavailable", output: null }),
+      loadReadiness: async () => ({ status: "unavailable", reasonCode: "SCANNER_OUTPUT_UNAVAILABLE" }),
+      loadAutomation: async () => null,
+      loadEstablishedUniverse: async () => null,
+      loadControlCenter: async () => null,
+      loadFollowUpStatus: async () => null,
+      loadFollowUpList: async () => null,
+      loadLifecycleRadar: async () => radar,
+      now: () => "2026-08-04T10:00:00.000Z",
+    } as ProductAppDataSources;
+    let renderer: ReturnType<typeof create> | undefined;
+    try {
+      await act(async () => {
+        renderer = create(React.createElement(ProductLocaleProvider, { initialLocale: "en" }, React.createElement(ProductAppContent, { dataSources, runtimeModeOverride: "INTERNAL_BETA" })));
+        await flush();
+      });
+      const markup = JSON.stringify(renderer!.toJSON());
+      assert.match(markup, new RegExp(card.contract_address));
+      assert.match(markup, /Token 0/);
+      assert.equal(lifecycleCardToCandidate(card).contractAddress, card.contract_address);
+      assert.equal(lifecycleCardToCandidate(card).id, `lifecycle:${card.identity}`);
+    } finally {
+      if (renderer) await act(async () => { renderer!.unmount(); });
+      if (originalWindow) Object.defineProperty(globalThis, "window", originalWindow); else Reflect.deleteProperty(globalThis, "window");
+    }
+  });
+
+  it("keeps ordinary TechnicalDetails collapsed by default", async () => {
+    let renderer: ReturnType<typeof create> | undefined;
+    try {
+      await act(async () => {
+        renderer = create(React.createElement(ProductLocaleProvider, { initialLocale: "en" }, React.createElement(TechnicalDetails, { label: "Technical details" }, "content")));
+      });
+      assert.equal(renderer!.root.findByType("details").props.open, false);
     } finally {
       renderer?.unmount();
     }
