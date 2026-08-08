@@ -277,6 +277,16 @@ describe("PC.1 bounded lifecycle Radar API", () => {
     assert.doesNotMatch(launcher, /\.local\\lifecycle\\new-inbox\.json" "%REVIEW_DATA_POC%/);
     assert.doesNotMatch(bootstrap, /readdir\(/);
     assert.match(bootstrap, /PC1_REVIEW_ACTIVE_SCANNER_RUN_REQUIRED/);
+    assert.match(bootstrap, /validateDisplayEligibleScannerSnapshot/);
+    assert.doesNotMatch(bootstrap, /validatePersistableScannerOutput/);
+    assert.match(bootstrap, /PC1_REVIEW_SCANNER_FILE_MISSING/);
+    assert.match(bootstrap, /PC1_REVIEW_SCANNER_JSON_INVALID/);
+    assert.match(bootstrap, /PC1_REVIEW_SCANNER_SCHEMA_INVALID/);
+    assert.match(bootstrap, /PC1_REVIEW_SCANNER_RUN_ID_MISMATCH/);
+    assert.match(bootstrap, /PC1_REVIEW_SCANNER_NOT_DISPLAY_ELIGIBLE/);
+    assert.match(bootstrap, /Active scanner run:/);
+    assert.match(bootstrap, /Validation: \$\{status\}/);
+    assert.match(bootstrap, /Reason: \$\{reason\}/);
   });
 });
 
