@@ -10,6 +10,17 @@ CAMP start: 12.09.2026. Details: `docs/product_completion_status.md`,
 `docs/system_lifecycle_policy_v1.md` and
 `docs/pc1_lifecycle_operational_radar.md`.
 
+## Deferred: PC.4 — AIKINTEL Access Bridge and CAMP User Workspace
+
+PC.4 is a later access-integration stage; it is not implemented by PC.1. Crypto
+Edge AI will not build its own user panel, account registry, password flow or
+duplicate login. AIKINTEL remains the source of truth for accounts, roles and
+access. An AIKINTEL user reaches Crypto Edge AI through the dedicated subdomain
+on our VPS, and Crypto Edge AI verifies the handed-off identity/session.
+
+Crypto Edge AI stores only its private workspace, notes, statuses, AI usage and
+audit. There is no second password and no second user-management panel.
+
 ## Historical technical base: Final Local Regression and Freeze Candidate
 
 Status bramki: **READY_FOR_FINAL_INTEGRATION**. Jednorazowa pełna regresja po P1.1, automatyczny read-only smoke na opublikowanych danych INTERNAL_BETA oraz końcowy backup STAB.2 są zakończone. Freeze candidate nie uruchamiał OpenAI, providerów, centralnego live cycle ani mutacji Task Scheduler; nie wykonano restore, deploymentu VPS ani zmian Cloudflare lub AIKINTEL.

@@ -1,4 +1,4 @@
-import { readFile, readdir } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { bootstrapLifecycleReview } from "./systemLifecycle.js";
 import { validatePersistableScannerOutput } from "./storageValidator.js";
@@ -28,26 +28,23 @@ async function main(): Promise<void> {
     canonical_mutations: result.canonical_mutations,
     provider_calls: result.provider_calls,
   }));
-  console.log(`New Inbox records in review: ${result.new_inbox_records}`);
-  console.log(`Follow-up records in review: ${result.follow_up_records}`);
-  console.log(`Main Radar records in review: ${result.main_radar_records}`);
-  console.log(`canonical mutations: ${result.canonical_mutations}`);
+  console.log(`Review New Inbox: ${result.new_inbox_records}`);
+  console.log(`Review Follow-up: ${result.follow_up_records}`);
+  console.log(`Review Main Radar: ${result.main_radar_records}`);
+  console.log("Provider calls: 0");
+  console.log("OpenAI calls: 0");
+  console.log("Honeypot.is calls: 0");
+  console.log(`Canonical mutations: ${result.canonical_mutations}`);
 }
 
 async function readReviewSnapshot(outputRoot: string, automationStatePath: string): Promise<PersistableScannerOutput> {
   const configuredRunId = await readAutomationRunId(automationStatePath);
-  const runIds = configuredRunId ? [configuredRunId] : (await readdir(outputRoot, { withFileTypes: true }))
-    .filter((entry) => entry.isDirectory() && /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(entry.name))
-    .map((entry) => entry.name)
-    .sort()
-    .reverse();
-  for (const runId of runIds) {
-    try {
-      const parsed = JSON.parse(await readFile(resolve(outputRoot, runId, "full_output.json"), "utf8")) as PersistableScannerOutput;
-      if (validatePersistableScannerOutput(parsed).valid) return parsed;
-    } catch {
-      // A review workspace never falls back to providers; try the next copied run only.
-    }
+  if (!configuredRunId) throw new Error("PC1_REVIEW_ACTIVE_SCANNER_RUN_REQUIRED");
+  try {
+    const parsed = JSON.parse(await readFile(resolve(outputRoot, configuredRunId, "full_output.json"), "utf8")) as PersistableScannerOutput;
+    if (validatePersistableScannerOutput(parsed).valid) return parsed;
+  } catch {
+    // A review workspace never falls back to providers or historical snapshots.
   }
   throw new Error("PC1_REVIEW_SCANNER_SNAPSHOT_UNAVAILABLE");
 }

@@ -47,6 +47,10 @@ set "CRYPTO_EDGE_LIFECYCLE_AUDIT_STORE_PATH=%REVIEW_DATA_POC%\.local\lifecycle\a
 set "CRYPTO_EDGE_LIFECYCLE_OPERATION_JOURNAL_PATH=%REVIEW_DATA_POC%\.local\lifecycle\operation-journal.json"
 set "CRYPTO_EDGE_LIFECYCLE_CYCLE_RECEIPT_PATH=%REVIEW_DATA_POC%\.local\lifecycle\cycle-receipts.json"
 set "CRYPTO_EDGE_REVIEW_OUTPUT_DIR=%REVIEW_DATA_POC%\output"
+set "CRYPTO_EDGE_REVIEW_SOURCE_DATA_POC_DIR=%DATA_POC_DIR%"
+set "CRYPTO_EDGE_REVIEW_SOURCE_UI_DIR=%UI_DIR%"
+set "CRYPTO_EDGE_REVIEW_DATA_POC_DIR=%REVIEW_DATA_POC%"
+set "CRYPTO_EDGE_REVIEW_UI_DIR=%REVIEW_UI%"
 set "CRYPTO_EDGE_USER_WORKSPACE_SQLITE_PATH=%REVIEW_UI%\user-workspace.sqlite"
 set "CRYPTO_EDGE_FEEDBACK_SQLITE_PATH=%REVIEW_UI%\tester-feedback.sqlite"
 set "CRYPTO_EDGE_AI_QUEUE_SQLITE_PATH=%REVIEW_UI%\ai-analysis-queue.sqlite"
@@ -64,19 +68,11 @@ echo.
 call pnpm --dir "%UI_DIR%" run build:internal-beta
 if errorlevel 1 exit /b %ERRORLEVEL%
 
-mkdir "%REVIEW_DATA_POC%\.local\automation" "%REVIEW_DATA_POC%\.local\follow-up" "%REVIEW_DATA_POC%\.local\established-universe" "%REVIEW_DATA_POC%\.local\lifecycle" "%REVIEW_DATA_POC%\config" "%REVIEW_DATA_POC%\output" "%REVIEW_UI%" >nul 2>&1
-call :copy_file "%DATA_POC_DIR%\.local\automation\automation-state.json" "%REVIEW_DATA_POC%\.local\automation\automation-state.json"
-call :copy_file "%DATA_POC_DIR%\.local\follow-up\store.json" "%REVIEW_DATA_POC%\.local\follow-up\store.json"
-call :copy_file "%DATA_POC_DIR%\.local\follow-up\store.json.bak" "%REVIEW_DATA_POC%\.local\follow-up\store.json.bak"
-call :copy_file "%DATA_POC_DIR%\.local\established-universe\store.json" "%REVIEW_DATA_POC%\.local\established-universe\store.json"
-call :copy_file "%REPO_ROOT%\config\established_address_universe_v1.json" "%REVIEW_DATA_POC%\config\established_address_universe_v1.json"
-call :copy_file "%REPO_ROOT%\tools\ui-mock\.local\tester-feedback.sqlite" "%REVIEW_UI%\tester-feedback.sqlite"
-call :copy_file "%REPO_ROOT%\tools\ui-mock\.local\ai-analysis-queue.sqlite" "%REVIEW_UI%\ai-analysis-queue.sqlite"
-call :copy_file "%REPO_ROOT%\tools\ui-mock\.local\user-workspace.sqlite" "%REVIEW_UI%\user-workspace.sqlite"
-if exist "%DATA_POC_DIR%\output" xcopy /E /I /Y "%DATA_POC_DIR%\output" "%REVIEW_DATA_POC%\output" >nul
+call "%UI_DIR%\node_modules\.bin\tsx.cmd" "%DATA_POC_DIR%\src\preparePc1LifecycleReview.ts"
+if errorlevel 1 goto :bootstrap_failed
 
-call pnpm --dir "%DATA_POC_DIR%" exec tsx src\bootstrapPc1LifecycleReview.ts
-if errorlevel 1 exit /b %ERRORLEVEL%
+call "%UI_DIR%\node_modules\.bin\tsx.cmd" "%DATA_POC_DIR%\src\bootstrapPc1LifecycleReview.ts"
+if errorlevel 1 goto :bootstrap_failed
 
 echo Starting one isolated review runtime on ports %UI_PORT% / %SCANNER_API_PORT%.
 start "Crypto Edge PC.1 Scanner API" cmd /k "cd /d ""%UI_DIR%"" && call node_modules\.bin\tsx.cmd server\scannerApiServer.ts"
@@ -84,6 +80,6 @@ start "Crypto Edge PC.1 UI" cmd /k "cd /d ""%UI_DIR%"" && call node_modules\.bin
 start "" "http://127.0.0.1:%UI_PORT%/?pc1_review=1#candidate-results"
 exit /b 0
 
-:copy_file
-if exist "%~1" copy /Y "%~1" "%~2" >nul
-exit /b 0
+:bootstrap_failed
+echo ERROR: PC.1 isolated review bootstrap failed.
+exit /b 1

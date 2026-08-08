@@ -252,21 +252,31 @@ describe("PC.1 bounded lifecycle Radar API", () => {
     }
   });
 
-  it("keeps the review launcher isolated, detects occupied ports, and opens one provider-free tab", async () => {
+  it("keeps the review launcher isolated, bounded to active snapshots, and fail-closed before runtime start", async () => {
     const launcher = await readFile(resolve(import.meta.dirname, "..", "..", "..", "scripts", "win", "start-pc1-lifecycle-radar-review.cmd"), "utf8");
+    const bootstrap = await readFile(resolve(import.meta.dirname, "..", "..", "data-poc", "src", "bootstrapPc1LifecycleReview.ts"), "utf8");
     assert.match(launcher, /build:internal-beta/);
     assert.match(launcher, /crypto-edge-pc1-review-/);
     assert.match(launcher, /netstat -ano/);
     assert.match(launcher, /Port %%P/);
     assert.match(launcher, /Port %%P jest już zajęty/);
     assert.match(launcher, /ALLOW_LIVE_PROVIDER_CALLS=0/);
+    assert.match(launcher, /preparePc1LifecycleReview\.ts/);
     assert.match(launcher, /bootstrapPc1LifecycleReview\.ts/);
+    assert.equal((launcher.match(/call "%UI_DIR%\\node_modules\\\.bin\\tsx\.cmd" "%DATA_POC_DIR%\\src\\(?:preparePc1LifecycleReview|bootstrapPc1LifecycleReview)\.ts"/g) ?? []).length, 2);
+    assert.doesNotMatch(launcher, /pnpm\s+--dir\s+"%DATA_POC_DIR%"\s+exec\s+tsx/i);
+    assert.doesNotMatch(launcher, /xcopy\s+\/E/i);
+    assert.match(launcher, /ERROR: PC\.1 isolated review bootstrap failed\./);
+    assert.equal((launcher.match(/if errorlevel 1 goto :bootstrap_failed/g) ?? []).length, 2);
+    assert.equal(launcher.indexOf("if errorlevel 1 goto :bootstrap_failed") < launcher.indexOf("start \"Crypto Edge PC.1 Scanner API\""), true);
     assert.match(launcher, /CRYPTO_EDGE_LIFECYCLE_CYCLE_RECEIPT_PATH/);
     assert.match(launcher, /set "OPENAI_API_KEY="/);
     assert.match(launcher, /Honeypot\.is calls: 0/);
     assert.equal((launcher.match(/start "" "http:\/\/127\.0\.0\.1:%UI_PORT%\//g) ?? []).length, 1);
     assert.doesNotMatch(launcher, /runInternalBetaCollector|curl |Invoke-WebRequest/i);
     assert.doesNotMatch(launcher, /\.local\\lifecycle\\new-inbox\.json" "%REVIEW_DATA_POC%/);
+    assert.doesNotMatch(bootstrap, /readdir\(/);
+    assert.match(bootstrap, /PC1_REVIEW_ACTIVE_SCANNER_RUN_REQUIRED/);
   });
 });
 

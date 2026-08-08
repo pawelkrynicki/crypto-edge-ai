@@ -10,6 +10,8 @@
 
 - [ ] AI work.
 - [ ] Research Playbook.
-- [ ] CAMP users/accounts and login.
-- [ ] AIKINTEL integration.
+- [ ] PC.4 — AIKINTEL Access Bridge and CAMP User Workspace (deferred; no implementation in PC.1):
+  - AIKINTEL is the source of truth for accounts, roles and access; Crypto Edge AI does not build a second user panel or password flow.
+  - An AIKINTEL user reaches Crypto Edge AI through a subdomain on our VPS; Crypto Edge AI verifies the handed-off identity/session.
+  - Crypto Edge AI stores only its private workspace, notes, statuses, AI usage and audit.
 - [ ] Final VPS, Cloudflare, scheduler, smoke and rollback approval.
