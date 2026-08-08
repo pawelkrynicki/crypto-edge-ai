@@ -47,6 +47,7 @@ export type LifecycleRadarCard = LifecycleTokenView & {
   follow_up: { lifecycle_status: string; next_check_at: string | null; last_checked_at: string | null; missing_data: string[]; risk_flags: string[] } | null;
 };
 export type LifecycleRadarGroup = { total: number; displayed: number; limit: number; next_cursor: string | null; cards: LifecycleRadarCard[] };
+export type LifecyclePrivateBaskets = { new: LifecycleRadarGroup; follow_up: LifecycleRadarGroup; main_radar: LifecycleRadarGroup };
 export type LifecycleRadarView = {
   schema_version: "lifecycle_radar_view_v1";
   summary: LifecycleSummary;
@@ -54,4 +55,8 @@ export type LifecycleRadarView = {
   new_inbox: LifecycleRadarGroup;
   follow_up: { action_due: LifecycleRadarGroup; candidates_ready: LifecycleRadarGroup; observed: LifecycleRadarGroup };
   main_radar: { total: number };
+  private_new_total: number;
+  private_follow_up_total: number;
+  private_main_radar_total: number;
+  private_baskets: LifecyclePrivateBaskets;
 };

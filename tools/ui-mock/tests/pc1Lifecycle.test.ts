@@ -12,7 +12,7 @@ import { findLatestManualVerification, readFollowUpStore } from "../../data-poc/
 import type { PersistableCandidate, PersistableScannerOutput } from "../../data-poc/src/persistableScannerModel.js";
 import { createScannerApiServer } from "../server/scannerApiServer.js";
 import { createUserWorkspaceRepository, UserWorkspaceError } from "../server/userWorkspaceRepository.js";
-import { ProductAppContent, lifecycleCardToCandidate, type ProductAppDataSources } from "../src/ProductApp.js";
+import { ProductAppContent, lifecycleCardToCandidate, lifecycleStatusToBasket, type ProductAppDataSources } from "../src/ProductApp.js";
 import { CandidateResultsView } from "../src/components/CandidateResultsView.js";
 import { PersonalRadarPanel } from "../src/components/PersonalRadarPanel.js";
 import { TechnicalDetails } from "../src/components/ProductUi.js";
@@ -106,6 +106,69 @@ describe("PC.1 bounded lifecycle Radar API", () => {
     } finally { await close(server); repository.close(); }
   });
 
+  it("moves each CAMP user's bounded private Radar card without changing global system totals", async () => {
+    const base = await root();
+    const paths = {
+      inbox: resolve(base, "lifecycle", "new-inbox.json"),
+      audit: resolve(base, "lifecycle", "audit.json"),
+      receipt: resolve(base, "lifecycle", "cycle-receipts.json"),
+      followUp: resolve(base, "follow-up", "store.json"),
+      established: resolve(base, "established", "store.json"),
+      output: resolve(base, "output"),
+    };
+    const snapshot = lifecycleConditionsSnapshot();
+    const candidate = snapshot.candidates[0]!;
+    candidate.basic_filter_status = "rejected_basic_filter";
+    candidate.filter_reasons = ["BASIC_FILTER_FAILED"];
+    candidate.final_label = "NEEDS_MANUAL_VERIFICATION";
+    candidate.final_reasons = ["BASIC_FILTER_FAILED"];
+    await applySystemLifecycle(snapshot, {
+      newInboxStorePath: paths.inbox,
+      auditStorePath: paths.audit,
+      cycleReceiptPath: paths.receipt,
+      followUpStorePath: paths.followUp,
+      establishedStorePath: paths.established,
+      centralCycleId: "cycle_private_basket",
+      contextRunId: "context_private_basket",
+      now: new Date("2026-08-04T10:00:00.000Z"),
+    });
+    const repository = await createUserWorkspaceRepository({ databaseFilePath: resolve(base, "workspace.sqlite") });
+    const server = createScannerApiServer({
+      runtimeMode: "DEVELOPMENT_DEMO",
+      scanner: { outputDirPath: paths.output, allowFixtureFallback: false },
+      followUp: { storePath: paths.followUp },
+      establishedUniverse: { storeFilePath: paths.established },
+      lifecycle: { newInboxStorePath: paths.inbox, auditStorePath: paths.audit, cycleReceiptPath: paths.receipt, workspace: repository },
+    });
+    await listen(server);
+    try {
+      const first = await requestApi(server, "POST", "/api/lifecycle/review-session/camp-user");
+      const firstCookie = cookie(first);
+      const before = privateRadar(await requestApi(server, "GET", "/api/lifecycle/radar?limit=24", { cookie: firstCookie }));
+      assert.deepEqual(privateBucket(before, "new"), [{ identity: IDENTITY, system_status: "NEW", user_status: "NEW" }]);
+
+      const followUp = await requestApi(server, "POST", "/api/lifecycle/token/status", { cookie: firstCookie, "content-type": "application/json" }, JSON.stringify({ chain: "base", contract_address: ADDRESS, target_status: "FOLLOW_UP", override_reason: "Early private review", confirmation: true }));
+      assert.equal(followUp.status, 200, followUp.body);
+      const afterFollowUp = privateRadar(await requestApi(server, "GET", "/api/lifecycle/radar?limit=24", { cookie: firstCookie }));
+      assert.equal(privateBucket(afterFollowUp, "new").length, 0);
+      assert.deepEqual(privateBucket(afterFollowUp, "follow_up"), [{ identity: IDENTITY, system_status: "NEW", user_status: "FOLLOW_UP" }]);
+      assert.deepEqual(afterFollowUp.summary, before.summary);
+
+      const main = await requestApi(server, "POST", "/api/lifecycle/token/status", { cookie: firstCookie, "content-type": "application/json" }, JSON.stringify({ chain: "base", contract_address: ADDRESS, target_status: "MAIN_RADAR", override_reason: "Private escalation", confirmation: true }));
+      assert.equal(main.status, 200, main.body);
+      const afterMain = privateRadar(await requestApi(server, "GET", "/api/lifecycle/radar?limit=24", { cookie: firstCookie }));
+      assert.equal(privateBucket(afterMain, "follow_up").length, 0);
+      assert.deepEqual(privateBucket(afterMain, "main_radar"), [{ identity: IDENTITY, system_status: "NEW", user_status: "MAIN_RADAR" }]);
+      assert.deepEqual(afterMain.summary, before.summary);
+      assert.equal(new Set(["new", "follow_up", "main_radar"].flatMap((bucket) => privateBucket(afterMain, bucket as "new" | "follow_up" | "main_radar").map((card) => card.identity))).size, 1);
+
+      const second = await requestApi(server, "POST", "/api/lifecycle/review-session/camp-user");
+      const secondRadar = privateRadar(await requestApi(server, "GET", "/api/lifecycle/radar?limit=24", { cookie: cookie(second) }));
+      assert.deepEqual(privateBucket(secondRadar, "new"), [{ identity: IDENTITY, system_status: "NEW", user_status: "NEW" }]);
+      assert.equal(privateBucket(secondRadar, "main_radar").length, 0);
+    } finally { await close(server); repository.close(); }
+  });
+
   it("returns identical Follow-up conditions in Candidate Detail, Radar, and the system resolver", async () => {
     const base = await root();
     const paths = {
@@ -185,9 +248,11 @@ describe("PC.1 bounded lifecycle Radar API", () => {
     assert.match(source, /\/api\/lifecycle\/radar\?limit=24/);
     assert.match(component, /initialView/);
     assert.match(component, /personal-radar-inline/);
+    assert.match(results, /onChanged=\{onLifecycleChanged\}/);
     assert.doesNotMatch(results, /data-pc1-review-switch="global"/);
     assert.equal((app.match(/data-pc1-review-switch="global"/g) ?? []).length, 1);
     assert.match(app, /isReviewMode\(\)/);
+    assert.match(app, /onLifecycleChanged=\{refreshLifecycleRadar\}/);
     assert.match(presentation, /Status systemowy/);
     assert.match(presentation, /System status/);
     assert.doesNotMatch(component, /conditions_met\.join/);
@@ -343,7 +408,12 @@ describe("PC.1 bounded lifecycle Radar API", () => {
   it("keeps independent private and details actions on a durable New card without mutating lifecycle", async () => {
     const radar = lifecycleRadar(1);
     const card = { ...radar.new_inbox.cards[0]!, actor: { role: "CAMP_USER" as const, capabilities: ["CAMP_USER_WORKSPACE_WRITE"] } };
-    const writableRadar = { ...radar, actor: card.actor, new_inbox: { ...radar.new_inbox, cards: [card] } };
+    const writableRadar = {
+      ...radar,
+      actor: card.actor,
+      new_inbox: { ...radar.new_inbox, cards: [card] },
+      private_baskets: { ...radar.private_baskets, new: { ...radar.private_baskets.new, cards: [card] } },
+    };
     let opened: { chain: string; contract_address: string } | null = null;
     let renderer: ReturnType<typeof create> | undefined;
     try {
@@ -358,11 +428,52 @@ describe("PC.1 bounded lifecycle Radar API", () => {
       const markup = JSON.stringify(renderer!.toJSON());
       assert.match(markup, /Add to Follow-up/);
       assert.match(markup, /Open details/);
+      const footer = renderer!.root.find((node) => typeof node.props.className === "string" && node.props.className.includes("lifecycle-radar-card-footer"));
+      assert.equal(footer.findAllByType("button").length, 2);
+      assert.equal(footer.findAll((node) => node.props["data-interaction"] === "status").length, 2);
       const detailsButton = renderer!.root.findAllByType("button").find((node) => node.props["data-action-variant"] === "primary");
       assert.ok(detailsButton);
       await act(async () => { detailsButton.props.onClick(); });
       assert.deepEqual(opened, { chain: card.chain, contract_address: card.contract_address });
       assert.equal(renderer!.root.findAllByType("details").length, 0);
+    } finally {
+      renderer?.unmount();
+    }
+  });
+
+  it("renders private Main Radar cards, opens their details, and maps return status to the private basket", async () => {
+    const baseRadar = lifecycleRadar(1);
+    const mainCard: LifecycleRadarCard = { ...baseRadar.new_inbox.cards[0]!, system_status: "NEW", user_status: "MAIN_RADAR", user_status_is_override: true };
+    const empty = { total: 0, displayed: 0, limit: 100, next_cursor: null, cards: [] as LifecycleRadarCard[] };
+    const radar: LifecycleRadarView = {
+      ...baseRadar,
+      private_new_total: 0,
+      private_follow_up_total: 0,
+      private_main_radar_total: 1,
+      private_baskets: { new: empty, follow_up: empty, main_radar: { total: 1, displayed: 1, limit: 100, next_cursor: null, cards: [mainCard] } },
+    };
+    let opened: { chain: string; contract_address: string } | null = null;
+    let renderer: ReturnType<typeof create> | undefined;
+    try {
+      await act(async () => {
+        renderer = create(React.createElement(ProductLocaleProvider, { initialLocale: "en" }, React.createElement(CandidateResultsView, {
+          candidates: [],
+          lifecycleRadar: radar,
+          preferredLifecycleBasket: "established",
+          onOpenLifecycleCard: (identity) => { opened = identity; },
+        })));
+        await flush();
+      });
+      const markup = JSON.stringify(renderer!.toJSON());
+      assert.match(markup, /Your private view/);
+      assert.match(markup, /Token 0/);
+      assert.doesNotMatch(markup, /Established basket is empty/);
+      const detailsButton = renderer!.root.findAllByType("button").find((node) => node.props["data-action-variant"] === "primary");
+      assert.ok(detailsButton);
+      await act(async () => { detailsButton.props.onClick(); });
+      assert.deepEqual(opened, { chain: mainCard.chain, contract_address: mainCard.contract_address });
+      assert.equal(lifecycleStatusToBasket("FOLLOW_UP"), "maturing");
+      assert.equal(lifecycleStatusToBasket("MAIN_RADAR"), "established");
     } finally {
       renderer?.unmount();
     }
@@ -493,6 +604,14 @@ function requestApi(server: Server, method: string, path: string, headers: Recor
   });
 }
 function cookie(response: { headers: Record<string, string | string[] | undefined> }): string { const value = response.headers["set-cookie"]; const header = Array.isArray(value) ? value[0] : value; assert.ok(header); return header.split(";", 1)[0]!; }
+type PrivateRadarResponse = {
+  summary: Record<string, unknown>;
+  private_baskets: Record<"new" | "follow_up" | "main_radar", { cards: Array<{ identity: string; system_status: string; user_status: string }> }>;
+};
+function privateRadar(response: { body: string }): PrivateRadarResponse { return JSON.parse(response.body) as PrivateRadarResponse; }
+function privateBucket(radar: PrivateRadarResponse, bucket: "new" | "follow_up" | "main_radar") {
+  return radar.private_baskets[bucket].cards.map(({ identity, system_status, user_status }) => ({ identity, system_status, user_status }));
+}
 
 function lifecycleConditionsSnapshot(): PersistableScannerOutput {
   const timestamp = "2026-08-04T10:00:00.000Z";
@@ -554,6 +673,10 @@ function lifecycleRadar(count: number): LifecycleRadarView {
     new_inbox: { total: count, displayed: count, limit: 100, next_cursor: null, cards },
     follow_up: { action_due: { total: 0, displayed: 0, limit: 100, next_cursor: null, cards: [] }, candidates_ready: { total: 0, displayed: 0, limit: 100, next_cursor: null, cards: [] }, observed: { total: 0, displayed: 0, limit: 100, next_cursor: null, cards: [] } },
     main_radar: { total: 0 },
+    private_new_total: count,
+    private_follow_up_total: 0,
+    private_main_radar_total: 0,
+    private_baskets: { new: { total: count, displayed: count, limit: 100, next_cursor: null, cards }, follow_up: { total: 0, displayed: 0, limit: 100, next_cursor: null, cards: [] }, main_radar: { total: 0, displayed: 0, limit: 100, next_cursor: null, cards: [] } },
   };
 }
 

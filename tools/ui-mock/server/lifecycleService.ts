@@ -13,7 +13,7 @@ import {
   type LifecycleSummary,
   type SystemLifecycleStatus,
 } from "../../data-poc/src/systemLifecycle.js";
-import { getDefaultEstablishedUniverseStorePath, normalizeEstablishedAddress, normalizeEstablishedChain, universeIdentityKey } from "../../data-poc/src/establishedAddressUniverse.js";
+import { getDefaultEstablishedUniverseStorePath, normalizeEstablishedAddress, normalizeEstablishedChain, universeIdentityKey, type EstablishedAddressUniverseEntry } from "../../data-poc/src/establishedAddressUniverse.js";
 import { readEstablishedUniverseStore } from "../../data-poc/src/establishedUniverseManager.js";
 import { readFollowUpStore, findLatestManualVerification, type FollowUpEntry } from "../../data-poc/src/followUpBasket.js";
 import type { PersistableScannerOutput } from "../../data-poc/src/persistableScannerModel.js";
@@ -44,6 +44,7 @@ export type LifecycleRadarCard = LifecycleTokenView & {
 };
 
 export type LifecycleRadarGroup = { total: number; displayed: number; limit: number; next_cursor: string | null; cards: LifecycleRadarCard[] };
+export type LifecyclePrivateBaskets = { new: LifecycleRadarGroup; follow_up: LifecycleRadarGroup; main_radar: LifecycleRadarGroup };
 export type LifecycleRadarView = {
   schema_version: "lifecycle_radar_view_v1";
   summary: LifecycleSummary;
@@ -51,6 +52,10 @@ export type LifecycleRadarView = {
   new_inbox: LifecycleRadarGroup;
   follow_up: { action_due: LifecycleRadarGroup; candidates_ready: LifecycleRadarGroup; observed: LifecycleRadarGroup };
   main_radar: { total: number };
+  private_new_total: number;
+  private_follow_up_total: number;
+  private_main_radar_total: number;
+  private_baskets: LifecyclePrivateBaskets;
 };
 
 export class LifecycleServiceError extends Error {
@@ -166,7 +171,9 @@ export function createLifecycleService(options: {
       workspace(),
     ]);
     const now = new Date();
-    const mainIdentities = new Set(universe.current.entries.filter((entry) => entry.enabled).map((entry) => universeIdentityKey(entry.chain, entry.contract_address)));
+    const mainEntries = universe.current.entries.filter((entry) => entry.enabled);
+    const mainByIdentity = new Map(mainEntries.map((entry) => [universeIdentityKey(entry.chain, entry.contract_address), entry]));
+    const mainIdentities = new Set(mainByIdentity.keys());
     const privateByIdentity = new Map(workspaceRepository.list(session.actor_id).map((entry) => [entry.identity, entry]));
     const snapshot = scannerOutput(scanner);
     const candidateByIdentity = new Map((snapshot?.candidates ?? []).flatMap((candidate) => {
@@ -175,10 +182,10 @@ export function createLifecycleService(options: {
       return identity ? [[identity, candidate] as const] : [];
     }));
     const actor = { role: session.role, capabilities: [...session.capabilities] };
-    const makeCard = (identity: string, systemStatus: SystemLifecycleStatus, inboxEntry: Awaited<ReturnType<typeof readNewInboxStore>>["entries"][number] | null, followEntry: FollowUpEntry | null): LifecycleRadarCard => {
+    const makeCard = (identity: string, systemStatus: SystemLifecycleStatus, inboxEntry: Awaited<ReturnType<typeof readNewInboxStore>>["entries"][number] | null, followEntry: FollowUpEntry | null, mainEntry: EstablishedAddressUniverseEntry | null): LifecycleRadarCard => {
       const candidate = candidateByIdentity.get(identity) ?? null;
-      const chain = inboxEntry?.chain ?? followEntry?.chain;
-      const contractAddress = inboxEntry?.contract_address ?? followEntry?.contract_address;
+      const chain = inboxEntry?.chain ?? followEntry?.chain ?? mainEntry?.chain;
+      const contractAddress = inboxEntry?.contract_address ?? followEntry?.contract_address ?? mainEntry?.contract_address;
       if (!chain || !contractAddress) throw new LifecycleServiceError("LIFECYCLE_RECORD_INVALID", 503);
       const main = mainIdentities.has(identity);
       const conditions = followEntry
@@ -197,8 +204,8 @@ export function createLifecycleService(options: {
         identity,
         chain,
         contract_address: contractAddress,
-        display_name: inboxEntry?.display_name ?? followEntry?.display_name ?? candidate?.name ?? null,
-        symbol: inboxEntry?.symbol ?? followEntry?.symbol_hint ?? candidate?.symbol ?? null,
+        display_name: inboxEntry?.display_name ?? followEntry?.display_name ?? mainEntry?.display_name ?? candidate?.name ?? null,
+        symbol: inboxEntry?.symbol ?? followEntry?.symbol_hint ?? mainEntry?.symbol_hint ?? candidate?.symbol ?? null,
         first_seen_at: inboxEntry?.first_seen_at ?? followEntry?.first_seen_at ?? now.toISOString(),
         last_seen_at: inboxEntry?.last_seen_at ?? followEntry?.last_seen_at ?? now.toISOString(),
         snapshot_present: candidate !== null,
@@ -220,13 +227,22 @@ export function createLifecycleService(options: {
         actor,
       };
     };
-    const newCards = inbox.entries
-      .filter((entry) => entry.system_status === "NEW" && entry.archived_at === null && entry.rejected_at === null)
-      .sort(compareInbox)
-      .map((entry) => makeCard(entry.identity, "NEW", entry, null));
-    const followCards = followUp.entries
-      .filter((entry) => entry.lifecycle_status !== "ESTABLISHED" && entry.lifecycle_status !== "ARCHIVED" && !mainIdentities.has(universeIdentityKey(entry.chain, entry.contract_address)))
-      .map((entry) => makeCard(universeIdentityKey(entry.chain, entry.contract_address), "FOLLOW_UP", inbox.entries.find((inboxEntry) => inboxEntry.identity === universeIdentityKey(entry.chain, entry.contract_address)) ?? null, entry));
+    const inboxByIdentity = new Map(inbox.entries
+      .filter((entry) => entry.archived_at === null && entry.rejected_at === null)
+      .map((entry) => [entry.identity, entry]));
+    const followByIdentity = new Map(followUp.entries
+      .filter((entry) => entry.lifecycle_status !== "ESTABLISHED" && entry.lifecycle_status !== "ARCHIVED")
+      .map((entry) => [universeIdentityKey(entry.chain, entry.contract_address), entry]));
+    const identities = new Set([...inboxByIdentity.keys(), ...followByIdentity.keys(), ...mainByIdentity.keys()]);
+    const cards = [...identities].map((identity) => {
+      const inboxEntry = inboxByIdentity.get(identity) ?? null;
+      const followEntry = followByIdentity.get(identity) ?? null;
+      const mainEntry = mainByIdentity.get(identity) ?? null;
+      const systemStatus: SystemLifecycleStatus = mainEntry ? "MAIN_RADAR" : followEntry ? "FOLLOW_UP" : inboxEntry?.system_status ?? "NEW";
+      return makeCard(identity, systemStatus, inboxEntry, followEntry, mainEntry);
+    });
+    const newCards = cards.filter((card) => card.system_status === "NEW").sort(compareInbox);
+    const followCards = cards.filter((card) => card.system_status === "FOLLOW_UP");
     const due = followCards.filter((card) => isActionDue(card, now)).sort(compareFollowUpCards);
     const ready = followCards.filter((card) => !due.includes(card) && card.follow_up?.lifecycle_status === "CANDIDATE_FOR_ESTABLISHED" && card.conditions.risks.length === 0).sort(compareFollowUpCards);
     const observed = followCards.filter((card) => !due.includes(card) && !ready.includes(card)).sort(compareFollowUpCards);
@@ -235,27 +251,41 @@ export function createLifecycleService(options: {
     const dueGroup = pageRadarGroup(due, cursor.action_due, input.limit, "action_due", cursor);
     const readyGroup = pageRadarGroup(ready, cursor.candidates_ready, input.limit, "candidates_ready", cursor);
     const observedGroup = pageRadarGroup(observed, cursor.observed, input.limit, "observed", cursor);
+    const privateNewGroup = pageRadarGroup(cards.filter((card) => card.user_status === "NEW").sort(compareInbox), cursor.private_new, input.limit, "private_new", cursor);
+    const privateFollowUpGroup = pageRadarGroup(cards.filter((card) => card.user_status === "FOLLOW_UP").sort(compareInbox), cursor.private_follow_up, input.limit, "private_follow_up", cursor);
+    const privateMainRadarGroup = pageRadarGroup(cards.filter((card) => card.user_status === "MAIN_RADAR").sort(compareInbox), cursor.private_main_radar, input.limit, "private_main_radar", cursor);
     const summary = buildLifecycleSummary(inbox, followUp, mainIdentities.size, receipt, now);
     summary.follow_up_displayed = dueGroup.displayed + readyGroup.displayed + observedGroup.displayed;
-    return { schema_version: "lifecycle_radar_view_v1", summary, actor, new_inbox: newGroup, follow_up: { action_due: dueGroup, candidates_ready: readyGroup, observed: observedGroup }, main_radar: { total: mainIdentities.size } };
+    return {
+      schema_version: "lifecycle_radar_view_v1",
+      summary,
+      actor,
+      new_inbox: newGroup,
+      follow_up: { action_due: dueGroup, candidates_ready: readyGroup, observed: observedGroup },
+      main_radar: { total: mainIdentities.size },
+      private_new_total: privateNewGroup.total,
+      private_follow_up_total: privateFollowUpGroup.total,
+      private_main_radar_total: privateMainRadarGroup.total,
+      private_baskets: { new: privateNewGroup, follow_up: privateFollowUpGroup, main_radar: privateMainRadarGroup },
+    };
   }
   return { resolveToken, transition, summary, inbox, latestReceipt, workspaceIntegrity, radar };
 }
 
-export type RadarCursor = { new_inbox: number; action_due: number; candidates_ready: number; observed: number };
+export type RadarCursor = { new_inbox: number; action_due: number; candidates_ready: number; observed: number; private_new: number; private_follow_up: number; private_main_radar: number };
 export function parseRadarCursor(value: string | null): RadarCursor | null {
   if (value === null) return null;
   if (value.length < 4 || value.length > 240 || !/^[A-Za-z0-9_-]+$/.test(value)) throw new LifecycleServiceError("LIFECYCLE_CURSOR_INVALID", 400);
   try {
     const parsed = JSON.parse(Buffer.from(value, "base64url").toString("utf8")) as unknown;
     if (!isRecord(parsed) || parsed.v !== 1 || !isRecord(parsed.o)) throw new Error("invalid");
-    const offsets = [parsed.o.new_inbox, parsed.o.action_due, parsed.o.candidates_ready, parsed.o.observed];
+    const offsets = [parsed.o.new_inbox, parsed.o.action_due, parsed.o.candidates_ready, parsed.o.observed, parsed.o.private_new ?? 0, parsed.o.private_follow_up ?? 0, parsed.o.private_main_radar ?? 0];
     if (!offsets.every((offset) => Number.isSafeInteger(offset) && Number(offset) >= 0 && Number(offset) <= 10_000)) throw new Error("invalid");
-    return { new_inbox: Number(parsed.o.new_inbox), action_due: Number(parsed.o.action_due), candidates_ready: Number(parsed.o.candidates_ready), observed: Number(parsed.o.observed) };
+    return { new_inbox: Number(parsed.o.new_inbox), action_due: Number(parsed.o.action_due), candidates_ready: Number(parsed.o.candidates_ready), observed: Number(parsed.o.observed), private_new: Number(parsed.o.private_new ?? 0), private_follow_up: Number(parsed.o.private_follow_up ?? 0), private_main_radar: Number(parsed.o.private_main_radar ?? 0) };
   } catch { throw new LifecycleServiceError("LIFECYCLE_CURSOR_INVALID", 400); }
 }
 
-function emptyRadarCursor(): RadarCursor { return { new_inbox: 0, action_due: 0, candidates_ready: 0, observed: 0 }; }
+function emptyRadarCursor(): RadarCursor { return { new_inbox: 0, action_due: 0, candidates_ready: 0, observed: 0, private_new: 0, private_follow_up: 0, private_main_radar: 0 }; }
 function pageRadarGroup(cards: LifecycleRadarCard[], offset: number, limit: number, key: keyof RadarCursor, cursor: RadarCursor): LifecycleRadarGroup {
   const boundedOffset = Math.min(offset, cards.length);
   const page = cards.slice(boundedOffset, boundedOffset + limit);

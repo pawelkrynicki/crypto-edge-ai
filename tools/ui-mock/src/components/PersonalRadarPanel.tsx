@@ -14,13 +14,15 @@ export function PersonalRadarPanel({
   initialView,
   unavailable = false,
   placement = "card",
+  trailingAction,
 }: {
   chain: string;
   contractAddress: string;
-  onChanged?: () => void;
+  onChanged?: (view: LifecycleTokenView) => void | Promise<void>;
   initialView?: LifecycleTokenView | null;
   unavailable?: boolean;
   placement?: "card" | "detail";
+  trailingAction?: React.ReactNode;
 }) {
   const { locale } = useProductLocale();
   const copy = lifecycleCopy(locale);
@@ -61,7 +63,7 @@ export function PersonalRadarPanel({
       setReason("");
       setConfirmed(false);
       setReviewOpen(false);
-      onChanged?.();
+      void onChanged?.(next);
     } else {
       setError(copy.saveFailed);
     }
@@ -73,12 +75,14 @@ export function PersonalRadarPanel({
       <div className="personal-radar-statuses">
         <StatusBadge tone="neutral">{copy.system}: {lifecycleStatusLabel(resolvedView.system_status, locale)}</StatusBadge>
         <StatusBadge tone={resolvedView.user_status_is_override ? "accent" : "neutral"}>{copy.yours}: {lifecycleStatusLabel(resolvedView.user_status, locale)}</StatusBadge>
+        {resolvedView.system_status !== resolvedView.user_status && <small className="personal-radar-private-note">{locale === "pl" ? "Przeniesiony wczeĹ›niej w Twoim prywatnym Radarze." : "Moved earlier in your private Radar."}</small>}
       </div>
       {target && canWrite && (
         <ActionButton variant="secondary" onClick={() => setReviewOpen((open) => !open)} aria-expanded={reviewOpen}>
           {actionLabel}
         </ActionButton>
       )}
+      {trailingAction}
       {reviewOpen && target && canWrite && (
         <TechnicalDetails label={copy.confirmAction} className="personal-radar-confirmation" initialOpen>
           {needsReason && <p>{copy.needsReason}</p>}

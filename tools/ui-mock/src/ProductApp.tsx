@@ -42,7 +42,7 @@ import {
 import { loadControlCenterStatus } from "./services/controlCenterStatusDataSource";
 import { loadFollowUpByIdentity, loadFollowUpList, loadFollowUpStatus } from "./services/followUpDataSource";
 import { loadLifecycleRadar, setLifecycleReviewRole } from "./services/lifecycleDataSource";
-import type { LifecycleRadarCard, LifecycleRadarView, LifecycleSummary } from "./types/lifecycleTypes";
+import type { LifecycleRadarCard, LifecycleRadarView, LifecycleSummary, LifecycleTokenView } from "./types/lifecycleTypes";
 import type { FollowUpPublicEntry, FollowUpPublicStatus } from "./types/followUpTypes";
 import {
   findFollowUpByIdentity,
@@ -78,6 +78,7 @@ const HASH_TO_SECTION: Record<string, ProductSectionId> = {
   "#methodology": "methodology",
   "#control-center": "control-center",
 };
+type RadarBasketId = "new_emerging" | "maturing" | "established";
 
 const SECTION_TO_HASH: Record<ProductSectionId, string> = {
   "candidate-results": "#candidate-results",
@@ -156,6 +157,7 @@ export function ProductAppContent({
   const [followUpStatus, setFollowUpStatus] = useState<FollowUpPublicStatus | null>(null);
   const [lifecycleSummary, setLifecycleSummary] = useState<LifecycleSummary | null>(null);
   const [lifecycleRadar, setLifecycleRadar] = useState<LifecycleRadarView | null>(null);
+  const [preferredLifecycleBasket, setPreferredLifecycleBasket] = useState<RadarBasketId | null>(null);
   const [followUpEntries, setFollowUpEntries] = useState<FollowUpPublicEntry[]>([]);
   const [selectedFollowUpEntryId, setSelectedFollowUpEntryId] = useState<string | null>(null);
   const [manualVerificationRecord, setManualVerificationRecord] = useState<ManualVerificationRecord | null>(null);
@@ -324,6 +326,15 @@ export function ProductAppContent({
     });
   }, [dataSources]);
 
+  const refreshLifecycleRadar = useCallback(async (view?: LifecycleTokenView): Promise<void> => {
+    if (view) setPreferredLifecycleBasket(lifecycleStatusToBasket(view.user_status));
+    if (!dataSources.loadLifecycleRadar) return;
+    const next = await dataSources.loadLifecycleRadar();
+    if (!next) return;
+    setLifecycleRadar(next);
+    setLifecycleSummary(next.summary);
+  }, [dataSources]);
+
   const refreshControlCenterAfterFeedback = useCallback(() => {
     void loadControlCenterStatus().then((value) => {
       if (value) setControlCenterStatus(value);
@@ -398,6 +409,8 @@ export function ProductAppContent({
   }, [candidates, navigate]);
 
   const openLifecycleCard = useCallback((identity: RouteTokenIdentity) => {
+    const card = findLifecycleRadarCard(lifecycleRadar, identity);
+    if (card) setPreferredLifecycleBasket(lifecycleStatusToBasket(card.user_status));
     setSelectedFollowUpEntryId(null);
     setSelectedCandidateId(null);
     setManualVerificationRecord(null);
@@ -406,7 +419,7 @@ export function ProductAppContent({
     setRouteTokenIdentity(identity);
     writeCandidateDetailRoute(identity, "summary");
     setActiveSection("candidate-detail");
-  }, []);
+  }, [lifecycleRadar]);
 
   const openFollowUp = useCallback((entryId: string) => {
     const entry = followUpEntries.find((candidate) => candidate.entry_id === entryId);
@@ -533,6 +546,7 @@ export function ProductAppContent({
       return (
         <ProductWorkspaceSection {...copy}>
           <CandidateResultsView
+            key={preferredLifecycleBasket ?? "system"}
             candidates={candidates}
             metadata={metadata}
             readiness={readiness}
@@ -545,6 +559,9 @@ export function ProductAppContent({
             followUpStatus={followUpStatus}
             lifecycleSummary={lifecycleSummary}
             lifecycleRadar={lifecycleRadar}
+            preferredLifecycleBasket={preferredLifecycleBasket}
+            onLifecycleBasketChange={setPreferredLifecycleBasket}
+            onLifecycleChanged={refreshLifecycleRadar}
             onLoadMoreLifecycle={loadMoreLifecycleRadar}
             followUpEntries={followUpEntries}
             establishedUniverseStatus={establishedUniverseStatus}
@@ -569,7 +586,7 @@ export function ProductAppContent({
             onOpenFollowUpExternalChecks={openVerification}
             onOpenControlCenter={() => navigate("control-center")}
             initialManualVerification={manualVerificationRecord}
-            onLifecycleChanged={() => loadData()}
+            onLifecycleChanged={refreshLifecycleRadar}
             activeTab={activeDetailTab}
             onActiveTabChange={changeDetailTab}
           />
@@ -667,8 +684,20 @@ function mergeLifecycleRadar(current: LifecycleRadarView | null, next: Lifecycle
   const actionDue = mergeGroup(current.follow_up.action_due, next.follow_up.action_due);
   const candidatesReady = mergeGroup(current.follow_up.candidates_ready, next.follow_up.candidates_ready);
   const observed = mergeGroup(current.follow_up.observed, next.follow_up.observed);
+  const privateNew = mergeGroup(current.private_baskets.new, next.private_baskets.new);
+  const privateFollowUp = mergeGroup(current.private_baskets.follow_up, next.private_baskets.follow_up);
+  const privateMainRadar = mergeGroup(current.private_baskets.main_radar, next.private_baskets.main_radar);
   const summary = { ...next.summary, follow_up_displayed: actionDue.displayed + candidatesReady.displayed + observed.displayed };
-  return { ...next, summary, new_inbox: newInbox, follow_up: { action_due: actionDue, candidates_ready: candidatesReady, observed } };
+  return {
+    ...next,
+    summary,
+    new_inbox: newInbox,
+    follow_up: { action_due: actionDue, candidates_ready: candidatesReady, observed },
+    private_new_total: privateNew.total,
+    private_follow_up_total: privateFollowUp.total,
+    private_main_radar_total: privateMainRadar.total,
+    private_baskets: { new: privateNew, follow_up: privateFollowUp, main_radar: privateMainRadar },
+  };
 }
 
 export function findLifecycleRadarCard(
@@ -681,7 +710,14 @@ export function findLifecycleRadarCard(
     ...radar.follow_up.action_due.cards,
     ...radar.follow_up.candidates_ready.cards,
     ...radar.follow_up.observed.cards,
+    ...radar.private_baskets.new.cards,
+    ...radar.private_baskets.follow_up.cards,
+    ...radar.private_baskets.main_radar.cards,
   ].find((card) => isSameTokenIdentity(card, identity)) ?? null;
+}
+
+export function lifecycleStatusToBasket(status: LifecycleTokenView["user_status"]): RadarBasketId {
+  return status === "NEW" ? "new_emerging" : status === "FOLLOW_UP" ? "maturing" : "established";
 }
 
 export function lifecycleCardToCandidate(card: LifecycleRadarCard): UiTokenCandidate {
