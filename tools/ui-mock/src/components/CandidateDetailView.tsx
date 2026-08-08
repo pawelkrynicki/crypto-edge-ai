@@ -362,9 +362,12 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
           <HeaderFact label={workspaceCopy.dataCompleteness} value={completeness} tone={completeness === workspaceCopy.complete ? "ready" : "warning"} />
           <CopyableAddress value={candidate.contractAddress} displayValue={shortenAddress(candidate.contractAddress, t("radar.missingData"))} copyLabel={t("verification.copyContract")} copiedLabel={t("app.copied")} buttonLabel={t("app.copy")} className="token-detail-address" />
         </div>
-        <div className="token-detail-next-step"><span>{workspaceCopy.nextResearchStep}</span><strong>{nextStep}</strong></div>
+        <div className="token-detail-next-step">
+          <span>{workspaceCopy.nextResearchStep}</span>
+          <strong>{nextStep}</strong>
+          <PersonalRadarPanel chain={candidate.chain} contractAddress={candidate.contractAddress} onChanged={onLifecycleChanged} placement="detail" />
+        </div>
       </header>
-      <PersonalRadarPanel chain={candidate.chain} contractAddress={candidate.contractAddress} onChanged={onLifecycleChanged} />
       <TokenDetailTabs tabs={CANDIDATE_DETAIL_TAB_IDS.map((id) => ({ id, label: workspaceCopy.tabs[id] }))} activeTab={activeTab} onChange={setActiveTab} idPrefix="candidate" ariaLabel={workspaceCopy.tablistLabel} />
       <TokenDetailTabPanel activeTab={activeTab} idPrefix="candidate">
         {activeTabContent}
@@ -647,9 +650,12 @@ function FollowUpOnlyDetail({
           <HeaderFact label={copy.dataCompleteness} value={completeness} tone="warning" />
           <CopyableAddress value={followUp.contract_address} displayValue={shortenAddress(followUp.contract_address, t("radar.missingData"))} copyLabel={t("verification.copyContract")} copiedLabel={t("app.copied")} buttonLabel={t("app.copy")} className="token-detail-address" />
         </div>
-        <div className="token-detail-next-step"><span>{copy.nextResearchStep}</span><strong>{lifecycleActionLabel(lifecycle.next_action_type, locale)}</strong></div>
+        <div className="token-detail-next-step">
+          <span>{copy.nextResearchStep}</span>
+          <strong>{lifecycleActionLabel(lifecycle.next_action_type, locale)}</strong>
+          <PersonalRadarPanel chain={followUp.chain} contractAddress={followUp.contract_address} onChanged={onLifecycleChanged} placement="detail" />
+        </div>
       </header>
-      <PersonalRadarPanel chain={followUp.chain} contractAddress={followUp.contract_address} onChanged={onLifecycleChanged} />
       <TokenDetailTabs tabs={CANDIDATE_DETAIL_TAB_IDS.map((id) => ({ id, label: copy.tabs[id] }))} activeTab={activeTab} onChange={onActiveTabChange} idPrefix="candidate" ariaLabel={copy.tablistLabel} />
       <TokenDetailTabPanel activeTab={activeTab} idPrefix="candidate">
         {content}

@@ -168,12 +168,14 @@ describe("PC.1 bounded lifecycle Radar API", () => {
     const source = await readFile(resolve(import.meta.dirname, "..", "src", "services", "lifecycleDataSource.ts"), "utf8");
     const component = await readFile(resolve(import.meta.dirname, "..", "src", "components", "PersonalRadarPanel.tsx"), "utf8");
     const results = await readFile(resolve(import.meta.dirname, "..", "src", "components", "CandidateResultsView.tsx"), "utf8");
+    const app = await readFile(resolve(import.meta.dirname, "..", "src", "ProductApp.tsx"), "utf8");
     const presentation = await readFile(resolve(import.meta.dirname, "..", "src", "lifecyclePresentation.ts"), "utf8");
     assert.match(source, /\/api\/lifecycle\/radar\?limit=24/);
     assert.match(component, /initialView/);
-    assert.match(component, /compact/);
-    assert.match(results, /data-pc1-review-switch="global"/);
-    assert.equal((results.match(/data-pc1-review-switch="global"/g) ?? []).length, 1);
+    assert.match(component, /personal-radar-inline/);
+    assert.doesNotMatch(results, /data-pc1-review-switch="global"/);
+    assert.equal((app.match(/data-pc1-review-switch="global"/g) ?? []).length, 1);
+    assert.match(app, /isReviewMode\(\)/);
     assert.match(presentation, /Status systemowy/);
     assert.match(presentation, /System status/);
     assert.doesNotMatch(component, /conditions_met\.join/);
@@ -255,6 +257,11 @@ describe("PC.1 bounded lifecycle Radar API", () => {
   it("keeps the review launcher isolated, bounded to active snapshots, and fail-closed before runtime start", async () => {
     const launcher = await readFile(resolve(import.meta.dirname, "..", "..", "..", "scripts", "win", "start-pc1-lifecycle-radar-review.cmd"), "utf8");
     const bootstrap = await readFile(resolve(import.meta.dirname, "..", "..", "data-poc", "src", "bootstrapPc1LifecycleReview.ts"), "utf8");
+    const radar = await readFile(resolve(import.meta.dirname, "..", "src", "components", "CandidateResultsView.tsx"), "utf8");
+    const detail = await readFile(resolve(import.meta.dirname, "..", "src", "components", "CandidateDetailView.tsx"), "utf8");
+    const personalRadar = await readFile(resolve(import.meta.dirname, "..", "src", "components", "PersonalRadarPanel.tsx"), "utf8");
+    const productApp = await readFile(resolve(import.meta.dirname, "..", "src", "ProductApp.tsx"), "utf8");
+    const styles = await readFile(resolve(import.meta.dirname, "..", "src", "index.css"), "utf8");
     assert.match(launcher, /build:internal-beta/);
     assert.match(launcher, /crypto-edge-pc1-review-/);
     assert.match(launcher, /netstat -ano/);
@@ -287,6 +294,25 @@ describe("PC.1 bounded lifecycle Radar API", () => {
     assert.match(bootstrap, /Active scanner run:/);
     assert.match(bootstrap, /Validation: \$\{status\}/);
     assert.match(bootstrap, /Reason: \$\{reason\}/);
+    assert.match(detail, /<\/header>\s*<TokenDetailTabs[\s\S]*?<TokenDetailTabPanel/);
+    assert.doesNotMatch(detail, /<\/header>\s*<PersonalRadarPanel/);
+    assert.match(detail, /PersonalRadarPanel[^>]+placement="detail"/);
+    assert.match(radar, /product-radar-intro/);
+    assert.match(radar, /product-summary-grid primary/);
+    assert.match(radar, /radar-lifecycle-guide/);
+    assert.match(radar, /basket-switcher/);
+    assert.match(radar, /product-candidate-card observation token-card-compact lifecycle-radar-card/);
+    assert.match(radar, /product-candidate-topline/);
+    assert.match(radar, /product-metrics-grid/);
+    assert.match(radar, /candidate-explanation-grid/);
+    assert.doesNotMatch(radar, /personal-radar-review-switch/);
+    assert.match(personalRadar, /data-personal-radar="inline"/);
+    assert.doesNotMatch(personalRadar, /personal-radar-panel/);
+    assert.match(personalRadar, /TechnicalDetails label=\{copy\.confirmAction\}/);
+    assert.match(productApp, /isReviewMode\(\).*LifecycleReviewSwitch/);
+    assert.match(productApp, /data-pc1-review-switch="global"/);
+    assert.match(styles, /\.personal-radar-inline\.card \{ grid-column: 1 \/ -1; \}/);
+    assert.match(styles, /\.personal-radar-review-switch \{\s*position: fixed;/);
   });
 });
 

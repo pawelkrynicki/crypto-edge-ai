@@ -41,7 +41,7 @@ import {
 } from "./services/establishedUniverseStatusDataSource";
 import { loadControlCenterStatus } from "./services/controlCenterStatusDataSource";
 import { loadFollowUpByIdentity, loadFollowUpList, loadFollowUpStatus } from "./services/followUpDataSource";
-import { loadLifecycleRadar } from "./services/lifecycleDataSource";
+import { loadLifecycleRadar, setLifecycleReviewRole } from "./services/lifecycleDataSource";
 import type { LifecycleRadarView, LifecycleSummary } from "./types/lifecycleTypes";
 import type { FollowUpPublicEntry, FollowUpPublicStatus } from "./types/followUpTypes";
 import {
@@ -596,32 +596,49 @@ export function ProductAppContent({
   };
 
   return (
-    <ProductWorkspaceShell
-      navItems={navItems}
-      activeSection={activeSection}
-      onSectionChange={(section) => section === "feedback" ? openFeedback() : navigate(section)}
-      onSendFeedback={openFeedback}
-      loading={loading}
-      runtimeMode={runtimeMode}
-      resolvedSource={resolvedSource}
-      runId={runId}
-      generatedAt={workspaceGeneratedAt}
-      ageSeconds={ageSeconds}
-      freshnessStatus={freshnessStatus}
-      viewRefreshedAt={viewRefreshedAt}
-      sourceIds={sourceIds}
-      sourceHealth={sourceHealth}
-      readiness={readiness}
-      readinessReasonCode={readinessReasonCode}
-      dataUnavailableMessage={unavailableMessage}
-      dataUnavailableReasonCode={reasonCode}
-      lastKnownGoodRefreshError={lastKnownGoodRefreshError}
-      onRefresh={() => void loadData()}
-      automationStatus={automationStatus}
-      establishedUniverseStatus={establishedUniverseStatus}
-    >
-      {renderSection()}
-    </ProductWorkspaceShell>
+    <>
+      {lifecycleRadar && isReviewMode() && <LifecycleReviewSwitch role={lifecycleRadar.actor.role} />}
+      <ProductWorkspaceShell
+        navItems={navItems}
+        activeSection={activeSection}
+        onSectionChange={(section) => section === "feedback" ? openFeedback() : navigate(section)}
+        onSendFeedback={openFeedback}
+        loading={loading}
+        runtimeMode={runtimeMode}
+        resolvedSource={resolvedSource}
+        runId={runId}
+        generatedAt={workspaceGeneratedAt}
+        ageSeconds={ageSeconds}
+        freshnessStatus={freshnessStatus}
+        viewRefreshedAt={viewRefreshedAt}
+        sourceIds={sourceIds}
+        sourceHealth={sourceHealth}
+        readiness={readiness}
+        readinessReasonCode={readinessReasonCode}
+        dataUnavailableMessage={unavailableMessage}
+        dataUnavailableReasonCode={reasonCode}
+        lastKnownGoodRefreshError={lastKnownGoodRefreshError}
+        onRefresh={() => void loadData()}
+        automationStatus={automationStatus}
+        establishedUniverseStatus={establishedUniverseStatus}
+      >
+        {renderSection()}
+      </ProductWorkspaceShell>
+    </>
+  );
+}
+
+function LifecycleReviewSwitch({ role }: { role: LifecycleRadarView["actor"]["role"] }) {
+  const copy = { label: "Visual review", camp: "CAMP_USER", owner: "OWNER" };
+  const switchTo = (next: "CAMP_USER" | "OWNER") => {
+    void setLifecycleReviewRole(next).then((changed) => { if (changed) window.location.reload(); });
+  };
+  return (
+    <aside className="personal-radar-review-switch" data-pc1-review-switch="global" aria-label={copy.label}>
+      <span>{copy.label}: {role}</span>
+      {role !== "CAMP_USER" && <button type="button" onClick={() => switchTo("CAMP_USER")}>{copy.camp}</button>}
+      {role !== "OWNER" && <button type="button" onClick={() => switchTo("OWNER")}>{copy.owner}</button>}
+    </aside>
   );
 }
 
@@ -649,4 +666,8 @@ export function selectAIResearchReviewCandidate(candidates: UiTokenCandidate[]):
 function resolveSection(): ProductSectionId {
   if (typeof window === "undefined") return "candidate-results";
   return HASH_TO_SECTION[window.location.hash.trim().toLowerCase()] ?? "candidate-results";
+}
+
+function isReviewMode(): boolean {
+  return typeof window !== "undefined" && new URLSearchParams(window.location.search).get("pc1_review") === "1";
 }

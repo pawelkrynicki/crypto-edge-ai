@@ -6792,6 +6792,100 @@ button:disabled,
 @media (prefers-reduced-motion: reduce) {
   .product-technical-details-content { animation: none !important; }
 }
+
+/* PC.1 adds private lifecycle state to established card and detail patterns. */
+.personal-radar-inline {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.personal-radar-inline.card { grid-column: 1 / -1; }
+
+.personal-radar-statuses {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.personal-radar-inline .action-button { flex: 0 0 auto; }
+
+.personal-radar-confirmation {
+  width: 100%;
+  flex: 1 1 100%;
+  margin-top: 0;
+}
+
+.personal-radar-confirmation .product-technical-details-content {
+  display: grid;
+  gap: var(--space-2);
+  font-size: 11px;
+}
+
+.personal-radar-confirmation p { margin: 0; }
+
+.personal-radar-confirmation label {
+  display: grid;
+  gap: 5px;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+}
+
+.personal-radar-confirmation label:has(input[type="checkbox"]) {
+  display: flex;
+  align-items: center;
+}
+
+.personal-radar-confirmation textarea {
+  width: 100%;
+  min-height: 72px;
+  resize: vertical;
+}
+
+.token-detail-next-step .personal-radar-inline.detail {
+  margin-left: auto;
+}
+
+.personal-radar-review-switch {
+  position: fixed;
+  z-index: 100;
+  right: 10px;
+  bottom: 10px;
+  top: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  max-width: min(360px, calc(100vw - 20px));
+  padding: 6px 8px;
+  color: var(--color-text-helper);
+  font-size: 10px;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-surface-2) 92%, transparent);
+  box-shadow: var(--shadow-panel);
+}
+
+.personal-radar-review-switch button {
+  min-height: 28px;
+  padding: 4px 7px;
+  color: var(--color-text-secondary);
+  font: inherit;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-3);
+}
+
+@media (max-width: 700px) {
+  .token-detail-next-step .personal-radar-inline.detail { width: 100%; margin-left: 0; }
+  .personal-radar-review-switch { right: 6px; bottom: 6px; }
+}
+
 .radar-lifecycle-guide {
   margin: 0 0 18px;
   border: 1px solid var(--color-border-default);

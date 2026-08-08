@@ -39,7 +39,6 @@ import type { EstablishedUniverseStatus } from "../services/establishedUniverseS
 import { ActionButton, CopyableAddress, ReadOnlyCard, StatusBadge, TechnicalDetails } from "./ProductUi";
 import { AIResearchRadarStatus } from "./AIResearchSection";
 import { PersonalRadarPanel } from "./PersonalRadarPanel";
-import { setLifecycleReviewRole } from "../services/lifecycleDataSource";
 import {
   lifecycleStageLabel,
   TokenCheckpointAxis,
@@ -158,7 +157,6 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
           <p>{t("radar.intro")}</p>
         </div>
       </section>
-      {lifecycleRadar && isReviewMode() && <LifecycleReviewSwitch role={lifecycleRadar.actor.role} locale={locale} />}
 
       <section className="product-summary-grid primary" aria-label={t("radar.summary")}>
         <SummaryCard label={t("radar.newProjects")} value={String(lifecycleSummary?.system_new_total ?? newCandidates.length)} detail={lifecycleSummary ? t("lifecycle.persistentNewInbox") : t("radar.observationOnly")} />
@@ -298,17 +296,10 @@ function NewInboxRadarBasket({ cards, total, nextCursor, locale, onLoadMore }: {
     : { title: "New projects", absent: "This project was not present in the latest scan, but remains in the New Inbox.", more: "Show more", empty: "No projects in the durable New Inbox." };
   return <section className="basket-content new-inbox-basket" aria-label={copy.title}>
     <header className="basket-heading"><div><span>{copy.title}</span><h3>{total}</h3></div></header>
-    {cards.length === 0 ? <BasketEmpty title={copy.title} detail={copy.empty} code="NEW_INBOX_EMPTY" /> : cards.map((card) => <LifecycleRadarCardView key={card.identity} card={card} locale={locale} absentNotice={copy.absent} />)}
+    {cards.length === 0 ? <BasketEmpty title={copy.title} detail={copy.empty} code="NEW_INBOX_EMPTY" /> : <div className="product-candidate-list">{cards.map((card) => <LifecycleRadarCardView key={card.identity} card={card} locale={locale} absentNotice={copy.absent} />)}</div>}
     {nextCursor && <button type="button" className="product-secondary-action" data-lifecycle-more="new_inbox" onClick={() => onLoadMore?.(nextCursor)}>{copy.more}</button>}
   </section>;
 }
-
-function LifecycleReviewSwitch({ role, locale }: { role: LifecycleRadarView["actor"]["role"]; locale: ProductLocale }) {
-  const copy = locale === "pl" ? { label: "Visual review", camp: "Przełącz na CAMP_USER", owner: "Przełącz na ownera" } : { label: "Visual review", camp: "Switch to CAMP_USER", owner: "Switch to owner" };
-  const switchTo = (next: "CAMP_USER" | "OWNER") => { void setLifecycleReviewRole(next).then((changed) => { if (changed) window.location.reload(); }); };
-  return <section className="personal-radar-review-switch" data-pc1-review-switch="global"><span>{copy.label}: {role}</span>{role !== "CAMP_USER" && <button type="button" onClick={() => switchTo("CAMP_USER")}>{copy.camp}</button>}{role !== "OWNER" && <button type="button" onClick={() => switchTo("OWNER")}>{copy.owner}</button>}</section>;
-}
-function isReviewMode(): boolean { return typeof window !== "undefined" && new URLSearchParams(window.location.search).get("pc1_review") === "1"; }
 
 function LifecycleFollowUpQueues({ radar, locale, onLoadMore }: { radar: LifecycleRadarView; locale: ProductLocale; onLoadMore?: (cursor: string) => void }) {
   const copy = locale === "pl"
@@ -317,19 +308,34 @@ function LifecycleFollowUpQueues({ radar, locale, onLoadMore }: { radar: Lifecyc
   const groups: Array<[keyof typeof copy, LifecycleRadarView["follow_up"]["action_due"]]> = [["due", radar.follow_up.action_due], ["ready", radar.follow_up.candidates_ready], ["observed", radar.follow_up.observed]];
   return <section className="basket-content follow-up-basket lifecycle-queues" aria-label={locale === "pl" ? "Kolejka Follow-up" : "Follow-up queue"}>
     {groups.map(([key, group]) => <section key={key} className="lifecycle-queue-group" data-lifecycle-queue={key}>
-      <header><h3>{copy[key]} <small>{group.displayed}/{group.total}</small></h3></header>
-      {group.cards.map((card) => <LifecycleRadarCardView key={card.identity} card={card} locale={locale} />)}
+      <header className="basket-heading"><div><span>{copy[key]}</span><h3>{group.displayed}/{group.total}</h3></div></header>
+      <div className="product-candidate-list">{group.cards.map((card) => <LifecycleRadarCardView key={card.identity} card={card} locale={locale} />)}</div>
       {group.next_cursor && <button type="button" className="product-secondary-action" data-lifecycle-more={key} onClick={() => onLoadMore?.(group.next_cursor!)}>{copy.more}</button>}
     </section>)}
   </section>;
 }
 
 function LifecycleRadarCardView({ card, locale, absentNotice }: { card: LifecycleRadarCard; locale: ProductLocale; absentNotice?: string }) {
-  return <article className="product-candidate-card lifecycle-radar-card" data-lifecycle-card={card.identity}>
-    <header><div><span className="candidate-results-eyebrow">{card.chain}</span><h3>{card.symbol ?? card.display_name ?? card.contract_address}</h3><p>{card.display_name ?? card.contract_address}</p></div></header>
-    <div className="candidate-metrics compact"><Metric label={locale === "pl" ? "Pierwsze wykrycie" : "First seen"} value={formatProductDateTime(card.first_seen_at, locale)} /><Metric label={locale === "pl" ? "Ostatnie wykrycie" : "Last seen"} value={formatProductDateTime(card.last_seen_at, locale)} /></div>
+  const copy = locale === "pl"
+    ? { firstSeen: "Pierwsze wykrycie", lastSeen: "Ostatnie wykrycie", price: "Cena", marketCap: "Kapitalizacja", liquidity: "Płynność", volume: "Wolumen 24h", snapshot: "Snapshot", nextCheck: "Następne sprawdzenie", missingData: "Brakujące dane", none: "Brak" }
+    : { firstSeen: "First seen", lastSeen: "Last seen", price: "Price", marketCap: "Market cap", liquidity: "Liquidity", volume: "24h volume", snapshot: "Snapshot", nextCheck: "Next check", missingData: "Missing data", none: "None" };
+  return <article className="product-candidate-card observation token-card-compact lifecycle-radar-card" data-lifecycle-card={card.identity}>
+    <header className="product-candidate-topline"><div><span className="candidate-results-eyebrow">{formatChain(card.chain, locale === "pl" ? "Brak sieci" : "Network unavailable")}</span><h4>{card.symbol ?? card.display_name ?? card.contract_address} <small>{card.display_name ?? ""}</small></h4><CopyableAddress value={card.contract_address} displayValue={shortenAddress(card.contract_address, locale === "pl" ? "Brak danych" : "No data")} copyLabel={locale === "pl" ? "Kopiuj kontrakt" : "Copy contract"} copiedLabel={locale === "pl" ? "Skopiowano" : "Copied"} className="contract-line" /></div></header>
+    <div className="product-metrics-grid">
+      <Metric label={copy.firstSeen} value={formatProductDateTime(card.first_seen_at, locale)} />
+      <Metric label={copy.lastSeen} value={formatProductDateTime(card.last_seen_at, locale)} />
+      <Metric label={copy.price} value={formatPrice(card.market?.price_usd ?? null, locale === "pl" ? "Brak danych" : "No data")} />
+      <Metric label={copy.marketCap} value={formatProductUsd(card.market?.market_cap_usd ?? null, locale, locale === "pl" ? "Brak danych" : "No data")} />
+      <Metric label={copy.liquidity} value={formatProductUsd(card.market?.liquidity_usd ?? null, locale, locale === "pl" ? "Brak danych" : "No data")} />
+      <Metric label={copy.volume} value={formatProductUsd(card.market?.volume_24h_usd ?? null, locale, locale === "pl" ? "Brak danych" : "No data")} />
+    </div>
+    <div className="candidate-explanation-grid">
+      <Explanation label={copy.snapshot} value={card.snapshot_present ? (locale === "pl" ? "Obecny" : "Present") : (locale === "pl" ? "Brak w ostatnim skanie" : "Absent from latest scan")} />
+      <Explanation label={copy.nextCheck} value={card.follow_up?.next_check_at ? formatProductDateTime(card.follow_up.next_check_at, locale) : copy.none} />
+      <Explanation label={copy.missingData} value={card.follow_up?.missing_data.length ? card.follow_up.missing_data.join(", ") : copy.none} />
+    </div>
     {card.snapshot_absence_notice && absentNotice && <p className="product-inline-warning">{absentNotice}</p>}
-    <PersonalRadarPanel chain={card.chain} contractAddress={card.contract_address} initialView={card} compact />
+    <footer className="product-candidate-footer"><PersonalRadarPanel chain={card.chain} contractAddress={card.contract_address} initialView={card} /></footer>
   </article>;
 }
 
@@ -422,12 +428,12 @@ export function MaturingFollowUpBasket({
               contractAddress={entry.contract_address}
               onOpen={onOpenFollowUp ? () => onOpenFollowUp(entry.entry_id) : undefined}
             />
-            <PersonalRadarPanel chain={entry.chain} contractAddress={entry.contract_address} unavailable={privateStatusesUnavailable} />
             {onOpenFollowUp && (
               <footer className="product-candidate-footer follow-up-actions">
                 <p>{entry.lifecycle_status === "CANDIDATE_FOR_ESTABLISHED"
                   ? (locale === "pl" ? "Nie dodano automatycznie. Następny krok: decyzja właściciela." : "Not promoted automatically. Next: owner decision.")
                   : (locale === "pl" ? "Dalsze sprawdzenie nastąpi automatycznie." : "The next check happens automatically.")}</p>
+                <PersonalRadarPanel chain={entry.chain} contractAddress={entry.contract_address} unavailable={privateStatusesUnavailable} />
                 <ActionButton variant="primary" icon="arrow" iconPosition="end" onClick={() => onOpenFollowUp(entry.entry_id)}>
                   {t("radar.openDetails")}
                 </ActionButton>
@@ -581,8 +587,6 @@ function NewCandidateCard({
         contractAddress={candidate.contractAddress}
         onOpen={onOpenCandidate ? () => onOpenCandidate(candidate.id) : undefined}
       />
-      <PersonalRadarPanel chain={candidate.chain} contractAddress={candidate.contractAddress} unavailable={privateStatusesUnavailable} />
-
       <footer className="product-candidate-footer">
         <div>
           <span>{t("radar.sourceAndCheck")}</span>
@@ -590,6 +594,7 @@ function NewCandidateCard({
           <small>{formatProductDateTime(candidate.lastCheckedAt, locale)}</small>
         </div>
         <p>{t("radar.newBoundary")}</p>
+        <PersonalRadarPanel chain={candidate.chain} contractAddress={candidate.contractAddress} unavailable={privateStatusesUnavailable} />
         <CandidateActions candidate={candidate} onOpenCandidate={onOpenCandidate} onOpenExternalChecks={onOpenExternalChecks} />
       </footer>
     </article>
