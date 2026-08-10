@@ -800,7 +800,7 @@ export function ProductAppContent({
 
   return (
     <>
-      {isReviewMode() && <LifecycleReviewSwitch
+      {isReviewMode() && canRenderReviewDiagnostics(lifecycleRadar?.actor.role) && <LifecycleReviewSwitch
         role={lifecycleRadar?.actor.role ?? "CAMP_USER"}
         autoUpdatePublished={reviewAutoUpdatePublished}
         publicationStatus={reviewPublicationStatus}
@@ -1033,4 +1033,11 @@ function resolveSection(): ProductSectionId {
 
 function isReviewMode(): boolean {
   return typeof window !== "undefined" && new URLSearchParams(window.location.search).get("pc1_review") === "1";
+}
+
+function canRenderReviewDiagnostics(role: LifecycleRadarView["actor"]["role"] | undefined): boolean {
+  if (typeof window === "undefined") return false;
+  const hostname = new URL(window.location.href).hostname.toLowerCase();
+  const isLocalReviewRuntime = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+  return isLocalReviewRuntime && (role === "OWNER" || role === "ADMIN");
 }
