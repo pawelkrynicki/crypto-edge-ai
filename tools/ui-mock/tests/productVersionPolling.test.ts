@@ -180,6 +180,49 @@ describe("product version polling", () => {
     assert.deepEqual(committed, [v2.scanner_run_id, v3.scanner_run_id, v4.scanner_run_id]);
   });
 
+  it("retries a temporarily unavailable V3 and preserves V2 until V3 then V4 commit", async () => {
+    const v2 = { ...VERSION_A, scanner_run_id: "scan-review-1", scanner_generated_at: "2026-08-10T10:01:00.000Z" };
+    const v3 = { ...VERSION_A, scanner_run_id: "scan-review-2", scanner_generated_at: "2026-08-10T10:02:00.000Z" };
+    const v4 = { ...VERSION_A, scanner_run_id: "scan-review-3", scanner_generated_at: "2026-08-10T10:03:00.000Z" };
+    let current = VERSION_A;
+    let clock = 0;
+    const rendered: string[] = [VERSION_A.scanner_run_id!];
+    let v3Attempts = 0;
+    const poller = createProductVersionPoller({
+      loadVersion: async () => current,
+      onVersionChanged: async (version) => {
+        if (version.scanner_run_id === v3.scanner_run_id && v3Attempts++ === 0) return false;
+        rendered.push(version.scanner_run_id!);
+        return true;
+      },
+      now: () => clock,
+    });
+
+    await poller.checkNow();
+    poller.markCommitted(VERSION_A);
+    current = v2;
+    clock += 1;
+    await poller.checkNow();
+    assert.deepEqual(rendered, [VERSION_A.scanner_run_id, v2.scanner_run_id]);
+
+    current = v3;
+    clock += 1;
+    await poller.checkNow();
+    assert.equal(poller.getVersionState().last_committed_version?.scanner_run_id, v2.scanner_run_id);
+    assert.equal(poller.getDiagnostics().last_refresh_result, "FAILED");
+    assert.deepEqual(rendered, [VERSION_A.scanner_run_id, v2.scanner_run_id], "the temporary V3 failure keeps V2 rendered");
+
+    clock += PRODUCT_VERSION_RETRY_DELAY_MS;
+    await poller.checkNow();
+    assert.equal(poller.getVersionState().last_committed_version?.scanner_run_id, v3.scanner_run_id);
+
+    current = v4;
+    clock += 1;
+    await poller.checkNow();
+    assert.deepEqual(rendered, [VERSION_A.scanner_run_id, v2.scanner_run_id, v3.scanner_run_id, v4.scanner_run_id]);
+    assert.equal(poller.getDiagnostics().last_refresh_result, "PASS");
+  });
+
   it("uses jitter while visible, slows down hidden tabs, and checks immediately after focus", async () => {
     assert.equal(resolveProductVersionPollDelay(false, () => 0), 35_000);
     assert.equal(resolveProductVersionPollDelay(false, () => 1), 55_000);

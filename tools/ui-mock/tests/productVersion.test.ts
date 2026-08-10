@@ -65,7 +65,7 @@ describe("product version API", () => {
     const server = createScannerApiServer({
       runtimeMode: "INTERNAL_BETA",
       reviewPublication: {
-        loadBaseScanner: async () => structuredClone(PERSISTABLE_SCANNER_SAMPLE) as ScannerOutputWithMeta,
+        loadBaseScanner: async () => scannerWithMeta(),
         loadBaseSnapshot: async () => structuredClone(PERSISTABLE_SCANNER_SAMPLE) as ScannerOutputWithMeta,
         validateSnapshot: () => undefined,
         persistReviewPointer: async () => undefined,
@@ -108,6 +108,8 @@ describe("product version API", () => {
         next_retry_at: null,
         last_published_at: null,
         next_attempt_at: null,
+        last_committed_ui_run_id: null,
+        ui_commit_acknowledged_at: null,
         timer_scheduled_at: null,
         timer_due_at: null,
         timer_fired_at: null,
@@ -123,6 +125,15 @@ describe("product version API", () => {
       assert.notEqual(after.scanner_run_id, before.scanner_run_id);
       assert.notEqual(after.scanner_generated_at, before.scanner_generated_at);
       assert.equal(after.lifecycle_updated_at, before.lifecycle_updated_at);
+      const acknowledgement = await fetch(`${base}/api/product/review/commit-ack?pc1_review=1`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ scanner_run_id: after.scanner_run_id }),
+      });
+      assert.equal(acknowledgement.status, 200);
+      const acknowledged = await acknowledgement.json() as { last_committed_ui_run_id: string; ui_commit_acknowledged_at: string | null };
+      assert.equal(acknowledged.last_committed_ui_run_id, after.scanner_run_id);
+      assert.equal(typeof acknowledged.ui_commit_acknowledged_at, "string");
       assert.deepEqual(await version(base), before, "the review publication is invisible without the review query");
     } finally {
       await close(server);
@@ -143,13 +154,15 @@ describe("product version API", () => {
         now: () => new Date("2026-08-10T10:05:00.000Z"),
         autoPublicationDelayMs: 60_000,
         setTimer: (callback, delay) => {
-          assert.equal(delay, 60_000);
-          reviewTimer = callback;
+          if (!reviewTimer) {
+            assert.equal(delay, 60_000);
+            reviewTimer = callback;
+          }
           return 1 as unknown as ReturnType<typeof setTimeout>;
         },
         clearTimer: () => undefined,
         persistMarker: async () => undefined,
-        loadBaseScanner: async () => structuredClone(PERSISTABLE_SCANNER_SAMPLE) as ScannerOutputWithMeta,
+        loadBaseScanner: async () => scannerWithMeta(),
         loadBaseSnapshot: async () => structuredClone(PERSISTABLE_SCANNER_SAMPLE) as ScannerOutputWithMeta,
         validateSnapshot: () => undefined,
         persistReviewPointer: async () => undefined,
@@ -184,7 +197,7 @@ describe("product version API", () => {
       now: () => new Date("2026-08-10T10:05:00.000Z"),
       enabled: true,
       reviewRootPath,
-      loadBaseScanner: async () => structuredClone(PERSISTABLE_SCANNER_SAMPLE) as ScannerOutputWithMeta,
+      loadBaseScanner: async () => scannerWithMeta(),
       loadBaseSnapshot: async () => structuredClone(PERSISTABLE_SCANNER_SAMPLE) as ScannerOutputWithMeta,
       persistReviewPointer: async () => undefined,
       loadBaseVersion: async () => ({

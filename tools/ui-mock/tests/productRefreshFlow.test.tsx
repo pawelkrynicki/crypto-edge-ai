@@ -233,6 +233,12 @@ describe("ProductApp Refresh View last-known-good flow", () => {
         renderer = create(<ProductLocaleProvider initialLocale="en"><ProductAppContent dataSources={dataSources} runtimeModeOverride="INTERNAL_BETA" /></ProductLocaleProvider>);
         await flushPromises();
       });
+      assert.match(renderedText(renderer!), /Diagnostyka/);
+      assert.doesNotMatch(renderedText(renderer!), /Auto-update test: oczekiwanie/, "review diagnostics start collapsed");
+      await act(async () => {
+        renderer!.root.findByProps({ className: "personal-radar-review-diagnostics-toggle" }).props.onClick();
+        await flushPromises();
+      });
       assert.match(renderedText(renderer!), /Auto-update test: oczekiwanie/);
 
       versionIndex = 1;

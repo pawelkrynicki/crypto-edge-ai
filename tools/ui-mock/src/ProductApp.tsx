@@ -49,6 +49,7 @@ import { loadControlCenterStatus } from "./services/controlCenterStatusDataSourc
 import { loadFollowUpByIdentity, loadFollowUpList, loadFollowUpStatus } from "./services/followUpDataSource";
 import { loadLifecycleRadar, setLifecycleReviewRole } from "./services/lifecycleDataSource";
 import {
+  acknowledgeReviewPublicationCommit,
   loadReviewPublicationStatus,
   type ReviewPublicationStatus,
 } from "./services/reviewPublicationStatusDataSource";
@@ -119,6 +120,7 @@ export type ProductAppDataSources = {
   loadLifecycleRadar?: typeof loadLifecycleRadar;
   loadProductVersion?: typeof loadProductVersion;
   loadReviewPublicationStatus?: typeof loadReviewPublicationStatus;
+  acknowledgeReviewPublicationCommit?: typeof acknowledgeReviewPublicationCommit;
   now: () => string;
 };
 
@@ -134,6 +136,7 @@ const DEFAULT_PRODUCT_APP_DATA_SOURCES: ProductAppDataSources = {
   loadLifecycleRadar,
   loadProductVersion,
   loadReviewPublicationStatus,
+  acknowledgeReviewPublicationCommit,
   now: () => new Date().toISOString(),
 };
 
@@ -184,6 +187,8 @@ export function ProductAppContent({
   const { t } = useProductLocale();
   const runtimeMode = runtimeModeOverride ?? getProductRuntimeMode();
   const loadVersionPointer = dataSources.loadProductVersion;
+  const loadReviewPublicationStatusSource = dataSources.loadReviewPublicationStatus;
+  const acknowledgeReviewPublicationCommitSource = dataSources.acknowledgeReviewPublicationCommit;
   const [activeSection, setActiveSection] = useState<ProductSectionId>(() => resolveSection());
   const [productView, setProductView] = useState<ProductViewModel>(() => createEmptyProductViewModel());
   const [loading, setLoading] = useState(true);
@@ -207,6 +212,7 @@ export function ProductAppContent({
   const [selectedReportContext, setSelectedReportContext] = useState<ReportDetail | null>(null);
   const refreshPromiseRef = useRef<Promise<boolean> | null>(null);
   const productVersionPollerRef = useRef<ProductVersionPoller | null>(null);
+  const reviewCommitAcknowledgementRef = useRef<string | null>(null);
   const productViewRef = useRef(productView);
   const routeTokenIdentityRef = useRef<RouteTokenIdentity | null>(routeTokenIdentity);
   const {
@@ -468,10 +474,10 @@ export function ProductAppContent({
   }, [loadData, loadVersionPointer]);
 
   useEffect(() => {
-    if (!isReviewMode() || !dataSources.loadReviewPublicationStatus) return undefined;
+    if (!isReviewMode() || !loadReviewPublicationStatusSource) return undefined;
     let active = true;
     const refreshStatus = () => {
-      void dataSources.loadReviewPublicationStatus!().then((next) => {
+      void loadReviewPublicationStatusSource().then((next) => {
         if (!active || !next) return;
         setReviewPublicationStatus(next);
       });
@@ -482,7 +488,22 @@ export function ProductAppContent({
       active = false;
       window.clearInterval(timer);
     };
-  }, [dataSources.loadReviewPublicationStatus]);
+  }, [loadReviewPublicationStatusSource]);
+
+  useEffect(() => {
+    const committedRunId = reviewPollingDiagnostics?.last_committed_version?.scanner_run_id;
+    const targetRunId = reviewPublicationStatus?.target_run_id;
+    if (!isReviewMode()
+      || !committedRunId
+      || targetRunId !== committedRunId
+      || reviewCommitAcknowledgementRef.current === targetRunId
+      || !acknowledgeReviewPublicationCommitSource) return;
+    reviewCommitAcknowledgementRef.current = targetRunId;
+    void acknowledgeReviewPublicationCommitSource(targetRunId).then((next) => {
+      if (next) setReviewPublicationStatus(next);
+      else reviewCommitAcknowledgementRef.current = null;
+    });
+  }, [acknowledgeReviewPublicationCommitSource, reviewPollingDiagnostics, reviewPublicationStatus]);
 
   const refreshView = useCallback((): Promise<void> => {
     if (!loadVersionPointer) return loadData().then(() => undefined);
@@ -826,32 +847,37 @@ function LifecycleReviewSwitch({
   publicationStatus: ReviewPublicationStatus | null;
   pollingDiagnostics: ProductVersionPollingDiagnostics | null;
 }) {
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const copy = { label: "Visual review", camp: "CAMP_USER", owner: "OWNER" };
   const switchTo = (next: "CAMP_USER" | "OWNER") => {
     void setLifecycleReviewRole(next).then((changed) => { if (changed) window.location.reload(); });
   };
   return (
     <aside className="personal-radar-review-switch" data-pc1-review-switch="global" aria-label={copy.label}>
-      <span>{copy.label}: {role}</span>
-      <span className="personal-radar-review-auto-update" role="status">
-        {reviewPublicationControllerMessage(publicationStatus, autoUpdatePublished, pollingDiagnostics)}
-      </span>
-      <dl className="personal-radar-review-publication" data-pc1-review-publication="enabled" aria-label="Review publication status">
-        <div><dt>Current review version</dt><dd>V{publicationStatus?.current_review_version ?? 1}</dd></div>
-        <div><dt>Last publication</dt><dd>{publicationStatus?.last_published_at ?? "—"}</dd></div>
-        <div><dt>Next attempt</dt><dd>{publicationStatus?.next_attempt_at ?? "—"}</dd></div>
-        <div><dt>Publication status</dt><dd>{publicationStatus?.status ?? "WAITING"}</dd></div>
-        <div><dt>Last committed UI version</dt><dd>{reviewUiVersionLabel(pollingDiagnostics?.last_committed_version)}</dd></div>
-      </dl>
-      <dl className="personal-radar-review-diagnostics" data-pc1-review-polling-diagnostics="enabled" aria-label="Review polling diagnostics">
-        <div><dt>last_poll_at</dt><dd>{pollingDiagnostics?.last_poll_at ?? "—"}</dd></div>
-        <div><dt>last_seen_version</dt><dd>{reviewVersionLabel(pollingDiagnostics?.last_seen_version)}</dd></div>
-        <div><dt>last_attempted_version</dt><dd>{reviewVersionLabel(pollingDiagnostics?.last_attempted_version)}</dd></div>
-        <div><dt>last_committed_version</dt><dd>{reviewVersionLabel(pollingDiagnostics?.last_committed_version)}</dd></div>
-        <div><dt>last_refresh_result</dt><dd>{pollingDiagnostics?.last_refresh_result ?? "NOT_STARTED"}</dd></div>
-      </dl>
-      {role !== "CAMP_USER" && <button type="button" onClick={() => switchTo("CAMP_USER")}>{copy.camp}</button>}
-      {role !== "OWNER" && <button type="button" onClick={() => switchTo("OWNER")}>{copy.owner}</button>}
+      <button type="button" className="personal-radar-review-diagnostics-toggle" aria-expanded={diagnosticsOpen} onClick={() => setDiagnosticsOpen((open) => !open)}>Diagnostyka</button>
+      {diagnosticsOpen && <div className="personal-radar-review-diagnostics-panel" data-pc1-review-diagnostics="expanded">
+        <span>{copy.label}: {role}</span>
+        <span className="personal-radar-review-auto-update" role="status">
+          {reviewPublicationControllerMessage(publicationStatus, autoUpdatePublished, pollingDiagnostics)}
+        </span>
+        <dl className="personal-radar-review-publication" data-pc1-review-publication="enabled" aria-label="Review publication status">
+          <div><dt>Current review version</dt><dd>V{publicationStatus?.current_review_version ?? 1}</dd></div>
+          <div><dt>Last committed version</dt><dd>{reviewUiVersionLabel(pollingDiagnostics?.last_committed_version)}</dd></div>
+          <div><dt>Publication status</dt><dd>{publicationStatus?.status ?? "WAITING"}</dd></div>
+          <div><dt>Next publication</dt><dd>{publicationStatus?.next_attempt_at ?? "—"}</dd></div>
+          <div><dt>Last refresh result</dt><dd>{pollingDiagnostics?.last_refresh_result ?? "NOT_STARTED"}</dd></div>
+        </dl>
+        <dl className="personal-radar-review-diagnostics" data-pc1-review-polling-diagnostics="enabled" aria-label="Review polling diagnostics">
+          <div><dt>last publication</dt><dd>{publicationStatus?.last_published_at ?? "—"}</dd></div>
+          <div><dt>last poll at</dt><dd>{pollingDiagnostics?.last_poll_at ?? "—"}</dd></div>
+          <div><dt>last seen version</dt><dd>{reviewVersionLabel(pollingDiagnostics?.last_seen_version)}</dd></div>
+          <div><dt>last attempted version</dt><dd>{reviewVersionLabel(pollingDiagnostics?.last_attempted_version)}</dd></div>
+          <div><dt>last committed UI run</dt><dd>{publicationStatus?.last_committed_ui_run_id ?? "—"}</dd></div>
+          <div><dt>UI commit acknowledged</dt><dd>{publicationStatus?.ui_commit_acknowledged_at ?? "—"}</dd></div>
+        </dl>
+        {role !== "CAMP_USER" && <button type="button" onClick={() => switchTo("CAMP_USER")}>{copy.camp}</button>}
+        {role !== "OWNER" && <button type="button" onClick={() => switchTo("OWNER")}>{copy.owner}</button>}
+      </div>}
     </aside>
   );
 }
@@ -862,6 +888,9 @@ function reviewPublicationControllerMessage(
   pollingDiagnostics: ProductVersionPollingDiagnostics | null,
 ): string {
   if (status?.status === "FAILED") return "Test auto-update failed. The previous version is preserved.";
+  if (status?.status === "RETRY_WAIT" && status.reason_code === "UI_COMMIT_PENDING") {
+    return "Review version published; waiting for view refresh…";
+  }
   if (status?.status === "RETRY_WAIT") return `Publication failed — retrying (${status.attempt}/3)`;
   if (status?.status === "PREPARING" || status?.status === "VALIDATING" || status?.status === "PUBLISHING") {
     return "Review version publication in progress…";
