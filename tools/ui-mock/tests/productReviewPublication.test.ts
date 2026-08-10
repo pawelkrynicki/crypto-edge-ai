@@ -206,7 +206,78 @@ describe("PC.1 review auto-publication harness", () => {
       assert.equal(second.published, true);
       assert.equal(second.status.attempt, 2);
       assert.equal(second.status.status, "PUBLISHED");
-      assert.equal(publication.getMarker()?.version.scanner_run_id, `${VERSION.scanner_run_id}-review-2`);
+      assert.equal(publication.getMarker()?.version.scanner_run_id, `${VERSION.scanner_run_id}-review-1`);
+    } finally {
+      publication.stop();
+    }
+  });
+
+  it("recurs V1 → V2, preserves V2 through an invalid V3, then commits V4", async () => {
+    const reviewRootPath = await reviewRoot();
+    await automationState(reviewRootPath);
+    const timers: Array<{ callback: () => void; delay: number }> = [];
+    const committedRuns: string[] = [];
+    let sourceRunId = VERSION.scanner_run_id!;
+    let clock = Date.parse("2026-08-10T08:30:00.000Z");
+    const publication = createProductReviewPublication({
+      enabled: true,
+      recurring: true,
+      reviewRootPath,
+      now: () => new Date(clock),
+      autoPublicationDelayMs: 60_000,
+      recurringDelayMs: 60_000,
+      retryDelayMs: 30_000,
+      loadBaseScanner: async () => scannerWithRun(sourceRunId),
+      loadBaseSnapshot: async () => scannerWithRun(sourceRunId),
+      loadBaseVersion: async () => versionForRun(sourceRunId),
+      validateSnapshot: (snapshot) => {
+        const runId = (snapshot as unknown as { scan_run: { run_id: string } }).scan_run.run_id;
+        if (runId.endsWith("-review-2")) throw new Error("SCANNER_DISPLAY_VALIDATION_FAILED");
+      },
+      persistReviewPointer: async (version) => {
+        committedRuns.push(version.scanner_run_id!);
+        sourceRunId = version.scanner_run_id!;
+      },
+      setTimer: (callback, delay) => {
+        timers.push({ callback, delay });
+        return timers.length as unknown as ReturnType<typeof setTimeout>;
+      },
+      clearTimer: () => undefined,
+    });
+    const trigger = async (delay: number) => {
+      const scheduled = timers.shift();
+      assert.equal(scheduled?.delay, delay);
+      clock += delay;
+      scheduled?.callback();
+      return publication.publishNext();
+    };
+    try {
+      const v2 = await trigger(60_000);
+      assert.equal(v2.published, true);
+      assert.equal(v2.status.revision, 1);
+      assert.equal(v2.status.current_review_version, 2);
+      assert.equal(publication.getMarker()?.version.scanner_run_id, `${VERSION.scanner_run_id}-review-1`);
+
+      for (let attempt = 1; attempt <= PC1_REVIEW_PUBLICATION_MAX_ATTEMPTS; attempt += 1) {
+        const v3 = await trigger(attempt === 1 ? 60_000 : PC1_REVIEW_PUBLICATION_RETRY_DELAY_MS);
+        assert.equal(v3.published, false);
+        assert.equal(v3.status.revision, 2);
+        assert.equal(v3.status.attempt, attempt);
+        assert.equal(v3.status.status, attempt < PC1_REVIEW_PUBLICATION_MAX_ATTEMPTS ? "RETRY_WAIT" : "FAILED");
+        assert.equal(publication.getMarker()?.version.scanner_run_id, `${VERSION.scanner_run_id}-review-1`);
+        assert.equal(publication.decorateVersion(versionForRun(VERSION.scanner_run_id!)).scanner_run_id, `${VERSION.scanner_run_id}-review-1`);
+      }
+
+      const v4 = await trigger(60_000);
+      assert.equal(v4.published, true);
+      assert.equal(v4.status.revision, 3);
+      assert.equal(v4.status.current_review_version, 4);
+      assert.equal(publication.getMarker()?.version.scanner_run_id, `${VERSION.scanner_run_id}-review-3`);
+      assert.deepEqual(committedRuns, [
+        `${VERSION.scanner_run_id}-review-1`,
+        `${VERSION.scanner_run_id}-review-3`,
+      ]);
+      assert.equal(publication.getStatus().next_attempt_at, "2026-08-10T08:35:00.000Z");
     } finally {
       publication.stop();
     }
@@ -277,4 +348,30 @@ function scannerWithMeta(): ScannerOutputWithMeta {
       freshness_status: "FRESH",
     },
   };
+}
+
+function scannerWithRun(runId: string): ScannerOutputWithMeta {
+  const snapshot = structuredClone(PERSISTABLE_SCANNER_SAMPLE) as ScannerOutputWithMeta;
+  return {
+    ...snapshot,
+    scan_run: { ...snapshot.scan_run, run_id: runId },
+    candidates: snapshot.candidates.map((entry) => ({ ...entry, run_id: runId })),
+    security_checks: snapshot.security_checks.map((entry) => ({ ...entry, run_id: runId })),
+    scorecards: snapshot.scorecards.map((entry) => ({ ...entry, run_id: runId })),
+    provenance: snapshot.provenance ? { ...snapshot.provenance, run_id: runId } : snapshot.provenance,
+    _source_meta: {
+      source: "real-output",
+      reason: "test",
+      selected_run_id: runId,
+      loaded_at: "2026-08-10T08:29:00.000Z",
+      runtime_mode: "INTERNAL_BETA",
+      age_seconds: 0,
+      source_ids: ["dexscreener"],
+      freshness_status: "FRESH",
+    },
+  };
+}
+
+function versionForRun(runId: string): ProductVersion {
+  return { ...VERSION, scanner_run_id: runId };
 }

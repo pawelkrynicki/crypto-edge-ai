@@ -7,6 +7,7 @@ import type { PersistableScannerOutput } from "../src/types/scannerTypes.js";
 import type { ScannerOutputWithMeta, ScannerSourceMeta } from "./latestScannerOutput.js";
 
 export const PC1_REVIEW_AUTO_PUBLICATION_DELAY_MS = 60_000;
+export const PC1_REVIEW_RECURRING_PUBLICATION_DELAY_MS = 60_000;
 export const PC1_REVIEW_PUBLICATION_RETRY_DELAY_MS = 30_000;
 export const PC1_REVIEW_PUBLICATION_MAX_ATTEMPTS = 3;
 const REVIEW_PUBLICATION_MARKER_FILE = "pc1-review-publication.json";
@@ -15,6 +16,7 @@ const REVIEW_PUBLICATION_STATUS_FILE = "pc1-review-publication-status.json";
 export type ProductReviewPublicationMarker = {
   schema_version: "pc1_review_publication_v1";
   review_version_id: string;
+  revision: number;
   generated_at: string;
   lifecycle_updated_at: string | null;
   version: ProductVersion;
@@ -38,6 +40,10 @@ export type ProductReviewPublicationStage =
 export type ProductReviewPublicationStatus = {
   schema_version: "pc1_review_publication_status_v1";
   status: "WAITING" | "PREPARING" | "VALIDATING" | "PUBLISHING" | "PUBLISHED" | "RETRY_WAIT" | "FAILED";
+  /** The review publication revision; retries retain this value. */
+  revision: number;
+  /** V1 before the first publication, then the last successfully published review version. */
+  current_review_version: number;
   attempt: number;
   started_at: string | null;
   finished_at: string | null;
@@ -46,6 +52,8 @@ export type ProductReviewPublicationStatus = {
   failure_stage: ProductReviewPublicationStage | null;
   reason_code: string | null;
   next_retry_at: string | null;
+  last_published_at: string | null;
+  next_attempt_at: string | null;
   /** Safe review-only timing facts for diagnosing the API-server lifetime timer. */
   timer_scheduled_at: string | null;
   timer_due_at: string | null;
@@ -66,6 +74,9 @@ export type ProductReviewPublicationOptions = {
   reviewRootPath?: string;
   outputRootPath?: string;
   autoPublicationDelayMs?: number;
+  /** Enables isolated V1 → V2 → V3… review cycles. It is never enabled outside the review runtime. */
+  recurring?: boolean;
+  recurringDelayMs?: number;
   retryDelayMs?: number;
   maxAttempts?: number;
   setTimer?: (callback: () => void, delay: number) => ReturnType<typeof setTimeout>;
@@ -83,8 +94,9 @@ export type ProductReviewPublicationOptions = {
 
 export type ProductReviewPublication = {
   readonly enabled: boolean;
+  readonly recurring: boolean;
   readonly autoPublicationDelayMs: number;
-  /** Prepares, validates and publishes the complete V2 snapshot before changing its pointer. */
+  /** Prepares, validates and publishes the next review snapshot before changing its pointer. */
   publishNext: () => Promise<ProductReviewPublicationResult>;
   decorateVersion: (version: ProductVersion) => ProductVersion;
   decorateScanner: (scanner: ScannerOutputWithMeta) => ScannerOutputWithMeta;
@@ -115,6 +127,8 @@ export function createProductReviewPublication(options: ProductReviewPublication
   const outputRootPath = options.outputRootPath ?? (reviewRootPath ? resolve(reviewRootPath, "output") : "");
   const enabled = options.enabled ?? (process.env.CRYPTO_EDGE_PC1_REVIEW_MODE === "1" && Boolean(reviewRootPath));
   const autoPublicationDelayMs = options.autoPublicationDelayMs ?? configuredAutoPublicationDelay();
+  const recurring = options.recurring ?? (enabled && process.env.CRYPTO_EDGE_PC1_REVIEW_MODE === "1" && Boolean(reviewRootPath));
+  const recurringDelayMs = options.recurringDelayMs ?? PC1_REVIEW_RECURRING_PUBLICATION_DELAY_MS;
   const retryDelayMs = options.retryDelayMs ?? PC1_REVIEW_PUBLICATION_RETRY_DELAY_MS;
   const maxAttempts = options.maxAttempts ?? PC1_REVIEW_PUBLICATION_MAX_ATTEMPTS;
   const setTimer = options.setTimer ?? ((callback, delay) => setTimeout(callback, delay));
@@ -147,7 +161,10 @@ export function createProductReviewPublication(options: ProductReviewPublication
   let publishedSnapshot: ScannerOutputWithMeta | null = null;
   let publishing: Promise<ProductReviewPublicationResult> | null = null;
   let autoTimer: ReturnType<typeof setTimeout> | null = null;
-  let status = createStatus("WAITING", 0);
+  let activeRevision: number | null = null;
+  let attemptsForActiveRevision = 0;
+  let nextRevision = 1;
+  let status = createStatus("WAITING", 0, 0, 1);
   let persistedStatus = Promise.resolve();
 
   const saveStatus = (nextStatus: ProductReviewPublicationStatus): Promise<void> => {
@@ -163,18 +180,27 @@ export function createProductReviewPublication(options: ProductReviewPublication
     return persistedStatus;
   };
 
-  const scheduleAttempt = (delayMs: number): void => {
+  const scheduleAttempt = (delayMs: number, kind: "NEXT" | "RETRY"): void => {
     if (autoTimer) clearTimer(autoTimer);
     const scheduledAt = now();
+    const dueAt = new Date(scheduledAt.getTime() + delayMs).toISOString();
     void saveStatus({
       ...status,
       timer_scheduled_at: scheduledAt.toISOString(),
-      timer_due_at: new Date(scheduledAt.getTime() + delayMs).toISOString(),
+      timer_due_at: dueAt,
       timer_fired_at: null,
+      next_retry_at: kind === "RETRY" ? dueAt : null,
+      next_attempt_at: dueAt,
     });
     autoTimer = setTimer(() => {
       autoTimer = null;
-      void saveStatus({ ...status, timer_fired_at: now().toISOString() }).finally(() => { void publishNext(); });
+      void saveStatus({
+        ...status,
+        status: status.status === "PUBLISHED" || status.status === "FAILED" ? "WAITING" : status.status,
+        timer_fired_at: now().toISOString(),
+        next_retry_at: null,
+        next_attempt_at: null,
+      }).finally(() => { void publishNext(); });
     }, delayMs);
     if (typeof autoTimer === "object" && autoTimer !== null && "unref" in autoTimer && typeof autoTimer.unref === "function") {
       autoTimer.unref();
@@ -184,10 +210,14 @@ export function createProductReviewPublication(options: ProductReviewPublication
   const publishNext = (): Promise<ProductReviewPublicationResult> => {
     if (publishing) return publishing;
     if (!enabled) return Promise.resolve({ published: false, status });
-    if (marker) return Promise.resolve({ published: false, status });
+    if (marker && !recurring) return Promise.resolve({ published: false, status });
 
-    const attempt = status.attempt + 1;
+    const revision = activeRevision ?? nextRevision;
+    const attempt = activeRevision === null ? 1 : attemptsForActiveRevision + 1;
+    activeRevision = revision;
+    attemptsForActiveRevision = attempt;
     publishing = prepareValidateAndPublish({
+      revision,
       attempt,
       now,
       outputRootPath,
@@ -206,8 +236,17 @@ export function createProductReviewPublication(options: ProductReviewPublication
       if (result.published) {
         marker = result.marker;
         publishedSnapshot = result.snapshot;
+        activeRevision = null;
+        attemptsForActiveRevision = 0;
+        nextRevision = revision + 1;
+        if (recurring) scheduleAttempt(recurringDelayMs, "NEXT");
       } else if (result.status.status === "RETRY_WAIT") {
-        scheduleAttempt(retryDelayMs);
+        scheduleAttempt(retryDelayMs, "RETRY");
+      } else {
+        activeRevision = null;
+        attemptsForActiveRevision = 0;
+        nextRevision = revision + 1;
+        if (recurring) scheduleAttempt(recurringDelayMs, "NEXT");
       }
       return { published: result.published, status: result.status };
     }).finally(() => {
@@ -216,10 +255,11 @@ export function createProductReviewPublication(options: ProductReviewPublication
     return publishing;
   };
 
-  if (enabled) scheduleAttempt(autoPublicationDelayMs);
+  if (enabled) scheduleAttempt(autoPublicationDelayMs, "NEXT");
 
   return {
     enabled,
+    recurring,
     autoPublicationDelayMs,
     publishNext,
     decorateVersion: (version) => marker?.version ?? activeVersion ?? version,
@@ -236,6 +276,7 @@ export function createProductReviewPublication(options: ProductReviewPublication
 }
 
 async function prepareValidateAndPublish({
+  revision,
   attempt,
   now,
   outputRootPath,
@@ -251,6 +292,7 @@ async function prepareValidateAndPublish({
   maxAttempts,
   retryDelayMs,
 }: {
+  revision: number;
   attempt: number;
   now: () => Date;
   outputRootPath: string;
@@ -275,10 +317,11 @@ async function prepareValidateAndPublish({
   ): Promise<ProductReviewPublicationStatus> => {
     const timerStatus = getStatus();
     const nextStatus: ProductReviewPublicationStatus = {
-      ...createStatus(next, attempt),
+      ...createStatus(next, revision, attempt, timerStatus.current_review_version),
       started_at: startedAt,
       source_run_id: sourceRunId,
       target_run_id: targetRunId,
+      last_published_at: timerStatus.last_published_at,
       timer_scheduled_at: timerStatus.timer_scheduled_at,
       timer_due_at: timerStatus.timer_due_at,
       timer_fired_at: timerStatus.timer_fired_at,
@@ -309,7 +352,7 @@ async function prepareValidateAndPublish({
       throw new PublicationStepError("SOURCE_VERSION_MATCH", "SOURCE_VERSION_RUN_ID_MISMATCH");
     }
 
-    targetRunId = withReviewSuffix(sourceRunId, attempt);
+    targetRunId = withReviewSuffix(baseReviewRunId(sourceRunId), revision);
     const snapshot = await runStep("CREATE_REVIEW_SNAPSHOT", () => Promise.resolve(createReviewSnapshot(source, targetRunId!, now().toISOString())));
     await writeStatus("VALIDATING");
     await runStep("VALIDATE", () => Promise.resolve(validateSnapshot(snapshot as unknown as ScannerOutputWithMeta)));
@@ -322,7 +365,8 @@ async function prepareValidateAndPublish({
     holdActiveVersion(sourceVersion);
     const marker: ProductReviewPublicationMarker = {
       schema_version: "pc1_review_publication_v1",
-      review_version_id: `pc1-review-${attempt}`,
+      review_version_id: `pc1-review-${revision}`,
+      revision,
       generated_at: snapshot.scan_run.finished_at,
       lifecycle_updated_at: version.lifecycle_updated_at,
       version,
@@ -350,7 +394,12 @@ async function prepareValidateAndPublish({
       throw error;
     }
 
-    const publishedStatus = await writeStatus("PUBLISHED", { finished_at: now().toISOString() });
+    const publishedAt = now().toISOString();
+    const publishedStatus = await writeStatus("PUBLISHED", {
+      finished_at: publishedAt,
+      current_review_version: revision + 1,
+      last_published_at: publishedAt,
+    });
     return { published: true, marker, snapshot: persistedSnapshot as unknown as ScannerOutputWithMeta, status: publishedStatus };
   } catch (error) {
     const failure = normalizeFailure(error);
@@ -392,11 +441,15 @@ function safeReasonCode(error: unknown): string {
 
 function createStatus(
   status: ProductReviewPublicationStatus["status"],
+  revision: number,
   attempt: number,
+  currentReviewVersion: number,
 ): ProductReviewPublicationStatus {
   return {
     schema_version: "pc1_review_publication_status_v1",
     status,
+    revision,
+    current_review_version: currentReviewVersion,
     attempt,
     started_at: null,
     finished_at: null,
@@ -405,6 +458,8 @@ function createStatus(
     failure_stage: null,
     reason_code: null,
     next_retry_at: null,
+    last_published_at: null,
+    next_attempt_at: null,
     timer_scheduled_at: null,
     timer_due_at: null,
     timer_fired_at: null,
@@ -488,6 +543,10 @@ async function writeAtomically(path: string, contents: string): Promise<void> {
 function withReviewSuffix(runId: string, revision: number): string {
   const suffix = `-review-${revision}`;
   return `${runId.slice(0, Math.max(1, 128 - suffix.length))}${suffix}`;
+}
+
+function baseReviewRunId(runId: string): string {
+  return runId.replace(/-review-[1-9][0-9]*$/, "");
 }
 
 function isSafeRunId(value: unknown): value is string {

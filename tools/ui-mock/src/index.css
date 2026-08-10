@@ -6892,6 +6892,7 @@ button:disabled,
   font-size: 10px;
 }
 
+.personal-radar-review-publication,
 .personal-radar-review-diagnostics {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -6903,17 +6904,21 @@ button:disabled,
   line-height: 1.25;
 }
 
+.personal-radar-review-publication div,
 .personal-radar-review-diagnostics div {
   display: flex;
   gap: 4px;
   min-width: 0;
 }
 
+.personal-radar-review-publication dt,
+.personal-radar-review-publication dd,
 .personal-radar-review-diagnostics dt,
 .personal-radar-review-diagnostics dd {
   margin: 0;
 }
 
+.personal-radar-review-publication dd,
 .personal-radar-review-diagnostics dd {
   overflow: hidden;
   text-overflow: ellipsis;

@@ -1,10 +1,15 @@
 export type ReviewPublicationStatus = {
   schema_version: "pc1_review_publication_status_v1";
   status: "WAITING" | "PREPARING" | "VALIDATING" | "PUBLISHING" | "PUBLISHED" | "RETRY_WAIT" | "FAILED";
+  revision: number;
+  current_review_version: number;
   attempt: number;
+  target_run_id: string | null;
   failure_stage: string | null;
   reason_code: string | null;
   next_retry_at: string | null;
+  last_published_at: string | null;
+  next_attempt_at: string | null;
   timer_scheduled_at: string | null;
   timer_due_at: string | null;
   timer_fired_at: string | null;
@@ -34,10 +39,15 @@ function isReviewPublicationStatus(value: unknown): value is ReviewPublicationSt
   const record = value as Record<string, unknown>;
   return record.schema_version === "pc1_review_publication_status_v1"
     && ["WAITING", "PREPARING", "VALIDATING", "PUBLISHING", "PUBLISHED", "RETRY_WAIT", "FAILED"].includes(String(record.status))
+    && Number.isSafeInteger(record.revision) && Number(record.revision) >= 0
+    && Number.isSafeInteger(record.current_review_version) && Number(record.current_review_version) >= 1
     && typeof record.attempt === "number"
+    && (record.target_run_id === null || typeof record.target_run_id === "string")
     && (record.failure_stage === null || typeof record.failure_stage === "string")
     && (record.reason_code === null || typeof record.reason_code === "string")
     && (record.next_retry_at === null || typeof record.next_retry_at === "string")
+    && (record.last_published_at === null || typeof record.last_published_at === "string")
+    && (record.next_attempt_at === null || typeof record.next_attempt_at === "string")
     && (record.timer_scheduled_at === null || typeof record.timer_scheduled_at === "string")
     && (record.timer_due_at === null || typeof record.timer_due_at === "string")
     && (record.timer_fired_at === null || typeof record.timer_fired_at === "string")

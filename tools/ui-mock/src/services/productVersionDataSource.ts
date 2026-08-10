@@ -8,7 +8,7 @@ export type { ProductVersion };
 
 export async function loadProductVersion(): Promise<ProductVersion | null> {
   try {
-    const response = await fetch(`${getApiBaseUrl()}/api/product/version`, { credentials: "same-origin" });
+    const response = await fetch(`${getApiBaseUrl()}/api/product/version${reviewQuery()}`, { credentials: "same-origin" });
     const value = await response.json() as unknown;
     return response.ok && isProductVersion(value) ? value : null;
   } catch {
@@ -30,6 +30,10 @@ export function isProductVersion(value: unknown): value is ProductVersion {
 function getApiBaseUrl(): string {
   const configured = (import.meta as ViteImportMeta).env?.VITE_SCANNER_API_URL?.trim();
   return configured ? configured.replace(/\/$/, "") : "";
+}
+
+function reviewQuery(): string {
+  return typeof window !== "undefined" && window.location.search.includes("pc1_review=1") ? "?pc1_review=1" : "";
 }
 
 function isNullableText(value: unknown): value is string | null {

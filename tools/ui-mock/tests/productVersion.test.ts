@@ -92,9 +92,12 @@ describe("product version API", () => {
         ...waitingPublicationStatus,
         timer_scheduled_at: null,
         timer_due_at: null,
+        next_attempt_at: null,
       }, {
         schema_version: "pc1_review_publication_status_v1",
         status: "WAITING",
+        revision: 0,
+        current_review_version: 1,
         attempt: 0,
         started_at: null,
         finished_at: null,
@@ -103,6 +106,8 @@ describe("product version API", () => {
         failure_stage: null,
         reason_code: null,
         next_retry_at: null,
+        last_published_at: null,
+        next_attempt_at: null,
         timer_scheduled_at: null,
         timer_due_at: null,
         timer_fired_at: null,
@@ -114,10 +119,11 @@ describe("product version API", () => {
       assert.equal(published.status, 200);
       const publishedStatus = await fetch(`${base}/api/product/review/publication-status?pc1_review=1`);
       assert.equal((await publishedStatus.json() as { status: string }).status, "PUBLISHED");
-      const after = await version(base);
+      const after = await version(base, "?pc1_review=1");
       assert.notEqual(after.scanner_run_id, before.scanner_run_id);
       assert.notEqual(after.scanner_generated_at, before.scanner_generated_at);
       assert.equal(after.lifecycle_updated_at, before.lifecycle_updated_at);
+      assert.deepEqual(await version(base), before, "the review publication is invisible without the review query");
     } finally {
       await close(server);
       await rm(reviewRootPath, { recursive: true, force: true });
@@ -162,7 +168,7 @@ describe("product version API", () => {
       reviewTimer();
       const publication = await fetch(`${base}/api/product/review/publish-next?pc1_review=1`, { method: "POST" });
       assert.equal(publication.status, 200);
-      const after = await version(base);
+      const after = await version(base, "?pc1_review=1");
       assert.notEqual(after.scanner_run_id, before.scanner_run_id);
       assert.equal(after.scanner_generated_at, "2026-08-10T10:05:00.000Z");
       assert.equal(after.lifecycle_updated_at, "2026-08-10T10:00:01.000Z");
@@ -207,8 +213,8 @@ describe("product version API", () => {
   });
 });
 
-async function version(base: string): Promise<Record<string, unknown>> {
-  const response = await fetch(`${base}/api/product/version`);
+async function version(base: string, query = ""): Promise<Record<string, unknown>> {
+  const response = await fetch(`${base}/api/product/version${query}`);
   assert.equal(response.status, 200);
   return await response.json() as Record<string, unknown>;
 }

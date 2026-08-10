@@ -319,6 +319,71 @@ describe("ProductApp Refresh View last-known-good flow", () => {
     }
   });
 
+  it("keeps V2 rendered through an invalid V3 and atomically commits V4 through normal polling", async () => {
+    const v1 = readyResult(scannerOutput("scan_cycle_v1", "FIRST", "2026-08-10T08:00:00.000Z"));
+    const v2 = readyResult(scannerOutput("scan_cycle_v2", "SECOND", "2026-08-10T08:01:00.000Z"));
+    const v4 = readyResult(scannerOutput("scan_cycle_v4", "FOURTH", "2026-08-10T08:03:00.000Z"));
+    const versions: ProductVersion[] = [
+      { scanner_run_id: "scan_cycle_v1", scanner_generated_at: "2026-08-10T08:00:00.000Z", context_run_id: "context_1", context_generated_at: "2026-08-10T08:00:00.000Z", lifecycle_cycle_id: "cycle_1", lifecycle_updated_at: "2026-08-10T08:00:01.000Z" },
+      { scanner_run_id: "scan_cycle_v2", scanner_generated_at: "2026-08-10T08:01:00.000Z", context_run_id: "context_1", context_generated_at: "2026-08-10T08:00:00.000Z", lifecycle_cycle_id: "cycle_1", lifecycle_updated_at: "2026-08-10T08:01:00.000Z" },
+      { scanner_run_id: "scan_cycle_v3", scanner_generated_at: "2026-08-10T08:02:00.000Z", context_run_id: "context_1", context_generated_at: "2026-08-10T08:00:00.000Z", lifecycle_cycle_id: "cycle_1", lifecycle_updated_at: "2026-08-10T08:02:00.000Z" },
+      { scanner_run_id: "scan_cycle_v4", scanner_generated_at: "2026-08-10T08:03:00.000Z", context_run_id: "context_1", context_generated_at: "2026-08-10T08:00:00.000Z", lifecycle_cycle_id: "cycle_1", lifecycle_updated_at: "2026-08-10T08:03:00.000Z" },
+    ];
+    const scans = [v1, v2, errorResult(), v4];
+    let scannerIndex = 0;
+    let versionIndex = 0;
+    const browser = installBrowser(`http://127.0.0.1:5173/?chain=base&contract=${CONTRACT}&detail=market#candidate-detail`);
+    const originalActEnvironment = globalThis.IS_REACT_ACT_ENVIRONMENT;
+    globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+    let renderer: ReturnType<typeof create> | undefined;
+    try {
+      const dataSources: ProductAppDataSources = {
+        ...createDataSources(async () => scans[scannerIndex++]!),
+        loadLifecycleRadar: async () => privateFollowUpRadar(),
+        loadProductVersion: async () => versions[versionIndex]!,
+      };
+      await act(async () => {
+        renderer = create(<ProductLocaleProvider initialLocale="en"><ProductAppContent dataSources={dataSources} runtimeModeOverride="INTERNAL_BETA" /></ProductLocaleProvider>);
+        await flushPromises();
+      });
+      const shell = () => renderer!.root.findByType(ProductWorkspaceShell);
+      const detail = () => renderer!.root.findByType(CandidateDetailView);
+
+      versionIndex = 1;
+      await act(async () => {
+        (globalThis.window as unknown as { dispatchEvent: (event: { type: string }) => void }).dispatchEvent({ type: "focus" });
+        await flushPromises();
+      });
+      assert.equal(shell().props.runId, "scan_cycle_v2");
+      assert.equal(detail().props.candidate.symbol, "SECOND");
+      assert.equal(detail().props.activeTab, "market");
+
+      versionIndex = 2;
+      await act(async () => {
+        (globalThis.window as unknown as { dispatchEvent: (event: { type: string }) => void }).dispatchEvent({ type: "focus" });
+        await flushPromises();
+      });
+      assert.equal(shell().props.runId, "scan_cycle_v2", "invalid V3 must preserve V2 rather than clear the view");
+      assert.equal(detail().props.candidate.symbol, "SECOND");
+      assert.equal(detail().props.activeTab, "market");
+      assert.equal(shell().props.lastKnownGoodRefreshError, true);
+
+      versionIndex = 3;
+      await act(async () => {
+        (globalThis.window as unknown as { dispatchEvent: (event: { type: string }) => void }).dispatchEvent({ type: "focus" });
+        await flushPromises();
+      });
+      assert.equal(shell().props.runId, "scan_cycle_v4");
+      assert.equal(detail().props.candidate.symbol, "FOURTH");
+      assert.equal(detail().props.activeTab, "market");
+      assert.equal(shell().props.lastKnownGoodRefreshError, false);
+    } finally {
+      if (renderer) await act(async () => { renderer!.unmount(); });
+      browser.restore();
+      globalThis.IS_REACT_ACT_ENVIRONMENT = originalActEnvironment;
+    }
+  });
+
   it("ships the required natural PL and EN last-known-good alert copy", () => {
     assert.equal(
       PRODUCT_TRANSLATIONS.pl["app.refreshLastKnownGood"],

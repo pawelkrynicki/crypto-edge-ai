@@ -150,6 +150,36 @@ describe("product version polling", () => {
     assert.equal(attempts, 2, "a committed V2 becomes the new no-action baseline");
   });
 
+  it("keeps V2 rendered when V3 is invalid, then commits V4 without an empty state", async () => {
+    const v2 = { ...VERSION_A, scanner_run_id: "scan-review-1", scanner_generated_at: "2026-08-10T10:01:00.000Z" };
+    const v3 = { ...VERSION_A, scanner_run_id: "scan-review-2", scanner_generated_at: "2026-08-10T10:02:00.000Z" };
+    const v4 = { ...VERSION_A, scanner_run_id: "scan-review-3", scanner_generated_at: "2026-08-10T10:03:00.000Z" };
+    let current = VERSION_A;
+    const committed: string[] = [];
+    const poller = createProductVersionPoller({
+      loadVersion: async () => current,
+      onVersionChanged: async (version) => {
+        committed.push(version.scanner_run_id!);
+        return version.scanner_run_id !== v3.scanner_run_id;
+      },
+    });
+
+    await poller.checkNow();
+    poller.markCommitted(VERSION_A);
+    current = v2;
+    await poller.checkNow();
+    assert.equal(poller.getVersionState().last_committed_version?.scanner_run_id, v2.scanner_run_id);
+
+    current = v3;
+    await poller.checkNow();
+    assert.equal(poller.getVersionState().last_committed_version?.scanner_run_id, v2.scanner_run_id, "invalid V3 preserves V2");
+
+    current = v4;
+    await poller.checkNow();
+    assert.equal(poller.getVersionState().last_committed_version?.scanner_run_id, v4.scanner_run_id);
+    assert.deepEqual(committed, [v2.scanner_run_id, v3.scanner_run_id, v4.scanner_run_id]);
+  });
+
   it("uses jitter while visible, slows down hidden tabs, and checks immediately after focus", async () => {
     assert.equal(resolveProductVersionPollDelay(false, () => 0), 35_000);
     assert.equal(resolveProductVersionPollDelay(false, () => 1), 55_000);

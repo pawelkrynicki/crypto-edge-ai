@@ -834,8 +834,15 @@ function LifecycleReviewSwitch({
     <aside className="personal-radar-review-switch" data-pc1-review-switch="global" aria-label={copy.label}>
       <span>{copy.label}: {role}</span>
       <span className="personal-radar-review-auto-update" role="status">
-        {reviewPublicationControllerMessage(publicationStatus, autoUpdatePublished)}
+        {reviewPublicationControllerMessage(publicationStatus, autoUpdatePublished, pollingDiagnostics)}
       </span>
+      <dl className="personal-radar-review-publication" data-pc1-review-publication="enabled" aria-label="Review publication status">
+        <div><dt>Current review version</dt><dd>V{publicationStatus?.current_review_version ?? 1}</dd></div>
+        <div><dt>Last publication</dt><dd>{publicationStatus?.last_published_at ?? "—"}</dd></div>
+        <div><dt>Next attempt</dt><dd>{publicationStatus?.next_attempt_at ?? "—"}</dd></div>
+        <div><dt>Publication status</dt><dd>{publicationStatus?.status ?? "WAITING"}</dd></div>
+        <div><dt>Last committed UI version</dt><dd>{reviewUiVersionLabel(pollingDiagnostics?.last_committed_version)}</dd></div>
+      </dl>
       <dl className="personal-radar-review-diagnostics" data-pc1-review-polling-diagnostics="enabled" aria-label="Review polling diagnostics">
         <div><dt>last_poll_at</dt><dd>{pollingDiagnostics?.last_poll_at ?? "—"}</dd></div>
         <div><dt>last_seen_version</dt><dd>{reviewVersionLabel(pollingDiagnostics?.last_seen_version)}</dd></div>
@@ -852,14 +859,20 @@ function LifecycleReviewSwitch({
 function reviewPublicationControllerMessage(
   status: ReviewPublicationStatus | null,
   autoUpdatePublished: boolean,
+  pollingDiagnostics: ProductVersionPollingDiagnostics | null,
 ): string {
-  if (autoUpdatePublished) return "New review version published";
-  if (status?.status === "PUBLISHED") return "Review version published; waiting for view refresh…";
+  if (status?.status === "FAILED") return "Test auto-update failed. The previous version is preserved.";
+  if (status?.status === "RETRY_WAIT") return `Publication failed — retrying (${status.attempt}/3)`;
   if (status?.status === "PREPARING" || status?.status === "VALIDATING" || status?.status === "PUBLISHING") {
-    return "Auto-update test: publikacja…";
+    return "Review version publication in progress…";
   }
-  if (status?.status === "RETRY_WAIT") return `Publikacja nie powiodła się — ponawiam (${status.attempt}/3)`;
-  if (status?.status === "FAILED") return "Test auto-update nie powiódł się. Poprzednia wersja zachowana.";
+  if (status?.status === "PUBLISHED") {
+    if (status.target_run_id && status.target_run_id === pollingDiagnostics?.last_committed_version?.scanner_run_id) {
+      return "New review version published";
+    }
+    return "Review version published; waiting for view refresh…";
+  }
+  if (autoUpdatePublished && !status?.target_run_id) return "New review version published";
   return "Auto-update test: oczekiwanie";
 }
 
@@ -869,6 +882,11 @@ function isReviewPublicationVersion(version: ProductVersion | null): boolean {
 
 function reviewVersionLabel(version: ProductVersion | null | undefined): string {
   return version?.scanner_run_id ?? "—";
+}
+
+function reviewUiVersionLabel(version: ProductVersion | null | undefined): string {
+  const revision = /-review-([1-9][0-9]*)$/.exec(version?.scanner_run_id ?? "");
+  return `V${revision ? Number(revision[1]) + 1 : 1}`;
 }
 
 function mergeLifecycleRadar(current: LifecycleRadarView | null, next: LifecycleRadarView): LifecycleRadarView {
