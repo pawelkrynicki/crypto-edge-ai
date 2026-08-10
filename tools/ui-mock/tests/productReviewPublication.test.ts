@@ -212,12 +212,12 @@ describe("PC.1 review auto-publication harness", () => {
     }
   });
 
-  it("recurs V1 → V2, preserves V2 through an invalid V3, then commits V4", async () => {
+  it("materializes ten acknowledged review versions from one immutable V1 base", async () => {
     const reviewRootPath = await reviewRoot();
     await automationState(reviewRootPath);
     const timers: Array<{ callback: () => void; delay: number }> = [];
     const committedRuns: string[] = [];
-    let sourceRunId = VERSION.scanner_run_id!;
+    let baseLoads = 0;
     let clock = Date.parse("2026-08-10T08:30:00.000Z");
     const publication = createProductReviewPublication({
       enabled: true,
@@ -227,16 +227,12 @@ describe("PC.1 review auto-publication harness", () => {
       autoPublicationDelayMs: 60_000,
       recurringDelayMs: 60_000,
       retryDelayMs: 30_000,
-      loadBaseScanner: async () => scannerWithRun(sourceRunId),
-      loadBaseSnapshot: async () => scannerWithRun(sourceRunId),
-      loadBaseVersion: async () => versionForRun(sourceRunId),
-      validateSnapshot: (snapshot) => {
-        const runId = (snapshot as unknown as { scan_run: { run_id: string } }).scan_run.run_id;
-        if (runId.endsWith("-review-2")) throw new Error("SCANNER_DISPLAY_VALIDATION_FAILED");
-      },
+      loadBaseScanner: async () => { baseLoads += 1; return scannerWithRun(VERSION.scanner_run_id!); },
+      loadBaseSnapshot: async () => scannerWithRun(VERSION.scanner_run_id!),
+      loadBaseVersion: async () => versionForRun(VERSION.scanner_run_id!),
+      validateSnapshot: () => undefined,
       persistReviewPointer: async (version) => {
         committedRuns.push(version.scanner_run_id!);
-        sourceRunId = version.scanner_run_id!;
       },
       setTimer: (callback, delay) => {
         timers.push({ callback, delay });
@@ -244,40 +240,34 @@ describe("PC.1 review auto-publication harness", () => {
       },
       clearTimer: () => undefined,
     });
-    const trigger = async (delay: number) => {
-      const scheduled = timers.shift();
-      assert.equal(scheduled?.delay, delay);
-      clock += delay;
-      scheduled?.callback();
-      return publication.publishNext();
-    };
     try {
-      const v2 = await trigger(60_000);
-      assert.equal(v2.published, true);
-      assert.equal(v2.status.revision, 1);
-      assert.equal(v2.status.current_review_version, 2);
-      assert.equal(publication.getMarker()?.version.scanner_run_id, `${VERSION.scanner_run_id}-review-1`);
-
-      for (let attempt = 1; attempt <= PC1_REVIEW_PUBLICATION_MAX_ATTEMPTS; attempt += 1) {
-        const v3 = await trigger(attempt === 1 ? 60_000 : PC1_REVIEW_PUBLICATION_RETRY_DELAY_MS);
-        assert.equal(v3.published, false);
-        assert.equal(v3.status.revision, 2);
-        assert.equal(v3.status.attempt, attempt);
-        assert.equal(v3.status.status, attempt < PC1_REVIEW_PUBLICATION_MAX_ATTEMPTS ? "RETRY_WAIT" : "FAILED");
-        assert.equal(publication.getMarker()?.version.scanner_run_id, `${VERSION.scanner_run_id}-review-1`);
-        assert.equal(publication.decorateVersion(versionForRun(VERSION.scanner_run_id!)).scanner_run_id, `${VERSION.scanner_run_id}-review-1`);
+      assert.equal(timers.shift()?.delay, 60_000);
+      for (let revision = 1; revision <= 10; revision += 1) {
+        const result = await publication.publishNext();
+        const targetRunId = `${VERSION.scanner_run_id}-review-${revision}`;
+        assert.equal(result.published, true);
+        assert.equal(result.status.target_run_id, targetRunId);
+        assert.equal(result.status.current_review_version, revision + 1);
+        assert.equal(publication.getMarker()?.version.scanner_run_id, targetRunId);
+        const persisted = JSON.parse(await readFile(resolve(reviewRootPath, "output", targetRunId, "full_output.json"), "utf8")) as {
+          scan_run: { run_id: string };
+          _source_meta: { selected_run_id: string };
+          provenance: { run_id: string; fixture_used: boolean };
+          candidates: Array<{ run_id: string }>;
+        };
+        assert.equal(persisted.scan_run.run_id, targetRunId);
+        assert.equal(persisted._source_meta.selected_run_id, targetRunId);
+        assert.equal(persisted.provenance.run_id, targetRunId);
+        assert.equal(persisted.provenance.fixture_used, false);
+        assert.equal(persisted.candidates.every((entry) => entry.run_id === targetRunId), true);
+        assert.equal((await publication.publishNext()).published, false, "a new revision waits for the UI acknowledgement");
+        assert.equal(await publication.acknowledgeUiCommit(targetRunId), true);
+        assert.equal(publication.getStatus().last_committed_ui_run_id, targetRunId);
+        clock += 60_000;
       }
-
-      const v4 = await trigger(60_000);
-      assert.equal(v4.published, true);
-      assert.equal(v4.status.revision, 3);
-      assert.equal(v4.status.current_review_version, 4);
-      assert.equal(publication.getMarker()?.version.scanner_run_id, `${VERSION.scanner_run_id}-review-3`);
-      assert.deepEqual(committedRuns, [
-        `${VERSION.scanner_run_id}-review-1`,
-        `${VERSION.scanner_run_id}-review-3`,
-      ]);
-      assert.equal(publication.getStatus().next_attempt_at, "2026-08-10T08:35:00.000Z");
+      assert.equal(baseLoads, 1);
+      assert.deepEqual(committedRuns, Array.from({ length: 10 }, (_, index) => `${VERSION.scanner_run_id}-review-${index + 1}`));
+      assert.equal(publication.getStatus().current_review_version, 11);
     } finally {
       publication.stop();
     }

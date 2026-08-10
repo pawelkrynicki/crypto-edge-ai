@@ -605,10 +605,14 @@ describe("PC.1 bounded lifecycle Radar API", () => {
     assert.match(productApp, /Publication failed/);
     assert.match(productApp, /New review version published/);
     assert.match(productApp, /Test auto-update failed/);
+    assert.match(productApp, />Diagnostyka<\/button>/);
+    assert.match(productApp, /aria-expanded=\{diagnosticsOpen\}/);
+    assert.match(productApp, /data-pc1-review-diagnostics="expanded"/);
     assert.match(productApp, /Current review version/);
-    assert.match(productApp, /Last publication/);
-    assert.match(productApp, /Next attempt/);
-    assert.match(productApp, /Last committed UI version/);
+    assert.match(productApp, /Last committed version/);
+    assert.match(productApp, /Next publication/);
+    assert.match(productApp, /Last refresh result/);
+    assert.match(productApp, /acknowledgeReviewPublicationCommit/);
     assert.match(productApp, /onVersionChanged:[\s\S]*?setReviewAutoUpdatePublished\(true\)/);
     assert.doesNotMatch(productApp, /setTimeout\([^)]*review/i);
     assert.match(styles, /\.personal-radar-inline\.card \{ grid-column: 1 \/ -1; \}/);

@@ -963,6 +963,25 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
       return;
     }
 
+    if (req.method === "POST" && path === "/api/product/review/commit-ack") {
+      if (!isActiveReviewRequest(req)) {
+        sendJson(req, res, 404, { error: "not_found", message: "Route not found" }, runtimeMode);
+        return;
+      }
+      try {
+        const { scanner_run_id: scannerRunId } = validateReviewCommitAcknowledgement(await readJsonBody(req));
+        const acknowledged = await reviewPublication.acknowledgeUiCommit(scannerRunId);
+        if (!acknowledged) {
+          sendJson(req, res, 409, { error: "review_commit_not_pending" }, runtimeMode);
+          return;
+        }
+        sendJson(req, res, 200, reviewPublication.getStatus(), runtimeMode);
+      } catch {
+        sendJson(req, res, 400, { error: "review_commit_ack_invalid" }, runtimeMode);
+      }
+      return;
+    }
+
     if (req.method === "POST" && path === "/api/product/review/publish-next") {
       if (!isActiveReviewRequest(req)) {
         sendJson(req, res, 404, { error: "not_found", message: "Route not found" }, runtimeMode);
@@ -1892,6 +1911,14 @@ function isPc1ReviewRequest(req: IncomingMessage): boolean {
   } catch {
     return false;
   }
+}
+
+function validateReviewCommitAcknowledgement(value: unknown): { scanner_run_id: string } {
+  if (!isRecord(value) || Object.keys(value).length !== 1 || typeof value.scanner_run_id !== "string"
+    || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(value.scanner_run_id)) {
+    throw new Error("REVIEW_COMMIT_ACK_INVALID");
+  }
+  return { scanner_run_id: value.scanner_run_id };
 }
 
 function isReportsApiPath(path: string): boolean {

@@ -54,6 +54,9 @@ export type ProductReviewPublicationStatus = {
   next_retry_at: string | null;
   last_published_at: string | null;
   next_attempt_at: string | null;
+  /** Review-only acknowledgement received after the browser has atomically rendered target_run_id. */
+  last_committed_ui_run_id: string | null;
+  ui_commit_acknowledged_at: string | null;
   /** Safe review-only timing facts for diagnosing the API-server lifetime timer. */
   timer_scheduled_at: string | null;
   timer_due_at: string | null;
@@ -88,6 +91,8 @@ export type ProductReviewPublicationOptions = {
   validateSnapshot?: (snapshot: ScannerOutputWithMeta) => void;
   /** Advances only the isolated review automation pointer after the V2 file has passed validation. */
   persistReviewPointer?: (version: ProductVersion) => Promise<void>;
+  /** Reads back the isolated pointer after a write. This is never used by production publication. */
+  verifyReviewPointer?: (version: ProductVersion) => Promise<void>;
   persistMarker?: (marker: ProductReviewPublicationMarker) => Promise<void>;
   persistStatus?: (status: ProductReviewPublicationStatus) => Promise<void>;
 };
@@ -100,12 +105,22 @@ export type ProductReviewPublication = {
   publishNext: () => Promise<ProductReviewPublicationResult>;
   decorateVersion: (version: ProductVersion) => ProductVersion;
   decorateScanner: (scanner: ScannerOutputWithMeta) => ScannerOutputWithMeta;
+  /** Review-only browser acknowledgement. A later revision is never scheduled before this succeeds. */
+  acknowledgeUiCommit: (runId: string) => Promise<boolean>;
   getMarker: () => ProductReviewPublicationMarker | null;
   getStatus: () => ProductReviewPublicationStatus;
   stop: () => void;
 };
 
 type ReviewScannerSnapshot = PersistableScannerOutput;
+
+type StableReviewBase = {
+  scanner: ScannerOutputWithMeta;
+  snapshot: ReviewScannerSnapshot;
+  version: ProductVersion;
+};
+
+type ScheduledReviewAction = "PUBLISH_NEXT" | "PUBLISH_RETRY" | "WAIT_FOR_UI_COMMIT";
 
 class PublicationStepError extends Error {
   readonly stage: ProductReviewPublicationStage;
@@ -155,14 +170,27 @@ export function createProductReviewPublication(options: ProductReviewPublication
       last_published_scanner_run_id: version.scanner_run_id,
     }, null, 2)}\n`);
   });
+  const verifyReviewPointer = options.verifyReviewPointer
+    ?? (options.persistReviewPointer
+      ? async () => undefined
+      : async (version: ProductVersion) => {
+        if (!reviewPointerPath) throw new Error("PC1_REVIEW_POINTER_PATH_REQUIRED");
+        const current = JSON.parse(await readFile(reviewPointerPath, "utf8")) as unknown;
+        if (!isRecord(current) || current.last_published_scanner_run_id !== version.scanner_run_id) {
+          throw new Error("PC1_REVIEW_POINTER_READBACK_MISMATCH");
+        }
+      });
 
   let marker: ProductReviewPublicationMarker | null = null;
   let activeVersion: ProductVersion | null = null;
   let publishedSnapshot: ScannerOutputWithMeta | null = null;
+  let stableBase: StableReviewBase | null = null;
   let publishing: Promise<ProductReviewPublicationResult> | null = null;
   let autoTimer: ReturnType<typeof setTimeout> | null = null;
   let activeRevision: number | null = null;
   let attemptsForActiveRevision = 0;
+  let pendingUiCommitRunId: string | null = null;
+  let uiCommitWaitAttempts = 0;
   let nextRevision = 1;
   let status = createStatus("WAITING", 0, 0, 1);
   let persistedStatus = Promise.resolve();
@@ -180,7 +208,36 @@ export function createProductReviewPublication(options: ProductReviewPublication
     return persistedStatus;
   };
 
-  const scheduleAttempt = (delayMs: number, kind: "NEXT" | "RETRY"): void => {
+  const loadStableBase = async (): Promise<StableReviewBase> => {
+    if (stableBase) return stableBase;
+    if (!options.loadBaseScanner || !options.loadBaseVersion || !outputRootPath) {
+      throw new PublicationStepError("LOAD_BASE_SCANNER", "REVIEW_PUBLICATION_CONFIG_INVALID");
+    }
+    const scanner = await runStep("LOAD_BASE_SCANNER", () => options.loadBaseScanner!());
+    const sourceRunId = (scanner as unknown as ReviewScannerSnapshot).scan_run.run_id;
+    if (!isSafeRunId(sourceRunId) || scanner._source_meta?.selected_run_id !== sourceRunId) {
+      throw new PublicationStepError("LOAD_BASE_SCANNER", "SOURCE_SELECTED_RUN_ID_INVALID");
+    }
+    const snapshot = await runStep(
+      "LOAD_BASE_SNAPSHOT",
+      () => options.loadBaseSnapshot ? options.loadBaseSnapshot() : readRawSnapshot(outputRootPath, scanner),
+    ) as unknown as ReviewScannerSnapshot;
+    if (snapshot.scan_run.run_id !== sourceRunId) {
+      throw new PublicationStepError("SOURCE_VERSION_MATCH", "SOURCE_SNAPSHOT_RUN_ID_MISMATCH");
+    }
+    const version = await runStep("LOAD_BASE_VERSION", () => options.loadBaseVersion!());
+    if (version.scanner_run_id !== sourceRunId) {
+      throw new PublicationStepError("SOURCE_VERSION_MATCH", "SOURCE_VERSION_RUN_ID_MISMATCH");
+    }
+    stableBase = {
+      scanner: structuredClone(scanner),
+      snapshot: structuredClone(snapshot),
+      version: structuredClone(version),
+    };
+    return stableBase;
+  };
+
+  const scheduleAction = (delayMs: number, action: ScheduledReviewAction): void => {
     if (autoTimer) clearTimer(autoTimer);
     const scheduledAt = now();
     const dueAt = new Date(scheduledAt.getTime() + delayMs).toISOString();
@@ -189,28 +246,56 @@ export function createProductReviewPublication(options: ProductReviewPublication
       timer_scheduled_at: scheduledAt.toISOString(),
       timer_due_at: dueAt,
       timer_fired_at: null,
-      next_retry_at: kind === "RETRY" ? dueAt : null,
+      next_retry_at: action === "PUBLISH_RETRY" || action === "WAIT_FOR_UI_COMMIT" ? dueAt : null,
       next_attempt_at: dueAt,
     });
     autoTimer = setTimer(() => {
       autoTimer = null;
       void saveStatus({
         ...status,
-        status: status.status === "PUBLISHED" || status.status === "FAILED" ? "WAITING" : status.status,
+        status: action === "PUBLISH_NEXT" && (status.status === "PUBLISHED" || status.status === "FAILED") ? "WAITING" : status.status,
         timer_fired_at: now().toISOString(),
         next_retry_at: null,
         next_attempt_at: null,
-      }).finally(() => { void publishNext(); });
+      }).finally(() => {
+        if (action === "WAIT_FOR_UI_COMMIT") void waitForUiCommit();
+        else void publishNext();
+      });
     }, delayMs);
     if (typeof autoTimer === "object" && autoTimer !== null && "unref" in autoTimer && typeof autoTimer.unref === "function") {
       autoTimer.unref();
     }
   };
 
+  const waitForUiCommit = async (): Promise<void> => {
+    if (!pendingUiCommitRunId) return;
+    uiCommitWaitAttempts += 1;
+    if (uiCommitWaitAttempts >= maxAttempts) {
+      await saveStatus({
+        ...status,
+        status: "FAILED",
+        failure_stage: null,
+        reason_code: "UI_COMMIT_UNCONFIRMED",
+        next_retry_at: null,
+        next_attempt_at: null,
+      });
+      return;
+    }
+    await saveStatus({
+      ...status,
+      status: "RETRY_WAIT",
+      failure_stage: null,
+      reason_code: "UI_COMMIT_PENDING",
+      next_retry_at: new Date(now().getTime() + retryDelayMs).toISOString(),
+    });
+    scheduleAction(retryDelayMs, "WAIT_FOR_UI_COMMIT");
+  };
+
   const publishNext = (): Promise<ProductReviewPublicationResult> => {
     if (publishing) return publishing;
     if (!enabled) return Promise.resolve({ published: false, status });
     if (marker && !recurring) return Promise.resolve({ published: false, status });
+    if (pendingUiCommitRunId) return Promise.resolve({ published: false, status });
 
     const revision = activeRevision ?? nextRevision;
     const attempt = activeRevision === null ? 1 : attemptsForActiveRevision + 1;
@@ -221,11 +306,10 @@ export function createProductReviewPublication(options: ProductReviewPublication
       attempt,
       now,
       outputRootPath,
-      loadBaseScanner: options.loadBaseScanner,
-      loadBaseSnapshot: options.loadBaseSnapshot,
-      loadBaseVersion: options.loadBaseVersion,
+      loadStableBase,
       validateSnapshot: options.validateSnapshot ?? validateCanonicalDisplaySnapshot,
       persistReviewPointer,
+      verifyReviewPointer,
       persistMarker,
       saveStatus,
       getStatus: () => status,
@@ -239,14 +323,16 @@ export function createProductReviewPublication(options: ProductReviewPublication
         activeRevision = null;
         attemptsForActiveRevision = 0;
         nextRevision = revision + 1;
-        if (recurring) scheduleAttempt(recurringDelayMs, "NEXT");
+        pendingUiCommitRunId = result.marker.version.scanner_run_id;
+        uiCommitWaitAttempts = 0;
+        if (recurring && pendingUiCommitRunId) scheduleAction(retryDelayMs, "WAIT_FOR_UI_COMMIT");
       } else if (result.status.status === "RETRY_WAIT") {
-        scheduleAttempt(retryDelayMs, "RETRY");
+        scheduleAction(retryDelayMs, "PUBLISH_RETRY");
       } else {
         activeRevision = null;
         attemptsForActiveRevision = 0;
         nextRevision = revision + 1;
-        if (recurring) scheduleAttempt(recurringDelayMs, "NEXT");
+        if (recurring) scheduleAction(recurringDelayMs, "PUBLISH_NEXT");
       }
       return { published: result.published, status: result.status };
     }).finally(() => {
@@ -255,7 +341,28 @@ export function createProductReviewPublication(options: ProductReviewPublication
     return publishing;
   };
 
-  if (enabled) scheduleAttempt(autoPublicationDelayMs, "NEXT");
+  const acknowledgeUiCommit = async (runId: string): Promise<boolean> => {
+    if (!isSafeRunId(runId) || pendingUiCommitRunId !== runId || marker?.version.scanner_run_id !== runId) return false;
+    if (autoTimer) clearTimer(autoTimer);
+    autoTimer = null;
+    pendingUiCommitRunId = null;
+    uiCommitWaitAttempts = 0;
+    const acknowledgedAt = now().toISOString();
+    await saveStatus({
+      ...status,
+      status: "PUBLISHED",
+      failure_stage: null,
+      reason_code: null,
+      next_retry_at: null,
+      next_attempt_at: null,
+      last_committed_ui_run_id: runId,
+      ui_commit_acknowledged_at: acknowledgedAt,
+    });
+    if (recurring) scheduleAction(recurringDelayMs, "PUBLISH_NEXT");
+    return true;
+  };
+
+  if (enabled) scheduleAction(autoPublicationDelayMs, "PUBLISH_NEXT");
 
   return {
     enabled,
@@ -266,6 +373,7 @@ export function createProductReviewPublication(options: ProductReviewPublication
     decorateScanner: (scanner) => publishedSnapshot
       ? withPublicationSourceMetadata(publishedSnapshot, scanner._source_meta)
       : scanner,
+    acknowledgeUiCommit,
     getMarker: () => marker,
     getStatus: () => status,
     stop: () => {
@@ -280,11 +388,10 @@ async function prepareValidateAndPublish({
   attempt,
   now,
   outputRootPath,
-  loadBaseScanner,
-  loadBaseSnapshot,
-  loadBaseVersion,
+  loadStableBase,
   validateSnapshot,
   persistReviewPointer,
+  verifyReviewPointer,
   persistMarker,
   saveStatus,
   getStatus,
@@ -296,11 +403,10 @@ async function prepareValidateAndPublish({
   attempt: number;
   now: () => Date;
   outputRootPath: string;
-  loadBaseScanner: (() => Promise<ScannerOutputWithMeta>) | undefined;
-  loadBaseSnapshot: (() => Promise<ScannerOutputWithMeta>) | undefined;
-  loadBaseVersion: (() => Promise<ProductVersion>) | undefined;
+  loadStableBase: () => Promise<StableReviewBase>;
   validateSnapshot: (snapshot: ScannerOutputWithMeta) => void;
   persistReviewPointer: (version: ProductVersion) => Promise<void>;
+  verifyReviewPointer: (version: ProductVersion) => Promise<void>;
   persistMarker: (marker: ProductReviewPublicationMarker) => Promise<void>;
   saveStatus: (status: ProductReviewPublicationStatus) => Promise<void>;
   getStatus: () => ProductReviewPublicationStatus;
@@ -322,6 +428,8 @@ async function prepareValidateAndPublish({
       source_run_id: sourceRunId,
       target_run_id: targetRunId,
       last_published_at: timerStatus.last_published_at,
+      last_committed_ui_run_id: timerStatus.last_committed_ui_run_id,
+      ui_commit_acknowledged_at: timerStatus.ui_commit_acknowledged_at,
       timer_scheduled_at: timerStatus.timer_scheduled_at,
       timer_due_at: timerStatus.timer_due_at,
       timer_fired_at: timerStatus.timer_fired_at,
@@ -332,28 +440,18 @@ async function prepareValidateAndPublish({
   };
 
   try {
-    if (!loadBaseScanner || !loadBaseVersion || !outputRootPath) {
-      throw new PublicationStepError("LOAD_BASE_SCANNER", "REVIEW_PUBLICATION_CONFIG_INVALID");
-    }
     await writeStatus("PREPARING");
-    const sourceScanner = await runStep("LOAD_BASE_SCANNER", () => loadBaseScanner());
-    sourceRunId = (sourceScanner as unknown as ReviewScannerSnapshot).scan_run.run_id;
-    if (!isSafeRunId(sourceRunId)) throw new PublicationStepError("LOAD_BASE_SCANNER", "SOURCE_RUN_ID_INVALID");
-
-    const sourceSnapshot = await runStep(
-      "LOAD_BASE_SNAPSHOT",
-      () => loadBaseSnapshot ? loadBaseSnapshot() : readRawSnapshot(outputRootPath, sourceScanner),
-    );
-    const source = sourceSnapshot as unknown as ReviewScannerSnapshot;
-    if (!isSafeRunId(source.scan_run.run_id)) throw new PublicationStepError("LOAD_BASE_SNAPSHOT", "SOURCE_SNAPSHOT_RUN_ID_INVALID");
-
-    const sourceVersion = await runStep("LOAD_BASE_VERSION", () => loadBaseVersion());
-    if (sourceVersion.scanner_run_id !== source.scan_run.run_id) {
-      throw new PublicationStepError("SOURCE_VERSION_MATCH", "SOURCE_VERSION_RUN_ID_MISMATCH");
-    }
+    const base = await loadStableBase();
+    sourceRunId = base.snapshot.scan_run.run_id;
+    const source = base.snapshot;
+    const sourceVersion = base.version;
 
     targetRunId = withReviewSuffix(baseReviewRunId(sourceRunId), revision);
-    const snapshot = await runStep("CREATE_REVIEW_SNAPSHOT", () => Promise.resolve(createReviewSnapshot(source, targetRunId!, now().toISOString())));
+    const snapshot = await runStep(
+      "CREATE_REVIEW_SNAPSHOT",
+      () => Promise.resolve(createReviewSnapshot(source, targetRunId!, now().toISOString(), base.scanner._source_meta)),
+    );
+    validateReviewSnapshotIdentity(snapshot, targetRunId!);
     await writeStatus("VALIDATING");
     await runStep("VALIDATE", () => Promise.resolve(validateSnapshot(snapshot as unknown as ScannerOutputWithMeta)));
 
@@ -382,7 +480,9 @@ async function prepareValidateAndPublish({
       throw new PublicationStepError("READ_BACK_VALIDATE", "PERSISTED_SNAPSHOT_RUN_ID_MISMATCH");
     }
     await runStep("READ_BACK_VALIDATE", () => Promise.resolve(validateSnapshot(persistedSnapshot as unknown as ScannerOutputWithMeta)));
+    validateReviewSnapshotIdentity(persistedSnapshot as ReviewScannerSnapshot, targetRunId!);
     await runStep("PERSIST_POINTER", () => persistReviewPointer(version));
+    await runStep("PERSIST_POINTER", () => verifyReviewPointer(version));
     try {
       await runStep("PERSIST_MARKER", () => persistMarker(marker));
     } catch (error) {
@@ -460,6 +560,8 @@ function createStatus(
     next_retry_at: null,
     last_published_at: null,
     next_attempt_at: null,
+    last_committed_ui_run_id: null,
+    ui_commit_acknowledged_at: null,
     timer_scheduled_at: null,
     timer_due_at: null,
     timer_fired_at: null,
@@ -501,17 +603,62 @@ function createReviewSnapshot(
   source: ReviewScannerSnapshot,
   reviewRunId: string,
   publishedAt: string,
+  sourceMeta: ScannerSourceMeta,
 ): ReviewScannerSnapshot {
+  const provenance = isRecord(source.provenance)
+    ? {
+      ...source.provenance,
+      run_id: reviewRunId,
+      generated_at: publishedAt,
+      finished_at: publishedAt,
+      fixture_used: false,
+    }
+    : {
+      schema_version: "pc1_review_provenance_v1",
+      contract_version: "pc1_review",
+      generator_version: "pc1_review",
+      environment: "review",
+      mode: "live",
+      fixture_used: false,
+      run_id: reviewRunId,
+      generated_at: publishedAt,
+      finished_at: publishedAt,
+      source_ids: [],
+      policy_decisions: {},
+    };
   return {
     ...source,
+    _source_meta: {
+      ...sourceMeta,
+      selected_run_id: reviewRunId,
+      loaded_at: publishedAt,
+    },
     scan_run: { ...source.scan_run, run_id: reviewRunId, finished_at: publishedAt },
-    ...(isRecord(source.provenance)
-      ? { provenance: { ...source.provenance, run_id: reviewRunId, generated_at: publishedAt, finished_at: publishedAt } }
-      : {}),
+    provenance,
     candidates: withReviewRun(source.candidates, reviewRunId),
     security_checks: withReviewRun(source.security_checks, reviewRunId),
     scorecards: withReviewRun(source.scorecards, reviewRunId),
+  } as ReviewScannerSnapshot;
+}
+
+function validateReviewSnapshotIdentity(snapshot: ReviewScannerSnapshot, reviewRunId: string): void {
+  const reviewSnapshot = snapshot as unknown as {
+    _source_meta?: { selected_run_id?: unknown };
+    provenance?: { run_id?: unknown; fixture_used?: unknown };
+    candidates: Array<{ run_id: unknown }>;
+    security_checks: Array<{ run_id: unknown }>;
+    scorecards: Array<{ run_id: unknown }>;
+    scan_run: { run_id: unknown };
   };
+  if (reviewSnapshot.scan_run.run_id !== reviewRunId
+    || reviewSnapshot._source_meta?.selected_run_id !== reviewRunId
+    || reviewSnapshot.provenance?.run_id !== reviewRunId
+    || reviewSnapshot.provenance?.fixture_used !== false
+    || !reviewSnapshot.candidates.every((entry) => entry.run_id === reviewRunId)
+    || !reviewSnapshot.security_checks.every((entry) => entry.run_id === reviewRunId)
+    || !reviewSnapshot.scorecards.every((entry) => entry.run_id === reviewRunId)) {
+    throw new PublicationStepError("VALIDATE", "REVIEW_SNAPSHOT_IDENTITY_INVALID");
+  }
 }
 
 function withPublicationSourceMetadata(
@@ -523,6 +670,7 @@ function withPublicationSourceMetadata(
     ...reviewSnapshot,
     _source_meta: {
       ...sourceMeta,
+      ...(reviewSnapshot as unknown as { _source_meta?: ScannerSourceMeta })._source_meta,
       selected_run_id: reviewSnapshot.scan_run.run_id,
     },
   };

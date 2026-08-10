@@ -10,6 +10,8 @@ export type ReviewPublicationStatus = {
   next_retry_at: string | null;
   last_published_at: string | null;
   next_attempt_at: string | null;
+  last_committed_ui_run_id: string | null;
+  ui_commit_acknowledged_at: string | null;
   timer_scheduled_at: string | null;
   timer_due_at: string | null;
   timer_fired_at: string | null;
@@ -34,6 +36,21 @@ export async function loadReviewPublicationStatus(): Promise<ReviewPublicationSt
   }
 }
 
+export async function acknowledgeReviewPublicationCommit(scannerRunId: string): Promise<ReviewPublicationStatus | null> {
+  try {
+    const response = await fetch(`${getApiBaseUrl()}/api/product/review/commit-ack?pc1_review=1`, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ scanner_run_id: scannerRunId }),
+    });
+    const value = await response.json() as unknown;
+    return response.ok && isReviewPublicationStatus(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
 function isReviewPublicationStatus(value: unknown): value is ReviewPublicationStatus {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const record = value as Record<string, unknown>;
@@ -48,6 +65,8 @@ function isReviewPublicationStatus(value: unknown): value is ReviewPublicationSt
     && (record.next_retry_at === null || typeof record.next_retry_at === "string")
     && (record.last_published_at === null || typeof record.last_published_at === "string")
     && (record.next_attempt_at === null || typeof record.next_attempt_at === "string")
+    && (record.last_committed_ui_run_id === null || typeof record.last_committed_ui_run_id === "string")
+    && (record.ui_commit_acknowledged_at === null || typeof record.ui_commit_acknowledged_at === "string")
     && (record.timer_scheduled_at === null || typeof record.timer_scheduled_at === "string")
     && (record.timer_due_at === null || typeof record.timer_due_at === "string")
     && (record.timer_fired_at === null || typeof record.timer_fired_at === "string")

@@ -6887,6 +6887,14 @@ button:disabled,
   background: var(--color-surface-3);
 }
 
+.personal-radar-review-diagnostics-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 5px;
+  flex-basis: 100%;
+  width: min(300px, calc(100vw - 36px));
+}
+
 .personal-radar-review-auto-update {
   color: var(--color-text-helper);
   font-size: 10px;
