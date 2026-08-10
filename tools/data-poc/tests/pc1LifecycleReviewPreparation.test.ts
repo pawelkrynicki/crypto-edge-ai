@@ -10,7 +10,7 @@ const roots: string[] = [];
 afterEach(async () => { await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))); });
 
 describe("PC.1 isolated review preparation", () => {
-  it("copies only the active scanner and context snapshots selected by automation state", async () => {
+  it("copies only review-safe active data and never copies a user's private workspace", async () => {
     const root = await isolatedRoot();
     const sourceDataPoc = resolve(root, "repository", "tools", "data-poc");
     const sourceUi = resolve(root, "repository", "tools", "ui-mock");
@@ -31,11 +31,12 @@ describe("PC.1 isolated review preparation", () => {
 
     const result = await preparePc1LifecycleReview({ sourceDataPocDir: sourceDataPoc, sourceUiDir: sourceUi, reviewDataPocDir: reviewDataPoc, reviewUiDir: reviewUi });
 
-    assert.deepEqual(result, { scanner_run_id: "scan_active", context_run_id: "context_active", copied_optional_files: 3 });
+    assert.deepEqual(result, { scanner_run_id: "scan_active", context_run_id: "context_active", copied_optional_files: 2 });
     assert.deepEqual(JSON.parse(await readFile(resolve(reviewDataPoc, "output", "scan_active", "full_output.json"), "utf8")), { active: "scanner" });
     assert.deepEqual(JSON.parse(await readFile(resolve(reviewDataPoc, "output", "context_active", "approved_sources_output.json"), "utf8")), { active: "context" });
     await assert.rejects(access(resolve(reviewDataPoc, "output", "scan_historical", "full_output.json")));
     assert.deepEqual(JSON.parse(await readFile(resolve(reviewDataPoc, ".local", "lifecycle", "new-inbox.json"), "utf8")), { copied: "new-inbox" });
+    await assert.rejects(access(resolve(reviewUi, "user-workspace.sqlite")));
   });
 
   it("fails closed when automation state does not point to both active snapshots", async () => {

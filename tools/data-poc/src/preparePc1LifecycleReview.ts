@@ -57,7 +57,6 @@ export async function preparePc1LifecycleReview(options: PreparePc1LifecycleRevi
     [resolve(sourceDataPocDir, ".local", "lifecycle", "operation-journal.json"), resolve(reviewDataPocDir, ".local", "lifecycle", "operation-journal.json")],
     [resolve(sourceUiDir, ".local", "tester-feedback.sqlite"), resolve(reviewUiDir, "tester-feedback.sqlite")],
     [resolve(sourceUiDir, ".local", "ai-analysis-queue.sqlite"), resolve(reviewUiDir, "ai-analysis-queue.sqlite")],
-    [resolve(sourceUiDir, ".local", "user-workspace.sqlite"), resolve(reviewUiDir, "user-workspace.sqlite")],
   ];
   let copiedOptionalFiles = 0;
   for (const [source, target] of optionalFiles) {

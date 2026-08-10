@@ -8,7 +8,7 @@ import { afterEach, describe, it } from "node:test";
 import React from "react";
 import TestRenderer from "react-test-renderer";
 import { applySystemLifecycle, evaluateFollowUpToMainRadar, type LifecycleConditions } from "../../data-poc/src/systemLifecycle.js";
-import { findLatestManualVerification, readFollowUpStore } from "../../data-poc/src/followUpBasket.js";
+import { findLatestManualVerification, ingestFollowUpObservations, readFollowUpStore, updateFollowUpStore } from "../../data-poc/src/followUpBasket.js";
 import type { PersistableCandidate, PersistableScannerOutput } from "../../data-poc/src/persistableScannerModel.js";
 import { createScannerApiServer } from "../server/scannerApiServer.js";
 import { createUserWorkspaceRepository, UserWorkspaceError } from "../server/userWorkspaceRepository.js";
@@ -132,6 +132,10 @@ describe("PC.1 bounded lifecycle Radar API", () => {
       contextRunId: "context_private_basket",
       now: new Date("2026-08-04T10:00:00.000Z"),
     });
+    await updateFollowUpStore(
+      (store) => ingestFollowUpObservations(store, [candidate], "2026-08-04T10:00:00.000Z", snapshot.scan_run.run_id),
+      { storePath: paths.followUp, now: new Date("2026-08-04T10:00:00.000Z") },
+    );
     const repository = await createUserWorkspaceRepository({ databaseFilePath: resolve(base, "workspace.sqlite") });
     const server = createScannerApiServer({
       runtimeMode: "DEVELOPMENT_DEMO",
@@ -146,6 +150,7 @@ describe("PC.1 bounded lifecycle Radar API", () => {
       const firstCookie = cookie(first);
       const before = privateRadar(await requestApi(server, "GET", "/api/lifecycle/radar?limit=24", { cookie: firstCookie }));
       assert.deepEqual(privateBucket(before, "new"), [{ identity: IDENTITY, system_status: "NEW", user_status: "NEW" }]);
+      assert.equal(before.private_baskets.follow_up.total, 0, "an unpromoted durable New record is not shadowed by a stale Follow-up observation");
 
       const followUp = await requestApi(server, "POST", "/api/lifecycle/token/status", { cookie: firstCookie, "content-type": "application/json" }, JSON.stringify({ chain: "base", contract_address: ADDRESS, target_status: "FOLLOW_UP", override_reason: "Early private review", confirmation: true }));
       assert.equal(followUp.status, 200, followUp.body);
@@ -532,6 +537,7 @@ describe("PC.1 bounded lifecycle Radar API", () => {
 
   it("keeps the review launcher isolated, bounded to active snapshots, and fail-closed before runtime start", async () => {
     const launcher = await readFile(resolve(import.meta.dirname, "..", "..", "..", "scripts", "win", "start-pc1-lifecycle-radar-review.cmd"), "utf8");
+    const prepare = await readFile(resolve(import.meta.dirname, "..", "..", "data-poc", "src", "preparePc1LifecycleReview.ts"), "utf8");
     const bootstrap = await readFile(resolve(import.meta.dirname, "..", "..", "data-poc", "src", "bootstrapPc1LifecycleReview.ts"), "utf8");
     const radar = await readFile(resolve(import.meta.dirname, "..", "src", "components", "CandidateResultsView.tsx"), "utf8");
     const detail = await readFile(resolve(import.meta.dirname, "..", "src", "components", "CandidateDetailView.tsx"), "utf8");
@@ -544,6 +550,8 @@ describe("PC.1 bounded lifecycle Radar API", () => {
     assert.match(launcher, /Port %%P/);
     assert.match(launcher, /Port %%P jest już zajęty/);
     assert.match(launcher, /ALLOW_LIVE_PROVIDER_CALLS=0/);
+    assert.match(launcher, /CRYPTO_EDGE_PC1_REVIEW_DEFAULT_ACTOR=CAMP_USER/);
+    assert.doesNotMatch(launcher, /CRYPTO_EDGE_PC1_REVIEW_DEFAULT_ACTOR=OWNER/);
     assert.match(launcher, /preparePc1LifecycleReview\.ts/);
     assert.match(launcher, /bootstrapPc1LifecycleReview\.ts/);
     assert.equal((launcher.match(/call "%UI_DIR%\\node_modules\\\.bin\\tsx\.cmd" "%DATA_POC_DIR%\\src\\(?:preparePc1LifecycleReview|bootstrapPc1LifecycleReview)\.ts"/g) ?? []).length, 2);
@@ -558,6 +566,7 @@ describe("PC.1 bounded lifecycle Radar API", () => {
     assert.equal((launcher.match(/start "" "http:\/\/127\.0\.0\.1:%UI_PORT%\//g) ?? []).length, 1);
     assert.doesNotMatch(launcher, /runInternalBetaCollector|curl |Invoke-WebRequest/i);
     assert.doesNotMatch(launcher, /\.local\\lifecycle\\new-inbox\.json" "%REVIEW_DATA_POC%/);
+    assert.doesNotMatch(prepare, /user-workspace\.sqlite/);
     assert.doesNotMatch(bootstrap, /readdir\(/);
     assert.match(bootstrap, /PC1_REVIEW_ACTIVE_SCANNER_RUN_REQUIRED/);
     assert.match(bootstrap, /validateDisplayEligibleScannerSnapshot/);

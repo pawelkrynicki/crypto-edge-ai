@@ -101,7 +101,9 @@ export function createLifecycleService(options: {
     const main = universe.current.entries.some((entry) => entry.enabled && universeIdentityKey(entry.chain, entry.contract_address) === identity.identity);
     const snapshot = scannerOutput(scanner);
     const candidate = snapshot?.candidates.find((entry) => entry.contract_address !== null && safeIdentity(entry.chain, entry.contract_address) === identity.identity) ?? null;
-    const systemStatus: SystemLifecycleStatus = main ? "MAIN_RADAR" : followUpEntry && followUpEntry.lifecycle_status !== "ARCHIVED" ? "FOLLOW_UP" : inboxEntry?.system_status ?? "NEW";
+    const systemStatus: SystemLifecycleStatus = main
+      ? "MAIN_RADAR"
+      : inboxEntry?.system_status ?? (followUpEntry && followUpEntry.lifecycle_status !== "ARCHIVED" ? "FOLLOW_UP" : "NEW");
     const conditions = systemStatus === "FOLLOW_UP" && followUpEntry
       ? evaluateFollowUpToMainRadar(followUpEntry, lifecycleEvaluationContext({
         receipt,
@@ -238,7 +240,10 @@ export function createLifecycleService(options: {
       const inboxEntry = inboxByIdentity.get(identity) ?? null;
       const followEntry = followByIdentity.get(identity) ?? null;
       const mainEntry = mainByIdentity.get(identity) ?? null;
-      const systemStatus: SystemLifecycleStatus = mainEntry ? "MAIN_RADAR" : followEntry ? "FOLLOW_UP" : inboxEntry?.system_status ?? "NEW";
+      // The durable inbox is the canonical lifecycle record for an identity.
+      // A stale Follow-up observation can coexist with an unpromoted New record
+      // in the review fixture; it must not overwrite that record's system status.
+      const systemStatus: SystemLifecycleStatus = mainEntry ? "MAIN_RADAR" : inboxEntry?.system_status ?? (followEntry ? "FOLLOW_UP" : "NEW");
       return makeCard(identity, systemStatus, inboxEntry, followEntry, mainEntry);
     });
     const newCards = cards.filter((card) => card.system_status === "NEW").sort(compareInbox);
