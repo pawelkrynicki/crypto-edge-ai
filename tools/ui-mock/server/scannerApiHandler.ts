@@ -167,7 +167,16 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
     lifecycleReceiptPath: options.productVersion?.lifecycleReceiptPath ?? options.lifecycle?.cycleReceiptPath,
     ...options.productVersion,
   };
-  const reviewPublication = createProductReviewPublication(options.reviewPublication);
+  const reviewPublication = createProductReviewPublication({
+    ...options.reviewPublication,
+    loadBaseScanner: options.reviewPublication?.loadBaseScanner
+      ?? (() => readLatestScannerOutput(scannerOptions)),
+    loadBaseVersion: options.reviewPublication?.loadBaseVersion
+      ?? (() => readProductVersion(productVersionOptions)),
+  });
+  const isActiveReviewRequest = (req: IncomingMessage): boolean => (
+    reviewPublication.enabled && isLocalOwnerRequest(req) && isPc1ReviewRequest(req)
+  );
   const ownerMode = resolveOwnerOperationsMode(options.ownerOperations?.mode ?? process.env.CRYPTO_EDGE_OWNER_OPERATIONS_MODE);
   const ownerSessionSecret = ownerMode === "DISABLED"
     ? undefined
@@ -930,7 +939,8 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
 
     if (req.method === "GET" && path === "/api/product/version") {
       try {
-        sendJson(req, res, 200, reviewPublication.decorateVersion(await readProductVersion(productVersionOptions)), runtimeMode);
+        const version = await readProductVersion(productVersionOptions);
+        sendJson(req, res, 200, isActiveReviewRequest(req) ? reviewPublication.decorateVersion(version) : version, runtimeMode);
       } catch {
         sendJson(req, res, 200, {
           scanner_run_id: null,
@@ -944,8 +954,17 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
       return;
     }
 
+    if (req.method === "GET" && path === "/api/product/review/publication-status") {
+      if (!isActiveReviewRequest(req)) {
+        sendJson(req, res, 404, { error: "not_found", message: "Route not found" }, runtimeMode);
+        return;
+      }
+      sendJson(req, res, 200, reviewPublication.getStatus(), runtimeMode);
+      return;
+    }
+
     if (req.method === "POST" && path === "/api/product/review/publish-next") {
-      if (!reviewPublication.enabled || !isLocalOwnerRequest(req) || !isPc1ReviewRequest(req)) {
+      if (!isActiveReviewRequest(req)) {
         sendJson(req, res, 404, { error: "not_found", message: "Route not found" }, runtimeMode);
         return;
       }
@@ -991,7 +1010,8 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
 
     if (req.method === "GET" && path === "/api/scanner/latest") {
       try {
-        sendJson(req, res, 200, reviewPublication.decorateScanner(await readLatestScannerOutput(scannerOptions)), runtimeMode);
+        const scanner = await readLatestScannerOutput(scannerOptions);
+        sendJson(req, res, 200, isActiveReviewRequest(req) ? reviewPublication.decorateScanner(scanner) : scanner, runtimeMode);
       } catch (error) {
         sendDataUnavailable(req, res, errorCode(error, "SCANNER_OUTPUT_UNAVAILABLE"), runtimeMode);
       }

@@ -552,7 +552,7 @@ describe("PC.1 bounded lifecycle Radar API", () => {
     assert.match(launcher, /ALLOW_LIVE_PROVIDER_CALLS=0/);
     assert.match(launcher, /CRYPTO_EDGE_PC1_REVIEW_DEFAULT_ACTOR=CAMP_USER/);
     assert.match(launcher, /CRYPTO_EDGE_PC1_REVIEW_MODE=1/);
-    assert.match(launcher, /CRYPTO_EDGE_PC1_REVIEW_ROOT=%REVIEW_ROOT%/);
+    assert.match(launcher, /CRYPTO_EDGE_PC1_REVIEW_ROOT=%REVIEW_DATA_POC%/);
     assert.match(launcher, /CRYPTO_EDGE_PC1_REVIEW_AUTO_PUBLICATION_DELAY_MS=60000/);
     assert.match(launcher, /Review auto-update publication: 60 seconds/);
     assert.doesNotMatch(launcher, /CRYPTO_EDGE_PC1_REVIEW_DEFAULT_ACTOR=OWNER/);
@@ -600,8 +600,15 @@ describe("PC.1 bounded lifecycle Radar API", () => {
     assert.match(personalRadar, /TechnicalDetails label=\{copy\.confirmAction\}/);
     assert.match(productApp, /isReviewMode\(\).*LifecycleReviewSwitch/);
     assert.match(productApp, /data-pc1-review-switch="global"/);
-    assert.match(productApp, /Auto-update test active/);
+    assert.match(productApp, /Auto-update test: oczekiwanie/);
+    assert.match(productApp, /Review version publication in progress/);
+    assert.match(productApp, /Publication failed/);
     assert.match(productApp, /New review version published/);
+    assert.match(productApp, /Test auto-update failed/);
+    assert.match(productApp, /Current review version/);
+    assert.match(productApp, /Last publication/);
+    assert.match(productApp, /Next attempt/);
+    assert.match(productApp, /Last committed UI version/);
     assert.match(productApp, /onVersionChanged:[\s\S]*?setReviewAutoUpdatePublished\(true\)/);
     assert.doesNotMatch(productApp, /setTimeout\([^)]*review/i);
     assert.match(styles, /\.personal-radar-inline\.card \{ grid-column: 1 \/ -1; \}/);

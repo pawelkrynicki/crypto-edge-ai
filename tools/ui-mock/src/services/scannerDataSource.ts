@@ -189,7 +189,7 @@ export async function loadScannerApiDataSourceResult(
 
   try {
     const apiBaseUrl = getApiBaseUrl();
-    const result = interpretScannerApiOutput(await fetchJson(`${apiBaseUrl}/api/scanner/latest`));
+    const result = interpretScannerApiOutput(await fetchJson(`${apiBaseUrl}/api/scanner/latest${reviewQuery()}`));
 
     if (runtimeMode !== "DEVELOPMENT_DEMO" && result.usedFallback) {
       return errorResult(
@@ -569,4 +569,8 @@ function isProductReadinessOutput(value: unknown): value is ProductReadinessOutp
 function getApiBaseUrl(): string {
   const viteEnv = (import.meta as ViteImportMeta).env;
   return viteEnv?.VITE_SCANNER_API_URL?.replace(/\/$/, "") ?? "";
+}
+
+function reviewQuery(): string {
+  return typeof window !== "undefined" && window.location.search.includes("pc1_review=1") ? "?pc1_review=1" : "";
 }
