@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   PRODUCT_VERSION_HIDDEN_POLL_INTERVAL_MS,
+  PRODUCT_VERSION_RETRY_DELAY_MS,
   createProductVersionPoller,
   productVersionsEqual,
   resolveProductVersionPollDelay,
@@ -52,6 +53,7 @@ describe("product version polling", () => {
     assert.equal(pointerReads, 1, "only one pointer request may be in flight");
     resolveFirstRead?.();
     await Promise.all([baseline, overlapping]);
+    poller.markCommitted(VERSION_A);
 
     current = { ...VERSION_A, scanner_run_id: "scan_b", scanner_generated_at: "2026-08-10T10:05:00.000Z" };
     await poller.checkNow();
@@ -70,6 +72,7 @@ describe("product version polling", () => {
     });
 
     await poller.checkNow();
+    poller.markCommitted(VERSION_A);
     current = {
       ...VERSION_A,
       scanner_run_id: "scan_a-review-1",
@@ -80,6 +83,42 @@ describe("product version polling", () => {
     await poller.checkNow();
 
     assert.equal(fullRefreshes, 1, "the review marker produces one bounded full read refresh");
+  });
+
+  it("keeps the committed V1 after an invalid V2 and retries it only after the bounded delay", async () => {
+    let current = VERSION_A;
+    let clock = 0;
+    let attempts = 0;
+    const poller = createProductVersionPoller({
+      loadVersion: async () => current,
+      onVersionChanged: async () => {
+        attempts += 1;
+        return attempts === 2;
+      },
+      now: () => clock,
+    });
+
+    await poller.checkNow();
+    poller.markCommitted(VERSION_A);
+    current = { ...VERSION_A, scanner_run_id: "scan_v2", scanner_generated_at: "2026-08-10T10:05:00.000Z" };
+    await poller.checkNow();
+    assert.equal(attempts, 1);
+    assert.deepEqual(poller.getVersionState(), {
+      last_seen_version: current,
+      last_attempted_version: current,
+      last_committed_version: VERSION_A,
+    });
+
+    clock = PRODUCT_VERSION_RETRY_DELAY_MS - 1;
+    await poller.checkNow();
+    assert.equal(attempts, 1, "the same failed V2 cannot cause a full refresh on every poll");
+
+    clock = PRODUCT_VERSION_RETRY_DELAY_MS;
+    await poller.checkNow();
+    assert.equal(attempts, 2);
+    assert.deepEqual(poller.getVersionState().last_committed_version, current);
+    await poller.checkNow();
+    assert.equal(attempts, 2, "a committed V2 becomes the new no-action baseline");
   });
 
   it("uses jitter while visible, slows down hidden tabs, and checks immediately after focus", async () => {

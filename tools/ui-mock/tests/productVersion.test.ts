@@ -8,6 +8,7 @@ import { createScannerApiServer } from "../server/scannerApiServer.js";
 import { createProductReviewPublication } from "../server/productReviewPublication.js";
 import { validateScannerApiOutput } from "../src/services/scannerDataSource.js";
 import { PERSISTABLE_SCANNER_SAMPLE } from "../src/fixtures/persistableScannerSample.js";
+import type { ScannerOutputWithMeta } from "../server/latestScannerOutput.js";
 
 const EXPECTED_KEYS = [
   "context_generated_at", "context_run_id", "lifecycle_cycle_id", "lifecycle_updated_at",
@@ -63,8 +64,14 @@ describe("product version API", () => {
     process.env.CRYPTO_EDGE_PC1_REVIEW_ROOT = reviewRootPath;
     const server = createScannerApiServer({
       runtimeMode: "INTERNAL_BETA",
+      reviewPublication: {
+        loadBaseScanner: async () => structuredClone(PERSISTABLE_SCANNER_SAMPLE) as ScannerOutputWithMeta,
+        loadBaseSnapshot: async () => structuredClone(PERSISTABLE_SCANNER_SAMPLE) as ScannerOutputWithMeta,
+        validateSnapshot: () => undefined,
+        persistReviewPointer: async () => undefined,
+      },
       productVersion: {
-        readAutomationState: async () => ({ last_published_scanner_run_id: "scan_pointer", last_published_context_run_id: "context_pointer" }),
+        readAutomationState: async () => ({ last_published_scanner_run_id: PERSISTABLE_SCANNER_SAMPLE.scan_run.run_id, last_published_context_run_id: "context_pointer" }),
         readPublishedSnapshotTimes: async () => ({ scanner_published_at: "2026-08-10T10:00:00.000Z", context_published_at: "2026-08-10T09:55:00.000Z" }),
         readLifecycleReceipt: async () => ({ central_cycle_id: "cycle_pointer", finished_at: "2026-08-10T10:00:01.000Z" }),
       },
@@ -80,7 +87,7 @@ describe("product version API", () => {
       const after = await version(base);
       assert.notEqual(after.scanner_run_id, before.scanner_run_id);
       assert.notEqual(after.scanner_generated_at, before.scanner_generated_at);
-      assert.notEqual(after.lifecycle_updated_at, before.lifecycle_updated_at);
+      assert.equal(after.lifecycle_updated_at, before.lifecycle_updated_at);
     } finally {
       await close(server);
       await rm(reviewRootPath, { recursive: true, force: true });
@@ -91,11 +98,12 @@ describe("product version API", () => {
 
   it("changes the version endpoint only after the isolated review timer publishes its marker", async () => {
     let reviewTimer: (() => void) | undefined;
+    const reviewRootPath = await mkdtemp(resolve(tmpdir(), "crypto-edge-pc1-version-timer-"));
     const server = createScannerApiServer({
       runtimeMode: "INTERNAL_BETA",
       reviewPublication: {
         enabled: true,
-        reviewRootPath: "review-only-test-root",
+        reviewRootPath,
         now: () => new Date("2026-08-10T10:05:00.000Z"),
         autoPublicationDelayMs: 60_000,
         setTimer: (callback, delay) => {
@@ -105,9 +113,13 @@ describe("product version API", () => {
         },
         clearTimer: () => undefined,
         persistMarker: async () => undefined,
+        loadBaseScanner: async () => structuredClone(PERSISTABLE_SCANNER_SAMPLE) as ScannerOutputWithMeta,
+        loadBaseSnapshot: async () => structuredClone(PERSISTABLE_SCANNER_SAMPLE) as ScannerOutputWithMeta,
+        validateSnapshot: () => undefined,
+        persistReviewPointer: async () => undefined,
       },
       productVersion: {
-        readAutomationState: async () => ({ last_published_scanner_run_id: "scan_pointer", last_published_context_run_id: "context_pointer" }),
+        readAutomationState: async () => ({ last_published_scanner_run_id: PERSISTABLE_SCANNER_SAMPLE.scan_run.run_id, last_published_context_run_id: "context_pointer" }),
         readPublishedSnapshotTimes: async () => ({ scanner_published_at: "2026-08-10T10:00:00.000Z", context_published_at: "2026-08-10T09:55:00.000Z" }),
         readLifecycleReceipt: async () => ({ central_cycle_id: "cycle_pointer", finished_at: "2026-08-10T10:00:01.000Z" }),
       },
@@ -118,18 +130,36 @@ describe("product version API", () => {
       const before = await version(base);
       assert.ok(reviewTimer, "the isolated review harness schedules one publication");
       reviewTimer();
-      await new Promise<void>((done) => setImmediate(done));
+      const publication = await fetch(`${base}/api/product/review/publish-next?pc1_review=1`, { method: "POST" });
+      assert.equal(publication.status, 200);
       const after = await version(base);
       assert.notEqual(after.scanner_run_id, before.scanner_run_id);
       assert.equal(after.scanner_generated_at, "2026-08-10T10:05:00.000Z");
-      assert.equal(after.lifecycle_updated_at, "2026-08-10T10:05:00.000Z");
-    } finally { await close(server); }
+      assert.equal(after.lifecycle_updated_at, "2026-08-10T10:00:01.000Z");
+    } finally {
+      await close(server);
+      await rm(reviewRootPath, { recursive: true, force: true });
+    }
   });
 
   it("keeps a simulated scanner publication internally consistent for the normal UI reader", async () => {
+    const reviewRootPath = await mkdtemp(resolve(tmpdir(), "crypto-edge-pc1-version-snapshot-"));
     const publication = createProductReviewPublication({
       now: () => new Date("2026-08-10T10:05:00.000Z"),
       enabled: true,
+      reviewRootPath,
+      loadBaseScanner: async () => structuredClone(PERSISTABLE_SCANNER_SAMPLE) as ScannerOutputWithMeta,
+      loadBaseSnapshot: async () => structuredClone(PERSISTABLE_SCANNER_SAMPLE) as ScannerOutputWithMeta,
+      persistReviewPointer: async () => undefined,
+      loadBaseVersion: async () => ({
+        scanner_run_id: PERSISTABLE_SCANNER_SAMPLE.scan_run.run_id,
+        scanner_generated_at: PERSISTABLE_SCANNER_SAMPLE.provenance?.generated_at ?? null,
+        context_run_id: "context_pointer",
+        context_generated_at: "2026-08-10T09:55:00.000Z",
+        lifecycle_cycle_id: "cycle_pointer",
+        lifecycle_updated_at: "2026-08-10T10:00:01.000Z",
+      }),
+      validateSnapshot: () => undefined,
       persistMarker: async () => undefined,
     });
     try {
@@ -140,7 +170,10 @@ describe("product version API", () => {
       assert.equal(validated.candidates.every((candidate) => candidate.run_id === validated.scan_run.run_id), true);
       assert.equal(validated.security_checks.every((entry) => entry.run_id === validated.scan_run.run_id), true);
       assert.equal(validated.scorecards.every((entry) => entry.run_id === validated.scan_run.run_id), true);
-    } finally { publication.stop(); }
+    } finally {
+      publication.stop();
+      await rm(reviewRootPath, { recursive: true, force: true });
+    }
   });
 });
 

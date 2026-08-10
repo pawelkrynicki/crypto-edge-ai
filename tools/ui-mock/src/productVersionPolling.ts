@@ -3,16 +3,19 @@ import type { ProductVersion } from "./productVersion";
 export const PRODUCT_VERSION_POLL_INTERVAL_MS = 45_000;
 export const PRODUCT_VERSION_POLL_JITTER_MS = 10_000;
 export const PRODUCT_VERSION_HIDDEN_POLL_INTERVAL_MS = 120_000;
+export const PRODUCT_VERSION_RETRY_DELAY_MS = 60_000;
 
 type VisibilityDocument = Pick<Document, "hidden" | "addEventListener" | "removeEventListener">;
 type FocusWindow = Pick<Window, "addEventListener" | "removeEventListener">;
 
 export type ProductVersionPollerOptions = {
   loadVersion: () => Promise<ProductVersion | null>;
-  onVersionChanged: (version: ProductVersion) => Promise<void> | void;
+  /** Returns true only after the version has been atomically committed to the rendered view. */
+  onVersionChanged: (version: ProductVersion) => Promise<boolean | void> | boolean | void;
   document?: VisibilityDocument;
   window?: FocusWindow;
   random?: () => number;
+  now?: () => number;
   setTimer?: (callback: () => void, delayMs: number) => ReturnType<typeof setTimeout>;
   clearTimer?: (timer: ReturnType<typeof setTimeout>) => void;
 };
@@ -21,7 +24,12 @@ export type ProductVersionPoller = {
   start: () => void;
   stop: () => void;
   checkNow: () => Promise<void>;
-  markKnown: (version: ProductVersion | null) => void;
+  markCommitted: (version: ProductVersion | null) => void;
+  getVersionState: () => {
+    last_seen_version: ProductVersion | null;
+    last_attempted_version: ProductVersion | null;
+    last_committed_version: ProductVersion | null;
+  };
 };
 
 export function productVersionsEqual(left: ProductVersion, right: ProductVersion): boolean {
@@ -45,8 +53,12 @@ export function createProductVersionPoller(options: ProductVersionPollerOptions)
   const setTimer = options.setTimer ?? ((callback, delay) => setTimeout(callback, delay));
   const clearTimer = options.clearTimer ?? ((timer) => clearTimeout(timer));
   const random = options.random ?? Math.random;
+  const now = options.now ?? Date.now;
   let active = false;
-  let known: ProductVersion | null = null;
+  let lastSeenVersion: ProductVersion | null = null;
+  let lastAttemptedVersion: ProductVersion | null = null;
+  let lastCommittedVersion: ProductVersion | null = null;
+  let lastAttemptedAt = 0;
   let inFlight: Promise<void> | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
 
@@ -62,11 +74,17 @@ export function createProductVersionPoller(options: ProductVersionPollerOptions)
   const checkNow = async (): Promise<void> => {
     if (inFlight) return inFlight;
     const task = (async () => {
-      const next = await options.loadVersion();
-      if (!next) return;
-      const changed = known !== null && !productVersionsEqual(known, next);
-      known = next;
-      if (changed) await options.onVersionChanged(next);
+       const next = await options.loadVersion();
+       if (!next) return;
+       lastSeenVersion = next;
+       if (lastCommittedVersion === null) return;
+       if (productVersionsEqual(lastCommittedVersion, next)) return;
+       const retryingSameVersion = lastAttemptedVersion !== null && productVersionsEqual(lastAttemptedVersion, next);
+       if (retryingSameVersion && now() - lastAttemptedAt < PRODUCT_VERSION_RETRY_DELAY_MS) return;
+       lastAttemptedVersion = next;
+       lastAttemptedAt = now();
+       const committed = await options.onVersionChanged(next);
+       if (committed !== false) lastCommittedVersion = next;
     })();
     inFlight = task;
     try {
@@ -103,6 +121,17 @@ export function createProductVersionPoller(options: ProductVersionPollerOptions)
       window?.removeEventListener("focus", onFocus);
     },
     checkNow,
-    markKnown: (version) => { if (version) known = version; },
+    markCommitted: (version) => {
+      if (!version) return;
+      lastSeenVersion = version;
+      lastAttemptedVersion = version;
+      lastAttemptedAt = now();
+      lastCommittedVersion = version;
+    },
+    getVersionState: () => ({
+      last_seen_version: lastSeenVersion,
+      last_attempted_version: lastAttemptedVersion,
+      last_committed_version: lastCommittedVersion,
+    }),
   };
 }

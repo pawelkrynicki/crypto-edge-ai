@@ -167,7 +167,13 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
     lifecycleReceiptPath: options.productVersion?.lifecycleReceiptPath ?? options.lifecycle?.cycleReceiptPath,
     ...options.productVersion,
   };
-  const reviewPublication = createProductReviewPublication(options.reviewPublication);
+  const reviewPublication = createProductReviewPublication({
+    ...options.reviewPublication,
+    loadBaseScanner: options.reviewPublication?.loadBaseScanner
+      ?? (() => readLatestScannerOutput(scannerOptions)),
+    loadBaseVersion: options.reviewPublication?.loadBaseVersion
+      ?? (() => readProductVersion(productVersionOptions)),
+  });
   const ownerMode = resolveOwnerOperationsMode(options.ownerOperations?.mode ?? process.env.CRYPTO_EDGE_OWNER_OPERATIONS_MODE);
   const ownerSessionSecret = ownerMode === "DISABLED"
     ? undefined
