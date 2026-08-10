@@ -55,6 +55,36 @@ describe("PC.1 private workspace repository", () => {
 });
 
 describe("PC.1 bounded lifecycle Radar API", () => {
+  it("exposes review diagnostics only to OWNER and ADMIN session roles in active local review", async () => {
+    const reviewSessionPath = resolve(await root(), "review-session.json");
+    const server = createScannerApiServer({
+      runtimeMode: "DEVELOPMENT_DEMO",
+      reviewSession: { storageFilePath: reviewSessionPath },
+      reviewPublication: { enabled: true },
+    });
+    await listen(server);
+    try {
+      const outsideReview = await requestApi(server, "GET", "/api/review-session/diagnostics");
+      assert.equal(outsideReview.status, 404, outsideReview.body);
+
+      const trusted = await requestApi(server, "GET", "/api/review-session/diagnostics?pc1_review=1");
+      assert.equal(trusted.status, 403, trusted.body);
+      assert.equal((JSON.parse(trusted.body) as { error: string }).error, "review_diagnostics_forbidden");
+
+      const campSession = await requestApi(server, "POST", "/api/lifecycle/review-session/camp-user");
+      const camp = await requestApi(server, "GET", "/api/review-session/diagnostics?pc1_review=1", { cookie: cookie(campSession) });
+      assert.equal(camp.status, 403, camp.body);
+      assert.equal((JSON.parse(camp.body) as { error: string }).error, "review_diagnostics_forbidden");
+
+      const ownerSession = await requestApi(server, "POST", "/api/lifecycle/review-session/owner");
+      const owner = await requestApi(server, "GET", "/api/review-session/diagnostics?pc1_review=1", { cookie: cookie(ownerSession) });
+      assert.equal(owner.status, 200, owner.body);
+      assert.equal((JSON.parse(owner.body) as { source_kind: string }).source_kind, "file-backed-review-session-diagnostics");
+    } finally {
+      await close(server);
+    }
+  });
+
   it("derives actors only from sessions, keeps trusted tester read-only, and bounds public Radar reads", async () => {
     const database = resolve(await root(), "workspace.sqlite");
     const repository = await createUserWorkspaceRepository({ databaseFilePath: database });
@@ -535,6 +565,56 @@ describe("PC.1 bounded lifecycle Radar API", () => {
     }
   });
 
+  it("renders review diagnostics only for server-provided OWNER and ADMIN roles", async () => {
+    const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+    const roles = ["CAMP_USER", "TRUSTED_TESTER", "OWNER", "ADMIN"] as const;
+    try {
+      for (const role of roles) {
+        Object.defineProperty(globalThis, "window", { configurable: true, value: productWindow("?pc1_review=1") });
+        const radar = { ...lifecycleRadar(0), actor: { role, capabilities: [] } };
+        const dataSources = reviewDiagnosticsDataSources(radar);
+        let renderer: ReturnType<typeof create> | undefined;
+        try {
+          await act(async () => {
+            renderer = create(React.createElement(ProductLocaleProvider, { initialLocale: "en" }, React.createElement(ProductAppContent, { dataSources, runtimeModeOverride: "INTERNAL_BETA" })));
+            await flush();
+          });
+          const markup = JSON.stringify(renderer!.toJSON());
+          const diagnosticsToggle = renderer!.root.findAll((node) => node.type === "button" && node.children.join("") === "Diagnostyka");
+          const canSeeDiagnostics = role === "OWNER" || role === "ADMIN";
+          assert.equal(diagnosticsToggle.length, canSeeDiagnostics ? 1 : 0, `${role} diagnostics toggle visibility`);
+          assert.equal(renderer!.root.findAll((node) => node.props["data-pc1-review-diagnostics"] === "expanded").length, 0, `${role} diagnostics are collapsed by default or absent`);
+          assert.equal(renderer!.root.findAll((node) => node.props["data-pc1-review-polling-diagnostics"] === "enabled").length, 0, `${role} polling diagnostics are initially absent`);
+          if (!canSeeDiagnostics) {
+            assert.doesNotMatch(markup, /Diagnostyka|Last committed version|last poll at/);
+            continue;
+          }
+          assert.equal(diagnosticsToggle[0]!.props["aria-expanded"], false, `${role} diagnostics start collapsed`);
+          await act(async () => { diagnosticsToggle[0]!.props.onClick(); });
+          assert.equal(renderer!.root.findAll((node) => node.props["data-pc1-review-diagnostics"] === "expanded").length, 1, `${role} can expand diagnostics`);
+          assert.equal(renderer!.root.findAll((node) => node.props["data-pc1-review-polling-diagnostics"] === "enabled").length, 1, `${role} sees polling diagnostics after expanding`);
+        } finally {
+          if (renderer) await act(async () => { renderer!.unmount(); });
+        }
+      }
+
+      Object.defineProperty(globalThis, "window", { configurable: true, value: productWindow() });
+      const ownerRadar = { ...lifecycleRadar(0), actor: { role: "OWNER" as const, capabilities: [] } };
+      let renderer: ReturnType<typeof create> | undefined;
+      try {
+        await act(async () => {
+          renderer = create(React.createElement(ProductLocaleProvider, { initialLocale: "en" }, React.createElement(ProductAppContent, { dataSources: reviewDiagnosticsDataSources(ownerRadar), runtimeModeOverride: "INTERNAL_BETA" })));
+          await flush();
+        });
+        assert.equal(renderer!.root.findAll((node) => node.type === "button" && node.children.join("") === "Diagnostyka").length, 0, "normal product mode omits diagnostics");
+      } finally {
+        if (renderer) await act(async () => { renderer!.unmount(); });
+      }
+    } finally {
+      if (originalWindow) Object.defineProperty(globalThis, "window", originalWindow); else Reflect.deleteProperty(globalThis, "window");
+    }
+  });
+
   it("keeps the review launcher isolated, bounded to active snapshots, and fail-closed before runtime start", async () => {
     const launcher = await readFile(resolve(import.meta.dirname, "..", "..", "..", "scripts", "win", "start-pc1-lifecycle-radar-review.cmd"), "utf8");
     const prepare = await readFile(resolve(import.meta.dirname, "..", "..", "data-poc", "src", "preparePc1LifecycleReview.ts"), "utf8");
@@ -720,8 +800,22 @@ function fallbackCandidate(index: number): UiTokenCandidate {
   } as UiTokenCandidate;
 }
 
-function productWindow() {
-  const location = { href: "http://127.0.0.1:5173/#candidate-results", hash: "#candidate-results", search: "" };
+function reviewDiagnosticsDataSources(radar: LifecycleRadarView): ProductAppDataSources {
+  return {
+    loadScanner: async () => ({ status: "error", source: "api", resolvedSource: "unavailable", usedFallback: false, reasonCode: "SCANNER_OUTPUT_UNAVAILABLE", error: "unavailable", output: null }),
+    loadReadiness: async () => ({ status: "unavailable", reasonCode: "SCANNER_OUTPUT_UNAVAILABLE" }),
+    loadAutomation: async () => null,
+    loadEstablishedUniverse: async () => null,
+    loadControlCenter: async () => null,
+    loadFollowUpStatus: async () => null,
+    loadFollowUpList: async () => null,
+    loadLifecycleRadar: async () => radar,
+    now: () => "2026-08-04T10:00:00.000Z",
+  } as ProductAppDataSources;
+}
+
+function productWindow(search = "") {
+  const location = { href: `http://127.0.0.1:5173/${search}#candidate-results`, hash: "#candidate-results", search };
   return { location, history: { pushState: () => undefined }, localStorage: { getItem: () => null, setItem: () => undefined }, addEventListener: () => undefined, removeEventListener: () => undefined, setTimeout, clearTimeout };
 }
 

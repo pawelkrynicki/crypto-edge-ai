@@ -1052,6 +1052,16 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
     }
 
     if (req.method === "GET" && path === "/api/review-session/diagnostics") {
+      if (!isActiveReviewRequest(req)) {
+        sendJson(req, res, 404, { error: "not_found" }, runtimeMode);
+        return;
+      }
+      const session = pc1Sessions.resolve(req);
+      if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
+      if (!isReviewDiagnosticsRole(session.context.role)) {
+        sendJson(req, res, 403, { error: "review_diagnostics_forbidden" }, runtimeMode);
+        return;
+      }
       try {
         sendJson(req, res, 200, await reviewSessionProvider.diagnostics(), runtimeMode);
       } catch {
@@ -1911,6 +1921,10 @@ function isPc1ReviewRequest(req: IncomingMessage): boolean {
   } catch {
     return false;
   }
+}
+
+function isReviewDiagnosticsRole(role: "TRUSTED_TESTER" | "CAMP_USER" | "OWNER" | "ADMIN"): boolean {
+  return role === "OWNER" || role === "ADMIN";
 }
 
 function validateReviewCommitAcknowledgement(value: unknown): { scanner_run_id: string } {

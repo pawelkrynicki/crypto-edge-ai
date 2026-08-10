@@ -233,13 +233,7 @@ describe("ProductApp Refresh View last-known-good flow", () => {
         renderer = create(<ProductLocaleProvider initialLocale="en"><ProductAppContent dataSources={dataSources} runtimeModeOverride="INTERNAL_BETA" /></ProductLocaleProvider>);
         await flushPromises();
       });
-      assert.match(renderedText(renderer!), /Diagnostyka/);
-      assert.doesNotMatch(renderedText(renderer!), /Auto-update test: oczekiwanie/, "review diagnostics start collapsed");
-      await act(async () => {
-        renderer!.root.findByProps({ className: "personal-radar-review-diagnostics-toggle" }).props.onClick();
-        await flushPromises();
-      });
-      assert.match(renderedText(renderer!), /Auto-update test: oczekiwanie/);
+      assert.doesNotMatch(renderedText(renderer!), /Diagnostyka|Auto-update test: oczekiwanie/, "CAMP_USER review keeps diagnostics absent");
 
       versionIndex = 1;
       await act(async () => {
@@ -253,7 +247,7 @@ describe("ProductApp Refresh View last-known-good flow", () => {
       assert.equal(lifecycleReads, 2, "the private lifecycle view is read again with the refresh");
       assert.equal(shell.props.generatedAt, "2026-08-10T08:30:00.000Z");
       assert.equal(radar.props.lifecycleRadar.private_baskets.follow_up.cards[0]!.user_status, "FOLLOW_UP");
-      assert.match(renderedText(renderer!), /New review version published/);
+      assert.doesNotMatch(renderedText(renderer!), /New review version published/, "CAMP_USER receives the auto-update without its owner-only diagnostics copy");
     } finally {
       if (renderer) await act(async () => { renderer!.unmount(); });
       browser.restore();
