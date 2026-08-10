@@ -245,13 +245,15 @@ export function TechnicalDetails({
   label,
   children,
   className = "",
+  initialOpen = false,
 }: {
   label: string;
   children: ReactNode;
   className?: string;
+  initialOpen?: boolean;
 }) {
   const { locale } = useProductLocale();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initialOpen);
   const stateLabel = open
     ? (locale === "pl" ? "Zwiń" : "Collapse")
     : (locale === "pl" ? "Rozwiń" : "Expand");

@@ -28,12 +28,14 @@ import {
 import { ProductLocaleProvider, useProductLocale } from "./productI18n";
 import type { ControlCenterStatus } from "./controlCenterStatus";
 import { resolveProductSourceHealth } from "./productSourceHealth";
+import { createProductVersionPoller, type ProductVersionPoller } from "./productVersionPolling";
 import { getProductRuntimeMode, isAIResearchRenderPreviewMode } from "./runtimeMode";
 import {
   loadScannerApiDataSourceResult,
   loadScannerReadinessResult,
   type ResolvedScannerSource,
 } from "./services/scannerDataSource";
+import { loadProductVersion } from "./services/productVersionDataSource";
 import { loadAutomationStatus, type AutomationStatus } from "./services/automationStatusDataSource";
 import {
   loadEstablishedUniverseStatus,
@@ -41,6 +43,8 @@ import {
 } from "./services/establishedUniverseStatusDataSource";
 import { loadControlCenterStatus } from "./services/controlCenterStatusDataSource";
 import { loadFollowUpByIdentity, loadFollowUpList, loadFollowUpStatus } from "./services/followUpDataSource";
+import { loadLifecycleRadar, setLifecycleReviewRole } from "./services/lifecycleDataSource";
+import type { LifecycleRadarCard, LifecycleRadarView, LifecycleSummary, LifecycleTokenView } from "./types/lifecycleTypes";
 import type { FollowUpPublicEntry, FollowUpPublicStatus } from "./types/followUpTypes";
 import {
   findFollowUpByIdentity,
@@ -76,6 +80,7 @@ const HASH_TO_SECTION: Record<string, ProductSectionId> = {
   "#methodology": "methodology",
   "#control-center": "control-center",
 };
+type RadarBasketId = "new_emerging" | "maturing" | "established";
 
 const SECTION_TO_HASH: Record<ProductSectionId, string> = {
   "candidate-results": "#candidate-results",
@@ -104,6 +109,8 @@ export type ProductAppDataSources = {
   loadFollowUpStatus: typeof loadFollowUpStatus;
   loadFollowUpList: typeof loadFollowUpList;
   loadFollowUpByIdentity?: typeof loadFollowUpByIdentity;
+  loadLifecycleRadar?: typeof loadLifecycleRadar;
+  loadProductVersion?: typeof loadProductVersion;
   now: () => string;
 };
 
@@ -116,6 +123,8 @@ const DEFAULT_PRODUCT_APP_DATA_SOURCES: ProductAppDataSources = {
   loadFollowUpStatus,
   loadFollowUpList,
   loadFollowUpByIdentity,
+  loadLifecycleRadar,
+  loadProductVersion,
   now: () => new Date().toISOString(),
 };
 
@@ -128,6 +137,7 @@ export function ProductAppContent({
 } = {}) {
   const { t } = useProductLocale();
   const runtimeMode = runtimeModeOverride ?? getProductRuntimeMode();
+  const loadVersionPointer = dataSources.loadProductVersion;
   const [activeSection, setActiveSection] = useState<ProductSectionId>(() => resolveSection());
   const [candidates, setCandidates] = useState<UiTokenCandidate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -150,6 +160,10 @@ export function ProductAppContent({
   const [establishedUniverseStatus, setEstablishedUniverseStatus] = useState<EstablishedUniverseStatus | null>(null);
   const [controlCenterStatus, setControlCenterStatus] = useState<ControlCenterStatus | null>(null);
   const [followUpStatus, setFollowUpStatus] = useState<FollowUpPublicStatus | null>(null);
+  const [lifecycleSummary, setLifecycleSummary] = useState<LifecycleSummary | null>(null);
+  const [lifecycleRadar, setLifecycleRadar] = useState<LifecycleRadarView | null>(null);
+  const [preferredLifecycleBasket, setPreferredLifecycleBasket] = useState<RadarBasketId | null>(null);
+  const [reviewAutoUpdatePublished, setReviewAutoUpdatePublished] = useState(false);
   const [followUpEntries, setFollowUpEntries] = useState<FollowUpPublicEntry[]>([]);
   const [selectedFollowUpEntryId, setSelectedFollowUpEntryId] = useState<string | null>(null);
   const [manualVerificationRecord, setManualVerificationRecord] = useState<ManualVerificationRecord | null>(null);
@@ -161,6 +175,7 @@ export function ProductAppContent({
   const [feedbackRefreshRevision, setFeedbackRefreshRevision] = useState(0);
   const [selectedReportContext, setSelectedReportContext] = useState<ReportDetail | null>(null);
   const refreshPromiseRef = useRef<Promise<void> | null>(null);
+  const productVersionPollerRef = useRef<ProductVersionPoller | null>(null);
   const scannerViewStateRef = useRef(createEmptyProductScannerViewState());
   const routeTokenIdentityRef = useRef<RouteTokenIdentity | null>(routeTokenIdentity);
   const [lastKnownGoodRefreshError, setLastKnownGoodRefreshError] = useState(false);
@@ -196,18 +211,21 @@ export function ProductAppContent({
       routeTokenIdentity,
     )) ?? null
     : null;
+  const routedLifecycleCard = findLifecycleRadarCard(lifecycleRadar, routeTokenIdentity);
+  const routedLifecycleCandidate = routedLifecycleCard ? lifecycleCardToCandidate(routedLifecycleCard) : null;
   const selectedCandidate = explicitlySelectedFollowUp
     ? candidates.find((candidate) => isSameTokenIdentity(
       explicitlySelectedFollowUp,
       { chain: candidate.chain, contract_address: candidate.contractAddress },
     )) ?? null
-    : routedCandidate
-      ?? reviewPreviewCandidate
-      ?? candidates.find((candidate) => candidate.id === selectedCandidateId)
-      ?? candidates.find((candidate) => candidate.discoveryBasket === "established" && candidate.finalLabel === "WATCHLIST")
-      ?? candidates.find((candidate) => candidate.discoveryBasket === "established")
-      ?? candidates[0]
-      ?? null;
+    : routeTokenIdentity
+      ? routedCandidate ?? routedLifecycleCandidate
+      : reviewPreviewCandidate
+        ?? candidates.find((candidate) => candidate.id === selectedCandidateId)
+        ?? candidates.find((candidate) => candidate.discoveryBasket === "established" && candidate.finalLabel === "WATCHLIST")
+        ?? candidates.find((candidate) => candidate.discoveryBasket === "established")
+        ?? candidates[0]
+        ?? null;
   const selectedFollowUp = explicitlySelectedFollowUp
     ?? (selectedCandidate ? findFollowUpByIdentity(followUpEntries, selectedCandidate) : null);
   const verificationCandidate = routeTokenIdentity
@@ -238,35 +256,20 @@ export function ProductAppContent({
     const refresh = (async () => {
       setLoading(true);
 
-      const [scannerResult, readinessResult, automationResult, universeStatusResult, controlCenterResult, followUpStatusResult, followUpListResult] = await Promise.all([
+      const [scannerResult, readinessResult, automationResult, universeStatusResult, controlCenterResult, lifecycleRadarResult] = await Promise.all([
         dataSources.loadScanner({ runtimeMode }),
         dataSources.loadReadiness({ runtimeMode }),
         dataSources.loadAutomation(),
         dataSources.loadEstablishedUniverse(),
         dataSources.loadControlCenter(),
-        dataSources.loadFollowUpStatus(),
-        dataSources.loadFollowUpList(),
+        dataSources.loadLifecycleRadar?.() ?? Promise.resolve(null),
       ]);
       setAutomationStatus(automationResult);
       setEstablishedUniverseStatus(universeStatusResult);
       setControlCenterStatus(controlCenterResult);
       setFeedbackRefreshRevision((value) => value + 1);
-      setFollowUpStatus(followUpStatusResult);
-      let nextFollowUpEntries = followUpListResult?.entries ?? [];
-      const routedIdentity = routeTokenIdentityRef.current;
-      if (routedIdentity
-        && dataSources.loadFollowUpByIdentity
-        && !findFollowUpByIdentity(nextFollowUpEntries, {
-          chain: routedIdentity.chain,
-          contractAddress: routedIdentity.contract_address,
-        })) {
-        const routedEntry = await dataSources.loadFollowUpByIdentity(
-          routedIdentity.chain,
-          routedIdentity.contract_address,
-        );
-        if (routedEntry) nextFollowUpEntries = [routedEntry, ...nextFollowUpEntries];
-      }
-      setFollowUpEntries(nextFollowUpEntries);
+      setLifecycleRadar(lifecycleRadarResult);
+      setLifecycleSummary(lifecycleRadarResult?.summary ?? null);
 
       const hadAcceptedSnapshot = scannerViewStateRef.current.hasAcceptedSnapshot;
       if (scannerResult.status === "ready" || !hadAcceptedSnapshot) {
@@ -306,6 +309,39 @@ export function ProductAppContent({
     return refresh;
   }, [dataSources, runtimeMode]);
 
+  const loadFollowUpDetails = useCallback((): void => {
+    const routedIdentity = routeTokenIdentityRef.current;
+    void Promise.all([dataSources.loadFollowUpStatus(), dataSources.loadFollowUpList()]).then(async ([status, list]) => {
+      setFollowUpStatus(status);
+      let entries = list?.entries ?? [];
+      if (routedIdentity && dataSources.loadFollowUpByIdentity && !findFollowUpByIdentity(entries, {
+        chain: routedIdentity.chain,
+        contractAddress: routedIdentity.contract_address,
+      })) {
+        const entry = await dataSources.loadFollowUpByIdentity(routedIdentity.chain, routedIdentity.contract_address);
+        if (entry) entries = [entry, ...entries];
+      }
+      setFollowUpEntries(entries);
+    });
+  }, [dataSources]);
+
+  const loadMoreLifecycleRadar = useCallback((cursor: string): void => {
+    if (!dataSources.loadLifecycleRadar) return;
+    void dataSources.loadLifecycleRadar(cursor).then((next) => {
+      if (!next) return;
+      setLifecycleRadar((current) => mergeLifecycleRadar(current, next));
+    });
+  }, [dataSources]);
+
+  const refreshLifecycleRadar = useCallback(async (view?: LifecycleTokenView): Promise<void> => {
+    if (view) setPreferredLifecycleBasket(lifecycleStatusToBasket(view.user_status));
+    if (!dataSources.loadLifecycleRadar) return;
+    const next = await dataSources.loadLifecycleRadar();
+    if (!next) return;
+    setLifecycleRadar(next);
+    setLifecycleSummary(next.summary);
+  }, [dataSources]);
+
   const refreshControlCenterAfterFeedback = useCallback(() => {
     void loadControlCenterStatus().then((value) => {
       if (value) setControlCenterStatus(value);
@@ -315,6 +351,37 @@ export function ProductAppContent({
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    if (!loadVersionPointer) return undefined;
+    const poller = createProductVersionPoller({
+      loadVersion: loadVersionPointer,
+      onVersionChanged: async () => {
+        await loadData();
+        if (isReviewMode()) setReviewAutoUpdatePublished(true);
+      },
+      document: typeof document === "undefined" ? undefined : document,
+      window: typeof window === "undefined" ? undefined : window,
+    });
+    productVersionPollerRef.current = poller;
+    poller.start();
+    return () => {
+      poller.stop();
+      if (productVersionPollerRef.current === poller) productVersionPollerRef.current = null;
+    };
+  }, [loadData, loadVersionPointer]);
+
+  const refreshView = useCallback((): Promise<void> => {
+    if (loadVersionPointer) {
+      void loadVersionPointer().then((version) => productVersionPollerRef.current?.markKnown(version));
+    }
+    return loadData();
+  }, [loadData, loadVersionPointer]);
+
+  useEffect(() => {
+    if (activeSection !== "candidate-detail" && activeSection !== "external-checks" && routeTokenIdentity === null) return;
+    loadFollowUpDetails();
+  }, [activeSection, loadFollowUpDetails, routeTokenIdentity]);
 
   useEffect(() => {
     const handleRouteChange = () => {
@@ -373,6 +440,19 @@ export function ProductAppContent({
     }
     navigate("candidate-detail");
   }, [candidates, navigate]);
+
+  const openLifecycleCard = useCallback((identity: RouteTokenIdentity) => {
+    const card = findLifecycleRadarCard(lifecycleRadar, identity);
+    if (card) setPreferredLifecycleBasket(lifecycleStatusToBasket(card.user_status));
+    setSelectedFollowUpEntryId(null);
+    setSelectedCandidateId(null);
+    setManualVerificationRecord(null);
+    setActiveDetailTab("summary");
+    routeTokenIdentityRef.current = identity;
+    setRouteTokenIdentity(identity);
+    writeCandidateDetailRoute(identity, "summary");
+    setActiveSection("candidate-detail");
+  }, [lifecycleRadar]);
 
   const openFollowUp = useCallback((entryId: string) => {
     const entry = followUpEntries.find((candidate) => candidate.entry_id === entryId);
@@ -499,6 +579,7 @@ export function ProductAppContent({
       return (
         <ProductWorkspaceSection {...copy}>
           <CandidateResultsView
+            key={preferredLifecycleBasket ?? "system"}
             candidates={candidates}
             metadata={metadata}
             readiness={readiness}
@@ -509,10 +590,17 @@ export function ProductAppContent({
             sourceHealth={sourceHealth}
             scannerUnavailableReasonCode={reasonCode}
             followUpStatus={followUpStatus}
+            lifecycleSummary={lifecycleSummary}
+            lifecycleRadar={lifecycleRadar}
+            preferredLifecycleBasket={preferredLifecycleBasket}
+            onLifecycleBasketChange={setPreferredLifecycleBasket}
+            onLifecycleChanged={refreshLifecycleRadar}
+            onLoadMoreLifecycle={loadMoreLifecycleRadar}
             followUpEntries={followUpEntries}
             establishedUniverseStatus={establishedUniverseStatus}
             onOpenCandidate={openCandidate}
             onOpenFollowUp={openFollowUp}
+            onOpenLifecycleCard={openLifecycleCard}
             onOpenExternalChecks={openVerification}
           />
         </ProductWorkspaceSection>
@@ -531,7 +619,7 @@ export function ProductAppContent({
             onOpenFollowUpExternalChecks={openVerification}
             onOpenControlCenter={() => navigate("control-center")}
             initialManualVerification={manualVerificationRecord}
-            onLifecycleChanged={() => loadData()}
+            onLifecycleChanged={refreshLifecycleRadar}
             activeTab={activeDetailTab}
             onActiveTabChange={changeDetailTab}
           />
@@ -573,33 +661,160 @@ export function ProductAppContent({
   };
 
   return (
-    <ProductWorkspaceShell
-      navItems={navItems}
-      activeSection={activeSection}
-      onSectionChange={(section) => section === "feedback" ? openFeedback() : navigate(section)}
-      onSendFeedback={openFeedback}
-      loading={loading}
-      runtimeMode={runtimeMode}
-      resolvedSource={resolvedSource}
-      runId={runId}
-      generatedAt={workspaceGeneratedAt}
-      ageSeconds={ageSeconds}
-      freshnessStatus={freshnessStatus}
-      viewRefreshedAt={viewRefreshedAt}
-      sourceIds={sourceIds}
-      sourceHealth={sourceHealth}
-      readiness={readiness}
-      readinessReasonCode={readinessReasonCode}
-      dataUnavailableMessage={unavailableMessage}
-      dataUnavailableReasonCode={reasonCode}
-      lastKnownGoodRefreshError={lastKnownGoodRefreshError}
-      onRefresh={() => void loadData()}
-      automationStatus={automationStatus}
-      establishedUniverseStatus={establishedUniverseStatus}
-    >
-      {renderSection()}
-    </ProductWorkspaceShell>
+    <>
+      {lifecycleRadar && isReviewMode() && <LifecycleReviewSwitch role={lifecycleRadar.actor.role} autoUpdatePublished={reviewAutoUpdatePublished} />}
+      <ProductWorkspaceShell
+        navItems={navItems}
+        activeSection={activeSection}
+        onSectionChange={(section) => section === "feedback" ? openFeedback() : navigate(section)}
+        onSendFeedback={openFeedback}
+        loading={loading}
+        runtimeMode={runtimeMode}
+        resolvedSource={resolvedSource}
+        runId={runId}
+        generatedAt={workspaceGeneratedAt}
+        ageSeconds={ageSeconds}
+        freshnessStatus={freshnessStatus}
+        viewRefreshedAt={viewRefreshedAt}
+        sourceIds={sourceIds}
+        sourceHealth={sourceHealth}
+        readiness={readiness}
+        readinessReasonCode={readinessReasonCode}
+        dataUnavailableMessage={unavailableMessage}
+        dataUnavailableReasonCode={reasonCode}
+        lastKnownGoodRefreshError={lastKnownGoodRefreshError}
+        onRefresh={() => void refreshView()}
+        automationStatus={automationStatus}
+        establishedUniverseStatus={establishedUniverseStatus}
+      >
+        {renderSection()}
+      </ProductWorkspaceShell>
+    </>
   );
+}
+
+function LifecycleReviewSwitch({
+  role,
+  autoUpdatePublished,
+}: {
+  role: LifecycleRadarView["actor"]["role"];
+  autoUpdatePublished: boolean;
+}) {
+  const copy = { label: "Visual review", camp: "CAMP_USER", owner: "OWNER" };
+  const switchTo = (next: "CAMP_USER" | "OWNER") => {
+    void setLifecycleReviewRole(next).then((changed) => { if (changed) window.location.reload(); });
+  };
+  return (
+    <aside className="personal-radar-review-switch" data-pc1-review-switch="global" aria-label={copy.label}>
+      <span>{copy.label}: {role}</span>
+      <span className="personal-radar-review-auto-update" role="status">
+        {autoUpdatePublished ? "New review version published" : "Auto-update test active"}
+      </span>
+      {role !== "CAMP_USER" && <button type="button" onClick={() => switchTo("CAMP_USER")}>{copy.camp}</button>}
+      {role !== "OWNER" && <button type="button" onClick={() => switchTo("OWNER")}>{copy.owner}</button>}
+    </aside>
+  );
+}
+
+function mergeLifecycleRadar(current: LifecycleRadarView | null, next: LifecycleRadarView): LifecycleRadarView {
+  if (!current) return next;
+  const mergeGroup = <T extends { identity: string }>(left: { cards: T[]; total: number; displayed: number; limit: number; next_cursor: string | null }, right: typeof left) => {
+    const cards = [...left.cards, ...right.cards].filter((card, index, values) => values.findIndex((value) => value.identity === card.identity) === index);
+    return { ...right, cards, displayed: cards.length, total: Math.max(left.total, right.total), next_cursor: right.next_cursor };
+  };
+  const newInbox = mergeGroup(current.new_inbox, next.new_inbox);
+  const actionDue = mergeGroup(current.follow_up.action_due, next.follow_up.action_due);
+  const candidatesReady = mergeGroup(current.follow_up.candidates_ready, next.follow_up.candidates_ready);
+  const observed = mergeGroup(current.follow_up.observed, next.follow_up.observed);
+  const privateNew = mergeGroup(current.private_baskets.new, next.private_baskets.new);
+  const privateFollowUp = mergeGroup(current.private_baskets.follow_up, next.private_baskets.follow_up);
+  const privateMainRadar = mergeGroup(current.private_baskets.main_radar, next.private_baskets.main_radar);
+  const summary = { ...next.summary, follow_up_displayed: actionDue.displayed + candidatesReady.displayed + observed.displayed };
+  return {
+    ...next,
+    summary,
+    new_inbox: newInbox,
+    follow_up: { action_due: actionDue, candidates_ready: candidatesReady, observed },
+    private_new_total: privateNew.total,
+    private_follow_up_total: privateFollowUp.total,
+    private_main_radar_total: privateMainRadar.total,
+    private_baskets: { new: privateNew, follow_up: privateFollowUp, main_radar: privateMainRadar },
+  };
+}
+
+export function findLifecycleRadarCard(
+  radar: LifecycleRadarView | null,
+  identity: RouteTokenIdentity | null,
+): LifecycleRadarCard | null {
+  if (!radar || !identity) return null;
+  return [
+    ...radar.new_inbox.cards,
+    ...radar.follow_up.action_due.cards,
+    ...radar.follow_up.candidates_ready.cards,
+    ...radar.follow_up.observed.cards,
+    ...radar.private_baskets.new.cards,
+    ...radar.private_baskets.follow_up.cards,
+    ...radar.private_baskets.main_radar.cards,
+  ].find((card) => isSameTokenIdentity(card, identity)) ?? null;
+}
+
+export function lifecycleStatusToBasket(status: LifecycleTokenView["user_status"]): RadarBasketId {
+  return status === "NEW" ? "new_emerging" : status === "FOLLOW_UP" ? "maturing" : "established";
+}
+
+export function lifecycleCardToCandidate(card: LifecycleRadarCard): UiTokenCandidate {
+  const conditionsMet = card.conditions.readiness === "CONDITIONS_MET";
+  const missingData = [...new Set([
+    ...card.conditions.missing_data,
+    ...(card.follow_up?.missing_data ?? []),
+  ])];
+  const riskFlags = [...new Set([
+    ...card.conditions.risks,
+    ...(card.follow_up?.risk_flags ?? []),
+  ])];
+  const unresolved = [...card.conditions.conditions_unmet, ...missingData];
+  return {
+    id: `lifecycle:${card.identity}`,
+    runId: "lifecycle-radar",
+    symbol: card.symbol ?? card.display_name ?? card.contract_address,
+    name: card.display_name ?? card.symbol ?? card.contract_address,
+    chain: card.chain,
+    dex: "",
+    source: "lifecycle_radar",
+    contractAddress: card.contract_address,
+    pairAddress: "",
+    sourceUrl: "",
+    discoveryBasket: "new_emerging",
+    discoveryMethod: "dexscreener_latest_token_profiles",
+    observationOnly: true,
+    establishedEligible: false,
+    universeVersion: null,
+    universeEntryIndex: null,
+    addressIdentityVerified: card.conditions.conditions_met.includes("IDENTITY_VALID"),
+    priceUsd: card.market?.price_usd ?? null,
+    marketCap: card.market?.market_cap_usd ?? null,
+    fdvUsd: card.market?.market_cap_usd ?? null,
+    liquidity: card.market?.liquidity_usd ?? null,
+    volume24h: card.market?.volume_24h_usd ?? null,
+    volumeMarketCapRatio: card.market?.market_cap_usd && card.market.market_cap_usd > 0 && card.market.volume_24h_usd != null
+      ? card.market.volume_24h_usd / card.market.market_cap_usd
+      : null,
+    pairCreatedAt: card.first_seen_at,
+    pairAgeDays: null,
+    basicFilterStatus: conditionsMet ? "passed_basic_filter" : "not_evaluated",
+    securityLabel: card.conditions.security_state,
+    finalLabel: conditionsMet ? "WATCHLIST" : "NEEDS_MANUAL_VERIFICATION",
+    mainReason: unresolved[0] ?? "LIFECYCLE_RADAR_RECORD",
+    filterReasons: card.conditions.conditions_unmet,
+    criticalReasons: riskFlags,
+    warningReasons: missingData,
+    finalReasons: unresolved,
+    missingData,
+    riskFlags,
+    security: null,
+    scorecard: null,
+    lastCheckedAt: card.follow_up?.last_checked_at ?? card.last_seen_at,
+  };
 }
 
 export function selectAIResearchReviewCandidate(candidates: UiTokenCandidate[]): UiTokenCandidate | null {
@@ -612,4 +827,8 @@ export function selectAIResearchReviewCandidate(candidates: UiTokenCandidate[]):
 function resolveSection(): ProductSectionId {
   if (typeof window === "undefined") return "candidate-results";
   return HASH_TO_SECTION[window.location.hash.trim().toLowerCase()] ?? "candidate-results";
+}
+
+function isReviewMode(): boolean {
+  return typeof window !== "undefined" && new URLSearchParams(window.location.search).get("pc1_review") === "1";
 }

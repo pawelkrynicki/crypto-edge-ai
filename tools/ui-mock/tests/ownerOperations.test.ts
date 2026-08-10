@@ -48,14 +48,14 @@ describe("owner operations capability and UI boundary", () => {
     const english = renderOwner(status, "en");
     const polish = renderOwner(status, "pl");
     assert.match(english, /Owner operations/);
-    assert.match(english, /One-time data refresh/);
-    assert.match(english, /Preview refresh plan/);
+    assert.match(english, /Run scan now/);
+    assert.match(english, /Preview scan plan/);
     assert.match(english, /real refresh remains blocked/);
     assert.match(polish, /Operacje właściciela/);
-    assert.match(polish, /Jednorazowe odświeżenie danych/);
-    assert.match(polish, /Sprawdź plan odświeżenia/);
+    assert.match(polish, /Uruchom skan teraz/);
+    assert.match(polish, /Sprawdź plan skanu/);
     assert.match(polish, /prawdziwe odświeżenie pozostaje zablokowane/);
-    assert.match(english, /<button[^>]*disabled=""[^>]*>[\s\S]*?Run one-time refresh<\/button>/);
+    assert.match(english, /<button[^>]*disabled=""[^>]*>[\s\S]*?Run scan now<\/button>/);
   });
 
   it("keeps the local launcher DISABLED by default and exposes only the REVIEW_SAFE review variant", async () => {

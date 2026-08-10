@@ -40,6 +40,21 @@ export type OwnerRefreshResult = {
   run_id?: string;
   error_code?: string;
   last_known_good_preserved: boolean;
+  lifecycle_receipt?: {
+    found: number;
+    valid: number;
+    rejected: number;
+    new_inbox: number;
+    new_inbox_updated: number;
+    promoted_to_follow_up: number;
+    promoted_to_main_radar: number;
+    duplicates: number;
+    lifecycle_cycle_id: string | null;
+    lifecycle_status: "SUCCESS" | "PARTIAL" | "FAILED" | null;
+    source_errors: string[];
+    snapshot_at: string | null;
+    honeypot_is_calls: 0;
+  };
 };
 
 export async function loadOwnerOperationsStatus(): Promise<OwnerOperationsStatus | null> {
@@ -125,7 +140,18 @@ function isOwnerRefreshResult(value: unknown): value is OwnerRefreshResult {
     && ["SUCCESS", "PARTIAL", "NO_ACTION", "FAILED", "RUN_ALREADY_IN_PROGRESS"].includes(String(value.status))
     && (value.run_id === undefined || isSafeText(value.run_id))
     && (value.error_code === undefined || isSafeText(value.error_code))
-    && typeof value.last_known_good_preserved === "boolean";
+    && typeof value.last_known_good_preserved === "boolean"
+    && (value.lifecycle_receipt === undefined || isLifecycleReceipt(value.lifecycle_receipt));
+}
+
+function isLifecycleReceipt(value: unknown): boolean {
+  return isRecord(value)
+    && ["found", "valid", "rejected", "new_inbox", "new_inbox_updated", "promoted_to_follow_up", "promoted_to_main_radar", "duplicates"].every((key) => Number.isSafeInteger(value[key]) && Number(value[key]) >= 0)
+    && isStringArray(value.source_errors)
+    && isNullableIso(value.snapshot_at)
+    && (value.lifecycle_cycle_id === null || isSafeText(value.lifecycle_cycle_id))
+    && (value.lifecycle_status === null || ["SUCCESS", "PARTIAL", "FAILED"].includes(String(value.lifecycle_status)))
+    && value.honeypot_is_calls === 0;
 }
 
 function isMode(value: unknown): value is OwnerOperationsMode {

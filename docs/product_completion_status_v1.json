@@ -1,0 +1,30 @@
+{
+  "schema_version": "product_completion_status_v1",
+  "status": "PRODUCT_COMPLETION_REQUIRED",
+  "technical_freeze_status": "TECHNICAL_BASE_ACCEPTED",
+  "current_stage": "PC.1",
+  "target_date": "2026-08-15",
+  "hard_limit_date": "2026-08-20",
+  "camp_start_date": "2026-09-12",
+  "completed_stages": [
+    "STAB.1",
+    "STAB.2",
+    "RC.1",
+    "P1.1_Radar_Operational_Usability",
+    "Final_Local_Regression_and_Technical_Freeze"
+  ],
+  "remaining_stages": [
+    "PC.1_code_review_and_acceptance",
+    "AI",
+    "Research_Playbook",
+    "CAMP_users_and_accounts",
+    "final_VPS"
+  ],
+  "pc1": {
+    "automatic_system_lifecycle": "IMPLEMENTED_PENDING_REVIEW",
+    "private_user_lifecycle": "IMPLEMENTED_PENDING_REVIEW",
+    "aikintel_started": false,
+    "vps_started": false
+  },
+  "historical_freeze_manifest_modified": false
+}

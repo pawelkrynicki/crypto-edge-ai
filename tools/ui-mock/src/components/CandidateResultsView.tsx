@@ -34,9 +34,11 @@ import type {
   UiTokenCandidate,
 } from "../types/scannerTypes";
 import type { FollowUpPublicEntry, FollowUpPublicStatus } from "../types/followUpTypes";
+import type { LifecycleRadarCard, LifecycleRadarView, LifecycleSummary, LifecycleTokenView } from "../types/lifecycleTypes";
 import type { EstablishedUniverseStatus } from "../services/establishedUniverseStatusDataSource";
 import { ActionButton, CopyableAddress, ReadOnlyCard, StatusBadge, TechnicalDetails } from "./ProductUi";
 import { AIResearchRadarStatus } from "./AIResearchSection";
+import { PersonalRadarPanel } from "./PersonalRadarPanel";
 import {
   lifecycleStageLabel,
   TokenCheckpointAxis,
@@ -58,10 +60,17 @@ interface CandidateResultsViewProps {
   sourceHealth?: ProductSourceHealthResolution;
   scannerUnavailableReasonCode?: string | null;
   followUpStatus?: FollowUpPublicStatus | null;
+  lifecycleSummary?: LifecycleSummary | null;
+  lifecycleRadar?: LifecycleRadarView | null;
+  preferredLifecycleBasket?: BasketId | null;
+  onLifecycleBasketChange?: (basket: BasketId) => void;
+  onLifecycleChanged?: (view: LifecycleTokenView) => void | Promise<void>;
+  onLoadMoreLifecycle?: (cursor: string) => void;
   followUpEntries?: FollowUpPublicEntry[];
   establishedUniverseStatus?: EstablishedUniverseStatus | null;
   onOpenCandidate?: (candidateId: string) => void;
   onOpenFollowUp?: (entryId: string) => void;
+  onOpenLifecycleCard?: (identity: { chain: string; contract_address: string }) => void;
   onOpenExternalChecks?: (candidate: UiTokenCandidate) => void;
 }
 
@@ -76,10 +85,17 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
   sourceHealth,
   scannerUnavailableReasonCode = null,
   followUpStatus = null,
+  lifecycleSummary = null,
+  lifecycleRadar = null,
+  preferredLifecycleBasket = null,
+  onLifecycleBasketChange,
+  onLifecycleChanged,
+  onLoadMoreLifecycle,
   followUpEntries = [],
   establishedUniverseStatus = null,
   onOpenCandidate,
   onOpenFollowUp,
+  onOpenLifecycleCard,
   onOpenExternalChecks,
 }) => {
   const { locale, t } = useProductLocale();
@@ -100,26 +116,24 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
   const establishedFollowUpEntries = followUpEntries.filter((entry) => (
     entry.lifecycle_status === "ESTABLISHED" || entry.established_membership
   ));
-  const [activeBasket, setActiveBasket] = useState<BasketId>(() => resolveInitialBasket(
+  const [activeBasket, setActiveBasket] = useState<BasketId>(() => preferredLifecycleBasket ?? resolveInitialBasket(
     candidates,
     followUpEntries,
     Boolean(scannerUnavailableReasonCode),
   ));
-  const [basketManuallySelected, setBasketManuallySelected] = useState(false);
   const [lifecycleGuideOpen, setLifecycleGuideOpen] = useState(false);
-  const visibleBasket = basketManuallySelected
-    ? activeBasket
-    : resolveInitialBasket(candidates, followUpEntries, Boolean(scannerUnavailableReasonCode));
+  const visibleBasket = activeBasket;
   const selectBasket = (basket: BasketId) => {
-    setBasketManuallySelected(true);
     setActiveBasket(basket);
+    onLifecycleBasketChange?.(basket);
   };
 
-  const establishedEntries = establishedUniverseStatus?.entries_enabled
+  const establishedEntries = lifecycleRadar?.main_radar.total
+    ?? establishedUniverseStatus?.entries_enabled
     ?? metadata?.established?.entries_enabled
     ?? establishedCandidates.length;
-  const followUpTotal = followUpStatus?.entries_total ?? 0;
-  const followUpDisplayed = displayedFollowUpEntries.length;
+  const followUpTotal = lifecycleSummary?.system_follow_up_total ?? followUpStatus?.entries_total ?? 0;
+  const followUpDisplayed = lifecycleRadar?.summary.follow_up_displayed ?? lifecycleSummary?.follow_up_displayed ?? displayedFollowUpEntries.length;
   const establishedAfterFilters = metadata?.established?.candidates_after_filters
     ?? establishedCandidates.filter((candidate) => candidate.basicFilterStatus === "passed_basic_filter").length;
   const securityChecked = establishedCandidates.filter((candidate) => (
@@ -130,6 +144,7 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
     ?? resolveProductSourceHealth({ metadata, readiness, sourceIds });
   const sourceState = presentProductSourceHealth(resolvedSourceHealth, locale, "summary");
   const stale = freshnessStatus === "STALE" || (ageSeconds !== null && ageSeconds > 1800);
+  const privateViewCopy = locale === "pl" ? "TwĂłj prywatny widok" : "Your private view";
 
   return (
     <div className="candidate-results-view product-radar">
@@ -150,10 +165,11 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
       </section>
 
       <section className="product-summary-grid primary" aria-label={t("radar.summary")}>
-        <SummaryCard label={t("radar.newProjects")} value={String(newCandidates.length)} detail={t("radar.observationOnly")} />
-        <SummaryCard label={t("followUp.totalCount")} value={String(followUpTotal)} detail={t("followUp.totalCountDetail")} />
-        <SummaryCard label={t("followUp.displayedCount")} value={String(followUpDisplayed)} detail={t("followUp.displayedCountDetail")} />
-        <SummaryCard label={t("followUp.candidateCount")} value={String(followUpStatus?.candidate_count ?? 0)} detail={t("followUp.candidateCountDetail")} tone="accent" />
+        <SummaryCard label={t("radar.newProjects")} value={String(lifecycleSummary?.system_new_total ?? newCandidates.length)} detail={lifecycleSummary ? t("lifecycle.persistentNewInbox") : t("radar.observationOnly")} />
+        <SummaryCard label={t("lifecycle.totalObserved")} value={String(followUpTotal)} detail={t("followUp.totalCountDetail")} />
+        <SummaryCard label={t("lifecycle.actionDueNow")} value={String(lifecycleSummary?.follow_up_action_due ?? followUpStatus?.due_count ?? 0)} detail={t("lifecycle.checkpointsAction")} />
+        <SummaryCard label={t("lifecycle.mainRadarCandidates")} value={String(lifecycleSummary?.follow_up_candidates_ready ?? followUpStatus?.candidate_count ?? 0)} detail={t("followUp.candidateCountDetail")} tone="accent" />
+        <SummaryCard label={t("lifecycle.displayedNow")} value={String(followUpDisplayed)} detail={t("followUp.displayedCountDetail")} />
         <SummaryCard label={t("radar.establishedEntries")} value={String(establishedEntries)} detail={t("radar.activeUniverseAddresses")} />
         <SummaryCard
           label={t("app.generated")}
@@ -185,10 +201,10 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
         </button>
         <ol id="radar-lifecycle-guide-content" hidden={!lifecycleGuideOpen}>
           <li>{locale === "pl" ? "Nowy token zostaje wykryty." : "A new token is detected."}</li>
-          <li>{locale === "pl" ? "Właściciel może dodać token do dalszej obserwacji po sprawdzeniu tożsamości i warunków." : "The owner may add the token to continued observation after reviewing identity and conditions."}</li>
+          <li>{locale === "pl" ? "System automatycznie awansuje projekt po spełnieniu jawnych warunków; użytkownik może wcześniej przesunąć go w swoim prywatnym Radarze." : "The system promotes a project after explicit conditions are met; a user may move it earlier in their private Radar."}</li>
           <li>{locale === "pl" ? "Token przechodzi checkpointy 1 / 3 / 7 / 14 / 30 dni." : "The token moves through 1 / 3 / 7 / 14 / 30-day checkpoints."}</li>
           <li>{locale === "pl" ? "Po spełnieniu filtrów może zostać kandydatem." : "After meeting the filters, it may become a candidate."}</li>
-          <li>{locale === "pl" ? "Tylko właściciel może dodać go do Głównego Radaru." : "Only the owner can add it to the Main Radar."}</li>
+          <li>{locale === "pl" ? "Prywatny ruch nie zmienia statusu innych użytkowników, a owner/admin nie wykonuje codziennych ręcznych przesunięć." : "A private move does not change other users’ status, and owner/admin do not perform daily manual moves."}</li>
         </ol>
       </section>
 
@@ -201,40 +217,44 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
       <section className="basket-switcher" aria-label={t("radar.basketSelection")}>
         <button
           type="button"
-          className={visibleBasket === "new_emerging" ? "active" : ""}
+          className={activeBasket === "new_emerging" ? "active" : ""}
           onClick={() => selectBasket("new_emerging")}
-          aria-pressed={visibleBasket === "new_emerging"}
+          aria-pressed={activeBasket === "new_emerging"}
           data-lifecycle-layer="observation"
         >
           <span>{t("radar.newBasket")}</span>
-          <strong>{newCandidates.length}</strong>
-          <small>{t("radar.newBasketDescription")}</small>
+          <strong>{lifecycleRadar?.private_new_total ?? lifecycleSummary?.system_new_total ?? newCandidates.length}</strong>
+          <small>{lifecycleRadar ? privateViewCopy : t("radar.newBasketDescription")}</small>
         </button>
         <button
           type="button"
-          className={visibleBasket === "maturing" ? "active" : ""}
+          className={activeBasket === "maturing" ? "active" : ""}
           onClick={() => selectBasket("maturing")}
-          aria-pressed={visibleBasket === "maturing"}
+          aria-pressed={activeBasket === "maturing"}
           data-lifecycle-layer="follow-up"
         >
           <span>{t("followUp.basket")}</span>
-          <strong>{followUpDisplayed}</strong>
-          <small>{t("followUp.displayedOfTotal", { displayed: followUpDisplayed, total: followUpTotal })}</small>
+          <strong>{lifecycleRadar?.private_follow_up_total ?? followUpDisplayed}</strong>
+          <small>{lifecycleRadar ? privateViewCopy : t("followUp.displayedOfTotal", { displayed: followUpDisplayed, total: followUpTotal })}</small>
         </button>
         <button
           type="button"
-          className={visibleBasket === "established" ? "active" : ""}
+          className={activeBasket === "established" ? "active" : ""}
           onClick={() => selectBasket("established")}
-          aria-pressed={visibleBasket === "established"}
+          aria-pressed={activeBasket === "established"}
           data-lifecycle-layer="established"
         >
           <span>{t("radar.establishedBasket")}</span>
-          <strong>{establishedEntries}</strong>
-          <small>{getEstablishedTabStatus(metadata, readiness, locale, establishedUniverseStatus)}</small>
+          <strong>{lifecycleRadar?.private_main_radar_total ?? establishedEntries}</strong>
+          <small>{lifecycleRadar ? privateViewCopy : getEstablishedTabStatus(metadata, readiness, locale, establishedUniverseStatus)}</small>
         </button>
       </section>
 
-      {visibleBasket === "new_emerging" && scannerUnavailableReasonCode ? (
+      {lifecycleRadar && scannerUnavailableReasonCode && <section className="product-partial-data lifecycle-scanner-warning" role="status"><strong>{t("status.delayed")}</strong><span>{t("lifecycle.scannerUnavailable")}</span></section>}
+      {!lifecycleRadar && visibleBasket !== "established" && <p className="product-inline-warning personal-radar-unavailable" role="status">{t("lifecycle.privateStatusesUnavailable")}</p>}
+      {visibleBasket === "new_emerging" && lifecycleRadar ? (
+        <PrivateLifecycleBasket basket="new" group={lifecycleRadar.private_baskets.new} locale={locale} onLoadMore={onLoadMoreLifecycle} onOpenDetails={onOpenLifecycleCard} onLifecycleChanged={onLifecycleChanged} />
+      ) : visibleBasket === "new_emerging" && scannerUnavailableReasonCode ? (
         <BasketUnavailable
           title={t("radar.unavailableTitle")}
           reasonCode={scannerUnavailableReasonCode}
@@ -249,13 +269,19 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
           followUpStatus={followUpStatus}
           onOpenCandidate={onOpenCandidate}
           onOpenExternalChecks={onOpenExternalChecks}
+          privateStatusesUnavailable={!lifecycleRadar}
         />
+      ) : visibleBasket === "maturing" && lifecycleRadar ? (
+        <PrivateLifecycleBasket basket="follow_up" group={lifecycleRadar.private_baskets.follow_up} locale={locale} onLoadMore={onLoadMoreLifecycle} onOpenDetails={onOpenLifecycleCard} onLifecycleChanged={onLifecycleChanged} />
       ) : visibleBasket === "maturing" ? (
         <MaturingFollowUpBasket
           entries={displayedFollowUpEntries}
           status={followUpStatus}
           onOpenFollowUp={onOpenFollowUp}
+          privateStatusesUnavailable={!lifecycleRadar}
         />
+      ) : lifecycleRadar ? (
+        <PrivateLifecycleBasket basket="main_radar" group={lifecycleRadar.private_baskets.main_radar} locale={locale} onLoadMore={onLoadMoreLifecycle} onOpenDetails={onOpenLifecycleCard} onLifecycleChanged={onLifecycleChanged} />
       ) : (
         <EstablishedBasket
           candidates={establishedCandidates}
@@ -272,14 +298,79 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
   );
 };
 
+function PrivateLifecycleBasket({ basket, group, locale, onLoadMore, onOpenDetails, onLifecycleChanged }: { basket: "new" | "follow_up" | "main_radar"; group: LifecycleRadarView["private_baskets"]["new"]; locale: ProductLocale; onLoadMore?: (cursor: string) => void; onOpenDetails?: (identity: { chain: string; contract_address: string }) => void; onLifecycleChanged?: (view: LifecycleTokenView) => void | Promise<void> }) {
+  const copy = locale === "pl"
+    ? {
+      new: { title: "Nowe projekty", empty: "Brak projektĂłw w Twoim prywatnym widoku Nowe." },
+      follow_up: { title: "Dalsza obserwacja", empty: "Brak projektĂłw w Twojej prywatnej dalszej obserwacji." },
+      main_radar: { title: "GĹ‚Ăłwny Radar", empty: "Brak projektĂłw w Twoim prywatnym GĹ‚Ăłwnym Radarze." },
+      absent: "Projekt nie wystÄ…piĹ‚ w ostatnim skanie, ale pozostaje w Twoim prywatnym Radarze.",
+      more: "PokaĹĽ wiÄ™cej",
+      privateView: "TwĂłj prywatny widok",
+    }
+    : {
+      new: { title: "New projects", empty: "No projects in your private New view." },
+      follow_up: { title: "Follow-up", empty: "No projects in your private Follow-up." },
+      main_radar: { title: "Main Radar", empty: "No projects in your private Main Radar." },
+      absent: "This project was not present in the latest scan, but remains in your private Radar.",
+      more: "Show more",
+      privateView: "Your private view",
+    };
+  const basketCopy = copy[basket];
+  return <section className={`basket-content private-lifecycle-basket private-lifecycle-${basket}`} aria-label={basketCopy.title}>
+    <header className="basket-heading"><div><span>{basketCopy.title}</span><h3>{group.displayed}/{group.total}</h3><p>{copy.privateView}</p></div></header>
+    {group.cards.length === 0 ? <BasketEmpty title={basketCopy.title} detail={basketCopy.empty} code={`PRIVATE_${basket.toUpperCase()}_EMPTY`} /> : <div className="product-candidate-list">{group.cards.map((card) => <LifecycleRadarCardView key={card.identity} card={card} locale={locale} absentNotice={copy.absent} onOpenDetails={onOpenDetails} onLifecycleChanged={onLifecycleChanged} />)}</div>}
+    {group.next_cursor && <button type="button" className="product-secondary-action" data-lifecycle-more={`private_${basket}`} onClick={() => onLoadMore?.(group.next_cursor!)}>{copy.more}</button>}
+  </section>;
+}
+
+function LifecycleRadarCardView({ card, locale, absentNotice, onOpenDetails, onLifecycleChanged }: { card: LifecycleRadarCard; locale: ProductLocale; absentNotice?: string; onOpenDetails?: (identity: { chain: string; contract_address: string }) => void; onLifecycleChanged?: (view: LifecycleTokenView) => void | Promise<void> }) {
+  const { t } = useProductLocale();
+  const copy = locale === "pl"
+    ? { firstSeen: "Pierwsze wykrycie", lastSeen: "Ostatnie wykrycie", price: "Cena", marketCap: "Kapitalizacja", liquidity: "Płynność", volume: "Wolumen 24h", snapshot: "Snapshot", nextCheck: "Następne sprawdzenie", missingData: "Brakujące dane", none: "Brak" }
+    : { firstSeen: "First seen", lastSeen: "Last seen", price: "Price", marketCap: "Market cap", liquidity: "Liquidity", volume: "24h volume", snapshot: "Snapshot", nextCheck: "Next check", missingData: "Missing data", none: "None" };
+  return <article className="product-candidate-card observation token-card-compact lifecycle-radar-card" data-lifecycle-card={card.identity}>
+    <header className="product-candidate-topline"><div><span className="candidate-results-eyebrow">{formatChain(card.chain, locale === "pl" ? "Brak sieci" : "Network unavailable")}</span><h4>{card.symbol ?? card.display_name ?? card.contract_address} <small>{card.display_name ?? ""}</small></h4><CopyableAddress value={card.contract_address} displayValue={shortenAddress(card.contract_address, locale === "pl" ? "Brak danych" : "No data")} copyLabel={locale === "pl" ? "Kopiuj kontrakt" : "Copy contract"} copiedLabel={locale === "pl" ? "Skopiowano" : "Copied"} className="contract-line" /></div></header>
+    <div className="product-metrics-grid">
+      <Metric label={copy.firstSeen} value={formatProductDateTime(card.first_seen_at, locale)} />
+      <Metric label={copy.lastSeen} value={formatProductDateTime(card.last_seen_at, locale)} />
+      <Metric label={copy.price} value={formatPrice(card.market?.price_usd ?? null, locale === "pl" ? "Brak danych" : "No data")} />
+      <Metric label={copy.marketCap} value={formatProductUsd(card.market?.market_cap_usd ?? null, locale, locale === "pl" ? "Brak danych" : "No data")} />
+      <Metric label={copy.liquidity} value={formatProductUsd(card.market?.liquidity_usd ?? null, locale, locale === "pl" ? "Brak danych" : "No data")} />
+      <Metric label={copy.volume} value={formatProductUsd(card.market?.volume_24h_usd ?? null, locale, locale === "pl" ? "Brak danych" : "No data")} />
+    </div>
+    <div className="candidate-explanation-grid">
+      <Explanation label={copy.snapshot} value={card.snapshot_present ? (locale === "pl" ? "Obecny" : "Present") : (locale === "pl" ? "Brak w ostatnim skanie" : "Absent from latest scan")} />
+      <Explanation label={copy.nextCheck} value={card.follow_up?.next_check_at ? formatProductDateTime(card.follow_up.next_check_at, locale) : copy.none} />
+      <Explanation label={copy.missingData} value={card.follow_up?.missing_data.length ? card.follow_up.missing_data.join(", ") : copy.none} />
+    </div>
+    {card.snapshot_absence_notice && absentNotice && <p className="product-inline-warning">{absentNotice}</p>}
+    <footer className="product-candidate-footer lifecycle-radar-card-footer">
+      <PersonalRadarPanel
+        chain={card.chain}
+        contractAddress={card.contract_address}
+        initialView={card}
+        onChanged={onLifecycleChanged}
+        trailingAction={onOpenDetails ? (
+          <ActionButton variant="primary" icon="arrow" iconPosition="end" onClick={() => onOpenDetails({ chain: card.chain, contract_address: card.contract_address })}>
+            {t("radar.openDetails")}
+          </ActionButton>
+        ) : null}
+      />
+    </footer>
+  </article>;
+}
+
 export function MaturingFollowUpBasket({
   entries,
   status,
   onOpenFollowUp,
+  privateStatusesUnavailable = false,
 }: {
   entries: FollowUpPublicEntry[];
   status?: FollowUpPublicStatus | null;
   onOpenFollowUp?: (entryId: string) => void;
+  privateStatusesUnavailable?: boolean;
 }) {
   const { locale, t } = useProductLocale();
   if (status && (!status.store_available || status.validation_status === "invalid" || status.validation_status === "unavailable")) {
@@ -364,6 +455,7 @@ export function MaturingFollowUpBasket({
                 <p>{entry.lifecycle_status === "CANDIDATE_FOR_ESTABLISHED"
                   ? (locale === "pl" ? "Nie dodano automatycznie. Następny krok: decyzja właściciela." : "Not promoted automatically. Next: owner decision.")
                   : (locale === "pl" ? "Dalsze sprawdzenie nastąpi automatycznie." : "The next check happens automatically.")}</p>
+                <PersonalRadarPanel chain={entry.chain} contractAddress={entry.contract_address} unavailable={privateStatusesUnavailable} />
                 <ActionButton variant="primary" icon="arrow" iconPosition="end" onClick={() => onOpenFollowUp(entry.entry_id)}>
                   {t("radar.openDetails")}
                 </ActionButton>
@@ -384,6 +476,7 @@ export function NewEmergingBasket({
   followUpStatus,
   onOpenCandidate,
   onOpenExternalChecks,
+  privateStatusesUnavailable = false,
 }: {
   candidates: UiTokenCandidate[];
   metadata?: ScannerDiscoveryMetadata["new_emerging"];
@@ -392,6 +485,7 @@ export function NewEmergingBasket({
   followUpStatus?: FollowUpPublicStatus | null;
   onOpenCandidate?: (candidateId: string) => void;
   onOpenExternalChecks?: (candidate: UiTokenCandidate) => void;
+  privateStatusesUnavailable?: boolean;
 }) {
   const { t } = useProductLocale();
   const state = readiness?.discovery.new_emerging;
@@ -443,6 +537,7 @@ export function NewEmergingBasket({
             followUpStatus={followUpStatus}
             onOpenCandidate={onOpenCandidate}
             onOpenExternalChecks={onOpenExternalChecks}
+            privateStatusesUnavailable={privateStatusesUnavailable}
           />
         ))}
       </div>
@@ -456,12 +551,14 @@ function NewCandidateCard({
   followUpStatus,
   onOpenCandidate,
   onOpenExternalChecks,
+  privateStatusesUnavailable,
 }: {
   candidate: UiTokenCandidate;
   followUp?: FollowUpPublicEntry | null;
   followUpStatus?: FollowUpPublicStatus | null;
   onOpenCandidate?: (candidateId: string) => void;
   onOpenExternalChecks?: (candidate: UiTokenCandidate) => void;
+  privateStatusesUnavailable: boolean;
 }) {
   const { locale, t } = useProductLocale();
   const lifecycle = resolveTokenLifecycle({ candidate, followUp, followUpStatus });
@@ -512,7 +609,6 @@ function NewCandidateCard({
         contractAddress={candidate.contractAddress}
         onOpen={onOpenCandidate ? () => onOpenCandidate(candidate.id) : undefined}
       />
-
       <footer className="product-candidate-footer">
         <div>
           <span>{t("radar.sourceAndCheck")}</span>
@@ -520,6 +616,7 @@ function NewCandidateCard({
           <small>{formatProductDateTime(candidate.lastCheckedAt, locale)}</small>
         </div>
         <p>{t("radar.newBoundary")}</p>
+        <PersonalRadarPanel chain={candidate.chain} contractAddress={candidate.contractAddress} unavailable={privateStatusesUnavailable} />
         <CandidateActions candidate={candidate} onOpenCandidate={onOpenCandidate} onOpenExternalChecks={onOpenExternalChecks} />
       </footer>
     </article>

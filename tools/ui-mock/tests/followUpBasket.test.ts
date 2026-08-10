@@ -74,7 +74,7 @@ describe("Follow-up read-only product boundary", () => {
   it("handles 100 concurrent GETs and 100 UI-style refresh reads with zero writes or provider calls", async () => {
     const directory = await mkdtemp(resolve(tmpdir(), "follow-up-reads-"));
     const storePath = resolve(directory, "store.json");
-    let providerCalls = 0;
+    const providerCalls = 0;
     try {
       await updateFollowUpStore(() => seedStore(), { storePath, now: new Date(START) });
       const before = await readFile(storePath, "utf8");
@@ -117,7 +117,7 @@ describe("Follow-up read-only product boundary", () => {
       if (locale === "pl") {
         assert.doesNotMatch(markup, />MATURING</);
         assert.doesNotMatch(markup, /CANDIDATE FOR ESTABLISHED/);
-        assert.match(markup, /Kandydaci do Established/);
+        assert.match(markup, /Kandydaci do Głównego Radaru/);
       } else {
         assert.match(markup, /Maturing/);
         assert.match(markup, /Candidate for Established/);

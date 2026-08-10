@@ -12,7 +12,7 @@ import { CandidateDetailView } from "../src/components/CandidateDetailView.js";
 import { AIResearchSection } from "../src/components/AIResearchSection.js";
 import { ExternalVerificationLinksView } from "../src/components/ExternalVerificationLinksView.js";
 import { VerificationTokenBrowser } from "../src/components/VerificationTokenBrowser.js";
-import { CandidateResultsView, MaturingFollowUpBasket } from "../src/components/CandidateResultsView.js";
+import { CandidateResultsView } from "../src/components/CandidateResultsView.js";
 import { ProductWorkspaceShell } from "../src/components/ProductWorkspaceShell.js";
 import { PERSISTABLE_SCANNER_SAMPLE } from "../src/fixtures/persistableScannerSample.js";
 import { mapPersistableScannerOutputToUiCandidates } from "../src/adapters/scannerOutputAdapter.js";
@@ -178,10 +178,10 @@ describe("P1.1 Radar operational usability", () => {
     assert.match(markup, /DexScreener/);
     assert.match(markup, /Alternative\.me/);
     assert.match(markup, /DefiLlama/);
-    assert.match(markup, /Rekordy Follow-up/);
+    assert.match(markup, /Łącznie obserwowane/);
     assert.match(markup, /Wyświetlane teraz/);
-    assert.match(markup, /Kandydaci do Established/);
-    assert.match(markup, /Aktywne wpisy|Established/);
+    assert.match(markup, /Kandydaci do Głównego Radaru/);
+    assert.match(markup, /Wpisy Established/);
   });
 
   it("keeps Follow-up usable without scanner data and explains the 100-of-385 limit", () => {
@@ -220,7 +220,7 @@ describe("P1.1 Radar operational usability", () => {
       loadFollowUpList: async () => { calls.list += 1; return { schema_version: "follow_up_list_v1", validation_status: "valid", entries: [entry] }; },
       now: () => "2026-08-02T14:00:00.000Z",
     };
-    const browser = installBrowser("http://127.0.0.1:4180/#candidate-results");
+    const browser = installBrowser(`http://127.0.0.1:4180/?chain=${entry.chain}&contract=${entry.contract_address}#candidate-detail`);
     const originalFetch = globalThis.fetch;
     const originalActEnvironment = globalThis.IS_REACT_ACT_ENVIRONMENT;
     const localRequests: Array<{ url: string; method: string }> = [];
@@ -241,8 +241,6 @@ describe("P1.1 Radar operational usability", () => {
         await flushPromises();
       });
 
-      const basket = renderer!.root.findByType(MaturingFollowUpBasket);
-      await act(async () => { basket.props.onOpenFollowUp(entry.entry_id); });
       let detail = renderer!.root.findByType(CandidateDetailView);
       assert.equal(detail.props.followUp.chain, entry.chain);
       assert.equal(detail.props.followUp.contract_address, entry.contract_address);

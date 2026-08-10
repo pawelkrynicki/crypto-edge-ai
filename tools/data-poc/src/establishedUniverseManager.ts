@@ -2,7 +2,6 @@ import { createHash, randomUUID } from "node:crypto";
 import { mkdir, open, readFile, rename, rm } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import {
-  ESTABLISHED_ADDRESS_UNIVERSE_CONFIG_PATH,
   ESTABLISHED_ADDRESS_UNIVERSE_MAX_ENTRIES,
   ESTABLISHED_UNIVERSE_SCHEMA_VERSION,
   ESTABLISHED_UNIVERSE_STORE_SCHEMA_VERSION,
@@ -17,7 +16,6 @@ import {
   type EstablishedAddressUniverseEntry,
   type SupportedEstablishedChain,
 } from "./establishedAddressUniverse.js";
-import { resolveRepoFile } from "./sourceRegistryValidator.js";
 
 export const ESTABLISHED_UNIVERSE_HISTORY_LIMIT = 20;
 export const ESTABLISHED_UNIVERSE_AUDIT_LIMIT = 200;
@@ -118,7 +116,7 @@ export async function readEstablishedUniverseStore(storePath = getDefaultEstabli
     return validateEstablishedUniverseStore(JSON.parse(await readFile(path, "utf8")) as unknown);
   } catch (error) {
     if (!isErrorCode(error, "ENOENT")) throw normalizeStoreReadError(error);
-    const initial = loadEstablishedAddressUniverse(resolveRepoFile(ESTABLISHED_ADDRESS_UNIVERSE_CONFIG_PATH));
+    const initial = loadEstablishedAddressUniverse();
     return {
       schema_version: ESTABLISHED_UNIVERSE_STORE_SCHEMA_VERSION,
       current: initial,

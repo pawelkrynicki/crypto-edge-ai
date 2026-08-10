@@ -20,6 +20,8 @@ import {
   readLatestScannerOutput,
   ScannerOutputError,
 } from "./latestScannerOutput.js";
+import { readProductVersion, type ProductVersionOptions } from "./productVersion.js";
+import { createProductReviewPublication, type ProductReviewPublicationOptions } from "./productReviewPublication.js";
 import type { ReviewSessionFileStoreOptions } from "./reviewSessionFileStore.js";
 import { createConfiguredReviewSessionStorageProvider } from "./reviewSessionProviderConfig.js";
 import {
@@ -97,6 +99,10 @@ import {
   type ManualOwnerActionsOptions,
 } from "./manualOwnerActions.js";
 import type { ManualVerificationVerdict } from "../../data-poc/src/followUpBasket.js";
+import type { LifecycleCycleReceipt } from "../../data-poc/src/systemLifecycle.js";
+import { createLifecycleService, LifecycleServiceError, parseRadarCursor } from "./lifecycleService.js";
+import { createPc1SessionContextService } from "./lifecycleSession.js";
+import { getDefaultUserWorkspaceDatabasePath, type UserWorkspaceRepository } from "./userWorkspaceRepository.js";
 
 const DEMO_CORS_ORIGINS = new Set(["http://127.0.0.1:5173", "http://localhost:5173"]);
 
@@ -114,6 +120,8 @@ export type ScannerApiHandlerOptions = {
   reviewSessionProvider?: ReviewSessionStorageProvider;
   health?: ScannerApiHealthOptions;
   automation?: AutomationStatusOptions;
+  productVersion?: ProductVersionOptions;
+  reviewPublication?: ProductReviewPublicationOptions;
   establishedUniverse?: EstablishedUniverseStatusOptions;
   establishedPromotion?: EstablishedPromotionOptions;
   ownerOperations?: OwnerOperationsOptions;
@@ -121,6 +129,13 @@ export type ScannerApiHandlerOptions = {
   reports?: ReportsLibraryOptions;
   followUp?: FollowUpApiOptions;
   aiResearch?: AIResearchApiOptions;
+  lifecycle?: {
+    newInboxStorePath?: string;
+    auditStorePath?: string;
+    cycleReceiptPath?: string;
+    workspaceDatabasePath?: string;
+    workspace?: UserWorkspaceRepository;
+  };
   feedback?: FeedbackStoreOptions & {
     store?: FeedbackStore;
     submissionEnabled?: boolean;
@@ -146,6 +161,13 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
     allowFixtureFallback: false,
   } : scannerOptions;
   const contextOptions: LatestContextOutputOptions = { ...options.context, runtimeMode };
+  const productVersionOptions: ProductVersionOptions = {
+    automationStatePath: options.productVersion?.automationStatePath ?? options.scanner?.automationStatePath,
+    outputDirectoryPath: options.productVersion?.outputDirectoryPath ?? options.scanner?.outputDirPath,
+    lifecycleReceiptPath: options.productVersion?.lifecycleReceiptPath ?? options.lifecycle?.cycleReceiptPath,
+    ...options.productVersion,
+  };
+  const reviewPublication = createProductReviewPublication(options.reviewPublication);
   const ownerMode = resolveOwnerOperationsMode(options.ownerOperations?.mode ?? process.env.CRYPTO_EDGE_OWNER_OPERATIONS_MODE);
   const ownerSessionSecret = ownerMode === "DISABLED"
     ? undefined
@@ -200,9 +222,143 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
     reports: options.reports,
   });
   const aiResearchSessionManager = createAIResearchSessionManager(options.aiResearch?.sessionSecret);
+  const pc1Sessions = createPc1SessionContextService();
+  const lifecycle = createLifecycleService({
+    scanner: scannerOptions,
+    followUpStorePath: options.followUp?.storePath,
+    establishedStorePath: options.establishedUniverse?.storeFilePath,
+    newInboxStorePath: options.lifecycle?.newInboxStorePath,
+    auditStorePath: options.lifecycle?.auditStorePath,
+    cycleReceiptPath: options.lifecycle?.cycleReceiptPath,
+    workspace: options.lifecycle?.workspace,
+    workspaceDatabasePath: options.lifecycle?.workspaceDatabasePath ?? getDefaultUserWorkspaceDatabasePath(),
+  });
 
   return async (req, res) => {
     const path = getRequestPath(req.url);
+
+    if (req.method === "GET" && path === "/api/lifecycle/session") {
+      const session = pc1Sessions.resolve(req);
+      if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
+      sendJson(req, res, 200, { actor: { role: session.context.role, capabilities: session.context.capabilities } }, runtimeMode);
+      return;
+    }
+
+    if (req.method === "POST" && path === "/api/lifecycle/review-session/camp-user") {
+      if (!isLocalOwnerRequest(req)) { sendJson(req, res, 404, { error: "not_found" }, runtimeMode); return; }
+      const session = pc1Sessions.setReviewRole("CAMP_USER");
+      res.setHeader("set-cookie", session.setCookie);
+      sendJson(req, res, 200, { actor: { role: session.context.role, capabilities: session.context.capabilities } }, runtimeMode);
+      return;
+    }
+
+    if (req.method === "POST" && path === "/api/lifecycle/review-session/owner") {
+      if (!isLocalOwnerRequest(req)) { sendJson(req, res, 404, { error: "not_found" }, runtimeMode); return; }
+      const session = pc1Sessions.setReviewRole("OWNER");
+      res.setHeader("set-cookie", session.setCookie);
+      sendJson(req, res, 200, { actor: { role: session.context.role, capabilities: session.context.capabilities } }, runtimeMode);
+      return;
+    }
+
+    if (req.method === "GET" && path === "/api/lifecycle/summary") {
+      try { sendJson(req, res, 200, await lifecycle.summary(), runtimeMode); } catch (error) { sendLifecycleError(req, res, error, runtimeMode); }
+      return;
+    }
+
+    if (req.method === "GET" && path === "/api/lifecycle/radar") {
+      try {
+        const session = pc1Sessions.resolve(req);
+        if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
+        const query = validateLifecycleRadarQuery(req.url);
+        sendJson(req, res, 200, await lifecycle.radar(session.context, query), runtimeMode);
+      } catch (error) { sendLifecycleError(req, res, error, runtimeMode); }
+      return;
+    }
+
+    if (req.method === "GET" && path === "/api/lifecycle/new-inbox") {
+      try {
+        const session = pc1Sessions.resolve(req);
+        if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
+        if (!session.context.capabilities.includes("LIFECYCLE_SCAN_NOW")) throw new LifecycleServiceError("LIFECYCLE_OWNER_ONLY", 403);
+        sendJson(req, res, 200, await lifecycle.inbox(), runtimeMode);
+      } catch (error) { sendLifecycleError(req, res, error, runtimeMode); }
+      return;
+    }
+
+    if (req.method === "GET" && path === "/api/lifecycle/workspace/integrity") {
+      try {
+        const session = pc1Sessions.resolve(req);
+        if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
+        if (!session.context.capabilities.includes("LIFECYCLE_SCAN_NOW")) throw new LifecycleServiceError("LIFECYCLE_OWNER_ONLY", 403);
+        sendJson(req, res, 200, await lifecycle.workspaceIntegrity(), runtimeMode);
+      } catch (error) { sendLifecycleError(req, res, error, runtimeMode); }
+      return;
+    }
+
+    if (req.method === "GET" && path === "/api/lifecycle/token") {
+      try {
+        const session = pc1Sessions.resolve(req);
+        if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
+        const query = validateManualOwnerQuery(req.url);
+        sendJson(req, res, 200, await lifecycle.resolveToken(query.chain, query.contract_address, session.context), runtimeMode);
+      } catch (error) { sendLifecycleError(req, res, error, runtimeMode); }
+      return;
+    }
+
+    if (req.method === "POST" && path === "/api/lifecycle/token/status") {
+      try {
+        const session = pc1Sessions.resolve(req);
+        if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
+        const body = validateLifecycleTransitionBody(await readOwnerJsonBody(req));
+        sendJson(req, res, 200, await lifecycle.transition({
+          chain: body.chain,
+          contractAddress: body.contract_address,
+          targetStatus: body.target_status,
+          overrideReason: body.override_reason,
+          session: session.context,
+        }), runtimeMode);
+      } catch (error) { sendLifecycleError(req, res, error, runtimeMode); }
+      return;
+    }
+
+    if (req.method === "GET" && path === "/api/lifecycle/scan-preview") {
+      try {
+        const session = pc1Sessions.resolve(req);
+        if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
+        if (!session.context.capabilities.includes("LIFECYCLE_SCAN_NOW")) throw new LifecycleServiceError("LIFECYCLE_SCAN_FORBIDDEN", 403);
+        const preview = await ownerOperations.createRefreshPreview(isLocalOwnerRequest(req));
+        sendJson(req, res, 200, { ...preview, honeypot_is_called: false, lifecycle_policy_version: "system_lifecycle_policy_v1" }, runtimeMode);
+      } catch (error) { sendLifecycleError(req, res, error, runtimeMode); }
+      return;
+    }
+
+    if (req.method === "POST" && path === "/api/lifecycle/scan-now") {
+      try {
+        const session = pc1Sessions.resolve(req);
+        if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
+        if (!session.context.capabilities.includes("LIFECYCLE_SCAN_NOW")) throw new LifecycleServiceError("LIFECYCLE_SCAN_FORBIDDEN", 403);
+        const body = validateOwnerRefreshBody(await readOwnerJsonBody(req));
+        const result = await ownerOperations.refresh(body.preflight_id, body.preflight_id, isLocalOwnerRequest(req));
+        const [scanner, lifecycleReceipt] = await Promise.all([
+          readLatestScannerOutput(scannerOptions).catch(() => null),
+          lifecycle.latestReceipt(),
+        ]);
+        const scannerReceipt = lifecycleScannerReceipt(scanner);
+        sendJson(req, res, result.status === "FAILED" ? 500 : 200, {
+          ...result,
+          receipt: {
+            found: scannerReceipt.found,
+            valid: scannerReceipt.valid,
+            rejected: scannerReceipt.rejected,
+            ...lastCompletedLifecycleReceipt(lifecycleReceipt, scannerReceipt.snapshot_at),
+            source_errors: scannerReceipt.source_errors,
+            snapshot_at: scannerReceipt.snapshot_at,
+            honeypot_is_calls: 0,
+          },
+        }, runtimeMode);
+      } catch (error) { sendLifecycleError(req, res, error, runtimeMode); }
+      return;
+    }
 
     if (req.method === "GET" && path === "/api/ai-research/status") {
       sendJson(req, res, 200, aiResearchService.status(), runtimeMode);
@@ -547,7 +703,19 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
           sessionHeader,
           isLocalOwnerRequest(req),
         );
-        sendJson(req, res, result.status === "FAILED" ? 500 : 200, result, runtimeMode);
+        const [scanner, lifecycleReceipt] = await Promise.all([
+          readLatestScannerOutput(scannerOptions).catch(() => null),
+          lifecycle.latestReceipt(),
+        ]);
+        const receipt = lifecycleScannerReceipt(scanner);
+        sendJson(req, res, result.status === "FAILED" ? 500 : 200, {
+          ...result,
+          lifecycle_receipt: {
+            ...receipt,
+            ...lastCompletedLifecycleReceipt(lifecycleReceipt, receipt.snapshot_at),
+            honeypot_is_calls: 0,
+          },
+        }, runtimeMode);
       } catch (error) {
         sendOwnerOperationsError(req, res, error, runtimeMode);
       }
@@ -760,6 +928,43 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
       return;
     }
 
+    if (req.method === "GET" && path === "/api/product/version") {
+      try {
+        sendJson(req, res, 200, reviewPublication.decorateVersion(await readProductVersion(productVersionOptions)), runtimeMode);
+      } catch {
+        sendJson(req, res, 200, {
+          scanner_run_id: null,
+          scanner_generated_at: null,
+          context_run_id: null,
+          context_generated_at: null,
+          lifecycle_cycle_id: null,
+          lifecycle_updated_at: null,
+        }, runtimeMode);
+      }
+      return;
+    }
+
+    if (req.method === "POST" && path === "/api/product/review/publish-next") {
+      if (!reviewPublication.enabled || !isLocalOwnerRequest(req) || !isPc1ReviewRequest(req)) {
+        sendJson(req, res, 404, { error: "not_found", message: "Route not found" }, runtimeMode);
+        return;
+      }
+      await reviewPublication.publishNext();
+      try {
+        sendJson(req, res, 200, reviewPublication.decorateVersion(await readProductVersion(productVersionOptions)), runtimeMode);
+      } catch {
+        sendJson(req, res, 200, {
+          scanner_run_id: null,
+          scanner_generated_at: null,
+          context_run_id: null,
+          context_generated_at: null,
+          lifecycle_cycle_id: null,
+          lifecycle_updated_at: null,
+        }, runtimeMode);
+      }
+      return;
+    }
+
     if (req.method === "GET" && path === "/api/established-universe/status") {
       sendJson(req, res, 200, await readEstablishedUniverseStatus(options.establishedUniverse), runtimeMode);
       return;
@@ -786,7 +991,7 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
 
     if (req.method === "GET" && path === "/api/scanner/latest") {
       try {
-        sendJson(req, res, 200, await readLatestScannerOutput(scannerOptions), runtimeMode);
+        sendJson(req, res, 200, reviewPublication.decorateScanner(await readLatestScannerOutput(scannerOptions)), runtimeMode);
       } catch (error) {
         sendDataUnavailable(req, res, errorCode(error, "SCANNER_OUTPUT_UNAVAILABLE"), runtimeMode);
       }
@@ -1063,6 +1268,37 @@ function validateOwnerRefreshBody(value: unknown): { preflight_id: string; confi
     throw new OwnerOperationsError("OWNER_REFRESH_BODY_INVALID", 400);
   }
   return { preflight_id: value.preflight_id, confirmation: true };
+}
+
+function validateLifecycleTransitionBody(value: unknown): {
+  chain: string;
+  contract_address: string;
+  target_status: "FOLLOW_UP" | "MAIN_RADAR";
+  override_reason: string | null;
+  confirmation: true;
+} {
+  if (!isRecord(value)) throw new LifecycleServiceError("LIFECYCLE_BODY_INVALID", 400);
+  const keys = Object.keys(value).sort();
+  if (keys.length !== 5
+    || keys[0] !== "chain"
+    || keys[1] !== "confirmation"
+    || keys[2] !== "contract_address"
+    || keys[3] !== "override_reason"
+    || keys[4] !== "target_status") throw new LifecycleServiceError("LIFECYCLE_BODY_INVALID", 400);
+  if (typeof value.chain !== "string" || value.chain.length === 0 || value.chain.length > 32
+    || typeof value.contract_address !== "string" || value.contract_address.length === 0 || value.contract_address.length > 128
+    || (value.target_status !== "FOLLOW_UP" && value.target_status !== "MAIN_RADAR")
+    || value.confirmation !== true
+    || !(value.override_reason === null || (typeof value.override_reason === "string" && value.override_reason.trim().length > 0 && value.override_reason.length <= 500))) {
+    throw new LifecycleServiceError("LIFECYCLE_BODY_INVALID", 400);
+  }
+  return {
+    chain: value.chain,
+    contract_address: value.contract_address,
+    target_status: value.target_status,
+    override_reason: value.override_reason,
+    confirmation: true,
+  };
 }
 
 function validateEstablishedPromotionBody(value: unknown): {
@@ -1440,6 +1676,77 @@ function sendManualOwnerActionError(
   }, runtimeMode);
 }
 
+function validateLifecycleRadarQuery(url: string | undefined): { limit: number; cursor: ReturnType<typeof parseRadarCursor> } {
+  let parsed: URL;
+  try { parsed = new URL(url ?? "/", "http://radar.local"); } catch { throw new LifecycleServiceError("LIFECYCLE_QUERY_INVALID", 400); }
+  const keys = [...parsed.searchParams.keys()].sort();
+  if (!keys.every((key) => key === "limit" || key === "cursor") || parsed.searchParams.getAll("limit").length > 1 || parsed.searchParams.getAll("cursor").length > 1) throw new LifecycleServiceError("LIFECYCLE_QUERY_INVALID", 400);
+  const limitText = parsed.searchParams.get("limit");
+  const limit = limitText === null ? 24 : Number(limitText);
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) throw new LifecycleServiceError("LIFECYCLE_LIMIT_INVALID", 400);
+  return { limit, cursor: parseRadarCursor(parsed.searchParams.get("cursor")) };
+}
+
+function sendLifecycleError(
+  req: IncomingMessage,
+  res: ServerResponse,
+  error: unknown,
+  runtimeMode: ResolvedProductRuntimeMode,
+): void {
+  const lifecycleError = error instanceof LifecycleServiceError
+    ? error
+    : new LifecycleServiceError("LIFECYCLE_REQUEST_REJECTED", 400);
+  sendJson(req, res, lifecycleError.httpStatus, {
+    error: lifecycleError.code,
+    message: "Lifecycle request rejected",
+  }, runtimeMode);
+}
+
+function lifecycleScannerReceipt(value: unknown): {
+  found: number;
+  valid: number;
+  rejected: number;
+  source_errors: string[];
+  snapshot_at: string | null;
+} {
+  if (!isRecord(value) || !isRecord(value.scan_run)) {
+    return { found: 0, valid: 0, rejected: 0, source_errors: [], snapshot_at: null };
+  }
+  const run = value.scan_run;
+  const provenance = isRecord(value.provenance) ? value.provenance : null;
+  return {
+    found: isNonNegativeInteger(run.total_raw) ? Number(run.total_raw) : 0,
+    valid: Array.isArray(value.candidates) ? value.candidates.length : 0,
+    rejected: isNonNegativeInteger(run.rejected_basic_filter) ? Number(run.rejected_basic_filter) : 0,
+    source_errors: Array.isArray(run.errors) ? run.errors.filter(isString) : [],
+    snapshot_at: typeof provenance?.generated_at === "string"
+      ? provenance.generated_at
+      : typeof run.finished_at === "string" ? run.finished_at : null,
+  };
+}
+
+function lastCompletedLifecycleReceipt(receipt: LifecycleCycleReceipt | null, fallbackSnapshotAt: string | null): {
+  new_inbox: number;
+  new_inbox_updated: number;
+  promoted_to_follow_up: number;
+  promoted_to_main_radar: number;
+  duplicates: number;
+  lifecycle_cycle_id: string | null;
+  lifecycle_status: LifecycleCycleReceipt["status"] | null;
+  snapshot_at: string | null;
+} {
+  return {
+    new_inbox: receipt?.new_inbox_added ?? 0,
+    new_inbox_updated: receipt?.new_inbox_updated ?? 0,
+    promoted_to_follow_up: receipt?.promoted_to_follow_up ?? 0,
+    promoted_to_main_radar: receipt?.promoted_to_main_radar ?? 0,
+    duplicates: receipt?.duplicate_noop ?? 0,
+    lifecycle_cycle_id: receipt?.central_cycle_id ?? null,
+    lifecycle_status: receipt?.status ?? null,
+    snapshot_at: receipt?.snapshot_timestamp ?? fallbackSnapshotAt,
+  };
+}
+
 function publicContextReadinessEntry(entry: ReadinessEntry): ProductReadinessOutput["context"] {
   if (!entry.ready || !isRecord(entry.value)) {
     return { ready: false, reason_code: entry.reason_code };
@@ -1557,6 +1864,14 @@ async function resolveFeedbackSubject(
 
 function getRequestPath(url: string | undefined): string {
   return url?.split("?")[0] ?? "/";
+}
+
+function isPc1ReviewRequest(req: IncomingMessage): boolean {
+  try {
+    return new URL(req.url ?? "/", "http://localhost").searchParams.get("pc1_review") === "1";
+  } catch {
+    return false;
+  }
 }
 
 function isReportsApiPath(path: string): boolean {

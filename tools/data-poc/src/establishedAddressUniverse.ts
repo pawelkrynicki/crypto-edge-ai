@@ -77,17 +77,22 @@ const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvw
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_LOCAL_STORE_PATH = resolve(__dirname, "../../.local/established-universe/store.json");
 
+export function getDefaultEstablishedUniverseConfigPath(env: NodeJS.ProcessEnv = process.env): string {
+  const configured = env.CRYPTO_EDGE_ESTABLISHED_UNIVERSE_CONFIG_PATH?.trim();
+  return configured ? resolve(configured) : resolveRepoFile(ESTABLISHED_ADDRESS_UNIVERSE_CONFIG_PATH);
+}
+
 export function getDefaultEstablishedUniverseStorePath(env: NodeJS.ProcessEnv = process.env): string {
   const configured = env.CRYPTO_EDGE_ESTABLISHED_UNIVERSE_STORE_PATH?.trim();
   return resolve(configured || DEFAULT_LOCAL_STORE_PATH);
 }
 
-export function loadEstablishedAddressUniverse(path?: string): EstablishedAddressUniverse {
+export function loadEstablishedAddressUniverse(path?: string, env: NodeJS.ProcessEnv = process.env): EstablishedAddressUniverse {
   const selectedPath = path
     ? resolve(path)
     : existsSync(getDefaultEstablishedUniverseStorePath())
       ? getDefaultEstablishedUniverseStorePath()
-      : resolveRepoFile(ESTABLISHED_ADDRESS_UNIVERSE_CONFIG_PATH);
+      : getDefaultEstablishedUniverseConfigPath(env);
   let parsed: unknown;
   try {
     parsed = JSON.parse(readFileSync(selectedPath, "utf8")) as unknown;
