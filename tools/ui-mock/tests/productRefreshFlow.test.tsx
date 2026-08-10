@@ -15,6 +15,7 @@ import {
   ProductLocaleProvider,
 } from "../src/productI18n.js";
 import type { ScannerDataSourceLoadResult } from "../src/services/scannerDataSource.js";
+import type { ProductVersion } from "../src/productVersion.js";
 import type {
   ProductReadinessOutput,
   ScannerApiOutput,
@@ -158,6 +159,50 @@ describe("ProductApp Refresh View last-known-good flow", () => {
       if (renderer) await act(async () => { renderer!.unmount(); });
       browser.restore();
       globalThis.fetch = originalFetch;
+      globalThis.IS_REACT_ACT_ENVIRONMENT = originalActEnvironment;
+    }
+  });
+
+  it("refreshes the normal product view once after a published version change and preserves Candidate Detail state", async () => {
+    const first = readyResult(scannerOutput("scan_pointer_1", "FIRST", "2026-07-30T12:00:00.000Z"));
+    const next = readyResult(scannerOutput("scan_pointer_2", "NEXT", "2026-07-30T12:05:00.000Z"));
+    const versions: ProductVersion[] = [
+      { scanner_run_id: "scan_pointer_1", scanner_generated_at: "2026-07-30T12:00:00.000Z", context_run_id: "context_1", context_generated_at: "2026-07-30T12:00:00.000Z", lifecycle_cycle_id: "cycle_1", lifecycle_updated_at: "2026-07-30T12:00:01.000Z" },
+      { scanner_run_id: "scan_pointer_2", scanner_generated_at: "2026-07-30T12:05:00.000Z", context_run_id: "context_2", context_generated_at: "2026-07-30T12:05:00.000Z", lifecycle_cycle_id: "cycle_2", lifecycle_updated_at: "2026-07-30T12:05:01.000Z" },
+    ];
+    let scannerCalls = 0;
+    let versionIndex = 0;
+    const browser = installBrowser(`http://127.0.0.1:5173/?chain=base&contract=${CONTRACT}&detail=market#candidate-detail`);
+    const originalActEnvironment = globalThis.IS_REACT_ACT_ENVIRONMENT;
+    globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+    let renderer: ReturnType<typeof create> | undefined;
+    try {
+      const dataSources: ProductAppDataSources = {
+        ...createDataSources(async () => [first, next][scannerCalls++]!),
+        loadProductVersion: async () => versions[versionIndex]!,
+      };
+      await act(async () => {
+        renderer = create(<ProductLocaleProvider initialLocale="en"><ProductAppContent dataSources={dataSources} runtimeModeOverride="INTERNAL_BETA" /></ProductLocaleProvider>);
+        await flushPromises();
+      });
+      assert.equal(scannerCalls, 1);
+      assert.equal(renderer!.root.findByType(CandidateDetailView).props.activeTab, "market");
+
+      versionIndex = 1;
+      await act(async () => {
+        (globalThis.window as unknown as { dispatchEvent: (event: { type: string }) => void }).dispatchEvent({ type: "focus" });
+        await flushPromises();
+      });
+
+      const detail = renderer!.root.findByType(CandidateDetailView);
+      const shell = renderer!.root.findByType(ProductWorkspaceShell);
+      assert.equal(scannerCalls, 2, "one changed pointer produces one bounded full refresh");
+      assert.equal(detail.props.candidate.symbol, "NEXT");
+      assert.equal(detail.props.activeTab, "market");
+      assert.equal(shell.props.runId, "scan_pointer_2");
+    } finally {
+      if (renderer) await act(async () => { renderer!.unmount(); });
+      browser.restore();
       globalThis.IS_REACT_ACT_ENVIRONMENT = originalActEnvironment;
     }
   });
@@ -312,6 +357,7 @@ function installBrowser(initialHref: string) {
     location.hash = url.hash;
   };
   apply(initialHref);
+  const listeners = new Map<string, Set<(event: { type: string }) => void>>();
   const windowValue = {
     location,
     history: {
@@ -321,8 +367,13 @@ function installBrowser(initialHref: string) {
       getItem: (key: string) => values.get(key) ?? null,
       setItem: (key: string, value: string) => { values.set(key, value); },
     },
-    addEventListener: () => undefined,
-    removeEventListener: () => undefined,
+    addEventListener: (name: string, handler: (event: { type: string }) => void) => {
+      const entries = listeners.get(name) ?? new Set();
+      entries.add(handler);
+      listeners.set(name, entries);
+    },
+    removeEventListener: (name: string, handler: (event: { type: string }) => void) => listeners.get(name)?.delete(handler),
+    dispatchEvent: (event: { type: string }) => listeners.get(event.type)?.forEach((handler) => handler(event)),
     setTimeout,
     clearTimeout,
   };

@@ -20,6 +20,8 @@ import {
   readLatestScannerOutput,
   ScannerOutputError,
 } from "./latestScannerOutput.js";
+import { readProductVersion, type ProductVersionOptions } from "./productVersion.js";
+import { createProductReviewPublication } from "./productReviewPublication.js";
 import type { ReviewSessionFileStoreOptions } from "./reviewSessionFileStore.js";
 import { createConfiguredReviewSessionStorageProvider } from "./reviewSessionProviderConfig.js";
 import {
@@ -118,6 +120,7 @@ export type ScannerApiHandlerOptions = {
   reviewSessionProvider?: ReviewSessionStorageProvider;
   health?: ScannerApiHealthOptions;
   automation?: AutomationStatusOptions;
+  productVersion?: ProductVersionOptions;
   establishedUniverse?: EstablishedUniverseStatusOptions;
   establishedPromotion?: EstablishedPromotionOptions;
   ownerOperations?: OwnerOperationsOptions;
@@ -157,6 +160,13 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
     allowFixtureFallback: false,
   } : scannerOptions;
   const contextOptions: LatestContextOutputOptions = { ...options.context, runtimeMode };
+  const productVersionOptions: ProductVersionOptions = {
+    automationStatePath: options.productVersion?.automationStatePath ?? options.scanner?.automationStatePath,
+    outputDirectoryPath: options.productVersion?.outputDirectoryPath ?? options.scanner?.outputDirPath,
+    lifecycleReceiptPath: options.productVersion?.lifecycleReceiptPath ?? options.lifecycle?.cycleReceiptPath,
+    ...options.productVersion,
+  };
+  const reviewPublication = createProductReviewPublication();
   const ownerMode = resolveOwnerOperationsMode(options.ownerOperations?.mode ?? process.env.CRYPTO_EDGE_OWNER_OPERATIONS_MODE);
   const ownerSessionSecret = ownerMode === "DISABLED"
     ? undefined
@@ -917,6 +927,43 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
       return;
     }
 
+    if (req.method === "GET" && path === "/api/product/version") {
+      try {
+        sendJson(req, res, 200, reviewPublication.decorateVersion(await readProductVersion(productVersionOptions)), runtimeMode);
+      } catch {
+        sendJson(req, res, 200, {
+          scanner_run_id: null,
+          scanner_generated_at: null,
+          context_run_id: null,
+          context_generated_at: null,
+          lifecycle_cycle_id: null,
+          lifecycle_updated_at: null,
+        }, runtimeMode);
+      }
+      return;
+    }
+
+    if (req.method === "POST" && path === "/api/product/review/publish-next") {
+      if (!reviewPublication.enabled || !isLocalOwnerRequest(req) || !isPc1ReviewRequest(req)) {
+        sendJson(req, res, 404, { error: "not_found", message: "Route not found" }, runtimeMode);
+        return;
+      }
+      reviewPublication.publishNext();
+      try {
+        sendJson(req, res, 200, reviewPublication.decorateVersion(await readProductVersion(productVersionOptions)), runtimeMode);
+      } catch {
+        sendJson(req, res, 200, {
+          scanner_run_id: null,
+          scanner_generated_at: null,
+          context_run_id: null,
+          context_generated_at: null,
+          lifecycle_cycle_id: null,
+          lifecycle_updated_at: null,
+        }, runtimeMode);
+      }
+      return;
+    }
+
     if (req.method === "GET" && path === "/api/established-universe/status") {
       sendJson(req, res, 200, await readEstablishedUniverseStatus(options.establishedUniverse), runtimeMode);
       return;
@@ -943,7 +990,7 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
 
     if (req.method === "GET" && path === "/api/scanner/latest") {
       try {
-        sendJson(req, res, 200, await readLatestScannerOutput(scannerOptions), runtimeMode);
+        sendJson(req, res, 200, reviewPublication.decorateScanner(await readLatestScannerOutput(scannerOptions)), runtimeMode);
       } catch (error) {
         sendDataUnavailable(req, res, errorCode(error, "SCANNER_OUTPUT_UNAVAILABLE"), runtimeMode);
       }
@@ -1816,6 +1863,14 @@ async function resolveFeedbackSubject(
 
 function getRequestPath(url: string | undefined): string {
   return url?.split("?")[0] ?? "/";
+}
+
+function isPc1ReviewRequest(req: IncomingMessage): boolean {
+  try {
+    return new URL(req.url ?? "/", "http://localhost").searchParams.get("pc1_review") === "1";
+  } catch {
+    return false;
+  }
 }
 
 function isReportsApiPath(path: string): boolean {

@@ -551,6 +551,8 @@ describe("PC.1 bounded lifecycle Radar API", () => {
     assert.match(launcher, /Port %%P jest już zajęty/);
     assert.match(launcher, /ALLOW_LIVE_PROVIDER_CALLS=0/);
     assert.match(launcher, /CRYPTO_EDGE_PC1_REVIEW_DEFAULT_ACTOR=CAMP_USER/);
+    assert.match(launcher, /CRYPTO_EDGE_PC1_REVIEW_MODE=1/);
+    assert.match(launcher, /CRYPTO_EDGE_PC1_REVIEW_ROOT=%REVIEW_ROOT%/);
     assert.doesNotMatch(launcher, /CRYPTO_EDGE_PC1_REVIEW_DEFAULT_ACTOR=OWNER/);
     assert.match(launcher, /preparePc1LifecycleReview\.ts/);
     assert.match(launcher, /bootstrapPc1LifecycleReview\.ts/);

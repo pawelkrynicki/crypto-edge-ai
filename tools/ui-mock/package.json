@@ -17,7 +17,7 @@
     "test:product-radar": "node --import tsx --test tests/productRadar.test.ts",
     "test:pc1": "node --import tsx --test tests/pc1Lifecycle.test.ts",
     "test:p1-radar": "node --import tsx --test tests/radarOperationalUsability.test.tsx tests/manualOwnerActions.test.ts",
-    "test:refresh": "node --import tsx --test tests/productRefreshFlow.test.tsx",
+    "test:refresh": "node --import tsx --test tests/productRefreshFlow.test.tsx tests/productVersionPolling.test.ts tests/productVersion.test.ts",
     "test:premium-ui": "node --import tsx --test tests/premiumUiPass.test.ts",
     "test:premium-ui2": "node --import tsx --test tests/premiumUi2Pass.test.ts",
     "test:flow1": "node --import tsx --test tests/tokenFlow.test.ts tests/followUpBasket.test.ts tests/establishedPromotion.test.ts tests/establishedPromotionUi.test.tsx",

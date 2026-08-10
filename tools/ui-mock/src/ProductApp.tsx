@@ -28,12 +28,14 @@ import {
 import { ProductLocaleProvider, useProductLocale } from "./productI18n";
 import type { ControlCenterStatus } from "./controlCenterStatus";
 import { resolveProductSourceHealth } from "./productSourceHealth";
+import { createProductVersionPoller, type ProductVersionPoller } from "./productVersionPolling";
 import { getProductRuntimeMode, isAIResearchRenderPreviewMode } from "./runtimeMode";
 import {
   loadScannerApiDataSourceResult,
   loadScannerReadinessResult,
   type ResolvedScannerSource,
 } from "./services/scannerDataSource";
+import { loadProductVersion } from "./services/productVersionDataSource";
 import { loadAutomationStatus, type AutomationStatus } from "./services/automationStatusDataSource";
 import {
   loadEstablishedUniverseStatus,
@@ -108,6 +110,7 @@ export type ProductAppDataSources = {
   loadFollowUpList: typeof loadFollowUpList;
   loadFollowUpByIdentity?: typeof loadFollowUpByIdentity;
   loadLifecycleRadar?: typeof loadLifecycleRadar;
+  loadProductVersion?: typeof loadProductVersion;
   now: () => string;
 };
 
@@ -121,6 +124,7 @@ const DEFAULT_PRODUCT_APP_DATA_SOURCES: ProductAppDataSources = {
   loadFollowUpList,
   loadFollowUpByIdentity,
   loadLifecycleRadar,
+  loadProductVersion,
   now: () => new Date().toISOString(),
 };
 
@@ -133,6 +137,7 @@ export function ProductAppContent({
 } = {}) {
   const { t } = useProductLocale();
   const runtimeMode = runtimeModeOverride ?? getProductRuntimeMode();
+  const loadVersionPointer = dataSources.loadProductVersion;
   const [activeSection, setActiveSection] = useState<ProductSectionId>(() => resolveSection());
   const [candidates, setCandidates] = useState<UiTokenCandidate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -169,6 +174,7 @@ export function ProductAppContent({
   const [feedbackRefreshRevision, setFeedbackRefreshRevision] = useState(0);
   const [selectedReportContext, setSelectedReportContext] = useState<ReportDetail | null>(null);
   const refreshPromiseRef = useRef<Promise<void> | null>(null);
+  const productVersionPollerRef = useRef<ProductVersionPoller | null>(null);
   const scannerViewStateRef = useRef(createEmptyProductScannerViewState());
   const routeTokenIdentityRef = useRef<RouteTokenIdentity | null>(routeTokenIdentity);
   const [lastKnownGoodRefreshError, setLastKnownGoodRefreshError] = useState(false);
@@ -344,6 +350,29 @@ export function ProductAppContent({
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    if (!loadVersionPointer) return undefined;
+    const poller = createProductVersionPoller({
+      loadVersion: loadVersionPointer,
+      onVersionChanged: async () => { await loadData(); },
+      document: typeof document === "undefined" ? undefined : document,
+      window: typeof window === "undefined" ? undefined : window,
+    });
+    productVersionPollerRef.current = poller;
+    poller.start();
+    return () => {
+      poller.stop();
+      if (productVersionPollerRef.current === poller) productVersionPollerRef.current = null;
+    };
+  }, [loadData, loadVersionPointer]);
+
+  const refreshView = useCallback((): Promise<void> => {
+    if (loadVersionPointer) {
+      void loadVersionPointer().then((version) => productVersionPollerRef.current?.markKnown(version));
+    }
+    return loadData();
+  }, [loadData, loadVersionPointer]);
 
   useEffect(() => {
     if (activeSection !== "candidate-detail" && activeSection !== "external-checks" && routeTokenIdentity === null) return;
@@ -650,7 +679,7 @@ export function ProductAppContent({
         dataUnavailableMessage={unavailableMessage}
         dataUnavailableReasonCode={reasonCode}
         lastKnownGoodRefreshError={lastKnownGoodRefreshError}
-        onRefresh={() => void loadData()}
+        onRefresh={() => void refreshView()}
         automationStatus={automationStatus}
         establishedUniverseStatus={establishedUniverseStatus}
       >

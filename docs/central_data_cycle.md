@@ -24,6 +24,14 @@ Jeśli jedno źródło context jest chwilowo niedostępne, cykl może przenieś�
 
 `GET /api/automation/status` udostępnia bezpieczne pola: cycle ID/status/duration, czasy próby/sukcesu/snapshotu, wiek snapshotu, received/valid/rejected/new, Follow-up ingest, checkpointy, source health, kod błędu i status danych `FRESH`, `STALE`, `PARTIAL`, `LAST_KNOWN_GOOD`, `IN_PROGRESS` albo `UNAVAILABLE`. UI pokazuje osobno czas snapshotu oraz lokalny czas odświeżenia widoku.
 
+## Odczytowa aktualizacja Product UI
+
+`GET /api/product/version` zwraca wyłącznie sześć wskaźników opublikowanego widoku: `scanner_run_id`, `scanner_generated_at`, `context_run_id`, `context_generated_at`, `lifecycle_cycle_id` oraz `lifecycle_updated_at`. Endpoint tylko czyta wskaźniki/snapshot receipt; nie uruchamia collectora, providerów, OpenAI ani zapisu lifecycle.
+
+Product UI sprawdza ten lekki endpoint co 45 sekund z jitterem ±10 sekund, co 120 sekund w ukrytej karcie i natychmiast po odzyskaniu focusu. Brak zmiany nie powoduje pełnego odświeżenia. Zmiana uruchamia jeden zwykły, ograniczony odczyt snapshotu scanner, readiness/context, lifecycle radar i statusów źródeł. Bieżąca sekcja, aktywna karta Candidate Detail oraz prywatny koszyk są zachowywane. `Refresh View` nadal wymusza natychmiastowy odczyt widoku, ale pozostaje wyłącznie odczytowy.
+
+W izolowanym lokalnym runtime PC.1 (`?pc1_review=1`, `CRYPTO_EDGE_PC1_REVIEW_MODE=1` i `CRYPTO_EDGE_PC1_REVIEW_ROOT`) dostępny jest wyłącznie loopbackowy `POST /api/product/review/publish-next?pc1_review=1`. Służy on do testu wykrywania nowej publikacji; nie wykonuje żadnego wywołania providera i nie zapisuje kanonicznych danych.
+
 ## Jednorazowy cykl live, backup i rollback
 
 Podgląd (zero provider calls i zero zapisów):
