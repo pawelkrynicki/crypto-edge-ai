@@ -233,7 +233,7 @@ describe("ProductApp Refresh View last-known-good flow", () => {
         renderer = create(<ProductLocaleProvider initialLocale="en"><ProductAppContent dataSources={dataSources} runtimeModeOverride="INTERNAL_BETA" /></ProductLocaleProvider>);
         await flushPromises();
       });
-      assert.match(renderedText(renderer!), /Auto-update test active/);
+      assert.match(renderedText(renderer!), /Auto-update test: oczekiwanie/);
 
       versionIndex = 1;
       await act(async () => {
@@ -247,7 +247,7 @@ describe("ProductApp Refresh View last-known-good flow", () => {
       assert.equal(lifecycleReads, 2, "the private lifecycle view is read again with the refresh");
       assert.equal(shell.props.generatedAt, "2026-08-10T08:30:00.000Z");
       assert.equal(radar.props.lifecycleRadar.private_baskets.follow_up.cards[0]!.user_status, "FOLLOW_UP");
-      assert.match(renderedText(renderer!), /New review version published/);
+      assert.match(renderedText(renderer!), /Nowa wersja review opublikowana/);
     } finally {
       if (renderer) await act(async () => { renderer!.unmount(); });
       browser.restore();

@@ -82,8 +82,27 @@ describe("product version API", () => {
       const before = await version(base);
       const absentReviewMarker = await fetch(`${base}/api/product/review/publish-next`, { method: "POST" });
       assert.equal(absentReviewMarker.status, 404);
+      const waitingStatus = await fetch(`${base}/api/product/review/publication-status?pc1_review=1`);
+      assert.equal(waitingStatus.status, 200);
+      assert.deepEqual(await waitingStatus.json(), {
+        schema_version: "pc1_review_publication_status_v1",
+        status: "WAITING",
+        attempt: 0,
+        started_at: null,
+        finished_at: null,
+        source_run_id: null,
+        target_run_id: null,
+        failure_stage: null,
+        reason_code: null,
+        next_retry_at: null,
+        provider_calls: 0,
+        openai_calls: 0,
+        canonical_mutations: 0,
+      });
       const published = await fetch(`${base}/api/product/review/publish-next?pc1_review=1`, { method: "POST" });
       assert.equal(published.status, 200);
+      const publishedStatus = await fetch(`${base}/api/product/review/publication-status?pc1_review=1`);
+      assert.equal((await publishedStatus.json() as { status: string }).status, "PUBLISHED");
       const after = await version(base);
       assert.notEqual(after.scanner_run_id, before.scanner_run_id);
       assert.notEqual(after.scanner_generated_at, before.scanner_generated_at);
@@ -164,7 +183,7 @@ describe("product version API", () => {
     });
     try {
       await publication.publishNext();
-      const simulated = publication.decorateScanner(structuredClone(PERSISTABLE_SCANNER_SAMPLE));
+      const simulated = publication.decorateScanner(scannerWithMeta());
       const validated = validateScannerApiOutput(simulated);
       assert.match(validated.scan_run.run_id, /-review-1$/);
       assert.equal(validated.candidates.every((candidate) => candidate.run_id === validated.scan_run.run_id), true);
@@ -193,4 +212,20 @@ function close(server: ReturnType<typeof createScannerApiServer>): Promise<void>
 
 function serverUrl(server: ReturnType<typeof createScannerApiServer>): string {
   return `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+}
+
+function scannerWithMeta(): ScannerOutputWithMeta {
+  return {
+    ...structuredClone(PERSISTABLE_SCANNER_SAMPLE),
+    _source_meta: {
+      source: "real-output",
+      reason: "test",
+      selected_run_id: PERSISTABLE_SCANNER_SAMPLE.scan_run.run_id,
+      loaded_at: "2026-08-10T10:00:00.000Z",
+      runtime_mode: "INTERNAL_BETA",
+      age_seconds: 0,
+      source_ids: ["dexscreener"],
+      freshness_status: "FRESH",
+    },
+  };
 }

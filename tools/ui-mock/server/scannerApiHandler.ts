@@ -950,6 +950,15 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
       return;
     }
 
+    if (req.method === "GET" && path === "/api/product/review/publication-status") {
+      if (!reviewPublication.enabled || !isLocalOwnerRequest(req) || !isPc1ReviewRequest(req)) {
+        sendJson(req, res, 404, { error: "not_found", message: "Route not found" }, runtimeMode);
+        return;
+      }
+      sendJson(req, res, 200, reviewPublication.getStatus(), runtimeMode);
+      return;
+    }
+
     if (req.method === "POST" && path === "/api/product/review/publish-next") {
       if (!reviewPublication.enabled || !isLocalOwnerRequest(req) || !isPc1ReviewRequest(req)) {
         sendJson(req, res, 404, { error: "not_found", message: "Route not found" }, runtimeMode);

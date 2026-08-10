@@ -600,8 +600,11 @@ describe("PC.1 bounded lifecycle Radar API", () => {
     assert.match(personalRadar, /TechnicalDetails label=\{copy\.confirmAction\}/);
     assert.match(productApp, /isReviewMode\(\).*LifecycleReviewSwitch/);
     assert.match(productApp, /data-pc1-review-switch="global"/);
-    assert.match(productApp, /Auto-update test active/);
-    assert.match(productApp, /New review version published/);
+    assert.match(productApp, /Auto-update test: oczekiwanie/);
+    assert.match(productApp, /Auto-update test: publikacja/);
+    assert.match(productApp, /Publikacja nie powiodła się/);
+    assert.match(productApp, /Nowa wersja review opublikowana/);
+    assert.match(productApp, /Test auto-update nie powiódł się/);
     assert.match(productApp, /onVersionChanged:[\s\S]*?setReviewAutoUpdatePublished\(true\)/);
     assert.doesNotMatch(productApp, /setTimeout\([^)]*review/i);
     assert.match(styles, /\.personal-radar-inline\.card \{ grid-column: 1 \/ -1; \}/);

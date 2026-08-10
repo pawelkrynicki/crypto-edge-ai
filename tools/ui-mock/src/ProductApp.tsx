@@ -44,6 +44,10 @@ import {
 import { loadControlCenterStatus } from "./services/controlCenterStatusDataSource";
 import { loadFollowUpByIdentity, loadFollowUpList, loadFollowUpStatus } from "./services/followUpDataSource";
 import { loadLifecycleRadar, setLifecycleReviewRole } from "./services/lifecycleDataSource";
+import {
+  loadReviewPublicationStatus,
+  type ReviewPublicationStatus,
+} from "./services/reviewPublicationStatusDataSource";
 import type { LifecycleRadarCard, LifecycleRadarView, LifecycleSummary, LifecycleTokenView } from "./types/lifecycleTypes";
 import type { FollowUpPublicEntry, FollowUpPublicStatus } from "./types/followUpTypes";
 import {
@@ -110,6 +114,7 @@ export type ProductAppDataSources = {
   loadFollowUpByIdentity?: typeof loadFollowUpByIdentity;
   loadLifecycleRadar?: typeof loadLifecycleRadar;
   loadProductVersion?: typeof loadProductVersion;
+  loadReviewPublicationStatus?: typeof loadReviewPublicationStatus;
   now: () => string;
 };
 
@@ -124,6 +129,7 @@ const DEFAULT_PRODUCT_APP_DATA_SOURCES: ProductAppDataSources = {
   loadFollowUpByIdentity,
   loadLifecycleRadar,
   loadProductVersion,
+  loadReviewPublicationStatus,
   now: () => new Date().toISOString(),
 };
 
@@ -183,6 +189,7 @@ export function ProductAppContent({
   const [followUpStatus, setFollowUpStatus] = useState<FollowUpPublicStatus | null>(null);
   const [preferredLifecycleBasket, setPreferredLifecycleBasket] = useState<RadarBasketId | null>(null);
   const [reviewAutoUpdatePublished, setReviewAutoUpdatePublished] = useState(false);
+  const [reviewPublicationStatus, setReviewPublicationStatus] = useState<ReviewPublicationStatus | null>(null);
   const [followUpEntries, setFollowUpEntries] = useState<FollowUpPublicEntry[]>([]);
   const [selectedFollowUpEntryId, setSelectedFollowUpEntryId] = useState<string | null>(null);
   const [manualVerificationRecord, setManualVerificationRecord] = useState<ManualVerificationRecord | null>(null);
@@ -448,6 +455,24 @@ export function ProductAppContent({
       if (productVersionPollerRef.current === poller) productVersionPollerRef.current = null;
     };
   }, [loadData, loadVersionPointer]);
+
+  useEffect(() => {
+    if (!isReviewMode() || !dataSources.loadReviewPublicationStatus) return undefined;
+    let active = true;
+    const refreshStatus = () => {
+      void dataSources.loadReviewPublicationStatus!().then((next) => {
+        if (!active || !next) return;
+        setReviewPublicationStatus(next);
+        if (next.status === "PUBLISHED") setReviewAutoUpdatePublished(true);
+      });
+    };
+    refreshStatus();
+    const timer = window.setInterval(refreshStatus, 1_000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [dataSources.loadReviewPublicationStatus]);
 
   const refreshView = useCallback((): Promise<void> => {
     if (!loadVersionPointer) return loadData().then(() => undefined);
@@ -741,7 +766,11 @@ export function ProductAppContent({
 
   return (
     <>
-      {lifecycleRadar && isReviewMode() && <LifecycleReviewSwitch role={lifecycleRadar.actor.role} autoUpdatePublished={reviewAutoUpdatePublished} />}
+      {isReviewMode() && <LifecycleReviewSwitch
+        role={lifecycleRadar?.actor.role ?? "CAMP_USER"}
+        autoUpdatePublished={reviewAutoUpdatePublished}
+        publicationStatus={reviewPublicationStatus}
+      />}
       <ProductWorkspaceShell
         navItems={navItems}
         activeSection={activeSection}
@@ -775,9 +804,11 @@ export function ProductAppContent({
 function LifecycleReviewSwitch({
   role,
   autoUpdatePublished,
+  publicationStatus,
 }: {
   role: LifecycleRadarView["actor"]["role"];
   autoUpdatePublished: boolean;
+  publicationStatus: ReviewPublicationStatus | null;
 }) {
   const copy = { label: "Visual review", camp: "CAMP_USER", owner: "OWNER" };
   const switchTo = (next: "CAMP_USER" | "OWNER") => {
@@ -787,12 +818,25 @@ function LifecycleReviewSwitch({
     <aside className="personal-radar-review-switch" data-pc1-review-switch="global" aria-label={copy.label}>
       <span>{copy.label}: {role}</span>
       <span className="personal-radar-review-auto-update" role="status">
-        {autoUpdatePublished ? "New review version published" : "Auto-update test active"}
+        {reviewPublicationControllerMessage(publicationStatus, autoUpdatePublished)}
       </span>
       {role !== "CAMP_USER" && <button type="button" onClick={() => switchTo("CAMP_USER")}>{copy.camp}</button>}
       {role !== "OWNER" && <button type="button" onClick={() => switchTo("OWNER")}>{copy.owner}</button>}
     </aside>
   );
+}
+
+function reviewPublicationControllerMessage(
+  status: ReviewPublicationStatus | null,
+  autoUpdatePublished: boolean,
+): string {
+  if (status?.status === "PUBLISHED" || autoUpdatePublished) return "Nowa wersja review opublikowana";
+  if (status?.status === "PREPARING" || status?.status === "VALIDATING" || status?.status === "PUBLISHING") {
+    return "Auto-update test: publikacja…";
+  }
+  if (status?.status === "RETRY_WAIT") return `Publikacja nie powiodła się — ponawiam (${status.attempt}/3)`;
+  if (status?.status === "FAILED") return "Test auto-update nie powiódł się. Poprzednia wersja zachowana.";
+  return "Auto-update test: oczekiwanie";
 }
 
 function mergeLifecycleRadar(current: LifecycleRadarView | null, next: LifecycleRadarView): LifecycleRadarView {
