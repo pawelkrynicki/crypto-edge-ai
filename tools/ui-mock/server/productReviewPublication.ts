@@ -46,6 +46,10 @@ export type ProductReviewPublicationStatus = {
   failure_stage: ProductReviewPublicationStage | null;
   reason_code: string | null;
   next_retry_at: string | null;
+  /** Safe review-only timing facts for diagnosing the API-server lifetime timer. */
+  timer_scheduled_at: string | null;
+  timer_due_at: string | null;
+  timer_fired_at: string | null;
   provider_calls: 0;
   openai_calls: 0;
   canonical_mutations: 0;
@@ -144,21 +148,33 @@ export function createProductReviewPublication(options: ProductReviewPublication
   let publishing: Promise<ProductReviewPublicationResult> | null = null;
   let autoTimer: ReturnType<typeof setTimeout> | null = null;
   let status = createStatus("WAITING", 0);
+  let persistedStatus = Promise.resolve();
 
-  const saveStatus = async (nextStatus: ProductReviewPublicationStatus): Promise<void> => {
+  const saveStatus = (nextStatus: ProductReviewPublicationStatus): Promise<void> => {
     status = nextStatus;
-    try {
-      await persistStatus(status);
-    } catch {
-      // Review diagnostics must never turn a valid publication into a failed one.
-    }
+    const statusToPersist = nextStatus;
+    persistedStatus = persistedStatus.then(async () => {
+      try {
+        await persistStatus(statusToPersist);
+      } catch {
+        // Review diagnostics must never turn a valid publication into a failed one.
+      }
+    });
+    return persistedStatus;
   };
 
   const scheduleAttempt = (delayMs: number): void => {
     if (autoTimer) clearTimer(autoTimer);
+    const scheduledAt = now();
+    void saveStatus({
+      ...status,
+      timer_scheduled_at: scheduledAt.toISOString(),
+      timer_due_at: new Date(scheduledAt.getTime() + delayMs).toISOString(),
+      timer_fired_at: null,
+    });
     autoTimer = setTimer(() => {
       autoTimer = null;
-      void publishNext();
+      void saveStatus({ ...status, timer_fired_at: now().toISOString() }).finally(() => { void publishNext(); });
     }, delayMs);
     if (typeof autoTimer === "object" && autoTimer !== null && "unref" in autoTimer && typeof autoTimer.unref === "function") {
       autoTimer.unref();
@@ -182,6 +198,7 @@ export function createProductReviewPublication(options: ProductReviewPublication
       persistReviewPointer,
       persistMarker,
       saveStatus,
+      getStatus: () => status,
       holdActiveVersion: (version) => { activeVersion = version; },
       maxAttempts,
       retryDelayMs,
@@ -229,6 +246,7 @@ async function prepareValidateAndPublish({
   persistReviewPointer,
   persistMarker,
   saveStatus,
+  getStatus,
   holdActiveVersion,
   maxAttempts,
   retryDelayMs,
@@ -243,6 +261,7 @@ async function prepareValidateAndPublish({
   persistReviewPointer: (version: ProductVersion) => Promise<void>;
   persistMarker: (marker: ProductReviewPublicationMarker) => Promise<void>;
   saveStatus: (status: ProductReviewPublicationStatus) => Promise<void>;
+  getStatus: () => ProductReviewPublicationStatus;
   holdActiveVersion: (version: ProductVersion) => void;
   maxAttempts: number;
   retryDelayMs: number;
@@ -254,11 +273,15 @@ async function prepareValidateAndPublish({
     next: ProductReviewPublicationStatus["status"],
     extras: Partial<ProductReviewPublicationStatus> = {},
   ): Promise<ProductReviewPublicationStatus> => {
+    const timerStatus = getStatus();
     const nextStatus: ProductReviewPublicationStatus = {
       ...createStatus(next, attempt),
       started_at: startedAt,
       source_run_id: sourceRunId,
       target_run_id: targetRunId,
+      timer_scheduled_at: timerStatus.timer_scheduled_at,
+      timer_due_at: timerStatus.timer_due_at,
+      timer_fired_at: timerStatus.timer_fired_at,
       ...extras,
     };
     await saveStatus(nextStatus);
@@ -382,6 +405,9 @@ function createStatus(
     failure_stage: null,
     reason_code: null,
     next_retry_at: null,
+    timer_scheduled_at: null,
+    timer_due_at: null,
+    timer_fired_at: null,
     provider_calls: 0,
     openai_calls: 0,
     canonical_mutations: 0,

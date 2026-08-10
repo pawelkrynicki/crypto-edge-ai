@@ -6,6 +6,7 @@ import {
   createProductVersionPoller,
   productVersionsEqual,
   resolveProductVersionPollDelay,
+  type ProductVersionPollingDiagnostics,
 } from "../src/productVersionPolling.js";
 import type { ProductVersion } from "../src/productVersion.js";
 
@@ -83,6 +84,34 @@ describe("product version polling", () => {
     await poller.checkNow();
 
     assert.equal(fullRefreshes, 1, "the review marker produces one bounded full read refresh");
+  });
+
+  it("reports the review-safe poll, refresh, and commit diagnostic timeline", async () => {
+    let current = VERSION_A;
+    let clock = Date.parse("2026-08-10T10:00:00.000Z");
+    const diagnostics: ProductVersionPollingDiagnostics[] = [];
+    const poller = createProductVersionPoller({
+      loadVersion: async () => current,
+      onVersionChanged: async () => true,
+      now: () => clock,
+      onDiagnosticsChange: (next) => diagnostics.push(next),
+    });
+
+    await poller.checkNow();
+    poller.markCommitted(VERSION_A);
+    current = { ...VERSION_A, scanner_run_id: "scan_a-review-1", scanner_generated_at: "2026-08-10T10:01:00.000Z" };
+    clock = Date.parse("2026-08-10T10:01:00.000Z");
+    await poller.checkNow();
+
+    assert.deepEqual(poller.getDiagnostics(), {
+      last_poll_at: "2026-08-10T10:01:00.000Z",
+      last_seen_version: current,
+      last_attempted_version: current,
+      last_committed_version: current,
+      last_refresh_result: "PASS",
+    });
+    assert.equal(diagnostics.some((entry) => entry.last_refresh_result === "REFRESHING"), true);
+    assert.equal(diagnostics.at(-1)?.last_refresh_result, "PASS");
   });
 
   it("keeps the committed V1 after an invalid V2 and retries it only after the bounded delay", async () => {

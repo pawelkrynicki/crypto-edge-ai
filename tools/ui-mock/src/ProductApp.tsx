@@ -28,7 +28,11 @@ import {
 import { ProductLocaleProvider, useProductLocale } from "./productI18n";
 import type { ControlCenterStatus } from "./controlCenterStatus";
 import { resolveProductSourceHealth } from "./productSourceHealth";
-import { createProductVersionPoller, type ProductVersionPoller } from "./productVersionPolling";
+import {
+  createProductVersionPoller,
+  type ProductVersionPoller,
+  type ProductVersionPollingDiagnostics,
+} from "./productVersionPolling";
 import type { ProductVersion } from "./productVersion";
 import { getProductRuntimeMode, isAIResearchRenderPreviewMode } from "./runtimeMode";
 import {
@@ -190,6 +194,7 @@ export function ProductAppContent({
   const [preferredLifecycleBasket, setPreferredLifecycleBasket] = useState<RadarBasketId | null>(null);
   const [reviewAutoUpdatePublished, setReviewAutoUpdatePublished] = useState(false);
   const [reviewPublicationStatus, setReviewPublicationStatus] = useState<ReviewPublicationStatus | null>(null);
+  const [reviewPollingDiagnostics, setReviewPollingDiagnostics] = useState<ProductVersionPollingDiagnostics | null>(null);
   const [followUpEntries, setFollowUpEntries] = useState<FollowUpPublicEntry[]>([]);
   const [selectedFollowUpEntryId, setSelectedFollowUpEntryId] = useState<string | null>(null);
   const [manualVerificationRecord, setManualVerificationRecord] = useState<ManualVerificationRecord | null>(null);
@@ -432,7 +437,10 @@ export function ProductAppContent({
     }
     void loadVersionPointer().then(async (version) => {
       const committed = await loadData(version);
-      if (committed) productVersionPollerRef.current?.markCommitted(version);
+      if (committed) {
+        productVersionPollerRef.current?.markCommitted(version);
+        if (isReviewMode() && isReviewPublicationVersion(version)) setReviewAutoUpdatePublished(true);
+      }
     }).catch(() => { void loadData(); });
   }, [loadData, loadVersionPointer]);
 
@@ -444,6 +452,9 @@ export function ProductAppContent({
         const committed = await loadData(version);
         if (committed && isReviewMode()) setReviewAutoUpdatePublished(true);
         return committed;
+      },
+      onDiagnosticsChange: (diagnostics) => {
+        if (isReviewMode()) setReviewPollingDiagnostics(diagnostics);
       },
       document: typeof document === "undefined" ? undefined : document,
       window: typeof window === "undefined" ? undefined : window,
@@ -463,7 +474,6 @@ export function ProductAppContent({
       void dataSources.loadReviewPublicationStatus!().then((next) => {
         if (!active || !next) return;
         setReviewPublicationStatus(next);
-        if (next.status === "PUBLISHED") setReviewAutoUpdatePublished(true);
       });
     };
     refreshStatus();
@@ -478,7 +488,10 @@ export function ProductAppContent({
     if (!loadVersionPointer) return loadData().then(() => undefined);
     return loadVersionPointer().then(async (version) => {
       const committed = await loadData(version);
-      if (committed) productVersionPollerRef.current?.markCommitted(version);
+      if (committed) {
+        productVersionPollerRef.current?.markCommitted(version);
+        if (isReviewMode() && isReviewPublicationVersion(version)) setReviewAutoUpdatePublished(true);
+      }
     }).catch(() => loadData().then(() => undefined));
   }, [loadData, loadVersionPointer]);
 
@@ -770,6 +783,7 @@ export function ProductAppContent({
         role={lifecycleRadar?.actor.role ?? "CAMP_USER"}
         autoUpdatePublished={reviewAutoUpdatePublished}
         publicationStatus={reviewPublicationStatus}
+        pollingDiagnostics={reviewPollingDiagnostics}
       />}
       <ProductWorkspaceShell
         navItems={navItems}
@@ -805,10 +819,12 @@ function LifecycleReviewSwitch({
   role,
   autoUpdatePublished,
   publicationStatus,
+  pollingDiagnostics,
 }: {
   role: LifecycleRadarView["actor"]["role"];
   autoUpdatePublished: boolean;
   publicationStatus: ReviewPublicationStatus | null;
+  pollingDiagnostics: ProductVersionPollingDiagnostics | null;
 }) {
   const copy = { label: "Visual review", camp: "CAMP_USER", owner: "OWNER" };
   const switchTo = (next: "CAMP_USER" | "OWNER") => {
@@ -820,6 +836,13 @@ function LifecycleReviewSwitch({
       <span className="personal-radar-review-auto-update" role="status">
         {reviewPublicationControllerMessage(publicationStatus, autoUpdatePublished)}
       </span>
+      <dl className="personal-radar-review-diagnostics" data-pc1-review-polling-diagnostics="enabled" aria-label="Review polling diagnostics">
+        <div><dt>last_poll_at</dt><dd>{pollingDiagnostics?.last_poll_at ?? "—"}</dd></div>
+        <div><dt>last_seen_version</dt><dd>{reviewVersionLabel(pollingDiagnostics?.last_seen_version)}</dd></div>
+        <div><dt>last_attempted_version</dt><dd>{reviewVersionLabel(pollingDiagnostics?.last_attempted_version)}</dd></div>
+        <div><dt>last_committed_version</dt><dd>{reviewVersionLabel(pollingDiagnostics?.last_committed_version)}</dd></div>
+        <div><dt>last_refresh_result</dt><dd>{pollingDiagnostics?.last_refresh_result ?? "NOT_STARTED"}</dd></div>
+      </dl>
       {role !== "CAMP_USER" && <button type="button" onClick={() => switchTo("CAMP_USER")}>{copy.camp}</button>}
       {role !== "OWNER" && <button type="button" onClick={() => switchTo("OWNER")}>{copy.owner}</button>}
     </aside>
@@ -830,13 +853,22 @@ function reviewPublicationControllerMessage(
   status: ReviewPublicationStatus | null,
   autoUpdatePublished: boolean,
 ): string {
-  if (status?.status === "PUBLISHED" || autoUpdatePublished) return "Nowa wersja review opublikowana";
+  if (autoUpdatePublished) return "New review version published";
+  if (status?.status === "PUBLISHED") return "Review version published; waiting for view refresh…";
   if (status?.status === "PREPARING" || status?.status === "VALIDATING" || status?.status === "PUBLISHING") {
     return "Auto-update test: publikacja…";
   }
   if (status?.status === "RETRY_WAIT") return `Publikacja nie powiodła się — ponawiam (${status.attempt}/3)`;
   if (status?.status === "FAILED") return "Test auto-update nie powiódł się. Poprzednia wersja zachowana.";
   return "Auto-update test: oczekiwanie";
+}
+
+function isReviewPublicationVersion(version: ProductVersion | null): boolean {
+  return Boolean(version?.scanner_run_id && /-review-[1-9][0-9]*$/.test(version.scanner_run_id));
+}
+
+function reviewVersionLabel(version: ProductVersion | null | undefined): string {
+  return version?.scanner_run_id ?? "—";
 }
 
 function mergeLifecycleRadar(current: LifecycleRadarView | null, next: LifecycleRadarView): LifecycleRadarView {

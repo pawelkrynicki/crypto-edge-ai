@@ -603,7 +603,7 @@ describe("PC.1 bounded lifecycle Radar API", () => {
     assert.match(productApp, /Auto-update test: oczekiwanie/);
     assert.match(productApp, /Auto-update test: publikacja/);
     assert.match(productApp, /Publikacja nie powiodła się/);
-    assert.match(productApp, /Nowa wersja review opublikowana/);
+    assert.match(productApp, /New review version published/);
     assert.match(productApp, /Test auto-update nie powiódł się/);
     assert.match(productApp, /onVersionChanged:[\s\S]*?setReviewAutoUpdatePublished\(true\)/);
     assert.doesNotMatch(productApp, /setTimeout\([^)]*review/i);

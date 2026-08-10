@@ -6892,6 +6892,34 @@ button:disabled,
   font-size: 10px;
 }
 
+.personal-radar-review-diagnostics {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--color-text-helper);
+  font-size: 9px;
+  line-height: 1.25;
+}
+
+.personal-radar-review-diagnostics div {
+  display: flex;
+  gap: 4px;
+  min-width: 0;
+}
+
+.personal-radar-review-diagnostics dt,
+.personal-radar-review-diagnostics dd {
+  margin: 0;
+}
+
+.personal-radar-review-diagnostics dd {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 @media (max-width: 700px) {
   .token-detail-next-step .personal-radar-inline.detail { width: 100%; margin-left: 0; }
   .personal-radar-review-switch { right: 6px; bottom: 6px; }

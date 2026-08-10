@@ -106,6 +106,46 @@ describe("PC.1 review auto-publication harness", () => {
     }
   });
 
+  it("records the scheduled, due and fired times for the API-lifetime timer", async () => {
+    const reviewRootPath = await reviewRoot();
+    await automationState(reviewRootPath);
+    const timers: Array<{ callback: () => void; delay: number }> = [];
+    let clock = new Date("2026-08-10T08:30:00.000Z");
+    const publication = createProductReviewPublication({
+      enabled: true,
+      reviewRootPath,
+      now: () => clock,
+      loadBaseScanner: async () => scannerWithMeta(),
+      loadBaseSnapshot: async () => structuredClone(PERSISTABLE_SCANNER_SAMPLE) as ScannerOutputWithMeta,
+      loadBaseVersion: async () => VERSION,
+      validateSnapshot: () => undefined,
+      setTimer: (callback, delay) => {
+        timers.push({ callback, delay });
+        return timers.length as unknown as ReturnType<typeof setTimeout>;
+      },
+      clearTimer: () => undefined,
+    });
+    try {
+      assert.deepEqual(publication.getStatus(), {
+        ...publication.getStatus(),
+        timer_scheduled_at: "2026-08-10T08:30:00.000Z",
+        timer_due_at: "2026-08-10T08:31:00.000Z",
+        timer_fired_at: null,
+      });
+      const scheduled = timers.shift();
+      assert.equal(scheduled?.delay, PC1_REVIEW_AUTO_PUBLICATION_DELAY_MS);
+      clock = new Date("2026-08-10T08:31:00.000Z");
+      scheduled?.callback();
+      const result = await publication.publishNext();
+      assert.equal(result.status.status, "PUBLISHED");
+      assert.equal(result.status.timer_scheduled_at, "2026-08-10T08:30:00.000Z");
+      assert.equal(result.status.timer_due_at, "2026-08-10T08:31:00.000Z");
+      assert.equal(result.status.timer_fired_at, "2026-08-10T08:31:00.000Z");
+    } finally {
+      publication.stop();
+    }
+  });
+
   it("does not create the final marker when the pointer commit fails", async () => {
     const reviewRootPath = await reviewRoot();
     const automationStatePath = await automationState(reviewRootPath);

@@ -84,7 +84,15 @@ describe("product version API", () => {
       assert.equal(absentReviewMarker.status, 404);
       const waitingStatus = await fetch(`${base}/api/product/review/publication-status?pc1_review=1`);
       assert.equal(waitingStatus.status, 200);
-      assert.deepEqual(await waitingStatus.json(), {
+      const waitingPublicationStatus = await waitingStatus.json() as Record<string, unknown>;
+      assert.equal(typeof waitingPublicationStatus.timer_scheduled_at, "string");
+      assert.equal(typeof waitingPublicationStatus.timer_due_at, "string");
+      assert.equal(waitingPublicationStatus.timer_fired_at, null);
+      assert.deepEqual({
+        ...waitingPublicationStatus,
+        timer_scheduled_at: null,
+        timer_due_at: null,
+      }, {
         schema_version: "pc1_review_publication_status_v1",
         status: "WAITING",
         attempt: 0,
@@ -95,6 +103,9 @@ describe("product version API", () => {
         failure_stage: null,
         reason_code: null,
         next_retry_at: null,
+        timer_scheduled_at: null,
+        timer_due_at: null,
+        timer_fired_at: null,
         provider_calls: 0,
         openai_calls: 0,
         canonical_mutations: 0,
