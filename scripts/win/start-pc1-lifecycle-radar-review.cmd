@@ -34,6 +34,7 @@ set "CRYPTO_EDGE_OWNER_OPERATIONS_MODE=ENABLED"
 set "CRYPTO_EDGE_PC1_REVIEW_DEFAULT_ACTOR=CAMP_USER"
 set "CRYPTO_EDGE_PC1_REVIEW_MODE=1"
 set "CRYPTO_EDGE_PC1_REVIEW_ROOT=%REVIEW_ROOT%"
+set "CRYPTO_EDGE_PC1_REVIEW_AUTO_PUBLICATION_DELAY_MS=60000"
 set "CRYPTO_EDGE_AUTOMATION_ENABLED=1"
 set "ALLOW_LIVE_PROVIDER_CALLS=0"
 set "CRYPTO_EDGE_AI_RESEARCH_PROVIDER=DISABLED"
@@ -61,7 +62,8 @@ echo.
 echo === Crypto Edge AI: PC.1 Lifecycle / Private Radar review ===
 echo Runtime: INTERNAL_BETA, isolated review workspace
 echo Workspace: %REVIEW_ROOT%
-echo Provider calls before an explicit browser click: 0
+echo Review auto-update publication: 60 seconds
+echo Provider calls: 0
 echo OpenAI calls: 0
 echo Honeypot.is calls: 0
 echo Canonical store mutations: 0

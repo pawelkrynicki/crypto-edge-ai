@@ -6887,6 +6887,11 @@ button:disabled,
   background: var(--color-surface-3);
 }
 
+.personal-radar-review-auto-update {
+  color: var(--color-text-helper);
+  font-size: 10px;
+}
+
 @media (max-width: 700px) {
   .token-detail-next-step .personal-radar-inline.detail { width: 100%; margin-left: 0; }
   .personal-radar-review-switch { right: 6px; bottom: 6px; }

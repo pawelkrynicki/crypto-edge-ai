@@ -30,7 +30,7 @@ Jeśli jedno źródło context jest chwilowo niedostępne, cykl może przenieś�
 
 Product UI sprawdza ten lekki endpoint co 45 sekund z jitterem ±10 sekund, co 120 sekund w ukrytej karcie i natychmiast po odzyskaniu focusu. Brak zmiany nie powoduje pełnego odświeżenia. Zmiana uruchamia jeden zwykły, ograniczony odczyt snapshotu scanner, readiness/context, lifecycle radar i statusów źródeł. Bieżąca sekcja, aktywna karta Candidate Detail oraz prywatny koszyk są zachowywane. `Refresh View` nadal wymusza natychmiastowy odczyt widoku, ale pozostaje wyłącznie odczytowy.
 
-W izolowanym lokalnym runtime PC.1 (`?pc1_review=1`, `CRYPTO_EDGE_PC1_REVIEW_MODE=1` i `CRYPTO_EDGE_PC1_REVIEW_ROOT`) dostępny jest wyłącznie loopbackowy `POST /api/product/review/publish-next?pc1_review=1`. Służy on do testu wykrywania nowej publikacji; nie wykonuje żadnego wywołania providera i nie zapisuje kanonicznych danych.
+W izolowanym lokalnym runtime PC.1 (`?pc1_review=1`, `CRYPTO_EDGE_PC1_REVIEW_MODE=1` i `CRYPTO_EDGE_PC1_REVIEW_ROOT`) harness po 60 sekundach jednokrotnie zapisuje marker `pc1-review-publication.json` wyłącznie w `REVIEW_ROOT`. Następny zwykły odczyt `GET /api/product/version` widzi nowszy review `scanner_run_id`, `scanner_generated_at` i `lifecycle_updated_at`, więc UI wykonuje normalny bounded refresh. Marker nie uruchamia collectora, providerów, OpenAI, centralnego cycle ani zapisu kanonicznych danych; dane tokenów nie są zmieniane. Lokalny, loopbackowy `POST /api/product/review/publish-next?pc1_review=1` pozostaje wyłącznie pomocniczym przełącznikiem review.
 
 ## Jednorazowy cykl live, backup i rollback
 

@@ -553,6 +553,8 @@ describe("PC.1 bounded lifecycle Radar API", () => {
     assert.match(launcher, /CRYPTO_EDGE_PC1_REVIEW_DEFAULT_ACTOR=CAMP_USER/);
     assert.match(launcher, /CRYPTO_EDGE_PC1_REVIEW_MODE=1/);
     assert.match(launcher, /CRYPTO_EDGE_PC1_REVIEW_ROOT=%REVIEW_ROOT%/);
+    assert.match(launcher, /CRYPTO_EDGE_PC1_REVIEW_AUTO_PUBLICATION_DELAY_MS=60000/);
+    assert.match(launcher, /Review auto-update publication: 60 seconds/);
     assert.doesNotMatch(launcher, /CRYPTO_EDGE_PC1_REVIEW_DEFAULT_ACTOR=OWNER/);
     assert.match(launcher, /preparePc1LifecycleReview\.ts/);
     assert.match(launcher, /bootstrapPc1LifecycleReview\.ts/);
@@ -598,6 +600,10 @@ describe("PC.1 bounded lifecycle Radar API", () => {
     assert.match(personalRadar, /TechnicalDetails label=\{copy\.confirmAction\}/);
     assert.match(productApp, /isReviewMode\(\).*LifecycleReviewSwitch/);
     assert.match(productApp, /data-pc1-review-switch="global"/);
+    assert.match(productApp, /Auto-update test active/);
+    assert.match(productApp, /New review version published/);
+    assert.match(productApp, /onVersionChanged:[\s\S]*?setReviewAutoUpdatePublished\(true\)/);
+    assert.doesNotMatch(productApp, /setTimeout\([^)]*review/i);
     assert.match(styles, /\.personal-radar-inline\.card \{ grid-column: 1 \/ -1; \}/);
     assert.match(styles, /\.personal-radar-review-switch \{\s*position: fixed;/);
   });

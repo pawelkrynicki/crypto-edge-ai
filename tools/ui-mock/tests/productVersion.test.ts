@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
+import { mkdtemp, rm } from "node:fs/promises";
 import type { AddressInfo } from "node:net";
+import { tmpdir } from "node:os";
+import { resolve } from "node:path";
 import { describe, it } from "node:test";
 import { createScannerApiServer } from "../server/scannerApiServer.js";
 import { createProductReviewPublication } from "../server/productReviewPublication.js";
@@ -55,8 +58,9 @@ describe("product version API", () => {
   it("allows the publication simulation only in the isolated PC.1 review runtime", async () => {
     const originalMode = process.env.CRYPTO_EDGE_PC1_REVIEW_MODE;
     const originalRoot = process.env.CRYPTO_EDGE_PC1_REVIEW_ROOT;
+    const reviewRootPath = await mkdtemp(resolve(tmpdir(), "crypto-edge-pc1-version-"));
     process.env.CRYPTO_EDGE_PC1_REVIEW_MODE = "1";
-    process.env.CRYPTO_EDGE_PC1_REVIEW_ROOT = "C:\\temp\\pc1-review";
+    process.env.CRYPTO_EDGE_PC1_REVIEW_ROOT = reviewRootPath;
     const server = createScannerApiServer({
       runtimeMode: "INTERNAL_BETA",
       productVersion: {
@@ -76,31 +80,67 @@ describe("product version API", () => {
       const after = await version(base);
       assert.notEqual(after.scanner_run_id, before.scanner_run_id);
       assert.notEqual(after.scanner_generated_at, before.scanner_generated_at);
+      assert.notEqual(after.lifecycle_updated_at, before.lifecycle_updated_at);
     } finally {
       await close(server);
+      await rm(reviewRootPath, { recursive: true, force: true });
       if (originalMode === undefined) delete process.env.CRYPTO_EDGE_PC1_REVIEW_MODE; else process.env.CRYPTO_EDGE_PC1_REVIEW_MODE = originalMode;
       if (originalRoot === undefined) delete process.env.CRYPTO_EDGE_PC1_REVIEW_ROOT; else process.env.CRYPTO_EDGE_PC1_REVIEW_ROOT = originalRoot;
     }
   });
 
-  it("keeps a simulated scanner publication internally consistent for the normal UI reader", () => {
-    const originalMode = process.env.CRYPTO_EDGE_PC1_REVIEW_MODE;
-    const originalRoot = process.env.CRYPTO_EDGE_PC1_REVIEW_ROOT;
-    process.env.CRYPTO_EDGE_PC1_REVIEW_MODE = "1";
-    process.env.CRYPTO_EDGE_PC1_REVIEW_ROOT = "C:\\temp\\pc1-review";
+  it("changes the version endpoint only after the isolated review timer publishes its marker", async () => {
+    let reviewTimer: (() => void) | undefined;
+    const server = createScannerApiServer({
+      runtimeMode: "INTERNAL_BETA",
+      reviewPublication: {
+        enabled: true,
+        reviewRootPath: "review-only-test-root",
+        now: () => new Date("2026-08-10T10:05:00.000Z"),
+        autoPublicationDelayMs: 60_000,
+        setTimer: (callback, delay) => {
+          assert.equal(delay, 60_000);
+          reviewTimer = callback;
+          return 1 as unknown as ReturnType<typeof setTimeout>;
+        },
+        clearTimer: () => undefined,
+        persistMarker: async () => undefined,
+      },
+      productVersion: {
+        readAutomationState: async () => ({ last_published_scanner_run_id: "scan_pointer", last_published_context_run_id: "context_pointer" }),
+        readPublishedSnapshotTimes: async () => ({ scanner_published_at: "2026-08-10T10:00:00.000Z", context_published_at: "2026-08-10T09:55:00.000Z" }),
+        readLifecycleReceipt: async () => ({ central_cycle_id: "cycle_pointer", finished_at: "2026-08-10T10:00:01.000Z" }),
+      },
+    });
+    await listen(server);
     try {
-      const publication = createProductReviewPublication(() => new Date("2026-08-10T10:05:00.000Z"), true);
-      publication.publishNext();
+      const base = serverUrl(server);
+      const before = await version(base);
+      assert.ok(reviewTimer, "the isolated review harness schedules one publication");
+      reviewTimer();
+      await new Promise<void>((done) => setImmediate(done));
+      const after = await version(base);
+      assert.notEqual(after.scanner_run_id, before.scanner_run_id);
+      assert.equal(after.scanner_generated_at, "2026-08-10T10:05:00.000Z");
+      assert.equal(after.lifecycle_updated_at, "2026-08-10T10:05:00.000Z");
+    } finally { await close(server); }
+  });
+
+  it("keeps a simulated scanner publication internally consistent for the normal UI reader", async () => {
+    const publication = createProductReviewPublication({
+      now: () => new Date("2026-08-10T10:05:00.000Z"),
+      enabled: true,
+      persistMarker: async () => undefined,
+    });
+    try {
+      await publication.publishNext();
       const simulated = publication.decorateScanner(structuredClone(PERSISTABLE_SCANNER_SAMPLE));
       const validated = validateScannerApiOutput(simulated);
       assert.match(validated.scan_run.run_id, /-review-1$/);
       assert.equal(validated.candidates.every((candidate) => candidate.run_id === validated.scan_run.run_id), true);
       assert.equal(validated.security_checks.every((entry) => entry.run_id === validated.scan_run.run_id), true);
       assert.equal(validated.scorecards.every((entry) => entry.run_id === validated.scan_run.run_id), true);
-    } finally {
-      if (originalMode === undefined) delete process.env.CRYPTO_EDGE_PC1_REVIEW_MODE; else process.env.CRYPTO_EDGE_PC1_REVIEW_MODE = originalMode;
-      if (originalRoot === undefined) delete process.env.CRYPTO_EDGE_PC1_REVIEW_ROOT; else process.env.CRYPTO_EDGE_PC1_REVIEW_ROOT = originalRoot;
-    }
+    } finally { publication.stop(); }
   });
 });
 

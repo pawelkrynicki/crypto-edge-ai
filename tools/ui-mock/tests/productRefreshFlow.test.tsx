@@ -20,6 +20,7 @@ import type {
   ProductReadinessOutput,
   ScannerApiOutput,
 } from "../src/types/scannerTypes.js";
+import type { LifecycleRadarView } from "../src/types/lifecycleTypes.js";
 
 void React;
 
@@ -207,6 +208,53 @@ describe("ProductApp Refresh View last-known-good flow", () => {
     }
   });
 
+  it("updates the review timestamp through polling without a click and preserves the private lifecycle basket", async () => {
+    const first = readyResult(scannerOutput("scan_review_1", "FIRST", "2026-08-04T04:39:00.000Z"));
+    const next = readyResult(scannerOutput("scan_review_1-review-1", "NEXT", "2026-08-10T08:30:00.000Z"));
+    const versions: ProductVersion[] = [
+      { scanner_run_id: "scan_review_1", scanner_generated_at: "2026-08-04T04:39:00.000Z", context_run_id: "context_1", context_generated_at: "2026-08-04T04:39:00.000Z", lifecycle_cycle_id: "cycle_1", lifecycle_updated_at: "2026-08-04T04:39:01.000Z" },
+      { scanner_run_id: "scan_review_1-review-1", scanner_generated_at: "2026-08-10T08:30:00.000Z", context_run_id: "context_1", context_generated_at: "2026-08-04T04:39:00.000Z", lifecycle_cycle_id: "cycle_1", lifecycle_updated_at: "2026-08-10T08:30:00.000Z" },
+    ];
+    let scannerCalls = 0;
+    let versionIndex = 0;
+    let lifecycleReads = 0;
+    const privateRadar = privateFollowUpRadar();
+    const browser = installBrowser("http://127.0.0.1:5173/?pc1_review=1#candidate-results");
+    const originalActEnvironment = globalThis.IS_REACT_ACT_ENVIRONMENT;
+    globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+    let renderer: ReturnType<typeof create> | undefined;
+    try {
+      const dataSources: ProductAppDataSources = {
+        ...createDataSources(async () => [first, next][scannerCalls++]!),
+        loadLifecycleRadar: async () => { lifecycleReads += 1; return privateRadar; },
+        loadProductVersion: async () => versions[versionIndex]!,
+      };
+      await act(async () => {
+        renderer = create(<ProductLocaleProvider initialLocale="en"><ProductAppContent dataSources={dataSources} runtimeModeOverride="INTERNAL_BETA" /></ProductLocaleProvider>);
+        await flushPromises();
+      });
+      assert.match(renderedText(renderer!), /Auto-update test active/);
+
+      versionIndex = 1;
+      await act(async () => {
+        (globalThis.window as unknown as { dispatchEvent: (event: { type: string }) => void }).dispatchEvent({ type: "focus" });
+        await flushPromises();
+      });
+
+      const shell = renderer!.root.findByType(ProductWorkspaceShell);
+      const radar = renderer!.root.findByType(CandidateResultsView);
+      assert.equal(scannerCalls, 2, "the published review version performs one full read refresh without Refresh View");
+      assert.equal(lifecycleReads, 2, "the private lifecycle view is read again with the refresh");
+      assert.equal(shell.props.generatedAt, "2026-08-10T08:30:00.000Z");
+      assert.equal(radar.props.lifecycleRadar.private_baskets.follow_up.cards[0]!.user_status, "FOLLOW_UP");
+      assert.match(renderedText(renderer!), /New review version published/);
+    } finally {
+      if (renderer) await act(async () => { renderer!.unmount(); });
+      browser.restore();
+      globalThis.IS_REACT_ACT_ENVIRONMENT = originalActEnvironment;
+    }
+  });
+
   it("ships the required natural PL and EN last-known-good alert copy", () => {
     assert.equal(
       PRODUCT_TRANSLATIONS.pl["app.refreshLastKnownGood"],
@@ -330,6 +378,56 @@ function readiness(): ProductReadinessOutput {
       established: { ready: false, configured: true, status: "empty_configured", reason_code: "ESTABLISHED_UNIVERSE_EMPTY" },
     },
     reason_codes: [],
+  };
+}
+
+function privateFollowUpRadar(): LifecycleRadarView {
+  const group = <T,>(cards: T[]) => ({ total: cards.length, displayed: cards.length, limit: 24, next_cursor: null, cards });
+  const card = {
+    identity: `base:${CONTRACT}`,
+    chain: "base",
+    contract_address: CONTRACT,
+    display_name: "Private token",
+    symbol: "PRIVATE",
+    first_seen_at: "2026-08-04T04:39:00.000Z",
+    last_seen_at: "2026-08-04T04:39:00.000Z",
+    snapshot_present: true,
+    snapshot_absence_notice: false,
+    market: null,
+    follow_up: null,
+    system_status: "NEW" as const,
+    user_status: "FOLLOW_UP" as const,
+    user_status_is_override: true,
+    conditions: { conditions_met: ["IDENTITY_VALID"], conditions_unmet: [], missing_data: [], risks: [], readiness: "CONDITIONS_MET" as const, security_state: "CHECKED", verification_state: "VERIFIED" },
+    actor: { role: "CAMP_USER" as const, capabilities: ["PRIVATE_LIFECYCLE_WRITE"] },
+  };
+  return {
+    schema_version: "lifecycle_radar_view_v1",
+    summary: {
+      schema_version: "lifecycle_summary_v1",
+      system_new_total: 1,
+      system_follow_up_total: 0,
+      system_main_radar_total: 0,
+      follow_up_action_due: 0,
+      follow_up_candidates_ready: 0,
+      follow_up_displayed: 0,
+      follow_up_store_version: "sha256:review",
+      last_lifecycle_change_at: "2026-08-04T04:39:00.000Z",
+      last_central_cycle_id: "cycle_1",
+      summary_as_of: "2026-08-04T04:39:00.000Z",
+      last_completed_cycle_id: "cycle_1",
+      last_completed_cycle_at: "2026-08-04T04:39:00.000Z",
+      delta_source: "CENTRAL_CYCLE",
+      last_change_summary: { added: 1, updated: 0, promoted_to_follow_up: 0, promoted_to_main_radar: 0, archived: 0, rejected: 0, duplicate_noop: 0 },
+    },
+    actor: card.actor,
+    new_inbox: group([]),
+    follow_up: { action_due: group([]), candidates_ready: group([]), observed: group([]) },
+    main_radar: { total: 0 },
+    private_new_total: 0,
+    private_follow_up_total: 1,
+    private_main_radar_total: 0,
+    private_baskets: { new: group([]), follow_up: group([card]), main_radar: group([]) },
   };
 }
 

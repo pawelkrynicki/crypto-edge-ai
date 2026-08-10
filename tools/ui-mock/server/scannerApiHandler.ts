@@ -21,7 +21,7 @@ import {
   ScannerOutputError,
 } from "./latestScannerOutput.js";
 import { readProductVersion, type ProductVersionOptions } from "./productVersion.js";
-import { createProductReviewPublication } from "./productReviewPublication.js";
+import { createProductReviewPublication, type ProductReviewPublicationOptions } from "./productReviewPublication.js";
 import type { ReviewSessionFileStoreOptions } from "./reviewSessionFileStore.js";
 import { createConfiguredReviewSessionStorageProvider } from "./reviewSessionProviderConfig.js";
 import {
@@ -121,6 +121,7 @@ export type ScannerApiHandlerOptions = {
   health?: ScannerApiHealthOptions;
   automation?: AutomationStatusOptions;
   productVersion?: ProductVersionOptions;
+  reviewPublication?: ProductReviewPublicationOptions;
   establishedUniverse?: EstablishedUniverseStatusOptions;
   establishedPromotion?: EstablishedPromotionOptions;
   ownerOperations?: OwnerOperationsOptions;
@@ -166,7 +167,7 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
     lifecycleReceiptPath: options.productVersion?.lifecycleReceiptPath ?? options.lifecycle?.cycleReceiptPath,
     ...options.productVersion,
   };
-  const reviewPublication = createProductReviewPublication();
+  const reviewPublication = createProductReviewPublication(options.reviewPublication);
   const ownerMode = resolveOwnerOperationsMode(options.ownerOperations?.mode ?? process.env.CRYPTO_EDGE_OWNER_OPERATIONS_MODE);
   const ownerSessionSecret = ownerMode === "DISABLED"
     ? undefined
@@ -948,7 +949,7 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
         sendJson(req, res, 404, { error: "not_found", message: "Route not found" }, runtimeMode);
         return;
       }
-      reviewPublication.publishNext();
+      await reviewPublication.publishNext();
       try {
         sendJson(req, res, 200, reviewPublication.decorateVersion(await readProductVersion(productVersionOptions)), runtimeMode);
       } catch {

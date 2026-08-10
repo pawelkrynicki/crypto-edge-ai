@@ -68,10 +68,14 @@ contract; CAMP user and trusted tester have no scan capability.
 
 `scripts\win\start-pc1-lifecycle-radar-review.cmd` builds INTERNAL_BETA, copies
 stores/config/snapshots to `%TEMP%\crypto-edge-pc1-review-*`, starts an isolated
-local review instance and opens one `?pc1_review=1` browser tab. It starts with an
-owner session and offers a local-only switch to a server-created CAMP_USER session.
-No provider call happens on launch. A live limited scan remains possible only after
-an explicit owner browser confirmation, and writes only to the copied workspace.
+local review instance and opens one `?pc1_review=1` browser tab. It starts with a
+CAMP_USER session and offers a local-only switch to a server-created OWNER session.
+After 60 seconds the review harness writes one version marker only inside
+`REVIEW_ROOT`; the ordinary Product UI version polling then performs its bounded
+refresh without a click. No provider call, OpenAI call, central cycle or canonical
+store mutation happens on launch or during that marker publication. A live limited
+scan remains possible only after an explicit owner browser confirmation, and writes
+only to the copied workspace.
 
 ## Migration and recovery
 

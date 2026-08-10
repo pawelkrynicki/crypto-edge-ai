@@ -163,6 +163,7 @@ export function ProductAppContent({
   const [lifecycleSummary, setLifecycleSummary] = useState<LifecycleSummary | null>(null);
   const [lifecycleRadar, setLifecycleRadar] = useState<LifecycleRadarView | null>(null);
   const [preferredLifecycleBasket, setPreferredLifecycleBasket] = useState<RadarBasketId | null>(null);
+  const [reviewAutoUpdatePublished, setReviewAutoUpdatePublished] = useState(false);
   const [followUpEntries, setFollowUpEntries] = useState<FollowUpPublicEntry[]>([]);
   const [selectedFollowUpEntryId, setSelectedFollowUpEntryId] = useState<string | null>(null);
   const [manualVerificationRecord, setManualVerificationRecord] = useState<ManualVerificationRecord | null>(null);
@@ -355,7 +356,10 @@ export function ProductAppContent({
     if (!loadVersionPointer) return undefined;
     const poller = createProductVersionPoller({
       loadVersion: loadVersionPointer,
-      onVersionChanged: async () => { await loadData(); },
+      onVersionChanged: async () => {
+        await loadData();
+        if (isReviewMode()) setReviewAutoUpdatePublished(true);
+      },
       document: typeof document === "undefined" ? undefined : document,
       window: typeof window === "undefined" ? undefined : window,
     });
@@ -658,7 +662,7 @@ export function ProductAppContent({
 
   return (
     <>
-      {lifecycleRadar && isReviewMode() && <LifecycleReviewSwitch role={lifecycleRadar.actor.role} />}
+      {lifecycleRadar && isReviewMode() && <LifecycleReviewSwitch role={lifecycleRadar.actor.role} autoUpdatePublished={reviewAutoUpdatePublished} />}
       <ProductWorkspaceShell
         navItems={navItems}
         activeSection={activeSection}
@@ -689,7 +693,13 @@ export function ProductAppContent({
   );
 }
 
-function LifecycleReviewSwitch({ role }: { role: LifecycleRadarView["actor"]["role"] }) {
+function LifecycleReviewSwitch({
+  role,
+  autoUpdatePublished,
+}: {
+  role: LifecycleRadarView["actor"]["role"];
+  autoUpdatePublished: boolean;
+}) {
   const copy = { label: "Visual review", camp: "CAMP_USER", owner: "OWNER" };
   const switchTo = (next: "CAMP_USER" | "OWNER") => {
     void setLifecycleReviewRole(next).then((changed) => { if (changed) window.location.reload(); });
@@ -697,6 +707,9 @@ function LifecycleReviewSwitch({ role }: { role: LifecycleRadarView["actor"]["ro
   return (
     <aside className="personal-radar-review-switch" data-pc1-review-switch="global" aria-label={copy.label}>
       <span>{copy.label}: {role}</span>
+      <span className="personal-radar-review-auto-update" role="status">
+        {autoUpdatePublished ? "New review version published" : "Auto-update test active"}
+      </span>
       {role !== "CAMP_USER" && <button type="button" onClick={() => switchTo("CAMP_USER")}>{copy.camp}</button>}
       {role !== "OWNER" && <button type="button" onClick={() => switchTo("OWNER")}>{copy.owner}</button>}
     </aside>

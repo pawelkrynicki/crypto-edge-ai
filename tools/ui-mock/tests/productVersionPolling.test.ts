@@ -61,6 +61,27 @@ describe("product version polling", () => {
     assert.equal(pointerReads, 3);
   });
 
+  it("detects one review publication and treats a second poll of its marker as NO_ACTION", async () => {
+    let current = VERSION_A;
+    let fullRefreshes = 0;
+    const poller = createProductVersionPoller({
+      loadVersion: async () => current,
+      onVersionChanged: async () => { fullRefreshes += 1; },
+    });
+
+    await poller.checkNow();
+    current = {
+      ...VERSION_A,
+      scanner_run_id: "scan_a-review-1",
+      scanner_generated_at: "2026-08-10T10:01:00.000Z",
+      lifecycle_updated_at: "2026-08-10T10:01:00.000Z",
+    };
+    await poller.checkNow();
+    await poller.checkNow();
+
+    assert.equal(fullRefreshes, 1, "the review marker produces one bounded full read refresh");
+  });
+
   it("uses jitter while visible, slows down hidden tabs, and checks immediately after focus", async () => {
     assert.equal(resolveProductVersionPollDelay(false, () => 0), 35_000);
     assert.equal(resolveProductVersionPollDelay(false, () => 1), 55_000);
