@@ -187,7 +187,7 @@ describe("AI.3 central worker, single-flight and last-known-good", () => {
     store.close();
   });
 
-  it("retries transient failures with bounded backoff and suspends after the limit", async () => {
+  it("retries transient failures with bounded backoff and leaves the worker available after the limit", async () => {
     await writeFixture(100_000, true);
     const store = await createAIAnalysisQueueStore({ databaseFilePath: resolve(root, "retry.sqlite") });
     enqueue(store, fromContext(await context(ADDRESS)), "retry-session");
@@ -199,7 +199,7 @@ describe("AI.3 central worker, single-flight and last-known-good", () => {
       async generate() { calls += 1; throw new AIResearchProviderError("PROVIDER_TIMEOUT"); },
     };
     const worker = createAIResearchWorker({
-      ...contextOptions(), store, provider, now: () => clock, limits: { maxAttempts: 2, retryBaseMs: 100 },
+      ...contextOptions(), store, provider, now: () => clock, limits: { maxAttempts: 2, retryBaseMs: 100, retryJitterRatio: 0 },
     });
     const first = await worker.runCycle();
     assert.equal(first.retried, 1);
@@ -209,7 +209,7 @@ describe("AI.3 central worker, single-flight and last-known-good", () => {
     const second = await worker.runCycle();
     assert.equal(second.suspended, 1);
     assert.equal(calls, 2);
-    assert.equal(store.workerState().suspended, true);
+    assert.equal(store.workerState().suspended, false);
     store.close();
   });
 });

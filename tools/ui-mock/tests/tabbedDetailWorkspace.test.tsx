@@ -227,8 +227,7 @@ describe("UX.3 client header and UX.4 provider-neutral AI", () => {
       error_code: null,
     };
     const client = render("en", <AIResearchSection chain="base" contractAddress={ADDRESS_A} symbol="PASS" name="Pass" initialLookup={lookup} mode="summary" />);
-    assert.match(client, /AI analysis is disabled in this preview mode/);
-    assert.match(client, /Enable AI analysis in Control Center\./);
+    assert.match(client, /AI analysis is currently unavailable/);
     assert.doesNotMatch(client, /OpenAI|gpt-5-mini|provider mode|PROVIDER_DISABLED/i);
 
     const canvas = await source("src/components/AIResearchBriefCanvas.tsx");

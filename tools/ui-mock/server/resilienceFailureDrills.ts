@@ -719,7 +719,7 @@ async function runAIScenarios(
   // Restore the original controlled fixture for independent queue scenarios.
   await writeFile(fixturePath, `${JSON.stringify(scanner, null, 2)}\n`, "utf8");
 
-  await runScenario(scenarios, "ai-attempt-limit", "Transient failures use bounded exponential backoff and end in SUSPENDED after the configured maximum.", async () => {
+  await runScenario(scenarios, "ai-attempt-limit", "Transient failures use bounded exponential backoff; the job ends in a controlled error without globally disabling the worker.", async () => {
     const databasePath = resolve(locations.ai, "attempt-limit.sqlite");
     const store = await createAIAnalysisQueueStore({ databaseFilePath: databasePath });
     const context = await buildAIResearchContext(candidate.chain, candidate.contract_address!, "pl", contextOptions);
@@ -751,13 +751,14 @@ async function runAIScenarios(
     const workerState = store.workerState();
     store.close();
     assert(first.retried === 1 && failedRecord.failed === 1, "AI_RETRY_NOT_SCHEDULED");
-    assert(second.suspended === 1 && finalStats.suspended === 1 && workerState.suspended, "AI_RETRY_LIMIT_NOT_ENFORCED");
+    assert(second.suspended === 1 && finalStats.suspended === 1 && !workerState.suspended, "AI_RETRY_LIMIT_NOT_ENFORCED");
     assert(calls === 2, "AI_UNBOUNDED_RETRY_DETECTED");
-    return evidence("One retry was scheduled with the configured backoff; the second failure exhausted the limit.", "The job and worker entered a controlled SUSPENDED state with no further provider call.", {
+    return evidence("One retry was scheduled with the configured backoff; the second failure exhausted the limit.", "The job entered a controlled terminal state with no further provider call; the central breaker, not a one-job failure, controls global protection.", {
       maximum_attempts: 2,
       provider_calls: calls,
       first_backoff_ms: 100,
       final_status: "SUSPENDED",
+      worker_remains_available: true,
       client_message: CLIENT_MESSAGES.pl[3],
     }, ["PROVIDER_TIMEOUT"]);
   });
