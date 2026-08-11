@@ -191,10 +191,13 @@ async function processClaim(
   }, Math.max(500, Math.min(30_000, Math.floor(limits.leaseMs / 3))));
   heartbeat.unref?.();
   try {
-    const context = await buildAIResearchContext(claimed.chain, claimed.contract_address, claimed.locale, contextOptions);
+    // Queue locale is retained only for database compatibility. A production job is
+    // always hydrated from the canonical English context, never from the first
+    // requester's presentation locale.
+    const context = await buildAIResearchContext(claimed.chain, claimed.contract_address, "en", contextOptions);
     const currentIdentity = buildAIAnalysisCacheIdentity({
       ...context.identity,
-      locale: claimed.locale,
+      locale: "en",
       snapshot_fingerprint: context.snapshot_fingerprint,
       prompt_version: context.prompt_version,
       model_id: claimed.model_id,

@@ -160,7 +160,8 @@ export function AIResearchSection({
   const showRequest = ["ABSENT", "STALE", "FAILED", "ERROR"].includes(availability);
 
   useEffect(() => {
-    if (typeof window === "undefined" || mode !== "detail" || !active || identity.status !== "valid" || !["QUEUED", "PROCESSING"].includes(availability)) return;
+    if (typeof window === "undefined" || typeof window.setInterval !== "function" || typeof window.clearInterval !== "function"
+      || mode !== "detail" || !active || identity.status !== "valid" || !["QUEUED", "PROCESSING"].includes(availability)) return;
     let cancelled = false;
     const refresh = () => {
       void loadAIResearchBrief(identity.chain, identity.contract_address, locale)

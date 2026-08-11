@@ -1228,21 +1228,21 @@ async function deterministicNarrative(context: AIResearchContext): Promise<Recor
       id: `fact:${fact.key}`,
       interpretation: pl ? "Wartość pochodzi z kontekstu produktu." : "The value comes from product context.",
     })),
-    risk_narratives: context.risk_candidates.map((risk, index) => ({
+    risk_narratives: context.risk_candidates.map((_risk, index) => ({
       id: `risk:${index}`,
-      explanation: risk.explanation,
+      explanation: pl ? "Zapisane dane wymagają ręcznej weryfikacji." : "Recorded evidence requires manual review.",
     })),
     missing_narratives: context.missing_information.map((item) => ({
       id: `missing:${item.key}`,
-      explanation: item.explanation,
+      explanation: pl ? "Dostarczone dane nie obejmują obecnie tego obszaru." : "The supplied evidence does not currently cover this area.",
     })),
-    action_narratives: context.action_catalog.map((action, index) => ({
+    action_narratives: context.action_catalog.map((_action, index) => ({
       id: `action:${index}`,
-      reason: action.reason,
+      reason: pl ? "Następny krok wynika z zapisanego stanu produktu." : "The next step follows the recorded product state.",
     })),
     status_change_narratives: context.status_change_conditions.map((condition) => ({
       id: `condition:${condition.key}`,
-      explanation: condition.explanation,
+      explanation: pl ? "Zmiana zapisanych danych może wymagać ponownej oceny." : "A change in recorded evidence may require reassessment.",
     })),
   };
 }

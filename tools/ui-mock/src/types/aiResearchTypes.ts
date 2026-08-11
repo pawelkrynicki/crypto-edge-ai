@@ -1,5 +1,7 @@
 export const AI_RESEARCH_SCHEMA_VERSION = "ai_research_brief_v1" as const;
-export const AI_RESEARCH_PROMPT_VERSION = "ai_research_prompt_v2" as const;
+// v3 fixes the shared-generation contract: heavy output is always canonical English,
+// while PL/EN wording is selected only in the deterministic public presentation layer.
+export const AI_RESEARCH_PROMPT_VERSION = "ai_research_prompt_v3" as const;
 export const AI_ANALYSIS_QUEUE_SCHEMA_VERSION = "ai_analysis_queue_v1" as const;
 export const AI_RESEARCH_DATA_CONTRACT_VERSION = "ai_research_data_contract_v2" as const;
 export const AI_RESEARCH_TARGET_MODEL = "gpt-5-mini" as const;

@@ -42,7 +42,7 @@ describe("AI.3 canonical cache identity and persistent queue", () => {
     const base = cacheIdentity("base", ADDRESS, "a".repeat(64));
     assert.notEqual(cacheIdentity("base", OTHER_ADDRESS, "a".repeat(64)).cache_key, base.cache_key);
     assert.notEqual(cacheIdentity("base", ADDRESS, "b".repeat(64)).cache_key, base.cache_key);
-    assert.notEqual(cacheIdentity("base", ADDRESS, "a".repeat(64), "ai_research_prompt_v3").cache_key, base.cache_key);
+    assert.notEqual(cacheIdentity("base", ADDRESS, "a".repeat(64), "ai_research_prompt_v4").cache_key, base.cache_key);
   });
 
   it("deduplicates concurrent submissions in SQLite and preserves one analysis_id", async () => {
@@ -214,7 +214,7 @@ describe("AI.3 central worker, single-flight and last-known-good", () => {
   });
 });
 
-function cacheIdentity(chain: string, address: string, fingerprint: string, promptVersion = "ai_research_prompt_v2") {
+function cacheIdentity(chain: string, address: string, fingerprint: string, promptVersion = "ai_research_prompt_v3") {
   return buildAIAnalysisCacheIdentity({
     chain,
     contract_address: address,

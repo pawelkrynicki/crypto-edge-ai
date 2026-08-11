@@ -31,13 +31,13 @@ const NOW = new Date("2026-08-11T12:00:00.000Z");
 after(async () => { await rm(root, { recursive: true, force: true }); });
 
 describe("PC.2 shared production AI path", () => {
-  it("deduplicates 100 concurrent uncached requests and serves 500 READY reads without another AI call", async () => {
+  it("deduplicates 100 simultaneous mixed-locale requests and serves 500 mixed READY reads without another AI call", async () => {
     await writeFixture(100_000);
     const store = await createAIAnalysisQueueStore({ databaseFilePath: resolve(root, "concurrency.sqlite") });
     let calls = 0;
     const service = createService(store);
     const requests = await Promise.all(Array.from({ length: 100 }, (_, index) => (
-      service.generate(request(), `camp-user-${index}`)
+      service.generate(request(index % 2 === 0 ? "pl" : "en", `pc2_mixed_request_${index.toString().padStart(4, "0")}`), `camp-user-${index}`)
     )));
     assert.equal(store.stats().records, 1);
     assert.equal(requests.filter((item) => item.request_outcome === "QUEUED").length, 1);
@@ -52,13 +52,18 @@ describe("PC.2 shared production AI path", () => {
     assert.equal((await worker.runCycle()).completed, 1);
     assert.equal(calls, 1);
 
-    const reads = await Promise.all(Array.from({ length: 500 }, () => service.getBrief("base", ADDRESS, "pl")));
+    const reads = await Promise.all(Array.from({ length: 500 }, (_, index) => service.getBrief("base", ADDRESS, index % 2 === 0 ? "pl" : "en")));
     assert.equal(reads.every((item) => item.availability === "READY"), true);
     assert.equal(new Set(reads.map((item) => item.brief?.analysis_id)).size, 1);
     assert.equal(calls, 1, "cache reads must not invoke a provider");
     assert.equal((await service.getBrief("base", ADDRESS, "en")).availability, "READY", "locale is not a second analysis key");
     assert.equal(store.stats().records, 1);
     store.close();
+  });
+
+  it("keeps PL and EN output independent of which locale enqueues the shared job first", async () => {
+    await assertLocaleOrder("pl", "en", "locale-order-pl-en.sqlite");
+    await assertLocaleOrder("en", "pl", "locale-order-en-pl.sqlite");
   });
 
   it("keeps last-known-good visible through stale refresh success and failure", async () => {
@@ -221,8 +226,44 @@ function limits() {
   return { windowMs: 600_000, session: 30, identity: 30, global: 100, cooldownMs: 1_000 };
 }
 
-function request() {
-  return { chain: "base", contract_address: ADDRESS, locale: "pl" as const, idempotency_key: "pc2_shared_request_0001" };
+function request(locale: "pl" | "en" = "pl", idempotencyKey = "pc2_shared_request_0001") {
+  return { chain: "base", contract_address: ADDRESS, locale, idempotency_key: idempotencyKey };
+}
+
+async function assertLocaleOrder(firstLocale: "pl" | "en", secondLocale: "pl" | "en", fileName: string) {
+  await writeFixture(100_000);
+  const store = await createAIAnalysisQueueStore({ databaseFilePath: resolve(root, fileName) });
+  const service = createService(store);
+  assert.equal((await service.generate(request(firstLocale, `pc2_${firstLocale}_first`), "camp-first")).availability, "QUEUED");
+  assert.equal((await service.generate(request(secondLocale, `pc2_${secondLocale}_second`), "camp-second")).request_outcome, "ALREADY_EXISTS");
+  let calls = 0;
+  let providerLocale: string | null = null;
+  const worker = createAIResearchWorker({
+    ...contextOptions(), store, now: () => NOW,
+    provider: provider(async (context) => {
+      calls += 1;
+      providerLocale = context.locale;
+      return JSON.stringify(narrative(context));
+    }),
+  });
+  await worker.runCycle();
+  assert.equal(store.stats().records, 1);
+  assert.equal(calls, 1);
+  assert.equal(providerLocale, "en", "the heavy provider context is canonical, not first-request locale");
+
+  const pl = presentAIProductionLookup(await service.getBrief("base", ADDRESS, "pl"), "pl");
+  const en = presentAIProductionLookup(await service.getBrief("base", ADDRESS, "en"), "en");
+  assert.equal(pl.status, "READY");
+  assert.equal(en.status, "READY");
+  assert.ok(pl.analysis);
+  assert.ok(en.analysis);
+  assert.match(pl.analysis.analysis_summary, /^Analiza porządkuje/);
+  assert.match(en.analysis.analysis_summary, /^The analysis organizes/);
+  assert.deepEqual(pl.analysis.risks.map((item) => item.severity), en.analysis.risks.map((item) => item.severity));
+  assert.deepEqual(pl.analysis.evidence.map((item) => item.completeness), en.analysis.evidence.map((item) => item.completeness));
+  assert.equal(pl.analysis.missing_data.length, en.analysis.missing_data.length);
+  assert.doesNotMatch(JSON.stringify({ pl, en }), /openai|gpt-|analysis_id|cache_key|queue_status|token_usage|sqlite/i);
+  store.close();
 }
 
 function cacheIdentity(context: AIResearchContext) {

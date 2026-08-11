@@ -115,7 +115,7 @@ function createOpenAIResearchProvider(options: OpenAIResearchProviderOptions): A
           model: config.model,
           store: false,
           background: false,
-          input: [{ role: "system", content: buildSystemPrompt(context.locale) }, {
+          input: [{ role: "system", content: buildSystemPrompt() }, {
             role: "user",
             content: JSON.stringify({
               task: "Write concise narrative text only for every supplied narrative target ID.",
@@ -153,7 +153,11 @@ function createOpenAIResearchProvider(options: OpenAIResearchProviderOptions): A
   };
 }
 
-export function buildSystemPrompt(locale: "pl" | "en"): string {
+/**
+ * The queue stores one heavy result per evidence snapshot. It must never depend on
+ * the locale of the requester that happened to enqueue it first.
+ */
+export function buildSystemPrompt(): string {
   return [
     "You produce bounded research narrative for Crypto Edge AI.",
     "Use only bounded_context. Never use outside knowledge, infer missing facts or change the deterministic product skeleton.",
@@ -165,7 +169,7 @@ export function buildSystemPrompt(locale: "pl" | "en"): string {
     "Never advise buying, selling, holding, trading, depositing, connecting a wallet or entering a position.",
     "Never claim a project is safe, promise profit or returns, or provide investment advice.",
     "Keep the summary to 2-3 sentences and every list concise.",
-    `Write every user-facing field only in ${locale === "pl" ? "Polish" : "English"}.`,
+    "Write every narrative field only in canonical English. Locale-specific wording is applied after retrieval.",
     "Return JSON only and comply exactly with the supplied strict schema.",
   ].join("\n");
 }

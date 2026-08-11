@@ -66,13 +66,13 @@ describe("AI Research canonical identity, fingerprint and input boundary", () =>
     const base = cacheIdentity(ADDRESS, "a".repeat(64));
     assert.notEqual(cacheIdentity(OTHER_ADDRESS, "a".repeat(64)).cache_key, base.cache_key);
     assert.notEqual(cacheIdentity(ADDRESS, "b".repeat(64)).cache_key, base.cache_key);
-    assert.notEqual(cacheIdentity(ADDRESS, "a".repeat(64), { prompt_version: "ai_research_prompt_v3" }).cache_key, base.cache_key);
+    assert.notEqual(cacheIdentity(ADDRESS, "a".repeat(64), { prompt_version: "ai_research_prompt_v4" }).cache_key, base.cache_key);
     assert.notEqual(cacheIdentity(ADDRESS, "a".repeat(64), { model_id: "different-model" }).cache_key, base.cache_key);
     assert.notEqual(cacheIdentity(ADDRESS, "a".repeat(64), { analysis_schema_version: "ai_research_brief_v2" }).cache_key, base.cache_key);
   });
 });
 
-describe("AI Research v1 brief and v2 prompt contract", () => {
+describe("AI Research v1 brief and v3 prompt contract", () => {
   it("accepts bounded narrative only and rejects skeleton changes, invented facts and unsafe advice", async () => {
     const value = await context("base", ADDRESS, "pl");
     const valid = narrative(value);
@@ -93,7 +93,7 @@ describe("AI Research v1 brief and v2 prompt contract", () => {
     const value = await context("base", ADDRESS, "pl");
     const brief = buildDeterministicPreview(value, NOW);
     assert.equal(brief.schema_version, "ai_research_brief_v1");
-    assert.equal(brief.prompt_version, "ai_research_prompt_v2");
+    assert.equal(brief.prompt_version, "ai_research_prompt_v3");
     assert.equal(brief.research_state, value.research_state);
     assert.deepEqual(brief.risk_factors.map(({ severity }) => severity), value.risk_candidates.map(({ severity }) => severity));
     assert.equal(brief.next_actions.some(({ action_type }) => action_type === "OWNER_REVIEW"), value.action_catalog.some(({ action_type }) => action_type === "OWNER_REVIEW"));
@@ -124,7 +124,7 @@ function cacheIdentity(
     chain: "base",
     contract_address: address,
     snapshot_fingerprint: fingerprint,
-    prompt_version: overrides.prompt_version ?? "ai_research_prompt_v2",
+    prompt_version: overrides.prompt_version ?? "ai_research_prompt_v3",
     model_id: overrides.model_id ?? "gpt-5-mini",
     analysis_schema_version: overrides.analysis_schema_version ?? "ai_research_brief_v1",
     locale: "pl",

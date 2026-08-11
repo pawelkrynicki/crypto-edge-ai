@@ -105,11 +105,13 @@ export function createAIResearchService(options: AIResearchServiceOptions = {}) 
     try { return await storePromise; } catch { throw new AIResearchServiceError("STORE_UNAVAILABLE", 503); }
   };
 
-  const contextAndIdentity = async (chain: string, contractAddress: string, locale: "pl" | "en") => {
-    const context = await buildAIResearchContext(chain, contractAddress, locale, contextOptions);
+  const contextAndIdentity = async (chain: string, contractAddress: string) => {
+    // A shared job is canonical English. Request locale is deliberately not allowed
+    // to reach the provider context or persisted semantic result.
+    const context = await buildAIResearchContext(chain, contractAddress, "en", contextOptions);
     const identity = buildAIAnalysisCacheIdentity({
       ...context.identity,
-      locale,
+      locale: "en",
       snapshot_fingerprint: context.snapshot_fingerprint,
       prompt_version: context.prompt_version,
       model_id: modelId,
@@ -130,7 +132,10 @@ export function createAIResearchService(options: AIResearchServiceOptions = {}) 
     },
 
     async getBrief(chain: string, contractAddress: string, locale: "pl" | "en"): Promise<AIResearchBriefLookup> {
-      const { context, identity } = await contextAndIdentity(chain, contractAddress, locale);
+      // Locale is accepted for API compatibility; scannerApiHandler applies it only
+      // after this canonical shared lookup is complete.
+      void locale;
+      const { context, identity } = await contextAndIdentity(chain, contractAddress);
       if (renderPreview) return lookup("READY", "DISABLED", buildDeterministicPreview(context, now()), null, null);
       let store: AIAnalysisQueueStore;
       try { store = await getStore(); } catch { return lookup("ERROR", providerMode(providerEnabled), null, null, "STORE_UNAVAILABLE"); }
@@ -145,7 +150,7 @@ export function createAIResearchService(options: AIResearchServiceOptions = {}) 
     },
 
     async generate(request: AIResearchGenerateRequest, sessionId: string): Promise<AIResearchBriefLookup> {
-      const { context, identity } = await contextAndIdentity(request.chain, request.contract_address, request.locale);
+      const { context, identity } = await contextAndIdentity(request.chain, request.contract_address);
       if (renderPreview) return lookup("READY", "DISABLED", buildDeterministicPreview(context, now()), null, null);
       const store = await getStore();
       const existing = store.lookup(identity);
@@ -241,7 +246,6 @@ export function hydrateAIResearchBrief(
     identity: context.identity,
     snapshot_fingerprint: context.snapshot_fingerprint,
     prompt_version: context.prompt_version,
-    locale: context.locale,
     model,
   }));
   const base = {

@@ -378,7 +378,7 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
         const session = pc1Sessions.resolve(req);
         if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
         const query = parseAIResearchQuery(req.url);
-        sendJson(req, res, 200, presentAIProductionLookup(await aiResearchService.getBrief(query.chain, query.contract_address, query.locale)), runtimeMode);
+        sendJson(req, res, 200, presentAIProductionLookup(await aiResearchService.getBrief(query.chain, query.contract_address, query.locale), query.locale), runtimeMode);
       } catch (error) {
         sendAIResearchError(req, res, error, runtimeMode);
       }
@@ -390,7 +390,7 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
         const session = pc1Sessions.resolve(req);
         if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
         const query = parseAIResearchQuery(req.url);
-        sendJson(req, res, 200, presentAIProductionLookup(await aiResearchService.getBrief(query.chain, query.contract_address, query.locale)), runtimeMode);
+        sendJson(req, res, 200, presentAIProductionLookup(await aiResearchService.getBrief(query.chain, query.contract_address, query.locale), query.locale), runtimeMode);
       } catch (error) {
         sendAIResearchError(req, res, error, runtimeMode);
       }
@@ -416,7 +416,7 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
         const session = pc1Sessions.resolve(req);
         if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
         const body = await readAIResearchGenerateRequest(req);
-        sendJson(req, res, 200, presentAIProductionLookup(await aiResearchService.generate(body, session.context.actor_id)), runtimeMode);
+        sendJson(req, res, 200, presentAIProductionLookup(await aiResearchService.generate(body, session.context.actor_id), body.locale), runtimeMode);
       } catch (error) {
         sendAIResearchError(req, res, error, runtimeMode);
       }
@@ -429,7 +429,7 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
         const session = pc1Sessions.resolve(req);
         if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
         const body = await readAIResearchGenerateRequest(req);
-        sendJson(req, res, 202, presentAIProductionLookup(await aiResearchService.generate(body, session.context.actor_id)), runtimeMode);
+        sendJson(req, res, 202, presentAIProductionLookup(await aiResearchService.generate(body, session.context.actor_id), body.locale), runtimeMode);
       } catch (error) {
         sendAIResearchError(req, res, error, runtimeMode);
       }

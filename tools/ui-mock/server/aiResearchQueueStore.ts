@@ -161,7 +161,9 @@ export function buildAIAnalysisCacheIdentity(input: {
     prompt_version: input.prompt_version ?? AI_RESEARCH_PROMPT_VERSION,
     snapshot_fingerprint: input.snapshot_fingerprint,
   };
-  // Locale is presentation only. It must not multiply a shared generation for the same evidence.
+  // The legacy database column is retained for compatibility. Production writes use
+  // the canonical "en" value; it is never a request-owned semantic value and is not
+  // part of the shared cache key.
   return { cache_key: sha256(stableJson(canonical)), ...canonical, locale: input.locale };
 }
 

@@ -49,7 +49,7 @@ export function AIProductionAnalysisCanvas({ analysis }: { analysis: AIProductio
       <section className="ai-research-panel ai-risk-panel" aria-labelledby="ai-production-risks">
         <h3 id="ai-production-risks">{headings.risks}</h3>
         {analysis.risks.length === 0 ? <p>{headings.empty}</p> : <ul className="ai-missing-list">{analysis.risks.map((risk, index) => (
-          <li key={`${risk.title}-${index}`}><strong>{risk.title} <StatusBadge tone={risk.severity === "high" ? "critical" : risk.severity === "medium" ? "warning" : "partial"}>{risk.severity}</StatusBadge></strong><p>{risk.detail}</p></li>
+          <li key={`${risk.title}-${index}`}><strong>{risk.title} <StatusBadge tone={risk.severity === "high" ? "critical" : risk.severity === "medium" ? "warning" : "partial"}>{riskSeverityLabel(risk.severity, locale)}</StatusBadge></strong><p>{risk.detail}</p></li>
         ))}</ul>}
       </section>
       <ListSection title={headings.watch} items={analysis.watch_items} empty={headings.empty} />
@@ -57,7 +57,7 @@ export function AIProductionAnalysisCanvas({ analysis }: { analysis: AIProductio
         <h3 id="ai-production-evidence">{headings.evidence}</h3>
         <ul className="ai-source-list">{analysis.evidence.map((item, index) => (
           <li key={`${item.label}-${index}`}><div><strong>{item.label}</strong><span>{item.observed_at ? formatProductDateTime(item.observed_at, locale) : headings.empty}</span></div>
-            <StatusBadge tone={item.completeness === "complete" ? "ready" : "warning"}>{item.completeness}</StatusBadge>
+            <StatusBadge tone={item.completeness === "complete" ? "ready" : "warning"}>{completenessLabel(item.completeness, locale)}</StatusBadge>
             {item.url && <ExternalLinkAction variant="tertiary" href={item.url}>{pl ? "Otwórz źródło" : "Open source"}</ExternalLinkAction>}
           </li>
         ))}</ul>
@@ -72,4 +72,14 @@ function Kpi({ label, value }: { label: string; value: string }) {
 
 function ListSection({ title, items, empty }: { title: string; items: string[]; empty: string }) {
   return <section className="ai-research-panel ai-brief-panel"><h3>{title}</h3>{items.length === 0 ? <p>{empty}</p> : <ul>{items.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}</ul>}</section>;
+}
+
+function riskSeverityLabel(value: AIProductionAnalysis["risks"][number]["severity"], locale: "pl" | "en") {
+  const labels = { low: ["Niskie", "Low"], medium: ["Średnie", "Medium"], high: ["Wysokie", "High"], unknown: ["Nieznane", "Unknown"] } as const;
+  return labels[value][locale === "pl" ? 0 : 1];
+}
+
+function completenessLabel(value: AIProductionAnalysis["evidence"][number]["completeness"], locale: "pl" | "en") {
+  const labels = { complete: ["Kompletne", "Complete"], partial: ["Częściowe", "Partial"], unavailable: ["Niedostępne", "Unavailable"] } as const;
+  return labels[value][locale === "pl" ? 0 : 1];
 }
