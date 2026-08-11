@@ -40,7 +40,11 @@ describe("AI.3 versioned public queue API", () => {
       assert.equal(firstBody.schema_version, "ai_production_analysis_lookup_v1");
       assert.equal(firstBody.status, "QUEUED");
       assert.equal(firstBody.analysis, null);
-      for (const forbidden of ["provider_mode", "model", "analysis_id", "cache_key", "queue_status", "error_code"]) {
+      for (const forbidden of [
+        "provider_mode", "model", "analysis_id", "cache_key", "queue_status", "error_code",
+        "provider_attempt_count", "provider_attempt_started_at", "provider_attempt_completed_at",
+        "provider_attempt_status", "provider_attempt_safe_error_code", "failure_stage",
+      ]) {
         assert.equal(Object.hasOwn(firstBody, forbidden), false, forbidden);
       }
       const second = await post(base, "queue_request_0002");

@@ -3,7 +3,7 @@ import {
   AI_RESEARCH_TARGET_MODEL,
   type AIResearchBrief,
 } from "../src/types/aiResearchTypes.js";
-import { buildAIResearchContext, type AIResearchContextOptions } from "./aiResearchContext.js";
+import { AIResearchContextError, buildAIResearchContext, type AIResearchContextOptions } from "./aiResearchContext.js";
 import {
   createAIResearchProvider,
   NOOP_AI_RESEARCH_USAGE_RECORDER,
@@ -18,8 +18,10 @@ import {
   parseAIResearchProviderNarrative,
 } from "./aiResearchSchema.js";
 import {
+  AIAnalysisQueueStoreError,
   buildAIAnalysisCacheIdentity,
   createAIAnalysisQueueStore,
+  type AIAnalysisFailureStage,
   type AIAnalysisQueueRecord,
   type AIAnalysisQueueStore,
   type AIAnalysisQueueStoreOptions,
@@ -190,11 +192,14 @@ async function processClaim(
     try { store.renewLease({ analysis_id: claimed.analysis_id, worker_id: workerId, now: now(), lease_ms: limits.leaseMs }); } catch { /* claim completion fails closed */ }
   }, Math.max(500, Math.min(30_000, Math.floor(limits.leaseMs / 3))));
   heartbeat.unref?.();
+  let stage: AIAnalysisFailureStage = "CONTEXT_BUILD";
+  let providerAttemptStarted = false;
   try {
     // Queue locale is retained only for database compatibility. A production job is
     // always hydrated from the canonical English context, never from the first
     // requester's presentation locale.
     const context = await buildAIResearchContext(claimed.chain, claimed.contract_address, "en", contextOptions);
+    stage = "IDENTITY_CHECK";
     const currentIdentity = buildAIAnalysisCacheIdentity({
       ...context.identity,
       locale: "en",
@@ -204,34 +209,40 @@ async function processClaim(
       analysis_schema_version: claimed.analysis_schema_version,
     });
     if (currentIdentity.cache_key !== claimed.cache_key) {
-      const failed = store.fail({
-        analysis_id: claimed.analysis_id,
-        worker_id: workerId,
-        safe_error_code: "DATA_STALE",
-        transient: false,
-        max_attempts: limits.maxAttempts,
-        retry_base_ms: limits.retryBaseMs,
-        now: now(),
-      });
-      cycleResult.suspended += failed.status === "SUSPENDED" ? 1 : 0;
-      return "COMPLETED";
+      throw new AIResearchWorkerContractError("DATA_STALE");
     }
-    if (!store.acquireCircuitPermit({ now: now() })) {
-      store.deferClaim({
+    stage = "CIRCUIT";
+    let circuitPermitted: boolean;
+    try {
+      circuitPermitted = store.acquireCircuitPermit({ now: now() });
+    } catch {
+      throw new AIResearchWorkerCircuitError();
+    }
+    if (!circuitPermitted) {
+      const deferred = store.deferClaim({
         analysis_id: claimed.analysis_id,
         worker_id: workerId,
         now: now(),
         next_retry_at: new Date(now().getTime() + limits.circuitDeferralMs),
         safe_error_code: "AI_CIRCUIT_OPEN",
+        failure_stage: "CIRCUIT",
       });
+      if (!deferred) throw new AIResearchWorkerCircuitError();
       cycleResult.status = "CIRCUIT_OPEN";
       cycleResult.safe_error_code = "AI_CIRCUIT_OPEN";
       return "CIRCUIT_OPEN";
     }
+    stage = "PROVIDER_CALL";
+    store.recordProviderAttemptStarted({ analysis_id: claimed.analysis_id, worker_id: workerId, now: now() });
+    providerAttemptStarted = true;
     cycleResult.provider_calls += 1;
     const providerResult = await provider.generate(context);
+    stage = "PROVIDER_RESPONSE";
+    store.recordProviderResponseReceived({ analysis_id: claimed.analysis_id, worker_id: workerId, now: now() });
     if (providerResult.model !== claimed.model_id) throw new AIResearchWorkerContractError("MODEL_MISMATCH");
+    stage = "PROVIDER_PARSE";
     const narrative = parseAIResearchProviderNarrative(providerResult.raw_json, context);
+    stage = "HYDRATE";
     const brief = hydrateAIResearchBrief(
       context,
       narrative,
@@ -241,6 +252,7 @@ async function processClaim(
       false,
       claimed.analysis_id,
     );
+    stage = "STORE_COMPLETE";
     store.complete({
       analysis_id: claimed.analysis_id,
       worker_id: workerId,
@@ -250,40 +262,83 @@ async function processClaim(
       provider_response_id: safeProviderResponseId(providerResult.request_id),
       now: now(),
     });
-    store.recordCircuitSuccess(now());
-    await usageRecorder.record({
-      analysis_id: brief.analysis_id,
-      identity: brief.identity,
-      model: brief.model,
-      token_usage: brief.token_usage,
-    });
+    try {
+      store.recordCircuitSuccess(now());
+    } catch {
+      recordPostCompletionFailure(store, claimed.analysis_id, "AI_STORE_FAILURE", "STORE_COMPLETE", now);
+      cycleResult.completed += 1;
+      cycleResult.safe_error_code = "AI_STORE_FAILURE";
+      return "COMPLETED";
+    }
+    stage = "USAGE_RECORD";
+    try {
+      await usageRecorder.record({
+        analysis_id: brief.analysis_id,
+        identity: brief.identity,
+        model: brief.model,
+        token_usage: brief.token_usage,
+      });
+    } catch {
+      recordPostCompletionFailure(store, claimed.analysis_id, "AI_USAGE_RECORD_FAILURE", "USAGE_RECORD", now);
+      cycleResult.completed += 1;
+      cycleResult.safe_error_code = "AI_USAGE_RECORD_FAILURE";
+      return "COMPLETED";
+    }
     cycleResult.completed += 1;
     return "COMPLETED";
   } catch (error) {
-    const failure = classifyFailure(error);
-    if (failure.transient) {
-      store.recordCircuitFailure({
-        now: now(),
-        threshold: limits.circuitFailureThreshold,
-        open_ms: limits.circuitOpenMs,
-      });
+    let failure = classifyFailure(error, stage);
+    if (providerAttemptStarted && stage === "PROVIDER_CALL") {
+      try {
+        store.recordProviderAttemptFailed({
+          analysis_id: claimed.analysis_id,
+          worker_id: workerId,
+          now: now(),
+          safe_error_code: failure.code,
+        });
+      } catch {
+        failure = { code: "AI_STORE_FAILURE", transient: false, stage: "PROVIDER_CALL" };
+      }
     }
-    const failed = store.fail({
-      analysis_id: claimed.analysis_id,
-      worker_id: workerId,
-      safe_error_code: failure.code,
-      transient: failure.transient,
-      max_attempts: limits.maxAttempts,
-      retry_base_ms: limits.retryBaseMs,
-      retry_jitter_ratio: limits.retryJitterRatio,
-      now: now(),
-    });
+    if (failure.transient) {
+      try {
+        store.recordCircuitFailure({
+          now: now(),
+          threshold: limits.circuitFailureThreshold,
+          open_ms: limits.circuitOpenMs,
+        });
+      } catch {
+        failure = { code: "AI_CIRCUIT_FAILURE", transient: false, stage: "CIRCUIT" };
+      }
+    }
+    let failed: AIAnalysisQueueRecord;
+    try {
+      failed = store.fail({
+        analysis_id: claimed.analysis_id,
+        worker_id: workerId,
+        safe_error_code: failure.code,
+        transient: failure.transient,
+        max_attempts: limits.maxAttempts,
+        retry_base_ms: limits.retryBaseMs,
+        retry_jitter_ratio: limits.retryJitterRatio,
+        failure_stage: failure.stage,
+        now: now(),
+      });
+    } catch {
+      try { store.suspendWorker("AI_STORE_FAILURE", now()); } catch { /* store is unavailable */ }
+      cycleResult.suspended += 1;
+      cycleResult.safe_error_code = "AI_STORE_FAILURE";
+      return "COMPLETED";
+    }
     if (failed.status === "FAILED") {
       cycleResult.retried += 1;
     } else {
       cycleResult.suspended += 1;
-      if (!failure.transient) store.suspendWorker(failure.code, now());
-      cycleResult.safe_error_code = failure.code;
+      let cycleSafeErrorCode = failure.code;
+      if (!failure.transient) {
+        try { store.suspendWorker(failure.code, now()); } catch { cycleSafeErrorCode = "AI_STORE_FAILURE"; }
+      }
+      cycleResult.safe_error_code = cycleSafeErrorCode;
     }
     return "COMPLETED";
   } finally {
@@ -333,17 +388,43 @@ class AIResearchWorkerContractError extends Error {
   constructor(code: string) { super(code); this.name = "AIResearchWorkerContractError"; this.code = code; }
 }
 
-function classifyFailure(error: unknown): { code: string; transient: boolean } {
-  if (error instanceof AIResearchWorkerContractError) return { code: error.code, transient: false };
-  if (error instanceof AIResearchValidationError) return { code: "VALIDATION_FAILURE", transient: false };
+class AIResearchWorkerCircuitError extends Error {
+  constructor() { super("AI_CIRCUIT_FAILURE"); this.name = "AIResearchWorkerCircuitError"; }
+}
+
+function classifyFailure(error: unknown, stage: AIAnalysisFailureStage): { code: string; transient: boolean; stage: AIAnalysisFailureStage } {
+  if (error instanceof AIResearchWorkerContractError) return { code: error.code, transient: false, stage };
+  if (error instanceof AIResearchContextError) return { code: "AI_CONTEXT_FAILURE", transient: false, stage: "CONTEXT_BUILD" };
+  if (error instanceof AIResearchWorkerCircuitError) return { code: "AI_CIRCUIT_FAILURE", transient: false, stage: "CIRCUIT" };
+  if (error instanceof AIAnalysisQueueStoreError) return { code: "AI_STORE_FAILURE", transient: false, stage };
+  if (error instanceof AIResearchValidationError) {
+    return { code: stage === "PROVIDER_PARSE" ? "PROVIDER_CONTRACT_INVALID" : "VALIDATION_FAILURE", transient: false, stage };
+  }
   if (error instanceof AIResearchProviderError) {
     if (["PROVIDER_TIMEOUT", "PROVIDER_RATE_LIMITED", "PROVIDER_UNAVAILABLE", "PROVIDER_ERROR"].includes(error.code)) {
-      return { code: error.code, transient: true };
+      return { code: error.code, transient: true, stage };
     }
-    if (error.code === "INVALID_PROVIDER_RESPONSE") return { code: "PROVIDER_CONTRACT_INVALID", transient: false };
-    return { code: error.code, transient: false };
+    if (error.code === "INVALID_PROVIDER_RESPONSE") return { code: "PROVIDER_CONTRACT_INVALID", transient: false, stage };
+    return { code: error.code, transient: false, stage };
   }
-  return { code: "AI_WORKER_FAILURE", transient: false };
+  return { code: "AI_WORKER_FAILURE", transient: false, stage: stage ?? "UNKNOWN" };
+}
+
+function recordPostCompletionFailure(
+  store: AIAnalysisQueueStore,
+  analysisId: string,
+  safeErrorCode: string,
+  failureStage: "STORE_COMPLETE" | "USAGE_RECORD",
+  now: () => Date,
+): void {
+  try {
+    store.recordPostCompletionFailure({
+      analysis_id: analysisId,
+      safe_error_code: safeErrorCode,
+      failure_stage: failureStage,
+      now: now(),
+    });
+  } catch { /* the completed analysis remains safe even if diagnostics storage is unavailable */ }
 }
 
 function cycle(workerId: string, status: AIResearchWorkerCycleResult["status"], safeErrorCode: string | null): AIResearchWorkerCycleResult {
