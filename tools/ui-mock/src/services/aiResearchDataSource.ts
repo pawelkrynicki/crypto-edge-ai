@@ -1,15 +1,15 @@
 import {
-  AI_RESEARCH_ACTION_TYPES,
-  AI_RESEARCH_SCHEMA_VERSION,
-  AI_RESEARCH_STATES,
   type AIResearchBrief,
-  type AIResearchBriefLookup,
   type AIResearchGenerateRequest,
   type AIResearchLocale,
-  type AIResearchProviderStatus,
   type AIResearchReviewMetrics,
   type AIResearchReviewMetricsLookup,
 } from "../types/aiResearchTypes";
+import type {
+  AIProductionAnalysis,
+  AIProductionAnalysisLookup,
+  AIProductionAvailability,
+} from "../types/aiProductionTypes";
 
 export class AIResearchDataSourceError extends Error {
   readonly status: number;
@@ -27,12 +27,12 @@ export class AIResearchDataSourceError extends Error {
   }
 }
 
-export async function loadAIResearchStatus(fetchImpl: typeof fetch = fetch): Promise<AIResearchProviderStatus | null> {
+export async function loadAIResearchStatus(fetchImpl: typeof fetch = fetch): Promise<AIProductionAvailability | null> {
   try {
     const response = await fetchImpl("/api/ai-research/status", { headers: { accept: "application/json" }, credentials: "same-origin" });
     if (!response.ok) return null;
     const value: unknown = await response.json();
-    return isProviderStatus(value) ? value : null;
+    return isAvailability(value) ? value : null;
   } catch {
     return null;
   }
@@ -43,7 +43,7 @@ export async function loadAIResearchBrief(
   contractAddress: string,
   locale: AIResearchLocale,
   fetchImpl: typeof fetch = fetch,
-): Promise<AIResearchBriefLookup> {
+): Promise<AIProductionAnalysisLookup> {
   const query = new URLSearchParams({ chain, contract_address: contractAddress, locale });
   const response = await fetchImpl(`/api/v1/ai-analyses/result?${query}`, {
     headers: { accept: "application/json" },
@@ -58,7 +58,7 @@ export async function loadAIResearchBrief(
 export async function requestAIResearchBrief(
   input: Omit<AIResearchGenerateRequest, "idempotency_key"> & { idempotency_key?: string },
   fetchImpl: typeof fetch = fetch,
-): Promise<AIResearchBriefLookup> {
+): Promise<AIProductionAnalysisLookup> {
   const body: AIResearchGenerateRequest = {
     chain: input.chain,
     contract_address: input.contract_address,
@@ -102,30 +102,23 @@ async function parseError(response: Response): Promise<AIResearchDataSourceError
   if (!isRecord(value)) return new AIResearchDataSourceError(response.status, "AI_RESEARCH_UNAVAILABLE", null, null);
   const code = typeof value.error === "string" ? value.error : "AI_RESEARCH_UNAVAILABLE";
   const retry = typeof value.retry_after_seconds === "number" ? value.retry_after_seconds : null;
-  const cached = isBrief(value.cached_brief) ? value.cached_brief : null;
-  return new AIResearchDataSourceError(response.status, code, retry, cached);
+  return new AIResearchDataSourceError(response.status, code, retry, null);
 }
 
-function isProviderStatus(value: unknown): value is AIResearchProviderStatus {
+function isAvailability(value: unknown): value is AIProductionAvailability {
   return isRecord(value)
-    && value.schema_version === "ai_research_status_v1"
-    && (value.provider_mode === "DISABLED" || value.provider_mode === "OPENAI")
-    && typeof value.available === "boolean"
-    && typeof value.model_configured === "boolean"
-    && typeof value.render_preview === "boolean";
+    && value.schema_version === "ai_production_availability_v1"
+    && typeof value.available === "boolean";
 }
 
-function isLookup(value: unknown): value is AIResearchBriefLookup {
+function isLookup(value: unknown): value is AIProductionAnalysisLookup {
   return isRecord(value)
-    && value.schema_version === "ai_research_lookup_v1"
-    && ["ABSENT", "QUEUED", "PROCESSING", "READY", "STALE", "FAILED", "SUSPENDED", "COOLDOWN", "PROVIDER_DISABLED", "INSUFFICIENT_DATA", "RATE_LIMITED", "ERROR"].includes(String(value.availability))
-    && (value.provider_mode === "DISABLED" || value.provider_mode === "OPENAI")
-    && (value.brief === null || isBrief(value.brief))
+    && value.schema_version === "ai_production_analysis_lookup_v1"
+    && ["NO_ANALYSIS", "QUEUED", "PROCESSING", "READY", "STALE", "ERROR", "LIMIT", "DISABLED"].includes(String(value.status))
+    && (value.analysis === null || isProductionAnalysis(value.analysis))
     && (value.retry_after_seconds === null || typeof value.retry_after_seconds === "number")
-    && (value.error_code === null || typeof value.error_code === "string")
-    && (value.generation_blocked_reason === undefined
-      || value.generation_blocked_reason === null
-      || ["LIVE_CALL_BUDGET_EXHAUSTED", "LIVE_CALL_BUDGET_INVALID", "REVIEW_STORE_REQUIRED"].includes(String(value.generation_blocked_reason)));
+    && typeof value.is_last_known_good === "boolean"
+    && !["provider_mode", "model", "analysis_id", "cache_key", "queue_status", "error_code"].some((key) => Object.prototype.hasOwnProperty.call(value, key));
 }
 
 function isReviewMetricsLookup(value: unknown): value is AIResearchReviewMetricsLookup {
@@ -152,25 +145,22 @@ function isReviewMetrics(value: unknown): value is AIResearchReviewMetrics {
     && (value.request_id === null || typeof value.request_id === "string");
 }
 
-function isBrief(value: unknown): value is AIResearchBrief {
-  if (!isRecord(value)
-    || value.schema_version !== AI_RESEARCH_SCHEMA_VERSION
-    || !isRecord(value.identity)
-    || typeof value.identity.chain !== "string"
-    || typeof value.identity.contract_address !== "string"
-    || !AI_RESEARCH_STATES.includes(value.research_state as never)
-    || typeof value.summary !== "string"
-    || !Array.isArray(value.known_facts)
-    || !Array.isArray(value.risk_factors)
-    || !Array.isArray(value.missing_information)
-    || !Array.isArray(value.next_actions)
-    || !Array.isArray(value.status_change_conditions)
-    || !Array.isArray(value.source_references)
-    || !Array.isArray(value.coverage)
-    || !Array.isArray(value.checkpoints)
-    || !isRecord(value.token_usage)
-    || typeof value.render_preview !== "boolean") return false;
-  return value.next_actions.every((action) => isRecord(action) && AI_RESEARCH_ACTION_TYPES.includes(action.action_type as never));
+function isProductionAnalysis(value: unknown): value is AIProductionAnalysis {
+  return isRecord(value)
+    && value.schema_version === "ai_production_analysis_v1"
+    && typeof value.analysis_summary === "string"
+    && Array.isArray(value.strengths) && value.strengths.every((item) => typeof item === "string")
+    && Array.isArray(value.risks) && value.risks.every((item) => isRecord(item)
+      && typeof item.title === "string" && typeof item.detail === "string"
+      && ["low", "medium", "high", "unknown"].includes(String(item.severity)))
+    && Array.isArray(value.missing_data) && value.missing_data.every((item) => typeof item === "string")
+    && typeof value.market_context === "string" && typeof value.security_context === "string"
+    && typeof value.liquidity_context === "string" && typeof value.holder_context === "string"
+    && Array.isArray(value.watch_items) && value.watch_items.every((item) => typeof item === "string")
+    && Array.isArray(value.evidence)
+    && typeof value.generated_at === "string" && typeof value.data_snapshot_at === "string"
+    && (value.freshness === "FRESH" || value.freshness === "STALE")
+    && typeof value.analysis_version === "string";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

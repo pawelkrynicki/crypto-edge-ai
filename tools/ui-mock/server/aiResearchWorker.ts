@@ -37,8 +37,12 @@ export type AIResearchWorkerLimits = {
   outputCostPerMillionTokensUsd: number | null;
   maxAttempts: number;
   retryBaseMs: number;
+  retryJitterRatio: number;
   leaseMs: number;
   budgetDeferralMs: number;
+  circuitFailureThreshold: number;
+  circuitOpenMs: number;
+  circuitDeferralMs: number;
 };
 
 export type AIResearchWorkerOptions = AIResearchContextOptions & {
@@ -55,7 +59,7 @@ export type AIResearchWorkerOptions = AIResearchContextOptions & {
 export type AIResearchWorkerCycleResult = {
   schema_version: "ai_analysis_worker_cycle_v1";
   worker_id: string;
-  status: "COMPLETED" | "IDLE" | "SUSPENDED" | "PROVIDER_DISABLED" | "BUDGET_BLOCKED";
+  status: "COMPLETED" | "IDLE" | "SUSPENDED" | "PROVIDER_DISABLED" | "BUDGET_BLOCKED" | "CIRCUIT_OPEN";
   claimed: number;
   completed: number;
   retried: number;
@@ -79,8 +83,12 @@ export function resolveAIResearchWorkerLimits(
     outputCostPerMillionTokensUsd: optionalNonNegative(input.outputCostPerMillionTokensUsd, envNumber(env.CRYPTO_EDGE_AI_OUTPUT_COST_PER_MILLION_USD)),
     maxAttempts: bounded(input.maxAttempts, envInteger(env.CRYPTO_EDGE_AI_WORKER_MAX_ATTEMPTS), 3, 1, 10),
     retryBaseMs: bounded(input.retryBaseMs, envInteger(env.CRYPTO_EDGE_AI_WORKER_RETRY_BASE_MS), 30_000, 100, 24 * 60 * 60_000),
+    retryJitterRatio: boundedDecimal(input.retryJitterRatio, envNumber(env.CRYPTO_EDGE_AI_WORKER_RETRY_JITTER_RATIO), 0.2, 0, 0.5),
     leaseMs: bounded(input.leaseMs, envInteger(env.CRYPTO_EDGE_AI_WORKER_LEASE_MS), 180_000, 1_000, 30 * 60_000),
     budgetDeferralMs: bounded(input.budgetDeferralMs, envInteger(env.CRYPTO_EDGE_AI_WORKER_BUDGET_DEFERRAL_MS), 60_000, 1_000, 24 * 60 * 60_000),
+    circuitFailureThreshold: bounded(input.circuitFailureThreshold, envInteger(env.CRYPTO_EDGE_AI_CIRCUIT_FAILURE_THRESHOLD), 3, 1, 100),
+    circuitOpenMs: bounded(input.circuitOpenMs, envInteger(env.CRYPTO_EDGE_AI_CIRCUIT_OPEN_MS), 60_000, 1_000, 24 * 60 * 60_000),
+    circuitDeferralMs: bounded(input.circuitDeferralMs, envInteger(env.CRYPTO_EDGE_AI_CIRCUIT_DEFERRAL_MS), 5_000, 1_000, 24 * 60 * 60_000),
   };
 }
 
@@ -141,7 +149,8 @@ export function createAIResearchWorker(options: AIResearchWorkerOptions = {}) {
             result.safe_error_code = "AI_BUDGET_LIMIT_REACHED";
             return;
           }
-          await processClaim(store, claimed, provider, usageRecorder, contextOptions, limits, workerId, now, result);
+          const outcome = await processClaim(store, claimed, provider, usageRecorder, contextOptions, limits, workerId, now, result);
+          if (outcome === "CIRCUIT_OPEN") return;
           if (store.workerState().suspended) return;
         }
       };
@@ -176,7 +185,7 @@ async function processClaim(
   workerId: string,
   now: () => Date,
   cycleResult: AIResearchWorkerCycleResult,
-): Promise<void> {
+): Promise<"COMPLETED" | "CIRCUIT_OPEN"> {
   const heartbeat = setInterval(() => {
     try { store.renewLease({ analysis_id: claimed.analysis_id, worker_id: workerId, now: now(), lease_ms: limits.leaseMs }); } catch { /* claim completion fails closed */ }
   }, Math.max(500, Math.min(30_000, Math.floor(limits.leaseMs / 3))));
@@ -202,7 +211,19 @@ async function processClaim(
         now: now(),
       });
       cycleResult.suspended += failed.status === "SUSPENDED" ? 1 : 0;
-      return;
+      return "COMPLETED";
+    }
+    if (!store.acquireCircuitPermit({ now: now() })) {
+      store.deferClaim({
+        analysis_id: claimed.analysis_id,
+        worker_id: workerId,
+        now: now(),
+        next_retry_at: new Date(now().getTime() + limits.circuitDeferralMs),
+        safe_error_code: "AI_CIRCUIT_OPEN",
+      });
+      cycleResult.status = "CIRCUIT_OPEN";
+      cycleResult.safe_error_code = "AI_CIRCUIT_OPEN";
+      return "CIRCUIT_OPEN";
     }
     cycleResult.provider_calls += 1;
     const providerResult = await provider.generate(context);
@@ -226,6 +247,7 @@ async function processClaim(
       provider_response_id: safeProviderResponseId(providerResult.request_id),
       now: now(),
     });
+    store.recordCircuitSuccess(now());
     await usageRecorder.record({
       analysis_id: brief.analysis_id,
       identity: brief.identity,
@@ -233,8 +255,16 @@ async function processClaim(
       token_usage: brief.token_usage,
     });
     cycleResult.completed += 1;
+    return "COMPLETED";
   } catch (error) {
     const failure = classifyFailure(error);
+    if (failure.transient) {
+      store.recordCircuitFailure({
+        now: now(),
+        threshold: limits.circuitFailureThreshold,
+        open_ms: limits.circuitOpenMs,
+      });
+    }
     const failed = store.fail({
       analysis_id: claimed.analysis_id,
       worker_id: workerId,
@@ -242,15 +272,17 @@ async function processClaim(
       transient: failure.transient,
       max_attempts: limits.maxAttempts,
       retry_base_ms: limits.retryBaseMs,
+      retry_jitter_ratio: limits.retryJitterRatio,
       now: now(),
     });
     if (failed.status === "FAILED") {
       cycleResult.retried += 1;
     } else {
       cycleResult.suspended += 1;
-      store.suspendWorker(failure.code, now());
+      if (!failure.transient) store.suspendWorker(failure.code, now());
       cycleResult.safe_error_code = failure.code;
     }
+    return "COMPLETED";
   } finally {
     clearInterval(heartbeat);
   }
@@ -302,7 +334,9 @@ function classifyFailure(error: unknown): { code: string; transient: boolean } {
   if (error instanceof AIResearchWorkerContractError) return { code: error.code, transient: false };
   if (error instanceof AIResearchValidationError) return { code: "VALIDATION_FAILURE", transient: false };
   if (error instanceof AIResearchProviderError) {
-    if (error.code === "PROVIDER_TIMEOUT" || error.code === "PROVIDER_ERROR") return { code: error.code, transient: true };
+    if (["PROVIDER_TIMEOUT", "PROVIDER_RATE_LIMITED", "PROVIDER_UNAVAILABLE", "PROVIDER_ERROR"].includes(error.code)) {
+      return { code: error.code, transient: true };
+    }
     if (error.code === "INVALID_PROVIDER_RESPONSE") return { code: "PROVIDER_CONTRACT_INVALID", transient: false };
     return { code: error.code, transient: false };
   }
@@ -339,6 +373,13 @@ function safeWorkerId(value: string | undefined): string | null {
 function bounded(value: number | undefined, envValue: number | null, fallback: number, minimum: number, maximum: number): number {
   const candidate = value ?? envValue;
   return candidate !== null && candidate !== undefined && Number.isSafeInteger(candidate) && candidate >= minimum && candidate <= maximum
+    ? candidate
+    : fallback;
+}
+
+function boundedDecimal(value: number | undefined, envValue: number | null, fallback: number, minimum: number, maximum: number): number {
+  const candidate = value ?? envValue;
+  return candidate !== null && candidate !== undefined && Number.isFinite(candidate) && candidate >= minimum && candidate <= maximum
     ? candidate
     : fallback;
 }

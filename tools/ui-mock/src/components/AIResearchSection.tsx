@@ -8,12 +8,44 @@ import {
   requestAIResearchBrief,
 } from "../services/aiResearchDataSource";
 import type { AIResearchBriefLookup, AIResearchReviewMetrics } from "../types/aiResearchTypes";
+import type { AIProductionAnalysisLookup, AIProductionAnalysisStatus } from "../types/aiProductionTypes";
 import { resolveTokenIdentity } from "../tokenLifecycle";
 import { AIResearchBriefCanvas } from "./AIResearchBriefCanvas";
+import { AIProductionAnalysisCanvas } from "./AIProductionAnalysisCanvas";
 import { applyAIResearchGenerationFailure } from "./aiResearchState";
 import { ActionButton, StatusBadge } from "./ProductUi";
 
 void React;
+
+type Lookup = AIResearchBriefLookup | AIProductionAnalysisLookup;
+
+function isLegacyLookup(value: Lookup | null | undefined): value is AIResearchBriefLookup {
+  return Boolean(value && value.schema_version === "ai_research_lookup_v1");
+}
+
+function isProductionLookup(value: Lookup | null | undefined): value is AIProductionAnalysisLookup {
+  return Boolean(value && value.schema_version === "ai_production_analysis_lookup_v1");
+}
+
+function hasAnalysis(value: Lookup | null | undefined): boolean {
+  return isLegacyLookup(value) ? Boolean(value.brief) : isProductionLookup(value) ? Boolean(value.analysis) : false;
+}
+
+function availabilityOf(value: Lookup | null | undefined): AIResearchBriefLookup["availability"] | null {
+  if (isLegacyLookup(value)) return value.availability;
+  if (!isProductionLookup(value)) return null;
+  const map: Record<AIProductionAnalysisStatus, AIResearchBriefLookup["availability"]> = {
+    NO_ANALYSIS: "ABSENT",
+    QUEUED: "QUEUED",
+    PROCESSING: "PROCESSING",
+    READY: "READY",
+    STALE: "STALE",
+    ERROR: "ERROR",
+    LIMIT: "RATE_LIMITED",
+    DISABLED: "PROVIDER_DISABLED",
+  };
+  return map[value.status];
+}
 
 export function AIResearchSection({
   chain,
@@ -30,7 +62,7 @@ export function AIResearchSection({
   contractAddress: string;
   symbol: string;
   name: string;
-  initialLookup?: AIResearchBriefLookup | null;
+  initialLookup?: AIResearchBriefLookup | AIProductionAnalysisLookup | null;
   mode?: "summary" | "detail";
   active?: boolean;
   onOpen?: () => void;
@@ -40,11 +72,11 @@ export function AIResearchSection({
   const ui = COPY[locale];
   const identity = useMemo(() => resolveTokenIdentity(chain, contractAddress), [chain, contractAddress]);
   const renderPreviewMode = isAIResearchRenderPreviewMode();
-  const initialNeedsPreview = renderPreviewMode && initialLookup?.brief?.render_preview !== true;
-  const [lookup, setLookup] = useState<AIResearchBriefLookup | null>(initialLookup ?? null);
+  const initialNeedsPreview = renderPreviewMode && (!isLegacyLookup(initialLookup) || initialLookup.brief?.render_preview !== true);
+  const [lookup, setLookup] = useState<Lookup | null>(initialLookup ?? null);
   const [loading, setLoading] = useState(initialLookup === undefined || initialNeedsPreview);
   const [requesting, setRequesting] = useState(false);
-  const [expanded, setExpanded] = useState(mode === "detail" && Boolean(initialLookup?.brief));
+  const [expanded, setExpanded] = useState(mode === "detail" && hasAnalysis(initialLookup));
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [retryAfter, setRetryAfter] = useState<number | null>(null);
   const [reviewMetrics, setReviewMetrics] = useState<AIResearchReviewMetrics | null>(null);
@@ -53,9 +85,9 @@ export function AIResearchSection({
   useEffect(() => {
     const revision = ++requestRevision.current;
     setLookup(initialLookup ?? null);
-    setExpanded(mode === "detail" && Boolean(initialLookup?.brief));
+    setExpanded(mode === "detail" && hasAnalysis(initialLookup));
 
-    const transientInitialLookup = initialLookup?.availability === "PROCESSING" && initialLookup.brief === null;
+    const transientInitialLookup = availabilityOf(initialLookup) === "PROCESSING" && !hasAnalysis(initialLookup);
     const shouldLoad = initialLookup === undefined || transientInitialLookup || initialNeedsPreview;
     if (!shouldLoad) {
       setLoading(false);
@@ -74,7 +106,7 @@ export function AIResearchSection({
       .then((value) => {
         if (revision !== requestRevision.current) return;
         setLookup(value);
-        setExpanded(mode === "detail" && Boolean(value.brief));
+        setExpanded(mode === "detail" && hasAnalysis(value));
       })
       .catch((error) => {
         if (revision !== requestRevision.current) return;
@@ -83,17 +115,19 @@ export function AIResearchSection({
       .finally(() => { if (revision === requestRevision.current) setLoading(false); });
   }, [identity, initialLookup, initialNeedsPreview, locale, mode]);
 
-  const displayLookup = lookup === null ? null : applyRenderReviewOverride(lookup);
+  const displayLookup = lookup === null ? null : isLegacyLookup(lookup) ? applyRenderReviewOverride(lookup) : lookup;
+  const reviewAnalysisId = isLegacyLookup(displayLookup) && !displayLookup.brief?.render_preview
+    ? displayLookup.brief?.analysis_id ?? null
+    : null;
 
   useEffect(() => {
-    const analysisId = displayLookup?.brief?.render_preview ? null : displayLookup?.brief?.analysis_id;
-    if (!analysisId) { setReviewMetrics(null); return; }
+    if (!reviewAnalysisId) { setReviewMetrics(null); return; }
     let cancelled = false;
-    void loadAIResearchReviewMetrics(analysisId)
+    void loadAIResearchReviewMetrics(reviewAnalysisId)
       .then((value) => { if (!cancelled) setReviewMetrics(value); })
       .catch(() => { if (!cancelled) setReviewMetrics(null); });
     return () => { cancelled = true; };
-  }, [displayLookup?.brief?.analysis_id, displayLookup?.brief?.render_preview]);
+  }, [reviewAnalysisId]);
 
   const requestPreparation = async () => {
     if (identity.status !== "valid" || requesting) return;
@@ -103,26 +137,39 @@ export function AIResearchSection({
     try {
       const result = await requestAIResearchBrief({ chain: identity.chain, contract_address: identity.contract_address, locale });
       setLookup(result);
-      if (result.brief && mode === "detail") setExpanded(true);
+      if (hasAnalysis(result) && mode === "detail") setExpanded(true);
     } catch (error) {
       const code = error instanceof AIResearchDataSourceError ? error.code : "AI_RESEARCH_UNAVAILABLE";
       const retry = error instanceof AIResearchDataSourceError ? error.retryAfterSeconds : null;
       setErrorCode(code);
       setRetryAfter(retry);
-      setLookup((previous) => applyAIResearchGenerationFailure(previous, error));
+      setLookup((previous) => isLegacyLookup(previous) ? applyAIResearchGenerationFailure(previous, error) : previous);
     } finally {
       setRequesting(false);
     }
   };
 
-  const availability: AIResearchBriefLookup["availability"] = displayLookup?.availability ?? (loading ? "PROCESSING" : "ERROR");
-  const brief = displayLookup?.brief ?? null;
-  const effectiveError = errorCode ?? displayLookup?.error_code ?? null;
+  const availability: AIResearchBriefLookup["availability"] = availabilityOf(displayLookup) ?? (loading ? "PROCESSING" : "ERROR");
+  const brief = isLegacyLookup(displayLookup) ? displayLookup.brief : null;
+  const analysis = isProductionLookup(displayLookup) ? displayLookup.analysis : null;
+  const effectiveError = errorCode ?? (isLegacyLookup(displayLookup) ? displayLookup.error_code : null);
   const effectiveRetryAfter = retryAfter ?? displayLookup?.retry_after_seconds ?? null;
   const waitingToRetry = availability === "COOLDOWN" || availability === "RATE_LIMITED";
   const canRequest = identity.status === "valid"
     && !["QUEUED", "PROCESSING", "READY", "PROVIDER_DISABLED", "INSUFFICIENT_DATA", "SUSPENDED", "COOLDOWN", "RATE_LIMITED"].includes(availability);
   const showRequest = ["ABSENT", "STALE", "FAILED", "ERROR"].includes(availability);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || mode !== "detail" || !active || identity.status !== "valid" || !["QUEUED", "PROCESSING"].includes(availability)) return;
+    let cancelled = false;
+    const refresh = () => {
+      void loadAIResearchBrief(identity.chain, identity.contract_address, locale)
+        .then((value) => { if (!cancelled) setLookup(value); })
+        .catch(() => { /* Preserve the last public state; never refresh the full Radar here. */ });
+    };
+    const timer = window.setInterval(refresh, 5_000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [active, availability, identity, locale, mode]);
 
   if (mode === "summary") {
     return (
@@ -156,7 +203,7 @@ export function AIResearchSection({
           <strong>{stateTitle(availability, locale)}</strong>
           <p>{stateDetail(availability, effectiveError, effectiveRetryAfter, locale, Boolean(brief))}</p>
           <p className="ai-shared-queue-note">{ui.sharedQueue}</p>
-          {brief && !brief.render_preview && <span className="ai-prepared-status">{ui.analysisPrepared}</span>}
+          {(brief || analysis) && (!brief || !brief.render_preview) && <span className="ai-prepared-status">{ui.analysisPrepared}</span>}
         </div>
         <div className="ai-research-section-actions">
           {showRequest && (
@@ -178,7 +225,7 @@ export function AIResearchSection({
               {effectiveRetryAfter === null ? ui.tryAgainLater : ui.tryAgainIn(effectiveRetryAfter)}
             </ActionButton>
           )}
-          {brief && (
+          {(brief || analysis) && (
             <ActionButton variant="primary" onClick={() => setExpanded((value) => !value)}>
               {expanded ? ui.close : ui.open}
             </ActionButton>
@@ -187,6 +234,7 @@ export function AIResearchSection({
       </div>
       <span className="sr-only" role="status" aria-live="polite">{requesting ? ui.requestingStatus : ""}</span>
       {brief && expanded && <AIResearchBriefCanvas brief={brief} symbol={symbol} name={name} reviewMetrics={reviewMetrics} />}
+      {analysis && expanded && <AIProductionAnalysisCanvas analysis={analysis} />}
     </section>
   );
 }
@@ -208,7 +256,7 @@ export function AIResearchRadarStatus({
     if (identity.status !== "valid") return;
     let cancelled = false;
     void loadAIResearchBrief(identity.chain, identity.contract_address, locale)
-      .then((value) => { if (!cancelled) setState(value.availability); })
+      .then((value) => { if (!cancelled) setState(availabilityOf(value) ?? "ERROR"); })
       .catch(() => { if (!cancelled) setState("ERROR"); });
     return () => { cancelled = true; };
   }, [identity, locale]);
@@ -274,7 +322,7 @@ function stateTitle(value: AIResearchBriefLookup["availability"], locale: "pl" |
   if (value === "QUEUED") return pl ? "Analiza oczekuje w kolejce" : "Analysis is waiting in the queue";
   if (value === "PROCESSING") return pl ? "Analiza jest przygotowywana" : "Analysis is being prepared";
   if (value === "STALE") return pl ? "Ostatnia analiza dostępna" : "Last analysis available";
-  if (value === "PROVIDER_DISABLED") return pl ? "Analiza AI jest wyłączona w tym trybie podglądu" : "AI analysis is disabled in this preview mode";
+  if (value === "PROVIDER_DISABLED") return pl ? "Analiza AI jest obecnie niedostępna." : "AI analysis is currently unavailable.";
   if (value === "SUSPENDED") return pl ? "Przygotowanie analizy jest wstrzymane" : "Analysis preparation is paused";
   if (["FAILED", "ERROR"].includes(value)) {
     return pl ? "Analiza nie mogła zostać teraz przygotowana." : "The analysis could not be prepared right now.";
@@ -293,7 +341,7 @@ function stateDetail(
 ) {
   const pl = locale === "pl";
   if (value === "READY") return pl ? "Otwórz wspólny, zwalidowany Canvas z ryzykami, brakami i kolejnym krokiem badawczym." : "Open the shared validated Canvas with risks, gaps and the next research step.";
-  if (value === "QUEUED") return pl ? "Zgłoszenie zostało zapisane. Centralny system podejmie je zgodnie z kolejnością i limitami." : "The request was recorded. The central system will process it according to queue order and limits.";
+  if (value === "QUEUED") return pl ? "Analiza została dodana do kolejki." : "The analysis has been added to the queue.";
   if (value === "PROCESSING") return pl ? "Centralny system przygotowuje jeden wspólny wynik dla tego stanu danych." : "The central system is preparing one shared result for this data state.";
   if (value === "STALE") return pl ? "Dane zmieniły się, a aktualizacja jest przygotowywana. Poprzedni prawidłowy wynik pozostaje dostępny." : "Data changed and an update is being prepared. The previous valid result remains available.";
   if (value === "FAILED" && hasBrief) return pl ? "Spróbuj ponownie później. Ostatni poprawny wynik pozostaje dostępny." : "Try again later. The last valid result remains available.";
@@ -302,7 +350,7 @@ function stateDetail(
   if (value === "COOLDOWN" || value === "RATE_LIMITED") return pl
     ? `Ponowne zgłoszenie będzie możliwe${retry ? ` za ${retry} s` : " później"}. Nie utworzono drugiej analizy.`
     : `Another request will be possible${retry ? ` in ${retry} sec` : " later"}. No duplicate analysis was created.`;
-  if (value === "PROVIDER_DISABLED") return pl ? "Aktywuj analizę AI w Centrum sterowania." : "Enable AI analysis in Control Center.";
+  if (value === "PROVIDER_DISABLED") return pl ? "Analiza AI jest obecnie niedostępna." : "AI analysis is currently unavailable.";
   if (value === "INSUFFICIENT_DATA") return pl ? "Serwer nie posiada zwalidowanych danych pozwalających przygotować wiarygodny brief." : "The server has no validated data that can prepare a reliable brief.";
   if (value === "ERROR") return pl ? "Spróbuj ponownie. Ponowne zgłoszenie nie utworzy duplikatu." : "Try again. A repeated request will not create a duplicate.";
   return pl ? "Możesz zgłosić potrzebę przygotowania wspólnej analizy." : "You can request preparation of the shared analysis.";

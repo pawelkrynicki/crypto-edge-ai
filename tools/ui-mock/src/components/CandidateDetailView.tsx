@@ -313,7 +313,7 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
       </>
     );
   } else if (activeTab === "ai") {
-    activeTabContent = <AIResearchSection chain={candidate.chain} contractAddress={candidate.contractAddress} symbol={candidate.symbol} name={candidate.name} mode="detail" onOpenControlCenter={onOpenControlCenter} />;
+    activeTabContent = <AIResearchSection chain={candidate.chain} contractAddress={candidate.contractAddress} symbol={candidate.symbol} name={candidate.name} mode="detail" active onOpenControlCenter={onOpenControlCenter} />;
   } else if (activeTab === "data") {
     activeTabContent = (
       <div className="candidate-data-sources-tab">
@@ -607,6 +607,7 @@ function FollowUpOnlyDetail({
         symbol={followUp.symbol ?? ""}
         name={followUp.display_name ?? followUp.symbol ?? ""}
         mode="detail"
+        active
         onOpenControlCenter={onOpenControlCenter}
       />
     );

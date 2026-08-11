@@ -42,6 +42,10 @@ export type AIResearchServiceOptions = AIResearchContextOptions & {
     identity?: number;
     global?: number;
     cooldownMs?: number;
+    actorHourly?: number;
+    globalHourly?: number;
+    globalDaily?: number;
+    queueDepth?: number;
   };
 };
 
@@ -82,7 +86,11 @@ export function createAIResearchService(options: AIResearchServiceOptions = {}) 
     identity: bounded(options.rateLimits?.identity, 10, 1, 1_000),
     global: bounded(options.rateLimits?.global, 100, 1, 10_000),
     cooldownMs: bounded(options.rateLimits?.cooldownMs, 60_000, 1_000, 24 * 60 * 60_000),
+    actorHourly: bounded(options.rateLimits?.actorHourly ?? envInteger(process.env.CRYPTO_EDGE_AI_ACTOR_INITIATIONS_PER_HOUR), 5, 1, 10_000),
+    globalHourly: bounded(options.rateLimits?.globalHourly ?? envInteger(process.env.CRYPTO_EDGE_AI_GLOBAL_INITIATIONS_PER_HOUR), 100, 1, 100_000),
+    globalDaily: bounded(options.rateLimits?.globalDaily ?? envInteger(process.env.CRYPTO_EDGE_AI_GLOBAL_INITIATIONS_PER_DAY), 1_000, 1, 1_000_000),
   };
+  const queueDepth = bounded(options.rateLimits?.queueDepth ?? envInteger(process.env.CRYPTO_EDGE_AI_QUEUE_DEPTH_LIMIT), 250, 1, 100_000);
   let storePromise: Promise<AIAnalysisQueueStore> | null = options.queueStore ? Promise.resolve(options.queueStore) : null;
   const contextOptions: AIResearchContextOptions = {
     scanner: options.scanner,
@@ -130,6 +138,9 @@ export function createAIResearchService(options: AIResearchServiceOptions = {}) 
       if (!current.record && !current.last_known_good && context.research_state === "INSUFFICIENT_DATA") {
         return lookup("INSUFFICIENT_DATA", providerMode(providerEnabled), null, null, "DATA_UNAVAILABLE", null, identity);
       }
+      if (!current.record && !current.last_known_good && store.circuitBreaker(now()).state === "OPEN") {
+        return lookup("FAILED", providerMode(providerEnabled), null, null, "AI_CIRCUIT_OPEN", null, identity);
+      }
       return publicLookup(current, identity, providerEnabled, null, null);
     },
 
@@ -153,6 +164,14 @@ export function createAIResearchService(options: AIResearchServiceOptions = {}) 
       if (store.workerState().suspended) {
         return lookup("SUSPENDED", "OPENAI", null, null, "WORKER_SUSPENDED", null, identity, "SUSPENDED");
       }
+      const breaker = store.circuitBreaker(now());
+      if (breaker.state === "OPEN") {
+        return lookup("FAILED", "OPENAI", existing.last_known_good, null, "AI_CIRCUIT_OPEN", null, identity, "RATE_LIMITED");
+      }
+      const queue = store.stats();
+      if (queue.queued + queue.processing >= queueDepth) {
+        return lookup("RATE_LIMITED", "OPENAI", existing.last_known_good, null, "AI_QUEUE_LIMIT_REACHED", null, identity, "RATE_LIMITED");
+      }
       let queued: AIAnalysisEnqueueResult;
       try {
         queued = store.enqueue({
@@ -163,10 +182,16 @@ export function createAIResearchService(options: AIResearchServiceOptions = {}) 
         });
       } catch (error) {
         if (error instanceof AIAnalysisQueueStoreError && error.code === "RATE_LIMITED") {
-          throw new AIResearchServiceError("RATE_LIMITED", 429, {
-            retryAfterSeconds: error.retryAfterSeconds ?? undefined,
-            cachedBrief: existing.last_known_good ?? undefined,
-          });
+          return lookup(
+            "RATE_LIMITED",
+            providerMode(providerEnabled),
+            existing.last_known_good,
+            error.retryAfterSeconds,
+            "RATE_LIMITED",
+            null,
+            identity,
+            "RATE_LIMITED",
+          );
         }
         throw new AIResearchServiceError("STORE_UNAVAILABLE", 503);
       }
@@ -363,4 +388,10 @@ function safeModelId(value: string | undefined): string | null {
 
 function bounded(value: number | undefined, fallback: number, minimum: number, maximum: number): number {
   return value !== undefined && Number.isSafeInteger(value) && value >= minimum && value <= maximum ? value : fallback;
+}
+
+function envInteger(value: string | undefined): number | undefined {
+  if (!value || !/^\d+$/.test(value.trim())) return undefined;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) ? parsed : undefined;
 }

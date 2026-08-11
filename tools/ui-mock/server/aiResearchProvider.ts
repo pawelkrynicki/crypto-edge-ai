@@ -54,6 +54,8 @@ export class AIResearchProviderError extends Error {
     | "MODEL_NOT_CONFIGURED"
     | "MISSING_API_KEY"
     | "PROVIDER_TIMEOUT"
+    | "PROVIDER_RATE_LIMITED"
+    | "PROVIDER_UNAVAILABLE"
     | "PROVIDER_ERROR"
     | "INVALID_PROVIDER_RESPONSE";
 
@@ -143,6 +145,8 @@ function createOpenAIResearchProvider(options: OpenAIResearchProviderOptions): A
         if (isTimeoutError(error)) {
           throw new AIResearchProviderError("PROVIDER_TIMEOUT");
         }
+        if (providerStatus(error) === 429) throw new AIResearchProviderError("PROVIDER_RATE_LIMITED");
+        if ((providerStatus(error) ?? 0) >= 500) throw new AIResearchProviderError("PROVIDER_UNAVAILABLE");
         throw new AIResearchProviderError("PROVIDER_ERROR");
       }
     },
@@ -201,6 +205,12 @@ function isTimeoutError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   if (error.name === "APIConnectionTimeoutError" || error.name === "AbortError" || /timed?\s*out/i.test(error.message)) return true;
   return "cause" in error && isTimeoutError(error.cause);
+}
+
+function providerStatus(error: unknown): number | null {
+  if (!error || typeof error !== "object" || !("status" in error)) return null;
+  const value = error.status;
+  return typeof value === "number" && Number.isSafeInteger(value) ? value : null;
 }
 
 function boundedInteger(value: string | undefined, fallback: number, minimum: number, maximum: number): number {

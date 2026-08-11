@@ -85,12 +85,24 @@ export type AIAnalysisRateLimits = {
   identity: number;
   global: number;
   cooldownMs: number;
+  /** New-analysis initiation limits. Cache reads and deduplicated requests never consume them. */
+  actorHourly?: number;
+  globalHourly?: number;
+  globalDaily?: number;
 };
 
 export type AIAnalysisWorkerState = {
   suspended: boolean;
   safe_error_code: string | null;
   suspended_at: string | null;
+  updated_at: string;
+};
+
+export type AIAnalysisCircuitBreakerState = {
+  state: "CLOSED" | "OPEN" | "HALF_OPEN";
+  consecutive_failures: number;
+  open_until: string | null;
+  half_open_in_flight: boolean;
   updated_at: string;
 };
 
@@ -145,12 +157,12 @@ export function buildAIAnalysisCacheIdentity(input: {
     analysis_schema_version: input.analysis_schema_version ?? AI_RESEARCH_SCHEMA_VERSION,
     chain: identity.chain,
     contract_address: identity.contract_address,
-    locale: input.locale,
     model_id: input.model_id,
     prompt_version: input.prompt_version ?? AI_RESEARCH_PROMPT_VERSION,
     snapshot_fingerprint: input.snapshot_fingerprint,
   };
-  return { cache_key: sha256(stableJson(canonical)), ...canonical };
+  // Locale is presentation only. It must not multiply a shared generation for the same evidence.
+  return { cache_key: sha256(stableJson(canonical)), ...canonical, locale: input.locale };
 }
 
 export function hashAIAnalysisRateScope(value: string): string {
@@ -357,8 +369,8 @@ SELECT * FROM crypto_ai_analysis_queue WHERE analysis_id = ? AND status = 'PROCE
         }).cache_key) throw new AIAnalysisQueueStoreError("STORE_SCHEMA_INVALID");
         db.prepare(`
 UPDATE crypto_ai_analysis_queue SET status = 'STALE', updated_at = ?
-WHERE chain = ? AND contract_address = ? AND locale = ? AND status = 'READY' AND analysis_id <> ?
-`).run(nowIso, owned.chain, owned.contract_address, owned.locale, owned.analysis_id);
+WHERE chain = ? AND contract_address = ? AND status = 'READY' AND analysis_id <> ?
+`).run(nowIso, owned.chain, owned.contract_address, owned.analysis_id);
         db.prepare(`
 UPDATE crypto_ai_analysis_queue SET status = 'READY', completed_at = ?, failed_at = NULL, next_retry_at = NULL,
   result_json = ?, validation_status = ?, safe_error_code = NULL, prompt_tokens = ?, completion_tokens = ?,
@@ -395,6 +407,7 @@ WHERE analysis_id = ? AND lease_owner = ?
       transient: boolean;
       max_attempts: number;
       retry_base_ms: number;
+      retry_jitter_ratio?: number;
       now: Date;
     }): AIAnalysisQueueRecord {
       const db = requireDb();
@@ -405,7 +418,12 @@ SELECT * FROM crypto_ai_analysis_queue WHERE analysis_id = ? AND status = 'PROCE
       const retryable = input.transient && current.attempt_count < input.max_attempts;
       const status = retryable ? "FAILED" : "SUSPENDED";
       const nextRetry = retryable
-        ? new Date(input.now.getTime() + input.retry_base_ms * (2 ** Math.max(0, current.attempt_count - 1))).toISOString()
+        ? new Date(input.now.getTime() + retryDelayMs(
+          input.analysis_id,
+          current.attempt_count,
+          input.retry_base_ms,
+          input.retry_jitter_ratio ?? 0.2,
+        )).toISOString()
         : null;
       requireDb().prepare(`
 UPDATE crypto_ai_analysis_queue SET status = ?, failed_at = ?, next_retry_at = ?, validation_status = ?,
@@ -442,6 +460,65 @@ UPDATE crypto_ai_worker_state SET suspended = 1, safe_error_code = ?, suspended_
 UPDATE crypto_ai_worker_state SET suspended = 0, safe_error_code = NULL, suspended_at = NULL, updated_at = ? WHERE id = 1
 `).run(now.toISOString());
       return this.workerState();
+    },
+
+    circuitBreaker(now: Date): AIAnalysisCircuitBreakerState {
+      return readCircuitBreaker(requireDb(), now);
+    },
+
+    acquireCircuitPermit(input: { now: Date }): boolean {
+      const db = requireDb();
+      db.exec("BEGIN IMMEDIATE TRANSACTION");
+      try {
+        const current = parseCircuitBreaker(db.prepare("SELECT * FROM crypto_ai_circuit_breaker WHERE id = 1").get());
+        if (current.state === "CLOSED") { db.exec("COMMIT"); return true; }
+        const nowMs = input.now.getTime();
+        if (current.state === "OPEN" && current.open_until && Date.parse(current.open_until) > nowMs) {
+          db.exec("COMMIT");
+          return false;
+        }
+        if (current.state === "HALF_OPEN" && current.half_open_in_flight) {
+          db.exec("COMMIT");
+          return false;
+        }
+        db.prepare(`
+UPDATE crypto_ai_circuit_breaker SET state = 'HALF_OPEN', half_open_in_flight = 1, updated_at = ? WHERE id = 1
+`).run(input.now.toISOString());
+        db.exec("COMMIT");
+        return true;
+      } catch {
+        try { db.exec("ROLLBACK"); } catch { /* preserve failure */ }
+        throw new AIAnalysisQueueStoreError("STORE_UNAVAILABLE");
+      }
+    },
+
+    recordCircuitSuccess(now: Date): AIAnalysisCircuitBreakerState {
+      requireDb().prepare(`
+UPDATE crypto_ai_circuit_breaker SET state = 'CLOSED', consecutive_failures = 0, open_until = NULL,
+  half_open_in_flight = 0, updated_at = ? WHERE id = 1
+`).run(now.toISOString());
+      return readCircuitBreaker(requireDb(), now);
+    },
+
+    recordCircuitFailure(input: { now: Date; threshold: number; open_ms: number }): AIAnalysisCircuitBreakerState {
+      const db = requireDb();
+      db.exec("BEGIN IMMEDIATE TRANSACTION");
+      try {
+        const current = parseCircuitBreaker(db.prepare("SELECT * FROM crypto_ai_circuit_breaker WHERE id = 1").get());
+        const failures = Math.min(1_000_000, current.consecutive_failures + 1);
+        const shouldOpen = current.state === "HALF_OPEN" || failures >= input.threshold;
+        const openUntil = shouldOpen ? new Date(input.now.getTime() + input.open_ms).toISOString() : null;
+        db.prepare(`
+UPDATE crypto_ai_circuit_breaker SET state = ?, consecutive_failures = ?, open_until = ?,
+  half_open_in_flight = 0, updated_at = ? WHERE id = 1
+`).run(shouldOpen ? "OPEN" : "CLOSED", failures, openUntil, input.now.toISOString());
+        const updated = readCircuitBreaker(db, input.now);
+        db.exec("COMMIT");
+        return updated;
+      } catch {
+        try { db.exec("ROLLBACK"); } catch { /* preserve failure */ }
+        throw new AIAnalysisQueueStoreError("STORE_UNAVAILABLE");
+      }
     },
 
     usageSince(since: Date): { analyses: number; prompt_tokens: number; completion_tokens: number; total_tokens: number } {
@@ -557,6 +634,16 @@ CREATE TABLE IF NOT EXISTS crypto_ai_worker_state (
 );
 INSERT OR IGNORE INTO crypto_ai_worker_state (id, schema_version, suspended, safe_error_code, suspended_at, updated_at)
 VALUES (1, 'ai_analysis_queue_v1', 0, NULL, NULL, '1970-01-01T00:00:00.000Z');
+CREATE TABLE IF NOT EXISTS crypto_ai_circuit_breaker (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  state TEXT NOT NULL CHECK (state IN ('CLOSED','OPEN','HALF_OPEN')),
+  consecutive_failures INTEGER NOT NULL CHECK (consecutive_failures >= 0),
+  open_until TEXT,
+  half_open_in_flight INTEGER NOT NULL CHECK (half_open_in_flight IN (0,1)),
+  updated_at TEXT NOT NULL
+);
+INSERT OR IGNORE INTO crypto_ai_circuit_breaker (id, state, consecutive_failures, open_until, half_open_in_flight, updated_at)
+VALUES (1, 'CLOSED', 0, NULL, 0, '1970-01-01T00:00:00.000Z');
 PRAGMA user_version = 1;
 `);
 }
@@ -630,13 +717,12 @@ function findLastKnownGood(
   if (current?.result) return current.result;
   const rows = database.prepare(`
 SELECT * FROM crypto_ai_analysis_queue
-WHERE chain = ? AND contract_address = ? AND locale = ? AND prompt_version = ?
+WHERE chain = ? AND contract_address = ? AND prompt_version = ?
   AND model_id = ? AND analysis_schema_version = ? AND result_json IS NOT NULL AND validation_status = 'VALID'
 ORDER BY completed_at DESC LIMIT 20
 `).all(
     identity.chain,
     identity.contract_address,
-    identity.locale,
     identity.prompt_version,
     identity.model_id,
     identity.analysis_schema_version,
@@ -657,6 +743,8 @@ function enforceRateLimits(
 ): void {
   if (!/^[0-9a-f]{64}$/.test(sessionScopeHash)) throw new AIAnalysisQueueStoreError("STORE_SCHEMA_INVALID");
   const since = new Date(now.getTime() - limits.windowMs).toISOString();
+  const hourSince = new Date(now.getTime() - 60 * 60_000).toISOString();
+  const daySince = new Date(now.getTime() - 24 * 60 * 60_000).toISOString();
   const identityHash = identityScopeHash(identity);
   const checks: Array<[string, string, number]> = [
     ["session_scope_hash", sessionScopeHash, limits.session],
@@ -676,7 +764,32 @@ function enforceRateLimits(
     const firstAt = isRecord(first) && typeof first.requested_at === "string" ? Date.parse(first.requested_at) : now.getTime();
     throw new AIAnalysisQueueStoreError("RATE_LIMITED", Math.max(1, Math.ceil((firstAt + limits.windowMs - now.getTime()) / 1_000)));
   }
-  database.prepare("DELETE FROM crypto_ai_analysis_request_log WHERE requested_at <= ?").run(since);
+  const actorHourly = limits.actorHourly ?? limits.session;
+  const globalHourly = limits.globalHourly ?? limits.global;
+  const globalDaily = limits.globalDaily ?? Math.max(limits.global, globalHourly);
+  enforceWindowLimit(database, "session_scope_hash", sessionScopeHash, hourSince, actorHourly, now, 60 * 60_000);
+  enforceWindowLimit(database, null, null, hourSince, globalHourly, now, 60 * 60_000);
+  enforceWindowLimit(database, null, null, daySince, globalDaily, now, 24 * 60 * 60_000);
+  database.prepare("DELETE FROM crypto_ai_analysis_request_log WHERE requested_at <= ?").run(daySince);
+}
+
+function enforceWindowLimit(
+  database: SqliteDatabase,
+  column: "session_scope_hash" | null,
+  value: string | null,
+  since: string,
+  limit: number,
+  now: Date,
+  windowMs: number,
+): void {
+  if (limit <= 0) throw new AIAnalysisQueueStoreError("RATE_LIMITED", Math.max(1, Math.ceil(windowMs / 1_000)));
+  const rows = column
+    ? database.prepare(`SELECT requested_at FROM crypto_ai_analysis_request_log WHERE ${column} = ? AND requested_at > ? ORDER BY requested_at ASC`).all(value, since)
+    : database.prepare("SELECT requested_at FROM crypto_ai_analysis_request_log WHERE requested_at > ? ORDER BY requested_at ASC").all(since);
+  if (rows.length < limit) return;
+  const first = rows[0];
+  const firstAt = isRecord(first) && typeof first.requested_at === "string" ? Date.parse(first.requested_at) : now.getTime();
+  throw new AIAnalysisQueueStoreError("RATE_LIMITED", Math.max(1, Math.ceil((firstAt + windowMs - now.getTime()) / 1_000)));
 }
 
 function recordRateRequest(database: SqliteDatabase, identity: AIAnalysisCacheIdentity, sessionScopeHash: string, nowIso: string): void {
@@ -695,6 +808,27 @@ function parseWorkerState(value: unknown): AIAnalysisWorkerState {
     suspended: value.suspended === 1,
     safe_error_code: stringField(value.safe_error_code),
     suspended_at: stringField(value.suspended_at),
+    updated_at: stringField(value.updated_at) ?? new Date(0).toISOString(),
+  };
+}
+
+function readCircuitBreaker(database: SqliteDatabase, now: Date): AIAnalysisCircuitBreakerState {
+  const state = parseCircuitBreaker(database.prepare("SELECT * FROM crypto_ai_circuit_breaker WHERE id = 1").get());
+  if (state.state === "OPEN" && state.open_until && Date.parse(state.open_until) <= now.getTime()) {
+    return { ...state, state: "HALF_OPEN" };
+  }
+  return state;
+}
+
+function parseCircuitBreaker(value: unknown): AIAnalysisCircuitBreakerState {
+  if (!isRecord(value) || !["CLOSED", "OPEN", "HALF_OPEN"].includes(String(value.state))) {
+    throw new AIAnalysisQueueStoreError("STORE_UNAVAILABLE");
+  }
+  return {
+    state: value.state as AIAnalysisCircuitBreakerState["state"],
+    consecutive_failures: integer(value.consecutive_failures),
+    open_until: stringField(value.open_until),
+    half_open_in_flight: value.half_open_in_flight === 1,
     updated_at: stringField(value.updated_at) ?? new Date(0).toISOString(),
   };
 }
@@ -729,6 +863,15 @@ function changes(result: SqliteRunResult): number {
 
 function boundedInteger(value: number | undefined, fallback: number, minimum: number, maximum: number): number {
   return value !== undefined && Number.isSafeInteger(value) && value >= minimum && value <= maximum ? value : fallback;
+}
+
+function retryDelayMs(analysisId: string, attempt: number, baseMs: number, jitterRatio: number): number {
+  const exponential = baseMs * (2 ** Math.max(0, attempt - 1));
+  const ratio = Number.isFinite(jitterRatio) ? Math.max(0, Math.min(0.5, jitterRatio)) : 0.2;
+  if (ratio === 0) return exponential;
+  const digest = createHash("sha256").update(`${analysisId}:${attempt}`, "utf8").digest();
+  const unit = digest.readUInt32BE(0) / 0xffff_ffff;
+  return Math.max(1, Math.round(exponential * (1 - ratio + unit * ratio * 2)));
 }
 
 async function loadNodeSqlite(): Promise<SqliteModule> {
