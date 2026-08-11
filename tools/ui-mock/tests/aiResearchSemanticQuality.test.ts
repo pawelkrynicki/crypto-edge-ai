@@ -97,17 +97,17 @@ describe("AI.2C deterministic actions and PL/EN narrative boundary", () => {
   it("accepts natural PL/EN narrative and rejects raw enums, machine values and mixed language", async () => {
     const pl = await researchContext("pl");
     const en = await researchContext("en");
-    assert.equal(parseAIResearchProviderNarrative(JSON.stringify(providerNarrative(pl)), pl).narrative_version, "ai_research_narrative_v2");
-    assert.equal(parseAIResearchProviderNarrative(JSON.stringify(providerNarrative(en)), en).narrative_version, "ai_research_narrative_v2");
+    assert.equal(parseAIResearchProviderNarrative(JSON.stringify(providerNarrative(pl)), pl).narrative_version, "ai_research_narrative_v3");
+    assert.equal(parseAIResearchProviderNarrative(JSON.stringify(providerNarrative(en)), en).narrative_version, "ai_research_narrative_v3");
 
     const rawEnum = providerNarrative(pl);
-    rawEnum.summary = "Stan DATA_STALE wymaga sprawdzenia.";
+    rawEnum.summary.pl = "Stan DATA_STALE wymaga sprawdzenia.";
     assert.throws(() => parseAIResearchProviderNarrative(JSON.stringify(rawEnum), pl), /RAW_MACHINE_VALUE/);
     const machineValue = providerNarrative(pl);
-    machineValue.fact_narratives[0]!.interpretation = "Etap lifecycle ma wartość new.";
+    machineValue.fact_narratives[0]!.pl = "Etap lifecycle ma wartość new.";
     assert.throws(() => parseAIResearchProviderNarrative(JSON.stringify(machineValue), pl), /RAW_MACHINE_VALUE/);
     const mixed = providerNarrative(en);
-    mixed.summary = "Dane wymagają świeżej migawki.";
+    mixed.summary.en = "Dane wymagają świeżej migawki.";
     assert.throws(() => parseAIResearchProviderNarrative(JSON.stringify(mixed), en), /LANGUAGE_MISMATCH/);
   });
 });
@@ -125,7 +125,10 @@ function semanticCandidate(context: AIResearchContext, fixture: CapturedFixture 
   const capturedFixture = "unsupported_missing" in fixture ? fixture : null;
   const actions = context.action_catalog.map((action) => ({
     ...action,
-    reason: "action_reason" in fixture ? fixture.action_reason : action.reason,
+    reason: bilingual(
+      "Use this permitted research step to verify the evidence.",
+      "action_reason" in fixture ? fixture.action_reason : "Wykorzystaj ten dozwolony krok analizy, aby sprawdzić dane.",
+    ),
   }));
   if (capturedFixture) {
     const index = actions.findIndex(({ action_type }) => action_type === capturedFixture.primary_action_type);
@@ -136,61 +139,64 @@ function semanticCandidate(context: AIResearchContext, fixture: CapturedFixture 
     }
   }
   return {
-    schema_version: "ai_research_brief_v1",
+    schema_version: "ai_research_brief_v2",
     research_state: context.research_state,
-    summary: fixture.summary,
+    summary: bilingual("Recorded evidence requires a focused follow-up review.", fixture.summary),
     known_facts: context.fact_candidates.map((fact) => ({
       ...fact,
-      interpretation: fixture.fact_interpretations[fact.key]
-        ?? (context.locale === "pl" ? "Wartość pochodzi z danych produktu." : "The value comes from product data."),
+      interpretation: bilingual(
+        "This recorded fact adds context to the research view.",
+        fixture.fact_interpretations[fact.key] ?? "Ten zapisany fakt uzupełnia obecną analizę.",
+      ),
     })),
     risk_factors: context.risk_candidates.map((risk) => ({
       ...risk,
-      explanation: "risk_explanation" in fixture ? fixture.risk_explanation : risk.explanation,
+      explanation: bilingual("This recorded risk needs verification against the listed evidence.", "risk_explanation" in fixture ? fixture.risk_explanation : "To zapisane ryzyko wymaga sprawdzenia względem wskazanych danych."),
     })),
     missing_information: [
       ...context.missing_information.map((item) => ({
         ...item,
-        explanation: "missing_explanation" in fixture ? fixture.missing_explanation : item.explanation,
+        explanation: bilingual("This evidence gap limits the current research view.", "missing_explanation" in fixture ? fixture.missing_explanation : "Ta luka w danych ogranicza obecną analizę."),
       })),
-      ...(capturedFixture ? [capturedFixture.unsupported_missing] : []),
+      ...(capturedFixture ? [{ ...capturedFixture.unsupported_missing, explanation: bilingual("This unsupported gap was returned.", capturedFixture.unsupported_missing.explanation) }] : []),
     ],
     next_actions: actions,
     status_change_conditions: context.status_change_conditions.map((condition) => ({
       ...condition,
-      explanation: "condition_explanation" in fixture ? fixture.condition_explanation : condition.explanation,
+      explanation: bilingual("This condition would justify reviewing the research view.", "condition_explanation" in fixture ? fixture.condition_explanation : "Ten warunek uzasadnia ponowne sprawdzenie analizy."),
     })),
   };
 }
 
 function providerNarrative(context: AIResearchContext) {
-  const pl = context.locale === "pl";
   return {
-    narrative_version: "ai_research_narrative_v2" as const,
-    summary: pl
-      ? "Dane wymagają dalszego sprawdzenia. Kolejny krok wynika ze stanu produktu."
-      : "The data needs further review. The next step follows from the product state.",
+    narrative_version: "ai_research_narrative_v3" as const,
+    summary: bilingual("The recorded data needs further review before the next research step.", "Zapisane dane wymagają dalszego sprawdzenia przed kolejnym krokiem analizy."),
     fact_narratives: context.fact_candidates.map((fact) => ({
       id: `fact:${fact.key}`,
-      interpretation: pl ? "Wartość pochodzi z danych produktu." : "The value comes from product data.",
+      ...bilingual("This recorded fact adds context to the research view.", "Ten zapisany fakt uzupełnia obecną analizę."),
     })),
     risk_narratives: context.risk_candidates.map((_risk, index) => ({
       id: `risk:${index}`,
-      explanation: pl ? "Stan wymaga dalszego sprawdzenia." : "The state needs further review.",
+      ...bilingual("This recorded risk needs verification against the listed evidence.", "To zapisane ryzyko wymaga sprawdzenia względem wskazanych danych."),
     })),
     missing_narratives: context.missing_information.map((item) => ({
       id: `missing:${item.key}`,
-      explanation: pl ? "Produkt wskazuje brak danych w tym obszarze." : "The product identifies missing data in this area.",
+      ...bilingual("This evidence gap limits the current research view.", "Ta luka w danych ogranicza obecną analizę."),
     })),
     action_narratives: context.action_catalog.map((_action, index) => ({
       id: `action:${index}`,
-      reason: pl ? "Krok wynika z bieżącego stanu produktu." : "The step follows from the current product state.",
+      ...bilingual("Use this permitted research step to verify the evidence.", "Wykorzystaj ten dozwolony krok analizy, aby sprawdzić dane."),
     })),
     status_change_narratives: context.status_change_conditions.map((condition) => ({
       id: `condition:${condition.key}`,
-      explanation: pl ? "Zmiana danych pozwoli ponowić ocenę." : "A data change will allow reassessment.",
+      ...bilingual("This condition would justify reviewing the research view.", "Ten warunek uzasadnia ponowne sprawdzenie analizy."),
     })),
   };
+}
+
+function bilingual(en: string, pl: string) {
+  return { en, pl };
 }
 
 type CapturedFixture = {

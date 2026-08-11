@@ -184,7 +184,7 @@ export function buildAIAnalysisCacheIdentity(input: {
     snapshot_fingerprint: input.snapshot_fingerprint,
   };
   // The legacy database column is retained for compatibility. Production writes use
-  // the canonical "en" value; it is never a request-owned semantic value and is not
+  // the canonical "en" legacy column value; it is never a request-owned semantic value and is not
   // part of the shared cache key.
   return { cache_key: sha256(stableJson(canonical)), ...canonical, locale: input.locale };
 }
@@ -441,7 +441,7 @@ SELECT * FROM crypto_ai_analysis_queue WHERE analysis_id = ? AND status = 'PROCE
           prompt_version: brief.prompt_version,
           model_id: brief.model,
           analysis_schema_version: brief.schema_version,
-          locale: brief.analysis_language,
+          locale: "en",
         }).cache_key) throw new AIAnalysisQueueStoreError("STORE_SCHEMA_INVALID");
         db.prepare(`
 UPDATE crypto_ai_analysis_queue SET status = 'STALE', updated_at = ?

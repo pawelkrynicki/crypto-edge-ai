@@ -106,7 +106,7 @@ export function AIResearchBriefCanvas({
             <div className="ai-risk-row" role="row" key={`${risk.category}-${index}`}>
               <strong role="cell" data-label={ui.area}>{risk.title}</strong>
               <span role="cell" data-label={ui.state}><StatusBadge tone={severityTone(risk.severity)}>{severityLabel(risk.severity, locale)}</StatusBadge></span>
-              <p role="cell" data-label={ui.meaning}>{risk.explanation}</p>
+              <p role="cell" data-label={ui.meaning}>{risk.explanation[locale]}</p>
               <SourceIds ids={risk.evidence_reference_ids} label={ui.sources} locale={locale} />
             </div>
           ))}
@@ -116,7 +116,7 @@ export function AIResearchBriefCanvas({
       <section className="ai-research-panel ai-missing-panel" aria-labelledby="ai-missing-title">
         <PanelHeading eyebrow="04" id="ai-missing-title" title={ui.whatWeDoNotKnow} detail={ui.missingHelp} />
         {brief.missing_information.length > 0 ? (
-          <ul className="ai-missing-list">{brief.missing_information.map((item) => <li key={item.key}><strong>{item.label}</strong><p>{missingInformationExplanation(item.key, item.explanation, locale)}</p><SourceIds ids={item.source_reference_ids} label={ui.sources} locale={locale} /></li>)}</ul>
+          <ul className="ai-missing-list">{brief.missing_information.map((item) => <li key={item.key}><strong>{item.label}</strong><p>{missingInformationExplanation(item.key, item.explanation[locale], locale)}</p><SourceIds ids={item.source_reference_ids} label={ui.sources} locale={locale} /></li>)}</ul>
         ) : <p className="ai-empty-line">{ui.noRecordedGaps}</p>}
       </section>
 
@@ -135,10 +135,10 @@ export function AIResearchBriefCanvas({
 
       <section className="ai-research-panel ai-brief-panel" aria-labelledby="ai-brief-title">
         <PanelHeading eyebrow="06" id="ai-brief-title" title={ui.shortBrief} detail={ui.shortBriefHelp} />
-        <p className="ai-brief-summary">{brief.summary}</p>
+        <p className="ai-brief-summary">{brief.summary[locale]}</p>
         <div className="ai-brief-columns">
-          <div><h4>{ui.whatWeKnow}</h4><ul>{brief.known_facts.map((fact) => <li key={fact.key}><strong>{fact.label}: {presentValue(fact.key, fact.value, locale)}</strong><span>{fact.interpretation}</span></li>)}</ul></div>
-          <div><h4>{ui.statusConditions}</h4><ul>{brief.status_change_conditions.map((condition) => <li key={condition.key}><strong>{condition.label}</strong><span>{condition.explanation}</span></li>)}</ul></div>
+          <div><h4>{ui.whatWeKnow}</h4><ul>{brief.known_facts.map((fact) => <li key={fact.key}><strong>{fact.label}: {presentValue(fact.key, fact.value, locale)}</strong><span>{fact.interpretation[locale]}</span></li>)}</ul></div>
+          <div><h4>{ui.statusConditions}</h4><ul>{brief.status_change_conditions.map((condition) => <li key={condition.key}><strong>{condition.label}</strong><span>{condition.explanation[locale]}</span></li>)}</ul></div>
         </div>
       </section>
 

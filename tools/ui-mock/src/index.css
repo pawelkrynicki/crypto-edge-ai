@@ -8353,6 +8353,51 @@ summary {
   font-weight: 500;
 }
 
+/* The public PC.2 canvas has no identicon column. Its title must keep whole words. */
+.ai-production-header {
+  grid-template-columns: minmax(0, 1fr) minmax(190px, auto);
+}
+
+.ai-production-header .ai-research-header-copy,
+.ai-production-header h3,
+.ai-production-header .ai-research-eyebrow,
+.ai-production-header .ai-research-times,
+.ai-production-header .ai-research-times dt,
+.ai-production-header .ai-research-times dd {
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+}
+
+.ai-production-summary {
+  display: grid;
+  gap: 7px;
+  padding: 12px 14px;
+  border: 1px solid rgba(35, 199, 190, 0.28);
+  border-radius: var(--radius-sm);
+  background: rgba(13, 37, 42, 0.58);
+}
+
+.ai-production-summary h4,
+.ai-production-context > h3,
+.ai-production-steps > h3 {
+  margin: 0;
+  color: var(--accent);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ai-production-summary p,
+.ai-production-boundary,
+.ai-production-freshness,
+.ai-production-context .ai-kpi p,
+.ai-production-steps li span {
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: 1.48;
+}
+
 .ai-research-identity-line {
   display: flex;
   align-items: center;
@@ -8429,6 +8474,19 @@ summary {
   display: block;
   overflow-wrap: anywhere;
 }
+
+.ai-production-context .ai-research-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 10px; }
+.ai-production-context .ai-kpi { min-height: 118px; }
+.ai-production-context .ai-kpi p { font-size: 10px; }
+.ai-production-freshness { margin-top: 10px; font-size: 10px; }
+.ai-production-insight-columns .ai-brief-panel ul { margin: 0; padding: 0; list-style: none; }
+.ai-production-insight-columns .ai-brief-panel li { display: grid; gap: 3px; }
+.ai-production-insight-columns .ai-brief-panel li span { color: var(--text-secondary); font-size: 11px; line-height: 1.42; }
+.ai-production-steps ol { display: grid; gap: 8px; margin: 0; padding-left: 22px; }
+.ai-production-steps li { padding-left: 2px; }
+.ai-production-steps li strong { display: block; font-size: 11px; }
+.ai-production-steps li span { display: block; margin-top: 2px; font-size: 11px; }
+.ai-production-boundary { font-size: 10px; }
 
 .ai-kpi span {
   margin-bottom: 5px;
@@ -8851,6 +8909,7 @@ summary {
   .ai-next-map { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .ai-next-map li:nth-child(2)::after { display: none; }
   .ai-coverage-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ai-production-context .ai-research-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 900px) {
@@ -8859,6 +8918,8 @@ summary {
   .ai-research-times dd { text-align: left; }
   .ai-risk-row { grid-template-columns: minmax(115px, 0.7fr) minmax(100px, 0.5fr) minmax(180px, 1.5fr) minmax(100px, 0.7fr); }
   .ai-checkpoint-axis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .ai-production-header { grid-template-columns: minmax(0, 1fr); }
+  .ai-production-header .ai-research-times { grid-column: auto; }
 }
 
 @media (max-width: 768px) {
@@ -8931,6 +8992,8 @@ summary {
   .ai-research-times div { grid-template-columns: minmax(84px, auto) minmax(0, 1fr); }
   .ai-research-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; }
   .ai-kpi { min-height: 69px; padding: 8px; }
+  .ai-production-context .ai-research-kpis { grid-template-columns: 1fr; }
+  .ai-production-header .ai-research-times { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .ai-research-panel { padding: 9px; }
   .ai-coverage-grid,
   .ai-next-map,

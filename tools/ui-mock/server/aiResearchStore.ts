@@ -121,6 +121,7 @@ ORDER BY generated_at DESC LIMIT 10
 
     save(brief: AIResearchBrief, reviewMetrics?: AIResearchReviewMetrics): { created: boolean; brief: AIResearchBrief } {
       const validated = validateStoredAIResearchBrief(brief);
+      const storageLocale: AIResearchLocale = "en";
       const validatedMetrics = reviewMetrics ? validateReviewMetrics(reviewMetrics, validated) : null;
       if (validatedMetrics && !reviewStore) throw new AIResearchStoreError("STORE_SCHEMA_INVALID");
       if (validated.render_preview) throw new AIResearchStoreError("STORE_SCHEMA_INVALID");
@@ -131,7 +132,7 @@ ORDER BY generated_at DESC LIMIT 10
 SELECT ai_analysis FROM crypto_ai_research_briefs
 WHERE chain = ? AND contract_address = ? AND locale = ?
   AND snapshot_fingerprint = ? AND prompt_version = ? LIMIT 1
-`).get(validated.identity.chain, validated.identity.contract_address, validated.analysis_language, validated.snapshot_fingerprint, validated.prompt_version);
+`).get(validated.identity.chain, validated.identity.contract_address, storageLocale, validated.snapshot_fingerprint, validated.prompt_version);
         if (existing && isRecord(existing) && typeof existing.ai_analysis === "string") {
           const parsed = parseBrief(existing.ai_analysis);
           if (parsed) {
@@ -143,7 +144,7 @@ WHERE chain = ? AND contract_address = ? AND locale = ?
   AND snapshot_fingerprint = ? AND prompt_version = ?`).run(
             validated.identity.chain,
             validated.identity.contract_address,
-            validated.analysis_language,
+            storageLocale,
             validated.snapshot_fingerprint,
             validated.prompt_version,
           );
@@ -151,7 +152,7 @@ WHERE chain = ? AND contract_address = ? AND locale = ?
         db.prepare(`
 UPDATE crypto_ai_research_briefs SET status = 'STALE', updated_at = ?
 WHERE chain = ? AND contract_address = ? AND locale = ? AND status = 'VALID'
-`).run(validated.generated_at, validated.identity.chain, validated.identity.contract_address, validated.analysis_language);
+`).run(validated.generated_at, validated.identity.chain, validated.identity.contract_address, storageLocale);
         const count = readCount(db.prepare("SELECT COUNT(*) AS count FROM crypto_ai_research_briefs").get());
         if (count >= maxRecords) {
           db.prepare(`DELETE FROM crypto_ai_research_briefs WHERE analysis_id IN (
@@ -169,7 +170,7 @@ INSERT INTO crypto_ai_research_briefs (
           AI_RESEARCH_SCHEMA_VERSION,
           validated.identity.chain,
           validated.identity.contract_address,
-          validated.analysis_language,
+          storageLocale,
           validated.snapshot_fingerprint,
           validated.prompt_version,
           validated.model,
@@ -275,11 +276,12 @@ function migrate(database: SqliteDatabase, busyTimeoutMs: number, reviewStore: b
   database.exec("PRAGMA journal_mode = WAL");
   database.exec("PRAGMA synchronous = FULL");
   database.exec("PRAGMA foreign_keys = ON");
+  if (hasStrictV1BriefSchema(database)) migrateBriefSchemaForBilingualNarrative(database);
   database.exec(`
 CREATE TABLE IF NOT EXISTS crypto_ai_research_briefs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   analysis_id TEXT NOT NULL UNIQUE,
-  schema_version TEXT NOT NULL CHECK (schema_version = 'ai_research_brief_v1'),
+  schema_version TEXT NOT NULL CHECK (schema_version IN ('ai_research_brief_v1', 'ai_research_brief_v2')),
   chain TEXT NOT NULL,
   contract_address TEXT NOT NULL,
   locale TEXT NOT NULL CHECK (locale IN ('pl','en')),
@@ -323,6 +325,79 @@ CREATE TABLE IF NOT EXISTS crypto_ai_research_live_call_budget (
 );
 PRAGMA user_version = 2;
 `);
+}
+
+/** Keeps the legacy local cache readable while allowing the v2 bilingual brief. Old v1 rows remain unreachable through the v4 cache identity. */
+function hasStrictV1BriefSchema(database: SqliteDatabase): boolean {
+  const row = database.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'crypto_ai_research_briefs'").get();
+  return isRecord(row) && typeof row.sql === "string" && /CHECK \(schema_version = 'ai_research_brief_v1'\)/.test(row.sql);
+}
+
+function migrateBriefSchemaForBilingualNarrative(database: SqliteDatabase): void {
+  const hasReviewMetrics = Boolean(database.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'crypto_ai_research_review_metrics'").get());
+  database.exec("PRAGMA foreign_keys = OFF");
+  database.exec("BEGIN IMMEDIATE TRANSACTION");
+  try {
+    if (hasReviewMetrics) database.exec("ALTER TABLE crypto_ai_research_review_metrics RENAME TO crypto_ai_research_review_metrics_v1_legacy");
+    database.exec("ALTER TABLE crypto_ai_research_briefs RENAME TO crypto_ai_research_briefs_v1_legacy");
+    database.exec(`
+CREATE TABLE crypto_ai_research_briefs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  analysis_id TEXT NOT NULL UNIQUE,
+  schema_version TEXT NOT NULL CHECK (schema_version IN ('ai_research_brief_v1', 'ai_research_brief_v2')),
+  chain TEXT NOT NULL,
+  contract_address TEXT NOT NULL,
+  locale TEXT NOT NULL CHECK (locale IN ('pl','en')),
+  snapshot_fingerprint TEXT NOT NULL,
+  prompt_version TEXT NOT NULL,
+  model TEXT NOT NULL,
+  ai_analysis TEXT NOT NULL,
+  prompt_tokens INTEGER NOT NULL CHECK (prompt_tokens >= 0),
+  completion_tokens INTEGER NOT NULL CHECK (completion_tokens >= 0),
+  total_tokens INTEGER NOT NULL CHECK (total_tokens >= 0),
+  input_hash TEXT NOT NULL,
+  output_hash TEXT NOT NULL,
+  hash TEXT NOT NULL UNIQUE,
+  generated_at TEXT NOT NULL,
+  data_generated_at TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('VALID','STALE')),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE (chain, contract_address, snapshot_fingerprint, prompt_version, locale)
+);
+INSERT INTO crypto_ai_research_briefs (
+  id, analysis_id, schema_version, chain, contract_address, locale, snapshot_fingerprint,
+  prompt_version, model, ai_analysis, prompt_tokens, completion_tokens, total_tokens,
+  input_hash, output_hash, hash, generated_at, data_generated_at, status, created_at, updated_at
+)
+SELECT
+  id, analysis_id, schema_version, chain, contract_address, locale, snapshot_fingerprint,
+  prompt_version, model, ai_analysis, prompt_tokens, completion_tokens, total_tokens,
+  input_hash, output_hash, hash, generated_at, data_generated_at, status, created_at, updated_at
+FROM crypto_ai_research_briefs_v1_legacy;
+`);
+    if (hasReviewMetrics) database.exec(`
+CREATE TABLE crypto_ai_research_review_metrics (
+  analysis_id TEXT PRIMARY KEY REFERENCES crypto_ai_research_briefs(analysis_id) ON DELETE CASCADE,
+  latency_ms INTEGER NOT NULL CHECK (latency_ms >= 0),
+  request_id TEXT,
+  validation_status TEXT NOT NULL CHECK (validation_status = 'VALID'),
+  cache_hit INTEGER NOT NULL CHECK (cache_hit = 0),
+  created_at TEXT NOT NULL
+);
+INSERT INTO crypto_ai_research_review_metrics (analysis_id, latency_ms, request_id, validation_status, cache_hit, created_at)
+SELECT analysis_id, latency_ms, request_id, validation_status, cache_hit, created_at
+FROM crypto_ai_research_review_metrics_v1_legacy;
+DROP TABLE crypto_ai_research_review_metrics_v1_legacy;
+`);
+    database.exec("DROP TABLE crypto_ai_research_briefs_v1_legacy");
+    database.exec("COMMIT");
+  } catch (error) {
+    try { database.exec("ROLLBACK"); } catch { /* preserve original migration failure */ }
+    throw error;
+  } finally {
+    database.exec("PRAGMA foreign_keys = ON");
+  }
 }
 
 function assertSchema(database: SqliteDatabase): void {

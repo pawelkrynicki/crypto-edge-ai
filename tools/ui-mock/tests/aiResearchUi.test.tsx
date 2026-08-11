@@ -9,6 +9,7 @@ import { buildAIResearchContext } from "../server/aiResearchContext.js";
 import { buildDeterministicPreview } from "../server/aiResearchService.js";
 import { mapPersistableScannerOutputToUiCandidates } from "../src/adapters/scannerOutputAdapter.js";
 import { AIResearchBriefCanvas } from "../src/components/AIResearchBriefCanvas.js";
+import { AIProductionAnalysisCanvas } from "../src/components/AIProductionAnalysisCanvas.js";
 import { AIResearchRadarStatus, AIResearchSection } from "../src/components/AIResearchSection.js";
 import { applyAIResearchGenerationFailure } from "../src/components/aiResearchState.js";
 import { CandidateDetailView } from "../src/components/CandidateDetailView.js";
@@ -17,6 +18,7 @@ import { PERSISTABLE_SCANNER_SAMPLE } from "../src/fixtures/persistableScannerSa
 import { ProductLocaleProvider, type ProductLocale } from "../src/productI18n.js";
 import { AIResearchDataSourceError } from "../src/services/aiResearchDataSource.js";
 import type { AIResearchBrief, AIResearchBriefLookup, AIResearchReviewMetrics } from "../src/types/aiResearchTypes.js";
+import { presentAnalysis } from "../server/aiProductionPublic.js";
 
 void React;
 
@@ -60,8 +62,8 @@ describe("AI.1 Visual Candidate Research Canvas", () => {
       assert.doesNotMatch(markup, /chatbot|chat-message|dangerouslySetInnerHTML/i);
       assert.doesNotMatch(markup, />\s*(Buy|Sell|Kup|Sprzedaj|Trade)\s*</i);
     }
-    assert.match(pl, /Produkt nie posiada danych pozwalających ocenić ten obszar/);
-    assert.match(en, /The product has no data that can assess this area/);
+    assert.match(pl, /Produkt nie posiada wyniku kontroli bezpieczeństwa kontraktu/);
+    assert.match(en, /The product does not have a contract security check result/);
     assert.match(pl, /Podgląd formatu — bez wywołania AI/);
     assert.match(en, /Format preview — no AI call/);
   });
@@ -185,12 +187,22 @@ describe("AI.1 Visual Candidate Research Canvas", () => {
       assert.ok(action.target_reference.startsWith("#") || action.target_reference.startsWith("https://"));
     }
   });
+
+  it("renders the CAMP public canvas in one complete locale at a time", () => {
+    const pl = render("pl", <AIProductionAnalysisCanvas analysis={presentAnalysis(briefPl, false, "pl")} />);
+    const en = render("en", <AIProductionAnalysisCanvas analysis={presentAnalysis(briefPl, false, "en")} />);
+
+    for (const label of ["ANALIZA AI", "Podsumowanie", "CO Z TEGO WYNIKA TERAZ", "NAJWAŻNIEJSZE POTWIERDZONE INFORMACJE", "NASTĘPNE KROKI RESEARCHU"]) assert.match(pl, new RegExp(label));
+    for (const label of ["AI ANALYSIS", "Summary", "WHAT THIS MEANS NOW", "KEY CONFIRMED FINDINGS", "NEXT RESEARCH STEPS"]) assert.match(en, new RegExp(label));
+    assert.doesNotMatch(pl, /AI ANALYSIS|WHAT THIS MEANS NOW|KEY CONFIRMED FINDINGS/);
+    assert.doesNotMatch(en, /ANALIZA AI|CO Z TEGO WYNIKA TERAZ|NAJWAŻNIEJSZE POTWIERDZONE INFORMACJE/);
+  });
 });
 
 describe("AI.1 responsive and accessibility contracts", () => {
   it("ships 390 px list transformations, 44 px actions, reduced motion and no overflow-prone layout", async () => {
-    const [css, canvas, section, client] = await Promise.all([
-      source("src/index.css"), source("src/components/AIResearchBriefCanvas.tsx"), source("src/components/AIResearchSection.tsx"), source("src/services/aiResearchDataSource.ts"),
+    const [css, canvas, productionCanvas, section, client] = await Promise.all([
+      source("src/index.css"), source("src/components/AIResearchBriefCanvas.tsx"), source("src/components/AIProductionAnalysisCanvas.tsx"), source("src/components/AIResearchSection.tsx"), source("src/services/aiResearchDataSource.ts"),
     ]);
     assert.match(css, /@media \(max-width: 420px\)[\s\S]*\.ai-research-kpis[\s\S]*repeat\(2/);
     assert.match(css, /\.ai-risk-table,[\s\S]*\.ai-risk-row[\s\S]*display: block/);
@@ -201,7 +213,11 @@ describe("AI.1 responsive and accessibility contracts", () => {
     assert.match(canvas, /<ol className="ai-checkpoint-axis">/);
     assert.match(section, /aria-live="polite"/);
     assert.match(section, /loading=\{requesting\}/);
-    assert.doesNotMatch([canvas, section, client].join("\n"), /dangerouslySetInnerHTML|onClick=\{undefined\}|role="button"/);
+    assert.match(productionCanvas, /AI ANALYSIS.*Summary[\s\S]*WHAT THIS MEANS NOW/);
+    assert.match(css, /\.ai-production-header\s*\{\s*grid-template-columns:\s*minmax\(0, 1fr\) minmax\(190px, auto\)/);
+    assert.match(css, /\.ai-production-header[\s\S]*overflow-wrap:\s*normal;[\s\S]*word-break:\s*normal;[\s\S]*hyphens:\s*none/);
+    assert.match(css, /@media \(max-width: 900px\)[\s\S]*\.ai-production-header\s*\{\s*grid-template-columns:\s*minmax\(0, 1fr\)/);
+    assert.doesNotMatch([canvas, productionCanvas, section, client].join("\n"), /dangerouslySetInnerHTML|onClick=\{undefined\}|role="button"/);
   });
 
   it("keeps the schema portable to AI KINTEL storage and billing adapters", async () => {
@@ -494,7 +510,7 @@ function buildSemanticReviewBrief(brief: AIResearchBrief, locale: ProductLocale)
     severity: "high",
     category: "basic_filters",
     title: pl ? "Filtry niespełnione" : "Filters not met",
-    explanation: pl ? "Co najmniej jeden podstawowy warunek produktu nie jest spełniony." : "At least one basic product condition is not met.",
+    explanation: bilingualText("At least one basic product condition is not met.", "Co najmniej jeden podstawowy warunek produktu nie jest spełniony."),
     evidence_reference_ids: ["basic_filters", "security_status", "scanner_snapshot", "follow_up_checkpoints", "established_membership", "methodology"],
   }];
   result.missing_information = [
@@ -503,21 +519,25 @@ function buildSemanticReviewBrief(brief: AIResearchBrief, locale: ProductLocale)
     ["next_checkpoint", pl ? "Brak kolejnego checkpointu" : "Next checkpoint missing", "follow_up_checkpoints"],
     ["fresh_data", pl ? "Brak świeżych danych" : "Fresh data missing", "scanner_snapshot"],
     ["source_verification", pl ? "Brak weryfikacji źródłowej" : "Source verification missing", "scanner_snapshot"],
-  ].map(([key, label, source_reference_id]) => ({ key, label, explanation: pl ? "Opis ogólny." : "Generic description.", source_reference_ids: [source_reference_id] }));
+  ].map(([key, label, source_reference_id]) => ({ key, label, explanation: bilingualText("Generic description.", "Opis ogólny."), source_reference_ids: [source_reference_id] }));
   result.next_actions = [{
-    action_type: "WAIT_FOR_CHECKPOINT", label: pl ? "Poczekaj na świeżą migawkę" : "Wait for a fresh snapshot", priority: "primary", reason: "", target_type: "internal_route", target_reference: "#ai-research-checkpoints",
+    action_type: "WAIT_FOR_CHECKPOINT", label: pl ? "Poczekaj na świeżą migawkę" : "Wait for a fresh snapshot", priority: "primary", reason: bilingualText("Wait for a fresh snapshot before comparing the recorded data.", "Poczekaj na świeżą migawkę przed porównaniem zapisanych danych."), target_type: "internal_route", target_reference: "#ai-research-checkpoints",
   }, {
-    action_type: "OPEN_VERIFICATION", label: pl ? "Otwórz weryfikację źródłową" : "Open source verification", priority: "secondary", reason: "", target_type: "internal_route", target_reference: "#external-checks",
+    action_type: "OPEN_VERIFICATION", label: pl ? "Otwórz weryfikację źródłową" : "Open source verification", priority: "secondary", reason: bilingualText("Verify the listed source after refreshing the snapshot.", "Zweryfikuj wskazane źródło po odświeżeniu migawki."), target_type: "internal_route", target_reference: "#external-checks",
   }, {
-    action_type: "OPEN_DEXSCREENER", label: pl ? "Otwórz DexScreener" : "Open DexScreener", priority: "tertiary", reason: "", target_type: "external_url", target_reference: "https://dexscreener.com/base/0x1111111111111111111111111111111111111111",
+    action_type: "OPEN_DEXSCREENER", label: pl ? "Otwórz DexScreener" : "Open DexScreener", priority: "tertiary", reason: bilingualText("Use the recorded market source as supporting context.", "Użyj zapisanego źródła rynkowego jako kontekstu pomocniczego."), target_type: "external_url", target_reference: "https://dexscreener.com/base/0x1111111111111111111111111111111111111111",
   }, {
-    action_type: "OPEN_EXPLORER", label: pl ? "Otwórz eksplorator" : "Open explorer", priority: "tertiary", reason: "", target_type: "external_url", target_reference: "https://basescan.org/token/0x1111111111111111111111111111111111111111",
+    action_type: "OPEN_EXPLORER", label: pl ? "Otwórz eksplorator" : "Open explorer", priority: "tertiary", reason: bilingualText("Use the recorded network source only for the listed verification step.", "Użyj zapisanego źródła sieciowego wyłącznie do wskazanego kroku weryfikacji."), target_type: "external_url", target_reference: "https://basescan.org/token/0x1111111111111111111111111111111111111111",
   }];
   result.source_references = [
     ["basic_filters", "basic_filters"], ["security_status", "security_status"], ["scanner_snapshot", "scanner_snapshot"],
     ["follow_up_checkpoints", "lifecycle"], ["established_membership", "established_membership"], ["methodology", "methodology"],
   ].map(([id, label]) => ({ id, source_type: sourceType(id), label, observed_at: null, completeness: "complete", url: null }));
   return result;
+}
+
+function bilingualText(en: string, pl: string) {
+  return { en, pl };
 }
 
 function sourceType(id: string): AIResearchBrief["source_references"][number]["source_type"] {

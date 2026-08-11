@@ -1183,8 +1183,8 @@ function cacheIdentity(context: AIResearchContext): AIAnalysisCacheIdentity {
     snapshot_fingerprint: context.snapshot_fingerprint,
     prompt_version: context.prompt_version,
     model_id: "gpt-5-mini",
-    analysis_schema_version: "ai_research_brief_v1",
-    locale: context.locale,
+    analysis_schema_version: "ai_research_brief_v2",
+    locale: "en",
   });
 }
 
@@ -1227,20 +1227,14 @@ function mockProvider(generateJson: (context: AIResearchContext) => Promise<stri
 }
 
 function validNarrative(context: AIResearchContext) {
-  const pl = context.locale === "pl";
   return {
-    narrative_version: "ai_research_narrative_v2",
-    summary: pl
-      ? "Dane wskazują aktualny etap badawczy. Kolejny krok dotyczy wyłącznie dalszej weryfikacji."
-      : "The data identifies the current research stage. The next step concerns further verification only.",
-    fact_narratives: context.fact_candidates.map((fact) => ({
-      id: `fact:${fact.key}`,
-      interpretation: pl ? "Wartość pochodzi z kontekstu produktu." : "The value comes from product context.",
-    })),
-    risk_narratives: context.risk_candidates.map((risk, index) => ({ id: `risk:${index}`, explanation: risk.explanation })),
-    missing_narratives: context.missing_information.map((item) => ({ id: `missing:${item.key}`, explanation: item.explanation })),
-    action_narratives: context.action_catalog.map((action, index) => ({ id: `action:${index}`, reason: action.reason })),
-    status_change_narratives: context.status_change_conditions.map((condition) => ({ id: `condition:${condition.key}`, explanation: condition.explanation })),
+    narrative_version: "ai_research_narrative_v3",
+    summary: { en: "The recorded snapshot gives market context while evidence gaps still need verification.", pl: "Zapisana migawka daje kontekst rynkowy, ale luki w danych nadal wymagają sprawdzenia." },
+    fact_narratives: context.fact_candidates.map((item) => ({ id: `fact:${item.key}`, en: "This recorded fact adds context to the research view.", pl: "Ten zapisany fakt uzupełnia obecną analizę." })),
+    risk_narratives: context.risk_candidates.map((_risk, index) => ({ id: `risk:${index}`, en: "Recorded risk needs review.", pl: "Zapisane ryzyko wymaga sprawdzenia." })),
+    missing_narratives: context.missing_information.map((item) => ({ id: `missing:${item.key}`, en: "This evidence gap limits the current research view.", pl: "Ta luka w danych ogranicza obecną analizę." })),
+    action_narratives: context.action_catalog.map((_action, index) => ({ id: `action:${index}`, en: "Use this permitted research step to verify the evidence.", pl: "Wykorzystaj ten dozwolony krok analizy, aby sprawdzić dane." })),
+    status_change_narratives: context.status_change_conditions.map((condition) => ({ id: `condition:${condition.key}`, en: "This condition would justify revisiting the research view.", pl: "Ten warunek uzasadnia ponowne sprawdzenie analizy." })),
   };
 }
 

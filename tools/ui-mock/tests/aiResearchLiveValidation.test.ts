@@ -94,13 +94,13 @@ function contextOptions() {
 
 function narrative(ctx: Awaited<ReturnType<typeof buildAIResearchContext>>) {
   return {
-    narrative_version: "ai_research_narrative_v2",
-    summary: "Dane wskazują aktualny etap badawczy. Kolejny krok dotyczy wyłącznie dalszej weryfikacji.",
-    fact_narratives: ctx.fact_candidates.map((fact) => ({ id: `fact:${fact.key}`, interpretation: "Wartość pochodzi z kontekstu produktu." })),
-    risk_narratives: ctx.risk_candidates.map((risk, index) => ({ id: `risk:${index}`, explanation: risk.explanation })),
-    missing_narratives: ctx.missing_information.map((item) => ({ id: `missing:${item.key}`, explanation: item.explanation })),
-    action_narratives: ctx.action_catalog.map((action, index) => ({ id: `action:${index}`, reason: action.reason })),
-    status_change_narratives: ctx.status_change_conditions.map((condition) => ({ id: `condition:${condition.key}`, explanation: condition.explanation })),
+    narrative_version: "ai_research_narrative_v3",
+    summary: { en: "The recorded snapshot gives market context while evidence gaps still need verification.", pl: "Zapisana migawka daje kontekst rynkowy, ale luki w danych nadal wymagają sprawdzenia." },
+    fact_narratives: ctx.fact_candidates.map((item) => ({ id: `fact:${item.key}`, en: "This recorded fact adds context to the research view.", pl: "Ten zapisany fakt uzupełnia obecną analizę." })),
+    risk_narratives: ctx.risk_candidates.map((_item, index) => ({ id: `risk:${index}`, en: "This recorded risk needs verification against the listed evidence.", pl: "To zapisane ryzyko wymaga sprawdzenia względem wskazanych danych." })),
+    missing_narratives: ctx.missing_information.map((item) => ({ id: `missing:${item.key}`, en: "This evidence gap limits the current research view.", pl: "Ta luka w danych ogranicza obecną analizę." })),
+    action_narratives: ctx.action_catalog.map((_item, index) => ({ id: `action:${index}`, en: "Use this permitted research step to verify the evidence.", pl: "Wykorzystaj ten dozwolony krok analizy, aby sprawdzić dane." })),
+    status_change_narratives: ctx.status_change_conditions.map((item) => ({ id: `condition:${item.key}`, en: "This condition would justify reviewing the research view.", pl: "Ten warunek uzasadnia ponowne sprawdzenie analizy." })),
   };
 }
 

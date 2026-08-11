@@ -132,7 +132,7 @@ function isReviewMetrics(value: unknown): value is AIResearchReviewMetrics {
     && value.schema_version === "ai_research_review_metrics_v1"
     && typeof value.analysis_id === "string"
     && typeof value.model === "string"
-    && value.prompt_version === "ai_research_prompt_v3"
+    && value.prompt_version === "ai_research_prompt_v4"
     && typeof value.snapshot_fingerprint === "string"
     && typeof value.generated_at === "string"
     && typeof value.data_generated_at === "string"
@@ -147,20 +147,33 @@ function isReviewMetrics(value: unknown): value is AIResearchReviewMetrics {
 
 function isProductionAnalysis(value: unknown): value is AIProductionAnalysis {
   return isRecord(value)
-    && value.schema_version === "ai_production_analysis_v1"
+    && value.schema_version === "ai_production_analysis_v2"
     && typeof value.analysis_summary === "string"
-    && Array.isArray(value.strengths) && value.strengths.every((item) => typeof item === "string")
+    && isInsightArray(value.confirmed_findings)
     && Array.isArray(value.risks) && value.risks.every((item) => isRecord(item)
       && typeof item.title === "string" && typeof item.detail === "string"
       && ["low", "medium", "high", "unknown"].includes(String(item.severity)))
-    && Array.isArray(value.missing_data) && value.missing_data.every((item) => typeof item === "string")
-    && typeof value.market_context === "string" && typeof value.security_context === "string"
-    && typeof value.liquidity_context === "string" && typeof value.holder_context === "string"
-    && Array.isArray(value.watch_items) && value.watch_items.every((item) => typeof item === "string")
+    && isInsightArray(value.missing_data)
+    && isInsight(value.market_context) && isInsight(value.security_context)
+    && isInsight(value.liquidity_context) && isInsight(value.holder_context)
+    && Array.isArray(value.next_research_steps) && value.next_research_steps.every((item) => isResearchStep(item))
+    && isInsightArray(value.reassessment_signals)
     && Array.isArray(value.evidence)
     && typeof value.generated_at === "string" && typeof value.data_snapshot_at === "string"
     && (value.freshness === "FRESH" || value.freshness === "STALE")
     && typeof value.analysis_version === "string";
+}
+
+function isInsight(value: unknown): value is { title: string; detail: string } {
+  return isRecord(value) && typeof value.title === "string" && typeof value.detail === "string";
+}
+
+function isInsightArray(value: unknown): value is Array<{ title: string; detail: string }> {
+  return Array.isArray(value) && value.every(isInsight);
+}
+
+function isResearchStep(value: unknown): boolean {
+  return isInsight(value) && isRecord(value) && ["primary", "secondary", "tertiary"].includes(String((value as Record<string, unknown>).priority));
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

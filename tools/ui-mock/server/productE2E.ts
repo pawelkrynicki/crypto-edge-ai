@@ -616,7 +616,7 @@ export async function runFullProductE2E(options: ProductE2EOptions = {}): Promis
       `/api/v1/ai-analyses/result?chain=${encodeURIComponent(selection!.identity.chain)}&contract_address=${encodeURIComponent(selection!.identity.contract_address)}&locale=pl`,
     ));
     assert(ready.status === 200 && ready.body.status === "READY", "AI_READY_RESULT_MISSING");
-    assert(isRecord(ready.body.analysis) && ready.body.analysis.schema_version === "ai_production_analysis_v1", "AI_BRIEF_SCHEMA_INVALID");
+    assert(isRecord(ready.body.analysis) && ready.body.analysis.schema_version === "ai_production_analysis_v2", "AI_BRIEF_SCHEMA_INVALID");
     assert(!["analysis_id", "cache_key", "queue_status", "provider_mode", "model"].some((key) => Object.hasOwn(ready.body, key)), "AI_READY_RESULT_LEAKED_INTERNALS");
 
     await runStep(steps, "invalid-mock-fails-closed", [analysisId], async () => {
@@ -867,7 +867,7 @@ export function assertReadyAnalysisForProductReport(value: unknown): asserts val
     !isRecord(value)
     || value.status !== "READY"
     || !isRecord(value.analysis)
-    || value.analysis.schema_version !== "ai_production_analysis_v1"
+    || value.analysis.schema_version !== "ai_production_analysis_v2"
   ) {
     throw new ProductE2EError("READY_ANALYSIS_REQUIRED_FOR_REPORT");
   }
@@ -1218,32 +1218,14 @@ function deterministicMockProvider(
 }
 
 async function deterministicNarrative(context: AIResearchContext): Promise<Record<string, unknown>> {
-  const pl = context.locale === "pl";
   return {
-    narrative_version: "ai_research_narrative_v2",
-    summary: pl
-      ? "Dane wyznaczają aktualny etap badawczy. Dalsze działania pozostają wyłącznie ręczną weryfikacją."
-      : "The data identifies the current research stage. Further actions remain manual verification only.",
-    fact_narratives: context.fact_candidates.map((fact) => ({
-      id: `fact:${fact.key}`,
-      interpretation: pl ? "Wartość pochodzi z kontekstu produktu." : "The value comes from product context.",
-    })),
-    risk_narratives: context.risk_candidates.map((_risk, index) => ({
-      id: `risk:${index}`,
-      explanation: pl ? "Zapisane dane wymagają ręcznej weryfikacji." : "Recorded evidence requires manual review.",
-    })),
-    missing_narratives: context.missing_information.map((item) => ({
-      id: `missing:${item.key}`,
-      explanation: pl ? "Dostarczone dane nie obejmują obecnie tego obszaru." : "The supplied evidence does not currently cover this area.",
-    })),
-    action_narratives: context.action_catalog.map((_action, index) => ({
-      id: `action:${index}`,
-      reason: pl ? "Następny krok wynika z zapisanego stanu produktu." : "The next step follows the recorded product state.",
-    })),
-    status_change_narratives: context.status_change_conditions.map((condition) => ({
-      id: `condition:${condition.key}`,
-      explanation: pl ? "Zmiana zapisanych danych może wymagać ponownej oceny." : "A change in recorded evidence may require reassessment.",
-    })),
+    narrative_version: "ai_research_narrative_v3",
+    summary: { en: "The recorded snapshot gives market context while evidence gaps still need verification.", pl: "Zapisana migawka daje kontekst rynkowy, ale luki w danych nadal wymagają sprawdzenia." },
+    fact_narratives: context.fact_candidates.map((item) => ({ id: `fact:${item.key}`, en: "This recorded fact adds context to the research view.", pl: "Ten zapisany fakt uzupełnia obecną analizę." })),
+    risk_narratives: context.risk_candidates.map((_item, index) => ({ id: `risk:${index}`, en: "This recorded risk needs verification against the listed evidence.", pl: "To zapisane ryzyko wymaga sprawdzenia względem wskazanych danych." })),
+    missing_narratives: context.missing_information.map((item) => ({ id: `missing:${item.key}`, en: "This evidence gap limits the current research view.", pl: "Ta luka w danych ogranicza obecną analizę." })),
+    action_narratives: context.action_catalog.map((_item, index) => ({ id: `action:${index}`, en: "Use this permitted research step to verify the evidence.", pl: "Wykorzystaj ten dozwolony krok analizy, aby sprawdzić dane." })),
+    status_change_narratives: context.status_change_conditions.map((item) => ({ id: `condition:${item.key}`, en: "This condition would justify reviewing the research view.", pl: "Ten warunek uzasadnia ponowne sprawdzenie analizy." })),
   };
 }
 

@@ -6,6 +6,7 @@ import {
   AI_RESEARCH_SCHEMA_VERSION,
   AI_RESEARCH_STATES,
   type AIResearchBrief,
+  type AIResearchBilingualText,
   type AIResearchKnownFact,
   type AIResearchNextAction,
   type AIResearchRiskFactor,
@@ -15,13 +16,14 @@ import { getAIResearchCapability, isCapabilitySourceSupported } from "./aiResear
 import { sha256, stableJson, type AIResearchContext } from "./aiResearchContext.js";
 import { AI_RESEARCH_NARRATIVE_VERSION, aiResearchNarrativeId } from "./aiResearchNarrativeContract.js";
 
-const narrativeBindingSchema = (field: string, maxLength: number) => ({
+const narrativeBindingSchema = (maxLength: number) => ({
   type: "object",
   additionalProperties: false,
-  required: ["id", field],
+  required: ["id", "en", "pl"],
   properties: {
     id: { type: "string", maxLength: 120 },
-    [field]: { type: "string", maxLength },
+    en: { type: "string", maxLength },
+    pl: { type: "string", maxLength },
   },
 }) as const;
 
@@ -39,48 +41,53 @@ export const AI_RESEARCH_PROVIDER_JSON_SCHEMA = {
   ],
   properties: {
     narrative_version: { type: "string", enum: [AI_RESEARCH_NARRATIVE_VERSION] },
-    summary: { type: "string", maxLength: 600 },
+    summary: {
+      type: "object",
+      additionalProperties: false,
+      required: ["en", "pl"],
+      properties: { en: { type: "string", maxLength: 600 }, pl: { type: "string", maxLength: 600 } },
+    },
     fact_narratives: {
       type: "array",
       minItems: 3,
       maxItems: 5,
-      items: narrativeBindingSchema("interpretation", 280),
+      items: narrativeBindingSchema(280),
     },
     risk_narratives: {
       type: "array",
       minItems: 1,
       maxItems: 5,
-      items: narrativeBindingSchema("explanation", 360),
+      items: narrativeBindingSchema(360),
     },
     missing_narratives: {
       type: "array",
       maxItems: 5,
-      items: narrativeBindingSchema("explanation", 280),
+      items: narrativeBindingSchema(280),
     },
     action_narratives: {
       type: "array",
       minItems: 1,
       maxItems: 4,
-      items: narrativeBindingSchema("reason", 280),
+      items: narrativeBindingSchema(280),
     },
     status_change_narratives: {
       type: "array",
       maxItems: 3,
-      items: narrativeBindingSchema("explanation", 280),
+      items: narrativeBindingSchema(280),
     },
   },
 } as const;
 
-export type AIResearchNarrativeBinding<Field extends string> = { id: string } & Record<Field, string>;
+export type AIResearchNarrativeBinding = { id: string; en: string; pl: string };
 
 export type AIResearchProviderNarrative = {
   narrative_version: typeof AI_RESEARCH_NARRATIVE_VERSION;
-  summary: string;
-  fact_narratives: Array<AIResearchNarrativeBinding<"interpretation">>;
-  risk_narratives: Array<AIResearchNarrativeBinding<"explanation">>;
-  missing_narratives: Array<AIResearchNarrativeBinding<"explanation">>;
-  action_narratives: Array<AIResearchNarrativeBinding<"reason">>;
-  status_change_narratives: Array<AIResearchNarrativeBinding<"explanation">>;
+  summary: AIResearchBilingualText;
+  fact_narratives: AIResearchNarrativeBinding[];
+  risk_narratives: AIResearchNarrativeBinding[];
+  missing_narratives: AIResearchNarrativeBinding[];
+  action_narratives: AIResearchNarrativeBinding[];
+  status_change_narratives: AIResearchNarrativeBinding[];
 };
 
 export type AIResearchSemanticViolation =
@@ -137,40 +144,35 @@ export function parseAIResearchProviderNarrative(raw: string, context: AIResearc
 
   const result: AIResearchProviderNarrative = {
     narrative_version: AI_RESEARCH_NARRATIVE_VERSION,
-    summary: text(value.summary, 1, 600),
+    summary: bilingualText(value.summary, 1, 600),
     fact_narratives: parseBindings(
       value.fact_narratives,
       context.fact_candidates.map((fact) => aiResearchNarrativeId("fact", fact.key)),
-      "interpretation",
       280,
     ),
     risk_narratives: parseBindings(
       value.risk_narratives,
       context.risk_candidates.map((_risk, index) => aiResearchNarrativeId("risk", index)),
-      "explanation",
       360,
     ),
     missing_narratives: parseBindings(
       value.missing_narratives,
       context.missing_information.map((item) => aiResearchNarrativeId("missing", item.key)),
-      "explanation",
       280,
     ),
     action_narratives: parseBindings(
       value.action_narratives,
       context.action_catalog.map((_action, index) => aiResearchNarrativeId("action", index)),
-      "reason",
       280,
     ),
     status_change_narratives: parseBindings(
       value.status_change_narratives,
       context.status_change_conditions.map((condition) => aiResearchNarrativeId("condition", condition.key)),
-      "explanation",
       280,
     ),
   };
-  const narratives = narrativeStringsFromProvider(result);
-  assertNarrativePolicy(narratives, context.locale, context);
+  assertNarrativePolicy(narrativeStringsFromProvider(result, "en"), "en", context);
+  assertNarrativePolicy(narrativeStringsFromProvider(result, "pl"), "pl", context);
   return result;
 }
 
@@ -242,13 +244,15 @@ export function auditAIResearchSemanticQuality(value: unknown, context: AIResear
       || !sameStringArray(item.source_reference_ids, expected.source_reference_ids);
   })) violations.add("STATUS_CONDITION_MISMATCH");
 
-  const narratives = narrativeStringsFromSemantic(value);
-  if (hasRawEnum(narratives)) violations.add("RAW_ENUM_IN_NARRATIVE");
-  if (hasMachineValue(narratives, context.locale)) violations.add("MACHINE_VALUE_IN_NARRATIVE");
-  if (hasLanguageMismatch(narratives, context.locale)) violations.add("LANGUAGE_MISMATCH");
-  if (hasForbiddenContent(narratives)) violations.add("FORBIDDEN_CONTENT");
-  if (hasGeneratedUrl(narratives)) violations.add("GENERATED_URL");
-  if (hasInventedNumber(narratives, context)) violations.add("INVENTED_NUMBER");
+  for (const locale of ["en", "pl"] as const) {
+    const narratives = narrativeStringsFromSemantic(value, locale);
+    if (hasRawEnum(narratives)) violations.add("RAW_ENUM_IN_NARRATIVE");
+    if (hasMachineValue(narratives, locale)) violations.add("MACHINE_VALUE_IN_NARRATIVE");
+    if (hasLanguageMismatch(narratives, locale)) violations.add("LANGUAGE_MISMATCH");
+    if (hasForbiddenContent(narratives)) violations.add("FORBIDDEN_CONTENT");
+    if (hasGeneratedUrl(narratives)) violations.add("GENERATED_URL");
+    if (hasInventedNumber(narratives, context)) violations.add("INVENTED_NUMBER");
+  }
   return [...violations];
 }
 
@@ -269,14 +273,14 @@ export function validateStoredAIResearchBrief(value: unknown): AIResearchBrief {
   if (!/^air_[0-9a-f-]{36}$/.test(analysisId)) fail();
   if (!isRecord(value.identity) || !hasExactKeys(value.identity, ["chain", "contract_address"])) fail();
   const identity = { chain: text(value.identity.chain, 1, 32), contract_address: text(value.identity.contract_address, 1, 64) };
-  if (value.analysis_language !== "pl" && value.analysis_language !== "en") fail();
+  if (value.analysis_language !== "bilingual") fail();
   if (!isHash(value.snapshot_fingerprint) || !isHash(value.input_hash) || !isHash(value.output_hash)) fail();
   if (!isResearchState(value.research_state)) fail();
   const knownFacts = array(value.known_facts, 3, 5).map((item) => parseStoredFact(item));
   const risks = array(value.risk_factors, 1, 5).map((item) => parseStoredRisk(item));
   const missing = array(value.missing_information, 0, 5).map((item) => {
     if (!isRecord(item) || !hasExactKeys(item, ["key", "label", "explanation", "source_reference_ids"])) fail();
-    return { key: text(item.key, 1, 80), label: text(item.label, 1, 140), explanation: text(item.explanation, 1, 280), source_reference_ids: stringArray(item.source_reference_ids, 1, 4, 80) };
+    return { key: text(item.key, 1, 80), label: text(item.label, 1, 140), explanation: bilingualText(item.explanation, 1, 280), source_reference_ids: stringArray(item.source_reference_ids, 1, 4, 80) };
   });
   const actions = array(value.next_actions, 1, 4).map((item) => {
     if (!isRecord(item) || !hasExactKeys(item, ["action_type", "label", "priority", "reason", "target_type", "target_reference"])) fail();
@@ -286,11 +290,11 @@ export function validateStoredAIResearchBrief(value: unknown): AIResearchBrief {
     const target = text(item.target_reference, 1, 2048);
     if (item.target_type === "external_url" && !isAllowedPublicUrl(target)) fail();
     if (item.target_type === "internal_route" && !target.startsWith("#")) fail();
-    return { action_type: item.action_type, label: text(item.label, 1, 140), priority: item.priority, reason: text(item.reason, 1, 280), target_type: item.target_type, target_reference: target } as AIResearchNextAction;
+    return { action_type: item.action_type, label: text(item.label, 1, 140), priority: item.priority, reason: bilingualText(item.reason, 1, 280), target_type: item.target_type, target_reference: target } as AIResearchNextAction;
   });
   const conditions = array(value.status_change_conditions, 0, 3).map((item) => {
     if (!isRecord(item) || !hasExactKeys(item, ["key", "label", "explanation", "source_reference_ids"])) fail();
-    return { key: text(item.key, 1, 80), label: text(item.label, 1, 140), explanation: text(item.explanation, 1, 280), source_reference_ids: stringArray(item.source_reference_ids, 1, 4, 80) };
+    return { key: text(item.key, 1, 80), label: text(item.label, 1, 140), explanation: bilingualText(item.explanation, 1, 280), source_reference_ids: stringArray(item.source_reference_ids, 1, 4, 80) };
   });
   const sources = array(value.source_references, 1, 16).map((item) => {
     if (!isRecord(item) || !hasExactKeys(item, ["id", "source_type", "label", "observed_at", "completeness", "url"])) fail();
@@ -341,7 +345,7 @@ export function validateStoredAIResearchBrief(value: unknown): AIResearchBrief {
     generated_at: utc(value.generated_at),
     data_generated_at: utc(value.data_generated_at),
     research_state: value.research_state,
-    summary: text(value.summary, 1, 600),
+    summary: bilingualText(value.summary, 1, 600),
     known_facts: knownFacts,
     risk_factors: risks,
     missing_information: missing,
@@ -357,23 +361,22 @@ export function validateStoredAIResearchBrief(value: unknown): AIResearchBrief {
   };
   const expectedOutputHash = sha256(stableJson({ ...result, output_hash: "0".repeat(64) }));
   if (result.output_hash !== expectedOutputHash) fail();
-  const narratives = narrativeStringsFromSemantic(result);
-  assertNarrativePolicy(narratives, result.analysis_language);
+  assertNarrativePolicy(narrativeStringsFromSemantic(result, "en"), "en");
+  assertNarrativePolicy(narrativeStringsFromSemantic(result, "pl"), "pl");
   return result;
 }
 
-function parseBindings<Field extends "interpretation" | "explanation" | "reason">(
+function parseBindings(
   value: unknown,
   expectedIds: string[],
-  field: Field,
   maxLength: number,
-): Array<AIResearchNarrativeBinding<Field>> {
+): AIResearchNarrativeBinding[] {
   const items = array(value, expectedIds.length, expectedIds.length);
   return items.map((item, index) => {
-    if (!isRecord(item) || !hasExactKeys(item, ["id", field])) fail();
+    if (!isRecord(item) || !hasExactKeys(item, ["id", "en", "pl"])) fail();
     const id = text(item.id, 1, 120);
     if (id !== expectedIds[index]) throw new AIResearchValidationError("SKELETON_MISMATCH");
-    return { id, [field]: text(item[field], 1, maxLength) } as AIResearchNarrativeBinding<Field>;
+    return { id, en: text(item.en, 1, maxLength), pl: text(item.pl, 1, maxLength) };
   });
 }
 
@@ -383,41 +386,41 @@ function parseStoredFact(value: unknown): AIResearchKnownFact {
   if (primitive !== null && typeof primitive !== "string" && typeof primitive !== "number" && typeof primitive !== "boolean") fail();
   if (typeof primitive === "string" && primitive.length > 200) fail();
   if (typeof primitive === "number" && !Number.isFinite(primitive)) fail();
-  return { key: text(value.key, 1, 80), label: text(value.label, 1, 140), value: primitive, interpretation: text(value.interpretation, 1, 280), source_reference_ids: stringArray(value.source_reference_ids, 1, 4, 80) };
+  return { key: text(value.key, 1, 80), label: text(value.label, 1, 140), value: primitive, interpretation: bilingualText(value.interpretation, 1, 280), source_reference_ids: stringArray(value.source_reference_ids, 1, 4, 80) };
 }
 
 function parseStoredRisk(value: unknown): AIResearchRiskFactor {
   if (!isRecord(value) || !hasExactKeys(value, ["severity", "category", "title", "explanation", "evidence_reference_ids"])) fail();
   if (!AI_RESEARCH_RISK_SEVERITIES.includes(value.severity as never)) fail();
-  return { severity: value.severity, category: text(value.category, 1, 80), title: text(value.title, 1, 140), explanation: text(value.explanation, 1, 360), evidence_reference_ids: stringArray(value.evidence_reference_ids, 1, 4, 80) } as AIResearchRiskFactor;
+  return { severity: value.severity, category: text(value.category, 1, 80), title: text(value.title, 1, 140), explanation: bilingualText(value.explanation, 1, 360), evidence_reference_ids: stringArray(value.evidence_reference_ids, 1, 4, 80) } as AIResearchRiskFactor;
 }
 
-function narrativeStringsFromProvider(value: AIResearchProviderNarrative): string[] {
+function narrativeStringsFromProvider(value: AIResearchProviderNarrative, locale: "pl" | "en"): string[] {
   return [
-    value.summary,
-    ...value.fact_narratives.map(({ interpretation }) => interpretation),
-    ...value.risk_narratives.map(({ explanation }) => explanation),
-    ...value.missing_narratives.map(({ explanation }) => explanation),
-    ...value.action_narratives.map(({ reason }) => reason),
-    ...value.status_change_narratives.map(({ explanation }) => explanation),
+    value.summary[locale],
+    ...value.fact_narratives.map((item) => item[locale]),
+    ...value.risk_narratives.map((item) => item[locale]),
+    ...value.missing_narratives.map((item) => item[locale]),
+    ...value.action_narratives.map((item) => item[locale]),
+    ...value.status_change_narratives.map((item) => item[locale]),
   ];
 }
 
-function narrativeStringsFromSemantic(value: Record<string, unknown> | AIResearchBrief): string[] {
+function narrativeStringsFromSemantic(value: Record<string, unknown> | AIResearchBrief, locale: "pl" | "en"): string[] {
   const result: string[] = [];
-  if (typeof value.summary === "string") result.push(value.summary);
+  if (isBilingualText(value.summary)) result.push(value.summary[locale]);
   for (const [field, narrativeKeys] of [
-    ["known_facts", ["label", "interpretation"]],
-    ["risk_factors", ["title", "explanation"]],
-    ["missing_information", ["label", "explanation"]],
-    ["next_actions", ["label", "reason"]],
-    ["status_change_conditions", ["label", "explanation"]],
+    ["known_facts", ["interpretation"]],
+    ["risk_factors", ["explanation"]],
+    ["missing_information", ["explanation"]],
+    ["next_actions", ["reason"]],
+    ["status_change_conditions", ["explanation"]],
   ] as const) {
     const items = value[field];
     if (!Array.isArray(items)) continue;
     for (const item of items) {
       if (!isRecord(item)) continue;
-      for (const key of narrativeKeys) if (typeof item[key] === "string") result.push(item[key]);
+      for (const key of narrativeKeys) if (isBilingualText(item[key])) result.push(item[key][locale]);
     }
   }
   return result;
@@ -454,13 +457,13 @@ function hasRawEnum(strings: string[]): boolean {
 function hasMachineValue(strings: string[], locale: "pl" | "en"): boolean {
   const content = strings.join("\n");
   if (/\b[a-z]+(?:_[a-z0-9]+)+\b/u.test(content)) return true;
-  return locale === "pl" && /\b(?:new|follow[ -]?up|candidate|lifecycle|security|holders?|holderów)\b/iu.test(content);
+  return locale === "pl" && /\b(?:new|follow[ -]?up|candidate|lifecycle|security)\b/iu.test(content);
 }
 
 function hasLanguageMismatch(strings: string[], locale: "pl" | "en"): boolean {
   const content = strings.join("\n");
-  if (locale === "en") return /[ąćęłńóśźż]/iu.test(content);
-  return /\b(?:lifecycle|security|holders?|the\s+data|the\s+product|filters?\s+(?:are|is)|wait\s+for)\b/iu.test(content);
+  if (locale === "en") return /[\u0105\u0107\u0119\u0142\u0144\u00f3\u015b\u017a\u017c]/u.test(content);
+  return /\b(?:lifecycle|security|the\s+data|the\s+product|filters?\s+(?:are|is)|wait\s+for)\b/iu.test(content);
 }
 
 function hasInventedNumber(strings: string[], context: AIResearchContext): boolean {
@@ -489,8 +492,24 @@ function isResearchState(value: unknown): value is AIResearchState {
 }
 
 function text(value: unknown, min: number, max: number): string {
-  if (typeof value !== "string" || value.length < min || value.length > max || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value)) fail();
+  if (typeof value !== "string" || value.length < min || value.length > max || hasControlCharacter(value)) fail();
   return value;
+}
+
+function hasControlCharacter(value: string): boolean {
+  return [...value].some((character) => {
+    const code = character.codePointAt(0) ?? 0;
+    return code <= 8 || code === 11 || code === 12 || (code >= 14 && code <= 31) || code === 127;
+  });
+}
+
+function bilingualText(value: unknown, min: number, max: number): AIResearchBilingualText {
+  if (!isRecord(value) || !hasExactKeys(value, ["en", "pl"])) fail();
+  return { en: text(value.en, min, max), pl: text(value.pl, min, max) };
+}
+
+function isBilingualText(value: unknown): value is AIResearchBilingualText {
+  return isRecord(value) && typeof value.en === "string" && typeof value.pl === "string";
 }
 
 function stringArray(value: unknown, min: number, max: number, maxLength: number): string[] {

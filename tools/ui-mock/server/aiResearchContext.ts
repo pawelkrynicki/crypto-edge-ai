@@ -38,6 +38,10 @@ export type AIResearchContextOptions = {
 };
 
 export type AIResearchFactCandidate = Omit<AIResearchKnownFact, "interpretation">;
+export type AIResearchRiskCandidate = Omit<AIResearchRiskFactor, "explanation">;
+export type AIResearchMissingCandidate = Omit<AIResearchMissingInformation, "explanation">;
+export type AIResearchActionCandidate = Omit<AIResearchNextAction, "reason">;
+export type AIResearchStatusConditionCandidate = Omit<AIResearchStatusChangeCondition, "explanation">;
 
 export type AIResearchContext = {
   identity: { chain: string; contract_address: string };
@@ -50,10 +54,10 @@ export type AIResearchContext = {
   research_state: AIResearchState;
   lifecycle: TokenLifecycleViewModel;
   fact_candidates: AIResearchFactCandidate[];
-  risk_candidates: AIResearchRiskFactor[];
-  missing_information: AIResearchMissingInformation[];
-  action_catalog: AIResearchNextAction[];
-  status_change_conditions: AIResearchStatusChangeCondition[];
+  risk_candidates: AIResearchRiskCandidate[];
+  missing_information: AIResearchMissingCandidate[];
+  action_catalog: AIResearchActionCandidate[];
+  status_change_conditions: AIResearchStatusConditionCandidate[];
   source_references: AIResearchSourceReference[];
   coverage: AIResearchCoverageItem[];
   checkpoints: TokenLifecycleViewModel["checkpoints"];
@@ -355,14 +359,13 @@ function buildRisks(
   followUp: FollowUpPublicEntry | null,
   freshness: string,
   locale: AIResearchLocale,
-): AIResearchRiskFactor[] {
+): AIResearchRiskCandidate[] {
   const pl = locale === "pl";
-  const risks: AIResearchRiskFactor[] = [];
-  const add = (severity: AIResearchRiskFactor["severity"], category: string, titlePl: string, titleEn: string, detailPl: string, detailEn: string, refs: string[]) => risks.push({
+  const risks: AIResearchRiskCandidate[] = [];
+  const add = (severity: AIResearchRiskCandidate["severity"], category: string, titlePl: string, titleEn: string, _detailPl: string, _detailEn: string, refs: string[]) => risks.push({
     severity,
     category,
     title: pl ? titlePl : titleEn,
-    explanation: pl ? detailPl : detailEn,
     evidence_reference_ids: refs,
   });
   const filterStatus = candidate?.basicFilterStatus ?? followUp?.filter_status;
@@ -384,18 +387,15 @@ function buildMissing(
   freshness: string,
   sources: AIResearchSourceReference[],
   locale: AIResearchLocale,
-): AIResearchMissingInformation[] {
+): AIResearchMissingCandidate[] {
   const pl = locale === "pl";
-  const generic = pl
-    ? "Produkt nie posiada danych pozwalających ocenić ten obszar."
-    : "The product has no data that can assess this area.";
-  const items: AIResearchMissingInformation[] = [];
+  const items: AIResearchMissingCandidate[] = [];
   const add = (key: string, plLabel: string, enLabel: string) => {
     const capability = getAIResearchCapability(key);
     if (!capability) return;
     const refs = capability.source_reference_ids.filter((id) => sources.some((source) => source.id === id));
     if (refs.length !== capability.source_reference_ids.length) return;
-    items.push({ key, label: pl ? plLabel : enLabel, explanation: generic, source_reference_ids: [...refs] });
+    items.push({ key, label: pl ? plLabel : enLabel, source_reference_ids: [...refs] });
   };
   if (resolveSecurityCoverage(candidate, followUp) === "unavailable") add("security", "Brak danych bezpieczeństwa", "Security data missing");
   if (!followUp || followUp.completed_checkpoints.length < 2) add("history", "Brak wystarczającej historii", "Insufficient history");
@@ -408,7 +408,7 @@ function buildMissing(
 function buildCoverage(
   candidate: UiTokenCandidate | null,
   followUp: FollowUpPublicEntry | null,
-  missing: AIResearchMissingInformation[],
+  missing: AIResearchMissingCandidate[],
   locale: AIResearchLocale,
 ): AIResearchCoverageItem[] {
   const pl = locale === "pl";
@@ -442,14 +442,13 @@ export function resolveAIResearchActions(
   freshness: string,
   sources: AIResearchSourceReference[],
   locale: AIResearchLocale,
-): AIResearchNextAction[] {
+): AIResearchActionCandidate[] {
   const pl = locale === "pl";
-  const result: AIResearchNextAction[] = [];
-  const add = (action_type: AIResearchActionType, labelPl: string, labelEn: string, priority: AIResearchNextAction["priority"], reasonPl: string, reasonEn: string, target_type: AIResearchNextAction["target_type"], target_reference: string) => result.push({
+  const result: AIResearchActionCandidate[] = [];
+  const add = (action_type: AIResearchActionType, labelPl: string, labelEn: string, priority: AIResearchActionCandidate["priority"], _reasonPl: string, _reasonEn: string, target_type: AIResearchActionCandidate["target_type"], target_reference: string) => result.push({
     action_type,
     label: pl ? labelPl : labelEn,
     priority,
-    reason: pl ? reasonPl : reasonEn,
     target_type,
     target_reference,
   });
@@ -477,10 +476,10 @@ function buildStatusConditions(
   lifecycle: TokenLifecycleViewModel,
   freshness: string,
   locale: AIResearchLocale,
-): AIResearchStatusChangeCondition[] {
+): AIResearchStatusConditionCandidate[] {
   const pl = locale === "pl";
-  const items: AIResearchStatusChangeCondition[] = [];
-  const add = (key: string, labelPl: string, labelEn: string, detailPl: string, detailEn: string, refs: string[]) => items.push({ key, label: pl ? labelPl : labelEn, explanation: pl ? detailPl : detailEn, source_reference_ids: refs });
+  const items: AIResearchStatusConditionCandidate[] = [];
+  const add = (key: string, labelPl: string, labelEn: string, _detailPl: string, _detailEn: string, refs: string[]) => items.push({ key, label: pl ? labelPl : labelEn, source_reference_ids: refs });
   if (lifecycle.next_checkpoint_at) add("next_checkpoint", "Pojawienie się następnego punktu kontrolnego", "Next checkpoint becomes available", "Nowy punkt kontrolny pozwoli ponownie ocenić dane, ale nie gwarantuje zmiany etapu.", "A new checkpoint enables reassessment but does not guarantee a stage change.", ["follow_up_checkpoints"]);
   if ((candidate?.basicFilterStatus ?? followUp?.filter_status) !== "passed_basic_filter") add("filter_thresholds", "Spełnienie progów filtrów", "Filter thresholds are met", "Zmiana metryk może zmienić wynik filtrów; nie oznacza automatycznej promocji.", "Metric changes may alter filter results; they do not mean automatic promotion.", ["basic_filters"]);
   if (freshness !== "FRESH") add("fresh_snapshot", "Dostępność świeżych danych", "Fresh data becomes available", "Świeża migawka może zmienić ocenę braków i ryzyk.", "A fresh snapshot may change the assessment of gaps and risks.", ["scanner_snapshot"]);

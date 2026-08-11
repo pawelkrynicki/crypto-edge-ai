@@ -24,17 +24,27 @@ export type AIProductionRisk = {
   severity: "low" | "medium" | "high" | "unknown";
 };
 
+export type AIProductionInsight = {
+  title: string;
+  detail: string;
+};
+
+export type AIProductionResearchStep = AIProductionInsight & {
+  priority: "primary" | "secondary" | "tertiary";
+};
+
 export type AIProductionAnalysis = {
-  schema_version: "ai_production_analysis_v1";
+  schema_version: "ai_production_analysis_v2";
   analysis_summary: string;
-  strengths: string[];
+  confirmed_findings: AIProductionInsight[];
   risks: AIProductionRisk[];
-  missing_data: string[];
-  market_context: string;
-  security_context: string;
-  liquidity_context: string;
-  holder_context: string;
-  watch_items: string[];
+  missing_data: AIProductionInsight[];
+  market_context: AIProductionInsight;
+  security_context: AIProductionInsight;
+  liquidity_context: AIProductionInsight;
+  holder_context: AIProductionInsight;
+  next_research_steps: AIProductionResearchStep[];
+  reassessment_signals: AIProductionInsight[];
   evidence: AIProductionEvidence[];
   generated_at: string;
   data_snapshot_at: string;

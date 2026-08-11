@@ -66,6 +66,37 @@ describe("PC.2 shared production AI path", () => {
     await assertLocaleOrder("en", "pl", "locale-order-en-pl.sqlite");
   });
 
+  it("surfaces a unique evidence-bound provider narrative in the CAMP public result", async () => {
+    await writeFixture(100_000);
+    const store = await createAIAnalysisQueueStore({ databaseFilePath: resolve(root, "provider-narrative.sqlite") });
+    const service = createService(store);
+    await service.generate(request(), "camp-user");
+    const worker = createAIResearchWorker({
+      ...contextOptions(), store, now: () => NOW,
+      provider: provider(async (context) => {
+        const result = narrative(context);
+        result.summary = {
+          en: "Unique provider interpretation explains why the recorded liquidity context still needs security verification.",
+          pl: "Unikalna interpretacja dostawcy wyjaśnia, dlaczego zapisany kontekst płynności nadal wymaga weryfikacji bezpieczeństwa.",
+        };
+        result.status_change_narratives[0] = {
+          ...result.status_change_narratives[0]!,
+          en: "Unique provider reassessment signal identifies the recorded condition that should trigger another review.",
+          pl: "Unikalny sygnał dostawcy wskazuje zapisany warunek, po którym warto wrócić do analizy.",
+        };
+        return JSON.stringify(result);
+      }),
+    });
+    await worker.runCycle();
+    const pl = presentAIProductionLookup(await service.getBrief("base", ADDRESS, "pl"), "pl");
+    const en = presentAIProductionLookup(await service.getBrief("base", ADDRESS, "en"), "en");
+    assert.match(en.analysis?.analysis_summary ?? "", /Unique provider interpretation/);
+    assert.match(pl.analysis?.analysis_summary ?? "", /Unikalna interpretacja dostawcy/);
+    assert.match(en.analysis?.reassessment_signals[0]?.detail ?? "", /Unique provider reassessment signal/);
+    assert.match(pl.analysis?.reassessment_signals[0]?.detail ?? "", /Unikalny sygnał dostawcy/);
+    store.close();
+  });
+
   it("keeps last-known-good visible through stale refresh success and failure", async () => {
     await writeFixture(100_000);
     const store = await createAIAnalysisQueueStore({ databaseFilePath: resolve(root, "lkg.sqlite") });
@@ -182,8 +213,8 @@ describe("PC.2 shared production AI path", () => {
     assert.equal(publicValue.status, "READY");
     assert.ok(publicValue.analysis);
     assert.deepEqual(Object.keys(publicValue.analysis!).sort(), [
-      "analysis_summary", "analysis_version", "data_snapshot_at", "evidence", "freshness", "generated_at", "holder_context",
-      "liquidity_context", "market_context", "missing_data", "risks", "schema_version", "security_context", "strengths", "watch_items",
+      "analysis_summary", "analysis_version", "confirmed_findings", "data_snapshot_at", "evidence", "freshness", "generated_at", "holder_context",
+      "liquidity_context", "market_context", "missing_data", "next_research_steps", "reassessment_signals", "risks", "schema_version", "security_context",
     ]);
     assert.doesNotMatch(JSON.stringify(publicValue), /openai|gpt-|analysis_id|cache_key|queue_status|token_usage|sqlite/i);
     assert.equal(CANDIDATE_DETAIL_TAB_IDS.length, 7);
@@ -257,8 +288,8 @@ async function assertLocaleOrder(firstLocale: "pl" | "en", secondLocale: "pl" | 
   assert.equal(en.status, "READY");
   assert.ok(pl.analysis);
   assert.ok(en.analysis);
-  assert.match(pl.analysis.analysis_summary, /^Analiza porządkuje/);
-  assert.match(en.analysis.analysis_summary, /^The analysis organizes/);
+  assert.match(pl.analysis.analysis_summary, /^Zapisana migawka/);
+  assert.match(en.analysis.analysis_summary, /^The recorded snapshot/);
   assert.deepEqual(pl.analysis.risks.map((item) => item.severity), en.analysis.risks.map((item) => item.severity));
   assert.deepEqual(pl.analysis.evidence.map((item) => item.completeness), en.analysis.evidence.map((item) => item.completeness));
   assert.equal(pl.analysis.missing_data.length, en.analysis.missing_data.length);
@@ -269,7 +300,7 @@ async function assertLocaleOrder(firstLocale: "pl" | "en", secondLocale: "pl" | 
 function cacheIdentity(context: AIResearchContext) {
   return buildAIAnalysisCacheIdentity({
     ...context.identity, snapshot_fingerprint: context.snapshot_fingerprint, prompt_version: context.prompt_version,
-    model_id: "gpt-5-mini", analysis_schema_version: "ai_research_brief_v1", locale: context.locale,
+    model_id: "gpt-5-mini", analysis_schema_version: "ai_research_brief_v2", locale: context.locale,
   });
 }
 
@@ -283,15 +314,14 @@ function provider(generate: (context: AIResearchContext) => Promise<string>): AI
 }
 
 function narrative(context: AIResearchContext) {
-  const pl = context.locale === "pl";
   return {
-    narrative_version: "ai_research_narrative_v2",
-    summary: pl ? "Analiza porządkuje przekazane dane i wskazuje obszary dalszej weryfikacji." : "The analysis organizes supplied data and identifies further verification areas.",
-    fact_narratives: context.fact_candidates.map((item) => ({ id: `fact:${item.key}`, interpretation: pl ? "Wartość pochodzi z przekazanych danych." : "The value comes from supplied data." })),
-    risk_narratives: context.risk_candidates.map((item, index) => ({ id: `risk:${index}`, explanation: item.explanation })),
-    missing_narratives: context.missing_information.map((item) => ({ id: `missing:${item.key}`, explanation: item.explanation })),
-    action_narratives: context.action_catalog.map((item, index) => ({ id: `action:${index}`, reason: item.reason })),
-    status_change_narratives: context.status_change_conditions.map((item) => ({ id: `condition:${item.key}`, explanation: item.explanation })),
+    narrative_version: "ai_research_narrative_v3",
+    summary: { en: "The recorded snapshot gives market context while evidence gaps still need verification.", pl: "Zapisana migawka daje kontekst rynkowy, ale luki w danych nadal wymagają sprawdzenia." },
+    fact_narratives: context.fact_candidates.map((item) => ({ id: `fact:${item.key}`, en: "This recorded fact adds context to the research view.", pl: "Ten zapisany fakt uzupełnia obecną analizę." })),
+    risk_narratives: context.risk_candidates.map((_item, index) => ({ id: `risk:${index}`, en: "This recorded risk needs verification against the listed evidence.", pl: "To zapisane ryzyko wymaga sprawdzenia względem wskazanych danych." })),
+    missing_narratives: context.missing_information.map((item) => ({ id: `missing:${item.key}`, en: "This evidence gap limits the current research view.", pl: "Ta luka w danych ogranicza obecną analizę." })),
+    action_narratives: context.action_catalog.map((_item, index) => ({ id: `action:${index}`, en: "Use this permitted research step to verify the evidence.", pl: "Wykorzystaj ten dozwolony krok analizy, aby sprawdzić dane." })),
+    status_change_narratives: context.status_change_conditions.map((item) => ({ id: `condition:${item.key}`, en: "This condition would justify reviewing the research view.", pl: "Ten warunek uzasadnia ponowne sprawdzenie analizy." })),
   };
 }
 

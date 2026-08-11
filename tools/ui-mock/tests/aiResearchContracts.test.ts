@@ -66,23 +66,23 @@ describe("AI Research canonical identity, fingerprint and input boundary", () =>
     const base = cacheIdentity(ADDRESS, "a".repeat(64));
     assert.notEqual(cacheIdentity(OTHER_ADDRESS, "a".repeat(64)).cache_key, base.cache_key);
     assert.notEqual(cacheIdentity(ADDRESS, "b".repeat(64)).cache_key, base.cache_key);
-    assert.notEqual(cacheIdentity(ADDRESS, "a".repeat(64), { prompt_version: "ai_research_prompt_v4" }).cache_key, base.cache_key);
+    assert.notEqual(cacheIdentity(ADDRESS, "a".repeat(64), { prompt_version: "ai_research_prompt_v3" }).cache_key, base.cache_key);
     assert.notEqual(cacheIdentity(ADDRESS, "a".repeat(64), { model_id: "different-model" }).cache_key, base.cache_key);
-    assert.notEqual(cacheIdentity(ADDRESS, "a".repeat(64), { analysis_schema_version: "ai_research_brief_v2" }).cache_key, base.cache_key);
+    assert.notEqual(cacheIdentity(ADDRESS, "a".repeat(64), { analysis_schema_version: "ai_research_brief_v1" }).cache_key, base.cache_key);
   });
 });
 
-describe("AI Research v1 brief and v3 prompt contract", () => {
+describe("AI Research v2 brief and v4 bilingual prompt contract", () => {
   it("accepts bounded narrative only and rejects skeleton changes, invented facts and unsafe advice", async () => {
     const value = await context("base", ADDRESS, "pl");
     const valid = narrative(value);
-    assert.equal(parseAIResearchProviderNarrative(JSON.stringify(valid), value).narrative_version, "ai_research_narrative_v2");
+    assert.equal(parseAIResearchProviderNarrative(JSON.stringify(valid), value).narrative_version, "ai_research_narrative_v3");
     assert.throws(() => parseAIResearchProviderNarrative("not-json", value), (error) => error instanceof AIResearchValidationError && error.code === "INVALID_JSON");
     const advice = structuredClone(valid);
-    advice.summary = "Kup token teraz.";
+    advice.summary.pl = "Kup token teraz.";
     assert.throws(() => parseAIResearchProviderNarrative(JSON.stringify(advice), value), /FORBIDDEN_CONTENT/);
     const invented = structuredClone(valid);
-    invented.summary = "Wartość 999999 wymaga weryfikacji.";
+    invented.summary.pl = "Wartość 999999 wymaga weryfikacji.";
     assert.throws(() => parseAIResearchProviderNarrative(JSON.stringify(invented), value), /UNKNOWN_FACT/);
     const reordered = structuredClone(valid);
     reordered.action_narratives.reverse();
@@ -92,8 +92,8 @@ describe("AI Research v1 brief and v3 prompt contract", () => {
   it("keeps lifecycle, risk severity and owner decisions deterministic", async () => {
     const value = await context("base", ADDRESS, "pl");
     const brief = buildDeterministicPreview(value, NOW);
-    assert.equal(brief.schema_version, "ai_research_brief_v1");
-    assert.equal(brief.prompt_version, "ai_research_prompt_v3");
+    assert.equal(brief.schema_version, "ai_research_brief_v2");
+    assert.equal(brief.prompt_version, "ai_research_prompt_v4");
     assert.equal(brief.research_state, value.research_state);
     assert.deepEqual(brief.risk_factors.map(({ severity }) => severity), value.risk_candidates.map(({ severity }) => severity));
     assert.equal(brief.next_actions.some(({ action_type }) => action_type === "OWNER_REVIEW"), value.action_catalog.some(({ action_type }) => action_type === "OWNER_REVIEW"));
@@ -124,9 +124,9 @@ function cacheIdentity(
     chain: "base",
     contract_address: address,
     snapshot_fingerprint: fingerprint,
-    prompt_version: overrides.prompt_version ?? "ai_research_prompt_v3",
+    prompt_version: overrides.prompt_version ?? "ai_research_prompt_v4",
     model_id: overrides.model_id ?? "gpt-5-mini",
-    analysis_schema_version: overrides.analysis_schema_version ?? "ai_research_brief_v1",
+    analysis_schema_version: overrides.analysis_schema_version ?? "ai_research_brief_v2",
     locale: "pl",
   });
 }
@@ -144,17 +144,14 @@ function contextOptions() {
 }
 
 function narrative(ctx: AIResearchContext) {
-  const pl = ctx.locale === "pl";
   return {
-    narrative_version: "ai_research_narrative_v2" as const,
-    summary: pl
-      ? "Dane wskazują aktualny etap badawczy. Kolejny krok dotyczy wyłącznie dalszej weryfikacji."
-      : "The data identifies the current research stage. The next step concerns further verification only.",
-    fact_narratives: ctx.fact_candidates.map((fact) => ({ id: `fact:${fact.key}`, interpretation: pl ? "Wartość pochodzi z kontekstu produktu." : "The value comes from product context." })),
-    risk_narratives: ctx.risk_candidates.map((risk, index) => ({ id: `risk:${index}`, explanation: risk.explanation })),
-    missing_narratives: ctx.missing_information.map((item) => ({ id: `missing:${item.key}`, explanation: item.explanation })),
-    action_narratives: ctx.action_catalog.map((action, index) => ({ id: `action:${index}`, reason: action.reason })),
-    status_change_narratives: ctx.status_change_conditions.map((condition) => ({ id: `condition:${condition.key}`, explanation: condition.explanation })),
+    narrative_version: "ai_research_narrative_v3" as const,
+    summary: { en: "Recorded evidence identifies the current research focus and the next verification step.", pl: "Zapisane dane wskazują obecny cel analizy i kolejny krok weryfikacji." },
+    fact_narratives: ctx.fact_candidates.map((fact) => ({ id: `fact:${fact.key}`, en: "This recorded fact adds context to the research view.", pl: "Ten zapisany fakt uzupełnia obecną analizę." })),
+    risk_narratives: ctx.risk_candidates.map((_risk, index) => ({ id: `risk:${index}`, en: "This recorded risk needs verification against the listed evidence.", pl: "To zapisane ryzyko wymaga sprawdzenia względem wskazanych danych." })),
+    missing_narratives: ctx.missing_information.map((item) => ({ id: `missing:${item.key}`, en: "This evidence gap limits the current research view.", pl: "Ta luka w danych ogranicza obecną analizę." })),
+    action_narratives: ctx.action_catalog.map((_action, index) => ({ id: `action:${index}`, en: "Use this permitted research step to verify the evidence.", pl: "Wykorzystaj ten dozwolony krok analizy, aby sprawdzić dane." })),
+    status_change_narratives: ctx.status_change_conditions.map((condition) => ({ id: `condition:${condition.key}`, en: "This condition would justify reviewing the research view.", pl: "Ten warunek uzasadnia ponowne sprawdzenie analizy." })),
   };
 }
 
