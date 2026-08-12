@@ -11,12 +11,12 @@ export function AIProductionAnalysisCanvas({ analysis }: { analysis: AIProductio
   const pl = locale === "pl";
   const headings = pl ? {
     eyebrow: "ANALIZA AI", title: "Podsumowanie", summary: "CO Z TEGO WYNIKA TERAZ", findings: "NAJWAŻNIEJSZE POTWIERDZONE INFORMACJE", risks: "RYZYKA", missing: "NAJWAŻNIEJSZE BRAKI W DANYCH",
-    context: "KONTEKST DANYCH", next: "NASTĘPNE KROKI RESEARCHU", reassessment: "KIEDY WARTO WRÓCIĆ DO ANALIZY", evidence: "ŹRÓDŁA I DOWODY", market: "Rynek", security: "Bezpieczeństwo", liquidity: "Płynność", holders: "Holderzy",
+    context: "KONTEKST DANYCH", next: "NASTĘPNE KROKI RESEARCHU", futureNext: "JEŚLI TOKEN PRZEJDZIE KROK 1", futureNextSupport: "Po spełnieniu podstawowych filtrów kolejnym etapem będzie weryfikacja bezpieczeństwa.", futureNextPreview: "PODGLĄD KOLEJNEGO ETAPU", reassessment: "KIEDY WARTO WRÓCIĆ DO ANALIZY", evidence: "ŹRÓDŁA I DOWODY", market: "Rynek", security: "Bezpieczeństwo", liquidity: "Płynność", holders: "Holderzy",
     generated: "Przygotowano", snapshot: "Migawka danych", fresh: "Świeża", stale: "Wymaga odświeżenia", empty: "Brak dodatkowych danych w tej migawce.", boundary: "Analiza opiera się wyłącznie na zapisanych danych i służy do researchu, nie stanowi rekomendacji inwestycyjnej.",
     guidance: "ETAP RESEARCHU", posture: "STAN RESEARCHU", blockers: "CO BLOKUJE DALSZY RESEARCH", actions: "CO ZROBIĆ TERAZ", unlocks: "CO ODBLOKUJE KOLEJNY ETAP", why: "Dlaczego", resolves: "Co to rozstrzygnie", filterFailures: "DOKŁADNE WYNIKI FILTRÓW", details: "SZCZEGÓŁY ANALIZY",
   } : {
     eyebrow: "AI ANALYSIS", title: "Summary", summary: "WHAT THIS MEANS NOW", findings: "KEY CONFIRMED FINDINGS", risks: "RISKS", missing: "HIGHEST-IMPACT DATA GAPS",
-    context: "DATA CONTEXT", next: "NEXT RESEARCH STEPS", reassessment: "WHEN TO REVISIT THE ANALYSIS", evidence: "SOURCES AND EVIDENCE", market: "Market", security: "Security", liquidity: "Liquidity", holders: "Holders",
+    context: "DATA CONTEXT", next: "NEXT RESEARCH STEPS", futureNext: "IF THE TOKEN PASSES STEP 1", futureNextSupport: "After the basic filters are met, the next stage will be security verification.", futureNextPreview: "NEXT-STAGE PREVIEW", reassessment: "WHEN TO REVISIT THE ANALYSIS", evidence: "SOURCES AND EVIDENCE", market: "Market", security: "Security", liquidity: "Liquidity", holders: "Holders",
     generated: "Generated", snapshot: "Data snapshot", fresh: "Fresh", stale: "Refreshing", empty: "No additional data in this snapshot.", boundary: "This analysis uses recorded data only and is for research, not investment advice.",
     guidance: "RESEARCH STAGE", posture: "RESEARCH POSTURE", blockers: "WHAT BLOCKS FURTHER RESEARCH", actions: "WHAT TO DO NOW", unlocks: "WHAT UNLOCKS THE NEXT STAGE", why: "Why", resolves: "What this check should resolve", filterFailures: "EXACT FILTER RESULTS", details: "ANALYSIS DETAILS",
   };
@@ -66,7 +66,14 @@ export function AIProductionAnalysisCanvas({ analysis }: { analysis: AIProductio
             ))}</ul>}
           </section>
 
-          <ResearchSteps title={headings.next} items={analysis.next_research_steps} empty={headings.empty} />
+          <ResearchSteps
+            title={isStepOneFuturePreview(analysis.research_guidance) ? headings.futureNext : headings.next}
+            items={analysis.next_research_steps}
+            empty={headings.empty}
+            futurePreview={isStepOneFuturePreview(analysis.research_guidance)
+              ? { support: headings.futureNextSupport, label: headings.futureNextPreview }
+              : null}
+          />
           <InsightList title={headings.reassessment} items={analysis.reassessment_signals} empty={headings.empty} />
 
           <section className="ai-research-panel ai-sources-panel" aria-labelledby="ai-production-evidence">
@@ -93,8 +100,27 @@ function InsightList({ title, items, empty }: { title: string; items: AIProducti
   return <section className="ai-research-panel ai-brief-panel"><h3>{title}</h3>{items.length === 0 ? <p>{empty}</p> : <ul>{items.map((item, index) => <li key={`${item.title}-${index}`}><strong>{item.title}</strong><span>{item.detail}</span></li>)}</ul>}</section>;
 }
 
-function ResearchSteps({ title, items, empty }: { title: string; items: AIProductionResearchStep[]; empty: string }) {
-  return <section className="ai-research-panel ai-production-steps"><h3>{title}</h3>{items.length === 0 ? <p>{empty}</p> : <ol>{items.map((item, index) => <li key={`${item.title}-${index}`}><strong>{item.title}</strong><span>{item.detail}</span></li>)}</ol>}</section>;
+function ResearchSteps({
+  title,
+  items,
+  empty,
+  futurePreview,
+}: {
+  title: string;
+  items: AIProductionResearchStep[];
+  empty: string;
+  futurePreview: { support: string; label: string } | null;
+}) {
+  return <section className="ai-research-panel ai-production-steps">
+    <h3>{title}</h3>
+    {futurePreview && <><p>{futurePreview.support}</p><span className="ai-production-steps-preview">{futurePreview.label}</span></>}
+    {items.length === 0 ? <p>{empty}</p> : <ol>{items.map((item, index) => <li key={`${item.title}-${index}`}><strong>{item.title}</strong><span>{item.detail}</span></li>)}</ol>}
+  </section>;
+}
+
+/** A failed mandatory Quick Filter makes later checks a deterministic preview, not a current instruction. */
+function isStepOneFuturePreview(guidance: AIProductionResearchGuidance): boolean {
+  return guidance.current_step.number === 1 && guidance.filter_failures.length > 0;
 }
 
 function ResearchGuidancePanel({

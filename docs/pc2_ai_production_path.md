@@ -24,6 +24,18 @@ The old render-preview fixture is retained only for isolated visual review. Norm
 - Limits cover worker global hourly/daily execution budgets, concurrent jobs, persistent per-actor/global initiation windows and queue depth. Shared cache reads and already-queued keys do not consume initiation quota.
 - A failed refresh keeps the prior validated result as last-known-good. The browser receives `STALE` with the old structured result, never an empty replacement.
 
+## CENTRAL QUERY & FAN-OUT CONTRACT
+
+This is a P0 product and architecture contract for PC.2, and the required data-access shape for PC.3 integrations:
+
+- The central server alone fetches providers, validates their response, normalizes it into a shared snapshot/cache and fans that record out to all product users. Browser code reads only product backend APIs. It never calls OpenAI, DexScreener, GoPlus, Honeypot.is, DefiLlama, or another data-provider API directly.
+- The shared AI identity is exactly normalized `chain + contract + snapshot fingerprint + prompt version + model + schema version`. It deliberately excludes actor, lifecycle, private workspace, session and locale. One heavy generation serves every eligible user of the same stored snapshot; PL and EN are deterministic reads of that shared result and never start a second generation.
+- Opening Candidate Detail and its AI tab reads the public cached result. Five hundred concurrent cached reads are read-only and produce zero provider calls. User-specific lifecycle and workspace state remain private and cannot fragment, mutate or become part of the central analysis cache.
+- “Refresh view” is a read-only product refresh: it never starts a scanner cycle, provider fetch, AI job or lifecycle mutation. Manual external links remain user-initiated website visits; they are not per-click server-side provider proxies.
+- For a PC.3 source with official, stable API access, use a central server fetch with explicit rate limits, TTL, normalization, cache and last-known-good handling, then fan out the stored result. For an uncertain, unstable or unauthorised source, do not scrape or create a per-user fetch path: expose a manual evidence link and record only allowed evidence.
+
+Violating this contract is P0. A regression that creates a browser-to-provider path, per-user heavy generation, locale-generated copy, or a refresh-triggered provider call blocks release.
+
 ## Public contract and security
 
 The server converts internal records to `ai_production_analysis_lookup_v1` before any Candidate Detail route responds. Its only states are:

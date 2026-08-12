@@ -172,11 +172,15 @@ describe("AI Research v2 brief and v4 bilingual prompt contract", () => {
   });
 
   it("keeps provider credentials and calls outside browser and public request service", async () => {
-    const [provider, worker, service, client] = await Promise.all([
+    const [provider, worker, service, client, scannerClient, contextClient, automationClient, ownerClient] = await Promise.all([
       source("server/aiResearchProvider.ts"),
       source("server/aiResearchWorker.ts"),
       source("server/aiResearchService.ts"),
       source("src/services/aiResearchDataSource.ts"),
+      source("src/services/scannerDataSource.ts"),
+      source("src/services/contextDataSource.ts"),
+      source("src/services/automationStatusDataSource.ts"),
+      source("src/services/ownerOperationsDataSource.ts"),
     ]);
     assert.match(provider, /OPENAI_API_KEY/);
     assert.match(worker, /createAIResearchProvider/);
@@ -184,6 +188,10 @@ describe("AI Research v2 brief and v4 bilingual prompt contract", () => {
     assert.doesNotMatch(client, /OPENAI_API_KEY|api\.openai\.com|createAIResearchProvider/);
     assert.match(client, /\/api\/v1\/ai-analyses\/result/);
     assert.match(client, /\/api\/v1\/ai-analyses\/requests/);
+    for (const browserClient of [client, scannerClient, contextClient, automationClient, ownerClient]) {
+      assert.doesNotMatch(browserClient, /https?:\/\/(?:api\.)?(?:openai|dexscreener|gopluslabs|honeypot|defillama)/i);
+      assert.doesNotMatch(browserClient, /OPENAI_API_KEY|createAIResearchProvider|runInternalBetaCollector/);
+    }
   });
 });
 

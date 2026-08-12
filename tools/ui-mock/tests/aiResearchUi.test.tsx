@@ -315,6 +315,9 @@ describe("PC.2 action-first research guidance", () => {
     assert.match(markup, /Poczekaj na świeżą migawkę/);
     assert.doesNotMatch(markup, /Sprawdź dokładne wyniki filtrów/);
     assert.match(markup, /DOKŁADNE WYNIKI FILTRÓW/);
+    assert.match(markup, /JEŚLI TOKEN PRZEJDZIE KROK 1/);
+    assert.match(markup, /Po spełnieniu podstawowych filtrów kolejnym etapem będzie weryfikacja bezpieczeństwa/);
+    assert.match(markup, /PODGLĄD KOLEJNEGO ETAPU/);
     assert.match(markup, /SZCZEGÓŁY ANALIZY/);
     assert.ok(markup.indexOf("ETAP RESEARCHU") < markup.indexOf("SZCZEGÓŁY ANALIZY"));
   });
@@ -345,6 +348,7 @@ describe("PC.2 action-first research guidance", () => {
     input.address_identity_verified = false;
     input.action_catalog = guidanceActions("en", ["REVIEW_SECURITY", "OPEN_VERIFICATION", "OPEN_EXPLORER"]);
     const analysis = presentAnalysis(briefEn, false, "en", input);
+    const markup = render("en", <AIProductionAnalysisCanvas analysis={analysis} />);
 
     assert.deepEqual(analysis.research_guidance.current_step, {
       number: 2,
@@ -354,6 +358,28 @@ describe("PC.2 action-first research guidance", () => {
     });
     assert.deepEqual(analysis.research_guidance.actions.map(({ title }) => title), ["Review security", "Verify the source", "Open the explorer"]);
     assert.deepEqual(analysis.research_guidance.unlock_conditions, ["Security result is available", "Contract verification is assessed", "Critical flags are reviewed"]);
+    assert.match(markup, /NEXT RESEARCH STEPS/);
+    assert.doesNotMatch(markup, /IF THE TOKEN PASSES STEP 1|NEXT-STAGE PREVIEW/);
+  });
+
+  it("labels detailed actions as a future Step 2 preview in both locales while Step 1 is failed", () => {
+    const plInput = structuredClone(context.guidance);
+    plInput.freshness = "STALE";
+    plInput.filters = {
+      status: "rejected_basic_filter",
+      reasons: ["market_cap_below_300000"],
+      metrics: { market_cap_usd: 4_659, liquidity_usd: 5_925, volume_24h_usd: 2_289, volume_market_cap_ratio: null, pair_age_days: null },
+    };
+    plInput.action_catalog = guidanceActions("pl", ["WAIT_FOR_CHECKPOINT"]);
+    const enInput = structuredClone(plInput);
+    enInput.action_catalog = guidanceActions("en", ["WAIT_FOR_CHECKPOINT"]);
+
+    const pl = render("pl", <AIProductionAnalysisCanvas analysis={presentAnalysis(briefPl, false, "pl", plInput)} />);
+    const en = render("en", <AIProductionAnalysisCanvas analysis={presentAnalysis(briefEn, false, "en", enInput)} />);
+    assert.match(pl, /JEŚLI TOKEN PRZEJDZIE KROK 1/);
+    assert.match(pl, /Po spełnieniu podstawowych filtrów kolejnym etapem będzie weryfikacja bezpieczeństwa/);
+    assert.match(en, /IF THE TOKEN PASSES STEP 1/);
+    assert.match(en, /After the basic filters are met, the next stage will be security verification/);
   });
 
   it("selects On-chain only after filters and security are sufficiently complete while holder data is missing", () => {

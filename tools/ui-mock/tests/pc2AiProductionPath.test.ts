@@ -31,7 +31,7 @@ const NOW = new Date("2026-08-11T12:00:00.000Z");
 after(async () => { await rm(root, { recursive: true, force: true }); });
 
 describe("PC.2 shared production AI path", () => {
-  it("deduplicates 100 simultaneous mixed-locale requests and serves 500 mixed READY reads without another AI call", async () => {
+  it("fan-outs one normalized analysis across 100 users and serves 500 mixed READY reads without another AI call", async () => {
     await writeFixture(100_000);
     const store = await createAIAnalysisQueueStore({ databaseFilePath: resolve(root, "concurrency.sqlite") });
     let calls = 0;
@@ -59,6 +59,30 @@ describe("PC.2 shared production AI path", () => {
     assert.equal((await service.getBrief("base", ADDRESS, "en")).availability, "READY", "locale is not a second analysis key");
     assert.equal(store.stats().records, 1);
     store.close();
+  });
+
+  it("keeps the shared cache identity independent of actor, lifecycle, workspace, session and locale", () => {
+    const sharedInput = {
+      chain: "base",
+      contract_address: ADDRESS,
+      snapshot_fingerprint: "a".repeat(64),
+      prompt_version: "ai_research_prompt_v4",
+      model_id: "gpt-5-mini",
+      analysis_schema_version: "ai_research_brief_v2",
+    };
+    const first = buildAIAnalysisCacheIdentity({ ...sharedInput, locale: "pl" as const });
+    const differentPrivateState = {
+      ...sharedInput,
+      locale: "en" as const,
+      actor: "camp-user-b",
+      private_lifecycle: "FOLLOW_UP",
+      workspace: "owner-private-workspace",
+      session: "session-b",
+    };
+    const second = buildAIAnalysisCacheIdentity(differentPrivateState);
+    assert.equal(first.cache_key, second.cache_key);
+    assert.equal(first.locale, "pl");
+    assert.equal(second.locale, "en");
   });
 
   it("keeps PL and EN output independent of which locale enqueues the shared job first", async () => {
@@ -206,8 +230,9 @@ describe("PC.2 shared production AI path", () => {
     await writeFixture(100_000);
     const store = await createAIAnalysisQueueStore({ databaseFilePath: resolve(root, "public-contract.sqlite") });
     const service = createService(store);
+    let calls = 0;
     await service.generate(request(), "camp-user");
-    const worker = createAIResearchWorker({ ...contextOptions(), store, now: () => NOW, provider: provider(async (context) => JSON.stringify(narrative(context))) });
+    const worker = createAIResearchWorker({ ...contextOptions(), store, now: () => NOW, provider: provider(async (context) => { calls += 1; return JSON.stringify(narrative(context)); }) });
     await worker.runCycle();
     const publicValue = presentAIProductionLookup(await service.getBrief("base", ADDRESS, "pl"));
     assert.equal(publicValue.status, "READY");
@@ -219,6 +244,10 @@ describe("PC.2 shared production AI path", () => {
     assert.doesNotMatch(JSON.stringify(publicValue), /openai|gpt-|analysis_id|cache_key|queue_status|token_usage|sqlite/i);
     assert.equal(CANDIDATE_DETAIL_TAB_IDS.length, 7);
     assert.equal(CANDIDATE_DETAIL_TAB_IDS.includes("ai"), true);
+
+    const readyMarkup = renderToStaticMarkup(React.createElement(ProductLocaleProvider, { initialLocale: "pl" }, React.createElement(AIResearchSection, { chain: "base", contractAddress: ADDRESS, symbol: "T", name: "Token", initialLookup: publicValue, active: true })));
+    assert.match(readyMarkup, /Analiza gotowa/);
+    assert.equal(calls, 1, "opening Candidate Detail with READY data must be a cache read, not a provider call");
 
     const queued: typeof publicValue = { ...publicValue, status: "QUEUED", analysis: null, is_last_known_good: false };
     const pl = renderToStaticMarkup(React.createElement(ProductLocaleProvider, { initialLocale: "pl" }, React.createElement(AIResearchSection, { chain: "base", contractAddress: ADDRESS, symbol: "T", name: "Token", initialLookup: queued })));
