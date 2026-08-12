@@ -38,6 +38,6 @@ The AI tab uses the safe contract and lightweight five-second status polling onl
 
 ## Operations
 
-The relevant server-only environment controls are documented in `tools/ui-mock/.env.example`, including breaker, retry jitter, actor/global initiation and queue-depth controls. AI remains fail-closed unless the existing server worker configuration enables it.
+The relevant server-only environment controls are documented in `tools/ui-mock/.env.example`, including breaker, retry jitter, actor/global initiation and queue-depth controls. `CRYPTO_EDGE_AI_RESEARCH_TIMEOUT_MS` defaults to `90000` for the bounded bilingual strict-schema Responses call; `CRYPTO_EDGE_AI_WORKER_LEASE_MS` defaults to `180000`, preserving a 90-second margin without enabling SDK retries. AI remains fail-closed unless the existing server worker configuration enables it.
 
 No controlled live owner test was run in this change. It requires a server-side `OPENAI_API_KEY`, `CRYPTO_EDGE_AI_RESEARCH_PROVIDER=OPENAI`, an allowed model configuration, and explicit worker enablement. It must be run separately against a small owner-selected token set after offline verification.

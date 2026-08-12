@@ -4,7 +4,15 @@ import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { after, describe, it } from "node:test";
 import { buildAIResearchContext } from "../server/aiResearchContext.js";
-import { createAIResearchProvider, resolveAIResearchProviderConfig } from "../server/aiResearchProvider.js";
+import {
+  AIResearchProviderError,
+  createAIResearchProvider,
+  OPENAI_RESEARCH_CLIENT_MAX_RETRIES,
+  OPENAI_RESEARCH_DEFAULT_TIMEOUT_MS,
+  OPENAI_RESEARCH_MAX_TIMEOUT_MS,
+  resolveAIResearchProviderConfig,
+} from "../server/aiResearchProvider.js";
+import { resolveAIResearchWorkerLimits } from "../server/aiResearchWorker.js";
 import { PERSISTABLE_SCANNER_SAMPLE } from "../src/fixtures/persistableScannerSample.js";
 
 const root = await mkdtemp(resolve(tmpdir(), "crypto-edge-ai2c-compat-tests-"));
@@ -25,6 +33,39 @@ describe("AI.2C provider contract compatibility under AI.3", () => {
     assert.equal(config.apiKey, null);
     assert.equal(config.model, null);
     assert.equal(config.maxConcurrency, 1);
+  });
+
+  it("defaults the bounded provider timeout to 90 seconds and preserves its configured bounds", () => {
+    assert.equal(resolveAIResearchProviderConfig({}).timeoutMs, OPENAI_RESEARCH_DEFAULT_TIMEOUT_MS);
+    assert.equal(resolveAIResearchProviderConfig({ CRYPTO_EDGE_AI_RESEARCH_TIMEOUT_MS: "1000" }).timeoutMs, 1_000);
+    assert.equal(resolveAIResearchProviderConfig({ CRYPTO_EDGE_AI_RESEARCH_TIMEOUT_MS: "120000" }).timeoutMs, OPENAI_RESEARCH_MAX_TIMEOUT_MS);
+    assert.equal(resolveAIResearchProviderConfig({ CRYPTO_EDGE_AI_RESEARCH_TIMEOUT_MS: "120001" }).timeoutMs, OPENAI_RESEARCH_DEFAULT_TIMEOUT_MS);
+    assert.equal(OPENAI_RESEARCH_CLIENT_MAX_RETRIES, 0);
+    assert.ok(resolveAIResearchWorkerLimits({}).leaseMs - OPENAI_RESEARCH_DEFAULT_TIMEOUT_MS >= 30_000);
+  });
+
+  it("maps a client timeout to PROVIDER_TIMEOUT without an SDK retry", async () => {
+    const context = await buildAIResearchContext("base", ADDRESS, "pl", contextOptions());
+    let mockCalls = 0;
+    const provider = createAIResearchProvider({
+      config: {
+        mode: "OPENAI",
+        model: "gpt-5-mini",
+        apiKey: "test-only-not-a-real-key",
+        timeoutMs: OPENAI_RESEARCH_DEFAULT_TIMEOUT_MS,
+        maxConcurrency: 1,
+        liveCallBudget: 1,
+        liveCallBudgetInvalid: false,
+      },
+      fetch: async () => {
+        mockCalls += 1;
+        const error = new Error("local client request deadline reached");
+        error.name = "APIConnectionTimeoutError";
+        throw error;
+      },
+    });
+    await assert.rejects(provider.generate(context), (error: unknown) => error instanceof AIResearchProviderError && error.code === "PROVIDER_TIMEOUT");
+    assert.equal(mockCalls, 1);
   });
 
   it("keeps Responses API structured-output parsing behind an injected mock fetch", async () => {

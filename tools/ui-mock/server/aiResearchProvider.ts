@@ -3,6 +3,8 @@ import type { AIResearchContext } from "./aiResearchContext.js";
 import { AI_RESEARCH_PROVIDER_JSON_SCHEMA } from "./aiResearchSchema.js";
 
 export const OPENAI_RESEARCH_CLIENT_MAX_RETRIES = 0;
+export const OPENAI_RESEARCH_DEFAULT_TIMEOUT_MS = 90_000;
+export const OPENAI_RESEARCH_MAX_TIMEOUT_MS = 120_000;
 
 export type AIResearchProviderMode = "DISABLED" | "OPENAI";
 
@@ -76,7 +78,7 @@ export function resolveAIResearchProviderConfig(env: NodeJS.ProcessEnv = process
     mode,
     model,
     apiKey,
-    timeoutMs: boundedInteger(env.CRYPTO_EDGE_AI_RESEARCH_TIMEOUT_MS, 30_000, 1_000, 120_000),
+    timeoutMs: boundedInteger(env.CRYPTO_EDGE_AI_RESEARCH_TIMEOUT_MS, OPENAI_RESEARCH_DEFAULT_TIMEOUT_MS, 1_000, OPENAI_RESEARCH_MAX_TIMEOUT_MS),
     maxConcurrency: boundedInteger(env.CRYPTO_EDGE_AI_RESEARCH_MAX_CONCURRENCY, 1, 1, 8),
     liveCallBudget: liveCallBudgetValue === "1" ? 1 : null,
     liveCallBudgetInvalid: liveCallBudgetValue !== undefined && liveCallBudgetValue !== "" && liveCallBudgetValue !== "1",

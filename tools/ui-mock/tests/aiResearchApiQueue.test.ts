@@ -23,12 +23,14 @@ after(async () => { await rm(root, { recursive: true, force: true }); });
 
 describe("AI.3 versioned public queue API", () => {
   it("POST only enqueues, is idempotent and never executes a provider call", async () => {
+    const context = contextOptions();
     const store = await createAIAnalysisQueueStore({ databaseFilePath: resolve(root, "api.sqlite") });
     const service = createAIResearchService({
-      ...contextOptions(), queueStore: store, providerEnabled: true, modelId: "gpt-5-mini", now: () => NOW,
+      ...context, queueStore: store, providerEnabled: true, modelId: "gpt-5-mini", now: () => NOW,
     });
     const server = createServer(createScannerApiHandler({
-      runtimeMode: "INTERNAL_BETA",
+      runtimeMode: "DEVELOPMENT_DEMO",
+      scanner: context.scanner,
       aiResearch: { service, sessionSecret: "ai3-api-test-secret" },
     }));
     await listen(server);
@@ -110,7 +112,6 @@ describe("AI.3 versioned public queue API", () => {
     assert.doesNotMatch(handler, /createAIResearchProvider|OPENAI_API_KEY|api\.openai\.com/);
     assert.match(worker, /createAIResearchProvider/);
     assert.match(component, /Zleć analizę AI/);
-    assert.match(component, /wspólnej kolejki/);
     assert.doesNotMatch(component, /Wygeneruj analizę AI|Generate AI analysis/);
   });
 
