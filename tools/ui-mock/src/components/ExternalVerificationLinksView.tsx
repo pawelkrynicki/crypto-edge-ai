@@ -48,6 +48,8 @@ interface ExternalVerificationLinksViewProps {
   initialActiveTab?: VerificationDrawerTabId;
   /** A compact playbook navigation target in the existing Data and sources tab. */
   focusedResearchStep?: ResearchStepNumber | null;
+  /** Returns from the focused checklist step to Candidate Detail > Summary. */
+  onBackToResearchPlaybook?: () => void;
 }
 
 export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksViewProps> = ({
@@ -59,6 +61,7 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
   onClose,
   initialActiveTab = "identity",
   focusedResearchStep = null,
+  onBackToResearchPlaybook,
 }) => {
   const { locale, t } = useProductLocale();
   const chain = candidate?.chain ?? followUp?.chain ?? "";
@@ -243,7 +246,7 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
           <VerificationMetric label={locale === "pl" ? "Status źródła" : "Source status"} value={locale === "pl" ? "Migawka dostępna do ręcznej kontroli" : "Snapshot available for manual review"} />
           <VerificationMetric label={locale === "pl" ? "Źródła kontroli bezpieczeństwa" : "Security check sources"} value={securityResolution?.sources.map(formatProductSourceLabel).join(", ") || missingText} />
         </div>
-        {candidate && <ResearchChecklistDetail candidate={candidate} focusedStep={focusedResearchStep} />}
+        {candidate && <ResearchChecklistDetail candidate={candidate} focusedStep={focusedResearchStep} onBackToResearchPlaybook={onBackToResearchPlaybook} />}
         <div className="external-checks-list">{targets.map((target) => <ExternalCheckCard key={target.id} target={target} />)}</div>
         {onOpenResearchBrief && <section className="verification-ai-research-action" aria-label={locale === "pl" ? "Analiza badawcza AI" : "AI Research Brief"}><div><strong>{locale === "pl" ? "Analiza badawcza AI" : "AI Research Brief"}</strong><p>{locale === "pl" ? "Analiza AI uzupełnia, ale nie zastępuje ręcznej weryfikacji." : "AI analysis complements but does not replace manual verification."}</p></div><ActionButton variant="secondary" icon="arrow" iconPosition="end" onClick={onOpenResearchBrief}>{locale === "pl" ? "Otwórz analizę AI" : "Open AI analysis"}</ActionButton></section>}
       </VerificationSection>

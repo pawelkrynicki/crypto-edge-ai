@@ -62,6 +62,7 @@ interface CandidateDetailViewProps {
   activeTab?: CandidateDetailTabId;
   initialActiveTab?: CandidateDetailTabId;
   onActiveTabChange?: (tab: CandidateDetailTabId) => void;
+  focusResearchPlaybook?: boolean;
 }
 
 export const CandidateDetailView: React.FC<CandidateDetailViewProps> = (props) => {
@@ -84,6 +85,7 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
   activeTab: controlledActiveTab,
   initialActiveTab = "summary",
   onActiveTabChange,
+  focusResearchPlaybook = false,
 }) => {
   const { locale, t } = useProductLocale();
   const [internalActiveTab, setInternalActiveTab] = useState<CandidateDetailTabId>(initialActiveTab);
@@ -223,6 +225,7 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
         </div>
         <ResearchChecklistSummary
           candidate={candidate}
+          focusOnMount={focusResearchPlaybook}
           onOpenStep={(step) => {
             if (onOpenResearchChecklistStep) onOpenResearchChecklistStep(candidate, step);
             else onOpenExternalChecks?.(candidate);

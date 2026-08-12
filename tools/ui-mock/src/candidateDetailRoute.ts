@@ -27,8 +27,13 @@ export function resolveResearchChecklistStep(): ResearchStepNumber | null {
   return Number.isInteger(value) && value >= 1 && value <= 7 ? value as ResearchStepNumber : null;
 }
 
-export function writeCandidateDetailRoute(identity: RouteTokenIdentity, tab: CandidateDetailTabId) {
-  writeTokenRoute(identity, "candidate-detail", tab);
+export function resolveResearchPlaybookFocus(): boolean {
+  if (typeof window === "undefined") return false;
+  return new URLSearchParams(window.location.search).get("research_playbook") === "1";
+}
+
+export function writeCandidateDetailRoute(identity: RouteTokenIdentity, tab: CandidateDetailTabId, focusResearchPlaybook = false) {
+  writeTokenRoute(identity, "candidate-detail", tab, null, focusResearchPlaybook);
 }
 
 export function writeVerificationRoute(identity: RouteTokenIdentity, researchStep: ResearchStepNumber | null = null) {
@@ -42,6 +47,7 @@ export function writeVerificationListRoute() {
   url.searchParams.delete("contract");
   url.searchParams.delete("detail");
   url.searchParams.delete("research_step");
+  url.searchParams.delete("research_playbook");
   url.hash = "external-checks";
   window.history.pushState(null, "", url);
 }
@@ -51,6 +57,7 @@ function writeTokenRoute(
   section: "candidate-detail" | "external-checks",
   tab: CandidateDetailTabId | null,
   researchStep: ResearchStepNumber | null = null,
+  focusResearchPlaybook = false,
 ) {
   if (typeof window === "undefined") return;
   const url = new URL(window.location.href);
@@ -60,6 +67,8 @@ function writeTokenRoute(
   else url.searchParams.delete("detail");
   if (researchStep) url.searchParams.set("research_step", String(researchStep));
   else url.searchParams.delete("research_step");
+  if (focusResearchPlaybook) url.searchParams.set("research_playbook", "1");
+  else url.searchParams.delete("research_playbook");
   url.hash = section;
   window.history.pushState(null, "", url);
 }

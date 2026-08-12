@@ -81,13 +81,76 @@ test("PC.3A compact playbook uses native buttons to target every detailed step, 
   }
 });
 
-test("PC.3A focuses Step 3 in the existing Data and sources drawer without changing tab counts", () => {
+test("PC.3A focus mode renders only Step 3, keeps evidence grouped, and returns to the compact playbook", async () => {
   const detail = renderToStaticMarkup(<ProductLocaleProvider initialLocale="en"><ResearchChecklistDetail candidate={candidate} focusedStep={3} /></ProductLocaleProvider>);
+  const polishDetail = renderToStaticMarkup(<ProductLocaleProvider initialLocale="pl"><ResearchChecklistDetail candidate={candidate} focusedStep={3} /></ProductLocaleProvider>);
   const drawer = renderToStaticMarkup(<ProductLocaleProvider initialLocale="en"><ExternalVerificationLinksView candidate={candidate} focusedResearchStep={3} /></ProductLocaleProvider>);
   assert.match(detail, /id="research-checklist-step-3"[^>]*data-research-step="3"[^>]*data-research-focused="true"/);
   assert.match(detail, /class="research-checklist-step[^"]*focused/);
-  assert.match(detail, /Research incomplete/);
+  assert.equal((detail.match(/data-research-step="/g) ?? []).length, 1, "focus mode renders one detailed step");
+  assert.doesNotMatch(detail, /research-checklist-step-[124567]/);
+  assert.match(detail, /← Back to Research Playbook/);
+  assert.match(polishDetail, /← Wróć do Research Playbook/);
+  assert.match(polishDetail, /Sprawdzone/);
+  assert.match(polishDetail, /Czerwone flagi/);
+  assert.match(polishDetail, /Do uzupełnienia \(2\)/);
+  assert.match(polishDetail, /Pokaż/);
+  assert.doesNotMatch(polishDetail, /<details[^>]*\sopen=/, "missing items start collapsed");
+  assert.match(detail, /To complete \(2\)/);
   assert.equal((drawer.match(/role="tab"/g) ?? []).length, 6);
   assert.match(drawer, /id="verification-tab-data"[^>]*aria-selected="true"/);
   assert.match(drawer, /id="research-checklist-step-3"/);
+
+  const originalFetch = globalThis.fetch;
+  const originalActEnvironment = globalThis.IS_REACT_ACT_ENVIRONMENT;
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  globalThis.fetch = (async () => new Response("{}", { status: 404, headers: { "content-type": "application/json" } })) as typeof fetch;
+  const returned: string[] = [];
+  let renderer: ReturnType<typeof create> | undefined;
+  try {
+    await act(async () => {
+      renderer = create(<ProductLocaleProvider initialLocale="pl"><ResearchChecklistDetail candidate={candidate} focusedStep={3} onBackToResearchPlaybook={() => returned.push("playbook")} /></ProductLocaleProvider>);
+    });
+    const back = renderer!.root.findByProps({ "data-research-playbook-back": true });
+    assert.equal(back.type, "button");
+    assert.equal(back.props.type, "button");
+    await act(async () => { back.props.onClick(); });
+    assert.deepEqual(returned, ["playbook"]);
+  } finally {
+    if (renderer) await act(async () => { renderer!.unmount(); });
+    globalThis.fetch = originalFetch;
+    globalThis.IS_REACT_ACT_ENVIRONMENT = originalActEnvironment;
+  }
+
+  const returnedDetail = renderToStaticMarkup(<ProductLocaleProvider initialLocale="pl"><CandidateDetailView candidate={candidate} initialOwnerPromotionStatus={null} focusResearchPlaybook /></ProductLocaleProvider>);
+  assert.match(returnedDetail, /id="research-playbook-summary"[^>]*data-research-playbook-focused="true"/);
+  assert.match(returnedDetail, /role="tab"[^>]*aria-selected="true"[^>]*>Podsumowanie/);
+});
+
+test("PC.3A focus mode localizes methodology values, hides machine values, and keeps red flags visible", () => {
+  const unknownCandidate: UiTokenCandidate = {
+    ...candidate,
+    security: { ...candidate.security!, honeypotStatus: "unknown", ownershipStatus: "unknown", contractVerified: null, liquidityLocked: null },
+  };
+  const polish = renderToStaticMarkup(<ProductLocaleProvider initialLocale="pl"><ResearchChecklistDetail candidate={unknownCandidate} focusedStep={2} /></ProductLocaleProvider>);
+  const english = renderToStaticMarkup(<ProductLocaleProvider initialLocale="en"><ResearchChecklistDetail candidate={unknownCandidate} focusedStep={2} /></ProductLocaleProvider>);
+  assert.match(polish, /Brak zapisanego wyniku/);
+  assert.doesNotMatch(polish, /unknown|\bnull\b|\bundefined\b/i);
+  assert.match(polish, /wymagane/);
+  assert.match(polish, /płynność musi być zablokowana/);
+  assert.match(english, /required/);
+  assert.match(english, /must be locked/);
+  const scorecardPolish = renderToStaticMarkup(<ProductLocaleProvider initialLocale="pl"><ResearchChecklistDetail candidate={candidate} focusedStep={6} /></ProductLocaleProvider>);
+  assert.match(scorecardPolish, /nie obliczono/);
+  assert.doesNotMatch(scorecardPolish, /not calculated/i);
+
+  const redFlagCandidate: UiTokenCandidate = {
+    ...candidate,
+    liquidity: 12_000,
+    basicFilterStatus: "rejected_basic_filter",
+    filterReasons: ["liquidity_below_30000"],
+  };
+  const redFlag = renderToStaticMarkup(<ProductLocaleProvider initialLocale="pl"><ResearchChecklistDetail candidate={redFlagCandidate} focusedStep={1} /></ProductLocaleProvider>);
+  assert.match(redFlag, /Czerwona flaga/);
+  assert.match(redFlag, /data-research-item-group="red-flag"/);
 });
