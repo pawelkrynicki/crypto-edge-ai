@@ -107,7 +107,8 @@ describe("P1.1 Radar operational usability", () => {
         />
       </ProductLocaleProvider>,
     );
-    assert.match(aiMarkup, /Analiza AI jest wyłączona w tym trybie podglądu/);
+    assert.match(aiMarkup, /Niedostępna/);
+    assert.match(aiMarkup, /Analiza AI jest obecnie niedostępna\./);
     assert.match(aiMarkup, /Aktywuj analizę AI w Centrum sterowania/);
     assert.doesNotMatch(aiMarkup, /provider|model|api[_ -]?key/i);
 

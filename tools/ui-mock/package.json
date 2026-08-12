@@ -16,6 +16,7 @@
     "test:runtime": "node --import tsx --test tests/productionRuntime.test.ts tests/runtimeImportBoundary.test.ts tests/automationStatus.test.ts tests/controlCenter.test.ts tests/ownerOperations.test.ts",
     "test:product-radar": "node --import tsx --test tests/productRadar.test.ts",
     "test:pc1": "node --import tsx --test tests/pc1Lifecycle.test.ts",
+    "test:pc2": "node --import tsx --test tests/pc2AiProductionPath.test.ts",
     "test:p1-radar": "node --import tsx --test tests/radarOperationalUsability.test.tsx tests/manualOwnerActions.test.ts",
     "test:refresh": "node --import tsx --test tests/productRefreshFlow.test.tsx tests/productVersionPolling.test.ts tests/productVersion.test.ts tests/productReviewPublication.test.ts",
     "test:premium-ui": "node --import tsx --test tests/premiumUiPass.test.ts",

@@ -3,7 +3,7 @@ import {
   AI_RESEARCH_TARGET_MODEL,
   type AIResearchBrief,
 } from "../src/types/aiResearchTypes.js";
-import { buildAIResearchContext, type AIResearchContextOptions } from "./aiResearchContext.js";
+import { AIResearchContextError, buildAIResearchContext, type AIResearchContextOptions } from "./aiResearchContext.js";
 import {
   createAIResearchProvider,
   NOOP_AI_RESEARCH_USAGE_RECORDER,
@@ -15,11 +15,13 @@ import {
 } from "./aiResearchProvider.js";
 import {
   AIResearchValidationError,
-  parseAIResearchProviderNarrative,
+  parseAIResearchProviderNarrativeWithDiagnostics,
 } from "./aiResearchSchema.js";
 import {
+  AIAnalysisQueueStoreError,
   buildAIAnalysisCacheIdentity,
   createAIAnalysisQueueStore,
+  type AIAnalysisFailureStage,
   type AIAnalysisQueueRecord,
   type AIAnalysisQueueStore,
   type AIAnalysisQueueStoreOptions,
@@ -37,8 +39,12 @@ export type AIResearchWorkerLimits = {
   outputCostPerMillionTokensUsd: number | null;
   maxAttempts: number;
   retryBaseMs: number;
+  retryJitterRatio: number;
   leaseMs: number;
   budgetDeferralMs: number;
+  circuitFailureThreshold: number;
+  circuitOpenMs: number;
+  circuitDeferralMs: number;
 };
 
 export type AIResearchWorkerOptions = AIResearchContextOptions & {
@@ -55,7 +61,7 @@ export type AIResearchWorkerOptions = AIResearchContextOptions & {
 export type AIResearchWorkerCycleResult = {
   schema_version: "ai_analysis_worker_cycle_v1";
   worker_id: string;
-  status: "COMPLETED" | "IDLE" | "SUSPENDED" | "PROVIDER_DISABLED" | "BUDGET_BLOCKED";
+  status: "COMPLETED" | "IDLE" | "SUSPENDED" | "PROVIDER_DISABLED" | "BUDGET_BLOCKED" | "CIRCUIT_OPEN";
   claimed: number;
   completed: number;
   retried: number;
@@ -79,8 +85,12 @@ export function resolveAIResearchWorkerLimits(
     outputCostPerMillionTokensUsd: optionalNonNegative(input.outputCostPerMillionTokensUsd, envNumber(env.CRYPTO_EDGE_AI_OUTPUT_COST_PER_MILLION_USD)),
     maxAttempts: bounded(input.maxAttempts, envInteger(env.CRYPTO_EDGE_AI_WORKER_MAX_ATTEMPTS), 3, 1, 10),
     retryBaseMs: bounded(input.retryBaseMs, envInteger(env.CRYPTO_EDGE_AI_WORKER_RETRY_BASE_MS), 30_000, 100, 24 * 60 * 60_000),
+    retryJitterRatio: boundedDecimal(input.retryJitterRatio, envNumber(env.CRYPTO_EDGE_AI_WORKER_RETRY_JITTER_RATIO), 0.2, 0, 0.5),
     leaseMs: bounded(input.leaseMs, envInteger(env.CRYPTO_EDGE_AI_WORKER_LEASE_MS), 180_000, 1_000, 30 * 60_000),
     budgetDeferralMs: bounded(input.budgetDeferralMs, envInteger(env.CRYPTO_EDGE_AI_WORKER_BUDGET_DEFERRAL_MS), 60_000, 1_000, 24 * 60 * 60_000),
+    circuitFailureThreshold: bounded(input.circuitFailureThreshold, envInteger(env.CRYPTO_EDGE_AI_CIRCUIT_FAILURE_THRESHOLD), 3, 1, 100),
+    circuitOpenMs: bounded(input.circuitOpenMs, envInteger(env.CRYPTO_EDGE_AI_CIRCUIT_OPEN_MS), 60_000, 1_000, 24 * 60 * 60_000),
+    circuitDeferralMs: bounded(input.circuitDeferralMs, envInteger(env.CRYPTO_EDGE_AI_CIRCUIT_DEFERRAL_MS), 5_000, 1_000, 24 * 60 * 60_000),
   };
 }
 
@@ -141,7 +151,8 @@ export function createAIResearchWorker(options: AIResearchWorkerOptions = {}) {
             result.safe_error_code = "AI_BUDGET_LIMIT_REACHED";
             return;
           }
-          await processClaim(store, claimed, provider, usageRecorder, contextOptions, limits, workerId, now, result);
+          const outcome = await processClaim(store, claimed, provider, usageRecorder, contextOptions, limits, workerId, now, result);
+          if (outcome === "CIRCUIT_OPEN") return;
           if (store.workerState().suspended) return;
         }
       };
@@ -176,38 +187,83 @@ async function processClaim(
   workerId: string,
   now: () => Date,
   cycleResult: AIResearchWorkerCycleResult,
-): Promise<void> {
+): Promise<"COMPLETED" | "CIRCUIT_OPEN"> {
   const heartbeat = setInterval(() => {
     try { store.renewLease({ analysis_id: claimed.analysis_id, worker_id: workerId, now: now(), lease_ms: limits.leaseMs }); } catch { /* claim completion fails closed */ }
   }, Math.max(500, Math.min(30_000, Math.floor(limits.leaseMs / 3))));
   heartbeat.unref?.();
+  let stage: AIAnalysisFailureStage = "CONTEXT_BUILD";
+  let providerAttemptStarted = false;
   try {
-    const context = await buildAIResearchContext(claimed.chain, claimed.contract_address, claimed.locale, contextOptions);
+    // Queue locale is retained only for database compatibility. A production job is
+    // always hydrated from the canonical English context, never from the first
+    // requester's presentation locale.
+    const context = await buildAIResearchContext(claimed.chain, claimed.contract_address, "en", contextOptions);
+    stage = "IDENTITY_CHECK";
     const currentIdentity = buildAIAnalysisCacheIdentity({
       ...context.identity,
-      locale: claimed.locale,
+      locale: "en",
       snapshot_fingerprint: context.snapshot_fingerprint,
       prompt_version: context.prompt_version,
       model_id: claimed.model_id,
       analysis_schema_version: claimed.analysis_schema_version,
     });
     if (currentIdentity.cache_key !== claimed.cache_key) {
-      const failed = store.fail({
+      throw new AIResearchWorkerContractError("DATA_STALE");
+    }
+    stage = "CIRCUIT";
+    let circuitPermitted: boolean;
+    try {
+      circuitPermitted = store.acquireCircuitPermit({ now: now() });
+    } catch {
+      throw new AIResearchWorkerCircuitError();
+    }
+    if (!circuitPermitted) {
+      const deferred = store.deferClaim({
         analysis_id: claimed.analysis_id,
         worker_id: workerId,
-        safe_error_code: "DATA_STALE",
-        transient: false,
-        max_attempts: limits.maxAttempts,
-        retry_base_ms: limits.retryBaseMs,
         now: now(),
+        next_retry_at: new Date(now().getTime() + limits.circuitDeferralMs),
+        safe_error_code: "AI_CIRCUIT_OPEN",
+        failure_stage: "CIRCUIT",
       });
-      cycleResult.suspended += failed.status === "SUSPENDED" ? 1 : 0;
-      return;
+      if (!deferred) throw new AIResearchWorkerCircuitError();
+      cycleResult.status = "CIRCUIT_OPEN";
+      cycleResult.safe_error_code = "AI_CIRCUIT_OPEN";
+      return "CIRCUIT_OPEN";
     }
+    stage = "PROVIDER_CALL";
+    store.recordProviderAttemptStarted({ analysis_id: claimed.analysis_id, worker_id: workerId, now: now() });
+    providerAttemptStarted = true;
     cycleResult.provider_calls += 1;
     const providerResult = await provider.generate(context);
+    stage = "PROVIDER_RESPONSE";
+    store.recordProviderResponseReceived({ analysis_id: claimed.analysis_id, worker_id: workerId, now: now() });
+    if (providerResult.response_metadata) {
+      store.recordProviderResponseDiagnostics({
+        analysis_id: claimed.analysis_id,
+        worker_id: workerId,
+        response_status: providerResult.response_metadata.response_status,
+        incomplete_reason: providerResult.response_metadata.incomplete_reason,
+        output_tokens: providerResult.response_metadata.output_tokens,
+        reasoning_tokens: providerResult.response_metadata.reasoning_tokens,
+        now: now(),
+      });
+    }
     if (providerResult.model !== claimed.model_id) throw new AIResearchWorkerContractError("MODEL_MISMATCH");
-    const narrative = parseAIResearchProviderNarrative(providerResult.raw_json, context);
+    stage = "PROVIDER_PARSE";
+    const parsedNarrative = parseAIResearchProviderNarrativeWithDiagnostics(providerResult.raw_json, context);
+    if (parsedNarrative.presentation_fallbacks.length > 0) {
+      store.recordValidationDiagnostics({
+        analysis_id: claimed.analysis_id,
+        worker_id: workerId,
+        validation_code: "PRESENTATION_FALLBACK",
+        violations: [...new Set(parsedNarrative.presentation_fallbacks.flatMap((item) => item.violations))],
+        now: now(),
+      });
+    }
+    const narrative = parsedNarrative.narrative;
+    stage = "HYDRATE";
     const brief = hydrateAIResearchBrief(
       context,
       narrative,
@@ -217,6 +273,7 @@ async function processClaim(
       false,
       claimed.analysis_id,
     );
+    stage = "STORE_COMPLETE";
     store.complete({
       analysis_id: claimed.analysis_id,
       worker_id: workerId,
@@ -226,31 +283,122 @@ async function processClaim(
       provider_response_id: safeProviderResponseId(providerResult.request_id),
       now: now(),
     });
-    await usageRecorder.record({
-      analysis_id: brief.analysis_id,
-      identity: brief.identity,
-      model: brief.model,
-      token_usage: brief.token_usage,
-    });
+    try {
+      store.recordCircuitSuccess(now());
+    } catch {
+      recordPostCompletionFailure(store, claimed.analysis_id, "AI_STORE_FAILURE", "STORE_COMPLETE", now);
+      cycleResult.completed += 1;
+      cycleResult.safe_error_code = "AI_STORE_FAILURE";
+      return "COMPLETED";
+    }
+    stage = "USAGE_RECORD";
+    try {
+      await usageRecorder.record({
+        analysis_id: brief.analysis_id,
+        identity: brief.identity,
+        model: brief.model,
+        token_usage: brief.token_usage,
+      });
+    } catch {
+      recordPostCompletionFailure(store, claimed.analysis_id, "AI_USAGE_RECORD_FAILURE", "USAGE_RECORD", now);
+      cycleResult.completed += 1;
+      cycleResult.safe_error_code = "AI_USAGE_RECORD_FAILURE";
+      return "COMPLETED";
+    }
     cycleResult.completed += 1;
+    return "COMPLETED";
   } catch (error) {
-    const failure = classifyFailure(error);
-    const failed = store.fail({
-      analysis_id: claimed.analysis_id,
-      worker_id: workerId,
-      safe_error_code: failure.code,
-      transient: failure.transient,
-      max_attempts: limits.maxAttempts,
-      retry_base_ms: limits.retryBaseMs,
-      now: now(),
-    });
+    let failure = classifyFailure(error, stage);
+    if (error instanceof AIResearchValidationError) {
+      try {
+        store.recordValidationDiagnostics({
+          analysis_id: claimed.analysis_id,
+          worker_id: workerId,
+          validation_code: error.code,
+          violations: error.violations,
+          now: now(),
+        });
+      } catch {
+        failure = { code: "AI_STORE_FAILURE", transient: false, stage: "PROVIDER_PARSE" };
+      }
+    }
+    if (error instanceof AIResearchProviderError && error.response_metadata.response_status !== null) {
+      try {
+        store.recordProviderResponseDiagnostics({
+          analysis_id: claimed.analysis_id,
+          worker_id: workerId,
+          response_status: error.response_metadata.response_status,
+          incomplete_reason: error.response_metadata.incomplete_reason,
+          output_tokens: error.response_metadata.output_tokens,
+          reasoning_tokens: error.response_metadata.reasoning_tokens,
+          now: now(),
+        });
+        if (error.code === "PROVIDER_OUTPUT_INCOMPLETE") {
+          store.recordValidationDiagnostics({
+            analysis_id: claimed.analysis_id,
+            worker_id: workerId,
+            validation_code: "PROVIDER_OUTPUT_INCOMPLETE",
+            violations: error.response_metadata.incomplete_reason ? [safeDiagnosticViolation(error.response_metadata.incomplete_reason)] : [],
+            now: now(),
+          });
+        }
+      } catch {
+        failure = { code: "AI_STORE_FAILURE", transient: false, stage: "PROVIDER_CALL" };
+      }
+    }
+    if (providerAttemptStarted && stage === "PROVIDER_CALL") {
+      try {
+        store.recordProviderAttemptFailed({
+          analysis_id: claimed.analysis_id,
+          worker_id: workerId,
+          now: now(),
+          safe_error_code: failure.code,
+        });
+      } catch {
+        failure = { code: "AI_STORE_FAILURE", transient: false, stage: "PROVIDER_CALL" };
+      }
+    }
+    if (failure.transient) {
+      try {
+        store.recordCircuitFailure({
+          now: now(),
+          threshold: limits.circuitFailureThreshold,
+          open_ms: limits.circuitOpenMs,
+        });
+      } catch {
+        failure = { code: "AI_CIRCUIT_FAILURE", transient: false, stage: "CIRCUIT" };
+      }
+    }
+    let failed: AIAnalysisQueueRecord;
+    try {
+      failed = store.fail({
+        analysis_id: claimed.analysis_id,
+        worker_id: workerId,
+        safe_error_code: failure.code,
+        transient: failure.transient,
+        max_attempts: limits.maxAttempts,
+        retry_base_ms: limits.retryBaseMs,
+        retry_jitter_ratio: limits.retryJitterRatio,
+        failure_stage: failure.stage,
+        now: now(),
+      });
+    } catch {
+      try { store.suspendWorker("AI_STORE_FAILURE", now()); } catch { /* store is unavailable */ }
+      cycleResult.suspended += 1;
+      cycleResult.safe_error_code = "AI_STORE_FAILURE";
+      return "COMPLETED";
+    }
     if (failed.status === "FAILED") {
       cycleResult.retried += 1;
     } else {
       cycleResult.suspended += 1;
-      store.suspendWorker(failure.code, now());
-      cycleResult.safe_error_code = failure.code;
+      let cycleSafeErrorCode = failure.code;
+      if (!failure.transient) {
+        try { store.suspendWorker(failure.code, now()); } catch { cycleSafeErrorCode = "AI_STORE_FAILURE"; }
+      }
+      cycleResult.safe_error_code = cycleSafeErrorCode;
     }
+    return "COMPLETED";
   } finally {
     clearInterval(heartbeat);
   }
@@ -298,15 +446,48 @@ class AIResearchWorkerContractError extends Error {
   constructor(code: string) { super(code); this.name = "AIResearchWorkerContractError"; this.code = code; }
 }
 
-function classifyFailure(error: unknown): { code: string; transient: boolean } {
-  if (error instanceof AIResearchWorkerContractError) return { code: error.code, transient: false };
-  if (error instanceof AIResearchValidationError) return { code: "VALIDATION_FAILURE", transient: false };
-  if (error instanceof AIResearchProviderError) {
-    if (error.code === "PROVIDER_TIMEOUT" || error.code === "PROVIDER_ERROR") return { code: error.code, transient: true };
-    if (error.code === "INVALID_PROVIDER_RESPONSE") return { code: "PROVIDER_CONTRACT_INVALID", transient: false };
-    return { code: error.code, transient: false };
+class AIResearchWorkerCircuitError extends Error {
+  constructor() { super("AI_CIRCUIT_FAILURE"); this.name = "AIResearchWorkerCircuitError"; }
+}
+
+function classifyFailure(error: unknown, stage: AIAnalysisFailureStage): { code: string; transient: boolean; stage: AIAnalysisFailureStage } {
+  if (error instanceof AIResearchWorkerContractError) return { code: error.code, transient: false, stage };
+  if (error instanceof AIResearchContextError) return { code: "AI_CONTEXT_FAILURE", transient: false, stage: "CONTEXT_BUILD" };
+  if (error instanceof AIResearchWorkerCircuitError) return { code: "AI_CIRCUIT_FAILURE", transient: false, stage: "CIRCUIT" };
+  if (error instanceof AIAnalysisQueueStoreError) return { code: "AI_STORE_FAILURE", transient: false, stage };
+  if (error instanceof AIResearchValidationError) {
+    return { code: stage === "PROVIDER_PARSE" ? "PROVIDER_CONTRACT_INVALID" : "VALIDATION_FAILURE", transient: false, stage };
   }
-  return { code: "AI_WORKER_FAILURE", transient: false };
+  if (error instanceof AIResearchProviderError) {
+    if (["PROVIDER_TIMEOUT", "PROVIDER_RATE_LIMITED", "PROVIDER_UNAVAILABLE", "PROVIDER_ERROR"].includes(error.code)) {
+      return { code: error.code, transient: true, stage };
+    }
+    if (error.code === "INVALID_PROVIDER_RESPONSE") return { code: "PROVIDER_CONTRACT_INVALID", transient: false, stage };
+    return { code: error.code, transient: false, stage };
+  }
+  return { code: "AI_WORKER_FAILURE", transient: false, stage: stage ?? "UNKNOWN" };
+}
+
+function safeDiagnosticViolation(value: string): string {
+  const normalized = value.toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  return normalized ? `INCOMPLETE_REASON_${normalized}`.slice(0, 80) : "INCOMPLETE_REASON_UNAVAILABLE";
+}
+
+function recordPostCompletionFailure(
+  store: AIAnalysisQueueStore,
+  analysisId: string,
+  safeErrorCode: string,
+  failureStage: "STORE_COMPLETE" | "USAGE_RECORD",
+  now: () => Date,
+): void {
+  try {
+    store.recordPostCompletionFailure({
+      analysis_id: analysisId,
+      safe_error_code: safeErrorCode,
+      failure_stage: failureStage,
+      now: now(),
+    });
+  } catch { /* the completed analysis remains safe even if diagnostics storage is unavailable */ }
 }
 
 function cycle(workerId: string, status: AIResearchWorkerCycleResult["status"], safeErrorCode: string | null): AIResearchWorkerCycleResult {
@@ -339,6 +520,13 @@ function safeWorkerId(value: string | undefined): string | null {
 function bounded(value: number | undefined, envValue: number | null, fallback: number, minimum: number, maximum: number): number {
   const candidate = value ?? envValue;
   return candidate !== null && candidate !== undefined && Number.isSafeInteger(candidate) && candidate >= minimum && candidate <= maximum
+    ? candidate
+    : fallback;
+}
+
+function boundedDecimal(value: number | undefined, envValue: number | null, fallback: number, minimum: number, maximum: number): number {
+  const candidate = value ?? envValue;
+  return candidate !== null && candidate !== undefined && Number.isFinite(candidate) && candidate >= minimum && candidate <= maximum
     ? candidate
     : fallback;
 }

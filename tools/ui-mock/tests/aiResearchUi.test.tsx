@@ -5,18 +5,20 @@ import { resolve } from "node:path";
 import { after, describe, it } from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { buildAIResearchContext } from "../server/aiResearchContext.js";
+import { buildAIResearchContext, type AIResearchGuidanceInput } from "../server/aiResearchContext.js";
 import { buildDeterministicPreview } from "../server/aiResearchService.js";
 import { mapPersistableScannerOutputToUiCandidates } from "../src/adapters/scannerOutputAdapter.js";
 import { AIResearchBriefCanvas } from "../src/components/AIResearchBriefCanvas.js";
+import { AIProductionAnalysisCanvas } from "../src/components/AIProductionAnalysisCanvas.js";
 import { AIResearchRadarStatus, AIResearchSection } from "../src/components/AIResearchSection.js";
 import { applyAIResearchGenerationFailure } from "../src/components/aiResearchState.js";
 import { CandidateDetailView } from "../src/components/CandidateDetailView.js";
 import { ExternalVerificationLinksView } from "../src/components/ExternalVerificationLinksView.js";
 import { PERSISTABLE_SCANNER_SAMPLE } from "../src/fixtures/persistableScannerSample.js";
-import { ProductLocaleProvider, type ProductLocale } from "../src/productI18n.js";
+import { ProductLocaleProvider, readRequestedProductLocale, type ProductLocale } from "../src/productI18n.js";
 import { AIResearchDataSourceError } from "../src/services/aiResearchDataSource.js";
 import type { AIResearchBrief, AIResearchBriefLookup, AIResearchReviewMetrics } from "../src/types/aiResearchTypes.js";
+import { presentAIProductionLookup, presentAnalysis, validateAIProductionLookup } from "../server/aiProductionPublic.js";
 
 void React;
 
@@ -60,8 +62,8 @@ describe("AI.1 Visual Candidate Research Canvas", () => {
       assert.doesNotMatch(markup, /chatbot|chat-message|dangerouslySetInnerHTML/i);
       assert.doesNotMatch(markup, />\s*(Buy|Sell|Kup|Sprzedaj|Trade)\s*</i);
     }
-    assert.match(pl, /Produkt nie posiada danych pozwalających ocenić ten obszar/);
-    assert.match(en, /The product has no data that can assess this area/);
+    assert.match(pl, /Produkt nie posiada wyniku kontroli bezpieczeństwa kontraktu/);
+    assert.match(en, /The product does not have a contract security check result/);
     assert.match(pl, /Podgląd formatu — bez wywołania AI/);
     assert.match(en, /Format preview — no AI call/);
   });
@@ -174,7 +176,7 @@ describe("AI.1 Visual Candidate Research Canvas", () => {
     };
     const markup = render("pl", <AIResearchSection chain="base" contractAddress={ADDRESS} symbol="PASS" name="Pass Token" initialLookup={lookup} mode="detail" />);
     assert.match(markup, /ai-research-canvas/);
-    assert.match(markup, /Analiza została przygotowana na podstawie zwalidowanych danych/);
+    assert.match(markup, /ai-prepared-status/);
     assert.doesNotMatch(markup, /OpenAI|gpt-5-mini|provider mode/i);
   });
 
@@ -185,12 +187,226 @@ describe("AI.1 Visual Candidate Research Canvas", () => {
       assert.ok(action.target_reference.startsWith("#") || action.target_reference.startsWith("https://"));
     }
   });
+
+  it("renders the CAMP public canvas in one complete locale at a time", () => {
+    const pl = render("pl", <AIProductionAnalysisCanvas analysis={presentAnalysis(briefPl, false, "pl")} />);
+    const en = render("en", <AIProductionAnalysisCanvas analysis={presentAnalysis(briefPl, false, "en")} />);
+
+    for (const label of ["ANALIZA AI", "Podsumowanie", "CO Z TEGO WYNIKA TERAZ", "NAJWAŻNIEJSZE POTWIERDZONE INFORMACJE", "NASTĘPNE KROKI RESEARCHU"]) assert.match(pl, new RegExp(label));
+    for (const label of ["AI ANALYSIS", "Summary", "WHAT THIS MEANS NOW", "KEY CONFIRMED FINDINGS", "NEXT RESEARCH STEPS"]) assert.match(en, new RegExp(label));
+    assert.doesNotMatch(pl, /AI ANALYSIS|WHAT THIS MEANS NOW|KEY CONFIRMED FINDINGS/);
+    assert.doesNotMatch(en, /ANALIZA AI|CO Z TEGO WYNIKA TERAZ|NAJWAŻNIEJSZE POTWIERDZONE INFORMACJE/);
+  });
+});
+
+describe("PC.2 CAMP presentation polish", () => {
+  it("keeps public CAMP copy nontechnical while restoring context values and trader-relevant findings", () => {
+    const plAnalysis = presentAnalysis(briefPl, false, "pl");
+    const enAnalysis = presentAnalysis(briefPl, false, "en");
+    const pl = render("pl", <AIProductionAnalysisCanvas analysis={plAnalysis} />);
+    const en = render("en", <AIProductionAnalysisCanvas analysis={enAnalysis} />);
+
+    assert.match(pl, /Kapitalizacja: /);
+    assert.match(pl, /Płynność: /);
+    assert.match(pl, /Do weryfikacji/);
+    assert.match(en, /Needs review/);
+    assert.match(pl, /Kompletność źródła:/);
+    assert.match(en, /Source completeness:/);
+    assert.match(pl, /Kontrola listy Established/);
+    assert.match(en, /Established-list check/);
+    assert.match(pl, /Brak dodatkowych danych w tej migawce/);
+    assert.match(en, /No additional data in this snapshot/);
+    assert.doesNotMatch(pl, /kolejk|provider|model|cache|dedup/i);
+    assert.doesNotMatch(pl, />[^<]*(?:wspóln|Canvas)[^<]*</i);
+    assert.doesNotMatch(en, /shared|queue|provider|model|cache|dedup/i);
+    assert.doesNotMatch(en, />[^<]*Canvas[^<]*</i);
+    assert.deepEqual(plAnalysis.confirmed_findings.map(({ title }) => title), ["Kapitalizacja", "Płynność", "Podstawowe filtry"]);
+    assert.deepEqual(enAnalysis.confirmed_findings.map(({ title }) => title), ["Market cap", "Liquidity", "Basic filters"]);
+    assert.match(en, /Fresh data becomes available/);
+    assert.doesNotMatch(en, /Dostępność świeżych danych/);
+  });
+
+  it("uses an explicit product URL locale before the stored preference", () => {
+    assert.equal(readRequestedProductLocale("?locale=pl"), "pl");
+    assert.equal(readRequestedProductLocale("?locale=en"), "en");
+    assert.equal(readRequestedProductLocale("?locale=de"), null);
+  });
+});
+
+describe("PC.2 action-first research guidance", () => {
+  it("keeps a stored bilingual READY brief public as v3 with guidance and rejects an invalid guidance projection", () => {
+    const storedReady: AIResearchBriefLookup = {
+      schema_version: "ai_research_lookup_v1",
+      availability: "READY",
+      provider_mode: "DISABLED",
+      brief: { ...briefPl, render_preview: false },
+      retry_after_seconds: null,
+      error_code: null,
+      queue_status: "READY",
+      shared_result: true,
+      is_last_known_good: false,
+    };
+    const providerCalls = 0;
+
+    for (const [locale, brief, guidance] of [
+      ["pl", briefPl, context.guidance],
+      ["en", briefEn, contextEn.guidance],
+    ] as const) {
+      const publicLookup = presentAIProductionLookup({ ...storedReady, brief }, locale, guidance);
+      assert.equal(publicLookup.status, "READY");
+      assert.equal(publicLookup.analysis?.schema_version, "ai_production_analysis_v3");
+      assert.ok(publicLookup.analysis?.research_guidance);
+      assert.ok(publicLookup.analysis?.research_guidance.current_step);
+
+      const invalidGuidance = {
+        ...publicLookup,
+        analysis: { ...publicLookup.analysis!, research_guidance: null },
+      };
+      assert.throws(
+        () => validateAIProductionLookup(invalidGuidance as unknown as Parameters<typeof validateAIProductionLookup>[0]),
+        /AI_PRODUCTION_PUBLIC_CONTRACT_INVALID/,
+      );
+      assert.equal(publicLookup.status, "READY", "a rejected projection must not mutate the valid cached READY lookup");
+    }
+
+    assert.equal(providerCalls, 0, "public projection of a stored brief must not call a provider");
+  });
+
+  it("keeps failed stale filters at Step 1 with one automatic-snapshot action and canonical exact failures", () => {
+    const input = structuredClone(context.guidance);
+    input.freshness = "STALE";
+    input.filters = {
+      status: "rejected_basic_filter",
+      reasons: ["market_cap_below_300000", "volume_24h_below_30000", "liquidity_below_30000"],
+      metrics: { market_cap_usd: 4_659, liquidity_usd: 5_925, volume_24h_usd: 2_289, volume_market_cap_ratio: null, pair_age_days: null },
+    };
+    input.action_catalog = guidanceActions("pl", ["WAIT_FOR_CHECKPOINT"]);
+    const analysis = presentAnalysis(briefPl, false, "pl", input);
+    const markup = render("pl", <AIProductionAnalysisCanvas analysis={analysis} />);
+
+    assert.deepEqual(analysis.research_guidance.current_step, {
+      number: 1,
+      title: "SZYBKI FILTR",
+      posture: "KROK 1 NIEZALICZONY",
+      posture_detail: "Dalszy research jest wstrzymany do kolejnej świeżej migawki.",
+    });
+    assert.deepEqual(analysis.research_guidance.filter_failures.map(({ label, value, status }) => ({ label, value, status })), [
+      { label: "Kapitalizacja", value: "4659 USD", status: "NIE SPEŁNIA" },
+      { label: "Wolumen 24 h", value: "2289 USD", status: "NIE SPEŁNIA" },
+      { label: "Płynność", value: "5925 USD", status: "NIE SPEŁNIA" },
+    ]);
+    assert.match(analysis.research_guidance.filter_failures[0]!.requirement, /300\s?000 USD/);
+    assert.match(analysis.research_guidance.filter_failures[1]!.requirement, /30\s?000 USD/);
+    assert.match(analysis.research_guidance.filter_failures[2]!.requirement, /30\s?000 USD/);
+    assert.deepEqual(analysis.research_guidance.actions.map(({ title }) => title), ["Poczekaj na świeżą migawkę"]);
+    assert.equal(analysis.research_guidance.actions[0]!.cta, null);
+    assert.match(analysis.research_guidance.actions[0]!.why, /System automatycznie ponownie przeliczy podstawowe filtry/);
+    assert.match(analysis.research_guidance.actions[0]!.resolves, /JEŻELI FILTRY NADAL NIE PRZEJDĄ: Token pozostaje w Kroku 1/);
+    assert.match(analysis.research_guidance.actions[0]!.resolves, /JEŻELI WSZYSTKIE WYMAGANE FILTRY PRZEJDĄ: Następny etap: Krok 2\/7 — Deal Breakers \/ Security/);
+    assert.deepEqual(analysis.research_guidance.unlock_conditions, [
+      "Świeża migawka danych",
+      "Kapitalizacja: spełnia wymagany próg",
+      "Wolumen 24 h: spełnia wymagany próg",
+      "Płynność: spełnia wymagany próg",
+    ]);
+    assert.match(markup, /Krok 1\/7 — SZYBKI FILTR/);
+    assert.match(markup, /KROK 1 NIEZALICZONY/);
+    assert.match(markup, /Dalszy research jest wstrzymany do kolejnej świeżej migawki/);
+    assert.match(markup, /Poczekaj na świeżą migawkę/);
+    assert.doesNotMatch(markup, /Sprawdź dokładne wyniki filtrów/);
+    assert.match(markup, /DOKŁADNE WYNIKI FILTRÓW/);
+    assert.match(markup, /JEŚLI TOKEN PRZEJDZIE KROK 1/);
+    assert.match(markup, /Po spełnieniu podstawowych filtrów kolejnym etapem będzie weryfikacja bezpieczeństwa/);
+    assert.match(markup, /PODGLĄD KOLEJNEGO ETAPU/);
+    assert.match(markup, /SZCZEGÓŁY ANALIZY/);
+    assert.ok(markup.indexOf("ETAP RESEARCHU") < markup.indexOf("SZCZEGÓŁY ANALIZY"));
+  });
+
+  it("keeps a freshness-specific Step 1 posture when filters passed and only the snapshot is stale", () => {
+    const input = structuredClone(contextEn.guidance);
+    input.freshness = "STALE";
+    input.filters = { ...input.filters, status: "passed_basic_filter", reasons: [] };
+    input.action_catalog = guidanceActions("en", ["WAIT_FOR_CHECKPOINT"]);
+    const analysis = presentAnalysis(briefEn, false, "en", input);
+
+    assert.deepEqual(analysis.research_guidance.current_step, {
+      number: 1,
+      title: "QUICK FILTER",
+      posture: "REFRESH DATA",
+      posture_detail: "Basic filters remain passed; only data freshness is awaiting the next snapshot.",
+    });
+    assert.doesNotMatch(analysis.research_guidance.current_step.posture, /NOT PASSED/);
+    assert.deepEqual(analysis.research_guidance.actions.map(({ title }) => title), ["Refresh the data", "Review the exact filter results"]);
+  });
+
+  it("selects Security before on-chain research when filters pass but security is incomplete", () => {
+    const input = structuredClone(contextEn.guidance);
+    input.freshness = "FRESH";
+    input.filters = { ...input.filters, status: "passed_basic_filter", reasons: [] };
+    input.security = { coverage: "unavailable", contract_verified: null, honeypot_status: null, buy_tax: null, sell_tax: null, critical_flags_recorded: false };
+    input.holder_data_available = false;
+    input.address_identity_verified = false;
+    input.action_catalog = guidanceActions("en", ["REVIEW_SECURITY", "OPEN_VERIFICATION", "OPEN_EXPLORER"]);
+    const analysis = presentAnalysis(briefEn, false, "en", input);
+    const markup = render("en", <AIProductionAnalysisCanvas analysis={analysis} />);
+
+    assert.deepEqual(analysis.research_guidance.current_step, {
+      number: 2,
+      title: "DEAL BREAKERS — SECURITY",
+      posture: "SECURITY VERIFICATION REQUIRED",
+      posture_detail: "Security checks must be completed before the on-chain data stage.",
+    });
+    assert.deepEqual(analysis.research_guidance.actions.map(({ title }) => title), ["Review security", "Verify the source", "Open the explorer"]);
+    assert.deepEqual(analysis.research_guidance.unlock_conditions, ["Security result is available", "Contract verification is assessed", "Critical flags are reviewed"]);
+    assert.match(markup, /NEXT RESEARCH STEPS/);
+    assert.doesNotMatch(markup, /IF THE TOKEN PASSES STEP 1|NEXT-STAGE PREVIEW/);
+  });
+
+  it("labels detailed actions as a future Step 2 preview in both locales while Step 1 is failed", () => {
+    const plInput = structuredClone(context.guidance);
+    plInput.freshness = "STALE";
+    plInput.filters = {
+      status: "rejected_basic_filter",
+      reasons: ["market_cap_below_300000"],
+      metrics: { market_cap_usd: 4_659, liquidity_usd: 5_925, volume_24h_usd: 2_289, volume_market_cap_ratio: null, pair_age_days: null },
+    };
+    plInput.action_catalog = guidanceActions("pl", ["WAIT_FOR_CHECKPOINT"]);
+    const enInput = structuredClone(plInput);
+    enInput.action_catalog = guidanceActions("en", ["WAIT_FOR_CHECKPOINT"]);
+
+    const pl = render("pl", <AIProductionAnalysisCanvas analysis={presentAnalysis(briefPl, false, "pl", plInput)} />);
+    const en = render("en", <AIProductionAnalysisCanvas analysis={presentAnalysis(briefEn, false, "en", enInput)} />);
+    assert.match(pl, /JEŚLI TOKEN PRZEJDZIE KROK 1/);
+    assert.match(pl, /Po spełnieniu podstawowych filtrów kolejnym etapem będzie weryfikacja bezpieczeństwa/);
+    assert.match(en, /IF THE TOKEN PASSES STEP 1/);
+    assert.match(en, /After the basic filters are met, the next stage will be security verification/);
+  });
+
+  it("selects On-chain only after filters and security are sufficiently complete while holder data is missing", () => {
+    const input = structuredClone(context.guidance);
+    input.freshness = "FRESH";
+    input.filters = { ...input.filters, status: "passed_basic_filter", reasons: [] };
+    input.security = { coverage: "complete", contract_verified: true, honeypot_status: "PASSED", buy_tax: 0, sell_tax: 0, critical_flags_recorded: false };
+    input.holder_data_available = false;
+    input.address_identity_verified = true;
+    input.action_catalog = guidanceActions("pl", ["OPEN_EXPLORER"]);
+    const analysis = presentAnalysis(briefPl, false, "pl", input);
+
+    assert.deepEqual(analysis.research_guidance.current_step, {
+      number: 4,
+      title: "DANE ON-CHAIN",
+      posture: "WYMAGA DANYCH ON-CHAIN",
+      posture_detail: "Do oceny koncentracji podaży potrzebne są zapisane dane holderów.",
+    });
+    assert.deepEqual(analysis.research_guidance.blockers.map(({ title }) => title), ["Brak struktury holderów"]);
+    assert.deepEqual(analysis.research_guidance.actions.map(({ title }) => title), ["Sprawdź dane holderów on-chain"]);
+  });
 });
 
 describe("AI.1 responsive and accessibility contracts", () => {
   it("ships 390 px list transformations, 44 px actions, reduced motion and no overflow-prone layout", async () => {
-    const [css, canvas, section, client] = await Promise.all([
-      source("src/index.css"), source("src/components/AIResearchBriefCanvas.tsx"), source("src/components/AIResearchSection.tsx"), source("src/services/aiResearchDataSource.ts"),
+    const [css, canvas, productionCanvas, section, client] = await Promise.all([
+      source("src/index.css"), source("src/components/AIResearchBriefCanvas.tsx"), source("src/components/AIProductionAnalysisCanvas.tsx"), source("src/components/AIResearchSection.tsx"), source("src/services/aiResearchDataSource.ts"),
     ]);
     assert.match(css, /@media \(max-width: 420px\)[\s\S]*\.ai-research-kpis[\s\S]*repeat\(2/);
     assert.match(css, /\.ai-risk-table,[\s\S]*\.ai-risk-row[\s\S]*display: block/);
@@ -201,7 +417,12 @@ describe("AI.1 responsive and accessibility contracts", () => {
     assert.match(canvas, /<ol className="ai-checkpoint-axis">/);
     assert.match(section, /aria-live="polite"/);
     assert.match(section, /loading=\{requesting\}/);
-    assert.doesNotMatch([canvas, section, client].join("\n"), /dangerouslySetInnerHTML|onClick=\{undefined\}|role="button"/);
+    assert.match(productionCanvas, /AI ANALYSIS.*Summary[\s\S]*WHAT THIS MEANS NOW/);
+    assert.match(css, /\.ai-production-header\s*\{\s*grid-template-columns:\s*minmax\(0, 1fr\) minmax\(190px, auto\)/);
+    assert.match(css, /\.ai-production-header[\s\S]*overflow-wrap:\s*normal;[\s\S]*word-break:\s*normal;[\s\S]*hyphens:\s*none/);
+    assert.match(css, /@media \(max-width: 900px\)[\s\S]*\.ai-production-header\s*\{\s*grid-template-columns:\s*minmax\(0, 1fr\)/);
+    assert.match(css, /\.ai-production-analysis \.ai-brief-panel li\s*\{\s*display: grid;[\s\S]*gap: 3px/);
+    assert.doesNotMatch([canvas, productionCanvas, section, client].join("\n"), /dangerouslySetInnerHTML|onClick=\{undefined\}|role="button"/);
   });
 
   it("keeps the schema portable to AI KINTEL storage and billing adapters", async () => {
@@ -352,7 +573,7 @@ describe("AI.3 shared queue UI", () => {
     const markup = render("pl", <AIResearchSection chain="base" contractAddress={ADDRESS} symbol="SCOOBERT" name="Scoobert" initialLookup={failure} />);
     assert.match(markup, /Niedostępna/);
     assert.match(markup, /Analiza nie mogła zostać teraz przygotowana\./);
-    assert.match(markup, /Spróbuj ponownie\. Ponowne zgłoszenie nie utworzy duplikatu\./);
+    assert.match(markup, /Spróbuj ponownie później\./);
     assert.match(markup, /Ponów zlecenie analizy/);
     assert.doesNotMatch(markup, /Wygeneruj analizę AI/);
     assert.doesNotMatch(markup, /Brak analizy/);
@@ -415,7 +636,7 @@ describe("AI.3 shared queue UI", () => {
       retry_after_seconds: null,
       error_code: null,
     }} />);
-    assert.match(section, /Analiza została przygotowana na podstawie zwalidowanych danych/);
+    assert.match(section, /ai-prepared-status/);
     assert.doesNotMatch(section, /OpenAI|gpt-5-mini|provider mode/i);
   });
 
@@ -430,7 +651,7 @@ describe("AI.3 shared queue UI", () => {
       queue_status: "SUSPENDED",
     }} />);
     assert.match(suspended, /Przygotowanie analizy jest wstrzymane/);
-    assert.match(suspended, /Wznowienie będzie możliwe po uruchomieniu kolejki analizy\./);
+    assert.match(suspended, /Przygotowanie będzie możliwe, gdy analiza będzie dostępna\./);
     assert.doesNotMatch(suspended, /Zleć analizę AI|Ponów zlecenie analizy/);
 
     const queued = render("pl", <AIResearchSection chain="base" contractAddress={ADDRESS} symbol="SCOOBERT" name="Scoobert" initialLookup={{
@@ -442,7 +663,7 @@ describe("AI.3 shared queue UI", () => {
       error_code: null,
       queue_status: "QUEUED",
     }} />);
-    assert.match(queued, /Analiza oczekuje w kolejce/);
+    assert.match(queued, /Analiza jest przygotowywana/);
     assert.doesNotMatch(queued, /Zleć analizę AI|Ponów zlecenie analizy/);
   });
 });
@@ -494,7 +715,7 @@ function buildSemanticReviewBrief(brief: AIResearchBrief, locale: ProductLocale)
     severity: "high",
     category: "basic_filters",
     title: pl ? "Filtry niespełnione" : "Filters not met",
-    explanation: pl ? "Co najmniej jeden podstawowy warunek produktu nie jest spełniony." : "At least one basic product condition is not met.",
+    explanation: bilingualText("At least one basic product condition is not met.", "Co najmniej jeden podstawowy warunek produktu nie jest spełniony."),
     evidence_reference_ids: ["basic_filters", "security_status", "scanner_snapshot", "follow_up_checkpoints", "established_membership", "methodology"],
   }];
   result.missing_information = [
@@ -503,15 +724,15 @@ function buildSemanticReviewBrief(brief: AIResearchBrief, locale: ProductLocale)
     ["next_checkpoint", pl ? "Brak kolejnego checkpointu" : "Next checkpoint missing", "follow_up_checkpoints"],
     ["fresh_data", pl ? "Brak świeżych danych" : "Fresh data missing", "scanner_snapshot"],
     ["source_verification", pl ? "Brak weryfikacji źródłowej" : "Source verification missing", "scanner_snapshot"],
-  ].map(([key, label, source_reference_id]) => ({ key, label, explanation: pl ? "Opis ogólny." : "Generic description.", source_reference_ids: [source_reference_id] }));
+  ].map(([key, label, source_reference_id]) => ({ key, label, explanation: bilingualText("Generic description.", "Opis ogólny."), source_reference_ids: [source_reference_id] }));
   result.next_actions = [{
-    action_type: "WAIT_FOR_CHECKPOINT", label: pl ? "Poczekaj na świeżą migawkę" : "Wait for a fresh snapshot", priority: "primary", reason: "", target_type: "internal_route", target_reference: "#ai-research-checkpoints",
+    action_type: "WAIT_FOR_CHECKPOINT", label: pl ? "Poczekaj na świeżą migawkę" : "Wait for a fresh snapshot", priority: "primary", reason: bilingualText("Wait for a fresh snapshot before comparing the recorded data.", "Poczekaj na świeżą migawkę przed porównaniem zapisanych danych."), target_type: "internal_route", target_reference: "#ai-research-checkpoints",
   }, {
-    action_type: "OPEN_VERIFICATION", label: pl ? "Otwórz weryfikację źródłową" : "Open source verification", priority: "secondary", reason: "", target_type: "internal_route", target_reference: "#external-checks",
+    action_type: "OPEN_VERIFICATION", label: pl ? "Otwórz weryfikację źródłową" : "Open source verification", priority: "secondary", reason: bilingualText("Verify the listed source after refreshing the snapshot.", "Zweryfikuj wskazane źródło po odświeżeniu migawki."), target_type: "internal_route", target_reference: "#external-checks",
   }, {
-    action_type: "OPEN_DEXSCREENER", label: pl ? "Otwórz DexScreener" : "Open DexScreener", priority: "tertiary", reason: "", target_type: "external_url", target_reference: "https://dexscreener.com/base/0x1111111111111111111111111111111111111111",
+    action_type: "OPEN_DEXSCREENER", label: pl ? "Otwórz DexScreener" : "Open DexScreener", priority: "tertiary", reason: bilingualText("Use the recorded market source as supporting context.", "Użyj zapisanego źródła rynkowego jako kontekstu pomocniczego."), target_type: "external_url", target_reference: "https://dexscreener.com/base/0x1111111111111111111111111111111111111111",
   }, {
-    action_type: "OPEN_EXPLORER", label: pl ? "Otwórz eksplorator" : "Open explorer", priority: "tertiary", reason: "", target_type: "external_url", target_reference: "https://basescan.org/token/0x1111111111111111111111111111111111111111",
+    action_type: "OPEN_EXPLORER", label: pl ? "Otwórz eksplorator" : "Open explorer", priority: "tertiary", reason: bilingualText("Use the recorded network source only for the listed verification step.", "Użyj zapisanego źródła sieciowego wyłącznie do wskazanego kroku weryfikacji."), target_type: "external_url", target_reference: "https://basescan.org/token/0x1111111111111111111111111111111111111111",
   }];
   result.source_references = [
     ["basic_filters", "basic_filters"], ["security_status", "security_status"], ["scanner_snapshot", "scanner_snapshot"],
@@ -520,9 +741,34 @@ function buildSemanticReviewBrief(brief: AIResearchBrief, locale: ProductLocale)
   return result;
 }
 
+function bilingualText(en: string, pl: string) {
+  return { en, pl };
+}
+
 function sourceType(id: string): AIResearchBrief["source_references"][number]["source_type"] {
   if (id === "follow_up_checkpoints") return "follow_up_checkpoint";
   return id as AIResearchBrief["source_references"][number]["source_type"];
+}
+
+function guidanceActions(locale: ProductLocale, types: Array<AIResearchGuidanceInput["action_catalog"][number]["action_type"]>): AIResearchGuidanceInput["action_catalog"] {
+  const labels: Record<AIResearchGuidanceInput["action_catalog"][number]["action_type"], [string, string]> = {
+    OPEN_VERIFICATION: ["Otwórz weryfikację źródła", "Open source verification"],
+    OPEN_DEXSCREENER: ["Otwórz DexScreener", "Open DexScreener"],
+    OPEN_EXPLORER: ["Otwórz eksplorator", "Open explorer"],
+    REVIEW_SECURITY: ["Sprawdź bezpieczeństwo", "Review security"],
+    WAIT_FOR_CHECKPOINT: ["Poczekaj na świeżą migawkę", "Wait for a fresh snapshot"],
+    REVIEW_CHECKPOINTS: ["Przejrzyj punkty kontrolne", "Review checkpoints"],
+    OPEN_REPORT: ["Otwórz raport", "Open report"],
+    OWNER_REVIEW: ["Przegląd ownera", "Owner review"],
+    RETURN_TO_RADAR: ["Wróć do Radaru", "Return to Radar"],
+  };
+  return types.map((action_type, index) => ({
+    action_type,
+    label: labels[action_type][locale === "pl" ? 0 : 1],
+    priority: index === 0 ? "primary" : index === 1 ? "secondary" : "tertiary",
+    target_type: action_type === "OPEN_EXPLORER" ? "external_url" : "internal_route",
+    target_reference: action_type === "OPEN_EXPLORER" ? `https://basescan.org/token/${ADDRESS}` : "#external-checks",
+  }));
 }
 
 function source(path: string) {

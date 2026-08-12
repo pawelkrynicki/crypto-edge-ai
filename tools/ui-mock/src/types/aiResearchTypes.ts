@@ -1,5 +1,7 @@
-export const AI_RESEARCH_SCHEMA_VERSION = "ai_research_brief_v1" as const;
-export const AI_RESEARCH_PROMPT_VERSION = "ai_research_prompt_v2" as const;
+export const AI_RESEARCH_SCHEMA_VERSION = "ai_research_brief_v2" as const;
+// One shared heavy generation carries evidence-bound English and Polish wording.
+// Request locale never owns the cache key or triggers a second provider call.
+export const AI_RESEARCH_PROMPT_VERSION = "ai_research_prompt_v4" as const;
 export const AI_ANALYSIS_QUEUE_SCHEMA_VERSION = "ai_analysis_queue_v1" as const;
 export const AI_RESEARCH_DATA_CONTRACT_VERSION = "ai_research_data_contract_v2" as const;
 export const AI_RESEARCH_TARGET_MODEL = "gpt-5-mini" as const;
@@ -62,6 +64,8 @@ export type AIResearchActionType = typeof AI_RESEARCH_ACTION_TYPES[number];
 export type AIResearchRiskSeverity = typeof AI_RESEARCH_RISK_SEVERITIES[number];
 export type AIResearchCoverageState = typeof AI_RESEARCH_COVERAGE_STATES[number];
 export type AIResearchLocale = "pl" | "en";
+export type AIResearchStorageLanguage = AIResearchLocale | "bilingual";
+export type AIResearchBilingualText = { en: string; pl: string };
 export type AIAnalysisStatus = typeof AI_ANALYSIS_STATUSES[number];
 export type AIAnalysisRequestOutcome = typeof AI_ANALYSIS_REQUEST_OUTCOMES[number];
 export type AIResearchGenerationBlockedReason =
@@ -104,7 +108,7 @@ export type AIResearchKnownFact = {
   key: string;
   label: string;
   value: string | number | boolean | null;
-  interpretation: string;
+  interpretation: AIResearchBilingualText;
   source_reference_ids: string[];
 };
 
@@ -112,14 +116,14 @@ export type AIResearchRiskFactor = {
   severity: AIResearchRiskSeverity;
   category: string;
   title: string;
-  explanation: string;
+  explanation: AIResearchBilingualText;
   evidence_reference_ids: string[];
 };
 
 export type AIResearchMissingInformation = {
   key: string;
   label: string;
-  explanation: string;
+  explanation: AIResearchBilingualText;
   source_reference_ids: string[];
 };
 
@@ -127,7 +131,7 @@ export type AIResearchNextAction = {
   action_type: AIResearchActionType;
   label: string;
   priority: "primary" | "secondary" | "tertiary";
-  reason: string;
+  reason: AIResearchBilingualText;
   target_type: "internal_route" | "external_url" | "status";
   target_reference: string;
 };
@@ -135,7 +139,7 @@ export type AIResearchNextAction = {
 export type AIResearchStatusChangeCondition = {
   key: string;
   label: string;
-  explanation: string;
+  explanation: AIResearchBilingualText;
   source_reference_ids: string[];
 };
 
@@ -149,14 +153,14 @@ export type AIResearchBrief = {
   schema_version: typeof AI_RESEARCH_SCHEMA_VERSION;
   analysis_id: string;
   identity: { chain: string; contract_address: string };
-  analysis_language: AIResearchLocale;
+  analysis_language: "bilingual";
   snapshot_fingerprint: string;
   prompt_version: typeof AI_RESEARCH_PROMPT_VERSION;
   model: string;
   generated_at: string;
   data_generated_at: string;
   research_state: AIResearchState;
-  summary: string;
+  summary: AIResearchBilingualText;
   known_facts: AIResearchKnownFact[];
   risk_factors: AIResearchRiskFactor[];
   missing_information: AIResearchMissingInformation[];

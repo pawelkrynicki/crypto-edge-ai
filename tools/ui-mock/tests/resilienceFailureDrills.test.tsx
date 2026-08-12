@@ -150,6 +150,7 @@ describe("STAB.1 resilience and controlled failure drills", () => {
     assert.equal(value.evidence.maximum_attempts, 2);
     assert.equal(value.evidence.provider_calls, 2);
     assert.equal(value.evidence.final_status, "SUSPENDED");
+    assert.equal(value.evidence.worker_remains_available, true);
   });
 
   it("18. cooldown nie tworzy duplikatu", () => {

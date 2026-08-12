@@ -30,6 +30,22 @@ type SqliteDatabase = {
 type SqliteModule = { DatabaseSync: new (filename: string) => SqliteDatabase };
 
 export const AI_ANALYSIS_ACTIVE_STATUSES = ["QUEUED", "PROCESSING"] as const;
+export const AI_ANALYSIS_PROVIDER_ATTEMPT_STATUSES = ["NOT_ATTEMPTED", "STARTED", "RESPONSE_RECEIVED", "FAILED"] as const;
+export const AI_ANALYSIS_FAILURE_STAGES = [
+  "CONTEXT_BUILD",
+  "IDENTITY_CHECK",
+  "CIRCUIT",
+  "PROVIDER_CALL",
+  "PROVIDER_RESPONSE",
+  "PROVIDER_PARSE",
+  "HYDRATE",
+  "STORE_COMPLETE",
+  "USAGE_RECORD",
+  "UNKNOWN",
+] as const;
+
+export type AIAnalysisProviderAttemptStatus = typeof AI_ANALYSIS_PROVIDER_ATTEMPT_STATUSES[number];
+export type AIAnalysisFailureStage = typeof AI_ANALYSIS_FAILURE_STAGES[number];
 
 export type AIAnalysisCacheIdentity = {
   cache_key: string;
@@ -58,6 +74,20 @@ export type AIAnalysisQueueRecord = AIAnalysisCacheIdentity & {
   token_usage: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
   latency_ms: number | null;
   provider_response_id: string | null;
+  provider_attempt_count: number;
+  provider_attempt_started_at: string | null;
+  provider_attempt_completed_at: string | null;
+  provider_attempt_status: AIAnalysisProviderAttemptStatus;
+  provider_attempt_safe_error_code: string | null;
+  internal_validation_code: string | null;
+  internal_validation_violations: string[];
+  internal_provider_response: {
+    status: string | null;
+    incomplete_reason: string | null;
+    output_tokens: number | null;
+    reasoning_tokens: number | null;
+  };
+  failure_stage: AIAnalysisFailureStage | null;
   lease_owner: string | null;
   lease_expires_at: string | null;
   created_at: string;
@@ -85,12 +115,24 @@ export type AIAnalysisRateLimits = {
   identity: number;
   global: number;
   cooldownMs: number;
+  /** New-analysis initiation limits. Cache reads and deduplicated requests never consume them. */
+  actorHourly?: number;
+  globalHourly?: number;
+  globalDaily?: number;
 };
 
 export type AIAnalysisWorkerState = {
   suspended: boolean;
   safe_error_code: string | null;
   suspended_at: string | null;
+  updated_at: string;
+};
+
+export type AIAnalysisCircuitBreakerState = {
+  state: "CLOSED" | "OPEN" | "HALF_OPEN";
+  consecutive_failures: number;
+  open_until: string | null;
+  half_open_in_flight: boolean;
   updated_at: string;
 };
 
@@ -145,12 +187,14 @@ export function buildAIAnalysisCacheIdentity(input: {
     analysis_schema_version: input.analysis_schema_version ?? AI_RESEARCH_SCHEMA_VERSION,
     chain: identity.chain,
     contract_address: identity.contract_address,
-    locale: input.locale,
     model_id: input.model_id,
     prompt_version: input.prompt_version ?? AI_RESEARCH_PROMPT_VERSION,
     snapshot_fingerprint: input.snapshot_fingerprint,
   };
-  return { cache_key: sha256(stableJson(canonical)), ...canonical };
+  // The legacy database column is retained for compatibility. Production writes use
+  // the canonical "en" legacy column value; it is never a request-owned semantic value and is not
+  // part of the shared cache key.
+  return { cache_key: sha256(stableJson(canonical)), ...canonical, locale: input.locale };
 }
 
 export function hashAIAnalysisRateScope(value: string): string {
@@ -238,7 +282,7 @@ export async function createAIAnalysisQueueStore(options: AIAnalysisQueueStoreOp
           db.prepare(`
 UPDATE crypto_ai_analysis_queue SET status = 'QUEUED', requested_at = ?, queued_at = ?, started_at = NULL,
   completed_at = NULL, failed_at = NULL, next_retry_at = NULL, validation_status = 'PENDING',
-  safe_error_code = NULL, lease_owner = NULL, lease_expires_at = NULL, updated_at = ?
+  safe_error_code = NULL, failure_stage = NULL, lease_owner = NULL, lease_expires_at = NULL, updated_at = ?
 WHERE cache_key = ?
 `).run(nowIso, nowIso, nowIso, input.identity.cache_key);
         } else {
@@ -247,8 +291,9 @@ INSERT INTO crypto_ai_analysis_queue (
   analysis_id, cache_key, chain, contract_address, snapshot_fingerprint, prompt_version, model_id,
   analysis_schema_version, locale, status, requested_at, queued_at, attempt_count, result_json,
   validation_status, safe_error_code, prompt_tokens, completion_tokens, total_tokens, latency_ms,
-  provider_response_id, lease_owner, lease_expires_at, created_at, updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'QUEUED', ?, ?, 0, NULL, 'PENDING', NULL, 0, 0, 0, NULL, NULL, NULL, NULL, ?, ?)
+  provider_response_id, provider_attempt_count, provider_attempt_started_at, provider_attempt_completed_at,
+  provider_attempt_status, provider_attempt_safe_error_code, failure_stage, lease_owner, lease_expires_at, created_at, updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'QUEUED', ?, ?, 0, NULL, 'PENDING', NULL, 0, 0, 0, NULL, NULL, 0, NULL, NULL, 'NOT_ATTEMPTED', NULL, NULL, NULL, NULL, ?, ?)
 `).run(
             `air_${randomUUID()}`,
             input.identity.cache_key,
@@ -314,14 +359,121 @@ WHERE analysis_id = ? AND status = 'PROCESSING' AND lease_owner = ?
       return changes(result) === 1;
     },
 
-    deferClaim(input: { analysis_id: string; worker_id: string; next_retry_at: Date; now: Date; safe_error_code: string }): boolean {
+    recordProviderAttemptStarted(input: { analysis_id: string; worker_id: string; now: Date }): AIAnalysisQueueRecord {
+      const db = requireDb();
+      const nowIso = input.now.toISOString();
+      const result = db.prepare(`
+UPDATE crypto_ai_analysis_queue SET provider_attempt_count = provider_attempt_count + 1,
+  provider_attempt_started_at = ?, provider_attempt_completed_at = NULL,
+  provider_attempt_status = 'STARTED', provider_attempt_safe_error_code = NULL,
+  internal_validation_code = NULL, internal_validation_violations_json = NULL,
+  internal_provider_response_status = NULL, internal_provider_incomplete_reason = NULL,
+  internal_provider_output_tokens = NULL, internal_provider_reasoning_tokens = NULL, updated_at = ?
+WHERE analysis_id = ? AND status = 'PROCESSING' AND lease_owner = ?
+`).run(nowIso, nowIso, input.analysis_id, input.worker_id);
+      if (changes(result) !== 1) throw new AIAnalysisQueueStoreError("STORE_UNAVAILABLE");
+      const record = safeRecord(db.prepare("SELECT * FROM crypto_ai_analysis_queue WHERE analysis_id = ?").get(input.analysis_id));
+      if (!record) throw new AIAnalysisQueueStoreError("STORE_UNAVAILABLE");
+      return record;
+    },
+
+    recordProviderResponseReceived(input: { analysis_id: string; worker_id: string; now: Date }): AIAnalysisQueueRecord {
+      const db = requireDb();
+      const nowIso = input.now.toISOString();
+      const result = db.prepare(`
+UPDATE crypto_ai_analysis_queue SET provider_attempt_completed_at = ?, provider_attempt_status = 'RESPONSE_RECEIVED',
+  provider_attempt_safe_error_code = NULL, updated_at = ?
+WHERE analysis_id = ? AND status = 'PROCESSING' AND lease_owner = ? AND provider_attempt_status = 'STARTED'
+`).run(nowIso, nowIso, input.analysis_id, input.worker_id);
+      if (changes(result) !== 1) throw new AIAnalysisQueueStoreError("STORE_UNAVAILABLE");
+      const record = safeRecord(db.prepare("SELECT * FROM crypto_ai_analysis_queue WHERE analysis_id = ?").get(input.analysis_id));
+      if (!record) throw new AIAnalysisQueueStoreError("STORE_UNAVAILABLE");
+      return record;
+    },
+
+    recordProviderAttemptFailed(input: { analysis_id: string; worker_id: string; now: Date; safe_error_code: string }): AIAnalysisQueueRecord {
+      const db = requireDb();
+      const nowIso = input.now.toISOString();
+      const result = db.prepare(`
+UPDATE crypto_ai_analysis_queue SET provider_attempt_completed_at = ?, provider_attempt_status = 'FAILED',
+  provider_attempt_safe_error_code = ?, updated_at = ?
+WHERE analysis_id = ? AND status = 'PROCESSING' AND lease_owner = ? AND provider_attempt_status = 'STARTED'
+`).run(nowIso, safeCode(input.safe_error_code), nowIso, input.analysis_id, input.worker_id);
+      if (changes(result) !== 1) throw new AIAnalysisQueueStoreError("STORE_UNAVAILABLE");
+      const record = safeRecord(db.prepare("SELECT * FROM crypto_ai_analysis_queue WHERE analysis_id = ?").get(input.analysis_id));
+      if (!record) throw new AIAnalysisQueueStoreError("STORE_UNAVAILABLE");
+      return record;
+    },
+
+    recordValidationDiagnostics(input: {
+      analysis_id: string;
+      worker_id: string;
+      validation_code: string;
+      violations: string[];
+      now: Date;
+    }): AIAnalysisQueueRecord {
+      const db = requireDb();
+      const result = db.prepare(`
+UPDATE crypto_ai_analysis_queue SET internal_validation_code = ?, internal_validation_violations_json = ?, updated_at = ?
+WHERE analysis_id = ? AND status = 'PROCESSING' AND lease_owner = ?
+`).run(
+        safeCode(input.validation_code),
+        JSON.stringify(input.violations.filter((value) => /^[A-Z0-9_]{1,80}$/.test(value)).slice(0, 20)),
+        input.now.toISOString(),
+        input.analysis_id,
+        input.worker_id,
+      );
+      if (changes(result) !== 1) throw new AIAnalysisQueueStoreError("STORE_UNAVAILABLE");
+      const record = safeRecord(db.prepare("SELECT * FROM crypto_ai_analysis_queue WHERE analysis_id = ?").get(input.analysis_id));
+      if (!record) throw new AIAnalysisQueueStoreError("STORE_UNAVAILABLE");
+      return record;
+    },
+
+    recordProviderResponseDiagnostics(input: {
+      analysis_id: string;
+      worker_id: string;
+      response_status: string | null;
+      incomplete_reason: string | null;
+      output_tokens: number | null;
+      reasoning_tokens: number | null;
+      now: Date;
+    }): AIAnalysisQueueRecord {
+      const db = requireDb();
+      const result = db.prepare(`
+UPDATE crypto_ai_analysis_queue SET internal_provider_response_status = ?, internal_provider_incomplete_reason = ?,
+  internal_provider_output_tokens = ?, internal_provider_reasoning_tokens = ?, updated_at = ?
+WHERE analysis_id = ? AND status = 'PROCESSING' AND lease_owner = ?
+`).run(
+        safeProviderDetail(input.response_status),
+        safeProviderDetail(input.incomplete_reason),
+        nullableInteger(input.output_tokens),
+        nullableInteger(input.reasoning_tokens),
+        input.now.toISOString(),
+        input.analysis_id,
+        input.worker_id,
+      );
+      if (changes(result) !== 1) throw new AIAnalysisQueueStoreError("STORE_UNAVAILABLE");
+      const record = safeRecord(db.prepare("SELECT * FROM crypto_ai_analysis_queue WHERE analysis_id = ?").get(input.analysis_id));
+      if (!record) throw new AIAnalysisQueueStoreError("STORE_UNAVAILABLE");
+      return record;
+    },
+
+    deferClaim(input: {
+      analysis_id: string;
+      worker_id: string;
+      next_retry_at: Date;
+      now: Date;
+      safe_error_code: string;
+      failure_stage?: AIAnalysisFailureStage;
+    }): boolean {
       const result = requireDb().prepare(`
 UPDATE crypto_ai_analysis_queue SET status = 'QUEUED', next_retry_at = ?, attempt_count = MAX(0, attempt_count - 1),
-  safe_error_code = ?, lease_owner = NULL, lease_expires_at = NULL, updated_at = ?
+  safe_error_code = ?, failure_stage = ?, lease_owner = NULL, lease_expires_at = NULL, updated_at = ?
 WHERE analysis_id = ? AND status = 'PROCESSING' AND lease_owner = ?
 `).run(
         input.next_retry_at.toISOString(),
         safeCode(input.safe_error_code),
+        safeFailureStage(input.failure_stage),
         input.now.toISOString(),
         input.analysis_id,
         input.worker_id,
@@ -353,16 +505,17 @@ SELECT * FROM crypto_ai_analysis_queue WHERE analysis_id = ? AND status = 'PROCE
           prompt_version: brief.prompt_version,
           model_id: brief.model,
           analysis_schema_version: brief.schema_version,
-          locale: brief.analysis_language,
+          locale: "en",
         }).cache_key) throw new AIAnalysisQueueStoreError("STORE_SCHEMA_INVALID");
         db.prepare(`
 UPDATE crypto_ai_analysis_queue SET status = 'STALE', updated_at = ?
-WHERE chain = ? AND contract_address = ? AND locale = ? AND status = 'READY' AND analysis_id <> ?
-`).run(nowIso, owned.chain, owned.contract_address, owned.locale, owned.analysis_id);
+WHERE chain = ? AND contract_address = ? AND status = 'READY' AND analysis_id <> ?
+`).run(nowIso, owned.chain, owned.contract_address, owned.analysis_id);
         db.prepare(`
 UPDATE crypto_ai_analysis_queue SET status = 'READY', completed_at = ?, failed_at = NULL, next_retry_at = NULL,
   result_json = ?, validation_status = ?, safe_error_code = NULL, prompt_tokens = ?, completion_tokens = ?,
-  total_tokens = ?, latency_ms = ?, provider_response_id = ?, lease_owner = NULL, lease_expires_at = NULL, updated_at = ?
+  total_tokens = ?, latency_ms = ?, provider_response_id = ?, failure_stage = NULL,
+  lease_owner = NULL, lease_expires_at = NULL, updated_at = ?
 WHERE analysis_id = ? AND lease_owner = ?
 `).run(
           nowIso,
@@ -395,6 +548,8 @@ WHERE analysis_id = ? AND lease_owner = ?
       transient: boolean;
       max_attempts: number;
       retry_base_ms: number;
+      retry_jitter_ratio?: number;
+      failure_stage?: AIAnalysisFailureStage;
       now: Date;
     }): AIAnalysisQueueRecord {
       const db = requireDb();
@@ -405,11 +560,16 @@ SELECT * FROM crypto_ai_analysis_queue WHERE analysis_id = ? AND status = 'PROCE
       const retryable = input.transient && current.attempt_count < input.max_attempts;
       const status = retryable ? "FAILED" : "SUSPENDED";
       const nextRetry = retryable
-        ? new Date(input.now.getTime() + input.retry_base_ms * (2 ** Math.max(0, current.attempt_count - 1))).toISOString()
+        ? new Date(input.now.getTime() + retryDelayMs(
+          input.analysis_id,
+          current.attempt_count,
+          input.retry_base_ms,
+          input.retry_jitter_ratio ?? 0.2,
+        )).toISOString()
         : null;
       requireDb().prepare(`
 UPDATE crypto_ai_analysis_queue SET status = ?, failed_at = ?, next_retry_at = ?, validation_status = ?,
-  safe_error_code = ?, lease_owner = NULL, lease_expires_at = NULL, updated_at = ?
+  safe_error_code = ?, failure_stage = ?, lease_owner = NULL, lease_expires_at = NULL, updated_at = ?
 WHERE analysis_id = ? AND lease_owner = ?
 `).run(
         status,
@@ -417,6 +577,7 @@ WHERE analysis_id = ? AND lease_owner = ?
         nextRetry,
         input.transient ? "PENDING" : "INVALID",
         safeCode(input.safe_error_code),
+        safeFailureStage(input.failure_stage) ?? "UNKNOWN",
         input.now.toISOString(),
         input.analysis_id,
         input.worker_id,
@@ -424,6 +585,23 @@ WHERE analysis_id = ? AND lease_owner = ?
       const failed = safeRecord(requireDb().prepare("SELECT * FROM crypto_ai_analysis_queue WHERE analysis_id = ?").get(input.analysis_id));
       if (!failed) throw new AIAnalysisQueueStoreError("STORE_UNAVAILABLE");
       return failed;
+    },
+
+    recordPostCompletionFailure(input: {
+      analysis_id: string;
+      safe_error_code: string;
+      failure_stage: "STORE_COMPLETE" | "USAGE_RECORD";
+      now: Date;
+    }): AIAnalysisQueueRecord {
+      const db = requireDb();
+      const result = db.prepare(`
+UPDATE crypto_ai_analysis_queue SET safe_error_code = ?, failure_stage = ?, updated_at = ?
+WHERE analysis_id = ? AND status IN ('READY', 'STALE')
+`).run(safeCode(input.safe_error_code), input.failure_stage, input.now.toISOString(), input.analysis_id);
+      if (changes(result) !== 1) throw new AIAnalysisQueueStoreError("STORE_UNAVAILABLE");
+      const record = safeRecord(db.prepare("SELECT * FROM crypto_ai_analysis_queue WHERE analysis_id = ?").get(input.analysis_id));
+      if (!record) throw new AIAnalysisQueueStoreError("STORE_UNAVAILABLE");
+      return record;
     },
 
     workerState(): AIAnalysisWorkerState {
@@ -442,6 +620,65 @@ UPDATE crypto_ai_worker_state SET suspended = 1, safe_error_code = ?, suspended_
 UPDATE crypto_ai_worker_state SET suspended = 0, safe_error_code = NULL, suspended_at = NULL, updated_at = ? WHERE id = 1
 `).run(now.toISOString());
       return this.workerState();
+    },
+
+    circuitBreaker(now: Date): AIAnalysisCircuitBreakerState {
+      return readCircuitBreaker(requireDb(), now);
+    },
+
+    acquireCircuitPermit(input: { now: Date }): boolean {
+      const db = requireDb();
+      db.exec("BEGIN IMMEDIATE TRANSACTION");
+      try {
+        const current = parseCircuitBreaker(db.prepare("SELECT * FROM crypto_ai_circuit_breaker WHERE id = 1").get());
+        if (current.state === "CLOSED") { db.exec("COMMIT"); return true; }
+        const nowMs = input.now.getTime();
+        if (current.state === "OPEN" && current.open_until && Date.parse(current.open_until) > nowMs) {
+          db.exec("COMMIT");
+          return false;
+        }
+        if (current.state === "HALF_OPEN" && current.half_open_in_flight) {
+          db.exec("COMMIT");
+          return false;
+        }
+        db.prepare(`
+UPDATE crypto_ai_circuit_breaker SET state = 'HALF_OPEN', half_open_in_flight = 1, updated_at = ? WHERE id = 1
+`).run(input.now.toISOString());
+        db.exec("COMMIT");
+        return true;
+      } catch {
+        try { db.exec("ROLLBACK"); } catch { /* preserve failure */ }
+        throw new AIAnalysisQueueStoreError("STORE_UNAVAILABLE");
+      }
+    },
+
+    recordCircuitSuccess(now: Date): AIAnalysisCircuitBreakerState {
+      requireDb().prepare(`
+UPDATE crypto_ai_circuit_breaker SET state = 'CLOSED', consecutive_failures = 0, open_until = NULL,
+  half_open_in_flight = 0, updated_at = ? WHERE id = 1
+`).run(now.toISOString());
+      return readCircuitBreaker(requireDb(), now);
+    },
+
+    recordCircuitFailure(input: { now: Date; threshold: number; open_ms: number }): AIAnalysisCircuitBreakerState {
+      const db = requireDb();
+      db.exec("BEGIN IMMEDIATE TRANSACTION");
+      try {
+        const current = parseCircuitBreaker(db.prepare("SELECT * FROM crypto_ai_circuit_breaker WHERE id = 1").get());
+        const failures = Math.min(1_000_000, current.consecutive_failures + 1);
+        const shouldOpen = current.state === "HALF_OPEN" || failures >= input.threshold;
+        const openUntil = shouldOpen ? new Date(input.now.getTime() + input.open_ms).toISOString() : null;
+        db.prepare(`
+UPDATE crypto_ai_circuit_breaker SET state = ?, consecutive_failures = ?, open_until = ?,
+  half_open_in_flight = 0, updated_at = ? WHERE id = 1
+`).run(shouldOpen ? "OPEN" : "CLOSED", failures, openUntil, input.now.toISOString());
+        const updated = readCircuitBreaker(db, input.now);
+        db.exec("COMMIT");
+        return updated;
+      } catch {
+        try { db.exec("ROLLBACK"); } catch { /* preserve failure */ }
+        throw new AIAnalysisQueueStoreError("STORE_UNAVAILABLE");
+      }
     },
 
     usageSince(since: Date): { analyses: number; prompt_tokens: number; completion_tokens: number; total_tokens: number } {
@@ -529,6 +766,18 @@ CREATE TABLE IF NOT EXISTS crypto_ai_analysis_queue (
   total_tokens INTEGER NOT NULL DEFAULT 0 CHECK (total_tokens >= 0),
   latency_ms INTEGER CHECK (latency_ms IS NULL OR latency_ms >= 0),
   provider_response_id TEXT,
+  provider_attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (provider_attempt_count >= 0),
+  provider_attempt_started_at TEXT,
+  provider_attempt_completed_at TEXT,
+  provider_attempt_status TEXT NOT NULL DEFAULT 'NOT_ATTEMPTED' CHECK (provider_attempt_status IN ('NOT_ATTEMPTED','STARTED','RESPONSE_RECEIVED','FAILED')),
+  provider_attempt_safe_error_code TEXT,
+  internal_validation_code TEXT,
+  internal_validation_violations_json TEXT,
+  internal_provider_response_status TEXT,
+  internal_provider_incomplete_reason TEXT,
+  internal_provider_output_tokens INTEGER CHECK (internal_provider_output_tokens IS NULL OR internal_provider_output_tokens >= 0),
+  internal_provider_reasoning_tokens INTEGER CHECK (internal_provider_reasoning_tokens IS NULL OR internal_provider_reasoning_tokens >= 0),
+  failure_stage TEXT CHECK (failure_stage IN ('CONTEXT_BUILD','IDENTITY_CHECK','CIRCUIT','PROVIDER_CALL','PROVIDER_RESPONSE','PROVIDER_PARSE','HYDRATE','STORE_COMPLETE','USAGE_RECORD','UNKNOWN')),
   lease_owner TEXT,
   lease_expires_at TEXT,
   created_at TEXT NOT NULL,
@@ -557,8 +806,36 @@ CREATE TABLE IF NOT EXISTS crypto_ai_worker_state (
 );
 INSERT OR IGNORE INTO crypto_ai_worker_state (id, schema_version, suspended, safe_error_code, suspended_at, updated_at)
 VALUES (1, 'ai_analysis_queue_v1', 0, NULL, NULL, '1970-01-01T00:00:00.000Z');
+CREATE TABLE IF NOT EXISTS crypto_ai_circuit_breaker (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  state TEXT NOT NULL CHECK (state IN ('CLOSED','OPEN','HALF_OPEN')),
+  consecutive_failures INTEGER NOT NULL CHECK (consecutive_failures >= 0),
+  open_until TEXT,
+  half_open_in_flight INTEGER NOT NULL CHECK (half_open_in_flight IN (0,1)),
+  updated_at TEXT NOT NULL
+);
+INSERT OR IGNORE INTO crypto_ai_circuit_breaker (id, state, consecutive_failures, open_until, half_open_in_flight, updated_at)
+VALUES (1, 'CLOSED', 0, NULL, 0, '1970-01-01T00:00:00.000Z');
 PRAGMA user_version = 1;
 `);
+  ensureQueueColumn(database, "provider_attempt_count", "INTEGER NOT NULL DEFAULT 0 CHECK (provider_attempt_count >= 0)");
+  ensureQueueColumn(database, "provider_attempt_started_at", "TEXT");
+  ensureQueueColumn(database, "provider_attempt_completed_at", "TEXT");
+  ensureQueueColumn(database, "provider_attempt_status", "TEXT NOT NULL DEFAULT 'NOT_ATTEMPTED' CHECK (provider_attempt_status IN ('NOT_ATTEMPTED','STARTED','RESPONSE_RECEIVED','FAILED'))");
+  ensureQueueColumn(database, "provider_attempt_safe_error_code", "TEXT");
+  ensureQueueColumn(database, "internal_validation_code", "TEXT");
+  ensureQueueColumn(database, "internal_validation_violations_json", "TEXT");
+  ensureQueueColumn(database, "internal_provider_response_status", "TEXT");
+  ensureQueueColumn(database, "internal_provider_incomplete_reason", "TEXT");
+  ensureQueueColumn(database, "internal_provider_output_tokens", "INTEGER CHECK (internal_provider_output_tokens IS NULL OR internal_provider_output_tokens >= 0)");
+  ensureQueueColumn(database, "internal_provider_reasoning_tokens", "INTEGER CHECK (internal_provider_reasoning_tokens IS NULL OR internal_provider_reasoning_tokens >= 0)");
+  ensureQueueColumn(database, "failure_stage", "TEXT CHECK (failure_stage IN ('CONTEXT_BUILD','IDENTITY_CHECK','CIRCUIT','PROVIDER_CALL','PROVIDER_RESPONSE','PROVIDER_PARSE','HYDRATE','STORE_COMPLETE','USAGE_RECORD','UNKNOWN'))");
+  database.exec("PRAGMA user_version = 4");
+}
+
+function ensureQueueColumn(database: SqliteDatabase, name: string, definition: string): void {
+  const names = new Set(database.prepare("PRAGMA table_info(crypto_ai_analysis_queue)").all().map((row) => isRecord(row) ? row.name : null));
+  if (!names.has(name)) database.exec(`ALTER TABLE crypto_ai_analysis_queue ADD COLUMN ${name} ${definition}`);
 }
 
 function assertSchema(database: SqliteDatabase): void {
@@ -568,7 +845,11 @@ function assertSchema(database: SqliteDatabase): void {
     "analysis_id", "cache_key", "chain", "contract_address", "snapshot_fingerprint", "prompt_version",
     "model_id", "analysis_schema_version", "status", "requested_at", "queued_at", "started_at", "completed_at",
     "failed_at", "next_retry_at", "attempt_count", "result_json", "validation_status", "safe_error_code",
-    "prompt_tokens", "completion_tokens", "total_tokens", "latency_ms", "provider_response_id", "created_at", "updated_at",
+    "prompt_tokens", "completion_tokens", "total_tokens", "latency_ms", "provider_response_id",
+    "provider_attempt_count", "provider_attempt_started_at", "provider_attempt_completed_at", "provider_attempt_status",
+    "provider_attempt_safe_error_code", "internal_validation_code", "internal_validation_violations_json",
+    "internal_provider_response_status", "internal_provider_incomplete_reason", "internal_provider_output_tokens", "internal_provider_reasoning_tokens",
+    "failure_stage", "created_at", "updated_at",
   ];
   if (required.some((name) => !names.has(name))) throw new AIAnalysisQueueStoreError("STORE_SCHEMA_INVALID");
 }
@@ -615,6 +896,20 @@ function safeRecord(value: unknown): AIAnalysisQueueRecord | null {
     },
     latency_ms: value.latency_ms === null ? null : integer(value.latency_ms),
     provider_response_id: stringField(value.provider_response_id),
+    provider_attempt_count: integer(value.provider_attempt_count),
+    provider_attempt_started_at: stringField(value.provider_attempt_started_at),
+    provider_attempt_completed_at: stringField(value.provider_attempt_completed_at),
+    provider_attempt_status: providerAttemptStatus(value.provider_attempt_status),
+    provider_attempt_safe_error_code: stringField(value.provider_attempt_safe_error_code),
+    internal_validation_code: stringField(value.internal_validation_code),
+    internal_validation_violations: internalValidationViolations(value.internal_validation_violations_json),
+    internal_provider_response: {
+      status: stringField(value.internal_provider_response_status),
+      incomplete_reason: stringField(value.internal_provider_incomplete_reason),
+      output_tokens: nullableInteger(value.internal_provider_output_tokens),
+      reasoning_tokens: nullableInteger(value.internal_provider_reasoning_tokens),
+    },
+    failure_stage: safeFailureStage(value.failure_stage),
     lease_owner: stringField(value.lease_owner),
     lease_expires_at: stringField(value.lease_expires_at),
     created_at: stringField(value.created_at) ?? new Date(0).toISOString(),
@@ -630,13 +925,12 @@ function findLastKnownGood(
   if (current?.result) return current.result;
   const rows = database.prepare(`
 SELECT * FROM crypto_ai_analysis_queue
-WHERE chain = ? AND contract_address = ? AND locale = ? AND prompt_version = ?
+WHERE chain = ? AND contract_address = ? AND prompt_version = ?
   AND model_id = ? AND analysis_schema_version = ? AND result_json IS NOT NULL AND validation_status = 'VALID'
 ORDER BY completed_at DESC LIMIT 20
 `).all(
     identity.chain,
     identity.contract_address,
-    identity.locale,
     identity.prompt_version,
     identity.model_id,
     identity.analysis_schema_version,
@@ -657,6 +951,8 @@ function enforceRateLimits(
 ): void {
   if (!/^[0-9a-f]{64}$/.test(sessionScopeHash)) throw new AIAnalysisQueueStoreError("STORE_SCHEMA_INVALID");
   const since = new Date(now.getTime() - limits.windowMs).toISOString();
+  const hourSince = new Date(now.getTime() - 60 * 60_000).toISOString();
+  const daySince = new Date(now.getTime() - 24 * 60 * 60_000).toISOString();
   const identityHash = identityScopeHash(identity);
   const checks: Array<[string, string, number]> = [
     ["session_scope_hash", sessionScopeHash, limits.session],
@@ -676,7 +972,32 @@ function enforceRateLimits(
     const firstAt = isRecord(first) && typeof first.requested_at === "string" ? Date.parse(first.requested_at) : now.getTime();
     throw new AIAnalysisQueueStoreError("RATE_LIMITED", Math.max(1, Math.ceil((firstAt + limits.windowMs - now.getTime()) / 1_000)));
   }
-  database.prepare("DELETE FROM crypto_ai_analysis_request_log WHERE requested_at <= ?").run(since);
+  const actorHourly = limits.actorHourly ?? limits.session;
+  const globalHourly = limits.globalHourly ?? limits.global;
+  const globalDaily = limits.globalDaily ?? Math.max(limits.global, globalHourly);
+  enforceWindowLimit(database, "session_scope_hash", sessionScopeHash, hourSince, actorHourly, now, 60 * 60_000);
+  enforceWindowLimit(database, null, null, hourSince, globalHourly, now, 60 * 60_000);
+  enforceWindowLimit(database, null, null, daySince, globalDaily, now, 24 * 60 * 60_000);
+  database.prepare("DELETE FROM crypto_ai_analysis_request_log WHERE requested_at <= ?").run(daySince);
+}
+
+function enforceWindowLimit(
+  database: SqliteDatabase,
+  column: "session_scope_hash" | null,
+  value: string | null,
+  since: string,
+  limit: number,
+  now: Date,
+  windowMs: number,
+): void {
+  if (limit <= 0) throw new AIAnalysisQueueStoreError("RATE_LIMITED", Math.max(1, Math.ceil(windowMs / 1_000)));
+  const rows = column
+    ? database.prepare(`SELECT requested_at FROM crypto_ai_analysis_request_log WHERE ${column} = ? AND requested_at > ? ORDER BY requested_at ASC`).all(value, since)
+    : database.prepare("SELECT requested_at FROM crypto_ai_analysis_request_log WHERE requested_at > ? ORDER BY requested_at ASC").all(since);
+  if (rows.length < limit) return;
+  const first = rows[0];
+  const firstAt = isRecord(first) && typeof first.requested_at === "string" ? Date.parse(first.requested_at) : now.getTime();
+  throw new AIAnalysisQueueStoreError("RATE_LIMITED", Math.max(1, Math.ceil((firstAt + windowMs - now.getTime()) / 1_000)));
 }
 
 function recordRateRequest(database: SqliteDatabase, identity: AIAnalysisCacheIdentity, sessionScopeHash: string, nowIso: string): void {
@@ -699,12 +1020,61 @@ function parseWorkerState(value: unknown): AIAnalysisWorkerState {
   };
 }
 
+function readCircuitBreaker(database: SqliteDatabase, now: Date): AIAnalysisCircuitBreakerState {
+  const state = parseCircuitBreaker(database.prepare("SELECT * FROM crypto_ai_circuit_breaker WHERE id = 1").get());
+  if (state.state === "OPEN" && state.open_until && Date.parse(state.open_until) <= now.getTime()) {
+    return { ...state, state: "HALF_OPEN" };
+  }
+  return state;
+}
+
+function parseCircuitBreaker(value: unknown): AIAnalysisCircuitBreakerState {
+  if (!isRecord(value) || !["CLOSED", "OPEN", "HALF_OPEN"].includes(String(value.state))) {
+    throw new AIAnalysisQueueStoreError("STORE_UNAVAILABLE");
+  }
+  return {
+    state: value.state as AIAnalysisCircuitBreakerState["state"],
+    consecutive_failures: integer(value.consecutive_failures),
+    open_until: stringField(value.open_until),
+    half_open_in_flight: value.half_open_in_flight === 1,
+    updated_at: stringField(value.updated_at) ?? new Date(0).toISOString(),
+  };
+}
+
 function parseBrief(raw: string): AIResearchBrief | null {
   try { return validateStoredAIResearchBrief(JSON.parse(raw)); } catch { return null; }
 }
 
+function internalValidationViolations(value: unknown): string[] {
+  if (typeof value !== "string") return [];
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return Array.isArray(parsed)
+      ? parsed.filter((item): item is string => typeof item === "string" && /^[A-Z0-9_]{1,80}$/.test(item)).slice(0, 20)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
 function safeCode(value: string): string {
   return /^[A-Z0-9_]{1,80}$/.test(value) ? value : "AI_WORKER_FAILURE";
+}
+
+function safeProviderDetail(value: string | null): string | null {
+  return value !== null && /^[a-z0-9_]{1,80}$/i.test(value) ? value : null;
+}
+
+function providerAttemptStatus(value: unknown): AIAnalysisProviderAttemptStatus {
+  return AI_ANALYSIS_PROVIDER_ATTEMPT_STATUSES.includes(value as AIAnalysisProviderAttemptStatus)
+    ? value as AIAnalysisProviderAttemptStatus
+    : "NOT_ATTEMPTED";
+}
+
+function safeFailureStage(value: unknown): AIAnalysisFailureStage | null {
+  return AI_ANALYSIS_FAILURE_STAGES.includes(value as AIAnalysisFailureStage)
+    ? value as AIAnalysisFailureStage
+    : null;
 }
 
 function safeVersion(value: string): boolean {
@@ -719,6 +1089,10 @@ function integer(value: unknown): number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : 0;
 }
 
+function nullableInteger(value: unknown): number | null {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : null;
+}
+
 function integerField(value: unknown, key: string): number {
   return isRecord(value) ? integer(value[key]) : 0;
 }
@@ -729,6 +1103,15 @@ function changes(result: SqliteRunResult): number {
 
 function boundedInteger(value: number | undefined, fallback: number, minimum: number, maximum: number): number {
   return value !== undefined && Number.isSafeInteger(value) && value >= minimum && value <= maximum ? value : fallback;
+}
+
+function retryDelayMs(analysisId: string, attempt: number, baseMs: number, jitterRatio: number): number {
+  const exponential = baseMs * (2 ** Math.max(0, attempt - 1));
+  const ratio = Number.isFinite(jitterRatio) ? Math.max(0, Math.min(0.5, jitterRatio)) : 0.2;
+  if (ratio === 0) return exponential;
+  const digest = createHash("sha256").update(`${analysisId}:${attempt}`, "utf8").digest();
+  const unit = digest.readUInt32BE(0) / 0xffff_ffff;
+  return Math.max(1, Math.round(exponential * (1 - ratio + unit * ratio * 2)));
 }
 
 async function loadNodeSqlite(): Promise<SqliteModule> {

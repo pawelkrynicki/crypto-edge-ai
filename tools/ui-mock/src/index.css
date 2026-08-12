@@ -8353,6 +8353,111 @@ summary {
   font-weight: 500;
 }
 
+/* The public PC.2 canvas has no identicon column. Its title must keep whole words. */
+.ai-production-header {
+  grid-template-columns: minmax(0, 1fr) minmax(190px, auto);
+}
+
+.ai-production-header .ai-research-header-copy,
+.ai-production-header h3,
+.ai-production-header .ai-research-eyebrow,
+.ai-production-header .ai-research-times,
+.ai-production-header .ai-research-times dt,
+.ai-production-header .ai-research-times dd {
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+}
+
+.ai-production-summary {
+  display: grid;
+  gap: 7px;
+  padding: 12px 14px;
+  border: 1px solid rgba(35, 199, 190, 0.28);
+  border-radius: var(--radius-sm);
+  background: rgba(13, 37, 42, 0.58);
+}
+
+.ai-research-guidance {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid rgba(35, 199, 190, 0.5);
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, rgba(14, 53, 58, 0.76), rgba(11, 28, 35, 0.86));
+  box-shadow: inset 0 1px 0 rgba(119, 255, 244, 0.08);
+}
+
+.ai-research-guidance > header { display: grid; gap: 5px; }
+.ai-research-guidance > header > span,
+.ai-research-guidance h5,
+.ai-guidance-filter-failures h6 {
+  margin: 0;
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.ai-research-guidance h4 { margin: 0; color: var(--text-primary); font-size: 20px; line-height: 1.18; overflow-wrap: normal; word-break: normal; hyphens: none; }
+.ai-research-guidance header dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; margin: 3px 0 0; font-size: 11px; }
+.ai-research-guidance header dt { color: var(--text-helper); font-weight: 700; }
+.ai-research-guidance header dd { display: grid; gap: 3px; margin: 0; color: var(--warning); font-weight: 800; letter-spacing: 0.04em; }
+.ai-research-guidance header dd small { color: var(--text-secondary); font-size: 11px; font-weight: 500; letter-spacing: normal; line-height: 1.4; }
+.ai-guidance-grid { display: grid; grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr); gap: 12px; }
+.ai-guidance-grid > section,
+.ai-guidance-unlocks { min-width: 0; padding: 12px; border: 1px solid rgba(113, 139, 151, 0.22); border-radius: var(--radius-sm); background: rgba(7, 21, 27, 0.46); }
+.ai-guidance-blockers,
+.ai-guidance-filter-failures ul,
+.ai-guidance-unlocks ul,
+.ai-guidance-actions { display: grid; gap: 8px; margin: 10px 0 0; padding: 0; list-style: none; }
+.ai-guidance-blockers li { display: grid; gap: 3px; }
+.ai-guidance-blockers strong,
+.ai-guidance-action-copy > strong { color: var(--text-primary); font-size: 12px; }
+.ai-guidance-blockers span,
+.ai-guidance-action-copy p { margin: 0; color: var(--text-secondary); font-size: 11px; line-height: 1.45; }
+.ai-guidance-action-copy p b { color: var(--text-primary); font-weight: 700; }
+.ai-guidance-filter-failures { margin-top: 12px; }
+.ai-guidance-filter-failures ul { grid-template-columns: repeat(auto-fit, minmax(148px, 1fr)); }
+.ai-guidance-filter-failures li { display: grid; gap: 3px; padding: 9px; border-radius: 8px; background: rgba(86, 42, 31, 0.25); }
+.ai-guidance-filter-failures li strong { color: var(--text-primary); font-size: 11px; }
+.ai-guidance-filter-failures li span { color: var(--text-secondary); font-size: 10px; line-height: 1.35; }
+.ai-guidance-filter-failures li em { color: var(--critical); font-size: 10px; font-style: normal; font-weight: 800; letter-spacing: 0.06em; }
+.ai-guidance-actions { counter-reset: guidance-actions; }
+.ai-guidance-actions > li { display: grid; grid-template-columns: 25px minmax(0, 1fr); gap: 9px; align-items: start; }
+.ai-guidance-action-number { display: grid; place-items: center; width: 25px; height: 25px; border-radius: 999px; color: var(--bg); background: var(--accent); font-size: 12px; font-weight: 900; }
+.ai-guidance-action-copy { display: grid; gap: 5px; min-width: 0; }
+.ai-guidance-action-copy .action-button { justify-self: start; min-height: 36px; margin-top: 2px; font-size: 11px; }
+.ai-guidance-unlocks ul { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+.ai-guidance-unlocks li { position: relative; padding-left: 19px; color: var(--text-secondary); font-size: 11px; line-height: 1.4; }
+.ai-guidance-unlocks li::before { position: absolute; left: 0; color: var(--accent); content: "□"; font-weight: 800; }
+.ai-production-details { display: grid; gap: 12px; margin: 0; }
+.ai-production-details > summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 42px; padding: 11px 13px; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); cursor: pointer; font-size: 11px; font-weight: 800; letter-spacing: 0.07em; list-style: none; }
+.ai-production-details > summary::-webkit-details-marker { display: none; }
+.ai-production-details > summary::after { color: var(--accent); content: "+"; font-size: 17px; line-height: 1; }
+.ai-production-details[open] > summary::after { content: "−"; }
+.ai-production-details-content { display: grid; gap: 12px; padding-top: 2px; }
+
+.ai-production-summary h4,
+.ai-production-context > h3,
+.ai-production-steps > h3 {
+  margin: 0;
+  color: var(--accent);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ai-production-summary p,
+.ai-production-boundary,
+.ai-production-freshness,
+.ai-production-context .ai-kpi p,
+.ai-production-steps li span {
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: 1.48;
+}
+
 .ai-research-identity-line {
   display: flex;
   align-items: center;
@@ -8429,6 +8534,21 @@ summary {
   display: block;
   overflow-wrap: anywhere;
 }
+
+.ai-production-context .ai-research-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 10px; }
+.ai-production-context .ai-kpi { min-height: 118px; }
+.ai-production-context .ai-kpi p { font-size: 10px; }
+.ai-production-freshness { margin-top: 10px; font-size: 10px; }
+.ai-production-analysis .ai-brief-panel ul { margin: 0; padding: 0; list-style: none; }
+.ai-production-analysis .ai-brief-panel li { display: grid; align-content: start; gap: 3px; }
+.ai-production-analysis .ai-brief-panel li strong,
+.ai-production-analysis .ai-brief-panel li span { display: block; }
+.ai-production-analysis .ai-brief-panel li span { color: var(--text-secondary); font-size: 11px; line-height: 1.42; }
+.ai-production-steps ol { display: grid; gap: 8px; margin: 0; padding-left: 22px; }
+.ai-production-steps li { padding-left: 2px; }
+.ai-production-steps li strong { display: block; font-size: 11px; }
+.ai-production-steps li span { display: block; margin-top: 2px; font-size: 11px; }
+.ai-production-boundary { font-size: 10px; }
 
 .ai-kpi span {
   margin-bottom: 5px;
@@ -8851,6 +8971,7 @@ summary {
   .ai-next-map { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .ai-next-map li:nth-child(2)::after { display: none; }
   .ai-coverage-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ai-production-context .ai-research-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 900px) {
@@ -8859,6 +8980,9 @@ summary {
   .ai-research-times dd { text-align: left; }
   .ai-risk-row { grid-template-columns: minmax(115px, 0.7fr) minmax(100px, 0.5fr) minmax(180px, 1.5fr) minmax(100px, 0.7fr); }
   .ai-checkpoint-axis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .ai-production-header { grid-template-columns: minmax(0, 1fr); }
+  .ai-production-header .ai-research-times { grid-column: auto; }
+  .ai-guidance-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 768px) {
@@ -8931,6 +9055,12 @@ summary {
   .ai-research-times div { grid-template-columns: minmax(84px, auto) minmax(0, 1fr); }
   .ai-research-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; }
   .ai-kpi { min-height: 69px; padding: 8px; }
+  .ai-production-context .ai-research-kpis { grid-template-columns: 1fr; }
+  .ai-production-header .ai-research-times { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ai-research-guidance { padding: 12px; }
+  .ai-research-guidance h4 { font-size: 17px; }
+  .ai-guidance-unlocks ul { grid-template-columns: 1fr; }
+  .ai-guidance-filter-failures ul { grid-template-columns: 1fr; }
   .ai-research-panel { padding: 9px; }
   .ai-coverage-grid,
   .ai-next-map,

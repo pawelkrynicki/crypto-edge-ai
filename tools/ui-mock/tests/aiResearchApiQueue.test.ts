@@ -23,12 +23,14 @@ after(async () => { await rm(root, { recursive: true, force: true }); });
 
 describe("AI.3 versioned public queue API", () => {
   it("POST only enqueues, is idempotent and never executes a provider call", async () => {
+    const context = contextOptions();
     const store = await createAIAnalysisQueueStore({ databaseFilePath: resolve(root, "api.sqlite") });
     const service = createAIResearchService({
-      ...contextOptions(), queueStore: store, providerEnabled: true, modelId: "gpt-5-mini", now: () => NOW,
+      ...context, queueStore: store, providerEnabled: true, modelId: "gpt-5-mini", now: () => NOW,
     });
     const server = createServer(createScannerApiHandler({
-      runtimeMode: "INTERNAL_BETA",
+      runtimeMode: "DEVELOPMENT_DEMO",
+      scanner: context.scanner,
       aiResearch: { service, sessionSecret: "ai3-api-test-secret" },
     }));
     await listen(server);
@@ -37,23 +39,30 @@ describe("AI.3 versioned public queue API", () => {
       const first = await post(base, "queue_request_0001");
       assert.equal(first.status, 202);
       const firstBody = await first.json() as Record<string, unknown>;
-      assert.equal(firstBody.availability, "QUEUED");
-      assert.equal(firstBody.request_outcome, "QUEUED");
-      assert.equal(firstBody.shared_result, true);
+      assert.equal(firstBody.schema_version, "ai_production_analysis_lookup_v1");
+      assert.equal(firstBody.status, "QUEUED");
+      assert.equal(firstBody.analysis, null);
+      for (const forbidden of [
+        "provider_mode", "model", "analysis_id", "cache_key", "queue_status", "error_code",
+        "provider_attempt_count", "provider_attempt_started_at", "provider_attempt_completed_at",
+        "provider_attempt_status", "provider_attempt_safe_error_code", "failure_stage",
+      ]) {
+        assert.equal(Object.hasOwn(firstBody, forbidden), false, forbidden);
+      }
       const second = await post(base, "queue_request_0002");
       assert.equal(second.status, 202);
       const secondBody = await second.json() as Record<string, unknown>;
-      assert.equal(secondBody.request_outcome, "ALREADY_EXISTS");
-      assert.equal(secondBody.analysis_id, firstBody.analysis_id);
+      assert.equal(secondBody.status, "QUEUED");
+      assert.equal(secondBody.is_last_known_good, false);
       assert.equal(store.stats().records, 1);
       assert.equal(store.stats().queued, 1);
 
       const status = await fetch(`${base}/api/v1/ai-analyses/status?chain=BASE&contract_address=${ADDRESS}&locale=pl`);
       assert.equal(status.status, 200);
-      assert.equal((await status.json() as { cache_key?: string }).cache_key, firstBody.cache_key);
+      assert.equal((await status.json() as { status?: string }).status, "QUEUED");
       const result = await fetch(`${base}/api/v1/ai-analyses/result?chain=base&contract_address=${ADDRESS}&locale=pl`);
       assert.equal(result.status, 200);
-      assert.equal((await result.json() as { availability?: string }).availability, "QUEUED");
+      assert.equal((await result.json() as { status?: string }).status, "QUEUED");
     } finally {
       await close(server);
       store.close();
@@ -103,7 +112,6 @@ describe("AI.3 versioned public queue API", () => {
     assert.doesNotMatch(handler, /createAIResearchProvider|OPENAI_API_KEY|api\.openai\.com/);
     assert.match(worker, /createAIResearchProvider/);
     assert.match(component, /Zleć analizę AI/);
-    assert.match(component, /wspólnej kolejki/);
     assert.doesNotMatch(component, /Wygeneruj analizę AI|Generate AI analysis/);
   });
 

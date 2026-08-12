@@ -1099,7 +1099,7 @@ export function ProductLocaleProvider({
   initialLocale?: ProductLocale;
 }) {
   const [locale, setLocaleState] = useState<ProductLocale>(() => (
-    initialLocale ?? readStoredProductLocale()
+    initialLocale ?? readRequestedProductLocale() ?? readStoredProductLocale()
   ));
 
   const setLocale = useCallback((nextLocale: ProductLocale) => {
@@ -1127,6 +1127,12 @@ export function useProductLocale(): LocaleContextValue {
 export function readStoredProductLocale(storage: Pick<Storage, "getItem"> | null = getBrowserStorage()): ProductLocale {
   const stored = storage?.getItem(PRODUCT_LOCALE_STORAGE_KEY);
   return stored === "pl" || stored === "en" ? stored : DEFAULT_PRODUCT_LOCALE;
+}
+
+/** A locale in a product URL is an explicit, shareable choice; the stored preference remains the fallback. */
+export function readRequestedProductLocale(search = getLocationSearch()): ProductLocale | null {
+  const locale = new URLSearchParams(search).get("locale");
+  return locale === "pl" || locale === "en" ? locale : null;
 }
 
 export function applyProductLocale(
@@ -1236,6 +1242,11 @@ function getBrowserStorage(): Storage | null {
   } catch {
     return null;
   }
+}
+
+function getLocationSearch(): string {
+  if (typeof window === "undefined") return "";
+  return typeof window.location?.search === "string" ? window.location.search : "";
 }
 
 function getDocumentElement(): HTMLElement | null {

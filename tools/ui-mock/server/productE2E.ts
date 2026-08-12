@@ -542,7 +542,7 @@ export async function runFullProductE2E(options: ProductE2EOptions = {}): Promis
       assert(queueStore!.stats().records === 0, "UNVALIDATED_DATA_CREATED_AI_JOB");
     });
 
-    const queued = await runStep(steps, "public-ai-post-queues-only", [], async () => {
+    await runStep(steps, "public-ai-post-queues-only", [], async () => {
       const response = await httpJson(server!, "POST", "/api/v1/ai-analyses/requests", {
         origin,
         "content-type": "application/json",
@@ -553,12 +553,20 @@ export async function runFullProductE2E(options: ProductE2EOptions = {}): Promis
         idempotency_key: `${runId.replaceAll("-", "_")}_ai_request_01`,
       });
       assert(response.status === 202, "AI_PUBLIC_POST_FAILED");
-      assert(response.body.queue_status === "QUEUED", "AI_PUBLIC_POST_DID_NOT_QUEUE");
+      assert(response.body.status === "QUEUED", "AI_PUBLIC_POST_DID_NOT_QUEUE");
+      assert(response.body.analysis === null, "AI_PUBLIC_POST_EXPOSED_RESULT");
+      assert(!["analysis_id", "cache_key", "queue_status", "provider_mode", "model"].some((key) => Object.hasOwn(response.body, key)), "AI_PUBLIC_POST_LEAKED_INTERNALS");
       assert(mockProviderCalls === 0, "AI_PUBLIC_POST_CALLED_PROVIDER");
       aiStatusTrace.push("QUEUED");
       return response;
     });
-    analysisId = typeof queued.body.analysis_id === "string" ? queued.body.analysis_id : null;
+    const internalQueued = await aiService.generate({
+      chain: selection!.identity.chain,
+      contract_address: selection!.identity.contract_address,
+      locale: "pl",
+      idempotency_key: `${runId.replaceAll("-", "_")}_ai_internal_read`,
+    }, "product-e2e-internal-actor");
+    analysisId = internalQueued.analysis_id ?? null;
     assert(analysisId !== null, "AI_ANALYSIS_ID_MISSING");
 
     const secondQueued = await runStep(steps, "shared-ai-status", [analysisId], async () => httpJson(
@@ -573,7 +581,7 @@ export async function runFullProductE2E(options: ProductE2EOptions = {}): Promis
         idempotency_key: `${runId.replaceAll("-", "_")}_ai_request_02`,
       },
     ));
-    assert(secondQueued.body.analysis_id === analysisId, "AI_SHARED_STATUS_MISMATCH");
+    assert(secondQueued.body.status === "QUEUED" && secondQueued.body.analysis === null, "AI_SHARED_STATUS_MISMATCH");
     assert(queueStore.stats().records === 1, "AI_QUEUE_DUPLICATE_CREATED");
 
     const validProvider = deterministicMockProvider(async (context) => {
@@ -607,9 +615,9 @@ export async function runFullProductE2E(options: ProductE2EOptions = {}): Promis
       "GET",
       `/api/v1/ai-analyses/result?chain=${encodeURIComponent(selection!.identity.chain)}&contract_address=${encodeURIComponent(selection!.identity.contract_address)}&locale=pl`,
     ));
-    assert(ready.status === 200 && ready.body.queue_status === "READY", "AI_READY_RESULT_MISSING");
-    assert(isRecord(ready.body.brief) && ready.body.brief.schema_version === "ai_research_brief_v1", "AI_BRIEF_SCHEMA_INVALID");
-    assert(ready.body.provider_mode === "OPENAI", "AI_PROVIDER_STATUS_UNEXPECTED");
+    assert(ready.status === 200 && ready.body.status === "READY", "AI_READY_RESULT_MISSING");
+    assert(isRecord(ready.body.analysis) && ready.body.analysis.schema_version === "ai_production_analysis_v2", "AI_BRIEF_SCHEMA_INVALID");
+    assert(!["analysis_id", "cache_key", "queue_status", "provider_mode", "model"].some((key) => Object.hasOwn(ready.body, key)), "AI_READY_RESULT_LEAKED_INTERNALS");
 
     await runStep(steps, "invalid-mock-fails-closed", [analysisId], async () => {
       const failureStore = await createAIAnalysisQueueStore({ databaseFilePath: resolve(root, "ai-invalid-response.sqlite") });
@@ -852,14 +860,14 @@ export async function cleanupProductE2ERun(runId: string, baseDirectory?: string
 }
 
 export function assertReadyAnalysisForProductReport(value: unknown): asserts value is {
-  queue_status: "READY";
-  brief: Record<string, unknown>;
+  status: "READY";
+  analysis: Record<string, unknown>;
 } {
   if (
     !isRecord(value)
-    || value.queue_status !== "READY"
-    || !isRecord(value.brief)
-    || value.brief.schema_version !== "ai_research_brief_v1"
+    || value.status !== "READY"
+    || !isRecord(value.analysis)
+    || value.analysis.schema_version !== "ai_production_analysis_v2"
   ) {
     throw new ProductE2EError("READY_ANALYSIS_REQUIRED_FOR_REPORT");
   }
@@ -1210,32 +1218,14 @@ function deterministicMockProvider(
 }
 
 async function deterministicNarrative(context: AIResearchContext): Promise<Record<string, unknown>> {
-  const pl = context.locale === "pl";
   return {
-    narrative_version: "ai_research_narrative_v2",
-    summary: pl
-      ? "Dane wyznaczają aktualny etap badawczy. Dalsze działania pozostają wyłącznie ręczną weryfikacją."
-      : "The data identifies the current research stage. Further actions remain manual verification only.",
-    fact_narratives: context.fact_candidates.map((fact) => ({
-      id: `fact:${fact.key}`,
-      interpretation: pl ? "Wartość pochodzi z kontekstu produktu." : "The value comes from product context.",
-    })),
-    risk_narratives: context.risk_candidates.map((risk, index) => ({
-      id: `risk:${index}`,
-      explanation: risk.explanation,
-    })),
-    missing_narratives: context.missing_information.map((item) => ({
-      id: `missing:${item.key}`,
-      explanation: item.explanation,
-    })),
-    action_narratives: context.action_catalog.map((action, index) => ({
-      id: `action:${index}`,
-      reason: action.reason,
-    })),
-    status_change_narratives: context.status_change_conditions.map((condition) => ({
-      id: `condition:${condition.key}`,
-      explanation: condition.explanation,
-    })),
+    narrative_version: "ai_research_narrative_v3",
+    summary: { en: "The recorded snapshot gives market context while evidence gaps still need verification.", pl: "Zapisana migawka daje kontekst rynkowy, ale luki w danych nadal wymagają sprawdzenia." },
+    fact_narratives: context.fact_candidates.map((item) => ({ id: `fact:${item.key}`, en: "This recorded fact adds context to the research view.", pl: "Ten zapisany fakt uzupełnia obecną analizę." })),
+    risk_narratives: context.risk_candidates.map((_item, index) => ({ id: `risk:${index}`, en: "This recorded risk needs verification against the listed evidence.", pl: "To zapisane ryzyko wymaga sprawdzenia względem wskazanych danych." })),
+    missing_narratives: context.missing_information.map((item) => ({ id: `missing:${item.key}`, en: "This evidence gap limits the current research view.", pl: "Ta luka w danych ogranicza obecną analizę." })),
+    action_narratives: context.action_catalog.map((_item, index) => ({ id: `action:${index}`, en: "Use this permitted research step to verify the evidence.", pl: "Wykorzystaj ten dozwolony krok analizy, aby sprawdzić dane." })),
+    status_change_narratives: context.status_change_conditions.map((item) => ({ id: `condition:${item.key}`, en: "This condition would justify reviewing the research view.", pl: "Ten warunek uzasadnia ponowne sprawdzenie analizy." })),
   };
 }
 

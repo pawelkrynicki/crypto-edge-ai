@@ -36,6 +36,8 @@ STAB.1 exercises scanner, central-cycle, lifecycle, AI.3, Reports and Feedback f
 
 STAB.2 adds an owner-only, manifest-last `product_backup_bundle_v1` for complete local product state, preview-first restore, explicit `--apply`, a pre-restore safety backup, versioned recovery journal and automatic reverse-order rollback. SQLite is copied consistently with `VACUUM INTO` and verified with `integrity_check`; secret-bearing or structurally unsafe bundles fail closed. The Windows review and 25 isolated recovery scenarios are documented in [`docs/backup_restore_rollback.md`](docs/backup_restore_rollback.md).
 
+PC.2 hardens the existing server-side AI queue into a shared production analysis path: one evidence-identical generation, safe public structured results, last-known-good refreshes, bounded retry/jitter, a persisted circuit breaker and central initiation/cost controls. The audit and operating contract are documented in [`docs/pc2_ai_production_path.md`](docs/pc2_ai_production_path.md).
+
 ## What Crypto Edge AI Is
 
 - A trader-facing crypto intelligence module.

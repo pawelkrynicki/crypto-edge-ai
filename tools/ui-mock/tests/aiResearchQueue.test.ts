@@ -187,7 +187,7 @@ describe("AI.3 central worker, single-flight and last-known-good", () => {
     store.close();
   });
 
-  it("retries transient failures with bounded backoff and suspends after the limit", async () => {
+  it("retries transient failures with bounded backoff and leaves the worker available after the limit", async () => {
     await writeFixture(100_000, true);
     const store = await createAIAnalysisQueueStore({ databaseFilePath: resolve(root, "retry.sqlite") });
     enqueue(store, fromContext(await context(ADDRESS)), "retry-session");
@@ -199,7 +199,7 @@ describe("AI.3 central worker, single-flight and last-known-good", () => {
       async generate() { calls += 1; throw new AIResearchProviderError("PROVIDER_TIMEOUT"); },
     };
     const worker = createAIResearchWorker({
-      ...contextOptions(), store, provider, now: () => clock, limits: { maxAttempts: 2, retryBaseMs: 100 },
+      ...contextOptions(), store, provider, now: () => clock, limits: { maxAttempts: 2, retryBaseMs: 100, retryJitterRatio: 0 },
     });
     const first = await worker.runCycle();
     assert.equal(first.retried, 1);
@@ -209,20 +209,20 @@ describe("AI.3 central worker, single-flight and last-known-good", () => {
     const second = await worker.runCycle();
     assert.equal(second.suspended, 1);
     assert.equal(calls, 2);
-    assert.equal(store.workerState().suspended, true);
+    assert.equal(store.workerState().suspended, false);
     store.close();
   });
 });
 
-function cacheIdentity(chain: string, address: string, fingerprint: string, promptVersion = "ai_research_prompt_v2") {
+function cacheIdentity(chain: string, address: string, fingerprint: string, promptVersion = "ai_research_prompt_v4") {
   return buildAIAnalysisCacheIdentity({
     chain,
     contract_address: address,
     snapshot_fingerprint: fingerprint,
     prompt_version: promptVersion,
     model_id: "gpt-5-mini",
-    analysis_schema_version: "ai_research_brief_v1",
-    locale: "pl",
+    analysis_schema_version: "ai_research_brief_v2",
+    locale: "en",
   });
 }
 
@@ -232,8 +232,8 @@ function fromContext(value: AIResearchContext): AIAnalysisCacheIdentity {
     snapshot_fingerprint: value.snapshot_fingerprint,
     prompt_version: value.prompt_version,
     model_id: "gpt-5-mini",
-    analysis_schema_version: "ai_research_brief_v1",
-    locale: value.locale,
+    analysis_schema_version: "ai_research_brief_v2",
+    locale: "en",
   });
 }
 
@@ -280,17 +280,14 @@ function mockProvider(generateJson: (context: AIResearchContext) => Promise<stri
 }
 
 function narrative(ctx: AIResearchContext) {
-  const pl = ctx.locale === "pl";
   return {
-    narrative_version: "ai_research_narrative_v2",
-    summary: pl
-      ? "Dane wskazują aktualny etap badawczy. Kolejny krok dotyczy wyłącznie dalszej weryfikacji."
-      : "The data identifies the current research stage. The next step concerns further verification only.",
-    fact_narratives: ctx.fact_candidates.map((fact) => ({ id: `fact:${fact.key}`, interpretation: pl ? "Wartość pochodzi z kontekstu produktu." : "The value comes from product context." })),
-    risk_narratives: ctx.risk_candidates.map((risk, index) => ({ id: `risk:${index}`, explanation: risk.explanation })),
-    missing_narratives: ctx.missing_information.map((item) => ({ id: `missing:${item.key}`, explanation: item.explanation })),
-    action_narratives: ctx.action_catalog.map((action, index) => ({ id: `action:${index}`, reason: action.reason })),
-    status_change_narratives: ctx.status_change_conditions.map((condition) => ({ id: `condition:${condition.key}`, explanation: condition.explanation })),
+    narrative_version: "ai_research_narrative_v3",
+    summary: { en: "The recorded snapshot gives market context while evidence gaps still need verification.", pl: "Zapisana migawka daje kontekst rynkowy, ale luki w danych nadal wymagają sprawdzenia." },
+    fact_narratives: ctx.fact_candidates.map((item) => ({ id: `fact:${item.key}`, en: "This recorded fact adds context to the research view.", pl: "Ten zapisany fakt uzupełnia obecną analizę." })),
+    risk_narratives: ctx.risk_candidates.map((_item, index) => ({ id: `risk:${index}`, en: "This recorded risk needs verification against the listed evidence.", pl: "To zapisane ryzyko wymaga sprawdzenia względem wskazanych danych." })),
+    missing_narratives: ctx.missing_information.map((item) => ({ id: `missing:${item.key}`, en: "This evidence gap limits the current research view.", pl: "Ta luka w danych ogranicza obecną analizę." })),
+    action_narratives: ctx.action_catalog.map((_item, index) => ({ id: `action:${index}`, en: "Use this permitted research step to verify the evidence.", pl: "Wykorzystaj ten dozwolony krok analizy, aby sprawdzić dane." })),
+    status_change_narratives: ctx.status_change_conditions.map((item) => ({ id: `condition:${item.key}`, en: "This condition would justify reviewing the research view.", pl: "Ten warunek uzasadnia ponowne sprawdzenie analizy." })),
   };
 }
 

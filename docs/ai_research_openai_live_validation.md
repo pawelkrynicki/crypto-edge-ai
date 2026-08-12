@@ -18,12 +18,12 @@ Sekrety i model są konfigurowane wyłącznie w środowisku procesu:
 OPENAI_API_KEY=<sekret ustawiony poza repozytorium>
 CRYPTO_EDGE_AI_RESEARCH_PROVIDER=OPENAI
 CRYPTO_EDGE_AI_RESEARCH_MODEL=<jawnie wybrany model zgodny z Responses API i Structured Outputs>
-CRYPTO_EDGE_AI_RESEARCH_TIMEOUT_MS=30000
+CRYPTO_EDGE_AI_RESEARCH_TIMEOUT_MS=90000
 CRYPTO_EDGE_AI_RESEARCH_MAX_CONCURRENCY=1
 CRYPTO_EDGE_AI_RESEARCH_LIVE_CALL_BUDGET=1
 ```
 
-`OPENAI_API_KEY` i `CRYPTO_EDGE_AI_RESEARCH_MODEL` są wymagane przez `--live-one`. Brak dowolnej z nich kończy launcher czytelnym błędem przed startem runtime i przed jakimkolwiek requestem. Model nie jest hardcodowany. Timeout jest ograniczony do 1000–120000 ms; wartość brakująca lub spoza kontraktu daje bezpieczny default 30000 ms. Launcher pierwszego smoke wymusza concurrency 1.
+`OPENAI_API_KEY` i `CRYPTO_EDGE_AI_RESEARCH_MODEL` są wymagane przez `--live-one`. Brak dowolnej z nich kończy launcher czytelnym błędem przed startem runtime i przed jakimkolwiek requestem. Model nie jest hardcodowany. Timeout jest ograniczony do 1000–120000 ms; wartość brakująca lub spoza kontraktu daje bezpieczny default 90000 ms. Ten limit pozostaje co najmniej 30 s poniżej domyślnego 180000 ms lease workera. Launcher pierwszego smoke wymusza concurrency 1.
 
 Klucz nie jest zapisywany w repozytorium, SQLite, publicznym modelu, stdout, stderr ani logach. Launcher nie drukuje jego wartości, długości, prefiksu ani wersji maskowanej. SDK ma `logLevel: "off"`.
 

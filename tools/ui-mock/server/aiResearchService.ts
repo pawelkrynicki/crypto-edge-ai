@@ -42,6 +42,10 @@ export type AIResearchServiceOptions = AIResearchContextOptions & {
     identity?: number;
     global?: number;
     cooldownMs?: number;
+    actorHourly?: number;
+    globalHourly?: number;
+    globalDaily?: number;
+    queueDepth?: number;
   };
 };
 
@@ -82,7 +86,11 @@ export function createAIResearchService(options: AIResearchServiceOptions = {}) 
     identity: bounded(options.rateLimits?.identity, 10, 1, 1_000),
     global: bounded(options.rateLimits?.global, 100, 1, 10_000),
     cooldownMs: bounded(options.rateLimits?.cooldownMs, 60_000, 1_000, 24 * 60 * 60_000),
+    actorHourly: bounded(options.rateLimits?.actorHourly ?? envInteger(process.env.CRYPTO_EDGE_AI_ACTOR_INITIATIONS_PER_HOUR), 5, 1, 10_000),
+    globalHourly: bounded(options.rateLimits?.globalHourly ?? envInteger(process.env.CRYPTO_EDGE_AI_GLOBAL_INITIATIONS_PER_HOUR), 100, 1, 100_000),
+    globalDaily: bounded(options.rateLimits?.globalDaily ?? envInteger(process.env.CRYPTO_EDGE_AI_GLOBAL_INITIATIONS_PER_DAY), 1_000, 1, 1_000_000),
   };
+  const queueDepth = bounded(options.rateLimits?.queueDepth ?? envInteger(process.env.CRYPTO_EDGE_AI_QUEUE_DEPTH_LIMIT), 250, 1, 100_000);
   let storePromise: Promise<AIAnalysisQueueStore> | null = options.queueStore ? Promise.resolve(options.queueStore) : null;
   const contextOptions: AIResearchContextOptions = {
     scanner: options.scanner,
@@ -97,11 +105,13 @@ export function createAIResearchService(options: AIResearchServiceOptions = {}) 
     try { return await storePromise; } catch { throw new AIResearchServiceError("STORE_UNAVAILABLE", 503); }
   };
 
-  const contextAndIdentity = async (chain: string, contractAddress: string, locale: "pl" | "en") => {
-    const context = await buildAIResearchContext(chain, contractAddress, locale, contextOptions);
+  const contextAndIdentity = async (chain: string, contractAddress: string) => {
+    // A shared job has one bilingual provider result. Request locale is deliberately
+    // not allowed to reach the cache identity or start another heavy generation.
+    const context = await buildAIResearchContext(chain, contractAddress, "en", contextOptions);
     const identity = buildAIAnalysisCacheIdentity({
       ...context.identity,
-      locale,
+      locale: "en",
       snapshot_fingerprint: context.snapshot_fingerprint,
       prompt_version: context.prompt_version,
       model_id: modelId,
@@ -122,7 +132,10 @@ export function createAIResearchService(options: AIResearchServiceOptions = {}) 
     },
 
     async getBrief(chain: string, contractAddress: string, locale: "pl" | "en"): Promise<AIResearchBriefLookup> {
-      const { context, identity } = await contextAndIdentity(chain, contractAddress, locale);
+      // Locale is accepted for API compatibility; scannerApiHandler applies it only
+      // after this canonical shared lookup is complete.
+      void locale;
+      const { context, identity } = await contextAndIdentity(chain, contractAddress);
       if (renderPreview) return lookup("READY", "DISABLED", buildDeterministicPreview(context, now()), null, null);
       let store: AIAnalysisQueueStore;
       try { store = await getStore(); } catch { return lookup("ERROR", providerMode(providerEnabled), null, null, "STORE_UNAVAILABLE"); }
@@ -130,11 +143,14 @@ export function createAIResearchService(options: AIResearchServiceOptions = {}) 
       if (!current.record && !current.last_known_good && context.research_state === "INSUFFICIENT_DATA") {
         return lookup("INSUFFICIENT_DATA", providerMode(providerEnabled), null, null, "DATA_UNAVAILABLE", null, identity);
       }
+      if (!current.record && !current.last_known_good && store.circuitBreaker(now()).state === "OPEN") {
+        return lookup("FAILED", providerMode(providerEnabled), null, null, "AI_CIRCUIT_OPEN", null, identity);
+      }
       return publicLookup(current, identity, providerEnabled, null, null);
     },
 
     async generate(request: AIResearchGenerateRequest, sessionId: string): Promise<AIResearchBriefLookup> {
-      const { context, identity } = await contextAndIdentity(request.chain, request.contract_address, request.locale);
+      const { context, identity } = await contextAndIdentity(request.chain, request.contract_address);
       if (renderPreview) return lookup("READY", "DISABLED", buildDeterministicPreview(context, now()), null, null);
       const store = await getStore();
       const existing = store.lookup(identity);
@@ -153,6 +169,14 @@ export function createAIResearchService(options: AIResearchServiceOptions = {}) 
       if (store.workerState().suspended) {
         return lookup("SUSPENDED", "OPENAI", null, null, "WORKER_SUSPENDED", null, identity, "SUSPENDED");
       }
+      const breaker = store.circuitBreaker(now());
+      if (breaker.state === "OPEN") {
+        return lookup("FAILED", "OPENAI", existing.last_known_good, null, "AI_CIRCUIT_OPEN", null, identity, "RATE_LIMITED");
+      }
+      const queue = store.stats();
+      if (queue.queued + queue.processing >= queueDepth) {
+        return lookup("RATE_LIMITED", "OPENAI", existing.last_known_good, null, "AI_QUEUE_LIMIT_REACHED", null, identity, "RATE_LIMITED");
+      }
       let queued: AIAnalysisEnqueueResult;
       try {
         queued = store.enqueue({
@@ -163,10 +187,16 @@ export function createAIResearchService(options: AIResearchServiceOptions = {}) 
         });
       } catch (error) {
         if (error instanceof AIAnalysisQueueStoreError && error.code === "RATE_LIMITED") {
-          throw new AIResearchServiceError("RATE_LIMITED", 429, {
-            retryAfterSeconds: error.retryAfterSeconds ?? undefined,
-            cachedBrief: existing.last_known_good ?? undefined,
-          });
+          return lookup(
+            "RATE_LIMITED",
+            providerMode(providerEnabled),
+            existing.last_known_good,
+            error.retryAfterSeconds,
+            "RATE_LIMITED",
+            null,
+            identity,
+            "RATE_LIMITED",
+          );
         }
         throw new AIResearchServiceError("STORE_UNAVAILABLE", 503);
       }
@@ -216,14 +246,13 @@ export function hydrateAIResearchBrief(
     identity: context.identity,
     snapshot_fingerprint: context.snapshot_fingerprint,
     prompt_version: context.prompt_version,
-    locale: context.locale,
     model,
   }));
   const base = {
     schema_version: AI_RESEARCH_SCHEMA_VERSION,
     analysis_id: analysisId ?? `air_${randomUUID()}`,
     identity: context.identity,
-    analysis_language: context.locale,
+    analysis_language: "bilingual",
     snapshot_fingerprint: context.snapshot_fingerprint,
     prompt_version: context.prompt_version,
     model,
@@ -233,23 +262,23 @@ export function hydrateAIResearchBrief(
     summary: narrative.summary,
     known_facts: context.fact_candidates.map((fact, index) => ({
       ...fact,
-      interpretation: narrative.fact_narratives[index]!.interpretation,
+      interpretation: { en: narrative.fact_narratives[index]!.en, pl: narrative.fact_narratives[index]!.pl },
     })),
     risk_factors: context.risk_candidates.map((risk, index) => ({
       ...risk,
-      explanation: narrative.risk_narratives[index]!.explanation,
+      explanation: { en: narrative.risk_narratives[index]!.en, pl: narrative.risk_narratives[index]!.pl },
     })),
     missing_information: context.missing_information.map((item, index) => ({
       ...item,
-      explanation: narrative.missing_narratives[index]!.explanation,
+      explanation: { en: narrative.missing_narratives[index]!.en, pl: narrative.missing_narratives[index]!.pl },
     })),
     next_actions: context.action_catalog.map((action, index) => ({
       ...action,
-      reason: narrative.action_narratives[index]!.reason,
+      reason: { en: narrative.action_narratives[index]!.en, pl: narrative.action_narratives[index]!.pl },
     })),
     status_change_conditions: context.status_change_conditions.map((condition, index) => ({
       ...condition,
-      explanation: narrative.status_change_narratives[index]!.explanation,
+      explanation: { en: narrative.status_change_narratives[index]!.en, pl: narrative.status_change_narratives[index]!.pl },
     })),
     source_references: context.source_references,
     coverage: context.coverage,
@@ -265,34 +294,176 @@ export function hydrateAIResearchBrief(
 }
 
 export function buildDeterministicPreview(context: AIResearchContext, generatedAt = new Date()): AIResearchBrief {
-  const pl = context.locale === "pl";
+  const bilingual = (en: string, pl: string) => ({ en, pl });
+  const factNarrative = (fact: AIResearchContext["fact_candidates"][number]) => {
+    const { key } = fact;
+    if (key === "holders" && fact.value === null) {
+      return bilingual(
+        "The current snapshot does not provide a holder value, so holder structure cannot be assessed from this evidence.",
+        "Bieżąca migawka nie zawiera wartości dotyczącej holderów, więc na jej podstawie nie można ocenić ich struktury.",
+      );
+    }
+    const copy: Record<string, ReturnType<typeof bilingual>> = {
+      lifecycle: bilingual(
+        "The token remains at the recorded observation stage, so the next checks stay focused on evidence rather than a stronger project assessment.",
+        "Token pozostaje na zapisanym etapie obserwacji, więc kolejne kroki skupiają się na danych, a nie na mocniejszej ocenie projektu.",
+      ),
+      basic_filters: bilingual(
+        "At least one recorded basic condition is not met, which limits how strongly the currently available information can be assessed.",
+        "Co najmniej jeden zapisany podstawowy warunek nie jest spełniony, co ogranicza siłę oceny dostępnych informacji.",
+      ),
+      freshness: bilingual(
+        "The latest recorded snapshot needs refreshing before its values are treated as current research context.",
+        "Najnowsza zapisana migawka wymaga odświeżenia, zanim jej wartości zostaną uznane za aktualny kontekst analizy.",
+      ),
+      market_cap_usd: bilingual(
+        "Market capitalization is recorded in this snapshot and can be considered alongside liquidity instead of as an isolated label.",
+        "Kapitalizacja jest zapisana w tej migawce i można ją zestawić z płynnością, zamiast traktować jako pojedynczą etykietę.",
+      ),
+      liquidity_usd: bilingual(
+        "Liquidity is available in the snapshot, so it can be compared with the recorded market context; it does not resolve the missing security or holder evidence.",
+        "Płynność jest dostępna w migawce, więc można ją zestawić z kontekstem rynkowym; nie zastępuje to brakujących danych bezpieczeństwa ani holderów.",
+      ),
+      volume_24h_usd: bilingual(
+        "Recorded trading activity adds market context, but it does not answer the open security and concentration questions.",
+        "Zapisana aktywność rynkowa daje kontekst, ale nie odpowiada na otwarte pytania o bezpieczeństwo i koncentrację.",
+      ),
+      holders: bilingual(
+        "Holder information is recorded and can be reviewed with the rest of the snapshot; it should not be read as a safety conclusion.",
+        "Dane o holderach są zapisane i można je sprawdzić wraz z resztą migawki; nie są jednak wnioskiem o bezpieczeństwie.",
+      ),
+      pair_age_days: bilingual(
+        "The recorded pair age adds timing context, but it does not resolve the open security or holder questions.",
+        "Zapisany wiek pary daje kontekst czasowy, ale nie rozstrzyga otwartych kwestii bezpieczeństwa ani holderów.",
+      ),
+    };
+    return copy[key] ?? bilingual(
+      "This recorded fact adds context to the current research view without resolving the remaining evidence gaps.",
+      "Ten zapisany fakt uzupełnia obecny obraz analizy, ale nie zamyka pozostałych luk w danych.",
+    );
+  };
+  const riskNarrative = (category: string) => {
+    const copy: Record<string, ReturnType<typeof bilingual>> = {
+      basic_filters: bilingual(
+        "At least one recorded basic filter is not met. That limits how strongly the available market information can be assessed; the concern comes from the stored basic-filter result.",
+        "Co najmniej jeden zapisany podstawowy filtr nie jest spełniony. Ogranicza to siłę oceny dostępnych danych rynkowych; obawa wynika z zapisanego wyniku filtrów.",
+      ),
+      security: bilingual(
+        "Security coverage is incomplete, so the available result cannot settle possible contract restrictions or warning flags; the concern comes from the partial security evidence.",
+        "Pokrycie bezpieczeństwa jest niepełne, więc dostępny wynik nie rozstrzyga możliwych ograniczeń kontraktu ani flag ostrzegawczych; obawa wynika z częściowych danych bezpieczeństwa.",
+      ),
+      coverage_missing: bilingual(
+        "No security result is recorded, so contract restrictions and warning flags cannot be assessed. This leaves the available market data without the security evidence needed for a stronger interpretation.",
+        "Brak zapisanego wyniku bezpieczeństwa, więc nie można ocenić ograniczeń kontraktu ani flag ostrzegawczych. Dostępne dane rynkowe nie mają przez to podstawy bezpieczeństwa potrzebnej do mocniejszej interpretacji.",
+      ),
+      freshness: bilingual(
+        "The recorded data is not current enough for a fresh comparison. Its timestamp is the reason this risk remains open.",
+        "Zapisane dane nie są wystarczająco aktualne do bieżącego porównania. Ten czas migawki jest powodem, dla którego ryzyko pozostaje otwarte.",
+      ),
+      security_flag: bilingual(
+        "A recorded security-check flag needs manual interpretation before it can support a conclusion. The concern is tied to the stored security-status evidence.",
+        "Zapisana flaga kontroli bezpieczeństwa wymaga ręcznej interpretacji, zanim będzie można oprzeć na niej wniosek. Obawa wynika z zapisanego statusu bezpieczeństwa.",
+      ),
+      workflow: bilingual(
+        "No workflow blocker is recorded, but that does not establish project safety. The available evidence is limited to the product methodology record.",
+        "Nie zapisano blokady procesu, ale nie potwierdza to bezpieczeństwa projektu. Dostępne dane ograniczają się do zapisu metodologii produktu.",
+      ),
+    };
+    return copy[category] ?? bilingual(
+      "This recorded risk remains relevant to the current research posture and needs verification against the listed evidence.",
+      "To zapisane ryzyko pozostaje ważne dla obecnej analizy i wymaga sprawdzenia względem wskazanych źródeł.",
+    );
+  };
+  const missingNarrative = (key: string) => {
+    const copy: Record<string, ReturnType<typeof bilingual>> = {
+      security: bilingual(
+        "Without a recorded security result, contract restrictions and warning flags cannot be assessed from this snapshot.",
+        "Bez zapisanego wyniku bezpieczeństwa z tej migawki nie można ocenić ograniczeń kontraktu ani flag ostrzegawczych.",
+      ),
+      history: bilingual(
+        "The available history is not sufficient to compare how the recorded market context changes across checkpoints.",
+        "Dostępna historia nie wystarcza do porównania zmian kontekstu rynkowego między punktami kontrolnymi.",
+      ),
+      next_checkpoint: bilingual(
+        "A later checkpoint has not been recorded yet, so the current observation cannot be compared with a follow-up state.",
+        "Kolejny punkt kontrolny nie został jeszcze zapisany, więc obecnej obserwacji nie można porównać ze stanem po czasie.",
+      ),
+      fresh_data: bilingual(
+        "A fresher snapshot is needed before the recorded values are treated as current research evidence.",
+        "Przed traktowaniem zapisanych wartości jako aktualnych danych do analizy potrzebna jest nowsza migawka.",
+      ),
+      source_verification: bilingual(
+        "The listed project identity or external source still needs manual verification before it can support a stronger conclusion.",
+        "Wskazana tożsamość projektu lub źródło zewnętrzne nadal wymaga ręcznej weryfikacji przed wyciągnięciem mocniejszego wniosku.",
+      ),
+    };
+    return copy[key] ?? bilingual(
+      "This missing area limits what can be concluded from the supplied evidence.",
+      "Ten brak ogranicza wnioski, które można wyciągnąć z dostarczonych danych.",
+    );
+  };
+  const actionNarrative = (action: string) => {
+    const copy: Record<string, ReturnType<typeof bilingual>> = {
+      REVIEW_SECURITY: bilingual("Review security evidence first because it is the highest-impact unresolved gap.", "Najpierw sprawdź dane bezpieczeństwa, ponieważ to luka o największym wpływie na dalszą analizę."),
+      OPEN_VERIFICATION: bilingual("Verify the listed source or identity next so the recorded context can be relied on.", "Następnie zweryfikuj wskazane źródło lub tożsamość, aby można było oprzeć się na zapisanym kontekście."),
+      WAIT_FOR_CHECKPOINT: bilingual("Wait for the next recorded checkpoint to compare the current observation with new evidence.", "Poczekaj na kolejny zapisany punkt kontrolny, aby porównać obecną obserwację z nowymi danymi."),
+      REVIEW_CHECKPOINTS: bilingual("Review the recorded checkpoints to see whether the open gap has changed over time.", "Przejrzyj zapisane punkty kontrolne, aby sprawdzić, czy otwarta luka zmieniła się w czasie."),
+    };
+    return copy[action] ?? bilingual("Use this permitted research step to verify the listed evidence gap.", "Wykorzystaj ten dozwolony krok analizy, aby sprawdzić wskazaną lukę w danych.");
+  };
   const narrative: AIResearchProviderNarrative = {
     narrative_version: AI_RESEARCH_NARRATIVE_VERSION,
-    summary: pl
-      ? "Analiza porządkuje aktualną migawkę produktu i wskazuje najważniejsze luki wymagające dalszego sprawdzenia. Aktualny etap obserwacji wynika z zapisanych danych, a nie z decyzji modelu."
-      : "The analysis organizes the current product snapshot and highlights the most important gaps for further review. The current observation stage comes from stored data, not from a model decision.",
+    summary: bilingual(
+      "The snapshot provides market and liquidity context, but the most important research blockers remain the missing security and supporting verification evidence. Use the recorded facts to guide the next check, not as a conclusion about the project.",
+      "Migawka zawiera kontekst rynkowy i płynnościowy, ale najważniejszymi blokadami analizy pozostają brak danych bezpieczeństwa i dodatkowej weryfikacji. Zapisane fakty pomagają wybrać kolejny krok, ale nie są oceną projektu.",
+    ),
     fact_narratives: context.fact_candidates.map((fact) => ({
       id: aiResearchNarrativeId("fact", fact.key),
-      interpretation: pl ? "Wartość pochodzi bezpośrednio z bieżącego kontekstu produktu." : "This value comes directly from the current product context.",
+      ...factNarrative(fact),
     })),
     risk_narratives: context.risk_candidates.map((risk, index) => ({
       id: aiResearchNarrativeId("risk", index),
-      explanation: risk.explanation,
+      ...riskNarrative(risk.category),
     })),
     missing_narratives: context.missing_information.map((item) => ({
       id: aiResearchNarrativeId("missing", item.key),
-      explanation: item.explanation,
+      ...missingNarrative(item.key),
     })),
     action_narratives: context.action_catalog.map((action, index) => ({
       id: aiResearchNarrativeId("action", index),
-      reason: action.reason,
+      ...actionNarrative(action.action_type),
     })),
     status_change_narratives: context.status_change_conditions.map((condition) => ({
       id: aiResearchNarrativeId("condition", condition.key),
-      explanation: condition.explanation,
+      ...statusConditionNarrative(condition.key),
     })),
   };
   return hydrateAIResearchBrief(context, narrative, "render-preview", { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }, generatedAt, true);
+}
+
+function statusConditionNarrative(key: string): { en: string; pl: string } {
+  const copy: Record<string, { en: string; pl: string }> = {
+    next_checkpoint: {
+      en: "A new recorded checkpoint would allow the current observation to be compared with a later state.",
+      pl: "Nowy zapisany punkt kontrolny pozwoli porównać obecną obserwację ze stanem po czasie.",
+    },
+    filter_thresholds: {
+      en: "Updated recorded metrics can change the filter result and should be checked before drawing a stronger conclusion.",
+      pl: "Zaktualizowane zapisane metryki mogą zmienić wynik filtrów i warto je sprawdzić przed mocniejszym wnioskiem.",
+    },
+    fresh_snapshot: {
+      en: "A fresher recorded snapshot can update the assessment of the current gaps and risks.",
+      pl: "Nowsza zapisana migawka może zaktualizować ocenę obecnych braków i ryzyk.",
+    },
+    owner_decision: {
+      en: "An owner decision is separate from this research result and is not automated by the analysis.",
+      pl: "Decyzja ownera jest oddzielna od tego wyniku analizy i nie jest automatyzowana przez AI.",
+    },
+  };
+  return copy[key] ?? {
+    en: "A recorded change in this area would justify revisiting the current research view.",
+    pl: "Zapisana zmiana w tym obszarze uzasadni ponowne sprawdzenie obecnej analizy.",
+  };
 }
 
 function lookup(
@@ -363,4 +534,10 @@ function safeModelId(value: string | undefined): string | null {
 
 function bounded(value: number | undefined, fallback: number, minimum: number, maximum: number): number {
   return value !== undefined && Number.isSafeInteger(value) && value >= minimum && value <= maximum ? value : fallback;
+}
+
+function envInteger(value: string | undefined): number | undefined {
+  if (!value || !/^\d+$/.test(value.trim())) return undefined;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) ? parsed : undefined;
 }

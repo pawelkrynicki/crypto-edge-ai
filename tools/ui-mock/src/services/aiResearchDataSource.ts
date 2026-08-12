@@ -1,15 +1,15 @@
 import {
-  AI_RESEARCH_ACTION_TYPES,
-  AI_RESEARCH_SCHEMA_VERSION,
-  AI_RESEARCH_STATES,
   type AIResearchBrief,
-  type AIResearchBriefLookup,
   type AIResearchGenerateRequest,
   type AIResearchLocale,
-  type AIResearchProviderStatus,
   type AIResearchReviewMetrics,
   type AIResearchReviewMetricsLookup,
 } from "../types/aiResearchTypes";
+import type {
+  AIProductionAnalysis,
+  AIProductionAnalysisLookup,
+  AIProductionAvailability,
+} from "../types/aiProductionTypes";
 
 export class AIResearchDataSourceError extends Error {
   readonly status: number;
@@ -27,12 +27,12 @@ export class AIResearchDataSourceError extends Error {
   }
 }
 
-export async function loadAIResearchStatus(fetchImpl: typeof fetch = fetch): Promise<AIResearchProviderStatus | null> {
+export async function loadAIResearchStatus(fetchImpl: typeof fetch = fetch): Promise<AIProductionAvailability | null> {
   try {
     const response = await fetchImpl("/api/ai-research/status", { headers: { accept: "application/json" }, credentials: "same-origin" });
     if (!response.ok) return null;
     const value: unknown = await response.json();
-    return isProviderStatus(value) ? value : null;
+    return isAvailability(value) ? value : null;
   } catch {
     return null;
   }
@@ -43,7 +43,7 @@ export async function loadAIResearchBrief(
   contractAddress: string,
   locale: AIResearchLocale,
   fetchImpl: typeof fetch = fetch,
-): Promise<AIResearchBriefLookup> {
+): Promise<AIProductionAnalysisLookup> {
   const query = new URLSearchParams({ chain, contract_address: contractAddress, locale });
   const response = await fetchImpl(`/api/v1/ai-analyses/result?${query}`, {
     headers: { accept: "application/json" },
@@ -58,7 +58,7 @@ export async function loadAIResearchBrief(
 export async function requestAIResearchBrief(
   input: Omit<AIResearchGenerateRequest, "idempotency_key"> & { idempotency_key?: string },
   fetchImpl: typeof fetch = fetch,
-): Promise<AIResearchBriefLookup> {
+): Promise<AIProductionAnalysisLookup> {
   const body: AIResearchGenerateRequest = {
     chain: input.chain,
     contract_address: input.contract_address,
@@ -102,30 +102,23 @@ async function parseError(response: Response): Promise<AIResearchDataSourceError
   if (!isRecord(value)) return new AIResearchDataSourceError(response.status, "AI_RESEARCH_UNAVAILABLE", null, null);
   const code = typeof value.error === "string" ? value.error : "AI_RESEARCH_UNAVAILABLE";
   const retry = typeof value.retry_after_seconds === "number" ? value.retry_after_seconds : null;
-  const cached = isBrief(value.cached_brief) ? value.cached_brief : null;
-  return new AIResearchDataSourceError(response.status, code, retry, cached);
+  return new AIResearchDataSourceError(response.status, code, retry, null);
 }
 
-function isProviderStatus(value: unknown): value is AIResearchProviderStatus {
+function isAvailability(value: unknown): value is AIProductionAvailability {
   return isRecord(value)
-    && value.schema_version === "ai_research_status_v1"
-    && (value.provider_mode === "DISABLED" || value.provider_mode === "OPENAI")
-    && typeof value.available === "boolean"
-    && typeof value.model_configured === "boolean"
-    && typeof value.render_preview === "boolean";
+    && value.schema_version === "ai_production_availability_v1"
+    && typeof value.available === "boolean";
 }
 
-function isLookup(value: unknown): value is AIResearchBriefLookup {
+function isLookup(value: unknown): value is AIProductionAnalysisLookup {
   return isRecord(value)
-    && value.schema_version === "ai_research_lookup_v1"
-    && ["ABSENT", "QUEUED", "PROCESSING", "READY", "STALE", "FAILED", "SUSPENDED", "COOLDOWN", "PROVIDER_DISABLED", "INSUFFICIENT_DATA", "RATE_LIMITED", "ERROR"].includes(String(value.availability))
-    && (value.provider_mode === "DISABLED" || value.provider_mode === "OPENAI")
-    && (value.brief === null || isBrief(value.brief))
+    && value.schema_version === "ai_production_analysis_lookup_v1"
+    && ["NO_ANALYSIS", "QUEUED", "PROCESSING", "READY", "STALE", "ERROR", "LIMIT", "DISABLED"].includes(String(value.status))
+    && (value.analysis === null || isProductionAnalysis(value.analysis))
     && (value.retry_after_seconds === null || typeof value.retry_after_seconds === "number")
-    && (value.error_code === null || typeof value.error_code === "string")
-    && (value.generation_blocked_reason === undefined
-      || value.generation_blocked_reason === null
-      || ["LIVE_CALL_BUDGET_EXHAUSTED", "LIVE_CALL_BUDGET_INVALID", "REVIEW_STORE_REQUIRED"].includes(String(value.generation_blocked_reason)));
+    && typeof value.is_last_known_good === "boolean"
+    && !["provider_mode", "model", "analysis_id", "cache_key", "queue_status", "error_code"].some((key) => Object.prototype.hasOwnProperty.call(value, key));
 }
 
 function isReviewMetricsLookup(value: unknown): value is AIResearchReviewMetricsLookup {
@@ -139,7 +132,7 @@ function isReviewMetrics(value: unknown): value is AIResearchReviewMetrics {
     && value.schema_version === "ai_research_review_metrics_v1"
     && typeof value.analysis_id === "string"
     && typeof value.model === "string"
-    && value.prompt_version === "ai_research_prompt_v2"
+    && value.prompt_version === "ai_research_prompt_v4"
     && typeof value.snapshot_fingerprint === "string"
     && typeof value.generated_at === "string"
     && typeof value.data_generated_at === "string"
@@ -152,25 +145,50 @@ function isReviewMetrics(value: unknown): value is AIResearchReviewMetrics {
     && (value.request_id === null || typeof value.request_id === "string");
 }
 
-function isBrief(value: unknown): value is AIResearchBrief {
-  if (!isRecord(value)
-    || value.schema_version !== AI_RESEARCH_SCHEMA_VERSION
-    || !isRecord(value.identity)
-    || typeof value.identity.chain !== "string"
-    || typeof value.identity.contract_address !== "string"
-    || !AI_RESEARCH_STATES.includes(value.research_state as never)
-    || typeof value.summary !== "string"
-    || !Array.isArray(value.known_facts)
-    || !Array.isArray(value.risk_factors)
-    || !Array.isArray(value.missing_information)
-    || !Array.isArray(value.next_actions)
-    || !Array.isArray(value.status_change_conditions)
-    || !Array.isArray(value.source_references)
-    || !Array.isArray(value.coverage)
-    || !Array.isArray(value.checkpoints)
-    || !isRecord(value.token_usage)
-    || typeof value.render_preview !== "boolean") return false;
-  return value.next_actions.every((action) => isRecord(action) && AI_RESEARCH_ACTION_TYPES.includes(action.action_type as never));
+function isProductionAnalysis(value: unknown): value is AIProductionAnalysis {
+  return isRecord(value)
+    && value.schema_version === "ai_production_analysis_v3"
+    && typeof value.analysis_summary === "string"
+    && isInsightArray(value.confirmed_findings)
+    && Array.isArray(value.risks) && value.risks.every((item) => isRecord(item)
+      && typeof item.title === "string" && typeof item.detail === "string"
+      && ["low", "medium", "high", "unknown"].includes(String(item.severity)))
+    && isInsightArray(value.missing_data)
+    && isInsight(value.market_context) && isInsight(value.security_context)
+    && isInsight(value.liquidity_context) && isInsight(value.holder_context)
+    && isResearchGuidance(value.research_guidance)
+    && Array.isArray(value.next_research_steps) && value.next_research_steps.every((item) => isResearchStep(item))
+    && isInsightArray(value.reassessment_signals)
+    && Array.isArray(value.evidence)
+    && typeof value.generated_at === "string" && typeof value.data_snapshot_at === "string"
+    && (value.freshness === "FRESH" || value.freshness === "STALE")
+    && typeof value.analysis_version === "string";
+}
+
+function isInsight(value: unknown): value is { title: string; detail: string } {
+  return isRecord(value) && typeof value.title === "string" && typeof value.detail === "string";
+}
+
+function isInsightArray(value: unknown): value is Array<{ title: string; detail: string }> {
+  return Array.isArray(value) && value.every(isInsight);
+}
+
+function isResearchStep(value: unknown): boolean {
+  return isInsight(value) && isRecord(value) && ["primary", "secondary", "tertiary"].includes(String((value as Record<string, unknown>).priority));
+}
+
+function isResearchGuidance(value: unknown): boolean {
+  if (!isRecord(value) || !isRecord(value.current_step)
+    || ![1, 2, 3, 4, 5, 6, 7].includes(Number(value.current_step.number))
+    || typeof value.current_step.title !== "string" || typeof value.current_step.posture !== "string" || typeof value.current_step.posture_detail !== "string"
+    || !isInsightArray(value.blockers)
+    || !Array.isArray(value.filter_failures) || !value.filter_failures.every((item) => isRecord(item)
+      && typeof item.label === "string" && typeof item.value === "string" && typeof item.requirement === "string" && typeof item.status === "string")
+    || !Array.isArray(value.actions) || !value.actions.every((item) => isRecord(item)
+      && typeof item.title === "string" && typeof item.why === "string" && typeof item.resolves === "string"
+      && (item.cta === null || (isRecord(item.cta) && typeof item.cta.label === "string" && typeof item.cta.href === "string" && typeof item.cta.external === "boolean")))
+    || !Array.isArray(value.unlock_conditions) || !value.unlock_conditions.every((item) => typeof item === "string")) return false;
+  return true;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

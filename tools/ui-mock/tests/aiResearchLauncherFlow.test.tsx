@@ -6,6 +6,7 @@ import { after, describe, it } from "node:test";
 import React from "react";
 import TestRenderer from "react-test-renderer";
 import { buildAIResearchContext } from "../server/aiResearchContext.js";
+import { presentAIProductionLookup } from "../server/aiProductionPublic.js";
 import { buildDeterministicPreview } from "../server/aiResearchService.js";
 import { mapPersistableScannerOutputToUiCandidates } from "../src/adapters/scannerOutputAdapter.js";
 import { CandidateDetailView } from "../src/components/CandidateDetailView.js";
@@ -54,24 +55,23 @@ describe("AI.3 real owner-review launcher flow", () => {
     });
   });
 
-  it("replaces the first PROCESSING render with the fetched preview before applying URL states", async () => {
+  it("replaces the first PROCESSING render with the safe public preview and ignores review-state query tampering", async () => {
     const cases = [
       {
         search: "?ai_review_state=cooldown",
-        expected: ["Czas oczekiwania", "Spróbuj ponownie później.", "Spróbuj ponownie za 60 s"],
-        disabledCta: "Spróbuj ponownie za 60 s",
+        expected: ["Dostępna", "Analiza gotowa", "Podsumowanie"],
       },
       {
         search: "?ai_review_state=failed",
-        expected: ["Chwilowo niedostępna", "Analiza nie mogła zostać teraz przygotowana."],
+        expected: ["Dostępna", "Analiza gotowa", "Podsumowanie"],
       },
       {
         search: "?ai_review_state=suspended",
-        expected: ["Wstrzymana", "Przygotowanie analizy jest wstrzymane", "Wznowienie będzie możliwe po uruchomieniu kolejki analizy."],
+        expected: ["Dostępna", "Analiza gotowa", "Podsumowanie"],
       },
       {
         search: "",
-        expected: ["Dostępna", "Analiza dostępna", "Wizualny stan badawczy"],
+        expected: ["Dostępna", "Analiza gotowa", "Podsumowanie"],
       },
     ] as const;
 
@@ -129,7 +129,7 @@ async function runCandidateDetailFlow(testCase: {
     assert.match(firstRender, /Analiza jest przygotowywana/);
 
     await act(async () => {
-      resolveLookup!(new Response(JSON.stringify(previewLookup), {
+      resolveLookup!(new Response(JSON.stringify(presentAIProductionLookup(previewLookup, "pl")), {
         status: 200,
         headers: { "content-type": "application/json" },
       }));

@@ -74,7 +74,7 @@ describe("UX.2 Tabbed Token Detail Workspace", () => {
       assert.equal(renderer!.root.findAll((node) => node.props.role === "tabpanel").length, 1);
       assert.equal(renderer!.root.find((node) => node.props["data-active-detail-tab"] !== undefined).props["data-active-detail-tab"], "ai");
       assert.equal(getTab("ai").props["aria-selected"], true);
-      assert.match(renderedText(renderer!), /AI Research Brief/);
+      assert.match(renderedText(renderer!), /AI analysis/);
       assert.doesNotMatch(activePanelText(renderer!), /Market data/);
       assert.ok(localApiRequests >= 1, "AI UI may read only its local API state");
     } finally {
@@ -227,8 +227,7 @@ describe("UX.3 client header and UX.4 provider-neutral AI", () => {
       error_code: null,
     };
     const client = render("en", <AIResearchSection chain="base" contractAddress={ADDRESS_A} symbol="PASS" name="Pass" initialLookup={lookup} mode="summary" />);
-    assert.match(client, /AI analysis is disabled in this preview mode/);
-    assert.match(client, /Enable AI analysis in Control Center\./);
+    assert.match(client, /AI analysis is currently unavailable/);
     assert.doesNotMatch(client, /OpenAI|gpt-5-mini|provider mode|PROVIDER_DISABLED/i);
 
     const canvas = await source("src/components/AIResearchBriefCanvas.tsx");

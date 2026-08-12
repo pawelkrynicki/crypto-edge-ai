@@ -38,6 +38,36 @@ export type AIResearchContextOptions = {
 };
 
 export type AIResearchFactCandidate = Omit<AIResearchKnownFact, "interpretation">;
+export type AIResearchRiskCandidate = Omit<AIResearchRiskFactor, "explanation">;
+export type AIResearchMissingCandidate = Omit<AIResearchMissingInformation, "explanation">;
+export type AIResearchActionCandidate = Omit<AIResearchNextAction, "reason">;
+export type AIResearchStatusConditionCandidate = Omit<AIResearchStatusChangeCondition, "explanation">;
+
+/**
+ * Deterministic, non-provider input for the public CAMP research playbook.
+ * It is intentionally separate from the stored brief: the guidance layer is
+ * derived from current validated product facts and never changes the shared
+ * analysis job, lifecycle, or user workspace.
+ */
+export type AIResearchGuidanceInput = {
+  freshness: "FRESH" | "STALE" | "UNKNOWN";
+  filters: {
+    status: string;
+    reasons: string[];
+    metrics: ReturnType<typeof marketMetrics>;
+  };
+  security: {
+    coverage: "complete" | "partial" | "unavailable";
+    contract_verified: boolean | null;
+    honeypot_status: string | null;
+    buy_tax: number | null;
+    sell_tax: number | null;
+    critical_flags_recorded: boolean;
+  };
+  holder_data_available: boolean;
+  address_identity_verified: boolean;
+  action_catalog: AIResearchActionCandidate[];
+};
 
 export type AIResearchContext = {
   identity: { chain: string; contract_address: string };
@@ -50,13 +80,14 @@ export type AIResearchContext = {
   research_state: AIResearchState;
   lifecycle: TokenLifecycleViewModel;
   fact_candidates: AIResearchFactCandidate[];
-  risk_candidates: AIResearchRiskFactor[];
-  missing_information: AIResearchMissingInformation[];
-  action_catalog: AIResearchNextAction[];
-  status_change_conditions: AIResearchStatusChangeCondition[];
+  risk_candidates: AIResearchRiskCandidate[];
+  missing_information: AIResearchMissingCandidate[];
+  action_catalog: AIResearchActionCandidate[];
+  status_change_conditions: AIResearchStatusConditionCandidate[];
   source_references: AIResearchSourceReference[];
   coverage: AIResearchCoverageItem[];
   checkpoints: TokenLifecycleViewModel["checkpoints"];
+  guidance: AIResearchGuidanceInput;
   provider_context: Record<string, unknown>;
 };
 
@@ -134,6 +165,28 @@ export async function buildAIResearchContext(
   const researchState = resolveResearchState(candidate, followUp, freshness, factCandidates.length);
   const actionCatalog = resolveAIResearchActions(candidate, followUp, lifecycle, freshness, sourceReferences, locale);
   const statusChangeConditions = buildStatusConditions(candidate, followUp, lifecycle, freshness, locale);
+  const metrics = marketMetrics(candidate, followUp);
+  const securityCoverage = resolveSecurityCoverage(candidate, followUp);
+  const guidance: AIResearchGuidanceInput = {
+    freshness: freshness === "FRESH" || freshness === "STALE" ? freshness : "UNKNOWN",
+    filters: {
+      status: candidate?.basicFilterStatus ?? followUp?.filter_status ?? "not_checked",
+      reasons: [...(candidate?.filterReasons ?? followUp?.filter_reasons ?? [])].sort(),
+      metrics,
+    },
+    security: {
+      coverage: securityCoverage,
+      contract_verified: candidate?.security?.contractVerified ?? null,
+      honeypot_status: candidate?.security?.honeypotStatus ?? null,
+      buy_tax: candidate?.security?.buyTax ?? null,
+      sell_tax: candidate?.security?.sellTax ?? null,
+      critical_flags_recorded: (candidate?.criticalReasons.length ?? 0) > 0 || (candidate?.riskFlags.length ?? 0) > 0,
+    },
+    holder_data_available: candidate?.security?.topWalletPct !== null && candidate?.security?.topWalletPct !== undefined
+      && candidate.security.top10WalletsPct !== null && candidate.security.top10WalletsPct !== undefined,
+    address_identity_verified: candidate?.addressIdentityVerified === true,
+    action_catalog: actionCatalog,
+  };
   const symbol = boundedUntrustedText(candidate?.symbol ?? followUp?.symbol ?? "", 32);
   const name = boundedUntrustedText(candidate?.name ?? followUp?.display_name ?? symbol, 120);
   const canonicalInput = {
@@ -148,7 +201,7 @@ export async function buildAIResearchContext(
       checkpoints: lifecycle.checkpoints,
     },
     freshness,
-    metrics: marketMetrics(candidate, followUp),
+    metrics,
     filters: {
       status: candidate?.basicFilterStatus ?? followUp?.filter_status ?? "not_checked",
       reasons: [...(candidate?.filterReasons ?? followUp?.filter_reasons ?? [])].sort(),
@@ -193,6 +246,7 @@ export async function buildAIResearchContext(
     source_references: sourceReferences,
     coverage,
     checkpoints: lifecycle.checkpoints,
+    guidance,
     provider_context: {
       contract_version: AI_RESEARCH_NARRATIVE_VERSION,
       locale,
@@ -355,14 +409,13 @@ function buildRisks(
   followUp: FollowUpPublicEntry | null,
   freshness: string,
   locale: AIResearchLocale,
-): AIResearchRiskFactor[] {
+): AIResearchRiskCandidate[] {
   const pl = locale === "pl";
-  const risks: AIResearchRiskFactor[] = [];
-  const add = (severity: AIResearchRiskFactor["severity"], category: string, titlePl: string, titleEn: string, detailPl: string, detailEn: string, refs: string[]) => risks.push({
+  const risks: AIResearchRiskCandidate[] = [];
+  const add = (severity: AIResearchRiskCandidate["severity"], category: string, titlePl: string, titleEn: string, _detailPl: string, _detailEn: string, refs: string[]) => risks.push({
     severity,
     category,
     title: pl ? titlePl : titleEn,
-    explanation: pl ? detailPl : detailEn,
     evidence_reference_ids: refs,
   });
   const filterStatus = candidate?.basicFilterStatus ?? followUp?.filter_status;
@@ -384,18 +437,15 @@ function buildMissing(
   freshness: string,
   sources: AIResearchSourceReference[],
   locale: AIResearchLocale,
-): AIResearchMissingInformation[] {
+): AIResearchMissingCandidate[] {
   const pl = locale === "pl";
-  const generic = pl
-    ? "Produkt nie posiada danych pozwalających ocenić ten obszar."
-    : "The product has no data that can assess this area.";
-  const items: AIResearchMissingInformation[] = [];
+  const items: AIResearchMissingCandidate[] = [];
   const add = (key: string, plLabel: string, enLabel: string) => {
     const capability = getAIResearchCapability(key);
     if (!capability) return;
     const refs = capability.source_reference_ids.filter((id) => sources.some((source) => source.id === id));
     if (refs.length !== capability.source_reference_ids.length) return;
-    items.push({ key, label: pl ? plLabel : enLabel, explanation: generic, source_reference_ids: [...refs] });
+    items.push({ key, label: pl ? plLabel : enLabel, source_reference_ids: [...refs] });
   };
   if (resolveSecurityCoverage(candidate, followUp) === "unavailable") add("security", "Brak danych bezpieczeństwa", "Security data missing");
   if (!followUp || followUp.completed_checkpoints.length < 2) add("history", "Brak wystarczającej historii", "Insufficient history");
@@ -408,7 +458,7 @@ function buildMissing(
 function buildCoverage(
   candidate: UiTokenCandidate | null,
   followUp: FollowUpPublicEntry | null,
-  missing: AIResearchMissingInformation[],
+  missing: AIResearchMissingCandidate[],
   locale: AIResearchLocale,
 ): AIResearchCoverageItem[] {
   const pl = locale === "pl";
@@ -442,33 +492,46 @@ export function resolveAIResearchActions(
   freshness: string,
   sources: AIResearchSourceReference[],
   locale: AIResearchLocale,
-): AIResearchNextAction[] {
+): AIResearchActionCandidate[] {
   const pl = locale === "pl";
-  const result: AIResearchNextAction[] = [];
-  const add = (action_type: AIResearchActionType, labelPl: string, labelEn: string, priority: AIResearchNextAction["priority"], reasonPl: string, reasonEn: string, target_type: AIResearchNextAction["target_type"], target_reference: string) => result.push({
+  const result: Omit<AIResearchActionCandidate, "priority">[] = [];
+  const add = (action_type: AIResearchActionType, labelPl: string, labelEn: string, target_type: AIResearchActionCandidate["target_type"], target_reference: string) => result.push({
     action_type,
     label: pl ? labelPl : labelEn,
-    priority,
-    reason: pl ? reasonPl : reasonEn,
     target_type,
     target_reference,
   });
   const security = resolveSecurityCoverage(candidate, followUp);
   const filters = candidate?.basicFilterStatus ?? followUp?.filter_status;
-  if (freshness === "STALE" || freshness === "UNKNOWN" || filters === "rejected_basic_filter") {
-    add("WAIT_FOR_CHECKPOINT", "Poczekaj na świeżą migawkę", "Wait for a fresh snapshot", "primary", "Najpierw poczekaj na najbliższy cykl danych, a następnie ponownie oblicz filtry.", "Wait for the next data cycle first, then recalculate the filters.", "internal_route", "#ai-research-checkpoints");
-  } else if (lifecycle.owner_decision_required) add("OWNER_REVIEW", "Przegląd właściciela", "Owner review", "primary", "Etap wymaga oddzielnej decyzji właściciela.", "This stage requires a separate owner decision.", "internal_route", "#candidate-detail");
-  else if (lifecycle.next_checkpoint_at) add("WAIT_FOR_CHECKPOINT", "Poczekaj na punkt kontrolny", "Wait for checkpoint", "primary", "Ponowna ocena powinna użyć następnego zapisanego punktu kontrolnego.", "Reassessment should use the next stored checkpoint.", "internal_route", "#ai-research-checkpoints");
-  else add("RETURN_TO_RADAR", "Wróć do Radaru", "Return to Radar", "primary", "Kontynuuj obserwację w bieżącym etapie.", "Continue observing at the current stage.", "internal_route", "#candidate-results");
-  if (security !== "complete" || !candidate?.addressIdentityVerified) {
-    add("OPEN_VERIFICATION", "Otwórz weryfikację źródłową", "Open source verification", "secondary", "Uzupełnij lub porównaj niepełne dane ręcznie po ustaleniu aktualnego stanu.", "Complete or compare incomplete data manually after the current state is established.", "internal_route", "#external-checks");
-  }
+  const needsSecurityReview = security !== "complete";
+  const needsIdentityVerification = !candidate?.addressIdentityVerified;
   const dex = sources.find(({ source_type, url }) => source_type === "dexscreener" && url !== null);
-  if (dex?.url) add("OPEN_DEXSCREENER", "Otwórz DexScreener", "Open DexScreener", "tertiary", "Porównaj bieżące dane w dozwolonym źródle.", "Compare current data in an allowlisted source.", "external_url", dex.url);
   const explorer = sources.find(({ source_type, url }) => source_type === "explorer" && url !== null);
-  if (explorer?.url) add("OPEN_EXPLORER", "Otwórz eksplorator", "Open explorer", "tertiary", "Zweryfikuj kontrakt w eksploratorze sieci.", "Verify the contract in the network explorer.", "external_url", explorer.url);
-  if (followUp) add("REVIEW_CHECKPOINTS", "Przejrzyj punkty kontrolne", "Review checkpoints", "tertiary", "Porównaj zapisane etapy obserwacji.", "Compare the stored observation stages.", "internal_route", "#candidate-detail");
-  return result.slice(0, 4);
+  const metrics = marketMetrics(candidate, followUp);
+  const hasRecordedMarketContext = Object.values(metrics).some((value) => value !== null);
+
+  // Evidence-closing actions lead only when their corresponding capability is missing.
+  if (needsSecurityReview) add("REVIEW_SECURITY", "Przejrzyj bezpieczeństwo", "Review security", "internal_route", "#external-checks");
+  if (needsSecurityReview || needsIdentityVerification) add("OPEN_VERIFICATION", "Otwórz weryfikację źródłową", "Open source verification", "internal_route", "#external-checks");
+  if (needsIdentityVerification && explorer?.url) add("OPEN_EXPLORER", "Otwórz eksplorator", "Open explorer", "external_url", explorer.url);
+
+  if (freshness === "STALE" || freshness === "UNKNOWN" || filters === "rejected_basic_filter") {
+    add("WAIT_FOR_CHECKPOINT", "Poczekaj na świeżą migawkę", "Wait for a fresh snapshot", "internal_route", "#ai-research-checkpoints");
+  } else if (lifecycle.owner_decision_required) {
+    add("OWNER_REVIEW", "Przegląd właściciela", "Owner review", "internal_route", "#candidate-detail");
+  } else if (lifecycle.next_checkpoint_at) {
+    add("WAIT_FOR_CHECKPOINT", "Poczekaj na punkt kontrolny", "Wait for checkpoint", "internal_route", "#ai-research-checkpoints");
+  } else {
+    add("RETURN_TO_RADAR", "Wróć do Radaru", "Return to Radar", "internal_route", "#candidate-results");
+  }
+  if (hasRecordedMarketContext && dex?.url) add("OPEN_DEXSCREENER", "Otwórz DexScreener", "Open DexScreener", "external_url", dex.url);
+  if (!needsIdentityVerification && explorer?.url) add("OPEN_EXPLORER", "Otwórz eksplorator", "Open explorer", "external_url", explorer.url);
+  if (followUp) add("REVIEW_CHECKPOINTS", "Przejrzyj punkty kontrolne", "Review checkpoints", "internal_route", "#candidate-detail");
+
+  return result.slice(0, 4).map((action, index) => ({
+    ...action,
+    priority: index === 0 ? "primary" : index === 1 ? "secondary" : "tertiary",
+  }));
 }
 
 function buildStatusConditions(
@@ -477,10 +540,10 @@ function buildStatusConditions(
   lifecycle: TokenLifecycleViewModel,
   freshness: string,
   locale: AIResearchLocale,
-): AIResearchStatusChangeCondition[] {
+): AIResearchStatusConditionCandidate[] {
   const pl = locale === "pl";
-  const items: AIResearchStatusChangeCondition[] = [];
-  const add = (key: string, labelPl: string, labelEn: string, detailPl: string, detailEn: string, refs: string[]) => items.push({ key, label: pl ? labelPl : labelEn, explanation: pl ? detailPl : detailEn, source_reference_ids: refs });
+  const items: AIResearchStatusConditionCandidate[] = [];
+  const add = (key: string, labelPl: string, labelEn: string, _detailPl: string, _detailEn: string, refs: string[]) => items.push({ key, label: pl ? labelPl : labelEn, source_reference_ids: refs });
   if (lifecycle.next_checkpoint_at) add("next_checkpoint", "Pojawienie się następnego punktu kontrolnego", "Next checkpoint becomes available", "Nowy punkt kontrolny pozwoli ponownie ocenić dane, ale nie gwarantuje zmiany etapu.", "A new checkpoint enables reassessment but does not guarantee a stage change.", ["follow_up_checkpoints"]);
   if ((candidate?.basicFilterStatus ?? followUp?.filter_status) !== "passed_basic_filter") add("filter_thresholds", "Spełnienie progów filtrów", "Filter thresholds are met", "Zmiana metryk może zmienić wynik filtrów; nie oznacza automatycznej promocji.", "Metric changes may alter filter results; they do not mean automatic promotion.", ["basic_filters"]);
   if (freshness !== "FRESH") add("fresh_snapshot", "Dostępność świeżych danych", "Fresh data becomes available", "Świeża migawka może zmienić ocenę braków i ryzyk.", "A fresh snapshot may change the assessment of gaps and risks.", ["scanner_snapshot"]);

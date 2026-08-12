@@ -719,7 +719,7 @@ async function runAIScenarios(
   // Restore the original controlled fixture for independent queue scenarios.
   await writeFile(fixturePath, `${JSON.stringify(scanner, null, 2)}\n`, "utf8");
 
-  await runScenario(scenarios, "ai-attempt-limit", "Transient failures use bounded exponential backoff and end in SUSPENDED after the configured maximum.", async () => {
+  await runScenario(scenarios, "ai-attempt-limit", "Transient failures use bounded exponential backoff; the job ends in a controlled error without globally disabling the worker.", async () => {
     const databasePath = resolve(locations.ai, "attempt-limit.sqlite");
     const store = await createAIAnalysisQueueStore({ databaseFilePath: databasePath });
     const context = await buildAIResearchContext(candidate.chain, candidate.contract_address!, "pl", contextOptions);
@@ -751,13 +751,14 @@ async function runAIScenarios(
     const workerState = store.workerState();
     store.close();
     assert(first.retried === 1 && failedRecord.failed === 1, "AI_RETRY_NOT_SCHEDULED");
-    assert(second.suspended === 1 && finalStats.suspended === 1 && workerState.suspended, "AI_RETRY_LIMIT_NOT_ENFORCED");
+    assert(second.suspended === 1 && finalStats.suspended === 1 && !workerState.suspended, "AI_RETRY_LIMIT_NOT_ENFORCED");
     assert(calls === 2, "AI_UNBOUNDED_RETRY_DETECTED");
-    return evidence("One retry was scheduled with the configured backoff; the second failure exhausted the limit.", "The job and worker entered a controlled SUSPENDED state with no further provider call.", {
+    return evidence("One retry was scheduled with the configured backoff; the second failure exhausted the limit.", "The job entered a controlled terminal state with no further provider call; the central breaker, not a one-job failure, controls global protection.", {
       maximum_attempts: 2,
       provider_calls: calls,
       first_backoff_ms: 100,
       final_status: "SUSPENDED",
+      worker_remains_available: true,
       client_message: CLIENT_MESSAGES.pl[3],
     }, ["PROVIDER_TIMEOUT"]);
   });
@@ -1182,8 +1183,8 @@ function cacheIdentity(context: AIResearchContext): AIAnalysisCacheIdentity {
     snapshot_fingerprint: context.snapshot_fingerprint,
     prompt_version: context.prompt_version,
     model_id: "gpt-5-mini",
-    analysis_schema_version: "ai_research_brief_v1",
-    locale: context.locale,
+    analysis_schema_version: "ai_research_brief_v2",
+    locale: "en",
   });
 }
 
@@ -1226,20 +1227,14 @@ function mockProvider(generateJson: (context: AIResearchContext) => Promise<stri
 }
 
 function validNarrative(context: AIResearchContext) {
-  const pl = context.locale === "pl";
   return {
-    narrative_version: "ai_research_narrative_v2",
-    summary: pl
-      ? "Dane wskazują aktualny etap badawczy. Kolejny krok dotyczy wyłącznie dalszej weryfikacji."
-      : "The data identifies the current research stage. The next step concerns further verification only.",
-    fact_narratives: context.fact_candidates.map((fact) => ({
-      id: `fact:${fact.key}`,
-      interpretation: pl ? "Wartość pochodzi z kontekstu produktu." : "The value comes from product context.",
-    })),
-    risk_narratives: context.risk_candidates.map((risk, index) => ({ id: `risk:${index}`, explanation: risk.explanation })),
-    missing_narratives: context.missing_information.map((item) => ({ id: `missing:${item.key}`, explanation: item.explanation })),
-    action_narratives: context.action_catalog.map((action, index) => ({ id: `action:${index}`, reason: action.reason })),
-    status_change_narratives: context.status_change_conditions.map((condition) => ({ id: `condition:${condition.key}`, explanation: condition.explanation })),
+    narrative_version: "ai_research_narrative_v3",
+    summary: { en: "The recorded snapshot gives market context while evidence gaps still need verification.", pl: "Zapisana migawka daje kontekst rynkowy, ale luki w danych nadal wymagają sprawdzenia." },
+    fact_narratives: context.fact_candidates.map((item) => ({ id: `fact:${item.key}`, en: "This recorded fact adds context to the research view.", pl: "Ten zapisany fakt uzupełnia obecną analizę." })),
+    risk_narratives: context.risk_candidates.map((_risk, index) => ({ id: `risk:${index}`, en: "Recorded risk needs review.", pl: "Zapisane ryzyko wymaga sprawdzenia." })),
+    missing_narratives: context.missing_information.map((item) => ({ id: `missing:${item.key}`, en: "This evidence gap limits the current research view.", pl: "Ta luka w danych ogranicza obecną analizę." })),
+    action_narratives: context.action_catalog.map((_action, index) => ({ id: `action:${index}`, en: "Use this permitted research step to verify the evidence.", pl: "Wykorzystaj ten dozwolony krok analizy, aby sprawdzić dane." })),
+    status_change_narratives: context.status_change_conditions.map((condition) => ({ id: `condition:${condition.key}`, en: "This condition would justify revisiting the research view.", pl: "Ten warunek uzasadnia ponowne sprawdzenie analizy." })),
   };
 }
 
