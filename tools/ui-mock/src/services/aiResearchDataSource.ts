@@ -147,7 +147,7 @@ function isReviewMetrics(value: unknown): value is AIResearchReviewMetrics {
 
 function isProductionAnalysis(value: unknown): value is AIProductionAnalysis {
   return isRecord(value)
-    && value.schema_version === "ai_production_analysis_v2"
+    && value.schema_version === "ai_production_analysis_v3"
     && typeof value.analysis_summary === "string"
     && isInsightArray(value.confirmed_findings)
     && Array.isArray(value.risks) && value.risks.every((item) => isRecord(item)
@@ -156,6 +156,7 @@ function isProductionAnalysis(value: unknown): value is AIProductionAnalysis {
     && isInsightArray(value.missing_data)
     && isInsight(value.market_context) && isInsight(value.security_context)
     && isInsight(value.liquidity_context) && isInsight(value.holder_context)
+    && isResearchGuidance(value.research_guidance)
     && Array.isArray(value.next_research_steps) && value.next_research_steps.every((item) => isResearchStep(item))
     && isInsightArray(value.reassessment_signals)
     && Array.isArray(value.evidence)
@@ -174,6 +175,20 @@ function isInsightArray(value: unknown): value is Array<{ title: string; detail:
 
 function isResearchStep(value: unknown): boolean {
   return isInsight(value) && isRecord(value) && ["primary", "secondary", "tertiary"].includes(String((value as Record<string, unknown>).priority));
+}
+
+function isResearchGuidance(value: unknown): boolean {
+  if (!isRecord(value) || !isRecord(value.current_step)
+    || ![1, 2, 3, 4, 5, 6, 7].includes(Number(value.current_step.number))
+    || typeof value.current_step.title !== "string" || typeof value.current_step.posture !== "string"
+    || !isInsightArray(value.blockers)
+    || !Array.isArray(value.filter_failures) || !value.filter_failures.every((item) => isRecord(item)
+      && typeof item.label === "string" && typeof item.value === "string" && typeof item.requirement === "string" && typeof item.status === "string")
+    || !Array.isArray(value.actions) || !value.actions.every((item) => isRecord(item)
+      && typeof item.title === "string" && typeof item.why === "string" && typeof item.resolves === "string"
+      && (item.cta === null || (isRecord(item.cta) && typeof item.cta.label === "string" && typeof item.cta.href === "string" && typeof item.cta.external === "boolean")))
+    || !Array.isArray(value.unlock_conditions) || !value.unlock_conditions.every((item) => typeof item === "string")) return false;
+  return true;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

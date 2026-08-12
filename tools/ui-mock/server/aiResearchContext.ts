@@ -43,6 +43,32 @@ export type AIResearchMissingCandidate = Omit<AIResearchMissingInformation, "exp
 export type AIResearchActionCandidate = Omit<AIResearchNextAction, "reason">;
 export type AIResearchStatusConditionCandidate = Omit<AIResearchStatusChangeCondition, "explanation">;
 
+/**
+ * Deterministic, non-provider input for the public CAMP research playbook.
+ * It is intentionally separate from the stored brief: the guidance layer is
+ * derived from current validated product facts and never changes the shared
+ * analysis job, lifecycle, or user workspace.
+ */
+export type AIResearchGuidanceInput = {
+  freshness: "FRESH" | "STALE" | "UNKNOWN";
+  filters: {
+    status: string;
+    reasons: string[];
+    metrics: ReturnType<typeof marketMetrics>;
+  };
+  security: {
+    coverage: "complete" | "partial" | "unavailable";
+    contract_verified: boolean | null;
+    honeypot_status: string | null;
+    buy_tax: number | null;
+    sell_tax: number | null;
+    critical_flags_recorded: boolean;
+  };
+  holder_data_available: boolean;
+  address_identity_verified: boolean;
+  action_catalog: AIResearchActionCandidate[];
+};
+
 export type AIResearchContext = {
   identity: { chain: string; contract_address: string };
   locale: AIResearchLocale;
@@ -61,6 +87,7 @@ export type AIResearchContext = {
   source_references: AIResearchSourceReference[];
   coverage: AIResearchCoverageItem[];
   checkpoints: TokenLifecycleViewModel["checkpoints"];
+  guidance: AIResearchGuidanceInput;
   provider_context: Record<string, unknown>;
 };
 
@@ -138,6 +165,28 @@ export async function buildAIResearchContext(
   const researchState = resolveResearchState(candidate, followUp, freshness, factCandidates.length);
   const actionCatalog = resolveAIResearchActions(candidate, followUp, lifecycle, freshness, sourceReferences, locale);
   const statusChangeConditions = buildStatusConditions(candidate, followUp, lifecycle, freshness, locale);
+  const metrics = marketMetrics(candidate, followUp);
+  const securityCoverage = resolveSecurityCoverage(candidate, followUp);
+  const guidance: AIResearchGuidanceInput = {
+    freshness: freshness === "FRESH" || freshness === "STALE" ? freshness : "UNKNOWN",
+    filters: {
+      status: candidate?.basicFilterStatus ?? followUp?.filter_status ?? "not_checked",
+      reasons: [...(candidate?.filterReasons ?? followUp?.filter_reasons ?? [])].sort(),
+      metrics,
+    },
+    security: {
+      coverage: securityCoverage,
+      contract_verified: candidate?.security?.contractVerified ?? null,
+      honeypot_status: candidate?.security?.honeypotStatus ?? null,
+      buy_tax: candidate?.security?.buyTax ?? null,
+      sell_tax: candidate?.security?.sellTax ?? null,
+      critical_flags_recorded: (candidate?.criticalReasons.length ?? 0) > 0 || (candidate?.riskFlags.length ?? 0) > 0,
+    },
+    holder_data_available: candidate?.security?.topWalletPct !== null && candidate?.security?.topWalletPct !== undefined
+      && candidate.security.top10WalletsPct !== null && candidate.security.top10WalletsPct !== undefined,
+    address_identity_verified: candidate?.addressIdentityVerified === true,
+    action_catalog: actionCatalog,
+  };
   const symbol = boundedUntrustedText(candidate?.symbol ?? followUp?.symbol ?? "", 32);
   const name = boundedUntrustedText(candidate?.name ?? followUp?.display_name ?? symbol, 120);
   const canonicalInput = {
@@ -152,7 +201,7 @@ export async function buildAIResearchContext(
       checkpoints: lifecycle.checkpoints,
     },
     freshness,
-    metrics: marketMetrics(candidate, followUp),
+    metrics,
     filters: {
       status: candidate?.basicFilterStatus ?? followUp?.filter_status ?? "not_checked",
       reasons: [...(candidate?.filterReasons ?? followUp?.filter_reasons ?? [])].sort(),
@@ -197,6 +246,7 @@ export async function buildAIResearchContext(
     source_references: sourceReferences,
     coverage,
     checkpoints: lifecycle.checkpoints,
+    guidance,
     provider_context: {
       contract_version: AI_RESEARCH_NARRATIVE_VERSION,
       locale,

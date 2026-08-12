@@ -91,6 +91,7 @@ import {
   readAIResearchGenerateRequest,
   type AIResearchApiOptions,
 } from "./aiResearchApi.js";
+import { buildAIResearchContext } from "./aiResearchContext.js";
 import { createAIResearchService } from "./aiResearchService.js";
 import { presentAIProductionAvailability, presentAIProductionLookup } from "./aiProductionPublic.js";
 import {
@@ -230,6 +231,22 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
     followUp: options.followUp,
     reports: options.reports,
   });
+  const presentResearchLookupValue = async (
+    lookup: Awaited<ReturnType<typeof aiResearchService.getBrief>>,
+    chain: string,
+    contractAddress: string,
+    locale: "pl" | "en",
+  ) => {
+    const context = await buildAIResearchContext(chain, contractAddress, locale, {
+      scanner: aiResearchScannerOptions,
+      followUp: options.followUp,
+      reports: options.reports,
+    });
+    return presentAIProductionLookup(lookup, locale, context.guidance);
+  };
+  const presentResearchLookup = async (chain: string, contractAddress: string, locale: "pl" | "en") => presentResearchLookupValue(
+    await aiResearchService.getBrief(chain, contractAddress, locale), chain, contractAddress, locale,
+  );
   const pc1Sessions = createPc1SessionContextService();
   const lifecycle = createLifecycleService({
     scanner: scannerOptions,
@@ -378,7 +395,7 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
         const session = pc1Sessions.resolve(req);
         if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
         const query = parseAIResearchQuery(req.url);
-        sendJson(req, res, 200, presentAIProductionLookup(await aiResearchService.getBrief(query.chain, query.contract_address, query.locale), query.locale), runtimeMode);
+        sendJson(req, res, 200, await presentResearchLookup(query.chain, query.contract_address, query.locale), runtimeMode);
       } catch (error) {
         sendAIResearchError(req, res, error, runtimeMode);
       }
@@ -390,7 +407,7 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
         const session = pc1Sessions.resolve(req);
         if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
         const query = parseAIResearchQuery(req.url);
-        sendJson(req, res, 200, presentAIProductionLookup(await aiResearchService.getBrief(query.chain, query.contract_address, query.locale), query.locale), runtimeMode);
+        sendJson(req, res, 200, await presentResearchLookup(query.chain, query.contract_address, query.locale), runtimeMode);
       } catch (error) {
         sendAIResearchError(req, res, error, runtimeMode);
       }
@@ -416,7 +433,9 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
         const session = pc1Sessions.resolve(req);
         if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
         const body = await readAIResearchGenerateRequest(req);
-        sendJson(req, res, 200, presentAIProductionLookup(await aiResearchService.generate(body, session.context.actor_id), body.locale), runtimeMode);
+        sendJson(req, res, 200, await presentResearchLookupValue(
+          await aiResearchService.generate(body, session.context.actor_id), body.chain, body.contract_address, body.locale,
+        ), runtimeMode);
       } catch (error) {
         sendAIResearchError(req, res, error, runtimeMode);
       }

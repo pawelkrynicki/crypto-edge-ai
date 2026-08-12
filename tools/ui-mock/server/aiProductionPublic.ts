@@ -1,4 +1,6 @@
 import type { AIResearchBrief, AIResearchBriefLookup, AIResearchKnownFact, AIResearchLocale } from "../src/types/aiResearchTypes.js";
+import type { AIResearchGuidanceInput } from "./aiResearchContext.js";
+import { presentAIResearchGuidance } from "./aiResearchGuidancePublic.js";
 import type {
   AIProductionAnalysis,
   AIProductionAnalysisLookup,
@@ -12,10 +14,14 @@ import type {
  * to CAMP users. Provider, model, queue and internal identifiers never cross this
  * boundary; the evidence-bound provider narrative does.
  */
-export function presentAIProductionLookup(value: AIResearchBriefLookup, locale: AIResearchLocale = "en"): AIProductionAnalysisLookup {
+export function presentAIProductionLookup(
+  value: AIResearchBriefLookup,
+  locale: AIResearchLocale = "en",
+  guidance?: AIResearchGuidanceInput,
+): AIProductionAnalysisLookup {
   const lastKnownGood = value.is_last_known_good === true || (Boolean(value.brief) && value.availability !== "READY");
   const status = lastKnownGood ? "STALE" : presentStatus(value.availability);
-  const analysis = value.brief ? presentAnalysis(value.brief, status === "STALE", locale) : null;
+  const analysis = value.brief ? presentAnalysis(value.brief, status === "STALE", locale, guidance) : null;
   return validateAIProductionLookup({
     schema_version: "ai_production_analysis_lookup_v1",
     status,
@@ -30,7 +36,12 @@ export function presentAIProductionAvailability(available: boolean) {
 }
 
 /** The public result reads one stored bilingual generation; locale never calls a provider. */
-export function presentAnalysis(brief: AIResearchBrief, stale = false, locale: AIResearchLocale = "en"): AIProductionAnalysis {
+export function presentAnalysis(
+  brief: AIResearchBrief,
+  stale = false,
+  locale: AIResearchLocale = "en",
+  guidance?: AIResearchGuidanceInput,
+): AIProductionAnalysis {
   const copy = (value: { en: string; pl: string }) => value[locale];
   const insight = (title: string, detail: string): AIProductionInsight => ({ title, detail });
   const factByKey = (...keys: string[]) => brief.known_facts.find((item) => keys.includes(item.key));
@@ -47,7 +58,7 @@ export function presentAnalysis(brief: AIResearchBrief, stale = false, locale: A
     : insight(title, unavailable);
 
   const analysis: AIProductionAnalysis = {
-    schema_version: "ai_production_analysis_v2",
+    schema_version: "ai_production_analysis_v3",
     analysis_summary: copy(brief.summary),
     confirmed_findings: [...brief.known_facts]
       .sort((left, right) => factPriority(left.key) - factPriority(right.key))
@@ -81,6 +92,7 @@ export function presentAnalysis(brief: AIResearchBrief, stale = false, locale: A
       locale === "pl" ? "Holderzy" : "Holders",
       locale === "pl" ? "Brak danych o strukturze holderów. Nie można ocenić koncentracji podaży." : "Holder structure data is unavailable. Supply concentration cannot be assessed.",
     ),
+    research_guidance: presentAIResearchGuidance(brief, locale, guidance),
     next_research_steps: [...brief.next_actions]
       .sort((left, right) => actionPriority(left.priority) - actionPriority(right.priority))
       .slice(0, 3)
@@ -192,12 +204,13 @@ export function validateAIProductionAnalysis(value: AIProductionAnalysis): AIPro
 }
 
 function isProductionAnalysis(value: AIProductionAnalysis): boolean {
-  return value.schema_version === "ai_production_analysis_v2"
+  return value.schema_version === "ai_production_analysis_v3"
     && typeof value.analysis_summary === "string"
     && isInsightArray(value.confirmed_findings)
     && Array.isArray(value.risks) && value.risks.every((item) => typeof item.title === "string" && typeof item.detail === "string" && ["low", "medium", "high", "unknown"].includes(item.severity))
     && isInsightArray(value.missing_data)
     && isInsight(value.market_context) && isInsight(value.security_context) && isInsight(value.liquidity_context) && isInsight(value.holder_context)
+    && isResearchGuidance(value.research_guidance)
     && Array.isArray(value.next_research_steps) && value.next_research_steps.every((item) => isInsight(item) && ["primary", "secondary", "tertiary"].includes(item.priority))
     && isInsightArray(value.reassessment_signals)
     && Array.isArray(value.evidence) && value.evidence.every((item) => typeof item.label === "string" && (item.observed_at === null || typeof item.observed_at === "string") && ["complete", "partial", "unavailable"].includes(item.completeness) && (item.url === null || typeof item.url === "string"))
@@ -210,6 +223,18 @@ function isInsight(value: unknown): value is AIProductionInsight {
 
 function isInsightArray(value: unknown): value is AIProductionInsight[] {
   return Array.isArray(value) && value.every(isInsight);
+}
+
+function isResearchGuidance(value: unknown): boolean {
+  if (!value || typeof value !== "object" || !("current_step" in value) || !("blockers" in value) || !("filter_failures" in value) || !("actions" in value) || !("unlock_conditions" in value)) return false;
+  const guidance = value as AIProductionAnalysis["research_guidance"];
+  return [1, 2, 3, 4, 5, 6, 7].includes(guidance.current_step?.number)
+    && typeof guidance.current_step?.title === "string"
+    && typeof guidance.current_step?.posture === "string"
+    && isInsightArray(guidance.blockers)
+    && Array.isArray(guidance.filter_failures) && guidance.filter_failures.every((item) => typeof item.label === "string" && typeof item.value === "string" && typeof item.requirement === "string" && typeof item.status === "string")
+    && Array.isArray(guidance.actions) && guidance.actions.every((item) => typeof item.title === "string" && typeof item.why === "string" && typeof item.resolves === "string" && (item.cta === null || (typeof item.cta.label === "string" && typeof item.cta.href === "string" && typeof item.cta.external === "boolean")))
+    && Array.isArray(guidance.unlock_conditions) && guidance.unlock_conditions.every((item) => typeof item === "string");
 }
 
 function presentStatus(value: AIResearchBriefLookup["availability"]): AIProductionAnalysisStatus {

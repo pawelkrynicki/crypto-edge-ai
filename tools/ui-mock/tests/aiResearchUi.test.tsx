@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 import { after, describe, it } from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { buildAIResearchContext } from "../server/aiResearchContext.js";
+import { buildAIResearchContext, type AIResearchGuidanceInput } from "../server/aiResearchContext.js";
 import { buildDeterministicPreview } from "../server/aiResearchService.js";
 import { mapPersistableScannerOutputToUiCandidates } from "../src/adapters/scannerOutputAdapter.js";
 import { AIResearchBriefCanvas } from "../src/components/AIResearchBriefCanvas.js";
@@ -230,6 +230,72 @@ describe("PC.2 CAMP presentation polish", () => {
     assert.equal(readRequestedProductLocale("?locale=pl"), "pl");
     assert.equal(readRequestedProductLocale("?locale=en"), "en");
     assert.equal(readRequestedProductLocale("?locale=de"), null);
+  });
+});
+
+describe("PC.2 action-first research guidance", () => {
+  it("keeps Quick Filter active for stale data and shows canonical exact filter failures first", () => {
+    const input = structuredClone(context.guidance);
+    input.freshness = "STALE";
+    input.filters = {
+      status: "rejected_basic_filter",
+      reasons: ["market_cap_below_300000", "volume_24h_below_30000", "liquidity_below_30000"],
+      metrics: { market_cap_usd: 4_659, liquidity_usd: 5_925, volume_24h_usd: 2_289, volume_market_cap_ratio: null, pair_age_days: null },
+    };
+    input.action_catalog = guidanceActions("pl", ["WAIT_FOR_CHECKPOINT"]);
+    const analysis = presentAnalysis(briefPl, false, "pl", input);
+    const markup = render("pl", <AIProductionAnalysisCanvas analysis={analysis} />);
+
+    assert.deepEqual(analysis.research_guidance.current_step, { number: 1, title: "SZYBKI FILTR", posture: "ODŚWIEŻ DANE" });
+    assert.deepEqual(analysis.research_guidance.filter_failures.map(({ label, value, status }) => ({ label, value, status })), [
+      { label: "Kapitalizacja", value: "4659 USD", status: "NIE SPEŁNIA" },
+      { label: "Wolumen 24 h", value: "2289 USD", status: "NIE SPEŁNIA" },
+      { label: "Płynność", value: "5925 USD", status: "NIE SPEŁNIA" },
+    ]);
+    assert.match(analysis.research_guidance.filter_failures[0]!.requirement, /300\s?000 USD/);
+    assert.match(analysis.research_guidance.filter_failures[1]!.requirement, /30\s?000 USD/);
+    assert.match(analysis.research_guidance.filter_failures[2]!.requirement, /30\s?000 USD/);
+    assert.deepEqual(analysis.research_guidance.actions.map(({ title }) => title), ["Odśwież dane", "Sprawdź dokładne wyniki filtrów"]);
+    assert.deepEqual(analysis.research_guidance.unlock_conditions, [
+      "Świeża migawka danych",
+      "Kapitalizacja: spełnia wymagany próg",
+      "Wolumen 24 h: spełnia wymagany próg",
+      "Płynność: spełnia wymagany próg",
+    ]);
+    assert.match(markup, /Krok 1\/7 — SZYBKI FILTR/);
+    assert.match(markup, /DOKŁADNE WYNIKI FILTRÓW/);
+    assert.match(markup, /SZCZEGÓŁY ANALIZY/);
+    assert.ok(markup.indexOf("ETAP RESEARCHU") < markup.indexOf("SZCZEGÓŁY ANALIZY"));
+  });
+
+  it("selects Security before on-chain research when filters pass but security is incomplete", () => {
+    const input = structuredClone(contextEn.guidance);
+    input.freshness = "FRESH";
+    input.filters = { ...input.filters, status: "passed_basic_filter", reasons: [] };
+    input.security = { coverage: "unavailable", contract_verified: null, honeypot_status: null, buy_tax: null, sell_tax: null, critical_flags_recorded: false };
+    input.holder_data_available = false;
+    input.address_identity_verified = false;
+    input.action_catalog = guidanceActions("en", ["REVIEW_SECURITY", "OPEN_VERIFICATION", "OPEN_EXPLORER"]);
+    const analysis = presentAnalysis(briefEn, false, "en", input);
+
+    assert.deepEqual(analysis.research_guidance.current_step, { number: 2, title: "DEAL BREAKERS — SECURITY", posture: "SECURITY VERIFICATION REQUIRED" });
+    assert.deepEqual(analysis.research_guidance.actions.map(({ title }) => title), ["Review security", "Verify the source", "Open the explorer"]);
+    assert.deepEqual(analysis.research_guidance.unlock_conditions, ["Security result is available", "Contract verification is assessed", "Critical flags are reviewed"]);
+  });
+
+  it("selects On-chain only after filters and security are sufficiently complete while holder data is missing", () => {
+    const input = structuredClone(context.guidance);
+    input.freshness = "FRESH";
+    input.filters = { ...input.filters, status: "passed_basic_filter", reasons: [] };
+    input.security = { coverage: "complete", contract_verified: true, honeypot_status: "PASSED", buy_tax: 0, sell_tax: 0, critical_flags_recorded: false };
+    input.holder_data_available = false;
+    input.address_identity_verified = true;
+    input.action_catalog = guidanceActions("pl", ["OPEN_EXPLORER"]);
+    const analysis = presentAnalysis(briefPl, false, "pl", input);
+
+    assert.deepEqual(analysis.research_guidance.current_step, { number: 4, title: "DANE ON-CHAIN", posture: "WYMAGA DANYCH ON-CHAIN" });
+    assert.deepEqual(analysis.research_guidance.blockers.map(({ title }) => title), ["Brak struktury holderów"]);
+    assert.deepEqual(analysis.research_guidance.actions.map(({ title }) => title), ["Sprawdź dane holderów on-chain"]);
   });
 });
 
@@ -578,6 +644,27 @@ function bilingualText(en: string, pl: string) {
 function sourceType(id: string): AIResearchBrief["source_references"][number]["source_type"] {
   if (id === "follow_up_checkpoints") return "follow_up_checkpoint";
   return id as AIResearchBrief["source_references"][number]["source_type"];
+}
+
+function guidanceActions(locale: ProductLocale, types: Array<AIResearchGuidanceInput["action_catalog"][number]["action_type"]>): AIResearchGuidanceInput["action_catalog"] {
+  const labels: Record<AIResearchGuidanceInput["action_catalog"][number]["action_type"], [string, string]> = {
+    OPEN_VERIFICATION: ["Otwórz weryfikację źródła", "Open source verification"],
+    OPEN_DEXSCREENER: ["Otwórz DexScreener", "Open DexScreener"],
+    OPEN_EXPLORER: ["Otwórz eksplorator", "Open explorer"],
+    REVIEW_SECURITY: ["Sprawdź bezpieczeństwo", "Review security"],
+    WAIT_FOR_CHECKPOINT: ["Poczekaj na świeżą migawkę", "Wait for a fresh snapshot"],
+    REVIEW_CHECKPOINTS: ["Przejrzyj punkty kontrolne", "Review checkpoints"],
+    OPEN_REPORT: ["Otwórz raport", "Open report"],
+    OWNER_REVIEW: ["Przegląd ownera", "Owner review"],
+    RETURN_TO_RADAR: ["Wróć do Radaru", "Return to Radar"],
+  };
+  return types.map((action_type, index) => ({
+    action_type,
+    label: labels[action_type][locale === "pl" ? 0 : 1],
+    priority: index === 0 ? "primary" : index === 1 ? "secondary" : "tertiary",
+    target_type: action_type === "OPEN_EXPLORER" ? "external_url" : "internal_route",
+    target_reference: action_type === "OPEN_EXPLORER" ? `https://basescan.org/token/${ADDRESS}` : "#external-checks",
+  }));
 }
 
 function source(path: string) {

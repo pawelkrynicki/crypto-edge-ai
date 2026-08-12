@@ -33,8 +33,39 @@ export type AIProductionResearchStep = AIProductionInsight & {
   priority: "primary" | "secondary" | "tertiary";
 };
 
+export type AIProductionFilterFailure = {
+  label: string;
+  value: string;
+  requirement: string;
+  status: string;
+};
+
+export type AIProductionGuidanceAction = {
+  title: string;
+  why: string;
+  resolves: string;
+  cta: {
+    label: string;
+    href: string;
+    external: boolean;
+  } | null;
+};
+
+/** Deterministic research workflow guidance. It contains no provider output or lifecycle decision. */
+export type AIProductionResearchGuidance = {
+  current_step: {
+    number: 1 | 2 | 3 | 4 | 5 | 6 | 7;
+    title: string;
+    posture: string;
+  };
+  blockers: AIProductionInsight[];
+  filter_failures: AIProductionFilterFailure[];
+  actions: AIProductionGuidanceAction[];
+  unlock_conditions: string[];
+};
+
 export type AIProductionAnalysis = {
-  schema_version: "ai_production_analysis_v2";
+  schema_version: "ai_production_analysis_v3";
   analysis_summary: string;
   confirmed_findings: AIProductionInsight[];
   risks: AIProductionRisk[];
@@ -43,6 +74,7 @@ export type AIProductionAnalysis = {
   security_context: AIProductionInsight;
   liquidity_context: AIProductionInsight;
   holder_context: AIProductionInsight;
+  research_guidance: AIProductionResearchGuidance;
   next_research_steps: AIProductionResearchStep[];
   reassessment_signals: AIProductionInsight[];
   evidence: AIProductionEvidence[];

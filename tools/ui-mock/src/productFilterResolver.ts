@@ -22,6 +22,17 @@ export type ProductFilterResolution = {
   unknownReasons: string[];
 };
 
+/**
+ * Canonical display metadata for a hard filter failure.  Public research
+ * guidance uses this instead of reconstructing thresholds in a second rule
+ * engine.
+ */
+export type ProductFilterThreshold = {
+  comparator: "minimum" | "maximum";
+  value: number;
+  format: "usd" | "percent" | "days";
+};
+
 export type ProductFilterResolverInput = {
   basicFilterStatus: string;
   filterReasons: readonly string[];
@@ -108,3 +119,23 @@ export function resolveProductFilterConditions(
 export const SUPPORTED_HARD_FILTER_REASONS = Object.freeze(
   Object.keys(HARD_FAILURE_CATEGORY_BY_REASON),
 );
+
+export function resolveProductFilterThreshold(
+  condition: Pick<BasicFilterConditionResolution, "failureReasons">,
+): ProductFilterThreshold | null {
+  for (const reason of condition.failureReasons) {
+    const threshold = HARD_FILTER_THRESHOLD_BY_REASON[reason];
+    if (threshold) return threshold;
+  }
+  return null;
+}
+
+const HARD_FILTER_THRESHOLD_BY_REASON: Readonly<Record<string, ProductFilterThreshold>> = {
+  market_cap_below_300000: { comparator: "minimum", value: 300_000, format: "usd" },
+  market_cap_above_10000000: { comparator: "maximum", value: 10_000_000, format: "usd" },
+  volume_24h_below_30000: { comparator: "minimum", value: 30_000, format: "usd" },
+  liquidity_below_30000: { comparator: "minimum", value: 30_000, format: "usd" },
+  volume_market_cap_ratio_below_1_percent: { comparator: "minimum", value: 0.01, format: "percent" },
+  volume_market_cap_ratio_above_100_percent: { comparator: "maximum", value: 1, format: "percent" },
+  pair_age_not_above_7_days: { comparator: "minimum", value: 7, format: "days" },
+};

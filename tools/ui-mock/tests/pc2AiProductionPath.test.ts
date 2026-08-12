@@ -214,7 +214,7 @@ describe("PC.2 shared production AI path", () => {
     assert.ok(publicValue.analysis);
     assert.deepEqual(Object.keys(publicValue.analysis!).sort(), [
       "analysis_summary", "analysis_version", "confirmed_findings", "data_snapshot_at", "evidence", "freshness", "generated_at", "holder_context",
-      "liquidity_context", "market_context", "missing_data", "next_research_steps", "reassessment_signals", "risks", "schema_version", "security_context",
+      "liquidity_context", "market_context", "missing_data", "next_research_steps", "reassessment_signals", "research_guidance", "risks", "schema_version", "security_context",
     ]);
     assert.doesNotMatch(JSON.stringify(publicValue), /openai|gpt-|analysis_id|cache_key|queue_status|token_usage|sqlite/i);
     assert.equal(CANDIDATE_DETAIL_TAB_IDS.length, 7);
