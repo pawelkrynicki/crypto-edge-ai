@@ -12,11 +12,11 @@ export function AIProductionAnalysisCanvas({ analysis }: { analysis: AIProductio
   const headings = pl ? {
     eyebrow: "ANALIZA AI", title: "Podsumowanie", summary: "CO Z TEGO WYNIKA TERAZ", findings: "NAJWAŻNIEJSZE POTWIERDZONE INFORMACJE", risks: "RYZYKA", missing: "NAJWAŻNIEJSZE BRAKI W DANYCH",
     context: "KONTEKST DANYCH", next: "NASTĘPNE KROKI RESEARCHU", reassessment: "KIEDY WARTO WRÓCIĆ DO ANALIZY", evidence: "ŹRÓDŁA I DOWODY", market: "Rynek", security: "Bezpieczeństwo", liquidity: "Płynność", holders: "Holderzy",
-    generated: "Przygotowano", snapshot: "Migawka danych", fresh: "Świeża", stale: "Wymaga odświeżenia", empty: "Brak dodatkowych pozycji.", boundary: "Wnioski opierają się wyłącznie na zapisanych danych. To narzędzie researchowe, nie rekomendacja inwestycyjna.",
+    generated: "Przygotowano", snapshot: "Migawka danych", fresh: "Świeża", stale: "Wymaga odświeżenia", empty: "Brak dodatkowych danych w tej migawce.", boundary: "Analiza opiera się wyłącznie na zapisanych danych i służy do researchu, nie stanowi rekomendacji inwestycyjnej.",
   } : {
     eyebrow: "AI ANALYSIS", title: "Summary", summary: "WHAT THIS MEANS NOW", findings: "KEY CONFIRMED FINDINGS", risks: "RISKS", missing: "HIGHEST-IMPACT DATA GAPS",
     context: "DATA CONTEXT", next: "NEXT RESEARCH STEPS", reassessment: "WHEN TO REVISIT THE ANALYSIS", evidence: "SOURCES AND EVIDENCE", market: "Market", security: "Security", liquidity: "Liquidity", holders: "Holders",
-    generated: "Generated", snapshot: "Data snapshot", fresh: "Fresh", stale: "Refreshing", empty: "No additional items.", boundary: "Interpretations use recorded evidence only. This is a research tool, not investment advice.",
+    generated: "Generated", snapshot: "Data snapshot", fresh: "Fresh", stale: "Refreshing", empty: "No additional data in this snapshot.", boundary: "This analysis uses recorded data only and is for research, not investment advice.",
   };
   return (
     <article className="ai-research-canvas ai-production-analysis" aria-labelledby="ai-production-analysis-title">
@@ -89,11 +89,11 @@ function ResearchSteps({ title, items, empty }: { title: string; items: AIProduc
 }
 
 function riskSeverityLabel(value: AIProductionAnalysis["risks"][number]["severity"], locale: "pl" | "en") {
-  const labels = { low: ["Niskie", "Low"], medium: ["Średnie", "Medium"], high: ["Wysokie", "High"], unknown: ["Nieznane", "Unknown"] } as const;
+  const labels = { low: ["Niskie", "Low"], medium: ["Średnie", "Medium"], high: ["Wysokie", "High"], unknown: ["Do weryfikacji", "Needs review"] } as const;
   return labels[value][locale === "pl" ? 0 : 1];
 }
 
 function completenessLabel(value: AIProductionAnalysis["evidence"][number]["completeness"], locale: "pl" | "en") {
-  const labels = { complete: ["Kompletne", "Complete"], partial: ["Częściowe", "Partial"], unavailable: ["Niedostępne", "Unavailable"] } as const;
+  const labels = { complete: ["Kompletność źródła: pełna", "Source completeness: complete"], partial: ["Kompletność źródła: częściowa", "Source completeness: partial"], unavailable: ["Kompletność źródła: niedostępna", "Source completeness: unavailable"] } as const;
   return labels[value][locale === "pl" ? 0 : 1];
 }

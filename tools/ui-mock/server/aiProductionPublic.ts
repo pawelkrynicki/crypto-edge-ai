@@ -1,4 +1,4 @@
-import type { AIResearchBrief, AIResearchBriefLookup, AIResearchLocale } from "../src/types/aiResearchTypes.js";
+import type { AIResearchBrief, AIResearchBriefLookup, AIResearchKnownFact, AIResearchLocale } from "../src/types/aiResearchTypes.js";
 import type {
   AIProductionAnalysis,
   AIProductionAnalysisLookup,
@@ -38,6 +38,10 @@ export function presentAnalysis(brief: AIResearchBrief, stale = false, locale: A
   const factInsight = (item: AIResearchBrief["known_facts"][number] | undefined, title: string, unavailable: string) => item
     ? insight(factLabel(item.key, locale), copy(item.interpretation))
     : insight(title, unavailable);
+  const valuedFactInsight = (keys: string[], title: string, unavailable: string) => {
+    const item = factByKey(...keys);
+    return item ? insight(factValueTitle(item, locale), copy(item.interpretation)) : insight(title, unavailable);
+  };
   const riskInsight = (item: AIResearchBrief["risk_factors"][number] | undefined, title: string, unavailable: string) => item
     ? insight(riskLabel(item.category, locale), copy(item.explanation))
     : insight(title, unavailable);
@@ -45,7 +49,10 @@ export function presentAnalysis(brief: AIResearchBrief, stale = false, locale: A
   const analysis: AIProductionAnalysis = {
     schema_version: "ai_production_analysis_v2",
     analysis_summary: copy(brief.summary),
-    confirmed_findings: brief.known_facts.slice(0, 3).map((item) => insight(factLabel(item.key, locale), copy(item.interpretation))),
+    confirmed_findings: [...brief.known_facts]
+      .sort((left, right) => factPriority(left.key) - factPriority(right.key))
+      .slice(0, 3)
+      .map((item) => insight(factLabel(item.key, locale), copy(item.interpretation))),
     risks: [...brief.risk_factors]
       .sort((left, right) => riskPriority(left.severity) - riskPriority(right.severity))
       .slice(0, 3)
@@ -54,32 +61,32 @@ export function presentAnalysis(brief: AIResearchBrief, stale = false, locale: A
       .sort((left, right) => missingPriority(left.key) - missingPriority(right.key))
       .slice(0, 3)
       .map((item) => insight(missingLabel(item.key, locale), copy(item.explanation))),
-    market_context: factInsight(
-      factByKey("market_cap_usd", "volume_24h_usd"),
+    market_context: valuedFactInsight(
+      ["market_cap_usd", "volume_24h_usd"],
       locale === "pl" ? "Dane rynkowe" : "Market data",
       locale === "pl" ? "Migawka nie zawiera zapisanej wartości rynkowej, więc nie można ocenić kontekstu rynkowego." : "The snapshot has no recorded market value, so market context cannot be assessed.",
     ),
     security_context: riskInsight(
       riskByCategory("security", "security_flag"),
       locale === "pl" ? "Bezpieczeństwo" : "Security",
-      locale === "pl" ? "Brak zapisanego wyniku bezpieczeństwa, więc nie można ocenić ograniczeń kontraktu ani flag ostrzegawczych." : "No security result is recorded, so contract restrictions and warning flags cannot be assessed.",
+      locale === "pl" ? "Brak wyniku weryfikacji bezpieczeństwa. Nie można jeszcze ocenić flag kontraktu i ograniczeń." : "No security verification result is available. Contract flags and restrictions cannot yet be assessed.",
     ),
-    liquidity_context: factInsight(
-      factByKey("liquidity_usd"),
+    liquidity_context: valuedFactInsight(
+      ["liquidity_usd"],
       locale === "pl" ? "Płynność" : "Liquidity",
       locale === "pl" ? "Migawka nie zawiera zapisanej wartości płynności, więc nie można ocenić jej kontekstu." : "The snapshot has no recorded liquidity value, so its context cannot be assessed.",
     ),
     holder_context: factInsight(
       factByKey("holders"),
       locale === "pl" ? "Holderzy" : "Holders",
-      locale === "pl" ? "Migawka nie zawiera danych pozwalających ocenić strukturę holderów." : "The snapshot does not provide data that can assess holder structure.",
+      locale === "pl" ? "Brak danych o strukturze holderów. Nie można ocenić koncentracji podaży." : "Holder structure data is unavailable. Supply concentration cannot be assessed.",
     ),
     next_research_steps: [...brief.next_actions]
       .sort((left, right) => actionPriority(left.priority) - actionPriority(right.priority))
       .slice(0, 3)
       .map((item) => ({ title: actionLabel(item.action_type, locale), detail: copy(item.reason), priority: item.priority })),
     reassessment_signals: brief.status_change_conditions.slice(0, 3)
-      .map((item) => insight(item.label, copy(item.explanation))),
+      .map((item) => insight(conditionLabel(item.key, locale), copy(item.explanation))),
     evidence: brief.source_references.map((item) => ({
       label: sourceLabel(item.source_type, item.label, locale),
       observed_at: item.observed_at,
@@ -98,6 +105,10 @@ function riskPriority(value: AIProductionRisk["severity"]): number {
   return { high: 0, medium: 1, unknown: 2, low: 3 }[value];
 }
 
+function factPriority(value: string): number {
+  return ["market_cap_usd", "liquidity_usd", "volume_24h_usd", "basic_filters", "holders", "pair_age_days", "lifecycle", "freshness"].indexOf(value) + 1 || 99;
+}
+
 function missingPriority(value: string): number {
   return ["security", "holders", "source_verification", "fresh_data", "history", "next_checkpoint"].indexOf(value) + 1 || 99;
 }
@@ -114,9 +125,22 @@ function factLabel(value: string, locale: AIResearchLocale): string {
   return labels[value]?.[locale === "pl" ? 0 : 1] ?? value;
 }
 
+function factValueTitle(item: AIResearchKnownFact, locale: AIResearchLocale): string {
+  if (typeof item.value === "number" && item.key.endsWith("_usd")) return `${factLabel(item.key, locale)}: ${formatUsd(item.value, locale)}`;
+  return factLabel(item.key, locale);
+}
+
+function formatUsd(value: number, locale: AIResearchLocale): string {
+  return new Intl.NumberFormat(locale === "pl" ? "pl-PL" : "en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: value < 1 ? 6 : 0,
+  }).format(value);
+}
+
 function riskLabel(value: string, locale: AIResearchLocale): string {
   const labels: Record<string, [string, string]> = {
-    basic_filters: ["Podstawowe filtry", "Basic filters"], coverage_missing: ["Braki w danych", "Evidence gaps"], security: ["Bezpieczeństwo", "Security"], freshness: ["Świeżość danych", "Data freshness"], security_flag: ["Flaga bezpieczeństwa", "Security flag"], workflow: ["Proces obserwacji", "Observation workflow"],
+    basic_filters: ["Podstawowe filtry", "Basic filters"], coverage_missing: ["Brak danych bezpieczeństwa", "Security evidence missing"], security: ["Bezpieczeństwo", "Security"], freshness: ["Świeżość danych", "Data freshness"], security_flag: ["Flaga bezpieczeństwa", "Security flag"], workflow: ["Proces obserwacji", "Observation workflow"],
   };
   return labels[value]?.[locale === "pl" ? 0 : 1] ?? (locale === "pl" ? "Zapisane ryzyko" : "Recorded risk");
 }
@@ -136,9 +160,19 @@ function actionLabel(value: string, locale: AIResearchLocale): string {
   return labels[value]?.[locale === "pl" ? 0 : 1] ?? value;
 }
 
+function conditionLabel(value: string, locale: AIResearchLocale): string {
+  const labels: Record<string, [string, string]> = {
+    next_checkpoint: ["Pojawienie się kolejnego punktu kontrolnego", "Next checkpoint becomes available"],
+    filter_thresholds: ["Spełnienie progów filtrów", "Filter thresholds are met"],
+    fresh_snapshot: ["Dostępność świeżych danych", "Fresh data becomes available"],
+    owner_decision: ["Decyzja właściciela", "Owner decision"],
+  };
+  return labels[value]?.[locale === "pl" ? 0 : 1] ?? value;
+}
+
 function sourceLabel(sourceType: string, fallback: string, locale: AIResearchLocale): string {
   const labels: Record<string, [string, string]> = {
-    scanner_snapshot: ["Migawka skanera", "Scanner snapshot"], follow_up_checkpoint: ["Punkty kontrolne obserwacji", "Observation checkpoints"], basic_filters: ["Podstawowe filtry", "Basic filters"], security_status: ["Status bezpieczeństwa", "Security status"], established_membership: ["Członkostwo Established", "Established membership"], methodology: ["Metodologia produktu", "Product methodology"], dexscreener: ["DexScreener", "DexScreener"], explorer: ["Eksplorator sieci", "Network explorer"], report: ["Aktualny raport", "Current report"],
+    scanner_snapshot: ["Migawka skanera", "Scanner snapshot"], follow_up_checkpoint: ["Punkty kontrolne obserwacji", "Observation checkpoints"], basic_filters: ["Podstawowe filtry", "Basic filters"], security_status: ["Status bezpieczeństwa", "Security status"], established_membership: ["Kontrola listy Established", "Established-list check"], methodology: ["Metodologia produktu", "Product methodology"], dexscreener: ["DexScreener", "DexScreener"], explorer: ["Eksplorator sieci", "Network explorer"], report: ["Aktualny raport", "Current report"],
   };
   return labels[sourceType]?.[locale === "pl" ? 0 : 1] ?? fallback;
 }

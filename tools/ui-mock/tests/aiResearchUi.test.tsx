@@ -15,7 +15,7 @@ import { applyAIResearchGenerationFailure } from "../src/components/aiResearchSt
 import { CandidateDetailView } from "../src/components/CandidateDetailView.js";
 import { ExternalVerificationLinksView } from "../src/components/ExternalVerificationLinksView.js";
 import { PERSISTABLE_SCANNER_SAMPLE } from "../src/fixtures/persistableScannerSample.js";
-import { ProductLocaleProvider, type ProductLocale } from "../src/productI18n.js";
+import { ProductLocaleProvider, readRequestedProductLocale, type ProductLocale } from "../src/productI18n.js";
 import { AIResearchDataSourceError } from "../src/services/aiResearchDataSource.js";
 import type { AIResearchBrief, AIResearchBriefLookup, AIResearchReviewMetrics } from "../src/types/aiResearchTypes.js";
 import { presentAnalysis } from "../server/aiProductionPublic.js";
@@ -176,7 +176,7 @@ describe("AI.1 Visual Candidate Research Canvas", () => {
     };
     const markup = render("pl", <AIResearchSection chain="base" contractAddress={ADDRESS} symbol="PASS" name="Pass Token" initialLookup={lookup} mode="detail" />);
     assert.match(markup, /ai-research-canvas/);
-    assert.match(markup, /Analiza została przygotowana na podstawie zwalidowanych danych/);
+    assert.match(markup, /ai-prepared-status/);
     assert.doesNotMatch(markup, /OpenAI|gpt-5-mini|provider mode/i);
   });
 
@@ -199,6 +199,40 @@ describe("AI.1 Visual Candidate Research Canvas", () => {
   });
 });
 
+describe("PC.2 CAMP presentation polish", () => {
+  it("keeps public CAMP copy nontechnical while restoring context values and trader-relevant findings", () => {
+    const plAnalysis = presentAnalysis(briefPl, false, "pl");
+    const enAnalysis = presentAnalysis(briefPl, false, "en");
+    const pl = render("pl", <AIProductionAnalysisCanvas analysis={plAnalysis} />);
+    const en = render("en", <AIProductionAnalysisCanvas analysis={enAnalysis} />);
+
+    assert.match(pl, /Kapitalizacja: /);
+    assert.match(pl, /Płynność: /);
+    assert.match(pl, /Do weryfikacji/);
+    assert.match(en, /Needs review/);
+    assert.match(pl, /Kompletność źródła:/);
+    assert.match(en, /Source completeness:/);
+    assert.match(pl, /Kontrola listy Established/);
+    assert.match(en, /Established-list check/);
+    assert.match(pl, /Brak dodatkowych danych w tej migawce/);
+    assert.match(en, /No additional data in this snapshot/);
+    assert.doesNotMatch(pl, /kolejk|provider|model|cache|dedup/i);
+    assert.doesNotMatch(pl, />[^<]*(?:wspóln|Canvas)[^<]*</i);
+    assert.doesNotMatch(en, /shared|queue|provider|model|cache|dedup/i);
+    assert.doesNotMatch(en, />[^<]*Canvas[^<]*</i);
+    assert.deepEqual(plAnalysis.confirmed_findings.map(({ title }) => title), ["Kapitalizacja", "Płynność", "Podstawowe filtry"]);
+    assert.deepEqual(enAnalysis.confirmed_findings.map(({ title }) => title), ["Market cap", "Liquidity", "Basic filters"]);
+    assert.match(en, /Fresh data becomes available/);
+    assert.doesNotMatch(en, /Dostępność świeżych danych/);
+  });
+
+  it("uses an explicit product URL locale before the stored preference", () => {
+    assert.equal(readRequestedProductLocale("?locale=pl"), "pl");
+    assert.equal(readRequestedProductLocale("?locale=en"), "en");
+    assert.equal(readRequestedProductLocale("?locale=de"), null);
+  });
+});
+
 describe("AI.1 responsive and accessibility contracts", () => {
   it("ships 390 px list transformations, 44 px actions, reduced motion and no overflow-prone layout", async () => {
     const [css, canvas, productionCanvas, section, client] = await Promise.all([
@@ -217,6 +251,7 @@ describe("AI.1 responsive and accessibility contracts", () => {
     assert.match(css, /\.ai-production-header\s*\{\s*grid-template-columns:\s*minmax\(0, 1fr\) minmax\(190px, auto\)/);
     assert.match(css, /\.ai-production-header[\s\S]*overflow-wrap:\s*normal;[\s\S]*word-break:\s*normal;[\s\S]*hyphens:\s*none/);
     assert.match(css, /@media \(max-width: 900px\)[\s\S]*\.ai-production-header\s*\{\s*grid-template-columns:\s*minmax\(0, 1fr\)/);
+    assert.match(css, /\.ai-production-analysis \.ai-brief-panel li\s*\{\s*display: grid;[\s\S]*gap: 3px/);
     assert.doesNotMatch([canvas, productionCanvas, section, client].join("\n"), /dangerouslySetInnerHTML|onClick=\{undefined\}|role="button"/);
   });
 
@@ -368,7 +403,7 @@ describe("AI.3 shared queue UI", () => {
     const markup = render("pl", <AIResearchSection chain="base" contractAddress={ADDRESS} symbol="SCOOBERT" name="Scoobert" initialLookup={failure} />);
     assert.match(markup, /Niedostępna/);
     assert.match(markup, /Analiza nie mogła zostać teraz przygotowana\./);
-    assert.match(markup, /Spróbuj ponownie\. Ponowne zgłoszenie nie utworzy duplikatu\./);
+    assert.match(markup, /Spróbuj ponownie później\./);
     assert.match(markup, /Ponów zlecenie analizy/);
     assert.doesNotMatch(markup, /Wygeneruj analizę AI/);
     assert.doesNotMatch(markup, /Brak analizy/);
@@ -431,7 +466,7 @@ describe("AI.3 shared queue UI", () => {
       retry_after_seconds: null,
       error_code: null,
     }} />);
-    assert.match(section, /Analiza została przygotowana na podstawie zwalidowanych danych/);
+    assert.match(section, /ai-prepared-status/);
     assert.doesNotMatch(section, /OpenAI|gpt-5-mini|provider mode/i);
   });
 
@@ -446,7 +481,7 @@ describe("AI.3 shared queue UI", () => {
       queue_status: "SUSPENDED",
     }} />);
     assert.match(suspended, /Przygotowanie analizy jest wstrzymane/);
-    assert.match(suspended, /Wznowienie będzie możliwe po uruchomieniu kolejki analizy\./);
+    assert.match(suspended, /Przygotowanie będzie możliwe, gdy analiza będzie dostępna\./);
     assert.doesNotMatch(suspended, /Zleć analizę AI|Ponów zlecenie analizy/);
 
     const queued = render("pl", <AIResearchSection chain="base" contractAddress={ADDRESS} symbol="SCOOBERT" name="Scoobert" initialLookup={{
@@ -458,7 +493,7 @@ describe("AI.3 shared queue UI", () => {
       error_code: null,
       queue_status: "QUEUED",
     }} />);
-    assert.match(queued, /Analiza oczekuje w kolejce/);
+    assert.match(queued, /Analiza jest przygotowywana/);
     assert.doesNotMatch(queued, /Zleć analizę AI|Ponów zlecenie analizy/);
   });
 });

@@ -73,7 +73,7 @@ describe("AI.2C captured live-response regression", () => {
 });
 
 describe("AI.2C deterministic actions and PL/EN narrative boundary", () => {
-  it("keeps fresh data first, source verification second and external sources tertiary", async () => {
+  it("puts security and identity verification ahead of passive waiting when those evidence gaps dominate", async () => {
     const staleScanner = structuredClone(scanner);
     staleScanner.candidates[0]!.basic_filter_status = "rejected_basic_filter";
     const staleOutput = resolve(root, "stale-output", "scan_20260623073520");
@@ -87,11 +87,12 @@ describe("AI.2C deterministic actions and PL/EN narrative boundary", () => {
     });
     assert.equal(context.research_state, "DATA_STALE");
     assert.equal(context.fact_candidates.find(({ key }) => key === "basic_filters")?.value, "rejected_basic_filter");
-    assert.deepEqual(context.action_catalog.slice(0, 2).map(({ action_type, priority }) => ({ action_type, priority })), [
-      { action_type: "WAIT_FOR_CHECKPOINT", priority: "primary" },
+    assert.deepEqual(context.action_catalog.slice(0, 3).map(({ action_type, priority }) => ({ action_type, priority })), [
+      { action_type: "REVIEW_SECURITY", priority: "primary" },
       { action_type: "OPEN_VERIFICATION", priority: "secondary" },
+      { action_type: "OPEN_EXPLORER", priority: "tertiary" },
     ]);
-    assert.ok(context.action_catalog.filter(({ target_type }) => target_type === "external_url").every(({ priority }) => priority === "tertiary"));
+    assert.ok(context.action_catalog.some(({ action_type }) => action_type === "WAIT_FOR_CHECKPOINT"));
   });
 
   it("accepts natural PL/EN narrative and rejects raw enums, machine values and mixed language", async () => {

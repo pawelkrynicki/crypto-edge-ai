@@ -59,19 +59,19 @@ describe("AI.3 real owner-review launcher flow", () => {
     const cases = [
       {
         search: "?ai_review_state=cooldown",
-        expected: ["Dostępna", "Analiza dostępna", "Podsumowanie analizy"],
+        expected: ["Dostępna", "Analiza gotowa", "Podsumowanie"],
       },
       {
         search: "?ai_review_state=failed",
-        expected: ["Dostępna", "Analiza dostępna", "Podsumowanie analizy"],
+        expected: ["Dostępna", "Analiza gotowa", "Podsumowanie"],
       },
       {
         search: "?ai_review_state=suspended",
-        expected: ["Dostępna", "Analiza dostępna", "Podsumowanie analizy"],
+        expected: ["Dostępna", "Analiza gotowa", "Podsumowanie"],
       },
       {
         search: "",
-        expected: ["Dostępna", "Analiza dostępna", "Podsumowanie analizy"],
+        expected: ["Dostępna", "Analiza gotowa", "Podsumowanie"],
       },
     ] as const;
 

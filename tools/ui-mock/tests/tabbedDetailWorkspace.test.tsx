@@ -74,7 +74,7 @@ describe("UX.2 Tabbed Token Detail Workspace", () => {
       assert.equal(renderer!.root.findAll((node) => node.props.role === "tabpanel").length, 1);
       assert.equal(renderer!.root.find((node) => node.props["data-active-detail-tab"] !== undefined).props["data-active-detail-tab"], "ai");
       assert.equal(getTab("ai").props["aria-selected"], true);
-      assert.match(renderedText(renderer!), /AI Research Brief/);
+      assert.match(renderedText(renderer!), /AI analysis/);
       assert.doesNotMatch(activePanelText(renderer!), /Market data/);
       assert.ok(localApiRequests >= 1, "AI UI may read only its local API state");
     } finally {

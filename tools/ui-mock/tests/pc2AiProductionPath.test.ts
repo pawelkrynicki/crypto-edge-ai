@@ -223,8 +223,8 @@ describe("PC.2 shared production AI path", () => {
     const queued: typeof publicValue = { ...publicValue, status: "QUEUED", analysis: null, is_last_known_good: false };
     const pl = renderToStaticMarkup(React.createElement(ProductLocaleProvider, { initialLocale: "pl" }, React.createElement(AIResearchSection, { chain: "base", contractAddress: ADDRESS, symbol: "T", name: "Token", initialLookup: queued })));
     const en = renderToStaticMarkup(React.createElement(ProductLocaleProvider, { initialLocale: "en" }, React.createElement(AIResearchSection, { chain: "base", contractAddress: ADDRESS, symbol: "T", name: "Token", initialLookup: queued })));
-    assert.match(pl, /Analiza została dodana do kolejki/);
-    assert.match(en, /The analysis has been added to the queue/);
+    assert.match(pl, /Przygotowanie analizy rozpocznie się, gdy będzie dostępna/);
+    assert.match(en, /The analysis will be prepared when it becomes available/);
     store.close();
   });
 

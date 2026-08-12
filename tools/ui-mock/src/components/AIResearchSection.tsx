@@ -203,7 +203,6 @@ export function AIResearchSection({
         <div>
           <strong>{stateTitle(availability, locale)}</strong>
           <p>{stateDetail(availability, effectiveError, effectiveRetryAfter, locale, Boolean(brief))}</p>
-          <p className="ai-shared-queue-note">{ui.sharedQueue}</p>
           {(brief || analysis) && (!brief || !brief.render_preview) && <span className="ai-prepared-status">{ui.analysisPrepared}</span>}
         </div>
         <div className="ai-research-section-actions">
@@ -319,8 +318,8 @@ function availabilityTone(value: AIResearchBriefLookup["availability"]): "neutra
 
 function stateTitle(value: AIResearchBriefLookup["availability"], locale: "pl" | "en") {
   const pl = locale === "pl";
-  if (value === "READY") return pl ? "Analiza dostępna" : "Analysis available";
-  if (value === "QUEUED") return pl ? "Analiza oczekuje w kolejce" : "Analysis is waiting in the queue";
+  if (value === "READY") return pl ? "Analiza gotowa" : "Analysis ready";
+  if (value === "QUEUED") return pl ? "Analiza jest przygotowywana" : "Analysis is being prepared";
   if (value === "PROCESSING") return pl ? "Analiza jest przygotowywana" : "Analysis is being prepared";
   if (value === "STALE") return pl ? "Ostatnia analiza dostępna" : "Last analysis available";
   if (value === "PROVIDER_DISABLED") return pl ? "Analiza AI jest obecnie niedostępna." : "AI analysis is currently unavailable.";
@@ -341,31 +340,31 @@ function stateDetail(
   hasBrief: boolean,
 ) {
   const pl = locale === "pl";
-  if (value === "READY") return pl ? "Otwórz wspólny, zwalidowany Canvas z ryzykami, brakami i kolejnym krokiem badawczym." : "Open the shared validated Canvas with risks, gaps and the next research step.";
-  if (value === "QUEUED") return pl ? "Analiza została dodana do kolejki." : "The analysis has been added to the queue.";
-  if (value === "PROCESSING") return pl ? "Centralny system przygotowuje jeden wspólny wynik dla tego stanu danych." : "The central system is preparing one shared result for this data state.";
+  if (value === "READY") return pl ? "Poniżej znajdziesz najważniejsze wnioski, ryzyka, braki danych i kolejne kroki researchu." : "Below you will find the key findings, risks, data gaps and next research steps.";
+  if (value === "QUEUED") return pl ? "Przygotowanie analizy rozpocznie się, gdy będzie dostępna." : "The analysis will be prepared when it becomes available.";
+  if (value === "PROCESSING") return pl ? "Przygotowanie analizy trwa." : "The analysis is being prepared.";
   if (value === "STALE") return pl ? "Dane zmieniły się, a aktualizacja jest przygotowywana. Poprzedni prawidłowy wynik pozostaje dostępny." : "Data changed and an update is being prepared. The previous valid result remains available.";
   if (value === "FAILED" && hasBrief) return pl ? "Spróbuj ponownie później. Ostatni poprawny wynik pozostaje dostępny." : "Try again later. The last valid result remains available.";
-  if (value === "FAILED") return pl ? "Spróbuj ponownie. Wspólna kolejka nie utworzy duplikatu analizy." : "Try again. The shared queue will not create a duplicate analysis.";
-  if (value === "SUSPENDED") return pl ? "Wznowienie będzie możliwe po uruchomieniu kolejki analizy." : "Preparation can resume when the analysis queue is enabled.";
+  if (value === "FAILED") return pl ? "Spróbuj ponownie później." : "Try again later.";
+  if (value === "SUSPENDED") return pl ? "Przygotowanie będzie możliwe, gdy analiza będzie dostępna." : "Preparation will be available when analysis becomes available.";
   if (value === "COOLDOWN" || value === "RATE_LIMITED") return pl
-    ? `Ponowne zgłoszenie będzie możliwe${retry ? ` za ${retry} s` : " później"}. Nie utworzono drugiej analizy.`
-    : `Another request will be possible${retry ? ` in ${retry} sec` : " later"}. No duplicate analysis was created.`;
+    ? `Spróbuj ponownie${retry ? ` za ${retry} s` : " później"}.`
+    : `Try again${retry ? ` in ${retry} sec` : " later"}.`;
   if (value === "PROVIDER_DISABLED") return pl ? "Analiza AI jest obecnie niedostępna." : "AI analysis is currently unavailable.";
   if (value === "INSUFFICIENT_DATA") return pl ? "Serwer nie posiada zwalidowanych danych pozwalających przygotować wiarygodny brief." : "The server has no validated data that can prepare a reliable brief.";
-  if (value === "ERROR") return pl ? "Spróbuj ponownie. Ponowne zgłoszenie nie utworzy duplikatu." : "Try again. A repeated request will not create a duplicate.";
-  return pl ? "Możesz zgłosić potrzebę przygotowania wspólnej analizy." : "You can request preparation of the shared analysis.";
+  if (value === "ERROR") return pl ? "Spróbuj ponownie później." : "Try again later.";
+  return pl ? "Możesz poprosić o przygotowanie analizy." : "You can request analysis preparation.";
 }
 
 const COPY = {
   pl: {
-    title: "Analiza badawcza AI",
-    intro: "Wspólna analiza zwalidowanych danych — bez sygnałów transakcyjnych.",
+    title: "Analiza AI",
+    intro: "Podsumowanie zweryfikowanych danych — bez sygnałów transakcyjnych.",
     request: "Zleć analizę AI",
     retry: "Ponów zlecenie analizy",
     openControlCenter: "Aktywuj analizę AI w Centrum sterowania",
-    requesting: "Zapisywanie zgłoszenia…",
-    requestingStatus: "Zgłoszenie trafia do wspólnej kolejki.",
+    requesting: "Przygotowywanie analizy…",
+    requestingStatus: "Trwa przygotowywanie analizy.",
     tryAgainLater: "Spróbuj ponownie później",
     tryAgainIn: (seconds: number) => `Spróbuj ponownie za ${seconds} s`,
     open: "Otwórz analizę AI",
@@ -373,18 +372,17 @@ const COPY = {
     radarLabel: "Analiza AI",
     radarOpen: "Otwórz analizę AI",
     radarDetails: "Przejdź do szczegółów analizy",
-    analysisPrepared: "Analiza została przygotowana na podstawie zwalidowanych danych.",
-    sharedQueue: "Zgłoszenie trafia do wspólnej kolejki analizy. Ponowne zgłoszenie nie utworzy drugiego wyniku.",
-    summaryNextStep: "Otwórz zakładkę analizy, aby zobaczyć pełny Canvas i kolejny krok.",
+    analysisPrepared: "Analiza została przygotowana na podstawie zweryfikowanych danych dostępnych w tej migawce.",
+    summaryNextStep: "Otwórz zakładkę Analiza AI, aby zobaczyć pełne podsumowanie.",
   },
   en: {
-    title: "AI Research Brief",
-    intro: "A shared analysis of validated data — without trading signals.",
+    title: "AI analysis",
+    intro: "A summary of verified data — without trading signals.",
     request: "Request analysis preparation",
     retry: "Retry analysis request",
     openControlCenter: "Enable AI analysis in Control Center",
-    requesting: "Recording request…",
-    requestingStatus: "The request is being added to the shared queue.",
+    requesting: "Preparing analysis…",
+    requestingStatus: "The analysis is being prepared.",
     tryAgainLater: "Try again later",
     tryAgainIn: (seconds: number) => `Try again in ${seconds} sec`,
     open: "Open AI analysis",
@@ -392,8 +390,7 @@ const COPY = {
     radarLabel: "AI analysis",
     radarOpen: "Open AI analysis",
     radarDetails: "Open analysis details",
-    analysisPrepared: "The analysis was prepared from validated data.",
-    sharedQueue: "The request enters the shared analysis queue. Repeating it will not create a second result.",
-    summaryNextStep: "Open the analysis tab to see the full Canvas and next step.",
+    analysisPrepared: "The analysis was prepared from verified data available in this snapshot.",
+    summaryNextStep: "Open the AI analysis tab to see the full summary.",
   },
 } as const;

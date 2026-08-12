@@ -344,17 +344,29 @@ export function buildDeterministicPreview(context: AIResearchContext, generatedA
   };
   const riskNarrative = (category: string) => {
     const copy: Record<string, ReturnType<typeof bilingual>> = {
+      basic_filters: bilingual(
+        "At least one recorded basic filter is not met. That limits how strongly the available market information can be assessed; the concern comes from the stored basic-filter result.",
+        "Co najmniej jeden zapisany podstawowy filtr nie jest spełniony. Ogranicza to siłę oceny dostępnych danych rynkowych; obawa wynika z zapisanego wyniku filtrów.",
+      ),
       security: bilingual(
-        "No contract-security result is recorded, so possible restrictions or warning flags cannot currently be assessed.",
-        "Brak wyniku kontroli bezpieczeństwa kontraktu nie pozwala obecnie ocenić możliwych ograniczeń ani flag ostrzegawczych.",
+        "Security coverage is incomplete, so the available result cannot settle possible contract restrictions or warning flags; the concern comes from the partial security evidence.",
+        "Pokrycie bezpieczeństwa jest niepełne, więc dostępny wynik nie rozstrzyga możliwych ograniczeń kontraktu ani flag ostrzegawczych; obawa wynika z częściowych danych bezpieczeństwa.",
       ),
       coverage_missing: bilingual(
-        "Important research areas remain uncovered, which limits how far the available market data can be interpreted.",
-        "Ważne obszary analizy nadal nie są pokryte danymi, co ogranicza interpretację dostępnych danych rynkowych.",
+        "No security result is recorded, so contract restrictions and warning flags cannot be assessed. This leaves the available market data without the security evidence needed for a stronger interpretation.",
+        "Brak zapisanego wyniku bezpieczeństwa, więc nie można ocenić ograniczeń kontraktu ani flag ostrzegawczych. Dostępne dane rynkowe nie mają przez to podstawy bezpieczeństwa potrzebnej do mocniejszej interpretacji.",
       ),
       freshness: bilingual(
-        "The timing of the recorded data needs attention before comparisons are treated as current.",
-        "Przed traktowaniem porównań jako aktualnych trzeba uwzględnić czas zapisanych danych.",
+        "The recorded data is not current enough for a fresh comparison. Its timestamp is the reason this risk remains open.",
+        "Zapisane dane nie są wystarczająco aktualne do bieżącego porównania. Ten czas migawki jest powodem, dla którego ryzyko pozostaje otwarte.",
+      ),
+      security_flag: bilingual(
+        "A recorded security-check flag needs manual interpretation before it can support a conclusion. The concern is tied to the stored security-status evidence.",
+        "Zapisana flaga kontroli bezpieczeństwa wymaga ręcznej interpretacji, zanim będzie można oprzeć na niej wniosek. Obawa wynika z zapisanego statusu bezpieczeństwa.",
+      ),
+      workflow: bilingual(
+        "No workflow blocker is recorded, but that does not establish project safety. The available evidence is limited to the product methodology record.",
+        "Nie zapisano blokady procesu, ale nie potwierdza to bezpieczeństwa projektu. Dostępne dane ograniczają się do zapisu metodologii produktu.",
       ),
     };
     return copy[category] ?? bilingual(

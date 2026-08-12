@@ -8479,9 +8479,11 @@ summary {
 .ai-production-context .ai-kpi { min-height: 118px; }
 .ai-production-context .ai-kpi p { font-size: 10px; }
 .ai-production-freshness { margin-top: 10px; font-size: 10px; }
-.ai-production-insight-columns .ai-brief-panel ul { margin: 0; padding: 0; list-style: none; }
-.ai-production-insight-columns .ai-brief-panel li { display: grid; gap: 3px; }
-.ai-production-insight-columns .ai-brief-panel li span { color: var(--text-secondary); font-size: 11px; line-height: 1.42; }
+.ai-production-analysis .ai-brief-panel ul { margin: 0; padding: 0; list-style: none; }
+.ai-production-analysis .ai-brief-panel li { display: grid; align-content: start; gap: 3px; }
+.ai-production-analysis .ai-brief-panel li strong,
+.ai-production-analysis .ai-brief-panel li span { display: block; }
+.ai-production-analysis .ai-brief-panel li span { color: var(--text-secondary); font-size: 11px; line-height: 1.42; }
 .ai-production-steps ol { display: grid; gap: 8px; margin: 0; padding-left: 22px; }
 .ai-production-steps li { padding-left: 2px; }
 .ai-production-steps li strong { display: block; font-size: 11px; }

@@ -444,30 +444,44 @@ export function resolveAIResearchActions(
   locale: AIResearchLocale,
 ): AIResearchActionCandidate[] {
   const pl = locale === "pl";
-  const result: AIResearchActionCandidate[] = [];
-  const add = (action_type: AIResearchActionType, labelPl: string, labelEn: string, priority: AIResearchActionCandidate["priority"], _reasonPl: string, _reasonEn: string, target_type: AIResearchActionCandidate["target_type"], target_reference: string) => result.push({
+  const result: Omit<AIResearchActionCandidate, "priority">[] = [];
+  const add = (action_type: AIResearchActionType, labelPl: string, labelEn: string, target_type: AIResearchActionCandidate["target_type"], target_reference: string) => result.push({
     action_type,
     label: pl ? labelPl : labelEn,
-    priority,
     target_type,
     target_reference,
   });
   const security = resolveSecurityCoverage(candidate, followUp);
   const filters = candidate?.basicFilterStatus ?? followUp?.filter_status;
-  if (freshness === "STALE" || freshness === "UNKNOWN" || filters === "rejected_basic_filter") {
-    add("WAIT_FOR_CHECKPOINT", "Poczekaj na świeżą migawkę", "Wait for a fresh snapshot", "primary", "Najpierw poczekaj na najbliższy cykl danych, a następnie ponownie oblicz filtry.", "Wait for the next data cycle first, then recalculate the filters.", "internal_route", "#ai-research-checkpoints");
-  } else if (lifecycle.owner_decision_required) add("OWNER_REVIEW", "Przegląd właściciela", "Owner review", "primary", "Etap wymaga oddzielnej decyzji właściciela.", "This stage requires a separate owner decision.", "internal_route", "#candidate-detail");
-  else if (lifecycle.next_checkpoint_at) add("WAIT_FOR_CHECKPOINT", "Poczekaj na punkt kontrolny", "Wait for checkpoint", "primary", "Ponowna ocena powinna użyć następnego zapisanego punktu kontrolnego.", "Reassessment should use the next stored checkpoint.", "internal_route", "#ai-research-checkpoints");
-  else add("RETURN_TO_RADAR", "Wróć do Radaru", "Return to Radar", "primary", "Kontynuuj obserwację w bieżącym etapie.", "Continue observing at the current stage.", "internal_route", "#candidate-results");
-  if (security !== "complete" || !candidate?.addressIdentityVerified) {
-    add("OPEN_VERIFICATION", "Otwórz weryfikację źródłową", "Open source verification", "secondary", "Uzupełnij lub porównaj niepełne dane ręcznie po ustaleniu aktualnego stanu.", "Complete or compare incomplete data manually after the current state is established.", "internal_route", "#external-checks");
-  }
+  const needsSecurityReview = security !== "complete";
+  const needsIdentityVerification = !candidate?.addressIdentityVerified;
   const dex = sources.find(({ source_type, url }) => source_type === "dexscreener" && url !== null);
-  if (dex?.url) add("OPEN_DEXSCREENER", "Otwórz DexScreener", "Open DexScreener", "tertiary", "Porównaj bieżące dane w dozwolonym źródle.", "Compare current data in an allowlisted source.", "external_url", dex.url);
   const explorer = sources.find(({ source_type, url }) => source_type === "explorer" && url !== null);
-  if (explorer?.url) add("OPEN_EXPLORER", "Otwórz eksplorator", "Open explorer", "tertiary", "Zweryfikuj kontrakt w eksploratorze sieci.", "Verify the contract in the network explorer.", "external_url", explorer.url);
-  if (followUp) add("REVIEW_CHECKPOINTS", "Przejrzyj punkty kontrolne", "Review checkpoints", "tertiary", "Porównaj zapisane etapy obserwacji.", "Compare the stored observation stages.", "internal_route", "#candidate-detail");
-  return result.slice(0, 4);
+  const metrics = marketMetrics(candidate, followUp);
+  const hasRecordedMarketContext = Object.values(metrics).some((value) => value !== null);
+
+  // Evidence-closing actions lead only when their corresponding capability is missing.
+  if (needsSecurityReview) add("REVIEW_SECURITY", "Przejrzyj bezpieczeństwo", "Review security", "internal_route", "#external-checks");
+  if (needsSecurityReview || needsIdentityVerification) add("OPEN_VERIFICATION", "Otwórz weryfikację źródłową", "Open source verification", "internal_route", "#external-checks");
+  if (needsIdentityVerification && explorer?.url) add("OPEN_EXPLORER", "Otwórz eksplorator", "Open explorer", "external_url", explorer.url);
+
+  if (freshness === "STALE" || freshness === "UNKNOWN" || filters === "rejected_basic_filter") {
+    add("WAIT_FOR_CHECKPOINT", "Poczekaj na świeżą migawkę", "Wait for a fresh snapshot", "internal_route", "#ai-research-checkpoints");
+  } else if (lifecycle.owner_decision_required) {
+    add("OWNER_REVIEW", "Przegląd właściciela", "Owner review", "internal_route", "#candidate-detail");
+  } else if (lifecycle.next_checkpoint_at) {
+    add("WAIT_FOR_CHECKPOINT", "Poczekaj na punkt kontrolny", "Wait for checkpoint", "internal_route", "#ai-research-checkpoints");
+  } else {
+    add("RETURN_TO_RADAR", "Wróć do Radaru", "Return to Radar", "internal_route", "#candidate-results");
+  }
+  if (hasRecordedMarketContext && dex?.url) add("OPEN_DEXSCREENER", "Otwórz DexScreener", "Open DexScreener", "external_url", dex.url);
+  if (!needsIdentityVerification && explorer?.url) add("OPEN_EXPLORER", "Otwórz eksplorator", "Open explorer", "external_url", explorer.url);
+  if (followUp) add("REVIEW_CHECKPOINTS", "Przejrzyj punkty kontrolne", "Review checkpoints", "internal_route", "#candidate-detail");
+
+  return result.slice(0, 4).map((action, index) => ({
+    ...action,
+    priority: index === 0 ? "primary" : index === 1 ? "secondary" : "tertiary",
+  }));
 }
 
 function buildStatusConditions(
