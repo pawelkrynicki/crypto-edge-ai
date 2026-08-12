@@ -141,7 +141,7 @@ function buildAutomaticEvidence(candidate: UiTokenCandidate): Map<string, Automa
   add(output, 3, "goplus_coverage", goplusAvailable ? "AUTO_VERIFIED" : "MISSING_DATA", null, null, null);
   add(output, 3, "honeypot", honeypotState, null, security?.honeypotStatus ?? null, null);
   add(output, 3, "contract_verified", contractState, null, boolText(security?.contractVerified), null);
-  add(output, 3, "ownership", security?.ownershipStatus ? "AUTO_VERIFIED" : "MISSING_DATA", null, security?.ownershipStatus ?? null, null);
+  add(output, 3, "ownership", stateForKnownOwnership(security?.ownershipStatus), null, ownershipText(security?.ownershipStatus), null);
   add(output, 3, "mint", security ? stateForRiskBoolean(security.mintRisk) : "MISSING_DATA", null, boolText(security?.mintRisk), null);
   add(output, 3, "blacklist", security ? stateForRiskBoolean(security.blacklistRisk) : "MISSING_DATA", null, boolText(security?.blacklistRisk), null);
   add(output, 3, "whitelist", security ? stateForRiskBoolean(security.whitelistRisk) : "MISSING_DATA", null, boolText(security?.whitelistRisk), null);
@@ -262,6 +262,16 @@ function stateForHoneypot(value: string): ResearchChecklistState {
   if (["passed", "pass", "false", "no", "safe", "not_honeypot"].includes(normalized)) return "AUTO_VERIFIED";
   if (["true", "yes", "honeypot", "failed", "fail", "is_honeypot"].includes(normalized)) return "RED_FLAG";
   return "MISSING_DATA";
+}
+
+function stateForKnownOwnership(value: string | null | undefined): ResearchChecklistState {
+  const normalized = value?.trim().toLowerCase();
+  return normalized === "renounced" || normalized === "active" ? "AUTO_VERIFIED" : "MISSING_DATA";
+}
+
+function ownershipText(value: string | null | undefined): string | null {
+  const normalized = value?.trim().toLowerCase();
+  return normalized === "renounced" || normalized === "active" || normalized === "unknown" ? normalized : null;
 }
 
 function boolText(value: boolean | null | undefined): string | null {

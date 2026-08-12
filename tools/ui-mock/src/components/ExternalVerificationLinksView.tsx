@@ -238,7 +238,9 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
       </VerificationSection>
     );
   } else if (activeTab === "data") {
-    activeContent = (
+    activeContent = focusedResearchStep && candidate ? (
+      <ResearchChecklistDetail candidate={candidate} focusedStep={focusedResearchStep} onBackToResearchPlaybook={onBackToResearchPlaybook} />
+    ) : (
       <VerificationSection heading={tabCopy.data} detail={locale === "pl" ? "Źródła są opisane i linkowane; otwarcie oraz zmiana zakładki nie wykonują połączeń do dostawców." : "Sources are described and linked; opening and switching tabs do not call providers."}>
         <div className="product-detail-grid data">
           <VerificationMetric label={locale === "pl" ? "Źródło danych rynkowych i filtrów" : "Market and filter source"} value={candidate ? formatProductSourceLabel(candidate.source) : "Follow-up"} />

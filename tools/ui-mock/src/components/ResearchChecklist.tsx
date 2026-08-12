@@ -141,8 +141,8 @@ function FocusedResearchStep({ step, locale }: { step: ResearchChecklistStep; lo
       <span className={redFlags.length > 0 ? "has-red-flags" : ""}><b>{pl ? "Czerwone flagi" : "Red flags"}</b>{redFlags.length}</span>
       <span><b>{pl ? "Do uzupełnienia" : "To complete"}</b>{incomplete.length}</span>
     </div>
-    <FocusedResearchItemGroup title={pl ? "Czerwone flagi" : "Red flags"} items={redFlags} locale={locale} tone="red-flag" />
-    <FocusedResearchItemGroup title={pl ? "Sprawdzone" : "Checked"} items={verified} locale={locale} tone="verified" />
+    {redFlags.length > 0 && <FocusedResearchItemGroup title={pl ? "Czerwone flagi" : "Red flags"} items={redFlags} locale={locale} tone="red-flag" />}
+    {verified.length > 0 && <FocusedResearchItemGroup title={pl ? "Sprawdzone" : "Checked"} items={verified} locale={locale} tone="verified" />}
     <details className="research-focused-item-group incomplete" data-research-missing-group={step.number} open={missingExpanded} onToggle={(event) => setMissingExpanded(event.currentTarget.open)}>
       <summary><span>{pl ? `Do uzupełnienia (${incomplete.length})` : `To complete (${incomplete.length})`}</span><b>{missingExpanded ? (pl ? "Ukryj" : "Hide") : (pl ? "Pokaż" : "Show")}</b></summary>
       <div className="research-checklist-items">{incomplete.map((item) => <ResearchItem key={`${step.number}:${item.key}`} item={item} locale={locale} incompleteResearch={isIncompleteFinalStep(step)} />)}</div>
@@ -278,13 +278,17 @@ function itemValue(item: ResearchChecklistItem, locale: "pl" | "en"): string {
     if (["top1_wallet", "top10_wallets", "buy_tax", "sell_tax"].includes(item.key)) return `${item.value_number.toFixed(2)}%`;
     return String(item.value_number);
   }
+  if (item.key === "ownership") {
+    if (item.value_text === "renounced") return locale === "pl" ? "Własność zrzucona" : "Ownership renounced";
+    if (item.value_text === "active") return locale === "pl" ? "Własność aktywna" : "Ownership active";
+    return locale === "pl" ? "Brak danych" : "Missing data";
+  }
   if (item.value_text) {
     if (isUnrecordedMachineValue(item.value_text)) return locale === "pl" ? "Brak zapisanego wyniku" : "No recorded result";
     if (item.value_text === "yes") return locale === "pl" ? "Tak" : "Yes";
     if (item.value_text === "no") return locale === "pl" ? "Nie" : "No";
     if (item.value_text === "passed") return locale === "pl" ? "Pozytywny wynik" : "Passed";
     if (item.value_text === "failed") return locale === "pl" ? "Negatywny wynik" : "Failed";
-    if (item.value_text === "renounced") return locale === "pl" ? "Własność zrzeknięta" : "Renounced";
     if (item.value_text === "locked") return locale === "pl" ? "Zablokowana" : "Locked";
     if (item.value_text === "unlocked") return locale === "pl" ? "Niezablokowana" : "Unlocked";
     return item.value_text;

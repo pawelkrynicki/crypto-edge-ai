@@ -87,7 +87,7 @@ test("PC.3A focus mode keeps navigation in normal flow, avoids title duplication
   const detail = renderToStaticMarkup(<ProductLocaleProvider initialLocale="en"><ResearchChecklistDetail candidate={candidate} focusedStep={3} /></ProductLocaleProvider>);
   const polishDetail = renderToStaticMarkup(<ProductLocaleProvider initialLocale="pl"><ResearchChecklistDetail candidate={candidate} focusedStep={3} /></ProductLocaleProvider>);
   const drawer = renderToStaticMarkup(<ProductLocaleProvider initialLocale="en"><ExternalVerificationLinksView candidate={candidate} focusedResearchStep={3} /></ProductLocaleProvider>);
-  const normalDrawer = renderToStaticMarkup(<ProductLocaleProvider initialLocale="en"><ExternalVerificationLinksView candidate={candidate} /></ProductLocaleProvider>);
+  const normalDrawer = renderToStaticMarkup(<ProductLocaleProvider initialLocale="en"><ExternalVerificationLinksView candidate={candidate} initialActiveTab="data" onOpenResearchBrief={() => undefined} /></ProductLocaleProvider>);
   assert.match(detail, /id="research-checklist-step-3"[^>]*data-research-step="3"[^>]*data-research-focused="true"/);
   assert.match(detail, /id="research-checklist-focus-3"[^>]*tabindex="-1"/);
   assert.match(detail, /class="research-checklist-step[^"]*focused/);
@@ -103,6 +103,7 @@ test("PC.3A focus mode keeps navigation in normal flow, avoids title duplication
   assert.match(polishDetail, /← Wróć do Research Playbook/);
   assert.match(polishDetail, /Sprawdzone/);
   assert.match(polishDetail, /Czerwone flagi/);
+  assert.doesNotMatch(polishDetail, /data-research-item-group="red-flag"/, "empty red-flag groups are omitted in focus mode");
   assert.match(polishDetail, /Do uzupełnienia \(2\)/);
   assert.match(polishDetail, /Pokaż/);
   assert.doesNotMatch(polishDetail, /<details[^>]*\sopen=/, "missing items start collapsed");
@@ -112,6 +113,10 @@ test("PC.3A focus mode keeps navigation in normal flow, avoids title duplication
   assert.match(drawer, /id="research-checklist-step-3"/);
   assert.match(drawer, /class="[^"]*verification-token-drawer research-focus-drawer[^"]*"/);
   assert.doesNotMatch(normalDrawer, /research-focus-drawer/, "normal Verification drawers stay bounded");
+  assert.doesNotMatch(drawer, /external-checks-list/, "focused research does not show the generic external-card wall");
+  assert.doesNotMatch(drawer, /AI Research Brief/, "focused research does not show the generic AI action");
+  assert.match(normalDrawer, /external-checks-list/, "normal Data and sources keeps the external-card wall");
+  assert.match(normalDrawer, /AI Research Brief/, "normal Data and sources keeps the generic AI action");
 
   const [researchSource, css] = await Promise.all([
     readFile(resolve(process.cwd(), "src", "components", "ResearchChecklist.tsx"), "utf8"),
@@ -181,4 +186,43 @@ test("PC.3A focus mode localizes methodology values, hides machine values, and k
   const redFlag = renderToStaticMarkup(<ProductLocaleProvider initialLocale="pl"><ResearchChecklistDetail candidate={redFlagCandidate} focusedStep={1} /></ProductLocaleProvider>);
   assert.match(redFlag, /Czerwona flaga/);
   assert.match(redFlag, /data-research-item-group="red-flag"/);
+});
+
+test("PC.3A localizes ownership only after a known ownership state is resolved", () => {
+  const unknownCandidate: UiTokenCandidate = { ...candidate, security: { ...candidate.security!, ownershipStatus: "unknown" } };
+  const activeCandidate: UiTokenCandidate = { ...candidate, security: { ...candidate.security!, ownershipStatus: "active" } };
+  const unknownPolish = renderToStaticMarkup(<ProductLocaleProvider initialLocale="pl"><ResearchChecklistDetail candidate={unknownCandidate} focusedStep={3} /></ProductLocaleProvider>);
+  const unknownEnglish = renderToStaticMarkup(<ProductLocaleProvider initialLocale="en"><ResearchChecklistDetail candidate={unknownCandidate} focusedStep={3} /></ProductLocaleProvider>);
+  const activePolish = renderToStaticMarkup(<ProductLocaleProvider initialLocale="pl"><ResearchChecklistDetail candidate={activeCandidate} focusedStep={3} /></ProductLocaleProvider>);
+  const renouncedEnglish = renderToStaticMarkup(<ProductLocaleProvider initialLocale="en"><ResearchChecklistDetail candidate={candidate} focusedStep={3} /></ProductLocaleProvider>);
+  const ownershipItem = (markup: string, label: string) => {
+    const start = markup.indexOf(`<strong>${label}</strong>`);
+    assert.ok(start >= 0, `missing ownership item for ${label}`);
+    return markup.slice(start, markup.indexOf("</article>", start));
+  };
+
+  const unknownPolishOwnership = ownershipItem(unknownPolish, "Własność");
+  const unknownEnglishOwnership = ownershipItem(unknownEnglish, "Ownership");
+  assert.match(unknownPolishOwnership, /Brak danych/);
+  assert.match(unknownEnglishOwnership, /Missing data/);
+  assert.doesNotMatch(unknownPolishOwnership, /Sprawdzone automatycznie|unknown/i);
+  assert.doesNotMatch(unknownEnglishOwnership, /Automatically checked|unknown/i);
+  assert.match(ownershipItem(activePolish, "Własność"), /Własność aktywna/);
+  assert.match(ownershipItem(activePolish, "Własność"), /Sprawdzone automatycznie/);
+  assert.match(ownershipItem(renouncedEnglish, "Ownership"), /Ownership renounced/);
+  assert.match(ownershipItem(renouncedEnglish, "Ownership"), /Automatically checked/);
+});
+
+test("PC.3A focus mode omits empty resolved groups while keeping missing work collapsed", () => {
+  const noResolvedSecurity = {
+    ...candidate.security!,
+    sources: [], honeypotStatus: "unknown", buyTax: null, sellTax: null, contractVerified: null, ownershipStatus: "unknown", liquidityLocked: null,
+    mintRisk: null, blacklistRisk: null, whitelistRisk: null, sellRestrictionRisk: null, proxyRisk: null,
+  };
+  const markup = renderToStaticMarkup(<ProductLocaleProvider initialLocale="pl"><ResearchChecklistDetail candidate={{ ...candidate, security: noResolvedSecurity }} focusedStep={3} /></ProductLocaleProvider>);
+  assert.doesNotMatch(markup, /data-research-item-group="red-flag"/);
+  assert.doesNotMatch(markup, /data-research-item-group="verified"/);
+  assert.match(markup, /data-research-missing-group="3"/);
+  assert.match(markup, /Do uzupełnienia [(]14[)]/);
+  assert.doesNotMatch(markup, /data-research-missing-group="3"[^>]*open=/, "missing work remains collapsed");
 });

@@ -41,6 +41,28 @@ test("PC.3A resolves the 7-step checklist from existing product evidence without
   assert.equal(item(noWalletView, 6, "security_scorecard").value_text, null);
 });
 
+test("PC.3A treats only known ownership states as automatically checked", () => {
+  const unknownView = resolveResearchChecklist(candidate({ security: { ...security(), ownershipStatus: "unknown" } }));
+  const activeView = resolveResearchChecklist(candidate({ security: { ...security(), ownershipStatus: "active" } }));
+  const renouncedView = resolveResearchChecklist(candidate({ security: { ...security(), ownershipStatus: "renounced" } }));
+  const missingSecurity = { ...security() } as { ownershipStatus?: string } & NonNullable<UiTokenCandidate["security"]>;
+  delete missingSecurity.ownershipStatus;
+  const missingView = resolveResearchChecklist(candidate({ security: missingSecurity }));
+
+  assert.equal(item(unknownView, 3, "ownership").state, "MISSING_DATA");
+  assert.equal(item(unknownView, 3, "ownership").value_text, "unknown");
+  assert.equal(item(missingView, 3, "ownership").state, "MISSING_DATA");
+  assert.equal(item(activeView, 3, "ownership").state, "AUTO_VERIFIED");
+  assert.equal(item(activeView, 3, "ownership").value_text, "active");
+  assert.equal(item(renouncedView, 3, "ownership").state, "AUTO_VERIFIED");
+  assert.equal(item(renouncedView, 3, "ownership").value_text, "renounced");
+  assert.equal(activeView.completeness.resolved_checks, unknownView.completeness.resolved_checks + 1, "unknown ownership earns no resolved-check credit");
+
+  for (const key of ["honeypot", "contract_verified", "mint", "blacklist"] as const) {
+    assert.equal(item(activeView, 3, key).state, item(unknownView, 3, key).state, `${key} security rule remains unchanged`);
+  }
+});
+
 test("PC.3A private research evidence is actor-isolated, URL-safe, and never mutates a checklist lifecycle input", async (t) => {
   const root = await mkdtemp(resolve(tmpdir(), "crypto-edge-research-evidence-"));
   const repository = await createResearchEvidenceRepository({ databaseFilePath: resolve(root, "research.sqlite") });
