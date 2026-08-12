@@ -8402,7 +8402,8 @@ summary {
 .ai-research-guidance h4 { margin: 0; color: var(--text-primary); font-size: 20px; line-height: 1.18; overflow-wrap: normal; word-break: normal; hyphens: none; }
 .ai-research-guidance header dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; margin: 3px 0 0; font-size: 11px; }
 .ai-research-guidance header dt { color: var(--text-helper); font-weight: 700; }
-.ai-research-guidance header dd { margin: 0; color: var(--warning); font-weight: 800; letter-spacing: 0.04em; }
+.ai-research-guidance header dd { display: grid; gap: 3px; margin: 0; color: var(--warning); font-weight: 800; letter-spacing: 0.04em; }
+.ai-research-guidance header dd small { color: var(--text-secondary); font-size: 11px; font-weight: 500; letter-spacing: normal; line-height: 1.4; }
 .ai-guidance-grid { display: grid; grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr); gap: 12px; }
 .ai-guidance-grid > section,
 .ai-guidance-unlocks { min-width: 0; padding: 12px; border: 1px solid rgba(113, 139, 151, 0.22); border-radius: var(--radius-sm); background: rgba(7, 21, 27, 0.46); }

@@ -231,6 +231,7 @@ function isResearchGuidance(value: unknown): boolean {
   return [1, 2, 3, 4, 5, 6, 7].includes(guidance.current_step?.number)
     && typeof guidance.current_step?.title === "string"
     && typeof guidance.current_step?.posture === "string"
+    && typeof guidance.current_step?.posture_detail === "string"
     && isInsightArray(guidance.blockers)
     && Array.isArray(guidance.filter_failures) && guidance.filter_failures.every((item) => typeof item.label === "string" && typeof item.value === "string" && typeof item.requirement === "string" && typeof item.status === "string")
     && Array.isArray(guidance.actions) && guidance.actions.every((item) => typeof item.title === "string" && typeof item.why === "string" && typeof item.resolves === "string" && (item.cta === null || (typeof item.cta.label === "string" && typeof item.cta.href === "string" && typeof item.cta.external === "boolean")))

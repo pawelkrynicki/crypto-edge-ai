@@ -57,6 +57,7 @@ export type AIProductionResearchGuidance = {
     number: 1 | 2 | 3 | 4 | 5 | 6 | 7;
     title: string;
     posture: string;
+    posture_detail: string;
   };
   blockers: AIProductionInsight[];
   filter_failures: AIProductionFilterFailure[];

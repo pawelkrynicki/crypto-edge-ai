@@ -272,7 +272,7 @@ describe("PC.2 action-first research guidance", () => {
     assert.equal(providerCalls, 0, "public projection of a stored brief must not call a provider");
   });
 
-  it("keeps Quick Filter active for stale data and shows canonical exact filter failures first", () => {
+  it("keeps failed stale filters at Step 1 with one automatic-snapshot action and canonical exact failures", () => {
     const input = structuredClone(context.guidance);
     input.freshness = "STALE";
     input.filters = {
@@ -284,7 +284,12 @@ describe("PC.2 action-first research guidance", () => {
     const analysis = presentAnalysis(briefPl, false, "pl", input);
     const markup = render("pl", <AIProductionAnalysisCanvas analysis={analysis} />);
 
-    assert.deepEqual(analysis.research_guidance.current_step, { number: 1, title: "SZYBKI FILTR", posture: "ODŚWIEŻ DANE" });
+    assert.deepEqual(analysis.research_guidance.current_step, {
+      number: 1,
+      title: "SZYBKI FILTR",
+      posture: "KROK 1 NIEZALICZONY",
+      posture_detail: "Dalszy research jest wstrzymany do kolejnej świeżej migawki.",
+    });
     assert.deepEqual(analysis.research_guidance.filter_failures.map(({ label, value, status }) => ({ label, value, status })), [
       { label: "Kapitalizacja", value: "4659 USD", status: "NIE SPEŁNIA" },
       { label: "Wolumen 24 h", value: "2289 USD", status: "NIE SPEŁNIA" },
@@ -293,7 +298,11 @@ describe("PC.2 action-first research guidance", () => {
     assert.match(analysis.research_guidance.filter_failures[0]!.requirement, /300\s?000 USD/);
     assert.match(analysis.research_guidance.filter_failures[1]!.requirement, /30\s?000 USD/);
     assert.match(analysis.research_guidance.filter_failures[2]!.requirement, /30\s?000 USD/);
-    assert.deepEqual(analysis.research_guidance.actions.map(({ title }) => title), ["Odśwież dane", "Sprawdź dokładne wyniki filtrów"]);
+    assert.deepEqual(analysis.research_guidance.actions.map(({ title }) => title), ["Poczekaj na świeżą migawkę"]);
+    assert.equal(analysis.research_guidance.actions[0]!.cta, null);
+    assert.match(analysis.research_guidance.actions[0]!.why, /System automatycznie ponownie przeliczy podstawowe filtry/);
+    assert.match(analysis.research_guidance.actions[0]!.resolves, /JEŻELI FILTRY NADAL NIE PRZEJDĄ: Token pozostaje w Kroku 1/);
+    assert.match(analysis.research_guidance.actions[0]!.resolves, /JEŻELI WSZYSTKIE WYMAGANE FILTRY PRZEJDĄ: Następny etap: Krok 2\/7 — Deal Breakers \/ Security/);
     assert.deepEqual(analysis.research_guidance.unlock_conditions, [
       "Świeża migawka danych",
       "Kapitalizacja: spełnia wymagany próg",
@@ -301,9 +310,30 @@ describe("PC.2 action-first research guidance", () => {
       "Płynność: spełnia wymagany próg",
     ]);
     assert.match(markup, /Krok 1\/7 — SZYBKI FILTR/);
+    assert.match(markup, /KROK 1 NIEZALICZONY/);
+    assert.match(markup, /Dalszy research jest wstrzymany do kolejnej świeżej migawki/);
+    assert.match(markup, /Poczekaj na świeżą migawkę/);
+    assert.doesNotMatch(markup, /Sprawdź dokładne wyniki filtrów/);
     assert.match(markup, /DOKŁADNE WYNIKI FILTRÓW/);
     assert.match(markup, /SZCZEGÓŁY ANALIZY/);
     assert.ok(markup.indexOf("ETAP RESEARCHU") < markup.indexOf("SZCZEGÓŁY ANALIZY"));
+  });
+
+  it("keeps a freshness-specific Step 1 posture when filters passed and only the snapshot is stale", () => {
+    const input = structuredClone(contextEn.guidance);
+    input.freshness = "STALE";
+    input.filters = { ...input.filters, status: "passed_basic_filter", reasons: [] };
+    input.action_catalog = guidanceActions("en", ["WAIT_FOR_CHECKPOINT"]);
+    const analysis = presentAnalysis(briefEn, false, "en", input);
+
+    assert.deepEqual(analysis.research_guidance.current_step, {
+      number: 1,
+      title: "QUICK FILTER",
+      posture: "REFRESH DATA",
+      posture_detail: "Basic filters remain passed; only data freshness is awaiting the next snapshot.",
+    });
+    assert.doesNotMatch(analysis.research_guidance.current_step.posture, /NOT PASSED/);
+    assert.deepEqual(analysis.research_guidance.actions.map(({ title }) => title), ["Refresh the data", "Review the exact filter results"]);
   });
 
   it("selects Security before on-chain research when filters pass but security is incomplete", () => {
@@ -316,7 +346,12 @@ describe("PC.2 action-first research guidance", () => {
     input.action_catalog = guidanceActions("en", ["REVIEW_SECURITY", "OPEN_VERIFICATION", "OPEN_EXPLORER"]);
     const analysis = presentAnalysis(briefEn, false, "en", input);
 
-    assert.deepEqual(analysis.research_guidance.current_step, { number: 2, title: "DEAL BREAKERS — SECURITY", posture: "SECURITY VERIFICATION REQUIRED" });
+    assert.deepEqual(analysis.research_guidance.current_step, {
+      number: 2,
+      title: "DEAL BREAKERS — SECURITY",
+      posture: "SECURITY VERIFICATION REQUIRED",
+      posture_detail: "Security checks must be completed before the on-chain data stage.",
+    });
     assert.deepEqual(analysis.research_guidance.actions.map(({ title }) => title), ["Review security", "Verify the source", "Open the explorer"]);
     assert.deepEqual(analysis.research_guidance.unlock_conditions, ["Security result is available", "Contract verification is assessed", "Critical flags are reviewed"]);
   });
@@ -331,7 +366,12 @@ describe("PC.2 action-first research guidance", () => {
     input.action_catalog = guidanceActions("pl", ["OPEN_EXPLORER"]);
     const analysis = presentAnalysis(briefPl, false, "pl", input);
 
-    assert.deepEqual(analysis.research_guidance.current_step, { number: 4, title: "DANE ON-CHAIN", posture: "WYMAGA DANYCH ON-CHAIN" });
+    assert.deepEqual(analysis.research_guidance.current_step, {
+      number: 4,
+      title: "DANE ON-CHAIN",
+      posture: "WYMAGA DANYCH ON-CHAIN",
+      posture_detail: "Do oceny koncentracji podaży potrzebne są zapisane dane holderów.",
+    });
     assert.deepEqual(analysis.research_guidance.blockers.map(({ title }) => title), ["Brak struktury holderów"]);
     assert.deepEqual(analysis.research_guidance.actions.map(({ title }) => title), ["Sprawdź dane holderów on-chain"]);
   });

@@ -113,7 +113,7 @@ function ResearchGuidancePanel({
     <header>
       <span>{headings.guidance}</span>
       <h4 id="ai-research-guidance-title">{pl ? "Krok" : "Step"} {guidance.current_step.number}/7 — {guidance.current_step.title}</h4>
-      <dl><dt>{headings.posture}</dt><dd>{guidance.current_step.posture}</dd></dl>
+      <dl><dt>{headings.posture}</dt><dd><span>{guidance.current_step.posture}</span><small>{guidance.current_step.posture_detail}</small></dd></dl>
     </header>
     <div className="ai-guidance-grid">
       <section aria-labelledby="ai-research-guidance-blockers">

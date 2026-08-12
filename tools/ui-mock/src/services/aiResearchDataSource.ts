@@ -180,7 +180,7 @@ function isResearchStep(value: unknown): boolean {
 function isResearchGuidance(value: unknown): boolean {
   if (!isRecord(value) || !isRecord(value.current_step)
     || ![1, 2, 3, 4, 5, 6, 7].includes(Number(value.current_step.number))
-    || typeof value.current_step.title !== "string" || typeof value.current_step.posture !== "string"
+    || typeof value.current_step.title !== "string" || typeof value.current_step.posture !== "string" || typeof value.current_step.posture_detail !== "string"
     || !isInsightArray(value.blockers)
     || !Array.isArray(value.filter_failures) || !value.filter_failures.every((item) => isRecord(item)
       && typeof item.label === "string" && typeof item.value === "string" && typeof item.requirement === "string" && typeof item.status === "string")

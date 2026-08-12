@@ -48,22 +48,31 @@ export function presentAIResearchGuidance(
     ));
 
     const refreshAction = actionFromCatalog(source, "WAIT_FOR_CHECKPOINT");
-    const actions: AIProductionGuidanceAction[] = [
-      guidanceAction(
-        pl ? "Odśwież dane" : "Refresh the data",
-        snapshotNeedsRefresh
-          ? (pl ? "Migawka jest nieaktualna." : "The snapshot is stale.")
-          : (pl ? "Wynik filtrów wymaga ponownego sprawdzenia na zapisanych danych." : "The filter result needs re-checking against the recorded data."),
-        pl ? "Czy aktualna migawka nadal prowadzi do tego samego wyniku podstawowych filtrów." : "Whether the current snapshot still leads to the same basic-filter result.",
-        refreshAction,
-      ),
-      guidanceAction(
-        pl ? "Sprawdź dokładne wyniki filtrów" : "Review the exact filter results",
-        pl ? "To ten etap zatrzymuje dalszy research." : "This stage is the current research gate.",
-        pl ? "Które mierzalne warunki trzeba spełnić przed etapem bezpieczeństwa." : "Which measurable conditions must be met before the Security stage.",
+    const actions: AIProductionGuidanceAction[] = filtersFailed && snapshotNeedsRefresh
+      ? [guidanceAction(
+        pl ? "Poczekaj na świeżą migawkę" : "Wait for the next fresh snapshot",
+        pl ? "System automatycznie ponownie przeliczy podstawowe filtry." : "The system automatically recalculates the basic filters.",
+        pl
+          ? "JEŻELI FILTRY NADAL NIE PRZEJDĄ: Token pozostaje w Kroku 1 — Szybki filtr. JEŻELI WSZYSTKIE WYMAGANE FILTRY PRZEJDĄ: Następny etap: Krok 2/7 — Deal Breakers / Security."
+          : "IF THE FILTERS STILL DO NOT PASS: The token remains at Step 1 — Quick Filter. IF EVERY REQUIRED FILTER PASSES: Next stage: Step 2/7 — Deal Breakers / Security.",
         null,
-      ),
-    ];
+      )]
+      : [
+        guidanceAction(
+          pl ? "Odśwież dane" : "Refresh the data",
+          snapshotNeedsRefresh
+            ? (pl ? "Migawka jest nieaktualna." : "The snapshot is stale.")
+            : (pl ? "Wynik filtrów wymaga ponownego sprawdzenia na zapisanych danych." : "The filter result needs re-checking against the recorded data."),
+          pl ? "Czy aktualna migawka nadal prowadzi do tego samego wyniku podstawowych filtrów." : "Whether the current snapshot still leads to the same basic-filter result.",
+          refreshAction,
+        ),
+        guidanceAction(
+          pl ? "Sprawdź dokładne wyniki filtrów" : "Review the exact filter results",
+          pl ? "To ten etap zatrzymuje dalszy research." : "This stage is the current research gate.",
+          pl ? "Które mierzalne warunki trzeba spełnić przed etapem bezpieczeństwa." : "Which measurable conditions must be met before the Security stage.",
+          null,
+        ),
+      ];
     const unlocks = [
       ...(snapshotNeedsRefresh ? [pl ? "Świeża migawka danych" : "Fresh data snapshot"] : []),
       ...filterFailures.slice(0, 5).map((item) => pl
@@ -75,7 +84,12 @@ export function presentAIResearchGuidance(
       current_step: {
         number: 1,
         title: pl ? "SZYBKI FILTR" : "QUICK FILTER",
-        posture: snapshotNeedsRefresh ? (pl ? "ODŚWIEŻ DANE" : "REFRESH DATA") : (pl ? "NIE SPEŁNIA FILTRÓW RESEARCHU" : "RESEARCH FILTERS NOT MET"),
+        posture: filtersFailed ? (pl ? "KROK 1 NIEZALICZONY" : "STEP 1 NOT PASSED") : snapshotNeedsRefresh ? (pl ? "ODŚWIEŻ DANE" : "REFRESH DATA") : (pl ? "NIE SPEŁNIA FILTRÓW RESEARCHU" : "RESEARCH FILTERS NOT MET"),
+        posture_detail: filtersFailed
+          ? (pl ? "Dalszy research jest wstrzymany do kolejnej świeżej migawki." : "Further research is paused until the next fresh snapshot.")
+          : snapshotNeedsRefresh
+            ? (pl ? "Podstawowe filtry pozostają zaliczone; oczekiwanie dotyczy wyłącznie świeżości danych." : "Basic filters remain passed; only data freshness is awaiting the next snapshot.")
+            : (pl ? "Podstawowe filtry nie mają potwierdzonego wyniku." : "The basic filters do not have a confirmed result."),
       },
       blockers: blockers.slice(0, 3),
       filter_failures: filterFailures,
@@ -96,6 +110,7 @@ export function presentAIResearchGuidance(
           ? (pl ? "BLOKERY — BEZPIECZEŃSTWO" : "DEAL BREAKERS — SECURITY")
           : (pl ? "BEZPIECZEŃSTWO / 3 KONTROLE" : "SECURITY / 3 STAMPS"),
         posture: pl ? "WYMAGA WERYFIKACJI BEZPIECZEŃSTWA" : "SECURITY VERIFICATION REQUIRED",
+        posture_detail: pl ? "Kontrole bezpieczeństwa muszą zostać zakończone przed etapem danych on-chain." : "Security checks must be completed before the on-chain data stage.",
       },
       blockers: [insight(
         unavailable ? (pl ? "Brak wyniku bezpieczeństwa" : "Security result missing") : (pl ? "Bezpieczeństwo wymaga uzupełnienia" : "Security review needs completion"),
@@ -143,6 +158,7 @@ export function presentAIResearchGuidance(
         number: 4,
         title: pl ? "DANE ON-CHAIN" : "ON-CHAIN",
         posture: pl ? "WYMAGA DANYCH ON-CHAIN" : "ON-CHAIN DATA REQUIRED",
+        posture_detail: pl ? "Do oceny koncentracji podaży potrzebne są zapisane dane holderów." : "Recorded holder data is needed to assess supply concentration.",
       },
       blockers: [insight(
         pl ? "Brak struktury holderów" : "Holder structure missing",
@@ -167,6 +183,7 @@ export function presentAIResearchGuidance(
       number: 5,
       title: pl ? "SPOŁECZNOŚĆ" : "SOCIAL",
       posture: pl ? "GOTOWY DO KOLEJNEGO KROKU RESEARCHU" : "READY FOR THE NEXT RESEARCH STEP",
+      posture_detail: pl ? "Dane zamykają bramki kroków 1–4; kolejny krok wymaga danych Social." : "The data closes the gates for steps 1–4; the next step requires Social data.",
     },
     blockers: [insight(
       pl ? "Kolejny etap playbooka" : "Next playbook stage",
