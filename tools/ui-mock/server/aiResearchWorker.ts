@@ -15,7 +15,7 @@ import {
 } from "./aiResearchProvider.js";
 import {
   AIResearchValidationError,
-  parseAIResearchProviderNarrative,
+  parseAIResearchProviderNarrativeWithDiagnostics,
 } from "./aiResearchSchema.js";
 import {
   AIAnalysisQueueStoreError,
@@ -241,7 +241,17 @@ async function processClaim(
     store.recordProviderResponseReceived({ analysis_id: claimed.analysis_id, worker_id: workerId, now: now() });
     if (providerResult.model !== claimed.model_id) throw new AIResearchWorkerContractError("MODEL_MISMATCH");
     stage = "PROVIDER_PARSE";
-    const narrative = parseAIResearchProviderNarrative(providerResult.raw_json, context);
+    const parsedNarrative = parseAIResearchProviderNarrativeWithDiagnostics(providerResult.raw_json, context);
+    if (parsedNarrative.presentation_fallbacks.length > 0) {
+      store.recordValidationDiagnostics({
+        analysis_id: claimed.analysis_id,
+        worker_id: workerId,
+        validation_code: "PRESENTATION_FALLBACK",
+        violations: [...new Set(parsedNarrative.presentation_fallbacks.flatMap((item) => item.violations))],
+        now: now(),
+      });
+    }
+    const narrative = parsedNarrative.narrative;
     stage = "HYDRATE";
     const brief = hydrateAIResearchBrief(
       context,
@@ -288,6 +298,19 @@ async function processClaim(
     return "COMPLETED";
   } catch (error) {
     let failure = classifyFailure(error, stage);
+    if (error instanceof AIResearchValidationError) {
+      try {
+        store.recordValidationDiagnostics({
+          analysis_id: claimed.analysis_id,
+          worker_id: workerId,
+          validation_code: error.code,
+          violations: error.violations,
+          now: now(),
+        });
+      } catch {
+        failure = { code: "AI_STORE_FAILURE", transient: false, stage: "PROVIDER_PARSE" };
+      }
+    }
     if (providerAttemptStarted && stage === "PROVIDER_CALL") {
       try {
         store.recordProviderAttemptFailed({

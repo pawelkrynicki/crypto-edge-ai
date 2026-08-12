@@ -104,6 +104,55 @@ describe("PC.2 provider attempt and failure-stage audit", () => {
     store.close();
   });
 
+  it("C2: persists validation code and violations internally without exposing a raw provider response", async () => {
+    const store = await storeFor("validation-diagnostics.sqlite");
+    const queued = await enqueueReal(store, "validation-diagnostics");
+    const worker = createAIResearchWorker({
+      ...contextOptions(),
+      store,
+      provider: provider(async (context) => {
+        const value = narrative(context);
+        value.summary.en = "Buy this token.";
+        return JSON.stringify(value);
+      }),
+      now: () => NOW,
+      limits: { maxAttempts: 1 },
+    });
+
+    await worker.runCycle();
+    const record = required(store, queued);
+    assert.equal(record.status, "SUSPENDED");
+    assert.equal(record.safe_error_code, "PROVIDER_CONTRACT_INVALID");
+    assert.equal(record.internal_validation_code, "FORBIDDEN_CONTENT");
+    assert.deepEqual(record.internal_validation_violations, ["FORBIDDEN_CONTENT"]);
+    assert.equal(record.result, null);
+    store.close();
+  });
+
+  it("C3: retains a valid shared result with a field-level presentation fallback", async () => {
+    const store = await storeFor("presentation-fallback.sqlite");
+    const queued = await enqueueReal(store, "presentation-fallback");
+    const worker = createAIResearchWorker({
+      ...contextOptions(),
+      store,
+      provider: provider(async (context) => {
+        const value = narrative(context);
+        value.fact_narratives[0]!.pl = "Dane security wymagają dalszej weryfikacji.";
+        return JSON.stringify(value);
+      }),
+      now: () => NOW,
+      limits: { maxAttempts: 1 },
+    });
+
+    await worker.runCycle();
+    const record = required(store, queued);
+    assert.equal(record.status, "READY");
+    assert.equal(record.internal_validation_code, "PRESENTATION_FALLBACK");
+    assert.deepEqual(record.internal_validation_violations, ["MACHINE_VALUE_IN_NARRATIVE", "LANGUAGE_MISMATCH"]);
+    assert.equal(record.result?.known_facts[0]?.interpretation.pl.includes("security"), false);
+    store.close();
+  });
+
   it("D: classifies a malformed provider response as a provider contract failure", async () => {
     const store = await storeFor("contract.sqlite");
     const queued = await enqueueReal(store, "contract");
@@ -182,6 +231,9 @@ describe("PC.2 provider attempt and failure-stage audit", () => {
         "provider_attempt_completed_at",
         "provider_attempt_status",
         "provider_attempt_safe_error_code",
+        "internal_validation_code",
+        "internal_validation_violations",
+        "internal_validation_violations_json",
         "failure_stage",
       ]) assert.equal(JSON.stringify(body).includes(forbidden), false, forbidden);
     } finally {

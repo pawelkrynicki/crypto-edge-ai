@@ -32,6 +32,8 @@ The server converts internal records to `ai_production_analysis_lookup_v1` befor
 
 The structured result is `ai_production_analysis_v1` with summary, strengths, risks, missing data, market/security/liquidity/holder context, watch items, evidence, timestamps, freshness and analysis version. It excludes model/provider names, token counts, queue/cache/analysis IDs, raw errors and SQLite details.
 
+The provider contract uses a per-request strict schema with exact current array counts and target-ID allowlists; the parser remains authoritative for target order. Invalid JSON, shape, skeleton, generated URLs, unsupported numbers and investment/safety/profit claims fail closed. A harmless raw enum, machine-style label or isolated locale contamination falls back only that narrative field to deterministic evidence-bound copy. Internal queue audit stores only a validation code and bounded violation names; it never stores raw provider output and these diagnostics never cross the CAMP public contract.
+
 AI request initiation now resolves the existing server-side PC.1 actor context. Browser payloads contain neither user nor role fields; the actor is used only for the persistent initiation limit. The AI worker has no lifecycle or private-workspace mutation path.
 
 The AI tab uses the safe contract and lightweight five-second status polling only while that tab is open and the state is `QUEUED` or `PROCESSING`; polling stops at a terminal state and never refreshes the Radar. PL/EN messages are user-facing and provider-neutral.

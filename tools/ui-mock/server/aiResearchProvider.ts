@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import type { AIResearchContext } from "./aiResearchContext.js";
-import { AI_RESEARCH_PROVIDER_JSON_SCHEMA } from "./aiResearchSchema.js";
+import { buildAIResearchProviderJsonSchema } from "./aiResearchSchema.js";
 
 export const OPENAI_RESEARCH_CLIENT_MAX_RETRIES = 0;
 export const OPENAI_RESEARCH_DEFAULT_TIMEOUT_MS = 90_000;
@@ -129,7 +129,7 @@ function createOpenAIResearchProvider(options: OpenAIResearchProviderOptions): A
               type: "json_schema",
               name: "ai_research_narrative_v3",
               strict: true,
-              schema: AI_RESEARCH_PROVIDER_JSON_SCHEMA,
+              schema: buildAIResearchProviderJsonSchema(context),
             },
           },
           max_output_tokens: 4_000,

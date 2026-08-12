@@ -13,6 +13,7 @@ import {
   AIResearchValidationError,
   auditAIResearchSemanticQuality,
   parseAIResearchProviderNarrative,
+  parseAIResearchProviderNarrativeWithDiagnostics,
 } from "../server/aiResearchSchema.js";
 import { PERSISTABLE_SCANNER_SAMPLE } from "../src/fixtures/persistableScannerSample.js";
 
@@ -95,7 +96,7 @@ describe("AI.2C deterministic actions and PL/EN narrative boundary", () => {
     assert.ok(context.action_catalog.some(({ action_type }) => action_type === "WAIT_FOR_CHECKPOINT"));
   });
 
-  it("accepts natural PL/EN narrative and rejects raw enums, machine values and mixed language", async () => {
+  it("accepts natural PL/EN narrative and field-falls back raw enums, machine values and mixed language", async () => {
     const pl = await researchContext("pl");
     const en = await researchContext("en");
     assert.equal(parseAIResearchProviderNarrative(JSON.stringify(providerNarrative(pl)), pl).narrative_version, "ai_research_narrative_v3");
@@ -103,13 +104,18 @@ describe("AI.2C deterministic actions and PL/EN narrative boundary", () => {
 
     const rawEnum = providerNarrative(pl);
     rawEnum.summary.pl = "Stan DATA_STALE wymaga sprawdzenia.";
-    assert.throws(() => parseAIResearchProviderNarrative(JSON.stringify(rawEnum), pl), /RAW_MACHINE_VALUE/);
+    const rawEnumResult = parseAIResearchProviderNarrativeWithDiagnostics(JSON.stringify(rawEnum), pl);
+    assert.equal(rawEnumResult.narrative.summary.pl.includes("DATA_STALE"), false);
+    assert.ok(rawEnumResult.presentation_fallbacks[0]?.violations.includes("RAW_ENUM_IN_NARRATIVE"));
     const machineValue = providerNarrative(pl);
     machineValue.fact_narratives[0]!.pl = "Etap lifecycle ma wartość new.";
-    assert.throws(() => parseAIResearchProviderNarrative(JSON.stringify(machineValue), pl), /RAW_MACHINE_VALUE/);
+    const machineResult = parseAIResearchProviderNarrativeWithDiagnostics(JSON.stringify(machineValue), pl);
+    assert.equal(machineResult.narrative.fact_narratives[0]!.pl.includes("lifecycle"), false);
+    assert.ok(machineResult.presentation_fallbacks[0]?.violations.includes("MACHINE_VALUE_IN_NARRATIVE"));
     const mixed = providerNarrative(en);
     mixed.summary.en = "Dane wymagają świeżej migawki.";
-    assert.throws(() => parseAIResearchProviderNarrative(JSON.stringify(mixed), en), /LANGUAGE_MISMATCH/);
+    const mixedResult = parseAIResearchProviderNarrativeWithDiagnostics(JSON.stringify(mixed), en);
+    assert.ok(mixedResult.presentation_fallbacks[0]?.violations.includes("LANGUAGE_MISMATCH"));
   });
 });
 

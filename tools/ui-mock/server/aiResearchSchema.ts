@@ -78,6 +78,30 @@ export const AI_RESEARCH_PROVIDER_JSON_SCHEMA = {
   },
 } as const;
 
+/**
+ * The Responses schema stays structurally identical for every request, while the
+ * current context tightens each narrative array to its exact expected size and
+ * target-ID allowlist. Exact order remains a parser invariant.
+ */
+export function buildAIResearchProviderJsonSchema(context: AIResearchContext): Record<string, unknown> {
+  const schema = JSON.parse(JSON.stringify(AI_RESEARCH_PROVIDER_JSON_SCHEMA)) as Record<string, unknown>;
+  const properties = schema.properties as Record<string, Record<string, unknown>>;
+  const configure = (field: string, ids: string[]) => {
+    const list = properties[field]!;
+    list.minItems = ids.length;
+    list.maxItems = ids.length;
+    const item = list.items as Record<string, unknown>;
+    const itemProperties = item.properties as Record<string, unknown>;
+    itemProperties.id = { type: "string", enum: ids };
+  };
+  configure("fact_narratives", context.fact_candidates.map((fact) => aiResearchNarrativeId("fact", fact.key)));
+  configure("risk_narratives", context.risk_candidates.map((_risk, index) => aiResearchNarrativeId("risk", index)));
+  configure("missing_narratives", context.missing_information.map((item) => aiResearchNarrativeId("missing", item.key)));
+  configure("action_narratives", context.action_catalog.map((_action, index) => aiResearchNarrativeId("action", index)));
+  configure("status_change_narratives", context.status_change_conditions.map((condition) => aiResearchNarrativeId("condition", condition.key)));
+  return schema;
+}
+
 export type AIResearchNarrativeBinding = { id: string; en: string; pl: string };
 
 export type AIResearchProviderNarrative = {
@@ -88,6 +112,17 @@ export type AIResearchProviderNarrative = {
   missing_narratives: AIResearchNarrativeBinding[];
   action_narratives: AIResearchNarrativeBinding[];
   status_change_narratives: AIResearchNarrativeBinding[];
+};
+
+export type AIResearchPresentationFallback = {
+  target: string;
+  locale: "en" | "pl";
+  violations: Array<"RAW_ENUM_IN_NARRATIVE" | "MACHINE_VALUE_IN_NARRATIVE" | "LANGUAGE_MISMATCH">;
+};
+
+export type AIResearchProviderNarrativeParseResult = {
+  narrative: AIResearchProviderNarrative;
+  presentation_fallbacks: AIResearchPresentationFallback[];
 };
 
 export type AIResearchSemanticViolation =
@@ -131,6 +166,10 @@ export class AIResearchValidationError extends Error {
 }
 
 export function parseAIResearchProviderNarrative(raw: string, context: AIResearchContext): AIResearchProviderNarrative {
+  return parseAIResearchProviderNarrativeWithDiagnostics(raw, context).narrative;
+}
+
+export function parseAIResearchProviderNarrativeWithDiagnostics(raw: string, context: AIResearchContext): AIResearchProviderNarrativeParseResult {
   let value: unknown;
   try {
     value = JSON.parse(raw);
@@ -171,9 +210,81 @@ export function parseAIResearchProviderNarrative(raw: string, context: AIResearc
       280,
     ),
   };
-  assertNarrativePolicy(narrativeStringsFromProvider(result, "en"), "en", context);
-  assertNarrativePolicy(narrativeStringsFromProvider(result, "pl"), "pl", context);
-  return result;
+  const presentation_fallbacks = applyPresentationFallbacks(result, context);
+  return { narrative: result, presentation_fallbacks };
+}
+
+function applyPresentationFallbacks(
+  narrative: AIResearchProviderNarrative,
+  context: AIResearchContext,
+): AIResearchPresentationFallback[] {
+  const fallbacks: AIResearchPresentationFallback[] = [];
+  const inspect = (target: string, copy: AIResearchBilingualText, fallback: AIResearchBilingualText) => {
+    for (const locale of ["en", "pl"] as const) {
+      const presentationViolations = narrativePresentationViolations(copy[locale], locale, context);
+      if (presentationViolations.length === 0) continue;
+      copy[locale] = fallback[locale];
+      fallbacks.push({ target, locale, violations: presentationViolations });
+    }
+  };
+  inspect("summary", narrative.summary, deterministicNarrativeFallback("summary"));
+  for (const [field, items] of [
+    ["fact_narratives", narrative.fact_narratives],
+    ["risk_narratives", narrative.risk_narratives],
+    ["missing_narratives", narrative.missing_narratives],
+    ["action_narratives", narrative.action_narratives],
+    ["status_change_narratives", narrative.status_change_narratives],
+  ] as const) {
+    for (let index = 0; index < items.length; index += 1) {
+      inspect(`${field}[${index}]`, items[index]!, deterministicNarrativeFallback(field));
+    }
+  }
+  return fallbacks;
+}
+
+function narrativePresentationViolations(
+  value: string,
+  locale: "en" | "pl",
+  context: AIResearchContext,
+): Array<"RAW_ENUM_IN_NARRATIVE" | "MACHINE_VALUE_IN_NARRATIVE" | "LANGUAGE_MISMATCH"> {
+  if (hasForbiddenContent([value])) throw new AIResearchValidationError("FORBIDDEN_CONTENT", ["FORBIDDEN_CONTENT"]);
+  if (hasGeneratedUrl([value])) throw new AIResearchValidationError("FORBIDDEN_CONTENT", ["GENERATED_URL"]);
+  if (hasInventedNumber([value], context)) throw new AIResearchValidationError("UNKNOWN_FACT", ["INVENTED_NUMBER"]);
+  const violations: Array<"RAW_ENUM_IN_NARRATIVE" | "MACHINE_VALUE_IN_NARRATIVE" | "LANGUAGE_MISMATCH"> = [];
+  if (hasRawEnum([value])) violations.push("RAW_ENUM_IN_NARRATIVE");
+  if (hasMachineValue([value], locale)) violations.push("MACHINE_VALUE_IN_NARRATIVE");
+  if (hasLanguageMismatch([value], locale)) violations.push("LANGUAGE_MISMATCH");
+  return violations;
+}
+
+function deterministicNarrativeFallback(field: string): AIResearchBilingualText {
+  const copy: Record<string, AIResearchBilingualText> = {
+    summary: {
+      en: "The recorded evidence provides research context, while the remaining gaps need verification before a stronger conclusion.",
+      pl: "Zapisane dane dają kontekst do analizy, ale pozostałe braki wymagają sprawdzenia przed mocniejszym wnioskiem.",
+    },
+    fact_narratives: {
+      en: "This recorded fact adds context to the current research view.",
+      pl: "Ten zapisany fakt uzupełnia obecny obraz analizy.",
+    },
+    risk_narratives: {
+      en: "This recorded risk needs verification against the listed evidence.",
+      pl: "To zapisane ryzyko wymaga sprawdzenia względem wskazanych danych.",
+    },
+    missing_narratives: {
+      en: "This evidence gap limits what can be concluded from the supplied record.",
+      pl: "Ta luka w danych ogranicza wnioski możliwe na podstawie zapisanego materiału.",
+    },
+    action_narratives: {
+      en: "Use this permitted research step to verify the listed evidence gap.",
+      pl: "Wykorzystaj ten dozwolony krok analizy, aby sprawdzić wskazaną lukę w danych.",
+    },
+    status_change_narratives: {
+      en: "This condition would justify reviewing the research view against new evidence.",
+      pl: "Ten warunek uzasadnia ponowne sprawdzenie analizy względem nowych danych.",
+    },
+  };
+  return copy[field] ?? copy.summary!;
 }
 
 export function auditAIResearchSemanticQuality(value: unknown, context: AIResearchContext): AIResearchSemanticViolation[] {
@@ -395,17 +506,6 @@ function parseStoredRisk(value: unknown): AIResearchRiskFactor {
   return { severity: value.severity, category: text(value.category, 1, 80), title: text(value.title, 1, 140), explanation: bilingualText(value.explanation, 1, 360), evidence_reference_ids: stringArray(value.evidence_reference_ids, 1, 4, 80) } as AIResearchRiskFactor;
 }
 
-function narrativeStringsFromProvider(value: AIResearchProviderNarrative, locale: "pl" | "en"): string[] {
-  return [
-    value.summary[locale],
-    ...value.fact_narratives.map((item) => item[locale]),
-    ...value.risk_narratives.map((item) => item[locale]),
-    ...value.missing_narratives.map((item) => item[locale]),
-    ...value.action_narratives.map((item) => item[locale]),
-    ...value.status_change_narratives.map((item) => item[locale]),
-  ];
-}
-
 function narrativeStringsFromSemantic(value: Record<string, unknown> | AIResearchBrief, locale: "pl" | "en"): string[] {
   const result: string[] = [];
   if (isBilingualText(value.summary)) result.push(value.summary[locale]);
@@ -435,7 +535,7 @@ function assertNarrativePolicy(strings: string[], locale: "pl" | "en", context?:
 
 function hasForbiddenContent(strings: string[]): boolean {
   const content = strings.join("\n").normalize("NFKC");
-  const forbidden = /\b(?:buy|sell|trade|hold|deposit|connect\s+wallet|kup|kupuj|sprzedaj|sprzedaż|trzymaj|wejdź\s+w\s+pozycj|safe|bezpieczn(?:y|a|e)|gwarantowan(?:y|a|e)|guaranteed\s+profit|prawdopodobn(?:y|a)\s+zwrot|investment\s+recommendation|rekomendacj[aą]\s+inwestycyjn[aą]|ignore\s+(?:all\s+)?previous|system\s+prompt|developer\s+message|prompt\s+injection|promot(?:e|es|ed|ing|ion)|promuj|awansuj)\b/iu;
+  const forbidden = /\b(?:(?:buy|sell|trade|hold|invest)\s+(?:this|the)\s+(?:token|coin|asset)|(?:buy|sell)\s+now|(?:enter|open|take)\s+(?:(?:a|the)\s+)?position|you\s+should\s+(?:buy|sell|trade|hold|invest|enter)|(?:safe|secure)\s+investment|(?:token|coin|project)\s+(?:is|looks)\s+(?:safe|secure)|guaranteed\s+(?:profit|return|returns)|kup(?:\s+ten|\s+tego)?\s+(?:token|monet(?:ę|e))|sprzedaj\s+(?:teraz|ten|tego)|wejdź\s+w\s+pozycj(?:ę|e)|(?:powinieneś|powinnaś|należy)\s+(?:kupić|sprzedać|inwestować)|bezpieczn(?:a|y)\s+inwestycj(?:a|ę)|gwarantowan(?:y|a)\s+zysk|(?:token|projekt)\s+jest\s+bezpieczn(?:y|a)|ignore\s+(?:all\s+)?previous|system\s+prompt|developer\s+message|prompt\s+injection|promot(?:e|es|ed|ing|ion)|promuj|awansuj)(?=\W|$)/iu;
   return forbidden.test(content);
 }
 

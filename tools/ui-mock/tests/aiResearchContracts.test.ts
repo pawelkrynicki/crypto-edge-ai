@@ -8,7 +8,12 @@ import { after, describe, it } from "node:test";
 import { buildAIResearchContext, type AIResearchContext } from "../server/aiResearchContext.js";
 import { parseAIResearchQuery, readAIResearchGenerateRequest } from "../server/aiResearchApi.js";
 import { buildAIAnalysisCacheIdentity } from "../server/aiResearchQueueStore.js";
-import { AIResearchValidationError, parseAIResearchProviderNarrative } from "../server/aiResearchSchema.js";
+import {
+  AIResearchValidationError,
+  buildAIResearchProviderJsonSchema,
+  parseAIResearchProviderNarrative,
+  parseAIResearchProviderNarrativeWithDiagnostics,
+} from "../server/aiResearchSchema.js";
 import { buildDeterministicPreview } from "../server/aiResearchService.js";
 import { PERSISTABLE_SCANNER_SAMPLE } from "../src/fixtures/persistableScannerSample.js";
 
@@ -87,6 +92,62 @@ describe("AI Research v2 brief and v4 bilingual prompt contract", () => {
     const reordered = structuredClone(valid);
     reordered.action_narratives.reverse();
     assert.throws(() => parseAIResearchProviderNarrative(JSON.stringify(reordered), value), /SKELETON_MISMATCH/);
+  });
+
+  it("allows neutral buy/sell tax research wording while rejecting investment instructions in both languages", async () => {
+    const value = await context("base", ADDRESS, "pl");
+    const neutral = narrative(value);
+    neutral.summary.en = "Buy tax is not available. Sell tax requires verification.";
+    neutral.summary.pl = "Podatek kupna nie jest dostępny. Podatek sprzedaży wymaga weryfikacji.";
+    assert.deepEqual(parseAIResearchProviderNarrativeWithDiagnostics(JSON.stringify(neutral), value).presentation_fallbacks, []);
+
+    for (const unsafe of [
+      "Buy this token.", "Sell now.", "Enter the position.", "You should invest.", "This is a safe investment.", "Guaranteed profit.",
+    ]) {
+      const candidate = structuredClone(neutral);
+      candidate.summary.en = unsafe;
+      assert.throws(() => parseAIResearchProviderNarrative(JSON.stringify(candidate), value), (error) => error instanceof AIResearchValidationError && error.code === "FORBIDDEN_CONTENT");
+    }
+    for (const unsafe of ["Kup ten token.", "Sprzedaj teraz.", "Wejdź w pozycję.", "Bezpieczna inwestycja.", "Gwarantowany zysk."]) {
+      const candidate = structuredClone(neutral);
+      candidate.summary.pl = unsafe;
+      assert.throws(() => parseAIResearchProviderNarrative(JSON.stringify(candidate), value), (error) => error instanceof AIResearchValidationError && error.code === "FORBIDDEN_CONTENT");
+    }
+  });
+
+  it("falls back only the presentation-defective field and keeps safety or skeleton failures closed", async () => {
+    const value = await context("base", ADDRESS, "pl");
+    const contaminated = narrative(value);
+    contaminated.fact_narratives[0]!.pl = "Dane security wymagają dalszej weryfikacji.";
+    const parsed = parseAIResearchProviderNarrativeWithDiagnostics(JSON.stringify(contaminated), value);
+    assert.deepEqual(parsed.presentation_fallbacks, [{
+      target: "fact_narratives[0]",
+      locale: "pl",
+      violations: ["MACHINE_VALUE_IN_NARRATIVE", "LANGUAGE_MISMATCH"],
+    }]);
+    assert.equal(parsed.narrative.fact_narratives[0]!.en, contaminated.fact_narratives[0]!.en);
+    assert.equal(parsed.narrative.fact_narratives[0]!.pl.includes("security"), false);
+
+    const wrongTarget = structuredClone(contaminated);
+    wrongTarget.fact_narratives[0]!.id = "fact:wrong";
+    assert.throws(() => parseAIResearchProviderNarrative(JSON.stringify(wrongTarget), value), (error) => error instanceof AIResearchValidationError && error.code === "SKELETON_MISMATCH");
+    const inventedNumber = structuredClone(contaminated);
+    inventedNumber.summary.en = "The recorded value is 999999 and needs verification.";
+    assert.throws(() => parseAIResearchProviderNarrative(JSON.stringify(inventedNumber), value), (error) => error instanceof AIResearchValidationError && error.code === "UNKNOWN_FACT" && error.violations.includes("INVENTED_NUMBER"));
+    const generatedUrl = structuredClone(contaminated);
+    generatedUrl.summary.en = "Review https://invented.example for more information.";
+    assert.throws(() => parseAIResearchProviderNarrative(JSON.stringify(generatedUrl), value), (error) => error instanceof AIResearchValidationError && error.code === "FORBIDDEN_CONTENT" && error.violations.includes("GENERATED_URL"));
+  });
+
+  it("tightens the per-request structured-output schema to current counts and target-ID allowlists", async () => {
+    const value = await context("base", ADDRESS, "pl");
+    const schema = buildAIResearchProviderJsonSchema(value);
+    const properties = schema.properties as Record<string, Record<string, unknown>>;
+    const facts = properties.fact_narratives!;
+    assert.equal(facts.minItems, value.fact_candidates.length);
+    assert.equal(facts.maxItems, value.fact_candidates.length);
+    const factItems = facts.items as { properties: { id: { enum: string[] } } };
+    assert.deepEqual(factItems.properties.id.enum, value.fact_candidates.map((fact) => `fact:${fact.key}`));
   });
 
   it("keeps lifecycle, risk severity and owner decisions deterministic", async () => {
