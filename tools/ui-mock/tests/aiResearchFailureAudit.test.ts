@@ -104,6 +104,44 @@ describe("PC.2 provider attempt and failure-stage audit", () => {
     store.close();
   });
 
+  it("C1: records an incomplete provider response with bounded internal metadata", async () => {
+    const store = await storeFor("incomplete.sqlite");
+    const queued = await enqueueReal(store, "incomplete");
+    const worker = createAIResearchWorker({
+      ...contextOptions(),
+      store,
+      provider: {
+        mode: "OPENAI",
+        model: "gpt-5-mini",
+        async generate() {
+          throw new AIResearchProviderError("PROVIDER_OUTPUT_INCOMPLETE", {
+            response_status: "incomplete",
+            incomplete_reason: "max_output_tokens",
+            output_tokens: 4_000,
+            reasoning_tokens: 2_000,
+          });
+        },
+      },
+      now: () => NOW,
+      limits: { maxAttempts: 1, retryJitterRatio: 0 },
+    });
+
+    await worker.runCycle();
+    const record = required(store, queued);
+    assert.equal(record.status, "SUSPENDED");
+    assert.equal(record.provider_attempt_count, 1);
+    assert.equal(record.provider_attempt_status, "FAILED");
+    assert.equal(record.provider_attempt_safe_error_code, "PROVIDER_OUTPUT_INCOMPLETE");
+    assert.equal(record.safe_error_code, "PROVIDER_OUTPUT_INCOMPLETE");
+    assert.equal(record.internal_validation_code, "PROVIDER_OUTPUT_INCOMPLETE");
+    assert.deepEqual(record.internal_validation_violations, ["INCOMPLETE_REASON_MAX_OUTPUT_TOKENS"]);
+    assert.deepEqual(record.internal_provider_response, {
+      status: "incomplete", incomplete_reason: "max_output_tokens", output_tokens: 4_000, reasoning_tokens: 2_000,
+    });
+    assert.equal(record.result, null);
+    store.close();
+  });
+
   it("C2: persists validation code and violations internally without exposing a raw provider response", async () => {
     const store = await storeFor("validation-diagnostics.sqlite");
     const queued = await enqueueReal(store, "validation-diagnostics");
@@ -157,7 +195,7 @@ describe("PC.2 provider attempt and failure-stage audit", () => {
     const store = await storeFor("contract.sqlite");
     const queued = await enqueueReal(store, "contract");
     const worker = createAIResearchWorker({
-      ...contextOptions(), store, provider: provider(async () => "{}"), now: () => NOW, limits: { maxAttempts: 1 },
+      ...contextOptions(), store, provider: provider(async () => "{\"narrative_version\":"), now: () => NOW, limits: { maxAttempts: 1 },
     });
 
     await worker.runCycle();
@@ -166,6 +204,7 @@ describe("PC.2 provider attempt and failure-stage audit", () => {
     assert.equal(record.provider_attempt_status, "RESPONSE_RECEIVED");
     assert.equal(record.failure_stage, "PROVIDER_PARSE");
     assert.equal(record.safe_error_code, "PROVIDER_CONTRACT_INVALID");
+    assert.equal(record.internal_validation_code, "INVALID_JSON");
     store.close();
   });
 
@@ -234,6 +273,11 @@ describe("PC.2 provider attempt and failure-stage audit", () => {
         "internal_validation_code",
         "internal_validation_violations",
         "internal_validation_violations_json",
+        "internal_provider_response",
+        "internal_provider_response_status",
+        "internal_provider_incomplete_reason",
+        "internal_provider_output_tokens",
+        "internal_provider_reasoning_tokens",
         "failure_stage",
       ]) assert.equal(JSON.stringify(body).includes(forbidden), false, forbidden);
     } finally {

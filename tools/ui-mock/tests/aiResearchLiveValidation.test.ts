@@ -9,6 +9,7 @@ import {
   createAIResearchProvider,
   OPENAI_RESEARCH_CLIENT_MAX_RETRIES,
   OPENAI_RESEARCH_DEFAULT_TIMEOUT_MS,
+  OPENAI_RESEARCH_MAX_OUTPUT_TOKENS,
   OPENAI_RESEARCH_MAX_TIMEOUT_MS,
   resolveAIResearchProviderConfig,
 } from "../server/aiResearchProvider.js";
@@ -84,8 +85,9 @@ describe("AI.2C provider contract compatibility under AI.3", () => {
       fetch: async () => {
         mockCalls += 1;
         return new Response(JSON.stringify({
+          status: "completed",
           output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(narrative(context)) }] }],
-          usage: { input_tokens: 100, output_tokens: 50 },
+          usage: { input_tokens: 100, output_tokens: 50, output_tokens_details: { reasoning_tokens: 12 } },
         }), {
           status: 200,
           headers: { "content-type": "application/json", "x-request-id": "mock_request_id" },
@@ -96,14 +98,49 @@ describe("AI.2C provider contract compatibility under AI.3", () => {
     assert.equal(mockCalls, 1);
     assert.equal(result.model, "gpt-5-mini");
     assert.deepEqual(result.token_usage, { prompt_tokens: 100, completion_tokens: 50, total_tokens: 150 });
+    assert.deepEqual(result.response_metadata, { response_status: "completed", incomplete_reason: null, output_tokens: 50, reasoning_tokens: 12, max_output_tokens: 8_000 });
     assert.equal(result.request_id, "mock_request_id");
+  });
+
+  it("rejects an incomplete response before its partial output can be treated as completed JSON", async () => {
+    const context = await buildAIResearchContext("base", ADDRESS, "pl", contextOptions());
+    const provider = createAIResearchProvider({
+      config: openAiConfig(),
+      fetch: async () => new Response(JSON.stringify({
+        status: "incomplete",
+        incomplete_details: { reason: "max_output_tokens" },
+        output: [{ type: "message", content: [{ type: "output_text", text: "{\"narrative_version\": \"ai_research_narrative_v3\"" }] }],
+        usage: { input_tokens: 100, output_tokens: 4_000, output_tokens_details: { reasoning_tokens: 2_000 } },
+      }), { status: 200, headers: { "content-type": "application/json" } }),
+    });
+    await assert.rejects(provider.generate(context), (error: unknown) => error instanceof AIResearchProviderError
+      && error.code === "PROVIDER_OUTPUT_INCOMPLETE"
+      && error.response_metadata.response_status === "incomplete"
+      && error.response_metadata.incomplete_reason === "max_output_tokens"
+      && error.response_metadata.output_tokens === 4_000
+      && error.response_metadata.reasoning_tokens === 2_000);
+  });
+
+  it("rejects an incomplete response even when its partial output happens to be syntactically valid", async () => {
+    const context = await buildAIResearchContext("base", ADDRESS, "pl", contextOptions());
+    const provider = createAIResearchProvider({
+      config: openAiConfig(),
+      fetch: async () => new Response(JSON.stringify({
+        status: "incomplete",
+        incomplete_details: { reason: "max_output_tokens" },
+        output: [{ type: "message", content: [{ type: "output_text", text: "{}" }] }],
+        usage: { input_tokens: 100, output_tokens: 4_000, output_tokens_details: { reasoning_tokens: 2_000 } },
+      }), { status: 200, headers: { "content-type": "application/json" } }),
+    });
+    await assert.rejects(provider.generate(context), (error: unknown) => error instanceof AIResearchProviderError && error.code === "PROVIDER_OUTPUT_INCOMPLETE");
   });
 
   it("keeps the SDK call non-persistent, bounded and without SDK retries", async () => {
     const providerSource = await source("server/aiResearchProvider.ts");
     assert.match(providerSource, /store: false/);
     assert.match(providerSource, /background: false/);
-    assert.match(providerSource, /max_output_tokens: 4_000/);
+    assert.equal(OPENAI_RESEARCH_MAX_OUTPUT_TOKENS, 8_000);
+    assert.match(providerSource, /max_output_tokens: OPENAI_RESEARCH_MAX_OUTPUT_TOKENS/);
     assert.match(providerSource, /OPENAI_RESEARCH_CLIENT_MAX_RETRIES = 0/);
     assert.match(providerSource, /strict: true/);
     assert.doesNotMatch(providerSource, /web_search|file_search|computer_use/);
@@ -123,6 +160,18 @@ describe("AI.2C provider contract compatibility under AI.3", () => {
     assert.match(worker, /parseAIResearchProviderNarrative/);
   });
 });
+
+function openAiConfig() {
+  return {
+    mode: "OPENAI" as const,
+    model: "gpt-5-mini",
+    apiKey: "test-only-not-a-real-key",
+    timeoutMs: 5_000,
+    maxConcurrency: 1,
+    liveCallBudget: 1 as const,
+    liveCallBudgetInvalid: false,
+  };
+}
 
 function contextOptions() {
   return {

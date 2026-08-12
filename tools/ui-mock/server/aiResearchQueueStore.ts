@@ -81,6 +81,12 @@ export type AIAnalysisQueueRecord = AIAnalysisCacheIdentity & {
   provider_attempt_safe_error_code: string | null;
   internal_validation_code: string | null;
   internal_validation_violations: string[];
+  internal_provider_response: {
+    status: string | null;
+    incomplete_reason: string | null;
+    output_tokens: number | null;
+    reasoning_tokens: number | null;
+  };
   failure_stage: AIAnalysisFailureStage | null;
   lease_owner: string | null;
   lease_expires_at: string | null;
@@ -360,7 +366,9 @@ WHERE analysis_id = ? AND status = 'PROCESSING' AND lease_owner = ?
 UPDATE crypto_ai_analysis_queue SET provider_attempt_count = provider_attempt_count + 1,
   provider_attempt_started_at = ?, provider_attempt_completed_at = NULL,
   provider_attempt_status = 'STARTED', provider_attempt_safe_error_code = NULL,
-  internal_validation_code = NULL, internal_validation_violations_json = NULL, updated_at = ?
+  internal_validation_code = NULL, internal_validation_violations_json = NULL,
+  internal_provider_response_status = NULL, internal_provider_incomplete_reason = NULL,
+  internal_provider_output_tokens = NULL, internal_provider_reasoning_tokens = NULL, updated_at = ?
 WHERE analysis_id = ? AND status = 'PROCESSING' AND lease_owner = ?
 `).run(nowIso, nowIso, input.analysis_id, input.worker_id);
       if (changes(result) !== 1) throw new AIAnalysisQueueStoreError("STORE_UNAVAILABLE");
@@ -411,6 +419,35 @@ WHERE analysis_id = ? AND status = 'PROCESSING' AND lease_owner = ?
 `).run(
         safeCode(input.validation_code),
         JSON.stringify(input.violations.filter((value) => /^[A-Z0-9_]{1,80}$/.test(value)).slice(0, 20)),
+        input.now.toISOString(),
+        input.analysis_id,
+        input.worker_id,
+      );
+      if (changes(result) !== 1) throw new AIAnalysisQueueStoreError("STORE_UNAVAILABLE");
+      const record = safeRecord(db.prepare("SELECT * FROM crypto_ai_analysis_queue WHERE analysis_id = ?").get(input.analysis_id));
+      if (!record) throw new AIAnalysisQueueStoreError("STORE_UNAVAILABLE");
+      return record;
+    },
+
+    recordProviderResponseDiagnostics(input: {
+      analysis_id: string;
+      worker_id: string;
+      response_status: string | null;
+      incomplete_reason: string | null;
+      output_tokens: number | null;
+      reasoning_tokens: number | null;
+      now: Date;
+    }): AIAnalysisQueueRecord {
+      const db = requireDb();
+      const result = db.prepare(`
+UPDATE crypto_ai_analysis_queue SET internal_provider_response_status = ?, internal_provider_incomplete_reason = ?,
+  internal_provider_output_tokens = ?, internal_provider_reasoning_tokens = ?, updated_at = ?
+WHERE analysis_id = ? AND status = 'PROCESSING' AND lease_owner = ?
+`).run(
+        safeProviderDetail(input.response_status),
+        safeProviderDetail(input.incomplete_reason),
+        nullableInteger(input.output_tokens),
+        nullableInteger(input.reasoning_tokens),
         input.now.toISOString(),
         input.analysis_id,
         input.worker_id,
@@ -736,6 +773,10 @@ CREATE TABLE IF NOT EXISTS crypto_ai_analysis_queue (
   provider_attempt_safe_error_code TEXT,
   internal_validation_code TEXT,
   internal_validation_violations_json TEXT,
+  internal_provider_response_status TEXT,
+  internal_provider_incomplete_reason TEXT,
+  internal_provider_output_tokens INTEGER CHECK (internal_provider_output_tokens IS NULL OR internal_provider_output_tokens >= 0),
+  internal_provider_reasoning_tokens INTEGER CHECK (internal_provider_reasoning_tokens IS NULL OR internal_provider_reasoning_tokens >= 0),
   failure_stage TEXT CHECK (failure_stage IN ('CONTEXT_BUILD','IDENTITY_CHECK','CIRCUIT','PROVIDER_CALL','PROVIDER_RESPONSE','PROVIDER_PARSE','HYDRATE','STORE_COMPLETE','USAGE_RECORD','UNKNOWN')),
   lease_owner TEXT,
   lease_expires_at TEXT,
@@ -784,8 +825,12 @@ PRAGMA user_version = 1;
   ensureQueueColumn(database, "provider_attempt_safe_error_code", "TEXT");
   ensureQueueColumn(database, "internal_validation_code", "TEXT");
   ensureQueueColumn(database, "internal_validation_violations_json", "TEXT");
+  ensureQueueColumn(database, "internal_provider_response_status", "TEXT");
+  ensureQueueColumn(database, "internal_provider_incomplete_reason", "TEXT");
+  ensureQueueColumn(database, "internal_provider_output_tokens", "INTEGER CHECK (internal_provider_output_tokens IS NULL OR internal_provider_output_tokens >= 0)");
+  ensureQueueColumn(database, "internal_provider_reasoning_tokens", "INTEGER CHECK (internal_provider_reasoning_tokens IS NULL OR internal_provider_reasoning_tokens >= 0)");
   ensureQueueColumn(database, "failure_stage", "TEXT CHECK (failure_stage IN ('CONTEXT_BUILD','IDENTITY_CHECK','CIRCUIT','PROVIDER_CALL','PROVIDER_RESPONSE','PROVIDER_PARSE','HYDRATE','STORE_COMPLETE','USAGE_RECORD','UNKNOWN'))");
-  database.exec("PRAGMA user_version = 3");
+  database.exec("PRAGMA user_version = 4");
 }
 
 function ensureQueueColumn(database: SqliteDatabase, name: string, definition: string): void {
@@ -802,7 +847,9 @@ function assertSchema(database: SqliteDatabase): void {
     "failed_at", "next_retry_at", "attempt_count", "result_json", "validation_status", "safe_error_code",
     "prompt_tokens", "completion_tokens", "total_tokens", "latency_ms", "provider_response_id",
     "provider_attempt_count", "provider_attempt_started_at", "provider_attempt_completed_at", "provider_attempt_status",
-    "provider_attempt_safe_error_code", "internal_validation_code", "internal_validation_violations_json", "failure_stage", "created_at", "updated_at",
+    "provider_attempt_safe_error_code", "internal_validation_code", "internal_validation_violations_json",
+    "internal_provider_response_status", "internal_provider_incomplete_reason", "internal_provider_output_tokens", "internal_provider_reasoning_tokens",
+    "failure_stage", "created_at", "updated_at",
   ];
   if (required.some((name) => !names.has(name))) throw new AIAnalysisQueueStoreError("STORE_SCHEMA_INVALID");
 }
@@ -856,6 +903,12 @@ function safeRecord(value: unknown): AIAnalysisQueueRecord | null {
     provider_attempt_safe_error_code: stringField(value.provider_attempt_safe_error_code),
     internal_validation_code: stringField(value.internal_validation_code),
     internal_validation_violations: internalValidationViolations(value.internal_validation_violations_json),
+    internal_provider_response: {
+      status: stringField(value.internal_provider_response_status),
+      incomplete_reason: stringField(value.internal_provider_incomplete_reason),
+      output_tokens: nullableInteger(value.internal_provider_output_tokens),
+      reasoning_tokens: nullableInteger(value.internal_provider_reasoning_tokens),
+    },
     failure_stage: safeFailureStage(value.failure_stage),
     lease_owner: stringField(value.lease_owner),
     lease_expires_at: stringField(value.lease_expires_at),
@@ -1008,6 +1061,10 @@ function safeCode(value: string): string {
   return /^[A-Z0-9_]{1,80}$/.test(value) ? value : "AI_WORKER_FAILURE";
 }
 
+function safeProviderDetail(value: string | null): string | null {
+  return value !== null && /^[a-z0-9_]{1,80}$/i.test(value) ? value : null;
+}
+
 function providerAttemptStatus(value: unknown): AIAnalysisProviderAttemptStatus {
   return AI_ANALYSIS_PROVIDER_ATTEMPT_STATUSES.includes(value as AIAnalysisProviderAttemptStatus)
     ? value as AIAnalysisProviderAttemptStatus
@@ -1030,6 +1087,10 @@ function stringField(value: unknown): string | null {
 
 function integer(value: unknown): number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : 0;
+}
+
+function nullableInteger(value: unknown): number | null {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : null;
 }
 
 function integerField(value: unknown, key: string): number {

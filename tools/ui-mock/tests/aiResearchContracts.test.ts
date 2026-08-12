@@ -7,6 +7,7 @@ import { Readable } from "node:stream";
 import { after, describe, it } from "node:test";
 import { buildAIResearchContext, type AIResearchContext } from "../server/aiResearchContext.js";
 import { parseAIResearchQuery, readAIResearchGenerateRequest } from "../server/aiResearchApi.js";
+import { OPENAI_RESEARCH_MAX_OUTPUT_TOKENS } from "../server/aiResearchProvider.js";
 import { buildAIAnalysisCacheIdentity } from "../server/aiResearchQueueStore.js";
 import {
   AIResearchValidationError,
@@ -150,6 +151,16 @@ describe("AI Research v2 brief and v4 bilingual prompt contract", () => {
     assert.deepEqual(factItems.properties.id.enum, value.fact_candidates.map((fact) => `fact:${fact.key}`));
   });
 
+  it("accepts a worst-case bounded bilingual narrative under the 8000-token provider budget", async () => {
+    const value = await context("base", ADDRESS, "pl");
+    const bounded = maximumLengthNarrative(value);
+    const raw = JSON.stringify(bounded);
+    const parsed = parseAIResearchProviderNarrativeWithDiagnostics(raw, value);
+    assert.equal(parsed.presentation_fallbacks.length, 0);
+    assert.equal(OPENAI_RESEARCH_MAX_OUTPUT_TOKENS, 8_000);
+    assert.ok(raw.length < OPENAI_RESEARCH_MAX_OUTPUT_TOKENS * 4, "bounded contract payload remains below the conservative local character envelope");
+  });
+
   it("keeps lifecycle, risk severity and owner decisions deterministic", async () => {
     const value = await context("base", ADDRESS, "pl");
     const brief = buildDeterministicPreview(value, NOW);
@@ -213,6 +224,23 @@ function narrative(ctx: AIResearchContext) {
     missing_narratives: ctx.missing_information.map((item) => ({ id: `missing:${item.key}`, en: "This evidence gap limits the current research view.", pl: "Ta luka w danych ogranicza obecną analizę." })),
     action_narratives: ctx.action_catalog.map((_action, index) => ({ id: `action:${index}`, en: "Use this permitted research step to verify the evidence.", pl: "Wykorzystaj ten dozwolony krok analizy, aby sprawdzić dane." })),
     status_change_narratives: ctx.status_change_conditions.map((condition) => ({ id: `condition:${condition.key}`, en: "This condition would justify reviewing the research view.", pl: "Ten warunek uzasadnia ponowne sprawdzenie analizy." })),
+  };
+}
+
+function maximumLengthNarrative(ctx: AIResearchContext) {
+  const text = (seed: string, length: number) => seed.repeat(Math.ceil(length / seed.length)).slice(0, length);
+  const enSummary = text("Recorded evidence remains subject to verification. ", 600);
+  const plSummary = text("Zapisane dane nadal wymagają weryfikacji. ", 600);
+  const enItem = text("Recorded evidence requires careful verification. ", 280);
+  const plItem = text("Zapisane dane wymagają dokładnej weryfikacji. ", 280);
+  return {
+    narrative_version: "ai_research_narrative_v3" as const,
+    summary: { en: enSummary, pl: plSummary },
+    fact_narratives: ctx.fact_candidates.map((fact) => ({ id: `fact:${fact.key}`, en: enItem, pl: plItem })),
+    risk_narratives: ctx.risk_candidates.map((_risk, index) => ({ id: `risk:${index}`, en: enItem, pl: plItem })),
+    missing_narratives: ctx.missing_information.map((item) => ({ id: `missing:${item.key}`, en: enItem, pl: plItem })),
+    action_narratives: ctx.action_catalog.map((_action, index) => ({ id: `action:${index}`, en: enItem, pl: plItem })),
+    status_change_narratives: ctx.status_change_conditions.map((condition) => ({ id: `condition:${condition.key}`, en: enItem, pl: plItem })),
   };
 }
 

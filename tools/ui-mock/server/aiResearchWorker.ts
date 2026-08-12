@@ -239,6 +239,17 @@ async function processClaim(
     const providerResult = await provider.generate(context);
     stage = "PROVIDER_RESPONSE";
     store.recordProviderResponseReceived({ analysis_id: claimed.analysis_id, worker_id: workerId, now: now() });
+    if (providerResult.response_metadata) {
+      store.recordProviderResponseDiagnostics({
+        analysis_id: claimed.analysis_id,
+        worker_id: workerId,
+        response_status: providerResult.response_metadata.response_status,
+        incomplete_reason: providerResult.response_metadata.incomplete_reason,
+        output_tokens: providerResult.response_metadata.output_tokens,
+        reasoning_tokens: providerResult.response_metadata.reasoning_tokens,
+        now: now(),
+      });
+    }
     if (providerResult.model !== claimed.model_id) throw new AIResearchWorkerContractError("MODEL_MISMATCH");
     stage = "PROVIDER_PARSE";
     const parsedNarrative = parseAIResearchProviderNarrativeWithDiagnostics(providerResult.raw_json, context);
@@ -309,6 +320,30 @@ async function processClaim(
         });
       } catch {
         failure = { code: "AI_STORE_FAILURE", transient: false, stage: "PROVIDER_PARSE" };
+      }
+    }
+    if (error instanceof AIResearchProviderError && error.response_metadata.response_status !== null) {
+      try {
+        store.recordProviderResponseDiagnostics({
+          analysis_id: claimed.analysis_id,
+          worker_id: workerId,
+          response_status: error.response_metadata.response_status,
+          incomplete_reason: error.response_metadata.incomplete_reason,
+          output_tokens: error.response_metadata.output_tokens,
+          reasoning_tokens: error.response_metadata.reasoning_tokens,
+          now: now(),
+        });
+        if (error.code === "PROVIDER_OUTPUT_INCOMPLETE") {
+          store.recordValidationDiagnostics({
+            analysis_id: claimed.analysis_id,
+            worker_id: workerId,
+            validation_code: "PROVIDER_OUTPUT_INCOMPLETE",
+            violations: error.response_metadata.incomplete_reason ? [safeDiagnosticViolation(error.response_metadata.incomplete_reason)] : [],
+            now: now(),
+          });
+        }
+      } catch {
+        failure = { code: "AI_STORE_FAILURE", transient: false, stage: "PROVIDER_CALL" };
       }
     }
     if (providerAttemptStarted && stage === "PROVIDER_CALL") {
@@ -431,6 +466,11 @@ function classifyFailure(error: unknown, stage: AIAnalysisFailureStage): { code:
     return { code: error.code, transient: false, stage };
   }
   return { code: "AI_WORKER_FAILURE", transient: false, stage: stage ?? "UNKNOWN" };
+}
+
+function safeDiagnosticViolation(value: string): string {
+  const normalized = value.toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  return normalized ? `INCOMPLETE_REASON_${normalized}`.slice(0, 80) : "INCOMPLETE_REASON_UNAVAILABLE";
 }
 
 function recordPostCompletionFailure(

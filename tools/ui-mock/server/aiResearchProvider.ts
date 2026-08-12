@@ -5,6 +5,7 @@ import { buildAIResearchProviderJsonSchema } from "./aiResearchSchema.js";
 export const OPENAI_RESEARCH_CLIENT_MAX_RETRIES = 0;
 export const OPENAI_RESEARCH_DEFAULT_TIMEOUT_MS = 90_000;
 export const OPENAI_RESEARCH_MAX_TIMEOUT_MS = 120_000;
+export const OPENAI_RESEARCH_MAX_OUTPUT_TOKENS = 8_000;
 
 export type AIResearchProviderMode = "DISABLED" | "OPENAI";
 
@@ -12,8 +13,17 @@ export type AIResearchProviderResult = {
   raw_json: string;
   model: string;
   token_usage: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
+  response_metadata?: AIResearchProviderResponseDiagnostics;
   latency_ms?: number;
   request_id?: string | null;
+};
+
+export type AIResearchProviderResponseDiagnostics = {
+  response_status: string | null;
+  incomplete_reason: string | null;
+  output_tokens: number | null;
+  reasoning_tokens: number | null;
+  max_output_tokens: number;
 };
 
 export interface AIResearchProvider {
@@ -59,12 +69,21 @@ export class AIResearchProviderError extends Error {
     | "PROVIDER_RATE_LIMITED"
     | "PROVIDER_UNAVAILABLE"
     | "PROVIDER_ERROR"
+    | "PROVIDER_OUTPUT_INCOMPLETE"
     | "INVALID_PROVIDER_RESPONSE";
+  readonly response_metadata: AIResearchProviderResponseDiagnostics;
 
-  constructor(code: AIResearchProviderError["code"]) {
+  constructor(code: AIResearchProviderError["code"], responseMetadata: Partial<AIResearchProviderResponseDiagnostics> = {}) {
     super(code);
     this.name = "AIResearchProviderError";
     this.code = code;
+    this.response_metadata = {
+      response_status: responseMetadata.response_status ?? null,
+      incomplete_reason: responseMetadata.incomplete_reason ?? null,
+      output_tokens: responseMetadata.output_tokens ?? null,
+      reasoning_tokens: responseMetadata.reasoning_tokens ?? null,
+      max_output_tokens: OPENAI_RESEARCH_MAX_OUTPUT_TOKENS,
+    };
   }
 }
 
@@ -132,13 +151,14 @@ function createOpenAIResearchProvider(options: OpenAIResearchProviderOptions): A
               schema: buildAIResearchProviderJsonSchema(context),
             },
           },
-          max_output_tokens: 4_000,
+          max_output_tokens: OPENAI_RESEARCH_MAX_OUTPUT_TOKENS,
         }).withResponse();
         const parsed = parseResponsesPayload(data);
         return {
           raw_json: parsed.text,
           model: config.model,
           token_usage: parsed.usage,
+          response_metadata: parsed.response_metadata,
           latency_ms: Math.max(0, Date.now() - startedAt),
           request_id: safeRequestId(response.headers.get("x-request-id")),
         };
@@ -180,16 +200,23 @@ export function buildSystemPrompt(): string {
 function parseResponsesPayload(value: unknown): {
   text: string;
   usage: AIResearchProviderResult["token_usage"];
+  response_metadata: AIResearchProviderResponseDiagnostics;
 } {
-  if (!isRecord(value) || !Array.isArray(value.output)) throw new AIResearchProviderError("INVALID_PROVIDER_RESPONSE");
+  const responseMetadata = responseMetadataFromPayload(value);
+  if (responseMetadata.response_status === "incomplete") {
+    throw new AIResearchProviderError("PROVIDER_OUTPUT_INCOMPLETE", responseMetadata);
+  }
+  if (responseMetadata.response_status !== "completed" || !isRecord(value) || !Array.isArray(value.output)) {
+    throw new AIResearchProviderError("INVALID_PROVIDER_RESPONSE", responseMetadata);
+  }
   const text = value.output.flatMap((item) => {
     if (!isRecord(item) || item.type !== "message" || !Array.isArray(item.content)) return [];
     return item.content.flatMap((content) => isRecord(content) && content.type === "output_text" && typeof content.text === "string" ? [content.text] : []);
   }).join("");
-  if (!text || text.length > 100_000) throw new AIResearchProviderError("INVALID_PROVIDER_RESPONSE");
+  if (!text || text.length > 100_000) throw new AIResearchProviderError("INVALID_PROVIDER_RESPONSE", responseMetadata);
   const usage = isRecord(value.usage) ? value.usage : {};
   const promptTokens = safeTokenCount(usage.input_tokens);
-  const completionTokens = safeTokenCount(usage.output_tokens);
+  const completionTokens = responseMetadata.output_tokens ?? 0;
   return {
     text,
     usage: {
@@ -197,11 +224,34 @@ function parseResponsesPayload(value: unknown): {
       completion_tokens: completionTokens,
       total_tokens: promptTokens + completionTokens,
     },
+    response_metadata: responseMetadata,
+  };
+}
+
+function responseMetadataFromPayload(value: unknown): AIResearchProviderResponseDiagnostics {
+  const record = isRecord(value) ? value : {};
+  const usage = isRecord(record.usage) ? record.usage : {};
+  const outputDetails = isRecord(usage.output_tokens_details) ? usage.output_tokens_details : {};
+  const incompleteDetails = isRecord(record.incomplete_details) ? record.incomplete_details : {};
+  return {
+    response_status: safeResponseDetail(record.status),
+    incomplete_reason: safeResponseDetail(incompleteDetails.reason),
+    output_tokens: optionalTokenCount(usage.output_tokens),
+    reasoning_tokens: optionalTokenCount(outputDetails.reasoning_tokens),
+    max_output_tokens: OPENAI_RESEARCH_MAX_OUTPUT_TOKENS,
   };
 }
 
 function safeTokenCount(value: unknown): number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : 0;
+}
+
+function optionalTokenCount(value: unknown): number | null {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : null;
+}
+
+function safeResponseDetail(value: unknown): string | null {
+  return typeof value === "string" && /^[a-z0-9_]{1,80}$/i.test(value) ? value : null;
 }
 
 function safeRequestId(value: string | null): string | null {
