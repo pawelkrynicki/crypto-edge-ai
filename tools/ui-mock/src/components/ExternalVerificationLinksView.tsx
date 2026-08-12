@@ -306,7 +306,7 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
       meta={<><span className="research-context-chip"><span>{t("verification.network")}</span><strong>{chain || missingText}</strong></span><span className="research-context-chip"><span>{t("verification.contractAddress")}</span><code>{contractAddress || missingText}</code></span></>}
       tabBar={<TokenDetailTabs tabs={VERIFICATION_DRAWER_TAB_IDS.map((id) => ({ id, label: tabCopy[id] }))} activeTab={activeTab} onChange={setActiveTab} idPrefix="verification" ariaLabel={locale === "pl" ? "Zakładki karty Weryfikacji" : "Verification drawer tabs"} />}
       bodyClassName="token-detail-drawer-body--tabbed"
-      className="verification-token-drawer"
+      className={`verification-token-drawer${focusedResearchStep ? " research-focus-drawer" : ""}`}
     >
       <TokenDetailTabPanel activeTab={activeTab} idPrefix="verification"><div className="external-checks-view product-verification verification-tab-content">{activeContent}</div></TokenDetailTabPanel>
     </TokenDetailDrawer>

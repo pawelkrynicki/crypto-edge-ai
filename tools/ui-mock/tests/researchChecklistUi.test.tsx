@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { test } from "node:test";
+import { resolve } from "node:path";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import TestRenderer from "react-test-renderer";
@@ -81,15 +83,23 @@ test("PC.3A compact playbook uses native buttons to target every detailed step, 
   }
 });
 
-test("PC.3A focus mode renders only Step 3, keeps evidence grouped, and returns to the compact playbook", async () => {
+test("PC.3A focus mode keeps navigation in normal flow, avoids title duplication and returns to the compact playbook", async () => {
   const detail = renderToStaticMarkup(<ProductLocaleProvider initialLocale="en"><ResearchChecklistDetail candidate={candidate} focusedStep={3} /></ProductLocaleProvider>);
   const polishDetail = renderToStaticMarkup(<ProductLocaleProvider initialLocale="pl"><ResearchChecklistDetail candidate={candidate} focusedStep={3} /></ProductLocaleProvider>);
   const drawer = renderToStaticMarkup(<ProductLocaleProvider initialLocale="en"><ExternalVerificationLinksView candidate={candidate} focusedResearchStep={3} /></ProductLocaleProvider>);
+  const normalDrawer = renderToStaticMarkup(<ProductLocaleProvider initialLocale="en"><ExternalVerificationLinksView candidate={candidate} /></ProductLocaleProvider>);
   assert.match(detail, /id="research-checklist-step-3"[^>]*data-research-step="3"[^>]*data-research-focused="true"/);
+  assert.match(detail, /id="research-checklist-focus-3"[^>]*tabindex="-1"/);
   assert.match(detail, /class="research-checklist-step[^"]*focused/);
   assert.equal((detail.match(/data-research-step="/g) ?? []).length, 1, "focus mode renders one detailed step");
   assert.doesNotMatch(detail, /research-checklist-step-[124567]/);
   assert.match(detail, /← Back to Research Playbook/);
+  assert.match(detail, /Step 3\/7/);
+  const navigationStart = detail.indexOf("data-research-focus-navigation");
+  const stepCardStart = detail.indexOf("id=\"research-checklist-step-3\"");
+  const focusNavigation = detail.slice(navigationStart, stepCardStart);
+  assert.ok(navigationStart >= 0 && navigationStart < stepCardStart, "Back navigation precedes the focused step card");
+  assert.doesNotMatch(focusNavigation, /Security \/ 3 checks/, "the navigation does not duplicate the full step title");
   assert.match(polishDetail, /← Wróć do Research Playbook/);
   assert.match(polishDetail, /Sprawdzone/);
   assert.match(polishDetail, /Czerwone flagi/);
@@ -100,6 +110,24 @@ test("PC.3A focus mode renders only Step 3, keeps evidence grouped, and returns 
   assert.equal((drawer.match(/role="tab"/g) ?? []).length, 6);
   assert.match(drawer, /id="verification-tab-data"[^>]*aria-selected="true"/);
   assert.match(drawer, /id="research-checklist-step-3"/);
+  assert.match(drawer, /class="[^"]*verification-token-drawer research-focus-drawer[^"]*"/);
+  assert.doesNotMatch(normalDrawer, /research-focus-drawer/, "normal Verification drawers stay bounded");
+
+  const [researchSource, css] = await Promise.all([
+    readFile(resolve(process.cwd(), "src", "components", "ResearchChecklist.tsx"), "utf8"),
+    readFile(resolve(process.cwd(), "src", "index.css"), "utf8"),
+  ]);
+  assert.match(researchSource, /getElementById\(`research-checklist-focus-\$\{focusedStep\}`\)/);
+  const navigationCss = css.match(/\.research-focus-navigation\s*\{([^}]*)\}/)?.[1] ?? "";
+  assert.match(navigationCss, /position:\s*static/);
+  assert.match(navigationCss, /top:\s*auto/);
+  assert.match(navigationCss, /z-index:\s*auto/);
+  assert.doesNotMatch(navigationCss, /sticky|fixed/);
+  assert.match(css, /\.verification-token-drawer\.research-focus-drawer\s*\{[^}]*max-height:\s*none;[^}]*min-height:\s*0;[^}]*overflow:\s*visible;/);
+  assert.match(css, /\.research-focus-drawer \.token-detail-drawer-body--tabbed\s*\{[^}]*flex:\s*0 0 auto;[^}]*overflow:\s*visible;/);
+  assert.match(css, /\.research-focus-drawer \.token-detail-tabpanel\s*\{[^}]*overflow-x:\s*visible;[^}]*overflow-y:\s*visible;/);
+  assert.match(css, /\.detail-panel\s*\{[\s\S]*?max-height:\s*calc\(100vh - 170px\);/, "normal drawers retain their accepted height");
+  assert.match(css, /\.token-detail-tabpanel\s*\{[\s\S]*?overflow-y:\s*auto;/, "normal drawers retain their internal tab scrolling");
 
   const originalFetch = globalThis.fetch;
   const originalActEnvironment = globalThis.IS_REACT_ACT_ENVIRONMENT;

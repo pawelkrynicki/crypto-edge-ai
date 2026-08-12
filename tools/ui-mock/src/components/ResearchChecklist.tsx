@@ -87,7 +87,7 @@ export function ResearchChecklistDetail({
   useEffect(() => {
     if (!focusedStep || typeof document === "undefined") return;
     const focusStep = () => {
-      const target = document.getElementById(`research-checklist-step-${focusedStep}`);
+      const target = document.getElementById(`research-checklist-focus-${focusedStep}`);
       if (!target) return;
       target.scrollIntoView({ behavior: "smooth", block: "start" });
       target.focus({ preventScroll: true });
@@ -97,10 +97,10 @@ export function ResearchChecklistDetail({
   }, [candidate.chain, candidate.contractAddress, focusedStep]);
   const selectedStep = focusedStep ? view.steps.find((step) => step.number === focusedStep) ?? null : null;
   if (selectedStep) {
-    return <section className="research-checklist-detail research-checklist-focus-mode" aria-label={pl ? "Skupiony krok checklisty researchu" : "Focused research checklist step"}>
-      <header className="research-focus-navigation">
+    return <section id={`research-checklist-focus-${selectedStep.number}`} tabIndex={-1} className="research-checklist-detail research-checklist-focus-mode" aria-label={pl ? "Skupiony krok checklisty researchu" : "Focused research checklist step"}>
+      <header className="research-focus-navigation" data-research-focus-navigation>
         <button type="button" className="research-focus-back" data-research-playbook-back onClick={() => onBackToResearchPlaybook?.()}>{pl ? "← Wróć do Research Playbook" : "← Back to Research Playbook"}</button>
-        <strong>{pl ? `Krok ${selectedStep.number}/7 — ${stepName(selectedStep.number, locale)}` : `Step ${selectedStep.number}/7 — ${stepName(selectedStep.number, locale)}`}</strong>
+        <strong>{pl ? `Krok ${selectedStep.number}/7` : `Step ${selectedStep.number}/7`}</strong>
       </header>
       <FocusedResearchStep step={selectedStep} locale={locale} />
     </section>;
