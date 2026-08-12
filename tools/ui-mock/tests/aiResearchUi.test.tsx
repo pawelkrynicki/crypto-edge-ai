@@ -18,7 +18,7 @@ import { PERSISTABLE_SCANNER_SAMPLE } from "../src/fixtures/persistableScannerSa
 import { ProductLocaleProvider, readRequestedProductLocale, type ProductLocale } from "../src/productI18n.js";
 import { AIResearchDataSourceError } from "../src/services/aiResearchDataSource.js";
 import type { AIResearchBrief, AIResearchBriefLookup, AIResearchReviewMetrics } from "../src/types/aiResearchTypes.js";
-import { presentAnalysis } from "../server/aiProductionPublic.js";
+import { presentAIProductionLookup, presentAnalysis, validateAIProductionLookup } from "../server/aiProductionPublic.js";
 
 void React;
 
@@ -234,6 +234,44 @@ describe("PC.2 CAMP presentation polish", () => {
 });
 
 describe("PC.2 action-first research guidance", () => {
+  it("keeps a stored bilingual READY brief public as v3 with guidance and rejects an invalid guidance projection", () => {
+    const storedReady: AIResearchBriefLookup = {
+      schema_version: "ai_research_lookup_v1",
+      availability: "READY",
+      provider_mode: "DISABLED",
+      brief: { ...briefPl, render_preview: false },
+      retry_after_seconds: null,
+      error_code: null,
+      queue_status: "READY",
+      shared_result: true,
+      is_last_known_good: false,
+    };
+    const providerCalls = 0;
+
+    for (const [locale, brief, guidance] of [
+      ["pl", briefPl, context.guidance],
+      ["en", briefEn, contextEn.guidance],
+    ] as const) {
+      const publicLookup = presentAIProductionLookup({ ...storedReady, brief }, locale, guidance);
+      assert.equal(publicLookup.status, "READY");
+      assert.equal(publicLookup.analysis?.schema_version, "ai_production_analysis_v3");
+      assert.ok(publicLookup.analysis?.research_guidance);
+      assert.ok(publicLookup.analysis?.research_guidance.current_step);
+
+      const invalidGuidance = {
+        ...publicLookup,
+        analysis: { ...publicLookup.analysis!, research_guidance: null },
+      };
+      assert.throws(
+        () => validateAIProductionLookup(invalidGuidance as unknown as Parameters<typeof validateAIProductionLookup>[0]),
+        /AI_PRODUCTION_PUBLIC_CONTRACT_INVALID/,
+      );
+      assert.equal(publicLookup.status, "READY", "a rejected projection must not mutate the valid cached READY lookup");
+    }
+
+    assert.equal(providerCalls, 0, "public projection of a stored brief must not call a provider");
+  });
+
   it("keeps Quick Filter active for stale data and shows canonical exact filter failures first", () => {
     const input = structuredClone(context.guidance);
     input.freshness = "STALE";
