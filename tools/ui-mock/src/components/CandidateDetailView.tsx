@@ -37,6 +37,7 @@ import { OwnerFollowUpActionPanel } from "./OwnerFollowUpActionPanel";
 import { PersonalRadarPanel } from "./PersonalRadarPanel";
 import type { ManualVerificationRecord } from "../services/manualOwnerActionsDataSource";
 import { ActionButton, CopyButton, CopyableAddress, StatusBadge, TechnicalDetails } from "./ProductUi";
+import { ResearchChecklistSummary } from "./ResearchChecklist";
 import {
   lifecycleActionLabel,
   lifecycleBlockingLabel,
@@ -217,6 +218,7 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
           </section>
           <AIResearchSection chain={candidate.chain} contractAddress={candidate.contractAddress} symbol={candidate.symbol} name={candidate.name} mode="summary" onOpen={() => setActiveTab("ai")} onOpenControlCenter={onOpenControlCenter} />
         </div>
+        <ResearchChecklistSummary candidate={candidate} />
         {onOpenExternalChecks && <div className="candidate-summary-actions"><ActionButton variant="secondary" onClick={() => onOpenExternalChecks(candidate)}>{t("detail.openVerification")}</ActionButton></div>}
       </section>
     );

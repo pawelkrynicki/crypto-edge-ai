@@ -46,6 +46,7 @@ import { resolveRepoFile } from "../../data-poc/src/sourceRegistryValidator.js";
 import { resolveFeedbackDatabasePath } from "./feedbackStore.js";
 import { resolveAIAnalysisQueueDatabasePath } from "./aiResearchQueueStore.js";
 import { getDefaultUserWorkspaceDatabasePath } from "./userWorkspaceRepository.js";
+import { getDefaultResearchEvidenceDatabasePath } from "./researchEvidenceRepository.js";
 import { buildReportsLibraryIndex, getDefaultReportsRootPath } from "./reportsLibrary.js";
 
 export const PRODUCT_BACKUP_SCHEMA_VERSION = "product_backup_bundle_v1";
@@ -76,6 +77,7 @@ export type ProductRecoveryPaths = {
   feedbackSqlite: string;
   aiQueueSqlite: string;
   userWorkspaceSqlite: string;
+  researchEvidenceSqlite: string;
   automationState: string;
   runOnceReceipt: string;
   reportsRoot: string;
@@ -250,6 +252,7 @@ export async function resolveProductRecoveryPaths(
     feedbackSqlite: resolveFeedbackDatabasePath(env.CRYPTO_EDGE_FEEDBACK_SQLITE_PATH),
     aiQueueSqlite: resolveAIAnalysisQueueDatabasePath(env.CRYPTO_EDGE_AI_QUEUE_SQLITE_PATH),
     userWorkspaceSqlite: getDefaultUserWorkspaceDatabasePath(env),
+    researchEvidenceSqlite: getDefaultResearchEvidenceDatabasePath(env),
     automationState: canonical.automation_state,
     runOnceReceipt: canonical.run_once_receipt,
     reportsRoot: getDefaultReportsRootPath(),
@@ -648,6 +651,7 @@ async function buildStoreInventory(
     paths.feedbackSqlite,
     paths.aiQueueSqlite,
     paths.userWorkspaceSqlite,
+    paths.researchEvidenceSqlite,
     paths.automationState,
     paths.reportsRoot,
   ];
@@ -686,6 +690,7 @@ async function buildStoreInventory(
     descriptor("feedback_sqlite", paths.feedbackSqlite, "stores/sqlite/tester-feedback.sqlite", "sqlite", true),
     descriptor("ai_queue_cache_sqlite", paths.aiQueueSqlite, "stores/sqlite/ai-analysis-queue.sqlite", "sqlite", true),
     descriptor("user_workspace_sqlite", paths.userWorkspaceSqlite, "stores/sqlite/user-workspace.sqlite", "sqlite", true),
+    descriptor("research_evidence_sqlite", paths.researchEvidenceSqlite, "stores/sqlite/research-evidence.sqlite", "sqlite", true),
     descriptor("central_automation_state", paths.automationState, "stores/automation/automation-state.json", "json", true),
   ];
   for (const config of paths.safeConfigFiles) {
@@ -846,6 +851,7 @@ async function assertRestoreManifestComplete(
     "feedback_sqlite",
     "ai_queue_cache_sqlite",
     "user_workspace_sqlite",
+    "research_evidence_sqlite",
     "central_automation_state",
     "runtime_policy_config",
     "established_discovery_query_plan",
@@ -914,6 +920,7 @@ async function mapManifestToTargets(manifest: ProductBackupManifest, paths: Prod
     feedback_sqlite: paths.feedbackSqlite,
     ai_queue_cache_sqlite: paths.aiQueueSqlite,
     user_workspace_sqlite: paths.userWorkspaceSqlite,
+    research_evidence_sqlite: paths.researchEvidenceSqlite,
     central_automation_state: paths.automationState,
     central_run_once_receipt: paths.runOnceReceipt,
   };
@@ -1006,7 +1013,7 @@ function groupTargetMappings(
   const priority = [
     "active_scanner_snapshot", "active_context_snapshot", "follow_up_store", "follow_up_backup",
     "established_universe_store", "established_address_config", "feedback_sqlite",
-    "ai_queue_cache_sqlite", "user_workspace_sqlite", "new_inbox_store", "lifecycle_audit_store", "lifecycle_cycle_receipt", "lifecycle_operation_journal", "reports_library", "runtime_policy_config",
+    "ai_queue_cache_sqlite", "user_workspace_sqlite", "research_evidence_sqlite", "new_inbox_store", "lifecycle_audit_store", "lifecycle_cycle_receipt", "lifecycle_operation_journal", "reports_library", "runtime_policy_config",
     "established_discovery_query_plan", "data_source_registry", "central_run_once_receipt",
     "central_automation_state",
   ];
@@ -1018,7 +1025,7 @@ async function publishGroup(group: PublishGroup, operation: ProductRecoveryOpera
   for (const file of group.files) if (await exists(file.targetPath)) existing = true;
   const log = { logical_store_id: group.logicalStoreId, target_existed: existing, published: false, rolled_back: false };
   operation.publication_log.push(log);
-  if (group.logicalStoreId === "feedback_sqlite" || group.logicalStoreId === "ai_queue_cache_sqlite" || group.logicalStoreId === "user_workspace_sqlite") {
+  if (group.logicalStoreId === "feedback_sqlite" || group.logicalStoreId === "ai_queue_cache_sqlite" || group.logicalStoreId === "user_workspace_sqlite" || group.logicalStoreId === "research_evidence_sqlite") {
     for (const file of group.files) await quiesceAndPreserveSqliteSidecars(file.targetPath, file.previousPath);
   }
   for (const file of group.files) {
@@ -1180,6 +1187,10 @@ async function assertSqliteLogicalSchema(path: string, logicalStoreId: string): 
       || !tables.has("user_workspace_audit")
       || !tables.has("user_workspace_meta")
     )) throw new ProductRecoveryError("USER_WORKSPACE_SQLITE_SCHEMA_INVALID");
+    if (logicalStoreId === "research_evidence_sqlite" && (
+      !tables.has("research_evidence")
+      || !tables.has("research_evidence_meta")
+    )) throw new ProductRecoveryError("RESEARCH_EVIDENCE_SQLITE_SCHEMA_INVALID");
   } finally {
     database.close();
   }

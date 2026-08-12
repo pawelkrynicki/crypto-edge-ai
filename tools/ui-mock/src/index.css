@@ -782,6 +782,77 @@
 .contract-line { display: flex; align-items: center; gap: 7px; min-width: 0; margin-top: 7px; }
 .contract-line code,
 .verification-contract code { min-width: 0; max-width: 100%; overflow: hidden; color: var(--text-secondary); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+
+/* PC.3A research playbook: compact in Summary, detailed within accepted drawer tabs. */
+.research-checklist-summary,
+.research-checklist-detail,
+.research-manual-evidence {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface) 92%, var(--accent) 8%);
+}
+.research-checklist-summary { padding: 13px 14px; }
+.research-checklist-summary header,
+.research-checklist-heading,
+.research-checklist-step > header,
+.research-manual-evidence > header,
+.research-manual-editor-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.research-checklist-summary header span,
+.research-checklist-heading span,
+.research-checklist-step > header span,
+.research-manual-evidence > header > span { color: var(--text-secondary); font-size: 10px; font-weight: 800; letter-spacing: .08em; }
+.research-checklist-summary header strong { color: var(--text-primary); font-size: 13px; }
+.research-checklist-summary > p { margin: 10px 0 8px; color: var(--text-secondary); font-size: 12px; }
+.research-checklist-summary ol { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; padding: 0; margin: 0; list-style: none; }
+.research-checklist-summary li { display: grid; gap: 5px; padding: 7px; border-left: 2px solid var(--border); color: var(--text-secondary); font-size: 10px; }
+.research-checklist-summary li.current { border-left-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--text-primary); }
+.research-state { display: inline-flex; align-items: center; width: fit-content; border: 1px solid var(--border); border-radius: 999px; padding: 3px 7px; color: var(--text-secondary); font-size: 10px; font-weight: 700; line-height: 1.1; }
+.research-state.compact { font-size: 9px; padding: 2px 5px; }
+.research-state.auto_verified, .research-state.manual_verified { border-color: color-mix(in srgb, var(--success) 60%, var(--border)); color: var(--success); }
+.research-state.red_flag { border-color: color-mix(in srgb, var(--danger) 60%, var(--border)); color: var(--danger); }
+.research-state.missing_data, .research-state.open_external_tool { border-color: color-mix(in srgb, var(--warning) 60%, var(--border)); color: var(--warning); }
+.research-checklist-detail { display: grid; gap: 14px; margin-top: 14px; padding: 14px; }
+.research-checklist-heading h3, .research-manual-evidence h3 { margin: 3px 0 4px; color: var(--text-primary); font-size: 15px; }
+.research-checklist-heading p, .research-manual-evidence > header p { max-width: 600px; margin: 0; color: var(--text-secondary); font-size: 12px; line-height: 1.5; }
+.research-progress { min-width: 126px; text-align: right; }
+.research-progress span { display: block; font-size: 9px; }
+.research-progress strong { color: var(--text-primary); font-size: 16px; }
+.research-progress > div { height: 5px; overflow: hidden; margin-top: 5px; border-radius: 999px; background: var(--border); }
+.research-progress i { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
+.research-checklist-steps { display: grid; gap: 10px; }
+.research-checklist-step { border: 1px solid var(--border); border-radius: 10px; padding: 11px; }
+.research-checklist-step.current { border-color: color-mix(in srgb, var(--accent) 65%, var(--border)); }
+.research-checklist-step h4, .research-manual-step h4 { margin: 2px 0 0; color: var(--text-primary); font-size: 13px; }
+.research-checklist-items { display: grid; gap: 7px; margin-top: 10px; }
+.research-checklist-item { display: grid; grid-template-columns: minmax(0, 1fr) minmax(180px, .65fr); gap: 10px; padding: 9px; border-radius: 8px; background: color-mix(in srgb, var(--surface) 88%, var(--border) 12%); }
+.research-checklist-item > div:first-child { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 5px 9px; }
+.research-checklist-item strong { color: var(--text-primary); font-size: 12px; }
+.research-checklist-item p, .research-checklist-item small { grid-column: 1 / -1; margin: 0; color: var(--text-secondary); font-size: 11px; line-height: 1.35; }
+.research-manual-note { display: grid; gap: 4px; padding-left: 10px; border-left: 2px solid var(--accent); }
+.research-manual-note span { color: var(--text-secondary); font-size: 9px; font-weight: 700; text-transform: uppercase; }
+.research-manual-note p, .research-manual-note small { margin: 0; color: var(--text-secondary); font-size: 11px; }
+.research-manual-note a { font-size: 11px; }
+.research-manual-evidence { display: grid; gap: 12px; margin-top: 14px; padding: 14px; }
+.research-manual-step { display: grid; gap: 7px; }
+.research-manual-editor { border: 1px solid var(--border); border-radius: 9px; padding: 9px; }
+.research-manual-editor-heading > div { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.research-manual-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; margin-top: 10px; }
+.research-manual-form label { display: grid; gap: 4px; color: var(--text-secondary); font-size: 10px; }
+.research-manual-form input, .research-manual-form select, .research-manual-form textarea { width: 100%; min-width: 0; border: 1px solid var(--border); border-radius: 6px; padding: 7px; color: var(--text-primary); background: var(--surface); font: inherit; }
+.research-manual-form textarea { resize: vertical; }
+.research-manual-actions { display: flex; align-items: end; gap: 8px; grid-column: 1 / -1; }
+.research-empty { margin: 0; color: var(--text-secondary); font-size: 12px; }
+@media (max-width: 1100px) {
+  .research-checklist-summary ol { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 720px) {
+  .research-checklist-summary ol { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .research-checklist-heading, .research-checklist-step > header, .research-manual-evidence > header { align-items: start; flex-direction: column; }
+  .research-progress { width: 100%; text-align: left; }
+  .research-checklist-item { grid-template-columns: 1fr; }
+  .research-manual-note { padding: 8px 0 0; border-top: 2px solid var(--accent); border-left: 0; }
+  .research-manual-form { grid-template-columns: 1fr; }
+}
 .contract-line button,
 .verification-contract button,
 .product-detail-field button { flex: 0 0 auto; color: var(--accent); font-size: 9px; font-weight: 700; }
