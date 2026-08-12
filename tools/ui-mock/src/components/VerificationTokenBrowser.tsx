@@ -7,6 +7,7 @@ import { isSameTokenIdentity } from "../tokenLifecycle";
 import type { UiTokenCandidate } from "../types/scannerTypes";
 import type { FollowUpPublicEntry } from "../types/followUpTypes";
 import type { ManualVerificationRecord } from "../services/manualOwnerActionsDataSource";
+import type { ResearchStepNumber } from "../researchChecklistTypes";
 import { ExternalVerificationLinksView } from "./ExternalVerificationLinksView";
 
 type VerificationTokenBrowserProps = {
@@ -19,6 +20,8 @@ type VerificationTokenBrowserProps = {
   onOpenResearchBrief?: () => void;
   onVerificationSaved?: (record: ManualVerificationRecord) => void;
   onReturnToDetail?: () => void;
+  onBackToResearchPlaybook?: () => void;
+  focusedResearchStep?: ResearchStepNumber | null;
 };
 
 type VerificationListToken =
@@ -39,6 +42,8 @@ export function VerificationTokenBrowser({
   onOpenResearchBrief,
   onVerificationSaved,
   onReturnToDetail,
+  onBackToResearchPlaybook,
+  focusedResearchStep = null,
 }: VerificationTokenBrowserProps) {
   const { locale } = useProductLocale();
   const tokens = useMemo<VerificationListToken[]>(() => {
@@ -103,13 +108,15 @@ export function VerificationTokenBrowser({
       <div className="verification-token-drawer-region" aria-live="polite">
         {selectedCandidate || selectedFollowUp ? (
           <ExternalVerificationLinksView
-            key={`${selectedCandidate?.chain ?? selectedFollowUp?.chain}:${selectedCandidate?.contractAddress ?? selectedFollowUp?.contract_address}`}
+            key={`${selectedCandidate?.chain ?? selectedFollowUp?.chain}:${selectedCandidate?.contractAddress ?? selectedFollowUp?.contract_address}:${focusedResearchStep ?? "none"}`}
             candidate={selectedCandidate}
             followUp={selectedFollowUp}
             onClose={onCloseToken}
             onOpenResearchBrief={onOpenResearchBrief}
             onVerificationSaved={onVerificationSaved}
             onReturnToDetail={onReturnToDetail}
+            onBackToResearchPlaybook={onBackToResearchPlaybook}
+            focusedResearchStep={focusedResearchStep}
           />
         ) : (
           <section className="verification-token-drawer-placeholder" aria-label={locale === "pl" ? "Wybór tokena do weryfikacji" : "Verification token selection"}>

@@ -5,6 +5,8 @@ void React; // Required by the Node TSX test runtime's classic JSX transform.
 import type { CandidateDetailTabId } from "./candidateDetailTabs";
 import {
   resolveDetailTab,
+  resolveResearchChecklistStep,
+  resolveResearchPlaybookFocus,
   resolveRouteTokenIdentity,
   writeCandidateDetailRoute,
   writeVerificationListRoute,
@@ -72,6 +74,7 @@ import {
   resolveProductScannerRefreshState,
 } from "./productRefreshState";
 import type { ManualVerificationRecord } from "./services/manualOwnerActionsDataSource";
+import type { ResearchStepNumber } from "./researchChecklistTypes";
 
 export {
   getAcceptedProductRefreshTimestamps,
@@ -195,6 +198,8 @@ export function ProductAppContent({
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
   const [routeTokenIdentity, setRouteTokenIdentity] = useState<RouteTokenIdentity | null>(() => resolveRouteTokenIdentity());
   const [activeDetailTab, setActiveDetailTab] = useState<CandidateDetailTabId>(() => resolveDetailTab());
+  const [focusedResearchStep, setFocusedResearchStep] = useState<ResearchStepNumber | null>(() => resolveResearchChecklistStep());
+  const [focusResearchPlaybook, setFocusResearchPlaybook] = useState(() => resolveResearchPlaybookFocus());
   const [followUpStatus, setFollowUpStatus] = useState<FollowUpPublicStatus | null>(null);
   const [preferredLifecycleBasket, setPreferredLifecycleBasket] = useState<RadarBasketId | null>(null);
   const [reviewAutoUpdatePublished, setReviewAutoUpdatePublished] = useState(false);
@@ -523,11 +528,14 @@ export function ProductAppContent({
 
   useEffect(() => {
     const handleRouteChange = () => {
-      setActiveSection(resolveSection());
+      const section = resolveSection();
+      setActiveSection(section);
       const identity = resolveRouteTokenIdentity();
       routeTokenIdentityRef.current = identity;
       setRouteTokenIdentity(identity);
       setActiveDetailTab(resolveDetailTab());
+      setFocusedResearchStep(section === "external-checks" ? resolveResearchChecklistStep() : null);
+      setFocusResearchPlaybook(section === "candidate-detail" && resolveResearchPlaybookFocus());
     };
     const handleHashChange = () => handleRouteChange();
     const handlePopState = () => handleRouteChange();
@@ -541,6 +549,8 @@ export function ProductAppContent({
 
   const navigate = useCallback((section: ProductSectionId) => {
     setActiveSection(section);
+    if (section !== "candidate-detail") setFocusResearchPlaybook(false);
+    if (section !== "external-checks") setFocusedResearchStep(null);
     if (window.location.hash !== SECTION_TO_HASH[section]) {
       window.location.hash = SECTION_TO_HASH[section];
     }
@@ -568,6 +578,8 @@ export function ProductAppContent({
     setSelectedCandidateId(candidateId);
     setManualVerificationRecord(null);
     setActiveDetailTab("summary");
+    setFocusedResearchStep(null);
+    setFocusResearchPlaybook(false);
     if (candidate) {
       const identity = { chain: candidate.chain, contract_address: candidate.contractAddress };
       routeTokenIdentityRef.current = identity;
@@ -586,6 +598,8 @@ export function ProductAppContent({
     setSelectedCandidateId(null);
     setManualVerificationRecord(null);
     setActiveDetailTab("summary");
+    setFocusedResearchStep(null);
+    setFocusResearchPlaybook(false);
     routeTokenIdentityRef.current = identity;
     setRouteTokenIdentity(identity);
     writeCandidateDetailRoute(identity, "summary");
@@ -604,6 +618,8 @@ export function ProductAppContent({
     setManualVerificationRecord(null);
     setSelectedCandidateId(matchingCandidate?.id ?? null);
     setActiveDetailTab("summary");
+    setFocusedResearchStep(null);
+    setFocusResearchPlaybook(false);
     if (entry) {
       const identity = { chain: entry.chain, contract_address: entry.contract_address };
       routeTokenIdentityRef.current = identity;
@@ -617,6 +633,8 @@ export function ProductAppContent({
 
   const changeDetailTab = useCallback((tab: CandidateDetailTabId) => {
     setActiveDetailTab(tab);
+    setFocusedResearchStep(null);
+    setFocusResearchPlaybook(false);
     const identity = selectedCandidate
       ? { chain: selectedCandidate.chain, contract_address: selectedCandidate.contractAddress }
       : selectedFollowUp
@@ -630,7 +648,7 @@ export function ProductAppContent({
     }
   }, [routeTokenIdentity, selectedCandidate, selectedFollowUp]);
 
-  const openVerification = useCallback((token: UiTokenCandidate | FollowUpPublicEntry) => {
+  const openVerification = useCallback((token: UiTokenCandidate | FollowUpPublicEntry, researchStep: ResearchStepNumber | null = null) => {
     const isFollowUp = "entry_id" in token;
     const identity = isFollowUp
       ? { chain: token.chain, contract_address: token.contract_address }
@@ -642,9 +660,11 @@ export function ProductAppContent({
       setSelectedCandidateId(token.id);
     }
     setManualVerificationRecord(null);
+    setFocusedResearchStep(researchStep);
+    setFocusResearchPlaybook(false);
     routeTokenIdentityRef.current = identity;
     setRouteTokenIdentity(identity);
-    writeVerificationRoute(identity);
+    writeVerificationRoute(identity, researchStep);
     setActiveSection("external-checks");
   }, []);
 
@@ -655,6 +675,8 @@ export function ProductAppContent({
   const closeVerification = useCallback(() => {
     routeTokenIdentityRef.current = null;
     setRouteTokenIdentity(null);
+    setFocusedResearchStep(null);
+    setFocusResearchPlaybook(false);
     writeVerificationListRoute();
     setActiveSection("external-checks");
   }, []);
@@ -670,7 +692,26 @@ export function ProductAppContent({
     routeTokenIdentityRef.current = identity;
     setRouteTokenIdentity(identity);
     setActiveDetailTab("security");
+    setFocusedResearchStep(null);
+    setFocusResearchPlaybook(false);
     writeCandidateDetailRoute(identity, "security");
+    setActiveSection("candidate-detail");
+  }, [routeTokenIdentity, verificationCandidate, verificationFollowUp]);
+
+  const returnToResearchPlaybook = useCallback(() => {
+    const identity = routeTokenIdentity
+      ?? (verificationCandidate
+        ? { chain: verificationCandidate.chain, contract_address: verificationCandidate.contractAddress }
+        : verificationFollowUp
+          ? { chain: verificationFollowUp.chain, contract_address: verificationFollowUp.contract_address }
+          : null);
+    if (!identity) return;
+    routeTokenIdentityRef.current = identity;
+    setRouteTokenIdentity(identity);
+    setActiveDetailTab("summary");
+    setFocusedResearchStep(null);
+    setFocusResearchPlaybook(true);
+    writeCandidateDetailRoute(identity, "summary", true);
     setActiveSection("candidate-detail");
   }, [routeTokenIdentity, verificationCandidate, verificationFollowUp]);
 
@@ -754,12 +795,14 @@ export function ProductAppContent({
             followUpStatus={followUpStatus}
             onBackToResults={() => navigate("candidate-results")}
             onOpenExternalChecks={openVerification}
+            onOpenResearchChecklistStep={(candidate, step) => openVerification(candidate, step)}
             onOpenFollowUpExternalChecks={openVerification}
             onOpenControlCenter={() => navigate("control-center")}
             initialManualVerification={manualVerificationRecord}
             onLifecycleChanged={refreshLifecycleRadar}
             activeTab={activeDetailTab}
             onActiveTabChange={changeDetailTab}
+            focusResearchPlaybook={focusResearchPlaybook}
           />
         </ProductWorkspaceSection>
       );
@@ -778,6 +821,8 @@ export function ProductAppContent({
             onOpenResearchBrief={() => changeDetailTab("ai")}
             onVerificationSaved={saveVerificationInPlace}
             onReturnToDetail={openDetailFromVerification}
+            onBackToResearchPlaybook={returnToResearchPlaybook}
+            focusedResearchStep={focusedResearchStep}
           />
         </ProductWorkspaceSection>
       );

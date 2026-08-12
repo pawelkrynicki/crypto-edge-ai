@@ -104,6 +104,22 @@ import type { LifecycleCycleReceipt } from "../../data-poc/src/systemLifecycle.j
 import { createLifecycleService, LifecycleServiceError, parseRadarCursor } from "./lifecycleService.js";
 import { createPc1SessionContextService } from "./lifecycleSession.js";
 import { getDefaultUserWorkspaceDatabasePath, type UserWorkspaceRepository } from "./userWorkspaceRepository.js";
+import {
+  createResearchEvidenceRepository,
+  ResearchEvidenceError,
+  type ResearchEvidenceRepository,
+} from "./researchEvidenceRepository.js";
+import { resolveResearchChecklist } from "../src/researchChecklistResolver.js";
+import {
+  isPersistedManualResearchState,
+  isResearchChecklistItemKey,
+  type PersistedManualResearchState,
+  type ResearchChecklistItemKey,
+  type ResearchStepNumber,
+} from "../src/researchChecklistTypes.js";
+import { resolveTokenIdentity } from "../src/tokenLifecycle.js";
+import { mapPersistableScannerOutputToUiCandidates } from "../src/adapters/scannerOutputAdapter.js";
+import type { PersistableScannerOutput, UiTokenCandidate } from "../src/types/scannerTypes.js";
 
 const DEMO_CORS_ORIGINS = new Set(["http://127.0.0.1:5173", "http://localhost:5173"]);
 
@@ -136,6 +152,10 @@ export type ScannerApiHandlerOptions = {
     cycleReceiptPath?: string;
     workspaceDatabasePath?: string;
     workspace?: UserWorkspaceRepository;
+  };
+  researchEvidence?: {
+    databaseFilePath?: string;
+    repository?: ResearchEvidenceRepository;
   };
   feedback?: FeedbackStoreOptions & {
     store?: FeedbackStore;
@@ -258,6 +278,8 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
     workspace: options.lifecycle?.workspace,
     workspaceDatabasePath: options.lifecycle?.workspaceDatabasePath ?? getDefaultUserWorkspaceDatabasePath(),
   });
+  const researchEvidenceRepository = options.researchEvidence?.repository
+    ?? awaitResearchEvidenceRepository(options.researchEvidence?.databaseFilePath);
 
   return async (req, res) => {
     const path = getRequestPath(req.url);
@@ -282,6 +304,79 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
       const session = pc1Sessions.setReviewRole("OWNER");
       res.setHeader("set-cookie", session.setCookie);
       sendJson(req, res, 200, { actor: { role: session.context.role, capabilities: session.context.capabilities } }, runtimeMode);
+      return;
+    }
+
+    if (req.method === "GET" && path === "/api/research-checklist") {
+      try {
+        const session = pc1Sessions.resolve(req);
+        if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
+        const query = validateResearchChecklistQuery(req.url);
+        const candidate = await resolveResearchChecklistCandidate(query.chain, query.contract_address, scannerOptions);
+        const evidence = (await researchEvidenceRepository).list(session.context.actor_id, query.chain, query.contract_address);
+        sendJson(req, res, 200, {
+          ...resolveResearchChecklist(candidate, evidence),
+          manual_evidence_writable: session.context.capabilities.includes("CAMP_USER_WORKSPACE_WRITE"),
+        }, runtimeMode);
+      } catch (error) {
+        sendResearchChecklistError(req, res, error, runtimeMode);
+      }
+      return;
+    }
+
+    if (req.method === "PUT" && path === "/api/research-evidence") {
+      try {
+        requireResearchEvidenceMutationRequest(req);
+        const session = pc1Sessions.resolve(req);
+        if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
+        if (!session.context.capabilities.includes("CAMP_USER_WORKSPACE_WRITE")) throw new ResearchChecklistRequestError("FORBIDDEN", 403);
+        const body = validateResearchEvidenceWriteBody(await readResearchEvidenceJsonBody(req));
+        await resolveResearchChecklistCandidate(body.chain, body.contract_address, scannerOptions);
+        const evidence = (await researchEvidenceRepository).upsert({
+          actorId: session.context.actor_id,
+          chain: body.chain,
+          contractAddress: body.contract_address,
+          stepNumber: body.step_number,
+          itemKey: body.item_key,
+          manualState: body.manual_state,
+          valueText: body.value_text,
+          valueNumber: body.value_number,
+          note: body.note,
+          sourceTool: body.source_tool,
+          evidenceUrl: body.evidence_url,
+          observedAt: body.observed_at,
+        });
+        sendJson(req, res, 200, { schema_version: "research_evidence_write_v1", evidence }, runtimeMode);
+      } catch (error) {
+        sendResearchChecklistError(req, res, error, runtimeMode);
+      }
+      return;
+    }
+
+    if (req.method === "DELETE" && path === "/api/research-evidence") {
+      try {
+        requireResearchEvidenceMutationRequest(req);
+        const session = pc1Sessions.resolve(req);
+        if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
+        if (!session.context.capabilities.includes("CAMP_USER_WORKSPACE_WRITE")) throw new ResearchChecklistRequestError("FORBIDDEN", 403);
+        const body = validateResearchEvidenceDeleteBody(await readResearchEvidenceJsonBody(req));
+        const deleted = (await researchEvidenceRepository).delete({
+          actorId: session.context.actor_id,
+          chain: body.chain,
+          contractAddress: body.contract_address,
+          stepNumber: body.step_number,
+          itemKey: body.item_key,
+        });
+        sendJson(req, res, 200, { schema_version: "research_evidence_delete_v1", deleted }, runtimeMode);
+      } catch (error) {
+        sendResearchChecklistError(req, res, error, runtimeMode);
+      }
+      return;
+    }
+
+    if (path === "/api/research-checklist" || path === "/api/research-evidence") {
+      res.setHeader("allow", path === "/api/research-checklist" ? "GET" : "PUT, DELETE");
+      sendJson(req, res, 405, { error: "method_not_allowed", message: "Method not allowed" }, runtimeMode);
       return;
     }
 
@@ -1182,12 +1277,189 @@ function responseHeaders(req: IncomingMessage, runtimeMode: ResolvedProductRunti
 
   if (runtimeMode === "DEVELOPMENT_DEMO" && origin && DEMO_CORS_ORIGINS.has(origin)) {
     headers["access-control-allow-origin"] = origin;
-    headers["access-control-allow-methods"] = "GET, PUT, OPTIONS";
+    headers["access-control-allow-methods"] = "GET, PUT, DELETE, OPTIONS";
     headers["access-control-allow-headers"] = "content-type";
     headers.vary = "Origin";
   }
 
   return headers;
+}
+
+class ResearchChecklistRequestError extends Error {
+  readonly code: "REQUEST_INVALID" | "NOT_FOUND" | "FORBIDDEN" | "UNAVAILABLE";
+  readonly httpStatus: 400 | 403 | 404 | 503;
+  constructor(code: "REQUEST_INVALID" | "NOT_FOUND" | "FORBIDDEN" | "UNAVAILABLE", httpStatus: 400 | 403 | 404 | 503) {
+    super(code);
+    this.name = "ResearchChecklistRequestError";
+    this.code = code;
+    this.httpStatus = httpStatus;
+  }
+}
+
+function awaitResearchEvidenceRepository(databaseFilePath: string | undefined): Promise<ResearchEvidenceRepository> {
+  return createResearchEvidenceRepository(databaseFilePath ? { databaseFilePath } : {});
+}
+
+function sendResearchChecklistError(
+  req: IncomingMessage,
+  res: ServerResponse,
+  error: unknown,
+  runtimeMode: ResolvedProductRuntimeMode,
+): void {
+  const status = error instanceof ResearchChecklistRequestError
+    ? error.httpStatus
+    : error instanceof ResearchEvidenceError && error.code === "RESEARCH_EVIDENCE_UNAVAILABLE"
+      ? 503
+      : error instanceof ResearchEvidenceError
+        ? 400
+        : 503;
+  const publicError = status === 403 ? "forbidden" : status === 404 ? "not_found" : status === 503 ? "research_unavailable" : "research_request_invalid";
+  const message = status === 403
+    ? "Research evidence write is not permitted"
+    : status === 404
+      ? "Research checklist is unavailable for this token"
+      : status === 503
+        ? "Research checklist is temporarily unavailable"
+        : "Research checklist request is invalid";
+  sendJson(req, res, status, { error: publicError, message }, runtimeMode);
+}
+
+function requireResearchEvidenceMutationRequest(req: IncomingMessage): void {
+  const contentType = req.headers["content-type"];
+  if (typeof contentType !== "string" || !/^application\/json(?:\s*;\s*charset=utf-8)?$/i.test(contentType.trim())) {
+    throw new ResearchChecklistRequestError("REQUEST_INVALID", 400);
+  }
+  const host = req.headers.host;
+  const origin = req.headers.origin;
+  if (typeof host !== "string" || typeof origin !== "string" || origin.toLowerCase() !== `http://${host}`.toLowerCase()) {
+    throw new ResearchChecklistRequestError("FORBIDDEN", 403);
+  }
+}
+
+function validateResearchChecklistQuery(url: string | undefined): { chain: string; contract_address: string } {
+  let parsed: URL;
+  try { parsed = new URL(url ?? "/", "http://research.local"); } catch { throw new ResearchChecklistRequestError("REQUEST_INVALID", 400); }
+  const keys = [...parsed.searchParams.keys()].sort();
+  if (keys.length !== 2 || keys[0] !== "chain" || keys[1] !== "contract_address"
+    || parsed.searchParams.getAll("chain").length !== 1 || parsed.searchParams.getAll("contract_address").length !== 1) {
+    throw new ResearchChecklistRequestError("REQUEST_INVALID", 400);
+  }
+  const chain = parsed.searchParams.get("chain");
+  const contractAddress = parsed.searchParams.get("contract_address");
+  if (!chain || !contractAddress) throw new ResearchChecklistRequestError("REQUEST_INVALID", 400);
+  const identity = resolveTokenIdentity(chain, contractAddress);
+  if (identity.status !== "valid") throw new ResearchChecklistRequestError("REQUEST_INVALID", 400);
+  return { chain: identity.chain, contract_address: identity.contract_address };
+}
+
+function validateResearchEvidenceWriteBody(value: unknown): {
+  chain: string;
+  contract_address: string;
+  step_number: ResearchStepNumber;
+  item_key: ResearchChecklistItemKey;
+  manual_state: PersistedManualResearchState;
+  value_text: string | null;
+  value_number: number | null;
+  note: string | null;
+  source_tool: string | null;
+  evidence_url: string | null;
+  observed_at: string | null;
+} {
+  if (!isRecord(value)) throw new ResearchChecklistRequestError("REQUEST_INVALID", 400);
+  const allowed = new Set(["chain", "contract_address", "step_number", "item_key", "manual_state", "value_text", "value_number", "note", "source_tool", "evidence_url", "observed_at"]);
+  const keys = Object.keys(value);
+  if (!keys.every((key) => allowed.has(key))
+    || !["chain", "contract_address", "step_number", "item_key", "manual_state"].every((key) => keys.includes(key))) {
+    throw new ResearchChecklistRequestError("REQUEST_INVALID", 400);
+  }
+  const identity = identityFromResearchBody(value.chain, value.contract_address);
+  if (!isResearchStep(value.step_number) || !isResearchChecklistItemKey(value.item_key) || !isPersistedManualResearchState(value.manual_state)) {
+    throw new ResearchChecklistRequestError("REQUEST_INVALID", 400);
+  }
+  return {
+    ...identity,
+    step_number: value.step_number,
+    item_key: value.item_key,
+    manual_state: value.manual_state,
+    value_text: nullableResearchText(value.value_text, 1_000),
+    value_number: nullableResearchNumber(value.value_number),
+    note: nullableResearchText(value.note, 1_000),
+    source_tool: nullableResearchText(value.source_tool, 120),
+    evidence_url: nullableResearchText(value.evidence_url, 2_048),
+    observed_at: nullableResearchTimestamp(value.observed_at),
+  };
+}
+
+function validateResearchEvidenceDeleteBody(value: unknown): {
+  chain: string;
+  contract_address: string;
+  step_number: ResearchStepNumber;
+  item_key: ResearchChecklistItemKey;
+} {
+  if (!isRecord(value) || Object.keys(value).length !== 4
+    || !["chain", "contract_address", "step_number", "item_key"].every((key) => Object.prototype.hasOwnProperty.call(value, key))) {
+    throw new ResearchChecklistRequestError("REQUEST_INVALID", 400);
+  }
+  const identity = identityFromResearchBody(value.chain, value.contract_address);
+  if (!isResearchStep(value.step_number) || !isResearchChecklistItemKey(value.item_key)) throw new ResearchChecklistRequestError("REQUEST_INVALID", 400);
+  return { ...identity, step_number: value.step_number, item_key: value.item_key };
+}
+
+function identityFromResearchBody(chain: unknown, contractAddress: unknown): { chain: string; contract_address: string } {
+  if (typeof chain !== "string" || typeof contractAddress !== "string") throw new ResearchChecklistRequestError("REQUEST_INVALID", 400);
+  const identity = resolveTokenIdentity(chain, contractAddress);
+  if (identity.status !== "valid") throw new ResearchChecklistRequestError("REQUEST_INVALID", 400);
+  return { chain: identity.chain, contract_address: identity.contract_address };
+}
+
+function isResearchStep(value: unknown): value is ResearchStepNumber {
+  return value === 1 || value === 2 || value === 3 || value === 4 || value === 5 || value === 6 || value === 7;
+}
+
+function nullableResearchText(value: unknown, limit: number): string | null {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== "string" || value.trim().length > limit) throw new ResearchChecklistRequestError("REQUEST_INVALID", 400);
+  return value.trim() || null;
+}
+
+function nullableResearchNumber(value: unknown): number | null {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== "number" || !Number.isFinite(value)) throw new ResearchChecklistRequestError("REQUEST_INVALID", 400);
+  return value;
+}
+
+function nullableResearchTimestamp(value: unknown): string | null {
+  if (value === undefined || value === null || value === "") return null;
+  if (typeof value !== "string" || !Number.isFinite(Date.parse(value))) throw new ResearchChecklistRequestError("REQUEST_INVALID", 400);
+  return new Date(value).toISOString();
+}
+
+async function readResearchEvidenceJsonBody(req: IncomingMessage): Promise<unknown> {
+  const chunks: Buffer[] = [];
+  let totalBytes = 0;
+  for await (const chunk of req) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    totalBytes += buffer.length;
+    if (totalBytes > 8_192) throw new ResearchChecklistRequestError("REQUEST_INVALID", 400);
+    chunks.push(buffer);
+  }
+  try { return JSON.parse(Buffer.concat(chunks).toString("utf8")) as unknown; } catch { throw new ResearchChecklistRequestError("REQUEST_INVALID", 400); }
+}
+
+async function resolveResearchChecklistCandidate(
+  chain: string,
+  contractAddress: string,
+  scannerOptions: LatestScannerOutputOptions,
+): Promise<UiTokenCandidate> {
+  const identity = resolveTokenIdentity(chain, contractAddress);
+  if (identity.status !== "valid") throw new ResearchChecklistRequestError("REQUEST_INVALID", 400);
+  const scanner = await readLatestScannerOutput(scannerOptions);
+  const candidate = mapPersistableScannerOutputToUiCandidates(scanner as unknown as PersistableScannerOutput).find((entry) => {
+    const entryIdentity = resolveTokenIdentity(entry.chain, entry.contractAddress);
+    return entryIdentity.status === "valid" && entryIdentity.key === identity.key;
+  });
+  if (!candidate) throw new ResearchChecklistRequestError("NOT_FOUND", 404);
+  return candidate;
 }
 
 function isCorsOriginDenied(req: IncomingMessage, runtimeMode: ResolvedProductRuntimeMode): boolean {

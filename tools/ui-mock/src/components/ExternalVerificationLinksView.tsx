@@ -19,6 +19,7 @@ import { resolveProductSecurityState, type ProductSecurityState } from "../produ
 import { manualVerificationVerdictLabel } from "../manualVerificationVerdictLabel";
 import type { UiTokenCandidate } from "../types/scannerTypes";
 import type { FollowUpPublicEntry } from "../types/followUpTypes";
+import type { ResearchStepNumber } from "../researchChecklistTypes";
 import {
   createManualVerificationPreview,
   loadManualVerificationOwnerStatus,
@@ -31,6 +32,7 @@ import {
 import { ActionButton, CopyButton, ExternalLinkAction } from "./ProductUi";
 import { TokenDetailDrawer } from "./TokenDetailDrawer";
 import { TokenDetailTabPanel, TokenDetailTabs } from "./TokenDetailTabs";
+import { ResearchChecklistDetail, ResearchManualEvidencePanel } from "./ResearchChecklist";
 
 const VERIFICATION_DRAWER_TAB_IDS = ["identity", "market", "filters", "security", "data", "decision"] as const;
 export type VerificationDrawerTabId = (typeof VERIFICATION_DRAWER_TAB_IDS)[number];
@@ -44,6 +46,10 @@ interface ExternalVerificationLinksViewProps {
   onClose?: () => void;
   /** Supports focused UI tests. A selected token always uses the identity tab. */
   initialActiveTab?: VerificationDrawerTabId;
+  /** A compact playbook navigation target in the existing Data and sources tab. */
+  focusedResearchStep?: ResearchStepNumber | null;
+  /** Returns from the focused checklist step to Candidate Detail > Summary. */
+  onBackToResearchPlaybook?: () => void;
 }
 
 export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksViewProps> = ({
@@ -54,13 +60,15 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
   onReturnToDetail,
   onClose,
   initialActiveTab = "identity",
+  focusedResearchStep = null,
+  onBackToResearchPlaybook,
 }) => {
   const { locale, t } = useProductLocale();
   const chain = candidate?.chain ?? followUp?.chain ?? "";
   const contractAddress = candidate?.contractAddress ?? followUp?.contract_address ?? "";
   const symbol = candidate?.symbol ?? followUp?.symbol ?? "";
   const displayName = candidate?.name ?? followUp?.display_name ?? "";
-  const [activeTab, setActiveTab] = useState<VerificationDrawerTabId>(initialActiveTab);
+  const [activeTab, setActiveTab] = useState<VerificationDrawerTabId>(focusedResearchStep ? "data" : initialActiveTab);
   const [ownerStatus, setOwnerStatus] = useState<ManualVerificationOwnerStatus | null>(null);
   const [verdict, setVerdict] = useState<ManualVerificationVerdict>("NEEDS_MORE_DATA");
   const [note, setNote] = useState("");
@@ -230,7 +238,9 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
       </VerificationSection>
     );
   } else if (activeTab === "data") {
-    activeContent = (
+    activeContent = focusedResearchStep && candidate ? (
+      <ResearchChecklistDetail candidate={candidate} focusedStep={focusedResearchStep} onBackToResearchPlaybook={onBackToResearchPlaybook} />
+    ) : (
       <VerificationSection heading={tabCopy.data} detail={locale === "pl" ? "Źródła są opisane i linkowane; otwarcie oraz zmiana zakładki nie wykonują połączeń do dostawców." : "Sources are described and linked; opening and switching tabs do not call providers."}>
         <div className="product-detail-grid data">
           <VerificationMetric label={locale === "pl" ? "Źródło danych rynkowych i filtrów" : "Market and filter source"} value={candidate ? formatProductSourceLabel(candidate.source) : "Follow-up"} />
@@ -238,6 +248,7 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
           <VerificationMetric label={locale === "pl" ? "Status źródła" : "Source status"} value={locale === "pl" ? "Migawka dostępna do ręcznej kontroli" : "Snapshot available for manual review"} />
           <VerificationMetric label={locale === "pl" ? "Źródła kontroli bezpieczeństwa" : "Security check sources"} value={securityResolution?.sources.map(formatProductSourceLabel).join(", ") || missingText} />
         </div>
+        {candidate && <ResearchChecklistDetail candidate={candidate} focusedStep={focusedResearchStep} onBackToResearchPlaybook={onBackToResearchPlaybook} />}
         <div className="external-checks-list">{targets.map((target) => <ExternalCheckCard key={target.id} target={target} />)}</div>
         {onOpenResearchBrief && <section className="verification-ai-research-action" aria-label={locale === "pl" ? "Analiza badawcza AI" : "AI Research Brief"}><div><strong>{locale === "pl" ? "Analiza badawcza AI" : "AI Research Brief"}</strong><p>{locale === "pl" ? "Analiza AI uzupełnia, ale nie zastępuje ręcznej weryfikacji." : "AI analysis complements but does not replace manual verification."}</p></div><ActionButton variant="secondary" icon="arrow" iconPosition="end" onClick={onOpenResearchBrief}>{locale === "pl" ? "Otwórz analizę AI" : "Open AI analysis"}</ActionButton></section>}
       </VerificationSection>
@@ -256,6 +267,7 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
   if (activeTab === "decision") {
     activeContent = (
       <VerificationDecision
+        candidate={candidate}
         locale={locale}
         lastDecision={lastDecision}
         verdict={verdict}
@@ -296,7 +308,7 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
       meta={<><span className="research-context-chip"><span>{t("verification.network")}</span><strong>{chain || missingText}</strong></span><span className="research-context-chip"><span>{t("verification.contractAddress")}</span><code>{contractAddress || missingText}</code></span></>}
       tabBar={<TokenDetailTabs tabs={VERIFICATION_DRAWER_TAB_IDS.map((id) => ({ id, label: tabCopy[id] }))} activeTab={activeTab} onChange={setActiveTab} idPrefix="verification" ariaLabel={locale === "pl" ? "Zakładki karty Weryfikacji" : "Verification drawer tabs"} />}
       bodyClassName="token-detail-drawer-body--tabbed"
-      className="verification-token-drawer"
+      className={`verification-token-drawer${focusedResearchStep ? " research-focus-drawer" : ""}`}
     >
       <TokenDetailTabPanel activeTab={activeTab} idPrefix="verification"><div className="external-checks-view product-verification verification-tab-content">{activeContent}</div></TokenDetailTabPanel>
     </TokenDetailDrawer>
@@ -304,6 +316,7 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
 };
 
 function VerificationDecision({
+  candidate,
   locale,
   lastDecision,
   verdict,
@@ -330,6 +343,7 @@ function VerificationDecision({
   onVerificationSaved,
   savedRecord,
 }: {
+  candidate: UiTokenCandidate | null | undefined;
   locale: ProductLocale;
   lastDecision: ManualVerificationRecord | null;
   verdict: ManualVerificationVerdict;
@@ -378,6 +392,8 @@ function VerificationDecision({
       <section className="verification-decision-impact"><strong>{pl ? "Podsumowanie skutków decyzji" : "Decision impact summary"}</strong><p>{decisionImpactCopy(verdict, locale)}</p></section>
 
       <section className="verification-decision-coverage"><div className="condition-list ready"><strong>{pl ? "Dostępne" : "Available"}</strong><ul>{availableData.map((item) => <li key={item}>{formatCoverageItem(item, locale)}</li>)}</ul></div><div className="condition-list warning"><strong>{pl ? "Brakujące" : "Missing"}</strong>{missingData.length > 0 ? <ul>{missingData.map((item) => <li key={item}>{formatCoverageItem(item, locale)}</li>)}</ul> : <p>{pl ? "Brak" : "None"}</p>}</div></section>
+
+      {candidate && <ResearchManualEvidencePanel candidate={candidate} />}
 
       {ownerStatus && <section className="owner-verification-decision" aria-labelledby="verification-decision-heading"><header><h3 id="verification-decision-heading">{pl ? "Potwierdzenie zapisu" : "Save confirmation"}</h3></header><ActionButton variant="primary" onClick={() => void onPrepare()} loading={preparing} disabled={note.trim().length < 3}>{pl ? "Zapisz decyzję" : "Save decision"}</ActionButton>{preview && <div className="owner-decision-confirmation"><p>{pl ? `Potwierdź dokładną tożsamość: ${expectedIdentity}` : `Confirm the exact identity: ${expectedIdentity}`}</p><input aria-label={pl ? "Potwierdzenie tożsamości" : "Identity confirmation"} value={identityConfirmation} onChange={(event) => onIdentityConfirmationChange(event.target.value)} autoComplete="off" /><label className="owner-confirmation"><input type="checkbox" checked={confirmed} onChange={(event) => onConfirmedChange(event.target.checked)} /><span>{pl ? "Potwierdzam werdykt i zapis w audycie." : "I confirm the verdict and audit record."}</span></label><ActionButton variant="primary" onClick={() => void onSave()} loading={saving} disabled={!canSave}>{pl ? "Zapisz status weryfikacji" : "Save verification status"}</ActionButton></div>}{saveError && <p role="alert">{pl ? "Nie zapisano decyzji. Przygotuj nowy zapis i spróbuj ponownie." : "The decision was not saved. Prepare a new save and try again."}</p>}</section>}
 

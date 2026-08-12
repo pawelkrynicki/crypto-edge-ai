@@ -16,6 +16,7 @@ import { createInitialAutomationState } from "../../data-poc/src/automation/auto
 import { createFeedbackStore } from "../server/feedbackStore.js";
 import { createAIAnalysisQueueStore } from "../server/aiResearchQueueStore.js";
 import { createUserWorkspaceRepository } from "../server/userWorkspaceRepository.js";
+import { createResearchEvidenceRepository } from "../server/researchEvidenceRepository.js";
 import type { ProductRecoveryPaths } from "../server/productRecovery.js";
 
 const FIXTURE_COMMIT_SHA = "738483d4d5fa267f70e3d87e6753c3a6cbae3461";
@@ -40,6 +41,7 @@ export function createIsolatedRecoveryPaths(root: string): ProductRecoveryPaths 
     feedbackSqlite: resolve(productRoot, "tools", "ui-mock", ".local", "tester-feedback.sqlite"),
     aiQueueSqlite: resolve(productRoot, "tools", "ui-mock", ".local", "ai-analysis-queue.sqlite"),
     userWorkspaceSqlite: resolve(productRoot, "tools", "ui-mock", ".local", "user-workspace.sqlite"),
+    researchEvidenceSqlite: resolve(productRoot, "tools", "ui-mock", ".local", "research-evidence.sqlite"),
     automationState: resolve(productRoot, "tools", "data-poc", ".local", "automation", "automation-state.json"),
     runOnceReceipt: resolve(productRoot, "tools", "data-poc", ".local", "data-cycle", "last-run-once.json"),
     reportsRoot: resolve(productRoot, "tools", "ui-mock", ".local", "reports"),
@@ -86,6 +88,8 @@ export async function seedIsolatedProductState(paths: ProductRecoveryPaths): Pro
   aiQueue.close();
   const workspace = await createUserWorkspaceRepository({ databaseFilePath: paths.userWorkspaceSqlite });
   workspace.close();
+  const researchEvidence = await createResearchEvidenceRepository({ databaseFilePath: paths.researchEvidenceSqlite });
+  researchEvidence.close();
 
   const automation = {
     ...createInitialAutomationState(),
