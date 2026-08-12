@@ -90,7 +90,10 @@ describe("Premium UI.1 presentation contract", () => {
   });
 
   it("keeps all Candidate Detail sections in one semantic tab panel and backend-gated owner controls", async () => {
-    const detail = await source("src/components/CandidateDetailView.tsx");
+    const [detail, tabs] = await Promise.all([
+      source("src/components/CandidateDetailView.tsx"),
+      source("src/components/TokenDetailTabs.tsx"),
+    ]);
     for (const tab of [
       "summary",
       "observation",
@@ -103,9 +106,17 @@ describe("Premium UI.1 presentation contract", () => {
       assert.match(detail, new RegExp(`"${tab}"`));
     }
     assert.match(detail, /data-active-detail-tab=\{activeTab\}/);
-    assert.match(detail, /role="tablist"/);
-    assert.match(detail, /role="tab"/);
-    assert.equal((detail.match(/role="tabpanel"/g) ?? []).length, 2);
+    assert.match(detail, /import \{ TokenDetailTabPanel, TokenDetailTabs \} from "\.\/TokenDetailTabs"/);
+    assert.match(detail, /<TokenDetailTabs /);
+    assert.match(detail, /<TokenDetailTabPanel /);
+    for (const semanticContract of [
+      'role="tablist"',
+      'role="tab"',
+      'role="tabpanel"',
+      "aria-selected",
+      "aria-controls",
+      "aria-labelledby",
+    ]) assert.match(tabs, new RegExp(semanticContract));
     assert.doesNotMatch(detail, /candidate-(?:context|summary|layer)-column|candidate-layer-body/);
     assert.match(detail, /status\?\.owner_controls_visible \? status : null/);
     assert.match(detail, /ownerPromotionStatus\?\.owner_controls_visible/);
