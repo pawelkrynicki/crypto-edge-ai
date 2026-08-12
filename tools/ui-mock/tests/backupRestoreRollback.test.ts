@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { readFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { resolve } from "node:path";
+import { tmpdir } from "node:os";
 import {
   PRODUCT_RECOVERY_DRILL_SCENARIOS,
   previewProductRecoveryDrills,
@@ -14,6 +15,7 @@ import {
   PRODUCT_RECOVERY_OPERATION_SCHEMA_VERSION,
   assertRecoveryTextSafe,
 } from "../server/productRecovery.js";
+import { createIsolatedRecoveryPaths, seedIsolatedProductState } from "./productRecoveryFixtures.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -62,7 +64,17 @@ test("STAB.2 permits public registry contacts without weakening the secret bound
 });
 
 test("STAB.2 isolated recovery drill", async (t) => {
-  const result = await runProductRecoveryDrills({ schedulerHostStatus: "NOT_OBSERVED" });
+  const sentinelRoot = await mkdtemp(resolve(tmpdir(), "crypto-edge-stab2-canonical-sentinel-"));
+  t.after(async () => {
+    await rm(sentinelRoot, { recursive: true, force: true });
+  });
+  const canonicalSentinel = createIsolatedRecoveryPaths(sentinelRoot);
+  await seedIsolatedProductState(canonicalSentinel);
+  const result = await runProductRecoveryDrills({
+    schedulerHostStatus: "NOT_OBSERVED",
+    canonicalPaths: canonicalSentinel,
+  });
+  assert.notEqual(result.manifest.isolated_root, sentinelRoot);
 
   for (const expected of PRODUCT_RECOVERY_DRILL_SCENARIOS) {
     await t.test(expected, () => {
