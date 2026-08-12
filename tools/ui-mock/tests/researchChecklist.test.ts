@@ -18,6 +18,8 @@ test("PC.3A resolves the 7-step checklist from existing product evidence without
   assert.equal(failedView.current_step, 1);
   assert.equal(item(failedView, 1, "liquidity").state, "RED_FLAG");
   assert.equal(item(failedView, 1, "liquidity").threshold, ">= $30K");
+  assert.equal(item(failedView, 7, "research_readiness").state, "MISSING_DATA");
+  assert.equal(failedView.steps[6]!.state, "MISSING_DATA");
   assert.equal(item(failedView, 1, "volume_market_cap_ratio").threshold, "1%–100%; preferred 5%–30%");
 
   const securityMissing = candidate({ security: null });

@@ -24,6 +24,7 @@ import {
 } from "../tokenLifecycle";
 import type { UiTokenCandidate } from "../types/scannerTypes";
 import type { FollowUpPublicEntry, FollowUpPublicStatus } from "../types/followUpTypes";
+import type { ResearchStepNumber } from "../researchChecklistTypes";
 import { CANDIDATE_DETAIL_TAB_IDS, type CandidateDetailTabId } from "../candidateDetailTabs";
 import { TokenDetailTabPanel, TokenDetailTabs } from "./TokenDetailTabs";
 import {
@@ -52,6 +53,7 @@ interface CandidateDetailViewProps {
   followUpStatus?: FollowUpPublicStatus | null;
   onBackToResults?: () => void;
   onOpenExternalChecks?: (candidate: UiTokenCandidate) => void;
+  onOpenResearchChecklistStep?: (candidate: UiTokenCandidate, step: ResearchStepNumber) => void;
   onOpenFollowUpExternalChecks?: (followUp: FollowUpPublicEntry) => void;
   onOpenControlCenter?: () => void;
   initialManualVerification?: ManualVerificationRecord | null;
@@ -73,6 +75,7 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
   followUpStatus,
   onBackToResults,
   onOpenExternalChecks,
+  onOpenResearchChecklistStep,
   onOpenFollowUpExternalChecks,
   onOpenControlCenter,
   initialManualVerification,
@@ -218,7 +221,13 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
           </section>
           <AIResearchSection chain={candidate.chain} contractAddress={candidate.contractAddress} symbol={candidate.symbol} name={candidate.name} mode="summary" onOpen={() => setActiveTab("ai")} onOpenControlCenter={onOpenControlCenter} />
         </div>
-        <ResearchChecklistSummary candidate={candidate} />
+        <ResearchChecklistSummary
+          candidate={candidate}
+          onOpenStep={(step) => {
+            if (onOpenResearchChecklistStep) onOpenResearchChecklistStep(candidate, step);
+            else onOpenExternalChecks?.(candidate);
+          }}
+        />
         {onOpenExternalChecks && <div className="candidate-summary-actions"><ActionButton variant="secondary" onClick={() => onOpenExternalChecks(candidate)}>{t("detail.openVerification")}</ActionButton></div>}
       </section>
     );
@@ -404,7 +413,7 @@ function getTabbedWorkspaceCopy(locale: ProductLocale) {
       dataCompleteness: "Kompletność danych",
       blockers: "Główne blokady",
       nextResearchStep: "Następny krok",
-      complete: "Dane kompletne",
+      complete: "Dane bazowe kompletne",
       partial: "Częściowo dostępne",
       missingData: "Brak danych",
       verificationRequired: "Wymagana weryfikacja",
@@ -429,7 +438,7 @@ function getTabbedWorkspaceCopy(locale: ProductLocale) {
     dataCompleteness: "Data completeness",
     blockers: "Main blockers",
     nextResearchStep: "Next step",
-    complete: "Data complete",
+    complete: "Base data complete",
     partial: "Partially available",
     missingData: "No data",
     verificationRequired: "Verification required",

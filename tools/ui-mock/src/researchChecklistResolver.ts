@@ -62,10 +62,10 @@ export function resolveResearchChecklist(
         ? "RESEARCH_INCOMPLETE" as const
         : "MANUAL_VERIFICATION_REQUIRED" as const
       : "EVIDENCE_COMPLETE_FOR_REVIEW" as const;
-  const finalAutomaticState: ResearchChecklistState = hasRedFlag
-    ? "RED_FLAG"
-    : unresolved
-      ? "MISSING_DATA"
+  const finalAutomaticState: ResearchChecklistState = unresolved
+    ? "MISSING_DATA"
+    : hasRedFlag
+      ? "RED_FLAG"
       : "AUTO_VERIFIED";
   const finalItem = applyManualEvidence({
     key: "research_readiness",

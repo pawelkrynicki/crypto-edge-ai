@@ -19,6 +19,7 @@ import { resolveProductSecurityState, type ProductSecurityState } from "../produ
 import { manualVerificationVerdictLabel } from "../manualVerificationVerdictLabel";
 import type { UiTokenCandidate } from "../types/scannerTypes";
 import type { FollowUpPublicEntry } from "../types/followUpTypes";
+import type { ResearchStepNumber } from "../researchChecklistTypes";
 import {
   createManualVerificationPreview,
   loadManualVerificationOwnerStatus,
@@ -45,6 +46,8 @@ interface ExternalVerificationLinksViewProps {
   onClose?: () => void;
   /** Supports focused UI tests. A selected token always uses the identity tab. */
   initialActiveTab?: VerificationDrawerTabId;
+  /** A compact playbook navigation target in the existing Data and sources tab. */
+  focusedResearchStep?: ResearchStepNumber | null;
 }
 
 export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksViewProps> = ({
@@ -55,13 +58,14 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
   onReturnToDetail,
   onClose,
   initialActiveTab = "identity",
+  focusedResearchStep = null,
 }) => {
   const { locale, t } = useProductLocale();
   const chain = candidate?.chain ?? followUp?.chain ?? "";
   const contractAddress = candidate?.contractAddress ?? followUp?.contract_address ?? "";
   const symbol = candidate?.symbol ?? followUp?.symbol ?? "";
   const displayName = candidate?.name ?? followUp?.display_name ?? "";
-  const [activeTab, setActiveTab] = useState<VerificationDrawerTabId>(initialActiveTab);
+  const [activeTab, setActiveTab] = useState<VerificationDrawerTabId>(focusedResearchStep ? "data" : initialActiveTab);
   const [ownerStatus, setOwnerStatus] = useState<ManualVerificationOwnerStatus | null>(null);
   const [verdict, setVerdict] = useState<ManualVerificationVerdict>("NEEDS_MORE_DATA");
   const [note, setNote] = useState("");
@@ -239,7 +243,7 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
           <VerificationMetric label={locale === "pl" ? "Status źródła" : "Source status"} value={locale === "pl" ? "Migawka dostępna do ręcznej kontroli" : "Snapshot available for manual review"} />
           <VerificationMetric label={locale === "pl" ? "Źródła kontroli bezpieczeństwa" : "Security check sources"} value={securityResolution?.sources.map(formatProductSourceLabel).join(", ") || missingText} />
         </div>
-        {candidate && <ResearchChecklistDetail candidate={candidate} />}
+        {candidate && <ResearchChecklistDetail candidate={candidate} focusedStep={focusedResearchStep} />}
         <div className="external-checks-list">{targets.map((target) => <ExternalCheckCard key={target.id} target={target} />)}</div>
         {onOpenResearchBrief && <section className="verification-ai-research-action" aria-label={locale === "pl" ? "Analiza badawcza AI" : "AI Research Brief"}><div><strong>{locale === "pl" ? "Analiza badawcza AI" : "AI Research Brief"}</strong><p>{locale === "pl" ? "Analiza AI uzupełnia, ale nie zastępuje ręcznej weryfikacji." : "AI analysis complements but does not replace manual verification."}</p></div><ActionButton variant="secondary" icon="arrow" iconPosition="end" onClick={onOpenResearchBrief}>{locale === "pl" ? "Otwórz analizę AI" : "Open AI analysis"}</ActionButton></section>}
       </VerificationSection>

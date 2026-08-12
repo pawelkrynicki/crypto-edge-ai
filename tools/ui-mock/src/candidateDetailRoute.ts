@@ -1,4 +1,5 @@
 import { isCandidateDetailTabId, type CandidateDetailTabId } from "./candidateDetailTabs";
+import type { ResearchStepNumber } from "./researchChecklistTypes";
 import { resolveTokenIdentity } from "./tokenLifecycle";
 
 export type RouteTokenIdentity = {
@@ -20,12 +21,18 @@ export function resolveDetailTab(): CandidateDetailTabId {
   return isCandidateDetailTabId(value) ? value : "summary";
 }
 
+export function resolveResearchChecklistStep(): ResearchStepNumber | null {
+  if (typeof window === "undefined") return null;
+  const value = Number(new URLSearchParams(window.location.search).get("research_step"));
+  return Number.isInteger(value) && value >= 1 && value <= 7 ? value as ResearchStepNumber : null;
+}
+
 export function writeCandidateDetailRoute(identity: RouteTokenIdentity, tab: CandidateDetailTabId) {
   writeTokenRoute(identity, "candidate-detail", tab);
 }
 
-export function writeVerificationRoute(identity: RouteTokenIdentity) {
-  writeTokenRoute(identity, "external-checks", null);
+export function writeVerificationRoute(identity: RouteTokenIdentity, researchStep: ResearchStepNumber | null = null) {
+  writeTokenRoute(identity, "external-checks", null, researchStep);
 }
 
 export function writeVerificationListRoute() {
@@ -34,6 +41,7 @@ export function writeVerificationListRoute() {
   url.searchParams.delete("chain");
   url.searchParams.delete("contract");
   url.searchParams.delete("detail");
+  url.searchParams.delete("research_step");
   url.hash = "external-checks";
   window.history.pushState(null, "", url);
 }
@@ -42,6 +50,7 @@ function writeTokenRoute(
   identity: RouteTokenIdentity,
   section: "candidate-detail" | "external-checks",
   tab: CandidateDetailTabId | null,
+  researchStep: ResearchStepNumber | null = null,
 ) {
   if (typeof window === "undefined") return;
   const url = new URL(window.location.href);
@@ -49,6 +58,8 @@ function writeTokenRoute(
   url.searchParams.set("contract", identity.contract_address);
   if (tab) url.searchParams.set("detail", tab);
   else url.searchParams.delete("detail");
+  if (researchStep) url.searchParams.set("research_step", String(researchStep));
+  else url.searchParams.delete("research_step");
   url.hash = section;
   window.history.pushState(null, "", url);
 }

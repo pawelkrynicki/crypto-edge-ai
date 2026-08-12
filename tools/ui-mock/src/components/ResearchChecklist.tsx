@@ -6,6 +6,7 @@ import {
   type ResearchChecklistItem,
   type ResearchChecklistState,
   type ResearchChecklistView,
+  type ResearchStepNumber,
 } from "../researchChecklistTypes";
 import {
   deleteResearchEvidence,
@@ -40,24 +41,41 @@ const STATUS_NAMES: Record<ResearchChecklistState, [string, string]> = {
   RED_FLAG: ["Czerwona flaga", "Red flag"],
 };
 
-export function ResearchChecklistSummary({ candidate }: { candidate: UiTokenCandidate }) {
+export function ResearchChecklistSummary({
+  candidate,
+  onOpenStep,
+}: {
+  candidate: UiTokenCandidate;
+  onOpenStep?: (step: ResearchStepNumber) => void;
+}) {
   const view = useResearchChecklist(candidate);
   const { locale } = useProductLocale();
   const pl = locale === "pl";
   return <section className="research-checklist-summary" aria-label={pl ? "Research playbook" : "Research playbook"}>
-    <header><span>{pl ? "RESEARCH PLAYBOOK" : "RESEARCH PLAYBOOK"}</span><strong>{pl ? `Krok ${view.current_step}/7 — ${stepName(view.current_step, locale)}` : `Step ${view.current_step}/7 — ${stepName(view.current_step, locale)}`}</strong></header>
+    <header><span>{pl ? "RESEARCH PLAYBOOK" : "RESEARCH PLAYBOOK"}</span><button type="button" className="research-current-step-cta" data-research-current-step-cta={view.current_step} onClick={() => onOpenStep?.(view.current_step)} onKeyDown={(event) => handleResearchStepKeyDown(event, view.current_step, onOpenStep)} aria-label={openStepLabel(view.current_step, locale)}>{pl ? `Krok ${view.current_step}/7 — ${stepName(view.current_step, locale)}` : `Step ${view.current_step}/7 — ${stepName(view.current_step, locale)}`}</button></header>
     <p>{pl ? "KOMPLETNOŚĆ RESEARCHU" : "RESEARCH COMPLETENESS"}: <b>{view.completeness.resolved_checks} / {view.completeness.total_checks}</b> ({view.completeness.percentage}%)</p>
-    <ol>{view.steps.map((step) => <li key={step.number} className={step.number === view.current_step ? "current" : ""}><span>{step.number}. {stepName(step.number, locale)}</span><ResearchStateBadge state={step.state} compact /></li>)}</ol>
+    <ol>{view.steps.map((step) => <li key={step.number} className={step.number === view.current_step ? "current" : ""}><button type="button" className="research-step-nav" data-research-step-nav={step.number} onClick={() => onOpenStep?.(step.number)} onKeyDown={(event) => handleResearchStepKeyDown(event, step.number, onOpenStep)} aria-label={openStepLabel(step.number, locale)}><span>{step.number}. {stepName(step.number, locale)}</span><ResearchStateBadge state={step.state} compact labelOverride={isIncompleteFinalStep(step) ? researchIncompleteName(locale) : undefined} /></button></li>)}</ol>
   </section>;
 }
 
-export function ResearchChecklistDetail({ candidate }: { candidate: UiTokenCandidate }) {
+export function ResearchChecklistDetail({ candidate, focusedStep = null }: { candidate: UiTokenCandidate; focusedStep?: ResearchStepNumber | null }) {
   const view = useResearchChecklist(candidate);
   const { locale } = useProductLocale();
   const pl = locale === "pl";
+  useEffect(() => {
+    if (!focusedStep || typeof document === "undefined") return;
+    const focusStep = () => {
+      const target = document.getElementById(`research-checklist-step-${focusedStep}`);
+      if (!target) return;
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+      target.focus({ preventScroll: true });
+    };
+    const frame = window.requestAnimationFrame(focusStep);
+    return () => window.cancelAnimationFrame(frame);
+  }, [candidate.chain, candidate.contractAddress, focusedStep]);
   return <section className="research-checklist-detail" aria-label={pl ? "7-stopniowa checklista researchu" : "7-step research checklist"}>
     <header className="research-checklist-heading"><div><span>{pl ? "RESEARCH PLAYBOOK" : "RESEARCH PLAYBOOK"}</span><h3>{pl ? `Aktualny krok ${view.current_step}/7: ${stepName(view.current_step, locale)}` : `Current step ${view.current_step}/7: ${stepName(view.current_step, locale)}`}</h3><p>{readinessText(view, locale)}</p></div><ResearchProgress view={view} /></header>
-    <div className="research-checklist-steps">{view.steps.map((step) => <section key={step.number} className={`research-checklist-step ${step.number === view.current_step ? "current" : ""}`}><header><div><span>{pl ? `KROK ${step.number}` : `STEP ${step.number}`}</span><h4>{stepName(step.number, locale)}</h4></div><ResearchStateBadge state={step.state} /></header><div className="research-checklist-items">{step.items.map((item) => <ResearchItem key={`${step.number}:${item.key}`} item={item} locale={locale} />)}</div></section>)}</div>
+    <div className="research-checklist-steps">{view.steps.map((step) => <section id={`research-checklist-step-${step.number}`} key={step.number} tabIndex={focusedStep === step.number ? -1 : undefined} data-research-step={step.number} data-research-focused={focusedStep === step.number ? "true" : undefined} className={`research-checklist-step ${step.number === view.current_step ? "current" : ""} ${focusedStep === step.number ? "focused" : ""}`}><header><div><span>{pl ? `KROK ${step.number}` : `STEP ${step.number}`}</span><h4>{stepName(step.number, locale)}</h4></div><ResearchStateBadge state={step.state} labelOverride={isIncompleteFinalStep(step) ? researchIncompleteName(locale) : undefined} /></header><div className="research-checklist-items">{step.items.map((item) => <ResearchItem key={`${step.number}:${item.key}`} item={item} locale={locale} incompleteResearch={isIncompleteFinalStep(step)} />)}</div></section>)}</div>
   </section>;
 }
 
@@ -103,10 +121,10 @@ function ResearchProgress({ view }: { view: ResearchChecklistView }) {
   return <div className="research-progress"><span>{pl ? "KOMPLETNOŚĆ RESEARCHU" : "RESEARCH COMPLETENESS"}</span><strong>{view.completeness.resolved_checks} / {view.completeness.total_checks}</strong><div aria-hidden="true"><i style={{ width: `${view.completeness.percentage}%` }} /></div></div>;
 }
 
-function ResearchItem({ item, locale }: { item: ResearchChecklistItem; locale: "pl" | "en" }) {
+function ResearchItem({ item, locale, incompleteResearch = false }: { item: ResearchChecklistItem; locale: "pl" | "en"; incompleteResearch?: boolean }) {
   const pl = locale === "pl";
   const manual = item.manual_evidence;
-  return <article className={`research-checklist-item ${item.state.toLowerCase()}`}><div><strong>{itemName(item.key, locale)}</strong><ResearchStateBadge state={item.state} /><p>{itemValue(item, locale)}</p>{item.threshold && <small>{pl ? "Próg metodologii" : "Methodology threshold"}: {item.threshold}</small>}</div>{manual && <div className="research-manual-note"><span>{pl ? "Prywatny wpis" : "Private entry"}</span>{manual.value_text && <p>{manual.value_text}</p>}{manual.value_number != null && <p>{manual.value_number}</p>}{manual.note && <p>{manual.note}</p>}{manual.source_tool && <small>{pl ? "Narzędzie" : "Tool"}: {manual.source_tool}</small>}{manual.evidence_url && <a href={manual.evidence_url} target="_blank" rel="noreferrer">{pl ? "Otwórz dowód" : "Open evidence"}</a>}</div>}</article>;
+  return <article className={`research-checklist-item ${item.state.toLowerCase()}`}><div><strong>{itemName(item.key, locale)}</strong><ResearchStateBadge state={item.state} labelOverride={incompleteResearch ? researchIncompleteName(locale) : undefined} /><p>{itemValue(item, locale)}</p>{item.threshold && <small>{pl ? "Próg metodologii" : "Methodology threshold"}: {item.threshold}</small>}</div>{manual && <div className="research-manual-note"><span>{pl ? "Prywatny wpis" : "Private entry"}</span>{manual.value_text && <p>{manual.value_text}</p>}{manual.value_number != null && <p>{manual.value_number}</p>}{manual.note && <p>{manual.note}</p>}{manual.source_tool && <small>{pl ? "Narzędzie" : "Tool"}: {manual.source_tool}</small>}{manual.evidence_url && <a href={manual.evidence_url} target="_blank" rel="noreferrer">{pl ? "Otwórz dowód" : "Open evidence"}</a>}</div>}</article>;
 }
 
 function ManualEvidenceEditor({ item, candidate, writable, locale, onSaved }: { item: ResearchChecklistItem; candidate: UiTokenCandidate; writable: boolean; locale: "pl" | "en"; onSaved: () => Promise<void> }) {
@@ -133,14 +151,23 @@ function ManualEvidenceEditor({ item, candidate, writable, locale, onSaved }: { 
   return <article className="research-manual-editor"><div className="research-manual-editor-heading"><div><strong>{itemName(item.key, locale)}</strong><ResearchStateBadge state={item.state} compact /></div><ActionButton variant="secondary" onClick={() => setExpanded((current) => !current)}>{expanded ? (pl ? "Zamknij" : "Close") : evidence ? (pl ? "Edytuj" : "Edit") : (pl ? "Dodaj wpis" : "Add entry")}</ActionButton></div>{expanded && <div className="research-manual-form"><label><span>{pl ? "Wynik" : "Result"}</span><select value={state} disabled={!writable} onChange={(event) => setState(event.target.value as PersistedManualResearchState)}><option value="MANUAL_VERIFIED">{pl ? "Sprawdzone ręcznie" : "Manually checked"}</option><option value="RED_FLAG">{pl ? "Czerwona flaga" : "Red flag"}</option><option value="MISSING_DATA">{pl ? "Brak danych" : "Missing data"}</option><option value="NOT_APPLICABLE">{pl ? "Nie dotyczy" : "Not applicable"}</option></select></label><label><span>{pl ? "Wartość" : "Value"}</span><input value={valueText} disabled={!writable} maxLength={1000} onChange={(event) => setValueText(event.target.value)} /></label><label><span>{pl ? "Krótka notatka" : "Short note"}</span><textarea value={note} disabled={!writable} maxLength={1000} rows={2} onChange={(event) => setNote(event.target.value)} /></label><label><span>{pl ? "Narzędzie / źródło" : "Tool / source"}</span><input value={sourceTool} disabled={!writable} maxLength={120} onChange={(event) => setSourceTool(event.target.value)} /></label><label><span>{pl ? "URL dowodu" : "Evidence URL"}</span><input type="url" value={evidenceUrl} disabled={!writable} maxLength={2048} placeholder="https://" onChange={(event) => setEvidenceUrl(event.target.value)} /></label><label><span>{pl ? "Zaobserwowano" : "Observed at"}</span><input type="datetime-local" value={observedAt} disabled={!writable} onChange={(event) => setObservedAt(event.target.value)} /></label>{writable && <div className="research-manual-actions"><ActionButton variant="primary" loading={saving} onClick={() => void save()}>{pl ? "Zapisz wpis" : "Save entry"}</ActionButton>{evidence && <ActionButton variant="secondary" loading={saving} onClick={() => void remove()}>{pl ? "Usuń" : "Delete"}</ActionButton>}</div>}{error && <p role="alert">{pl ? "Nie zapisano wpisu. Sprawdź adres URL i spróbuj ponownie." : "The entry was not saved. Check the URL and try again."}</p>}</div>}</article>;
 }
 
-function ResearchStateBadge({ state, compact = false }: { state: ResearchChecklistState; compact?: boolean }) {
+function ResearchStateBadge({ state, compact = false, labelOverride }: { state: ResearchChecklistState; compact?: boolean; labelOverride?: string }) {
   const { locale } = useProductLocale();
-  return <span className={`research-state ${state.toLowerCase()} ${compact ? "compact" : ""}`}>{STATUS_NAMES[state][locale === "pl" ? 0 : 1]}</span>;
+  return <span className={`research-state ${state.toLowerCase()} ${compact ? "compact" : ""}`}>{labelOverride ?? STATUS_NAMES[state][locale === "pl" ? 0 : 1]}</span>;
 }
 
 function itemName(key: string, locale: "pl" | "en"): string { return (ITEM_NAMES[key] ?? [key, key])[locale === "pl" ? 0 : 1]; }
 function stepName(step: number, locale: "pl" | "en"): string { return STEP_NAMES[locale][step - 1] ?? String(step); }
+function handleResearchStepKeyDown(event: React.KeyboardEvent<HTMLButtonElement>, step: ResearchStepNumber, onOpenStep?: (step: ResearchStepNumber) => void) {
+  if (event.key !== "Enter" && event.key !== " ") return;
+  event.preventDefault();
+  onOpenStep?.(step);
+}
+function openStepLabel(step: ResearchStepNumber, locale: "pl" | "en"): string { return locale === "pl" ? `Otwórz szczegóły kroku ${step}: ${stepName(step, locale)}` : `Open step ${step} details: ${stepName(step, locale)}`; }
+function researchIncompleteName(locale: "pl" | "en"): string { return locale === "pl" ? "Research niekompletny" : "Research incomplete"; }
+function isIncompleteFinalStep(step: { number: ResearchStepNumber; state: ResearchChecklistState }): boolean { return step.number === 7 && step.state === "MISSING_DATA"; }
 function readinessText(view: ResearchChecklistView, locale: "pl" | "en"): string {
+  if (view.steps[6]?.state === "MISSING_DATA") return locale === "pl" ? "Research jest niekompletny. Czerwone flagi pozostają widoczne przy odpowiednich kontrolach." : "Research is incomplete. Red flags remain visible on the relevant checks.";
   if (view.readiness === "CRITICAL_RED_FLAG_PRESENT") return locale === "pl" ? "Wykryto czerwoną flagę. To nie jest rekomendacja inwestycyjna." : "A red flag is recorded. This is not investment advice.";
   if (view.readiness === "EVIDENCE_COMPLETE_FOR_REVIEW") return locale === "pl" ? "Dowody są kompletne do przeglądu użytkownika lub ownera." : "Evidence is complete enough for user or owner review.";
   if (view.readiness === "MANUAL_VERIFICATION_REQUIRED") return locale === "pl" ? "Wymagana jest ręczna weryfikacja." : "Manual verification is required.";

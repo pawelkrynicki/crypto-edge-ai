@@ -801,11 +801,14 @@
 .research-checklist-heading span,
 .research-checklist-step > header span,
 .research-manual-evidence > header > span { color: var(--text-secondary); font-size: 10px; font-weight: 800; letter-spacing: .08em; }
-.research-checklist-summary header strong { color: var(--text-primary); font-size: 13px; }
+.research-current-step-cta { padding: 0; border: 0; color: var(--text-primary); background: transparent; font: inherit; font-size: 13px; font-weight: 700; text-align: right; cursor: pointer; }
 .research-checklist-summary > p { margin: 10px 0 8px; color: var(--text-secondary); font-size: 12px; }
 .research-checklist-summary ol { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; padding: 0; margin: 0; list-style: none; }
-.research-checklist-summary li { display: grid; gap: 5px; padding: 7px; border-left: 2px solid var(--border); color: var(--text-secondary); font-size: 10px; }
+.research-checklist-summary li { border-left: 2px solid var(--border); color: var(--text-secondary); font-size: 10px; }
 .research-checklist-summary li.current { border-left-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--text-primary); }
+.research-step-nav { display: grid; width: 100%; gap: 5px; padding: 7px; border: 0; color: inherit; background: transparent; font: inherit; font-size: inherit; text-align: left; cursor: pointer; border-radius: 6px; }
+.research-step-nav:hover, .research-current-step-cta:hover { color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.research-step-nav:focus-visible, .research-current-step-cta:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .research-state { display: inline-flex; align-items: center; width: fit-content; border: 1px solid var(--border); border-radius: 999px; padding: 3px 7px; color: var(--text-secondary); font-size: 10px; font-weight: 700; line-height: 1.1; }
 .research-state.compact { font-size: 9px; padding: 2px 5px; }
 .research-state.auto_verified, .research-state.manual_verified { border-color: color-mix(in srgb, var(--success) 60%, var(--border)); color: var(--success); }
@@ -822,6 +825,7 @@
 .research-checklist-steps { display: grid; gap: 10px; }
 .research-checklist-step { border: 1px solid var(--border); border-radius: 10px; padding: 11px; }
 .research-checklist-step.current { border-color: color-mix(in srgb, var(--accent) 65%, var(--border)); }
+.research-checklist-step.focused { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
 .research-checklist-step h4, .research-manual-step h4 { margin: 2px 0 0; color: var(--text-primary); font-size: 13px; }
 .research-checklist-items { display: grid; gap: 7px; margin-top: 10px; }
 .research-checklist-item { display: grid; grid-template-columns: minmax(0, 1fr) minmax(180px, .65fr); gap: 10px; padding: 9px; border-radius: 8px; background: color-mix(in srgb, var(--surface) 88%, var(--border) 12%); }
