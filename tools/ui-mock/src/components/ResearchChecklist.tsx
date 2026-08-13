@@ -73,6 +73,7 @@ export function ResearchChecklistSummary({
   return <section id="research-playbook-summary" tabIndex={focusOnMount ? -1 : undefined} data-research-playbook-focused={focusOnMount ? "true" : undefined} className="research-checklist-summary" aria-label={pl ? "Research playbook" : "Research playbook"}>
     <header><span>{pl ? "RESEARCH PLAYBOOK" : "RESEARCH PLAYBOOK"}</span><button type="button" className="research-current-step-cta" data-research-current-step-cta={view.current_step} onClick={() => onOpenStep?.(view.current_step)} onKeyDown={(event) => handleResearchStepKeyDown(event, view.current_step, onOpenStep)} aria-label={openStepLabel(view.current_step, locale)}>{pl ? `Krok ${view.current_step}/7 — ${stepName(view.current_step, locale)}` : `Step ${view.current_step}/7 — ${stepName(view.current_step, locale)}`}</button></header>
     <p>{pl ? "KOMPLETNOŚĆ RESEARCHU" : "RESEARCH COMPLETENESS"}: <b>{view.completeness.resolved_checks} / {view.completeness.total_checks}</b> ({view.completeness.percentage}%)</p>
+    <ResearchKeyToolsOverview view={view} candidate={candidate} locale={locale} onOpenStep={onOpenStep} />
     <ol>{view.steps.map((step) => <li key={step.number} className={step.number === view.current_step ? "current" : ""}><button type="button" className="research-step-nav" data-research-step-nav={step.number} onClick={() => onOpenStep?.(step.number)} onKeyDown={(event) => handleResearchStepKeyDown(event, step.number, onOpenStep)} aria-label={openStepLabel(step.number, locale)}><span>{step.number}. {stepName(step.number, locale)}</span><ResearchStateBadge state={step.state} compact labelOverride={isIncompleteFinalStep(step) ? researchIncompleteName(locale) : undefined} /></button></li>)}</ol>
   </section>;
 }
@@ -81,12 +82,10 @@ export function ResearchChecklistDetail({
   candidate,
   focusedStep = null,
   onBackToResearchPlaybook,
-  onOpenFocusedResearchStep,
 }: {
   candidate: UiTokenCandidate;
   focusedStep?: ResearchStepNumber | null;
   onBackToResearchPlaybook?: () => void;
-  onOpenFocusedResearchStep?: (step: ResearchStepNumber) => void;
 }) {
   const { view, reload } = useResearchChecklistWithReload(candidate);
   const { locale } = useProductLocale();
@@ -109,17 +108,18 @@ export function ResearchChecklistDetail({
         <button type="button" className="research-focus-back" data-research-playbook-back onClick={() => onBackToResearchPlaybook?.()}>{pl ? "← Wróć do Research Playbook" : "← Back to Research Playbook"}</button>
         <strong>{pl ? `Krok ${selectedStep.number}/7` : `Step ${selectedStep.number}/7`}</strong>
       </header>
-      <FocusedResearchStep step={selectedStep} view={view} candidate={candidate} locale={locale} writable={view.manual_evidence_writable} onSaved={reload} onOpenFocusedResearchStep={onOpenFocusedResearchStep} />
+      <FocusedResearchStep step={selectedStep} view={view} candidate={candidate} locale={locale} writable={view.manual_evidence_writable} onSaved={reload} />
     </section>;
   }
   return <section className="research-checklist-detail" aria-label={pl ? "7-stopniowa checklista researchu" : "7-step research checklist"}>
     <header className="research-checklist-heading"><div><span>{pl ? "RESEARCH PLAYBOOK" : "RESEARCH PLAYBOOK"}</span><h3>{pl ? `Aktualny krok ${view.current_step}/7: ${stepName(view.current_step, locale)}` : `Current step ${view.current_step}/7: ${stepName(view.current_step, locale)}`}</h3><p>{readinessText(view, locale)}</p></div><ResearchProgress view={view} /></header>
-    <div className="research-checklist-steps">{view.steps.map((step) => <ResearchStepCard key={step.number} step={step} candidate={candidate} locale={locale} writable={view.manual_evidence_writable} onSaved={reload} />)}</div>
+    <div className="research-checklist-steps">{view.steps.map((step) => <ResearchStepCard key={step.number} step={step} view={view} candidate={candidate} locale={locale} writable={view.manual_evidence_writable} onSaved={reload} />)}</div>
   </section>;
 }
 
 function ResearchStepCard({
   step,
+  view,
   candidate,
   locale,
   focused = false,
@@ -128,6 +128,7 @@ function ResearchStepCard({
   children,
 }: {
   step: ResearchChecklistStep;
+  view?: ResearchChecklistView;
   candidate?: UiTokenCandidate;
   locale: "pl" | "en";
   focused?: boolean;
@@ -138,67 +139,111 @@ function ResearchStepCard({
   const pl = locale === "pl";
   return <section id={`research-checklist-step-${step.number}`} tabIndex={focused ? -1 : undefined} data-research-step={step.number} data-research-focused={focused ? "true" : undefined} className={`research-checklist-step ${focused ? "focused" : ""}`}>
     <header><div><span>{pl ? `KROK ${step.number}` : `STEP ${step.number}`}</span><h4>{stepName(step.number, locale)}</h4></div><ResearchStateBadge state={step.state} labelOverride={isIncompleteFinalStep(step) ? researchIncompleteName(locale) : undefined} /></header>
-    {children ?? <div className="research-checklist-items">{step.items.map((item) => <ResearchItem key={`${step.number}:${item.key}`} item={item} candidate={candidate} locale={locale} writable={writable} onSaved={onSaved} incompleteResearch={isIncompleteFinalStep(step)} />)}</div>}
+    {children ?? <ResearchStepBody step={step} view={view} candidate={candidate} locale={locale} writable={writable} onSaved={onSaved} />}
   </section>;
 }
 
-function FocusedResearchStep({ step, view, candidate, locale, writable, onSaved, onOpenFocusedResearchStep }: {
+function FocusedResearchStep({ step, view, candidate, locale, writable, onSaved }: {
   step: ResearchChecklistStep;
   view: ResearchChecklistView;
   candidate: UiTokenCandidate;
   locale: "pl" | "en";
   writable: boolean;
   onSaved: () => Promise<void>;
-  onOpenFocusedResearchStep?: (step: ResearchStepNumber) => void;
 }) {
   const pl = locale === "pl";
   const [technicalExpanded, setTechnicalExpanded] = useState(false);
-  const keyTools = resolveKeyResearchTools(view);
-  const checkedTools = keyTools.filter((item) => isSimpleChecked(item.state));
-  const redFlagTools = keyTools.filter((item) => item.state === "RED_FLAG");
-  const incompleteTools = keyTools.filter((item) => !isSimpleChecked(item.state) && item.state !== "RED_FLAG");
-  const technicalItems = step.items.filter((item) => !isManualExternalResearchItem(item));
+  const contextualTools = contextualResearchTools(step);
+  const technicalItems = meaningfulTechnicalItems(step);
+  const unavailableItems = unavailableTechnicalItems(step);
+  const meaningfulItems = [...contextualTools, ...technicalItems];
+  const checked = meaningfulItems.filter((item) => isSimpleChecked(item.state));
+  const redFlags = meaningfulItems.filter((item) => item.state === "RED_FLAG");
+  const toCheck = meaningfulItems.filter((item) => !isSimpleChecked(item.state) && item.state !== "RED_FLAG");
   const technicalRedFlags = technicalItems.filter((item) => item.state === "RED_FLAG");
   return <ResearchStepCard step={step} candidate={candidate} locale={locale} focused writable={writable} onSaved={onSaved}>
     <section className="research-simple-summary" data-research-simple-summary={step.number} aria-label={pl ? "Prosty status researchu" : "Simple research status"}>
-      <header><div><span>{simpleFocusTitle(step.number, locale)}</span><strong>{simpleResearchStatus(view, keyTools, locale)}</strong></div>{technicalRedFlags.length > 0 && <button type="button" className="research-red-flag-reveal" data-research-red-flag-reveal onClick={() => setTechnicalExpanded(true)}>{pl ? `Wykryto ${technicalRedFlags.length} ${technicalRedFlags.length === 1 ? "czerwoną flagę" : "czerwone flagi"}` : `${technicalRedFlags.length} red ${technicalRedFlags.length === 1 ? "flag detected" : "flags detected"}`} <span>{pl ? "Zobacz" : "View"}</span></button>}</header>
+      <header><div><span>{simpleFocusTitle(step.number, locale)}</span><strong>{simpleResearchStatus(view, step, meaningfulItems, locale)}</strong></div>{technicalRedFlags.length > 0 && <button type="button" className="research-red-flag-reveal" data-research-red-flag-reveal onClick={() => setTechnicalExpanded(true)}>{pl ? `Wykryto ${technicalRedFlags.length} ${technicalRedFlags.length === 1 ? "czerwoną flagę" : "czerwone flagi"}` : `${technicalRedFlags.length} red ${technicalRedFlags.length === 1 ? "flag detected" : "flags detected"}`} <span>{pl ? "Zobacz" : "View"}</span></button>}</header>
       <div className="research-focused-step-summary">
-        <span><b>{pl ? "Sprawdzone" : "Checked"}</b>{checkedTools.length}</span>
-        <span className={redFlagTools.length > 0 ? "has-red-flags" : ""}><b>{pl ? "Czerwone flagi" : "Red flags"}</b>{redFlagTools.length}</span>
-        <span><b>{pl ? "Do sprawdzenia" : "To check"}</b>{incompleteTools.length}</span>
+        <span><b>{pl ? "Sprawdzone" : "Checked"}</b>{checked.length}</span>
+        <span className={redFlags.length > 0 ? "has-red-flags" : ""}><b>{pl ? "Czerwone flagi" : "Red flags"}</b>{redFlags.length}</span>
+        <span><b>{pl ? "Do sprawdzenia" : "To check"}</b>{toCheck.length}</span>
       </div>
     </section>
-    <section className="research-key-tools" aria-label={pl ? "Główne kontrole" : "Key checks"}>
-      <header><h5>{pl ? "Główne kontrole" : "Key checks"}</h5><span>{pl ? "4 narzędzia" : "4 tools"}</span></header>
-      <div>{keyTools.map((item) => <KeyResearchToolCard key={`${item.step_number}:${item.key}`} item={item} candidate={candidate} locale={locale} writable={writable} onSaved={onSaved} onOpenFocusedResearchStep={onOpenFocusedResearchStep} />)}</div>
-    </section>
-    <details className="research-technical-details" data-research-technical-details={step.number} open={technicalExpanded} onToggle={(event) => setTechnicalExpanded(event.currentTarget.open)}>
+    <ContextualResearchTools items={contextualTools} step={step.number} candidate={candidate} locale={locale} writable={writable} onSaved={onSaved} />
+    {technicalItems.length > 0 && <details className="research-technical-details" data-research-technical-details={step.number} open={technicalExpanded} onToggle={(event) => setTechnicalExpanded(event.currentTarget.open)}>
       <summary><span>{pl ? `Pokaż szczegóły techniczne (${technicalItems.length})` : `Show technical details (${technicalItems.length})`}</span><b>{technicalExpanded ? (pl ? "Ukryj" : "Hide") : (pl ? "Pokaż" : "Show")}</b></summary>
       {technicalRedFlags.length > 0 && <div className="research-technical-red-flags" data-research-technical-red-flags><strong>{pl ? `Wykryto ${technicalRedFlags.length} ${technicalRedFlags.length === 1 ? "czerwoną flagę" : "czerwone flagi"}` : `${technicalRedFlags.length} red ${technicalRedFlags.length === 1 ? "flag" : "flags"}`}</strong></div>}
-      <div className="research-checklist-items">{technicalItems.map((item) => <ResearchItem key={`${step.number}:${item.key}`} item={item} candidate={candidate} locale={locale} writable={writable} onSaved={onSaved} incompleteResearch={isIncompleteFinalStep(step)} />)}</div>
-    </details>
+      <div className="research-checklist-items">{technicalItems.map((item) => <ResearchItem key={`${step.number}:${item.key}`} item={item} locale={locale} incompleteResearch={isIncompleteFinalStep(step)} />)}</div>
+    </details>}
+    <ResearchUnavailableState step={step} view={view} items={unavailableItems} locale={locale} />
   </ResearchStepCard>;
 }
 
-function KeyResearchToolCard({
-  item,
-  candidate,
-  locale,
-  writable,
-  onSaved,
-  onOpenFocusedResearchStep,
-}: {
+function ResearchStepBody({ step, view, candidate, locale, writable, onSaved }: {
+  step: ResearchChecklistStep;
+  view?: ResearchChecklistView;
+  candidate?: UiTokenCandidate;
+  locale: "pl" | "en";
+  writable: boolean;
+  onSaved?: () => Promise<void>;
+}) {
+  const contextualTools = contextualResearchTools(step);
+  const technicalItems = meaningfulTechnicalItems(step);
+  if (step.number === 7) return <ResearchDerivedReadiness view={view} locale={locale} />;
+  return <>
+    {candidate && onSaved && <ContextualResearchTools items={contextualTools} step={step.number} candidate={candidate} locale={locale} writable={writable} onSaved={onSaved} />}
+    {technicalItems.length > 0 && <div className="research-checklist-items">{technicalItems.map((item) => <ResearchItem key={`${step.number}:${item.key}`} item={item} locale={locale} incompleteResearch={isIncompleteFinalStep(step)} />)}</div>}
+    <ResearchUnavailableState step={step} view={view} items={unavailableTechnicalItems(step)} locale={locale} />
+  </>;
+}
+
+function ResearchKeyToolsOverview({ view, candidate, locale, onOpenStep }: {
+  view: ResearchChecklistView;
+  candidate: UiTokenCandidate;
+  locale: "pl" | "en";
+  onOpenStep?: (step: ResearchStepNumber) => void;
+}) {
+  const pl = locale === "pl";
+  const tools = resolveKeyResearchTools(view);
+  return <section className="research-global-key-tools" data-research-global-tools aria-label={pl ? "Główne kontrole" : "Key checks"}>
+    <header><h4>{pl ? "Główne kontrole" : "Key checks"}</h4><span>{pl ? "4 narzędzia" : "4 tools"}</span></header>
+    <div>{tools.map((item) => {
+      const tool = item.manual_external_tool;
+      const content = <><strong>{keyToolName(tool, locale)}</strong><span>{simpleToolStatus(item, candidate, locale)}</span></>;
+      return onOpenStep
+        ? <button type="button" key={tool} data-research-global-tool={tool} data-research-global-tool-focus={item.step_number} onClick={() => onOpenStep(item.step_number)} aria-label={pl ? `Otwórz krok ${item.step_number}: ${keyToolName(tool, locale)}` : `Open step ${item.step_number}: ${keyToolName(tool, locale)}`}>{content}</button>
+        : <div key={tool} data-research-global-tool={tool}>{content}</div>;
+    })}</div>
+  </section>;
+}
+
+function ContextualResearchTools({ items, step, candidate, locale, writable, onSaved }: {
+  items: Array<ResearchChecklistItem & { manual_external_tool: ManualResearchTool }>;
+  step: ResearchStepNumber;
+  candidate: UiTokenCandidate;
+  locale: "pl" | "en";
+  writable: boolean;
+  onSaved: () => Promise<void>;
+}) {
+  if (items.length === 0) return null;
+  const pl = locale === "pl";
+  return <section className="research-key-tools" data-research-contextual-tools={step} aria-label={pl ? "Główne kontrole" : "Key checks"}>
+    <header><h5>{pl ? "Główne kontrole" : "Key checks"}</h5><span>{pl ? `${items.length} narzędzia` : `${items.length} tools`}</span></header>
+    <div>{items.map((item) => <ContextualResearchToolCard key={`${item.step_number}:${item.key}`} item={item} candidate={candidate} locale={locale} writable={writable} onSaved={onSaved} />)}</div>
+  </section>;
+}
+
+function ContextualResearchToolCard({ item, candidate, locale, writable, onSaved }: {
   item: ResearchChecklistItem & { manual_external_tool: ManualResearchTool };
   candidate: UiTokenCandidate;
   locale: "pl" | "en";
   writable: boolean;
   onSaved: () => Promise<void>;
-  onOpenFocusedResearchStep?: (step: ResearchStepNumber) => void;
 }) {
   const tool = item.manual_external_tool;
-  const pl = locale === "pl";
   return <article className="research-key-tool" data-key-research-tool={tool}>
-    {onOpenFocusedResearchStep ? <button type="button" className="research-key-tool-heading" data-key-research-tool-focus={tool} onClick={() => onOpenFocusedResearchStep(item.step_number)} aria-label={pl ? `Otwórz krok ${item.step_number}: ${keyToolName(tool, locale)}` : `Open step ${item.step_number}: ${keyToolName(tool, locale)}`}><strong>{keyToolName(tool, locale)}</strong><span>{simpleToolStatus(item, candidate, locale)}</span></button> : <div className="research-key-tool-heading"><strong>{keyToolName(tool, locale)}</strong><span>{simpleToolStatus(item, candidate, locale)}</span></div>}
+    <div className="research-key-tool-heading"><strong>{keyToolName(tool, locale)}</strong><span>{simpleToolStatus(item, candidate, locale)}</span></div>
     <ManualExternalResearchWorkflow item={item} candidate={candidate} writable={writable} locale={locale} onSaved={onSaved} compact />
   </article>;
 }
@@ -272,19 +317,79 @@ function isSimpleChecked(state: ResearchChecklistState): boolean {
   return state === "AUTO_VERIFIED" || state === "MANUAL_VERIFIED" || state === "NOT_APPLICABLE";
 }
 
+function contextualResearchTools(step: ResearchChecklistStep): Array<ResearchChecklistItem & { manual_external_tool: ManualResearchTool }> {
+  return step.items.filter(isManualExternalResearchItem);
+}
+
+function meaningfulTechnicalItems(step: ResearchChecklistStep): ResearchChecklistItem[] {
+  return step.items.filter((item) => !isManualExternalResearchItem(item) && isMeaningfulResearchItem(item));
+}
+
+function unavailableTechnicalItems(step: ResearchChecklistStep): ResearchChecklistItem[] {
+  return step.items.filter((item) => !isManualExternalResearchItem(item) && !isMeaningfulResearchItem(item));
+}
+
+function isMeaningfulResearchItem(item: ResearchChecklistItem): boolean {
+  if (item.manual_evidence) return true;
+  if (item.state === "AUTO_VERIFIED" || item.state === "MANUAL_VERIFIED" || item.state === "RED_FLAG") return true;
+  if (item.state === "NOT_APPLICABLE") return hasRealResearchValue(item);
+  return hasRealResearchValue(item);
+}
+
+function hasRealResearchValue(item: ResearchChecklistItem): boolean {
+  if (item.value_number != null) return true;
+  if (!item.value_text) return false;
+  return !["unknown", "null", "undefined", "missing_data", "open_external_tool", "auto_verified", "manual_verified", "not_applicable", "red_flag", "not calculated"].includes(item.value_text.trim().toLowerCase());
+}
+
 function simpleFocusTitle(step: ResearchStepNumber, locale: "pl" | "en"): string {
   if (step === 3) return locale === "pl" ? "Bezpieczeństwo" : "Security";
   if (step === 4) return locale === "pl" ? "On-chain" : "On-chain";
   return stepName(step, locale);
 }
 
-function simpleResearchStatus(view: ResearchChecklistView, keyTools: Array<ResearchChecklistItem & { manual_external_tool: ManualResearchTool }>, locale: "pl" | "en"): string {
-  const completed = keyTools.filter((item) => isSimpleChecked(item.state)).length;
-  if (completed === keyTools.length && keyTools.length > 0) return locale === "pl"
-    ? `${completed}/${keyTools.length} główne kontrole wykonane`
-    : `${completed}/${keyTools.length} key checks completed`;
-  if (view.readiness === "CRITICAL_RED_FLAG_PRESENT") return locale === "pl" ? "Research wymaga uwagi" : "Research needs attention";
+function simpleResearchStatus(view: ResearchChecklistView, step: ResearchChecklistStep, items: ResearchChecklistItem[], locale: "pl" | "en"): string {
+  if (step.number === 7) return derivedReadinessText(view, locale);
+  if (items.some((item) => item.state === "RED_FLAG")) return locale === "pl" ? "Research wymaga uwagi" : "Research needs attention";
+  if (step.state === "MISSING_DATA" || step.state === "OPEN_EXTERNAL_TOOL") return researchIncompleteName(locale);
+  const completed = items.filter((item) => isSimpleChecked(item.state)).length;
+  if (items.length > 0 && completed === items.length) return locale === "pl"
+    ? `${completed}/${items.length} kontrole wykonane`
+    : `${completed}/${items.length} checks completed`;
   return locale === "pl" ? "Research niekompletny" : "Research incomplete";
+}
+
+function ResearchUnavailableState({ step, view, items, locale }: {
+  step: ResearchChecklistStep;
+  view?: ResearchChecklistView;
+  items: ResearchChecklistItem[];
+  locale: "pl" | "en";
+}) {
+  const pl = locale === "pl";
+  const technicalItems = meaningfulTechnicalItems(step);
+  if (step.number === 7) return <ResearchDerivedReadiness view={view} locale={locale} />;
+  if (step.number === 5 && technicalItems.length === 0) return <p className="research-empty-step-state" data-research-social-unavailable>{pl ? "Brak dostępnych danych społecznościowych" : "No social research data available"}</p>;
+  if (step.number === 6 && technicalItems.length === 0) return <section className="research-empty-step-state" data-research-scorecard-unavailable><strong>{pl ? "Scorecard" : "Scorecard"}</strong><p>{pl ? "Brak dostępnego wyniku" : "No score is available"}</p></section>;
+  if (items.length === 0) return null;
+  return <section className="research-unavailable-data" data-research-unavailable-data={step.number}>
+    <p>{unavailableSummary(items.length, locale)}</p>
+    <details data-research-missing-fields={step.number}><summary>{pl ? `Pokaż brakujące pola (${items.length})` : `Show missing fields (${items.length})`}</summary><ul>{items.map((item) => <li key={`${step.number}:${item.key}`}>{itemName(item.key, locale)}</li>)}</ul></details>
+  </section>;
+}
+
+function ResearchDerivedReadiness({ view, locale }: { view?: ResearchChecklistView; locale: "pl" | "en" }) {
+  return <p className="research-derived-readiness" data-research-derived-readiness>{view ? derivedReadinessText(view, locale) : researchIncompleteName(locale)}</p>;
+}
+
+function unavailableSummary(count: number, locale: "pl" | "en"): string {
+  if (locale === "en") return `Data is unavailable for ${count} additional ${count === 1 ? "check" : "checks"}`;
+  return count === 1 ? "Brakuje danych dla 1 dodatkowej kontroli" : `Brakuje danych dla ${count} dodatkowych kontroli`;
+}
+
+function derivedReadinessText(view: ResearchChecklistView, locale: "pl" | "en"): string {
+  if (view.readiness === "CRITICAL_RED_FLAG_PRESENT") return locale === "pl" ? "Wykryto czerwoną flagę" : "A red flag was detected";
+  if (view.readiness === "EVIDENCE_COMPLETE_FOR_REVIEW") return locale === "pl" ? "Research kompletny do przeglądu" : "Research is complete for review";
+  return researchIncompleteName(locale);
 }
 
 function keyToolName(tool: ManualResearchTool, locale: "pl" | "en"): string {
@@ -503,7 +608,7 @@ function readinessText(view: ResearchChecklistView, locale: "pl" | "en"): string
   if (view.readiness === "CRITICAL_RED_FLAG_PRESENT") return locale === "pl" ? "Wykryto czerwoną flagę. To nie jest rekomendacja inwestycyjna." : "A red flag is recorded. This is not investment advice.";
   if (view.readiness === "EVIDENCE_COMPLETE_FOR_REVIEW") return locale === "pl" ? "Dowody są kompletne do przeglądu użytkownika lub ownera." : "Evidence is complete enough for user or owner review.";
   if (view.readiness === "MANUAL_VERIFICATION_REQUIRED") return locale === "pl" ? "Wymagana jest ręczna weryfikacja." : "Manual verification is required.";
-  return locale === "pl" ? "Research jest niekompletny — brakuje zapisanych danych." : "Research is incomplete — recorded data is missing.";
+  return locale === "pl" ? "Research jest niekompletny." : "Research is incomplete.";
 }
 function methodologyThreshold(value: string, locale: "pl" | "en"): string {
   if (locale === "en") return value;

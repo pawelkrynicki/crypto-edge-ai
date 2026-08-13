@@ -29,7 +29,7 @@ export function researchChecklistItemValue(item: ResearchChecklistItem, locale: 
     if (item.value_text === "unlocked") return locale === "pl" ? "Niezablokowana" : "Unlocked";
     return item.value_text;
   }
-  if (item.key.endsWith("scorecard")) return locale === "pl" ? "Nie obliczono w PC.3A" : "Not calculated in PC.3A";
+  if (item.key.endsWith("scorecard")) return locale === "pl" ? "Brak dostępnego wyniku" : "No score is available";
   if (item.manual_external_tool) return locale === "pl" ? "Zapisany wynik" : "Saved result";
   return item.state === "MISSING_DATA" ? (locale === "pl" ? "Brak zapisanych danych" : "No recorded data") : (locale === "pl" ? "Zapisana kontrola" : "Recorded check");
 }

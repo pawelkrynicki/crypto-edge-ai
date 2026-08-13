@@ -161,22 +161,20 @@ test("PC.3A focus mode keeps navigation in normal flow, avoids title duplication
   assert.match(returnedDetail, /role="tab"[^>]*aria-selected="true"[^>]*>Podsumowanie/);
 });
 
-test("PC.3A focus mode localizes methodology values, hides machine values, and keeps red flags visible", () => {
+test("PC.3A focus mode localizes methodology values, omits unavailable rows, and keeps red flags visible", () => {
   const unknownCandidate: UiTokenCandidate = {
     ...candidate,
     security: { ...candidate.security!, honeypotStatus: "unknown", ownershipStatus: "unknown", contractVerified: null, liquidityLocked: null },
   };
   const polish = renderToStaticMarkup(<ProductLocaleProvider initialLocale="pl"><ResearchChecklistDetail candidate={unknownCandidate} focusedStep={2} /></ProductLocaleProvider>);
   const english = renderToStaticMarkup(<ProductLocaleProvider initialLocale="en"><ResearchChecklistDetail candidate={unknownCandidate} focusedStep={2} /></ProductLocaleProvider>);
-  assert.match(polish, /Brak zapisanego wyniku/);
+  assert.match(polish, /Brakuje danych dla 6 dodatkowych kontroli/);
   assert.doesNotMatch(polish, /unknown|\bnull\b|\bundefined\b/i);
-  assert.match(polish, /wymagane/);
-  assert.match(polish, /płynność musi być zablokowana/);
-  assert.match(english, /required/);
-  assert.match(english, /must be locked/);
+  assert.doesNotMatch(polish, /<strong>Zweryfikowany kontrakt<\/strong>/);
+  assert.match(english, /Data is unavailable for 6 additional checks/);
   const scorecardPolish = renderToStaticMarkup(<ProductLocaleProvider initialLocale="pl"><ResearchChecklistDetail candidate={candidate} focusedStep={6} /></ProductLocaleProvider>);
-  assert.match(scorecardPolish, /nie obliczono/);
-  assert.doesNotMatch(scorecardPolish, /not calculated/i);
+  assert.match(scorecardPolish, /Brak dostępnego wyniku/);
+  assert.doesNotMatch(scorecardPolish, /PC\.3A|not calculated/i);
 
   const redFlagCandidate: UiTokenCandidate = {
     ...candidate,
@@ -190,7 +188,7 @@ test("PC.3A focus mode localizes methodology values, hides machine values, and k
   assert.match(redFlag, /data-research-technical-red-flags/);
 });
 
-test("PC.3A localizes ownership only after a known ownership state is resolved", () => {
+test("PC.3A renders ownership only after a known ownership state is resolved", () => {
   const unknownCandidate: UiTokenCandidate = { ...candidate, security: { ...candidate.security!, ownershipStatus: "unknown" } };
   const activeCandidate: UiTokenCandidate = { ...candidate, security: { ...candidate.security!, ownershipStatus: "active" } };
   const unknownPolish = renderToStaticMarkup(<ProductLocaleProvider initialLocale="pl"><ResearchChecklistDetail candidate={unknownCandidate} focusedStep={3} /></ProductLocaleProvider>);
@@ -203,19 +201,16 @@ test("PC.3A localizes ownership only after a known ownership state is resolved",
     return markup.slice(start, markup.indexOf("</article>", start));
   };
 
-  const unknownPolishOwnership = ownershipItem(unknownPolish, "Własność");
-  const unknownEnglishOwnership = ownershipItem(unknownEnglish, "Ownership");
-  assert.match(unknownPolishOwnership, /Brak danych/);
-  assert.match(unknownEnglishOwnership, /Missing data/);
-  assert.doesNotMatch(unknownPolishOwnership, /Sprawdzone automatycznie|unknown/i);
-  assert.doesNotMatch(unknownEnglishOwnership, /Automatically checked|unknown/i);
+  assert.doesNotMatch(unknownPolish, /<strong>Własność<\/strong>/);
+  assert.doesNotMatch(unknownEnglish, /<strong>Ownership<\/strong>/);
+  assert.match(unknownPolish, /Pokaż brakujące pola/);
   assert.match(ownershipItem(activePolish, "Własność"), /Własność aktywna/);
   assert.match(ownershipItem(activePolish, "Własność"), /Sprawdzone automatycznie/);
   assert.match(ownershipItem(renouncedEnglish, "Ownership"), /Ownership renounced/);
   assert.match(ownershipItem(renouncedEnglish, "Ownership"), /Automatically checked/);
 });
 
-test("PC.3A focus mode retains all technical evidence behind one collapsed detail section", () => {
+test("PC.3A focus mode collapses unavailable technical schema fields into one compact disclosure", () => {
   const noResolvedSecurity = {
     ...candidate.security!,
     sources: [], honeypotStatus: "unknown", buyTax: null, sellTax: null, contractVerified: null, ownershipStatus: "unknown", liquidityLocked: null,
@@ -223,9 +218,11 @@ test("PC.3A focus mode retains all technical evidence behind one collapsed detai
   };
   const markup = renderToStaticMarkup(<ProductLocaleProvider initialLocale="pl"><ResearchChecklistDetail candidate={{ ...candidate, security: noResolvedSecurity }} focusedStep={3} /></ProductLocaleProvider>);
   assert.doesNotMatch(markup, /data-research-red-flag-reveal/);
-  assert.match(markup, /data-research-technical-details="3"/);
-  assert.match(markup, /Pokaż szczegóły techniczne \(11\)/);
+  assert.doesNotMatch(markup, /data-research-technical-details="3"/);
+  assert.match(markup, /data-research-unavailable-data="3"/);
+  assert.match(markup, /Brakuje danych dla 11 dodatkowych kontroli/);
+  assert.match(markup, /Pokaż brakujące pola \(11\)/);
   assert.match(markup, /Pokrycie GoPlus/);
   assert.match(markup, /Blokada płynności/);
-  assert.doesNotMatch(markup, /data-research-technical-details="3"[^>]*open=/, "technical evidence remains collapsed");
+  assert.doesNotMatch(markup, /<strong>Pokrycie GoPlus<\/strong>/);
 });

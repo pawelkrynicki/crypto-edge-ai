@@ -8,7 +8,7 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import TestRenderer from "react-test-renderer";
 import { isSafeOfficialManualResearchUrl, resolveManualResearchTarget } from "../src/externalVerificationTargets.js";
-import { ResearchChecklistDetail } from "../src/components/ResearchChecklist.js";
+import { ResearchChecklistDetail, ResearchChecklistSummary } from "../src/components/ResearchChecklist.js";
 import { ExternalVerificationLinksView } from "../src/components/ExternalVerificationLinksView.js";
 import { ProductLocaleProvider } from "../src/productI18n.js";
 import { researchChecklistItemValue } from "../src/researchChecklistPresentation.js";
@@ -204,7 +204,10 @@ test("PC.3B renders four usable external tool actions, shows saved state truthfu
   assert.match(step3, /Research niekompletny/);
   assert.match(step3, /Sprawdzone/);
   assert.match(step3, /Do sprawdzenia/);
-  for (const tool of ["honeypot", "tokensniffer", "defi_scanner", "bubblemaps"]) assert.match(step3, new RegExp(`data-key-research-tool="${tool}"`));
+  for (const tool of ["honeypot", "tokensniffer", "defi_scanner"]) assert.match(step3, new RegExp(`data-key-research-tool="${tool}"`));
+  assert.doesNotMatch(step3, /data-key-research-tool="bubblemaps"/);
+  assert.match(step4, /data-key-research-tool="bubblemaps"/);
+  assert.doesNotMatch(step4, /data-key-research-tool="honeypot"/);
   assert.match(step3, /Główne kontrole/);
   assert.match(step3, /Pokaż szczegóły techniczne/);
   assert.doesNotMatch(step3, /data-research-technical-details="3"[^>]*\sopen=/, "technical details start collapsed");
@@ -212,7 +215,8 @@ test("PC.3B renders four usable external tool actions, shows saved state truthfu
   assert.match(step3, /Własność/);
   assert.match(step3, /Mint/);
   assert.match(step4, /Top 10 wallets/);
-  assert.match(step4, /Holder count/);
+  assert.match(step4, /12\.00%/);
+  assert.doesNotMatch(step4, /<strong>Holder count<\/strong>/);
   assert.match(step3, /Dodaj wynik/);
   assert.match(step3, /Kopiuj CA/);
   assert.match(step3, /Wklej skopiowany adres w polu wyszukiwania TokenSniffer\./);
@@ -275,23 +279,20 @@ test("PC.3B keeps the simplified focus view compact while retaining expandable t
     }
     return new Response("{}", { status: 404, headers: { "content-type": "application/json" } });
   }) as typeof fetch;
-  const opened: number[] = [];
   let renderer: ReturnType<typeof create> | undefined;
   try {
     await act(async () => {
-      renderer = create(<ProductLocaleProvider initialLocale="pl"><ResearchChecklistDetail candidate={candidate()} focusedStep={3} onOpenFocusedResearchStep={(step) => opened.push(step)} /></ProductLocaleProvider>);
+      renderer = create(<ProductLocaleProvider initialLocale="pl"><ResearchChecklistDetail candidate={candidate()} focusedStep={3} /></ProductLocaleProvider>);
       await Promise.resolve();
     });
     const technical = renderer!.root.findByProps({ "data-research-technical-details": 3 });
     assert.equal(technical.props.open, false);
     assert.equal(renderer!.root.findAll((node) => String(node.props.className ?? "").includes("research-external-result-form")).length, 0);
 
-    for (const [tool, expectedStep] of [["honeypot", 3], ["tokensniffer", 3], ["defi_scanner", 3], ["bubblemaps", 4]] as const) {
-      const jump = renderer!.root.findByProps({ "data-key-research-tool-focus": tool });
-      await act(async () => { jump.props.onClick(); });
-      assert.equal(opened.at(-1), expectedStep, `${tool} returns to its methodological home`);
-    }
-    assert.deepEqual(opened, [3, 3, 3, 4]);
+    assert.deepEqual(renderer!.root.findAllByProps({ "data-key-research-tool": "honeypot" }).length, 1);
+    assert.deepEqual(renderer!.root.findAllByProps({ "data-key-research-tool": "tokensniffer" }).length, 1);
+    assert.deepEqual(renderer!.root.findAllByProps({ "data-key-research-tool": "defi_scanner" }).length, 1);
+    assert.equal(renderer!.root.findAllByProps({ "data-key-research-tool": "bubblemaps" }).length, 0);
 
     const tokenSnifferWorkflow = renderer!.root.findByProps({ "data-manual-research-tool": "tokensniffer" });
     const addResult = tokenSnifferWorkflow.findAllByType("button").find((node) => buttonText(node) === "Dodaj wynik");
@@ -336,6 +337,62 @@ test("PC.3B surfaces a technical red flag in the simple layer and reveals techni
     globalThis.fetch = originalFetch;
     globalThis.IS_REACT_ACT_ENVIRONMENT = originalActEnvironment;
   }
+});
+
+test("PC.3B keeps one global tool overview and maps each tool to its contextual step", async () => {
+  const originalFetch = globalThis.fetch;
+  const originalActEnvironment = globalThis.IS_REACT_ACT_ENVIRONMENT;
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  globalThis.fetch = (async () => new Response("{}", { status: 404, headers: { "content-type": "application/json" } })) as typeof fetch;
+  const opened: number[] = [];
+  let renderer: ReturnType<typeof create> | undefined;
+  try {
+    await act(async () => {
+      renderer = create(<ProductLocaleProvider initialLocale="pl"><ResearchChecklistSummary candidate={candidate()} onOpenStep={(step) => opened.push(step)} /></ProductLocaleProvider>);
+      await Promise.resolve();
+    });
+    assert.equal(renderer!.root.findAllByProps({ "data-research-global-tools": true }).length, 1);
+    for (const [tool, expectedStep] of [["honeypot", 3], ["tokensniffer", 3], ["defi_scanner", 3], ["bubblemaps", 4]] as const) {
+      const action = renderer!.root.findByProps({ "data-research-global-tool": tool });
+      await act(async () => { action.props.onClick(); });
+      assert.equal(opened.at(-1), expectedStep, `${tool} opens its contextual step`);
+    }
+    assert.deepEqual(opened, [3, 3, 3, 4]);
+  } finally {
+    if (renderer) await act(async () => { renderer!.unmount(); });
+    globalThis.fetch = originalFetch;
+    globalThis.IS_REACT_ACT_ENVIRONMENT = originalActEnvironment;
+  }
+});
+
+test("PC.3B renders only meaningful step data and uses compact unavailable states", () => {
+  const ratioCandidate: UiTokenCandidate = { ...candidate(), liquidity: 1_271_700, marketCap: 1_000_000 };
+  const step4 = renderToStaticMarkup(<ProductLocaleProvider initialLocale="pl"><ResearchChecklistDetail candidate={ratioCandidate} focusedStep={4} /></ProductLocaleProvider>);
+  const step5 = renderToStaticMarkup(<ProductLocaleProvider initialLocale="pl"><ResearchChecklistDetail candidate={candidate()} focusedStep={5} /></ProductLocaleProvider>);
+  const step6 = renderToStaticMarkup(<ProductLocaleProvider initialLocale="pl"><ResearchChecklistDetail candidate={candidate()} focusedStep={6} /></ProductLocaleProvider>);
+  const step7 = renderToStaticMarkup(<ProductLocaleProvider initialLocale="pl"><ResearchChecklistDetail candidate={candidate()} focusedStep={7} /></ProductLocaleProvider>);
+  const deadSecurity = { ...security(), sources: [], contractVerified: null, ownershipStatus: "unknown", liquidityLocked: null, mintRisk: null, blacklistRisk: null, whitelistRisk: null, sellRestrictionRisk: null, proxyRisk: null, buyTax: null, sellTax: null };
+  const step3WithDeadRows = renderToStaticMarkup(<ProductLocaleProvider initialLocale="pl"><ResearchChecklistDetail candidate={{ ...candidate(), security: deadSecurity }} focusedStep={3} /></ProductLocaleProvider>);
+  const redFlag = renderToStaticMarkup(<ProductLocaleProvider initialLocale="pl"><ResearchChecklistDetail candidate={{ ...candidate(), security: { ...security(), mintRisk: true } }} focusedStep={3} /></ProductLocaleProvider>);
+
+  assert.match(step4, /127\.17%/);
+  for (const name of ["Liczba holderów", "Portfel dewelopera", "Data końca blokady", "Jakość wolumenu"]) assert.doesNotMatch(step4, new RegExp(`<strong>${name}<\\/strong>`));
+  assert.match(step4, /Brakuje danych dla 4 dodatkowych kontroli/);
+  assert.doesNotMatch(step3WithDeadRows, /<strong>Mint<\/strong>/);
+  assert.doesNotMatch(step3WithDeadRows, /<strong>Własność<\/strong>/);
+  assert.match(redFlag, /data-research-red-flag-reveal/);
+  assert.match(redFlag, /<strong>Mint<\/strong>/);
+
+  assert.doesNotMatch(step5, /data-key-research-tool=/);
+  assert.match(step5, /Brak dostępnych danych społecznościowych/);
+  for (const name of ["X / Twitter", "Telegram", "Discord", "Strona WWW", "Zespół", "Whitepaper", "Roadmap"]) assert.doesNotMatch(step5, new RegExp(`<strong>${name}<\\/strong>`));
+  assert.doesNotMatch(step6, /data-key-research-tool=/);
+  assert.match(step6, /Brak dostępnego wyniku/);
+  assert.match(step6, /<b>Do sprawdzenia<\/b>0/);
+  assert.doesNotMatch(step6, /PC\.3A|<strong>Bezpieczeństwo \(30\)<\/strong>|<strong>On-chain \(25\)<\/strong>/);
+  assert.match(step7, /data-research-derived-readiness/);
+  assert.match(step7, /Research niekompletny/);
+  assert.doesNotMatch(step7, /<strong>Gotowość researchu<\/strong>|Brak zapisanych danych/);
 });
 
 function externalActions(markup: string) {
