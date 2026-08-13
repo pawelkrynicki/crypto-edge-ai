@@ -2,6 +2,28 @@ export type ExternalVerificationTargetKind = "explorer" | "dex" | "security" | "
 
 export type ExternalVerificationTargetState = "link" | "manual";
 
+/**
+ * These are deliberately browser-only research destinations.  They are not
+ * provider integrations: the app never requests, embeds, or proxies them.
+ */
+export const MANUAL_RESEARCH_TOOLS = ["honeypot", "tokensniffer", "defi_scanner", "bubblemaps"] as const;
+export type ManualResearchTool = (typeof MANUAL_RESEARCH_TOOLS)[number];
+export type ManualResearchTargetAvailability = "AVAILABLE" | "MANUAL_SEARCH" | "UNSUPPORTED_CHAIN" | "UNAVAILABLE";
+
+export interface ManualResearchTargetInput {
+  chain?: string;
+  contractAddress?: string;
+}
+
+export interface ManualResearchTarget {
+  tool: ManualResearchTool;
+  chain: string;
+  contract_address: string;
+  availability: ManualResearchTargetAvailability;
+  official_url: string | null;
+  copy_value: string;
+}
+
 export interface ExternalVerificationInput {
   symbol?: string;
   projectName?: string;
@@ -42,6 +64,17 @@ const ALLOWLISTED_SOURCE_HOSTS = new Set([
   "optimistic.etherscan.io",
   "solscan.io",
 ]);
+
+const MANUAL_RESEARCH_OFFICIAL_HOSTS = new Set([
+  "honeypot.is",
+  "tokensniffer.com",
+  "de.fi",
+  "v2.bubblemaps.io",
+]);
+
+const EVM_MANUAL_SEARCH_CHAINS = new Set(["ethereum", "eth", "bsc", "binance", "base", "polygon", "arbitrum", "optimism"]);
+const BUBBLEMAPS_CHAINS = new Set([...EVM_MANUAL_SEARCH_CHAINS, "solana"]);
+const HONEYPOT_CHAIN_ALIASES: Record<string, string> = { eth: "ethereum", binance: "bsc" };
 
 const EXPLORER_TARGETS: Record<string, ExplorerTarget> = {
   ethereum: {
@@ -93,6 +126,71 @@ export function buildExternalVerificationTargets(input: ExternalVerificationInpu
     buildSecurityTarget(normalized, copyValue, copyLabel),
     buildSourceTarget(normalized),
   ];
+}
+
+/**
+ * Resolves only URLs we construct from fixed official domains.  Honeypot's
+ * address query is verified against its public site; the other tools use their
+ * official search page until a stable, documented deep link is available.
+ */
+export function resolveManualResearchTarget(
+  tool: ManualResearchTool,
+  input: ManualResearchTargetInput,
+): ManualResearchTarget {
+  const chain = normalizeManualResearchChain(input.chain);
+  const contractAddress = (input.contractAddress ?? "").trim();
+  const base = { tool, chain, contract_address: contractAddress, copy_value: contractAddress };
+
+  if (!contractAddress) return { ...base, availability: "UNAVAILABLE", official_url: null };
+
+  if (tool === "honeypot") {
+    if (!["ethereum", "bsc", "base"].includes(chain)) {
+      return { ...base, availability: "UNSUPPORTED_CHAIN", official_url: null };
+    }
+    return {
+      ...base,
+      availability: "AVAILABLE",
+      official_url: safeOfficialManualResearchUrl(`https://honeypot.is/?address=${encodeURIComponent(contractAddress)}`),
+    };
+  }
+
+  if (tool === "bubblemaps") {
+    if (!BUBBLEMAPS_CHAINS.has(chain)) return { ...base, availability: "UNSUPPORTED_CHAIN", official_url: null };
+    return {
+      ...base,
+      availability: "MANUAL_SEARCH",
+      official_url: safeOfficialManualResearchUrl("https://v2.bubblemaps.io/"),
+    };
+  }
+
+  if (!EVM_MANUAL_SEARCH_CHAINS.has(chain)) return { ...base, availability: "UNSUPPORTED_CHAIN", official_url: null };
+  return {
+    ...base,
+    availability: "MANUAL_SEARCH",
+    official_url: safeOfficialManualResearchUrl(tool === "tokensniffer" ? "https://tokensniffer.com/" : "https://de.fi/scanner"),
+  };
+}
+
+export function isSafeOfficialManualResearchUrl(value: string | null | undefined): value is string {
+  if (!value) return false;
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "https:"
+      && !parsed.username
+      && !parsed.password
+      && MANUAL_RESEARCH_OFFICIAL_HOSTS.has(parsed.hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
+function safeOfficialManualResearchUrl(value: string): string | null {
+  return isSafeOfficialManualResearchUrl(value) ? value : null;
+}
+
+function normalizeManualResearchChain(value: string | undefined): string {
+  const normalized = (value ?? "").trim().toLowerCase();
+  return HONEYPOT_CHAIN_ALIASES[normalized] ?? normalized;
 }
 
 export function normalizeExternalVerificationInput(input: ExternalVerificationInput): Required<ExternalVerificationInput> {
