@@ -17,6 +17,7 @@ import {
 } from "../src/runtimeMode.js";
 import { readCommittedSnapshotState } from "./committedSnapshotState.js";
 import { resolveCanonicalProductDataPaths } from "./canonicalProductDataPaths.js";
+import { isSocialLinkCategory, normalizeSafeSocialLinkUrl } from "../src/socialLinks.js";
 
 export const SCANNER_OUTPUT_UNAVAILABLE = "SCANNER_OUTPUT_UNAVAILABLE";
 export const INVALID_SCANNER_OUTPUT = "SCANNER_SCHEMA_INVALID";
@@ -765,6 +766,12 @@ function sanitizeCandidate(
   if (value.source_url !== null && sourceUrl === null) {
     throw new RealDataBoundaryError(INVALID_SCANNER_OUTPUT);
   }
+  const socialLinks = sanitizeSocialLinks(value.social_links);
+  if (value.social_links !== undefined && socialLinks === null) {
+    // A malformed newer link payload must fail closed so canonical snapshot/LKG
+    // selection does not silently replace previously safe shared evidence.
+    throw new RealDataBoundaryError(INVALID_SCANNER_OUTPUT);
+  }
   if (value.discovery_basket === "new_emerging") {
     if (
       value.discovery_method !== "dexscreener_latest_token_profiles"
@@ -797,6 +804,7 @@ function sanitizeCandidate(
     dex: value.dex,
     source: "dexscreener",
     source_url: sourceUrl,
+    social_links: socialLinks ?? [],
     price_usd: value.price_usd,
     market_cap_usd: value.market_cap_usd,
     fdv_usd: value.fdv_usd,
@@ -818,6 +826,23 @@ function sanitizeCandidate(
     universe_entry_index: value.universe_entry_index,
     address_identity_verified: value.address_identity_verified,
   };
+}
+
+function sanitizeSocialLinks(value: unknown): Array<{ category: string; url: string; source: "DexScreener"; snapshot_at: string }> | null {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) return null;
+  const seen = new Set<string>();
+  const links: Array<{ category: string; url: string; source: "DexScreener"; snapshot_at: string }> = [];
+  for (const entry of value) {
+    if (!isRecord(entry) || !isSocialLinkCategory(entry.category) || entry.source !== "DexScreener" || typeof entry.snapshot_at !== "string") return null;
+    const url = normalizeSafeSocialLinkUrl(entry.category, entry.url);
+    if (!url || !Number.isFinite(Date.parse(entry.snapshot_at))) return null;
+    const key = `${entry.category}:${url}`;
+    if (seen.has(key)) return null;
+    seen.add(key);
+    links.push({ category: entry.category, url, source: "DexScreener", snapshot_at: new Date(entry.snapshot_at).toISOString() });
+  }
+  return links;
 }
 
 function sanitizeSecurityChecks(

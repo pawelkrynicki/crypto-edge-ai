@@ -42,6 +42,7 @@
     "test:follow-up": "tsc && node --test dist/tests/followUpBasket.test.js dist/tests/followUpCollector.test.js",
     "test:pc1": "tsc && node --test dist/tests/systemLifecycle.test.js dist/tests/pc1LifecycleReviewPreparation.test.js dist/tests/pc1LifecycleReviewBootstrap.test.js",
     "test:pc3c": "tsc && node --test dist/tests/pc3cOnchainNormalization.test.js",
+    "test:pc3d": "tsc && node --test dist/tests/pc3dSocialLinkNormalization.test.js",
     "test": "tsc && node --test dist/tests/*.js",
     "test:automation": "tsc && node --test dist/tests/automationLock.test.js dist/tests/automationCircuitBreaker.test.js dist/tests/centralAutomationCoordinator.test.js dist/tests/dataCycleOperations.test.js dist/tests/schedulerCadence.test.js dist/tests/taskSchedulerScripts.test.js",
     "test:data1": "tsc && node --test dist/tests/automationLock.test.js dist/tests/atomicPublish.test.js dist/tests/centralAutomationCoordinator.test.js dist/tests/dataCycleOperations.test.js dist/tests/followUpBasket.test.js dist/tests/followUpCollector.test.js dist/tests/internalBetaCollector.test.js dist/tests/internalBetaContextCollection.test.js dist/tests/schedulerCadence.test.js dist/tests/taskSchedulerScripts.test.js",

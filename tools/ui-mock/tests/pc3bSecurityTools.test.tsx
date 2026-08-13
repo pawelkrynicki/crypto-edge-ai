@@ -384,7 +384,8 @@ test("PC.3B renders only meaningful step data and uses compact unavailable state
   assert.match(redFlag, /<strong>Mint<\/strong>/);
 
   assert.doesNotMatch(step5, /data-key-research-tool=/);
-  assert.match(step5, /Brak dostępnych danych społecznościowych/);
+  assert.match(step5, /Nie znaleziono automatycznych linków społecznościowych w obecnym źródle/);
+  assert.match(step5, /Research społeczny wymaga ręcznego uzupełnienia/);
   for (const name of ["X / Twitter", "Telegram", "Discord", "Strona WWW", "Zespół", "Whitepaper", "Roadmap"]) assert.doesNotMatch(step5, new RegExp(`<strong>${name}<\\/strong>`));
   assert.doesNotMatch(step6, /data-key-research-tool=/);
   assert.match(step6, /Brak dostępnego wyniku/);

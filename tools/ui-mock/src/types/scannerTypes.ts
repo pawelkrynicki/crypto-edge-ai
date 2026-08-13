@@ -56,6 +56,7 @@ export type PersistableCandidate = {
   dex: string | null;
   source: string;
   source_url: string | null;
+  social_links?: PersistableSocialLink[];
   price_usd: number | null;
   market_cap_usd: number | null;
   fdv_usd: number | null;
@@ -76,6 +77,13 @@ export type PersistableCandidate = {
   universe_version?: string | null;
   universe_entry_index?: number | null;
   address_identity_verified?: boolean;
+};
+
+export type PersistableSocialLink = {
+  category: "twitter" | "telegram" | "discord" | "website" | "team" | "whitepaper" | "roadmap";
+  url: string;
+  source: "DexScreener";
+  snapshot_at: string;
 };
 
 export type PersistableSecurityCheck = {
@@ -266,6 +274,8 @@ export interface UiTokenCandidate {
   contractAddress: string;
   pairAddress: string;
   sourceUrl: string;
+  /** Safe central snapshot links only; no automatic social-quality conclusion. */
+  socialLinks?: import("../socialLinks").PublicSocialLink[];
   discoveryBasket: "new_emerging" | "established";
   discoveryMethod: "dexscreener_latest_token_profiles" | "address_seeded_universe";
   observationOnly: boolean;

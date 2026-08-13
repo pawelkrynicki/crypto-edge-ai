@@ -1,4 +1,5 @@
 import { applyBasicFilters, calculateVolumeMarketCapRatio } from "./filters.js";
+import { normalizeDexScreenerSocialLinks } from "./socialLinkNormalization.js";
 import type { CryptoEdgeCandidate, DexScreenerPair, DexScreenerToken } from "./types.js";
 import type { SupportedEstablishedChain } from "./establishedAddressUniverse.js";
 import { isSameContractAddress } from "./establishedAddressUniverse.js";
@@ -23,6 +24,7 @@ export function normalizeDexScreenerPair(pair: DexScreenerPair, now = new Date()
     dex: pair.dexId ?? null,
     source: "dexscreener",
     source_url: pair.url ?? null,
+    social_links: normalizeDexScreenerSocialLinks(pair.info),
     price_usd: parseNullableNumber(pair.priceUsd),
     market_cap_usd: marketCapUsd,
     fdv_usd: fdvUsd,
@@ -95,6 +97,7 @@ function normalizeQuoteTokenCandidate(
     dex: pair.dexId ?? null,
     source: "dexscreener",
     source_url: pair.url ?? null,
+    social_links: normalizeDexScreenerSocialLinks(pair.info),
     // DexScreener pair valuation and price fields describe baseToken. They must
     // not be silently attributed to the configured token when it is quoteToken.
     price_usd: null,

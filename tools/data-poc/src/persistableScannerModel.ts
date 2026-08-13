@@ -4,6 +4,7 @@ import {
   type SnapshotProvenanceManifest,
 } from "./provenanceManifest.js";
 import type { CombinedScannerFinalLabel, CombinedScannerOutput } from "./types.js";
+import type { NormalizedSocialLink, SocialLinkCategory } from "./types.js";
 
 export const LEGACY_SCANNER_SCHEMA_VERSION = "scanner_snapshot_v1";
 export const LEGACY_SCANNER_GENERATOR_VERSION = "data_poc_persistable_scanner_v1";
@@ -49,6 +50,8 @@ export type PersistableCandidate = {
   dex: string | null;
   source: string;
   source_url: string | null;
+  /** Shared discovery links are not quality findings and are bound to this candidate snapshot. */
+  social_links?: PersistableSocialLink[];
   price_usd: number | null;
   market_cap_usd: number | null;
   fdv_usd: number | null;
@@ -69,6 +72,13 @@ export type PersistableCandidate = {
   universe_version?: string | null;
   universe_entry_index?: number | null;
   address_identity_verified?: boolean;
+};
+
+export type PersistableSocialLink = {
+  category: SocialLinkCategory;
+  url: string;
+  source: "DexScreener";
+  snapshot_at: string;
 };
 
 export type PersistableSecurityCheck = {
@@ -146,6 +156,7 @@ export function buildPersistableScannerOutput(input: BuildPersistableScannerInpu
       dex: item.candidate.dex,
       source: item.candidate.source,
       source_url: item.candidate.source_url,
+      social_links: persistSocialLinks(item.candidate.social_links ?? [], finishedAt),
       price_usd: item.candidate.price_usd,
       market_cap_usd: item.candidate.market_cap_usd,
       fdv_usd: item.candidate.fdv_usd,
@@ -264,6 +275,10 @@ export function buildPersistableScannerOutput(input: BuildPersistableScannerInpu
     security_checks: securityChecks,
     scorecards
   };
+}
+
+function persistSocialLinks(links: readonly NormalizedSocialLink[], snapshotAt: string): PersistableSocialLink[] {
+  return links.map((link) => ({ ...link, source: "DexScreener", snapshot_at: snapshotAt }));
 }
 
 export function buildRunId(finishedAt: string): string {

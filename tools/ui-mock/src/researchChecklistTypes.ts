@@ -102,6 +102,12 @@ export type ResearchAutomaticProvenance = {
   normalization_path: "candidate_snapshot" | "security_snapshot" | "derived_from_candidate_snapshot";
 };
 
+/** A source link is actionable evidence, never a completed quality check. */
+export type ResearchAutomaticLink = {
+  url: string;
+  provenance: ResearchAutomaticProvenance;
+};
+
 export type ResearchChecklistItem = {
   key: ResearchChecklistItemKey;
   step_number: ResearchStepNumber;
@@ -112,6 +118,7 @@ export type ResearchChecklistItem = {
   threshold: string | null;
   source: "AUTOMATIC" | "MANUAL" | "UNAVAILABLE";
   automatic_provenance: ResearchAutomaticProvenance | null;
+  automatic_link: ResearchAutomaticLink | null;
   manual_allowed: boolean;
   /** Present only for the four PC.3B browser-only research workflows. */
   manual_external_tool: "honeypot" | "tokensniffer" | "defi_scanner" | "bubblemaps" | null;
