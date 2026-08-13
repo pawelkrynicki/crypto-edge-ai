@@ -49,6 +49,29 @@ test("PC.3D keeps automatic links actionable but does not complete a social-qual
   assert.doesNotMatch(empty, /research-checklist-item/);
 });
 
+test("PC.3D uses plain-language findings copy for CAMP_USER Step 5", async () => {
+  const emptyCandidate = candidate({ socialLinks: [] });
+  const emptyView = { ...resolveResearchChecklist(emptyCandidate), manual_evidence_writable: true };
+  const polish = await renderSocialDetails(emptyCandidate, emptyView, "pl");
+  const english = await renderSocialDetails(emptyCandidate, emptyView, "en");
+  assert.match(polish, /Wymaga ręcznego sprawdzenia/);
+  assert.match(polish, /Twoje ustalenia/);
+  assert.match(polish, /Widoczne tylko dla Ciebie\. Nie wpływają na wspólne dane ani status tokena\./);
+  assert.match(polish, /Dodaj ustalenie/);
+  assert.doesNotMatch(polish, /workspace|migawka|lifecycle/i);
+  assert.match(english, /Manual review required/);
+  assert.match(english, /Your findings/);
+  assert.match(english, /Visible only to you\. They do not affect shared data or the token status\./);
+  assert.match(english, /Add finding/);
+  assert.doesNotMatch(english, /workspace|snapshot|lifecycle/i);
+
+  const finding = socialEvidence("twitter", "MANUAL_VERIFIED", "healthy");
+  const existingPolish = await renderSocialDetails(emptyCandidate, { ...resolveResearchChecklist(emptyCandidate, [finding]), manual_evidence_writable: true }, "pl");
+  const existingEnglish = await renderSocialDetails(emptyCandidate, { ...resolveResearchChecklist(emptyCandidate, [finding]), manual_evidence_writable: true }, "en");
+  assert.match(existingPolish, /Edytuj ustalenie/);
+  assert.match(existingEnglish, /Edit finding/);
+});
+
 test("PC.3D Step 5 counters measure final research state rather than automatic-link presence", async () => {
   const automaticLinksOnly = candidate();
   const caseA = await renderStep5(automaticLinksOnly, resolveResearchChecklist(automaticLinksOnly));
@@ -198,6 +221,31 @@ async function renderStep5(candidateValue: UiTokenCandidate, view: ResearchCheck
       },
       text: textContent(renderer!.root),
     };
+  } finally {
+    renderer?.unmount();
+    globalThis.fetch = originalFetch;
+  }
+}
+
+async function renderSocialDetails(candidateValue: UiTokenCandidate, view: ResearchChecklistView, locale: "pl" | "en"): Promise<string> {
+  const originalFetch = globalThis.fetch;
+  let renderer: ReturnType<typeof create> | undefined;
+  globalThis.fetch = (async () => new Response(JSON.stringify(view), { status: 200, headers: { "content-type": "application/json" } })) as typeof fetch;
+  try {
+    await act(async () => {
+      renderer = create(<ProductLocaleProvider initialLocale={locale}><ResearchChecklistDetail candidate={candidateValue} focusedStep={5} /></ProductLocaleProvider>);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    const details = renderer!.root.findByProps({ "data-pc3d-social-details": true });
+    await act(async () => {
+      details.props.onToggle({ currentTarget: { open: true } });
+      await Promise.resolve();
+    });
+    return textContent(renderer!.root);
   } finally {
     renderer?.unmount();
     globalThis.fetch = originalFetch;
