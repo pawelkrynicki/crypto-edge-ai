@@ -22,12 +22,21 @@ const ADDRESS = "0x1111111111111111111111111111111111111111";
 const PAIR = "0x2222222222222222222222222222222222222222";
 
 test("PC.3B resolves only safe official browser targets and declares unsupported chains truthfully", () => {
-  const honeypot = resolveManualResearchTarget("honeypot", { chain: "base", contractAddress: ADDRESS });
-  assert.equal(honeypot.availability, "AVAILABLE");
-  assert.equal(honeypot.official_url, `https://honeypot.is/?address=${encodeURIComponent(ADDRESS)}`);
-  assert.equal(new URL(honeypot.official_url!).hostname, "honeypot.is");
-  assert.doesNotMatch(honeypot.official_url!, /api\.honeypot\.is|\/v2\//i);
-  assert.equal(resolveManualResearchTarget("honeypot", { chain: "solana", contractAddress: ADDRESS }).availability, "UNSUPPORTED_CHAIN");
+  for (const [chain, path] of [["ethereum", "/ethereum"], ["eth", "/ethereum"], ["bsc", "/"], ["binance", "/"], ["base", "/base"]] as const) {
+    const honeypot = resolveManualResearchTarget("honeypot", { chain, contractAddress: ADDRESS });
+    assert.equal(honeypot.availability, "AVAILABLE", chain);
+    assert.ok(honeypot.official_url, chain);
+    const url = new URL(honeypot.official_url);
+    assert.equal(url.hostname, "honeypot.is", chain);
+    assert.equal(url.pathname, path, chain);
+    assert.equal(url.searchParams.get("address"), ADDRESS, chain);
+    assert.doesNotMatch(honeypot.official_url, /api\.honeypot\.is|\/v2\//i);
+  }
+  for (const chain of ["solana", "polygon", "arbitrum", "optimism"]) {
+    const unsupported = resolveManualResearchTarget("honeypot", { chain, contractAddress: ADDRESS });
+    assert.equal(unsupported.availability, "UNSUPPORTED_CHAIN", chain);
+    assert.equal(unsupported.official_url, null, chain);
+  }
 
   const sniffer = resolveManualResearchTarget("tokensniffer", { chain: "ethereum", contractAddress: ADDRESS });
   assert.equal(sniffer.availability, "MANUAL_SEARCH");
@@ -60,10 +69,12 @@ test("PC.3B maps private manual outcomes without changing automatic evidence", (
   const score50 = evidence(3, "tokensniffer", "MANUAL_VERIFIED", { value_number: 50, source_tool: "TokenSniffer" });
   const score0 = evidence(3, "tokensniffer", "RED_FLAG", { value_number: 0, source_tool: "TokenSniffer" });
   const score100 = evidence(3, "tokensniffer", "MANUAL_VERIFIED", { value_number: 100, source_tool: "TokenSniffer" });
+  const notConfirmed = evidence(3, "honeypot", "MISSING_DATA", { value_text: "could_not_confirm", source_tool: "Honeypot.is" });
   assert.equal(item(resolveResearchChecklist(base, [score49]), 3, "tokensniffer").state, "RED_FLAG");
   assert.equal(item(resolveResearchChecklist(base, [score50]), 3, "tokensniffer").state, "MANUAL_VERIFIED");
   assert.equal(item(resolveResearchChecklist(base, [score0]), 3, "tokensniffer").value_number, 0);
   assert.equal(item(resolveResearchChecklist(base, [score100]), 3, "tokensniffer").value_number, 100);
+  assert.equal(item(resolveResearchChecklist(base, [notConfirmed]), 3, "honeypot").state, "MISSING_DATA");
   assert.equal(item(resolveResearchChecklist(base, [evidence(4, "wallet_clustering", "RED_FLAG", { value_text: "strong_concentration_or_related_cluster", source_tool: "Bubblemaps" })]), 4, "wallet_clustering").state, "RED_FLAG");
   assert.equal(base.finalLabel, "WATCHLIST", "manual research does not mutate lifecycle-derived candidate data");
 });
@@ -156,14 +167,15 @@ test("PC.3B renders four usable external tool actions, shows saved state truthfu
   const step4 = renderToStaticMarkup(<ProductLocaleProvider initialLocale="en"><ResearchChecklistDetail candidate={candidate()} focusedStep={4} /></ProductLocaleProvider>);
   const focusedDrawer = renderToStaticMarkup(<ProductLocaleProvider initialLocale="en"><ExternalVerificationLinksView candidate={candidate()} focusedResearchStep={3} /></ProductLocaleProvider>);
   const css = await readFile("src/index.css", "utf8");
-  const [researchSource, presentationSource] = await Promise.all([
+  const [researchSource, presentationSource, targetsSource] = await Promise.all([
     readFile("src/components/ResearchChecklist.tsx", "utf8"),
     readFile("src/researchChecklistPresentation.ts", "utf8"),
+    readFile("src/externalVerificationTargets.ts", "utf8"),
   ]);
   const step3Actions = externalActions(step3);
   const step4Actions = externalActions(step4);
 
-  assertExternalAction(step3Actions, "Sprawdź Honeypot", `https://honeypot.is/?address=${ADDRESS}`);
+  assertExternalAction(step3Actions, "Sprawdź Honeypot", `https://honeypot.is/base?address=${ADDRESS}`);
   assertExternalAction(step3Actions, "Otwórz TokenSniffer", "https://tokensniffer.com/");
   assertExternalAction(step3Actions, "Otwórz De.Fi Scanner", "https://de.fi/scanner");
   assertExternalAction(step4Actions, "Open Bubblemaps", "https://v2.bubblemaps.io/");
@@ -174,7 +186,7 @@ test("PC.3B renders four usable external tool actions, shows saved state truthfu
   assert.match(css, /\.research-external-open-action\s*\{[^}]*cursor:\s*pointer/s);
   assert.match(css, /\.research-external-open-action:hover\s*\{/);
   assert.match(css, /\.research-external-open-action:focus-visible\s*\{/);
-  assert.doesNotMatch(`${researchSource}${presentationSource}`, /fetch\(|axios|XMLHttpRequest|openai/i);
+  assert.doesNotMatch(`${researchSource}${presentationSource}${targetsSource}`, /fetch\(|axios|XMLHttpRequest|openai|api\.honeypot\.is/i);
   for (const [markup, tool] of [[step3, "honeypot"], [step3, "tokensniffer"], [step3, "defi_scanner"], [step4, "bubblemaps"]] as const) {
     const toolRegion = manualToolRegion(markup, tool);
     assert.match(toolRegion, /Brak zapisanego wyniku|No saved result/);
@@ -227,7 +239,7 @@ function item(view: ReturnType<typeof resolveResearchChecklist>, step: number, k
   return result;
 }
 
-function evidence(step: 3 | 4, key: "honeypot" | "tokensniffer" | "defi_scanner" | "wallet_clustering", state: "MANUAL_VERIFIED" | "RED_FLAG", values: Partial<ReturnType<typeof defaultEvidence>>) {
+function evidence(step: 3 | 4, key: "honeypot" | "tokensniffer" | "defi_scanner" | "wallet_clustering", state: "MANUAL_VERIFIED" | "MISSING_DATA" | "RED_FLAG", values: Partial<ReturnType<typeof defaultEvidence>>) {
   return { ...defaultEvidence(), step_number: step, item_key: key, manual_state: state, ...values };
 }
 

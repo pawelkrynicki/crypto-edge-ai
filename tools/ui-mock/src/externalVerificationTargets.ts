@@ -75,6 +75,11 @@ const MANUAL_RESEARCH_OFFICIAL_HOSTS = new Set([
 const EVM_MANUAL_SEARCH_CHAINS = new Set(["ethereum", "eth", "bsc", "binance", "base", "polygon", "arbitrum", "optimism"]);
 const BUBBLEMAPS_CHAINS = new Set([...EVM_MANUAL_SEARCH_CHAINS, "solana"]);
 const HONEYPOT_CHAIN_ALIASES: Record<string, string> = { eth: "ethereum", binance: "bsc" };
+const HONEYPOT_WEBSITE_PATHS = {
+  ethereum: "/ethereum",
+  bsc: "/",
+  base: "/base",
+} as const;
 
 const EXPLORER_TARGETS: Record<string, ExplorerTarget> = {
   ethereum: {
@@ -144,13 +149,14 @@ export function resolveManualResearchTarget(
   if (!contractAddress) return { ...base, availability: "UNAVAILABLE", official_url: null };
 
   if (tool === "honeypot") {
-    if (!["ethereum", "bsc", "base"].includes(chain)) {
+    const path = HONEYPOT_WEBSITE_PATHS[chain as keyof typeof HONEYPOT_WEBSITE_PATHS];
+    if (!path) {
       return { ...base, availability: "UNSUPPORTED_CHAIN", official_url: null };
     }
     return {
       ...base,
       availability: "AVAILABLE",
-      official_url: safeOfficialManualResearchUrl(`https://honeypot.is/?address=${encodeURIComponent(contractAddress)}`),
+      official_url: safeOfficialManualResearchUrl(`https://honeypot.is${path}?address=${encodeURIComponent(contractAddress)}`),
     };
   }
 
