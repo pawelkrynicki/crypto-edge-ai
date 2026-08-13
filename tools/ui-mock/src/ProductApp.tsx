@@ -822,6 +822,7 @@ export function ProductAppContent({
             onVerificationSaved={saveVerificationInPlace}
             onReturnToDetail={openDetailFromVerification}
             onBackToResearchPlaybook={returnToResearchPlaybook}
+            onOpenFocusedResearchStep={(candidate, step) => openVerification(candidate, step)}
             focusedResearchStep={focusedResearchStep}
           />
         </ProductWorkspaceSection>

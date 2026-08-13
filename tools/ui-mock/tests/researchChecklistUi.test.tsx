@@ -104,10 +104,11 @@ test("PC.3A focus mode keeps navigation in normal flow, avoids title duplication
   assert.match(polishDetail, /Sprawdzone/);
   assert.match(polishDetail, /Czerwone flagi/);
   assert.doesNotMatch(polishDetail, /data-research-item-group="red-flag"/, "empty red-flag groups are omitted in focus mode");
-  assert.match(polishDetail, /Do uzupełnienia \(2\)/);
+  assert.match(polishDetail, /Główne kontrole/);
+  assert.match(polishDetail, /Pokaż szczegóły techniczne \(11\)/);
   assert.match(polishDetail, /Pokaż/);
-  assert.doesNotMatch(polishDetail, /<details[^>]*\sopen=/, "missing items start collapsed");
-  assert.match(detail, /To complete \(2\)/);
+  assert.doesNotMatch(polishDetail, /data-research-technical-details="3"[^>]*\sopen=/, "technical details start collapsed");
+  assert.match(detail, /Key checks/);
   assert.equal((drawer.match(/role="tab"/g) ?? []).length, 6);
   assert.match(drawer, /id="verification-tab-data"[^>]*aria-selected="true"/);
   assert.match(drawer, /id="research-checklist-step-3"/);
@@ -185,7 +186,8 @@ test("PC.3A focus mode localizes methodology values, hides machine values, and k
   };
   const redFlag = renderToStaticMarkup(<ProductLocaleProvider initialLocale="pl"><ResearchChecklistDetail candidate={redFlagCandidate} focusedStep={1} /></ProductLocaleProvider>);
   assert.match(redFlag, /Czerwona flaga/);
-  assert.match(redFlag, /data-research-item-group="red-flag"/);
+  assert.match(redFlag, /data-research-red-flag-reveal/);
+  assert.match(redFlag, /data-research-technical-red-flags/);
 });
 
 test("PC.3A localizes ownership only after a known ownership state is resolved", () => {
@@ -213,16 +215,17 @@ test("PC.3A localizes ownership only after a known ownership state is resolved",
   assert.match(ownershipItem(renouncedEnglish, "Ownership"), /Automatically checked/);
 });
 
-test("PC.3A focus mode omits empty resolved groups while keeping missing work collapsed", () => {
+test("PC.3A focus mode retains all technical evidence behind one collapsed detail section", () => {
   const noResolvedSecurity = {
     ...candidate.security!,
     sources: [], honeypotStatus: "unknown", buyTax: null, sellTax: null, contractVerified: null, ownershipStatus: "unknown", liquidityLocked: null,
     mintRisk: null, blacklistRisk: null, whitelistRisk: null, sellRestrictionRisk: null, proxyRisk: null,
   };
   const markup = renderToStaticMarkup(<ProductLocaleProvider initialLocale="pl"><ResearchChecklistDetail candidate={{ ...candidate, security: noResolvedSecurity }} focusedStep={3} /></ProductLocaleProvider>);
-  assert.doesNotMatch(markup, /data-research-item-group="red-flag"/);
-  assert.doesNotMatch(markup, /data-research-item-group="verified"/);
-  assert.match(markup, /data-research-missing-group="3"/);
-  assert.match(markup, /Do uzupełnienia [(]14[)]/);
-  assert.doesNotMatch(markup, /data-research-missing-group="3"[^>]*open=/, "missing work remains collapsed");
+  assert.doesNotMatch(markup, /data-research-red-flag-reveal/);
+  assert.match(markup, /data-research-technical-details="3"/);
+  assert.match(markup, /Pokaż szczegóły techniczne \(11\)/);
+  assert.match(markup, /Pokrycie GoPlus/);
+  assert.match(markup, /Blokada płynności/);
+  assert.doesNotMatch(markup, /data-research-technical-details="3"[^>]*open=/, "technical evidence remains collapsed");
 });

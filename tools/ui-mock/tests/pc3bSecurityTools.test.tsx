@@ -6,6 +6,7 @@ import { resolve } from "node:path";
 import { test } from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import TestRenderer from "react-test-renderer";
 import { isSafeOfficialManualResearchUrl, resolveManualResearchTarget } from "../src/externalVerificationTargets.js";
 import { ResearchChecklistDetail } from "../src/components/ResearchChecklist.js";
 import { ExternalVerificationLinksView } from "../src/components/ExternalVerificationLinksView.js";
@@ -17,6 +18,8 @@ import { createResearchEvidenceRepository, ResearchEvidenceError } from "../serv
 import { createScannerApiHandler } from "../server/scannerApiHandler.js";
 
 void React;
+
+const { act, create } = TestRenderer;
 
 const ADDRESS = "0x1111111111111111111111111111111111111111";
 const PAIR = "0x2222222222222222222222222222222222222222";
@@ -197,6 +200,19 @@ test("PC.3B renders four usable external tool actions, shows saved state truthfu
   assertExternalAction(step3Actions, "Otwórz TokenSniffer", "https://tokensniffer.com/");
   assertExternalAction(step3Actions, "Otwórz De.Fi Scanner", "https://de.fi/scanner");
   assertExternalAction(step4Actions, "Open Bubblemaps", `https://v2.bubblemaps.io/map?chain=base&address=${ADDRESS}`);
+  assert.match(step3, /data-research-simple-summary="3"/);
+  assert.match(step3, /Research niekompletny/);
+  assert.match(step3, /Sprawdzone/);
+  assert.match(step3, /Do sprawdzenia/);
+  for (const tool of ["honeypot", "tokensniffer", "defi_scanner", "bubblemaps"]) assert.match(step3, new RegExp(`data-key-research-tool="${tool}"`));
+  assert.match(step3, /Główne kontrole/);
+  assert.match(step3, /Pokaż szczegóły techniczne/);
+  assert.doesNotMatch(step3, /data-research-technical-details="3"[^>]*\sopen=/, "technical details start collapsed");
+  assert.doesNotMatch(step3, /research-external-result-form/, "result forms are hidden until Add result");
+  assert.match(step3, /Własność/);
+  assert.match(step3, /Mint/);
+  assert.match(step4, /Top 10 wallets/);
+  assert.match(step4, /Holder count/);
   assert.match(step3, /Dodaj wynik/);
   assert.match(step3, /Kopiuj CA/);
   assert.match(step3, /Wklej skopiowany adres w polu wyszukiwania TokenSniffer\./);
@@ -217,8 +233,8 @@ test("PC.3B renders four usable external tool actions, shows saved state truthfu
   assert.doesNotMatch(`${researchSource}${presentationSource}${targetsSource}`, /fetch\(|axios|XMLHttpRequest|openai|api\.honeypot\.is|api\.bubblemaps|<iframe|partnerId/i);
   for (const [markup, tool] of [[step3, "honeypot"], [step3, "tokensniffer"], [step3, "defi_scanner"], [step4, "bubblemaps"]] as const) {
     const toolRegion = manualToolRegion(markup, tool);
-    assert.match(toolRegion, /Brak zapisanego wyniku|No saved result/);
-    assert.doesNotMatch(toolRegion, /Zapisana kontrola|Recorded check/);
+    assert.match(toolRegion, /Sprawdzone|Do sprawdzenia|Checked|To check/);
+    assert.doesNotMatch(toolRegion, /research-external-result-form/);
   }
 
   const unrecorded = resolveResearchChecklist(candidate());
@@ -240,6 +256,88 @@ test("PC.3B renders four usable external tool actions, shows saved state truthfu
   assert.doesNotMatch(focusedDrawer, /external-checks-list|AI Research Brief/);
 });
 
+test("PC.3B keeps the simplified focus view compact while retaining expandable technical and result details", async () => {
+  const initialView = resolveResearchChecklist(candidate());
+  initialView.manual_evidence_writable = true;
+  const savedEvidence = evidence(3, "tokensniffer", "MANUAL_VERIFIED", { value_number: 80, source_tool: "TokenSniffer" });
+  const savedView = resolveResearchChecklist(candidate(), [savedEvidence]);
+  savedView.manual_evidence_writable = true;
+  const originalFetch = globalThis.fetch;
+  const originalActEnvironment = globalThis.IS_REACT_ACT_ENVIRONMENT;
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  let saved = false;
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url.startsWith("/api/research-checklist")) return new Response(JSON.stringify(saved ? savedView : initialView), { status: 200, headers: { "content-type": "application/json" } });
+    if (url === "/api/research-evidence" && init?.method === "PUT") {
+      saved = true;
+      return new Response(JSON.stringify({ evidence: savedEvidence }), { status: 200, headers: { "content-type": "application/json" } });
+    }
+    return new Response("{}", { status: 404, headers: { "content-type": "application/json" } });
+  }) as typeof fetch;
+  const opened: number[] = [];
+  let renderer: ReturnType<typeof create> | undefined;
+  try {
+    await act(async () => {
+      renderer = create(<ProductLocaleProvider initialLocale="pl"><ResearchChecklistDetail candidate={candidate()} focusedStep={3} onOpenFocusedResearchStep={(step) => opened.push(step)} /></ProductLocaleProvider>);
+      await Promise.resolve();
+    });
+    const technical = renderer!.root.findByProps({ "data-research-technical-details": 3 });
+    assert.equal(technical.props.open, false);
+    assert.equal(renderer!.root.findAll((node) => String(node.props.className ?? "").includes("research-external-result-form")).length, 0);
+
+    for (const [tool, expectedStep] of [["honeypot", 3], ["tokensniffer", 3], ["defi_scanner", 3], ["bubblemaps", 4]] as const) {
+      const jump = renderer!.root.findByProps({ "data-key-research-tool-focus": tool });
+      await act(async () => { jump.props.onClick(); });
+      assert.equal(opened.at(-1), expectedStep, `${tool} returns to its methodological home`);
+    }
+    assert.deepEqual(opened, [3, 3, 3, 4]);
+
+    const tokenSnifferWorkflow = renderer!.root.findByProps({ "data-manual-research-tool": "tokensniffer" });
+    const addResult = tokenSnifferWorkflow.findAllByType("button").find((node) => buttonText(node) === "Dodaj wynik");
+    assert.ok(addResult);
+    await act(async () => { addResult!.props.onClick(); });
+    const scoreInput = renderer!.root.findAllByType("input").find((node) => node.props.type === "number");
+    assert.ok(scoreInput);
+    await act(async () => { scoreInput!.props.onChange({ target: { value: "80" } }); });
+    const saveResult = renderer!.root.findAllByType("button").find((node) => buttonText(node) === "Zapisz wynik");
+    assert.ok(saveResult);
+    await act(async () => { await saveResult!.props.onClick(); });
+    assert.equal(renderer!.root.findAll((node) => String(node.props.className ?? "").includes("research-external-result-form")).length, 0, "save collapses the result form");
+    assert.ok(renderer!.root.findAllByType("button").some((node) => buttonText(node) === "Edytuj wynik"), "saved results remain editable");
+  } finally {
+    if (renderer) await act(async () => { renderer!.unmount(); });
+    globalThis.fetch = originalFetch;
+    globalThis.IS_REACT_ACT_ENVIRONMENT = originalActEnvironment;
+  }
+});
+
+test("PC.3B surfaces a technical red flag in the simple layer and reveals technical details on demand", async () => {
+  const redFlagCandidate: UiTokenCandidate = { ...candidate(), security: { ...security(), mintRisk: true } };
+  const redFlagView = resolveResearchChecklist(redFlagCandidate);
+  redFlagView.manual_evidence_writable = true;
+  const originalFetch = globalThis.fetch;
+  const originalActEnvironment = globalThis.IS_REACT_ACT_ENVIRONMENT;
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  globalThis.fetch = (async () => new Response(JSON.stringify(redFlagView), { status: 200, headers: { "content-type": "application/json" } })) as typeof fetch;
+  let renderer: ReturnType<typeof create> | undefined;
+  try {
+    await act(async () => {
+      renderer = create(<ProductLocaleProvider initialLocale="pl"><ResearchChecklistDetail candidate={redFlagCandidate} focusedStep={3} /></ProductLocaleProvider>);
+      await Promise.resolve();
+    });
+    const reveal = renderer!.root.findByProps({ "data-research-red-flag-reveal": true });
+    assert.match(buttonText(reveal), /Wykryto 1 czerwoną flagę/);
+    await act(async () => { reveal.props.onClick(); });
+    assert.equal(renderer!.root.findByProps({ "data-research-technical-details": 3 }).props.open, true);
+    assert.ok(renderer!.root.findByProps({ "data-research-technical-red-flags": true }));
+  } finally {
+    if (renderer) await act(async () => { renderer!.unmount(); });
+    globalThis.fetch = originalFetch;
+    globalThis.IS_REACT_ACT_ENVIRONMENT = originalActEnvironment;
+  }
+});
+
 function externalActions(markup: string) {
   return [...markup.matchAll(/<a class="research-external-open-action" href="([^"]+)" target="_blank" rel="noopener noreferrer">([^<]+)<span aria-hidden="true">↗<\/span><\/a>/g)]
     .map((match) => ({ href: match[1].replaceAll("&amp;", "&"), label: match[2].trim() }));
@@ -256,6 +354,10 @@ function assertActionOrder(markup: string, labels: string[]) {
   const positions = labels.map((label) => markup.indexOf(label));
   assert.ok(positions.every((position) => position >= 0), `Missing workflow actions: ${labels.join(", ")}`);
   assert.ok(positions.every((position, index) => index === 0 || position > positions[index - 1]), `Workflow action order is incorrect: ${labels.join(" → ")}`);
+}
+
+function buttonText(node: TestRenderer.ReactTestInstance): string {
+  return node.children.map((child) => typeof child === "string" || typeof child === "number" ? String(child) : "").join("");
 }
 
 function manualToolRegion(markup: string, tool: string) {

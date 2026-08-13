@@ -50,6 +50,8 @@ interface ExternalVerificationLinksViewProps {
   focusedResearchStep?: ResearchStepNumber | null;
   /** Returns from the focused checklist step to Candidate Detail > Summary. */
   onBackToResearchPlaybook?: () => void;
+  /** Opens another focused checklist step for the selected candidate. */
+  onOpenFocusedResearchStep?: (step: ResearchStepNumber) => void;
 }
 
 export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksViewProps> = ({
@@ -62,6 +64,7 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
   initialActiveTab = "identity",
   focusedResearchStep = null,
   onBackToResearchPlaybook,
+  onOpenFocusedResearchStep,
 }) => {
   const { locale, t } = useProductLocale();
   const chain = candidate?.chain ?? followUp?.chain ?? "";
@@ -239,7 +242,7 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
     );
   } else if (activeTab === "data") {
     activeContent = focusedResearchStep && candidate ? (
-      <ResearchChecklistDetail candidate={candidate} focusedStep={focusedResearchStep} onBackToResearchPlaybook={onBackToResearchPlaybook} />
+      <ResearchChecklistDetail candidate={candidate} focusedStep={focusedResearchStep} onBackToResearchPlaybook={onBackToResearchPlaybook} onOpenFocusedResearchStep={onOpenFocusedResearchStep} />
     ) : (
       <VerificationSection heading={tabCopy.data} detail={locale === "pl" ? "Źródła są opisane i linkowane; otwarcie oraz zmiana zakładki nie wykonują połączeń do dostawców." : "Sources are described and linked; opening and switching tabs do not call providers."}>
         <div className="product-detail-grid data">
@@ -248,7 +251,7 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
           <VerificationMetric label={locale === "pl" ? "Status źródła" : "Source status"} value={locale === "pl" ? "Migawka dostępna do ręcznej kontroli" : "Snapshot available for manual review"} />
           <VerificationMetric label={locale === "pl" ? "Źródła kontroli bezpieczeństwa" : "Security check sources"} value={securityResolution?.sources.map(formatProductSourceLabel).join(", ") || missingText} />
         </div>
-        {candidate && <ResearchChecklistDetail candidate={candidate} focusedStep={focusedResearchStep} onBackToResearchPlaybook={onBackToResearchPlaybook} />}
+        {candidate && <ResearchChecklistDetail candidate={candidate} focusedStep={focusedResearchStep} onBackToResearchPlaybook={onBackToResearchPlaybook} onOpenFocusedResearchStep={onOpenFocusedResearchStep} />}
         <div className="external-checks-list">{targets.map((target) => <ExternalCheckCard key={target.id} target={target} />)}</div>
         {onOpenResearchBrief && <section className="verification-ai-research-action" aria-label={locale === "pl" ? "Analiza badawcza AI" : "AI Research Brief"}><div><strong>{locale === "pl" ? "Analiza badawcza AI" : "AI Research Brief"}</strong><p>{locale === "pl" ? "Analiza AI uzupełnia, ale nie zastępuje ręcznej weryfikacji." : "AI analysis complements but does not replace manual verification."}</p></div><ActionButton variant="secondary" icon="arrow" iconPosition="end" onClick={onOpenResearchBrief}>{locale === "pl" ? "Otwórz analizę AI" : "Open AI analysis"}</ActionButton></section>}
       </VerificationSection>
