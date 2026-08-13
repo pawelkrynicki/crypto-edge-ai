@@ -3,6 +3,11 @@ import type { ResearchChecklistItem } from "./researchChecklistTypes";
 
 export function researchChecklistItemValue(item: ResearchChecklistItem, locale: "pl" | "en"): string {
   if (item.manual_external_tool && !item.manual_evidence) return locale === "pl" ? "Brak zapisanego wyniku" : "No saved result";
+  if (item.manual_evidence && item.key === "developer_wallet") {
+    const wallet = item.manual_evidence.value_text ?? (locale === "pl" ? "Portfel zapisany rÄ™cznie" : "Wallet recorded manually");
+    const percentage = item.manual_evidence.value_number == null ? "" : ` · ${item.manual_evidence.value_number.toFixed(2)}%`;
+    return `${wallet}${percentage}`;
+  }
   if (item.manual_evidence?.value_text) return researchEvidencePresentationText(item.manual_evidence.value_text, locale, item.manual_evidence.source_tool);
   if (item.value_number != null) {
     if (item.manual_evidence?.source_tool === "TokenSniffer") return locale === "pl"
@@ -11,6 +16,7 @@ export function researchChecklistItemValue(item: ResearchChecklistItem, locale: 
     if (["market_cap", "volume_24h", "liquidity"].includes(item.key)) return formatProductUsd(item.value_number, locale, locale === "pl" ? "Brak danych" : "Missing data");
     if (["volume_market_cap_ratio", "liquidity_market_cap_ratio"].includes(item.key)) return `${(item.value_number * 100).toFixed(2)}%`;
     if (["pair_age", "liquidity_lock_days"].includes(item.key)) return `${item.value_number.toFixed(1)} ${locale === "pl" ? "dni" : "days"}`;
+    if (item.key === "holder_count") return new Intl.NumberFormat(locale === "pl" ? "pl-PL" : "en-US", { maximumFractionDigits: 0 }).format(item.value_number);
     if (["top1_wallet", "top10_wallets", "buy_tax", "sell_tax"].includes(item.key)) return `${item.value_number.toFixed(2)}%`;
     return String(item.value_number);
   }
@@ -45,6 +51,12 @@ export function researchEvidencePresentationText(value: string, locale: "pl" | "
     if (value === "needs_attention") return locale === "pl" ? "Wymaga uwagi — dalsza ocena ręczna" : "Needs attention — further manual assessment";
     if (value === "strong_concentration_or_related_cluster") return locale === "pl" ? "Silna koncentracja / powiązany klaster" : "Strong concentration / related cluster";
     if (value === "no_data") return locale === "pl" ? "Brak danych" : "No data";
+  }
+  if (sourceTool === "Manual volume-quality research") {
+    if (value === "natural") return locale === "pl" ? "Naturalny / bez oczywistych anomalii" : "Natural / no obvious anomalies";
+    if (value === "requires_attention") return locale === "pl" ? "Wymaga uwagi" : "Requires attention";
+    if (value === "suspicious") return locale === "pl" ? "Podejrzany / nienaturalny" : "Suspicious / unnatural";
+    if (value === "missing") return locale === "pl" ? "Brak danych" : "Missing data";
   }
   return isUnrecordedMachineValue(value) ? (locale === "pl" ? "Brak zapisanego wyniku" : "No recorded result") : value;
 }

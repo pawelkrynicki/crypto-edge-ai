@@ -19,6 +19,7 @@
     "test:pc2": "node --import tsx --test tests/pc2AiProductionPath.test.ts",
     "test:pc3a": "node --import tsx --test tests/researchChecklist.test.ts tests/researchChecklistUi.test.tsx",
     "test:pc3b": "node --import tsx --test tests/pc3bSecurityTools.test.tsx",
+    "test:pc3c": "pnpm --dir ../data-poc run test:pc3c && node --import tsx --test tests/pc3cOnchainLiquidity.test.tsx",
     "test:p1-radar": "node --import tsx --test tests/radarOperationalUsability.test.tsx tests/manualOwnerActions.test.ts",
     "test:refresh": "node --import tsx --test tests/productRefreshFlow.test.tsx tests/productVersionPolling.test.ts tests/productVersion.test.ts tests/productReviewPublication.test.ts",
     "test:premium-ui": "node --import tsx --test tests/premiumUiPass.test.ts",

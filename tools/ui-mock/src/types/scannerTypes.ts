@@ -328,5 +328,7 @@ export interface UiTokenCandidate {
     createdAt: string;
   } | null;
 
+  /** Timestamp from the central candidate snapshot, retained for provenance. */
+  candidateSnapshotAt?: string;
   lastCheckedAt: string;
 }

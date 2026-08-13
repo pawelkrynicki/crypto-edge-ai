@@ -1389,6 +1389,7 @@ function validateResearchEvidenceWriteBody(value: unknown): {
     observed_at: nullableResearchTimestamp(value.observed_at),
   };
   validatePc3bManualResearchEvidence(body);
+  validatePc3cManualResearchEvidence(body);
   return body;
 }
 
@@ -1443,6 +1444,60 @@ function validatePc3bManualResearchEvidence(input: {
       no_data: "MISSING_DATA",
     };
     if (input.source_tool !== "Bubblemaps" || input.value_number !== null || !input.value_text || states[input.value_text] !== input.manual_state) {
+      throw new ResearchChecklistRequestError("REQUEST_INVALID", 400);
+    }
+  }
+}
+
+/** PC.3C keeps on-chain manual evidence structured and fail-closed. */
+function validatePc3cManualResearchEvidence(input: {
+  step_number: ResearchStepNumber;
+  item_key: ResearchChecklistItemKey;
+  manual_state: PersistedManualResearchState;
+  value_text: string | null;
+  value_number: number | null;
+  source_tool: string | null;
+}): void {
+  const matches = (item: ResearchChecklistItemKey) => input.step_number === 4 && input.item_key === item;
+  const isPc3cKey = input.item_key === "holder_count" || input.item_key === "developer_wallet"
+    || input.item_key === "liquidity_lock_end_date" || input.item_key === "volume_quality";
+  if (isPc3cKey && input.step_number !== 4) throw new ResearchChecklistRequestError("REQUEST_INVALID", 400);
+
+  if (matches("holder_count")) {
+    const holderCount = input.value_number;
+    if (input.source_tool !== "Manual holder research" || input.value_text !== null || !Number.isSafeInteger(holderCount) || holderCount === null || holderCount < 0 || input.manual_state !== "MANUAL_VERIFIED") {
+      throw new ResearchChecklistRequestError("REQUEST_INVALID", 400);
+    }
+    return;
+  }
+
+  if (matches("developer_wallet")) {
+    const source = /^Manual developer wallet \((locked|unlocked|unknown)\)$/.exec(input.source_tool ?? "");
+    const percentage = input.value_number;
+    if (!source || !input.value_text || percentage === null || percentage < 0 || percentage > 100) {
+      throw new ResearchChecklistRequestError("REQUEST_INVALID", 400);
+    }
+    const expected = percentage > 10 && source[1] === "unlocked" ? "RED_FLAG" : "MANUAL_VERIFIED";
+    if (input.manual_state !== expected) throw new ResearchChecklistRequestError("REQUEST_INVALID", 400);
+    return;
+  }
+
+  if (matches("liquidity_lock_end_date")) {
+    const isDate = Boolean(input.value_text && /^\d{4}-\d{2}-\d{2}$/.test(input.value_text) && Number.isFinite(Date.parse(`${input.value_text}T00:00:00.000Z`)));
+    if (input.source_tool !== "Manual liquidity lock research" || !isDate || input.value_number !== null || input.manual_state !== "MANUAL_VERIFIED") {
+      throw new ResearchChecklistRequestError("REQUEST_INVALID", 400);
+    }
+    return;
+  }
+
+  if (matches("volume_quality")) {
+    const states: Record<string, PersistedManualResearchState> = {
+      natural: "MANUAL_VERIFIED",
+      requires_attention: "MANUAL_VERIFIED",
+      suspicious: "RED_FLAG",
+      missing: "MISSING_DATA",
+    };
+    if (input.source_tool !== "Manual volume-quality research" || !input.value_text || input.value_number !== null || states[input.value_text] !== input.manual_state) {
       throw new ResearchChecklistRequestError("REQUEST_INVALID", 400);
     }
   }

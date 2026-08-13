@@ -8,6 +8,7 @@ import {
   type ResearchChecklistState,
   type ResearchChecklistStep,
   type ResearchChecklistView,
+  type ResearchAutomaticProvenance,
   type ResearchStepNumber,
 } from "./researchChecklistTypes";
 
@@ -38,6 +39,7 @@ type AutomaticItem = {
   threshold: string | null;
   manual_external_tool: ManualResearchTool | null;
   manual_external_state: ResearchChecklistState | null;
+  automatic_provenance: ResearchAutomaticProvenance | null;
 };
 
 export function resolveResearchChecklist(
@@ -79,6 +81,7 @@ export function resolveResearchChecklist(
     threshold: null,
     manual_external_tool: null,
     manual_external_state: null,
+    automatic_provenance: null,
   }, null);
   steps.push(buildStep(7, [finalItem]));
 
@@ -108,6 +111,18 @@ export function isResearchChecklistStateResolved(state: ResearchChecklistState):
 
 function buildAutomaticEvidence(candidate: UiTokenCandidate): Map<string, AutomaticItem> {
   const output = new Map<string, AutomaticItem>();
+  const dexScreenerProvenance: ResearchAutomaticProvenance = {
+    source: "DexScreener",
+    snapshot_at: candidate.candidateSnapshotAt ?? candidate.lastCheckedAt ?? null,
+    normalization_path: "candidate_snapshot",
+  };
+  const goPlusProvenance = candidate.security?.sources.some((source) => source.trim().toLowerCase() === "goplus")
+    ? {
+      source: "GoPlus" as const,
+      snapshot_at: candidate.security.checkedAt,
+      normalization_path: "security_snapshot" as const,
+    }
+    : null;
   const filter = resolveProductFilterConditions({
     basicFilterStatus: candidate.basicFilterStatus,
     filterReasons: candidate.filterReasons,
@@ -158,14 +173,17 @@ function buildAutomaticEvidence(candidate: UiTokenCandidate): Map<string, Automa
   add(output, 3, "tokensniffer", "MISSING_DATA", null, null, null, "tokensniffer", manualExternalState(candidate, "tokensniffer"));
   add(output, 3, "defi_scanner", "MISSING_DATA", null, null, null, "defi_scanner", manualExternalState(candidate, "defi_scanner"));
 
-  add(output, 4, "top1_wallet", top1State, security?.topWalletPct ?? null, null, "<= 30%");
-  add(output, 4, "top10_wallets", security?.top10WalletsPct == null ? "MISSING_DATA" : "AUTO_VERIFIED", security?.top10WalletsPct ?? null, null, null);
+  // Step 4 quality context deliberately stays separate from the frozen Step 2
+  // deal-breaker rules. A value between the preferred and deal-breaker ranges
+  // remains factual context, not an invented negative verdict.
+  add(output, 4, "top1_wallet", top1State, security?.topWalletPct ?? null, null, "preferred <10%; deal-breaker >30%", null, null, goPlusProvenance);
+  add(output, 4, "top10_wallets", security?.top10WalletsPct == null ? "MISSING_DATA" : stateForMaximum(security.top10WalletsPct, 60), security?.top10WalletsPct ?? null, null, "preferred <40%; deal-breaker >60%", null, null, goPlusProvenance);
   const liquidityMarketCap = candidate.liquidity == null || candidate.marketCap == null
     ? null
     : liquidityMarketCapRatio(candidate.liquidity, candidate.marketCap);
-  add(output, 4, "liquidity_market_cap_ratio", liquidityMarketCap == null ? "MISSING_DATA" : "AUTO_VERIFIED", liquidityMarketCap, null, null);
-  add(output, 4, "liquidity_lock", liquidityState, null, liquidityLockText, null);
-  add(output, 4, "liquidity_lock_days", security?.liquidityLockDays == null ? "MISSING_DATA" : "AUTO_VERIFIED", security?.liquidityLockDays ?? null, null, null);
+  add(output, 4, "liquidity_market_cap_ratio", liquidityMarketCap == null ? "MISSING_DATA" : stateForMinimum(liquidityMarketCap, 0.03), liquidityMarketCap, null, "optimal 10–30%; red concern <3%", null, null, liquidityMarketCap == null ? null : { ...dexScreenerProvenance, normalization_path: "derived_from_candidate_snapshot" });
+  add(output, 4, "liquidity_lock", liquidityState, null, liquidityLockText, "must be locked", null, null, goPlusProvenance);
+  add(output, 4, "liquidity_lock_days", security?.liquidityLockDays == null ? "MISSING_DATA" : "AUTO_VERIFIED", security?.liquidityLockDays ?? null, null, "preferred 180–365 days", null, null, goPlusProvenance);
   for (const key of ["holder_count", "developer_wallet", "liquidity_lock_end_date", "volume_quality"] as const) add(output, 4, key, "MISSING_DATA", null, null, null);
   add(output, 4, "wallet_clustering", "MISSING_DATA", null, null, null, "bubblemaps", manualExternalState(candidate, "bubblemaps"));
 
@@ -184,6 +202,7 @@ function add(
   threshold: string | null,
   manualExternalTool: ManualResearchTool | null = null,
   manualExternalState: ResearchChecklistState | null = null,
+  automaticProvenance: ResearchAutomaticProvenance | null = null,
 ): void {
   output.set(`${step}:${key}`, {
     key,
@@ -194,11 +213,12 @@ function add(
     threshold,
     manual_external_tool: manualExternalTool,
     manual_external_state: manualExternalState,
+    automatic_provenance: automaticProvenance,
   });
 }
 
 function missingItem(step: ResearchStepNumber, key: ResearchChecklistItemKey): AutomaticItem {
-  return { key, step_number: step, automatic_state: "MISSING_DATA", value_text: null, value_number: null, threshold: null, manual_external_tool: null, manual_external_state: null };
+  return { key, step_number: step, automatic_state: "MISSING_DATA", value_text: null, value_number: null, threshold: null, manual_external_tool: null, manual_external_state: null, automatic_provenance: null };
 }
 
 function applyManualEvidence(automatic: AutomaticItem, manual: PublicResearchEvidence | null): ResearchChecklistItem {
@@ -262,6 +282,11 @@ function isResolved(state: ResearchChecklistState): boolean {
 function stateForMaximum(value: number | null, maximum: number): ResearchChecklistState {
   if (value == null) return "MISSING_DATA";
   return value > maximum ? "RED_FLAG" : "AUTO_VERIFIED";
+}
+
+function stateForMinimum(value: number | null, minimum: number): ResearchChecklistState {
+  if (value == null) return "MISSING_DATA";
+  return value < minimum ? "RED_FLAG" : "AUTO_VERIFIED";
 }
 
 function stateForRequiredBoolean(value: boolean | null): ResearchChecklistState {
