@@ -118,6 +118,7 @@ import {
   type ResearchStepNumber,
 } from "../src/researchChecklistTypes.js";
 import { resolveTokenIdentity } from "../src/tokenLifecycle.js";
+import { normalizeSafeSocialLinkUrl } from "../src/socialLinks.js";
 import { mapPersistableScannerOutputToUiCandidates } from "../src/adapters/scannerOutputAdapter.js";
 import type { PersistableScannerOutput, UiTokenCandidate } from "../src/types/scannerTypes.js";
 
@@ -1390,6 +1391,7 @@ function validateResearchEvidenceWriteBody(value: unknown): {
   };
   validatePc3bManualResearchEvidence(body);
   validatePc3cManualResearchEvidence(body);
+  validatePc3dManualResearchEvidence(body);
   return body;
 }
 
@@ -1500,6 +1502,44 @@ function validatePc3cManualResearchEvidence(input: {
     if (input.source_tool !== "Manual volume-quality research" || !input.value_text || input.value_number !== null || states[input.value_text] !== input.manual_state) {
       throw new ResearchChecklistRequestError("REQUEST_INVALID", 400);
     }
+  }
+}
+
+/** PC.3D uses controlled private outcomes; automatic source links stay separate. */
+function validatePc3dManualResearchEvidence(input: {
+  step_number: ResearchStepNumber;
+  item_key: ResearchChecklistItemKey;
+  manual_state: PersistedManualResearchState;
+  value_text: string | null;
+  value_number: number | null;
+  source_tool: string | null;
+  evidence_url: string | null;
+}): void {
+  const socialKeys = ["twitter", "telegram", "discord", "website", "team", "whitepaper", "roadmap"] as const;
+  if (!socialKeys.includes(input.item_key as typeof socialKeys[number])) return;
+  if (input.step_number !== 5) throw new ResearchChecklistRequestError("REQUEST_INVALID", 400);
+  const key = input.item_key as typeof socialKeys[number];
+  if (input.source_tool !== `Manual social research: ${key}` || !input.value_text) {
+    throw new ResearchChecklistRequestError("REQUEST_INVALID", 400);
+  }
+  const states: Record<typeof socialKeys[number], Record<string, PersistedManualResearchState>> = {
+    twitter: { healthy: "MANUAL_VERIFIED", needs_attention: "MANUAL_VERIFIED", suspicious: "RED_FLAG", missing: "MISSING_DATA" },
+    telegram: { healthy: "MANUAL_VERIFIED", needs_attention: "MANUAL_VERIFIED", suspicious: "RED_FLAG", missing: "MISSING_DATA" },
+    discord: { healthy: "MANUAL_VERIFIED", needs_attention: "MANUAL_VERIFIED", suspicious: "RED_FLAG", missing: "MISSING_DATA" },
+    website: { working: "MANUAL_VERIFIED", needs_attention: "MANUAL_VERIFIED", suspicious: "RED_FLAG", missing: "MISSING_DATA" },
+    team: { transparent: "MANUAL_VERIFIED", anonymous: "MANUAL_VERIFIED", missing: "MISSING_DATA" },
+    whitepaper: { reasonable: "MANUAL_VERIFIED", needs_attention: "MANUAL_VERIFIED", suspected_copy_paste: "RED_FLAG", missing: "MISSING_DATA" },
+    roadmap: { coherent: "MANUAL_VERIFIED", needs_attention: "MANUAL_VERIFIED", missing: "MISSING_DATA" },
+  };
+  if (states[key][input.value_text] !== input.manual_state) throw new ResearchChecklistRequestError("REQUEST_INVALID", 400);
+  if (key === "twitter" || key === "telegram") {
+    if (input.value_number !== null && (input.value_number < 0 || input.value_number > 100)) throw new ResearchChecklistRequestError("REQUEST_INVALID", 400);
+  } else if (input.value_number !== null) {
+    throw new ResearchChecklistRequestError("REQUEST_INVALID", 400);
+  }
+  if (input.evidence_url) {
+    const category = key === "whitepaper" ? "whitepaper" : key;
+    if (!normalizeSafeSocialLinkUrl(category, input.evidence_url)) throw new ResearchChecklistRequestError("REQUEST_INVALID", 400);
   }
 }
 

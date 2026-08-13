@@ -40,6 +40,7 @@ type AutomaticItem = {
   manual_external_tool: ManualResearchTool | null;
   manual_external_state: ResearchChecklistState | null;
   automatic_provenance: ResearchAutomaticProvenance | null;
+  automatic_link: ResearchChecklistItem["automatic_link"];
 };
 
 export function resolveResearchChecklist(
@@ -82,6 +83,7 @@ export function resolveResearchChecklist(
     manual_external_tool: null,
     manual_external_state: null,
     automatic_provenance: null,
+    automatic_link: null,
   }, null);
   steps.push(buildStep(7, [finalItem]));
 
@@ -187,7 +189,22 @@ function buildAutomaticEvidence(candidate: UiTokenCandidate): Map<string, Automa
   for (const key of ["holder_count", "developer_wallet", "liquidity_lock_end_date", "volume_quality"] as const) add(output, 4, key, "MISSING_DATA", null, null, null);
   add(output, 4, "wallet_clustering", "MISSING_DATA", null, null, null, "bubblemaps", manualExternalState(candidate, "bubblemaps"));
 
-  for (const key of STEP_ITEM_KEYS[5]) add(output, 5, key, "MISSING_DATA", null, null, null);
+  for (const key of STEP_ITEM_KEYS[5]) {
+    const link = (candidate.socialLinks ?? []).find((entry) => entry.category === key) ?? null;
+    add(
+      output,
+      5,
+      key,
+      "MISSING_DATA",
+      null,
+      null,
+      null,
+      null,
+      null,
+      link ? { source: link.source, snapshot_at: link.snapshotAt, normalization_path: "candidate_snapshot" } : null,
+      link ? { url: link.url, provenance: { source: link.source, snapshot_at: link.snapshotAt, normalization_path: "candidate_snapshot" } } : null,
+    );
+  }
   for (const key of STEP_ITEM_KEYS[6]) add(output, 6, key, "MISSING_DATA", null, null, "not calculated");
   return output;
 }
@@ -203,6 +220,7 @@ function add(
   manualExternalTool: ManualResearchTool | null = null,
   manualExternalState: ResearchChecklistState | null = null,
   automaticProvenance: ResearchAutomaticProvenance | null = null,
+  automaticLink: ResearchChecklistItem["automatic_link"] = null,
 ): void {
   output.set(`${step}:${key}`, {
     key,
@@ -214,11 +232,12 @@ function add(
     manual_external_tool: manualExternalTool,
     manual_external_state: manualExternalState,
     automatic_provenance: automaticProvenance,
+    automatic_link: automaticLink,
   });
 }
 
 function missingItem(step: ResearchStepNumber, key: ResearchChecklistItemKey): AutomaticItem {
-  return { key, step_number: step, automatic_state: "MISSING_DATA", value_text: null, value_number: null, threshold: null, manual_external_tool: null, manual_external_state: null, automatic_provenance: null };
+  return { key, step_number: step, automatic_state: "MISSING_DATA", value_text: null, value_number: null, threshold: null, manual_external_tool: null, manual_external_state: null, automatic_provenance: null, automatic_link: null };
 }
 
 function applyManualEvidence(automatic: AutomaticItem, manual: PublicResearchEvidence | null): ResearchChecklistItem {
@@ -228,9 +247,11 @@ function applyManualEvidence(automatic: AutomaticItem, manual: PublicResearchEvi
   const state = manualApplies && manual
     ? manual.manual_state
     : automatic.manual_external_state ?? automaticState;
-  const source = state === "MISSING_DATA" || state === "OPEN_EXTERNAL_TOOL"
+  const source = manualApplies ? "MANUAL"
+    : automatic.automatic_link ? "AUTOMATIC"
+    : state === "MISSING_DATA" || state === "OPEN_EXTERNAL_TOOL"
     ? manual ? "MANUAL" : "UNAVAILABLE"
-    : manualApplies ? "MANUAL" : "AUTOMATIC";
+    : "AUTOMATIC";
   return {
     ...automatic,
     state,

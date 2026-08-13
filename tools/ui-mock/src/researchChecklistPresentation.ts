@@ -58,6 +58,22 @@ export function researchEvidencePresentationText(value: string, locale: "pl" | "
     if (value === "suspicious") return locale === "pl" ? "Podejrzany / nienaturalny" : "Suspicious / unnatural";
     if (value === "missing") return locale === "pl" ? "Brak danych" : "Missing data";
   }
+  if (sourceTool?.startsWith("Manual social research:")) {
+    const labels: Record<string, [string, string]> = {
+      healthy: ["Zdrowy / organiczny", "Healthy / organic"],
+      needs_attention: ["Wymaga uwagi", "Needs attention"],
+      suspicious: ["Podejrzany", "Suspicious"],
+      missing: ["Brak danych", "Missing data"],
+      working: ["Działa i pasuje do projektu", "Working and consistent with the project"],
+      transparent: ["Transparentny / nazwany team", "Transparent / named team"],
+      anonymous: ["Anonimowy team", "Anonymous team"],
+      reasonable: ["Oryginalny / sensowny", "Original / reasonable"],
+      suspected_copy_paste: ["Podejrzenie copy-paste", "Suspected copy-paste"],
+      coherent: ["Spójna / realistyczna", "Coherent / realistic"],
+    };
+    const label = labels[value];
+    if (label) return label[locale === "pl" ? 0 : 1];
+  }
   return isUnrecordedMachineValue(value) ? (locale === "pl" ? "Brak zapisanego wyniku" : "No recorded result") : value;
 }
 

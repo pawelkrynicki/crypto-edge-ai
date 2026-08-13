@@ -16,6 +16,35 @@ export type DexScreenerTokenProfile = {
   tokenAddress?: unknown;
 };
 
+export type DexScreenerLink = {
+  type?: unknown;
+  label?: unknown;
+  url?: unknown;
+};
+
+export type DexScreenerPairInfo = {
+  socials?: DexScreenerLink[];
+  websites?: DexScreenerLink[];
+};
+
+export const SOCIAL_LINK_CATEGORIES = [
+  "twitter",
+  "telegram",
+  "discord",
+  "website",
+  "team",
+  "whitepaper",
+  "roadmap",
+] as const;
+
+export type SocialLinkCategory = (typeof SOCIAL_LINK_CATEGORIES)[number];
+
+/** Safe, source-neutral link normalized before a scanner snapshot is persisted. */
+export type NormalizedSocialLink = {
+  category: SocialLinkCategory;
+  url: string;
+};
+
 export type DexScreenerPair = {
   chainId?: string;
   dexId?: string;
@@ -33,6 +62,7 @@ export type DexScreenerPair = {
   volume?: {
     h24?: number;
   };
+  info?: DexScreenerPairInfo;
 };
 
 export type DexScreenerSearchResponse = {
@@ -48,6 +78,8 @@ export type CryptoEdgeCandidate = {
   dex: string | null;
   source: "dexscreener";
   source_url: string | null;
+  /** Existing token-source links only. They never represent a quality verdict. */
+  social_links?: NormalizedSocialLink[];
   price_usd: number | null;
   market_cap_usd: number | null;
   fdv_usd: number | null;

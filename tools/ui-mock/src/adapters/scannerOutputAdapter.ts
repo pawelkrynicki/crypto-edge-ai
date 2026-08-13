@@ -96,6 +96,12 @@ export function mapPersistableScannerOutputToUiCandidates(
       contractAddress: safeString(candidate.contract_address),
       pairAddress: safeString(candidate.pair_address),
       sourceUrl: safeString(candidate.source_url),
+      socialLinks: (candidate.social_links ?? []).map((link) => ({
+        category: link.category,
+        url: link.url,
+        source: link.source,
+        snapshotAt: link.snapshot_at,
+      })),
       discoveryBasket: candidate.discovery_basket ?? "new_emerging",
       discoveryMethod: candidate.discovery_method ?? "dexscreener_latest_token_profiles",
       observationOnly: candidate.observation_only ?? true,

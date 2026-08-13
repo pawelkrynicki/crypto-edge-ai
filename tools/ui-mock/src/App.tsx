@@ -56,6 +56,8 @@ import {
 } from "./workspaceNavigation";
 import type { CandidateReviewInput, ReviewSessionState } from "./types/reviewSessionTypes";
 import type { UiTokenCandidate } from "./types/scannerTypes";
+import { ProductLocaleProvider } from "./productI18n";
+import type { ResearchStepNumber } from "./researchChecklistTypes";
 
 function buildSummary(candidates: MockCandidate[]) {
   return {
@@ -182,6 +184,7 @@ export default function App() {
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null | undefined>(undefined);
   const [tokenLookupInput, setTokenLookupInput] = useState("");
   const [externalChecksCandidateId, setExternalChecksCandidateId] = useState<string | null | undefined>(undefined);
+  const [focusedResearchStep, setFocusedResearchStep] = useState<ResearchStepNumber | null>(null);
   const [reviewSession, setReviewSession] = useState<ReviewSessionState>(() => loadReviewSession());
   const [reviewStorageStatus, setReviewStorageStatus] = useState<ReviewStorageStatus>(INITIAL_REVIEW_STORAGE_STATUS);
   const [marketContextState, setMarketContextState] = useState<MarketContextPanelState>({
@@ -391,10 +394,12 @@ export default function App() {
 
   const handleOpenCandidate = useCallback((candidateId: string) => {
     setSelectedCandidateId(candidateId);
+    setFocusedResearchStep(null);
     handleWorkspaceSectionChange("candidate-detail");
   }, [handleWorkspaceSectionChange]);
 
-  const handleOpenExternalChecks = useCallback((candidate?: UiTokenCandidate | null, tokenInput?: string) => {
+  const handleOpenExternalChecks = useCallback((candidate?: UiTokenCandidate | null, tokenInput?: string, researchStep: ResearchStepNumber | null = null) => {
+    setFocusedResearchStep(researchStep);
     if (candidate) {
       setSelectedCandidateId(candidate.id);
       setExternalChecksCandidateId(candidate.id);
@@ -477,6 +482,7 @@ export default function App() {
               candidate={selectedDetailCandidate}
               onBackToResults={() => handleWorkspaceSectionChange("candidate-results")}
               onOpenExternalChecks={handleOpenExternalChecks}
+              onOpenResearchChecklistStep={(candidate, step) => handleOpenExternalChecks(candidate, undefined, step)}
             />
           </WorkspaceSection>
         );
@@ -494,6 +500,11 @@ export default function App() {
           <WorkspaceSection {...SECTION_COPY["external-checks"]}>
             <ExternalVerificationLinksView
               candidate={externalChecksCandidate}
+              focusedResearchStep={focusedResearchStep}
+              onBackToResearchPlaybook={() => {
+                setFocusedResearchStep(null);
+                handleWorkspaceSectionChange("candidate-detail");
+              }}
             />
           </WorkspaceSection>
         );
@@ -565,23 +576,25 @@ export default function App() {
   };
 
   return (
-    <WorkspaceShell
-      navGroups={navGroups}
-      activeSection={activeSection}
-      onSectionChange={handleWorkspaceSectionChange}
-      dataSource={dataSource}
-      dataSourceOptions={dataSourceOptions}
-      onDataSourceChange={handleSourceChange}
-      loading={loading}
-      sourceStatusText={sourceStatusText}
-      fallbackMsg={fallbackMsg}
-      dataUnavailableReasonCode={dataUnavailableReasonCode}
-      runtimeMode={runtimeMode}
-      presentationMode={activeSection === "webinar-teaser"}
-      trustedPreviewMode={activeSection === "trusted-preview" || activeSection === "feedback-notes"}
-    >
-      {renderSection()}
-    </WorkspaceShell>
+    <ProductLocaleProvider>
+      <WorkspaceShell
+        navGroups={navGroups}
+        activeSection={activeSection}
+        onSectionChange={handleWorkspaceSectionChange}
+        dataSource={dataSource}
+        dataSourceOptions={dataSourceOptions}
+        onDataSourceChange={handleSourceChange}
+        loading={loading}
+        sourceStatusText={sourceStatusText}
+        fallbackMsg={fallbackMsg}
+        dataUnavailableReasonCode={dataUnavailableReasonCode}
+        runtimeMode={runtimeMode}
+        presentationMode={activeSection === "webinar-teaser"}
+        trustedPreviewMode={activeSection === "trusted-preview" || activeSection === "feedback-notes"}
+      >
+        {renderSection()}
+      </WorkspaceShell>
+    </ProductLocaleProvider>
   );
 }
 
