@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { test } from "node:test";
@@ -10,6 +10,7 @@ import { isSafeOfficialManualResearchUrl, resolveManualResearchTarget } from "..
 import { ResearchChecklistDetail } from "../src/components/ResearchChecklist.js";
 import { ExternalVerificationLinksView } from "../src/components/ExternalVerificationLinksView.js";
 import { ProductLocaleProvider } from "../src/productI18n.js";
+import { researchChecklistItemValue } from "../src/researchChecklistPresentation.js";
 import { resolveResearchChecklist } from "../src/researchChecklistResolver.js";
 import type { PersistableScannerOutput, UiTokenCandidate } from "../src/types/scannerTypes.js";
 import { createResearchEvidenceRepository, ResearchEvidenceError } from "../server/researchEvidenceRepository.js";
@@ -150,19 +151,75 @@ test("PC.3B trusted testers can read but cannot write private tool findings", as
   assert.equal(denied.status, 403);
 });
 
-test("PC.3B places the four actions beside focused checklist items and preserves the 7/6 tab boundaries", () => {
+test("PC.3B renders four usable external tool actions, shows saved state truthfully, and preserves the 7/6 tab boundaries", async () => {
   const step3 = renderToStaticMarkup(<ProductLocaleProvider initialLocale="pl"><ResearchChecklistDetail candidate={candidate()} focusedStep={3} /></ProductLocaleProvider>);
   const step4 = renderToStaticMarkup(<ProductLocaleProvider initialLocale="en"><ResearchChecklistDetail candidate={candidate()} focusedStep={4} /></ProductLocaleProvider>);
   const focusedDrawer = renderToStaticMarkup(<ProductLocaleProvider initialLocale="en"><ExternalVerificationLinksView candidate={candidate()} focusedResearchStep={3} /></ProductLocaleProvider>);
-  assert.match(step3, /Sprawdź Honeypot/);
-  assert.match(step3, /Otwórz TokenSniffer/);
-  assert.match(step3, /Otwórz De\.Fi Scanner/);
+  const css = await readFile("src/index.css", "utf8");
+  const [researchSource, presentationSource] = await Promise.all([
+    readFile("src/components/ResearchChecklist.tsx", "utf8"),
+    readFile("src/researchChecklistPresentation.ts", "utf8"),
+  ]);
+  const step3Actions = externalActions(step3);
+  const step4Actions = externalActions(step4);
+
+  assertExternalAction(step3Actions, "Sprawdź Honeypot", `https://honeypot.is/?address=${ADDRESS}`);
+  assertExternalAction(step3Actions, "Otwórz TokenSniffer", "https://tokensniffer.com/");
+  assertExternalAction(step3Actions, "Otwórz De.Fi Scanner", "https://de.fi/scanner");
+  assertExternalAction(step4Actions, "Open Bubblemaps", "https://v2.bubblemaps.io/");
   assert.match(step3, /Dodaj wynik/);
-  assert.match(step4, /Open Bubblemaps/);
-  assert.match(step3, /target="_blank"[^>]*rel="noopener noreferrer"/);
+  assert.match(step3, /Kopiuj CA/);
+  assert.match(step3, /Wklej adres kontraktu w narzędziu\./);
+  assert.match(css, /\.research-external-open-action\s*\{/);
+  assert.match(css, /\.research-external-open-action\s*\{[^}]*cursor:\s*pointer/s);
+  assert.match(css, /\.research-external-open-action:hover\s*\{/);
+  assert.match(css, /\.research-external-open-action:focus-visible\s*\{/);
+  assert.doesNotMatch(`${researchSource}${presentationSource}`, /fetch\(|axios|XMLHttpRequest|openai/i);
+  for (const [markup, tool] of [[step3, "honeypot"], [step3, "tokensniffer"], [step3, "defi_scanner"], [step4, "bubblemaps"]] as const) {
+    const toolRegion = manualToolRegion(markup, tool);
+    assert.match(toolRegion, /Brak zapisanego wyniku|No saved result/);
+    assert.doesNotMatch(toolRegion, /Zapisana kontrola|Recorded check/);
+  }
+
+  const unrecorded = resolveResearchChecklist(candidate());
+  for (const [step, key] of [[3, "honeypot"], [3, "tokensniffer"], [3, "defi_scanner"], [4, "wallet_clustering"]] as const) {
+    assert.equal(researchChecklistItemValue(item(unrecorded, step, key), "pl"), "Brak zapisanego wyniku");
+  }
+
+  const recorded = resolveResearchChecklist(candidate(), [
+    evidence(3, "honeypot", "MANUAL_VERIFIED", { value_text: "no_honeypot", source_tool: "Honeypot.is" }),
+    evidence(3, "tokensniffer", "MANUAL_VERIFIED", { value_number: 80, source_tool: "TokenSniffer" }),
+    evidence(3, "defi_scanner", "MANUAL_VERIFIED", { source_tool: "De.Fi Scanner" }),
+    evidence(4, "wallet_clustering", "MANUAL_VERIFIED", { value_text: "no_material_cluster", source_tool: "Bubblemaps" }),
+  ]);
+  assert.equal(researchChecklistItemValue(item(recorded, 3, "honeypot"), "pl"), "Brak honeypota");
+  assert.equal(researchChecklistItemValue(item(recorded, 3, "tokensniffer"), "pl"), "Ręcznie zapisany wynik TokenSniffer: 80");
+  assert.equal(researchChecklistItemValue(item(recorded, 3, "defi_scanner"), "pl"), "Zapisany wynik");
+  assert.equal(researchChecklistItemValue(item(recorded, 4, "wallet_clustering"), "pl"), "Brak istotnego klastra");
   assert.equal((focusedDrawer.match(/role="tab"/g) ?? []).length, 6);
   assert.doesNotMatch(focusedDrawer, /external-checks-list|AI Research Brief/);
 });
+
+function externalActions(markup: string) {
+  return [...markup.matchAll(/<a class="research-external-open-action" href="([^"]+)" target="_blank" rel="noopener noreferrer">([^<]+)<span aria-hidden="true">↗<\/span><\/a>/g)]
+    .map((match) => ({ href: match[1], label: match[2].trim() }));
+}
+
+function assertExternalAction(actions: { href: string; label: string }[], label: string, href: string) {
+  const action = actions.find((entry) => entry.label === label);
+  assert.ok(action, `Missing visible external action: ${label}`);
+  assert.equal(action.href, href);
+  assert.equal(new URL(action.href).protocol, "https:");
+}
+
+function manualToolRegion(markup: string, tool: string) {
+  const workflow = markup.indexOf(`data-manual-research-tool="${tool}"`);
+  assert.notEqual(workflow, -1, `Missing manual tool workflow: ${tool}`);
+  const start = markup.lastIndexOf("<article", workflow);
+  const end = markup.indexOf("</article>", workflow);
+  assert.ok(start >= 0 && end >= workflow, `Missing item bounds for manual tool: ${tool}`);
+  return markup.slice(start, end + "</article>".length);
+}
 
 function item(view: ReturnType<typeof resolveResearchChecklist>, step: number, key: string) {
   const result = view.steps.find((entry) => entry.number === step)?.items.find((entry) => entry.key === key);
@@ -170,7 +227,7 @@ function item(view: ReturnType<typeof resolveResearchChecklist>, step: number, k
   return result;
 }
 
-function evidence(step: 3 | 4, key: "tokensniffer" | "wallet_clustering", state: "MANUAL_VERIFIED" | "RED_FLAG", values: Partial<ReturnType<typeof defaultEvidence>>) {
+function evidence(step: 3 | 4, key: "honeypot" | "tokensniffer" | "defi_scanner" | "wallet_clustering", state: "MANUAL_VERIFIED" | "RED_FLAG", values: Partial<ReturnType<typeof defaultEvidence>>) {
   return { ...defaultEvidence(), step_number: step, item_key: key, manual_state: state, ...values };
 }
 

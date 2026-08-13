@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { formatProductUsd, useProductLocale } from "../productI18n";
+import { useProductLocale } from "../productI18n";
+import { researchChecklistItemValue, researchEvidencePresentationText } from "../researchChecklistPresentation";
 import { resolveResearchChecklist } from "../researchChecklistResolver";
 import {
   type PersistedManualResearchState,
@@ -228,7 +229,7 @@ function ResearchProgress({ view }: { view: ResearchChecklistView }) {
 function ResearchItem({ item, candidate, locale, writable = false, onSaved, incompleteResearch = false }: { item: ResearchChecklistItem; candidate?: UiTokenCandidate; locale: "pl" | "en"; writable?: boolean; onSaved?: () => Promise<void>; incompleteResearch?: boolean }) {
   const pl = locale === "pl";
   const manual = item.manual_evidence;
-  return <article className={`research-checklist-item ${item.state.toLowerCase()}`}><div><strong>{itemName(item.key, locale)}</strong><ResearchStateBadge state={item.state} labelOverride={incompleteResearch ? researchIncompleteName(locale) : undefined} /><p>{itemValue(item, locale)}</p>{item.manual_external_tool && item.automatic_state && item.automatic_state !== item.state && <small>{pl ? "Dane automatyczne pozostają oddzielne" : "Automatic evidence remains separate"}: {statusName(item.automatic_state, locale)}</small>}{item.threshold && <small>{pl ? "Próg metodologii" : "Methodology threshold"}: {methodologyThreshold(item.threshold, locale)}</small>}</div>{candidate && isManualExternalResearchItem(item) && onSaved && <ManualExternalResearchWorkflow item={item} candidate={candidate} writable={writable} locale={locale} onSaved={onSaved} />}{manual && <div className="research-manual-note"><span>{pl ? "Prywatny wpis" : "Private entry"}</span>{manual.value_text && <p>{presentationText(manual.value_text, locale, manual.source_tool)}</p>}{manual.value_number != null && <p>{manual.value_number}</p>}{manual.note && <p>{manual.note}</p>}{manual.source_tool && <small>{pl ? "Narzędzie" : "Tool"}: {manual.source_tool}</small>}{manual.evidence_url && <a href={manual.evidence_url} target="_blank" rel="noopener noreferrer">{pl ? "Otwórz dowód" : "Open evidence"}</a>}</div>}</article>;
+  return <article className={`research-checklist-item ${item.state.toLowerCase()}`}><div><strong>{itemName(item.key, locale)}</strong><ResearchStateBadge state={item.state} labelOverride={incompleteResearch ? researchIncompleteName(locale) : undefined} /><p>{researchChecklistItemValue(item, locale)}</p>{item.manual_external_tool && item.automatic_state && item.automatic_state !== item.state && <small>{pl ? "Dane automatyczne pozostają oddzielne" : "Automatic evidence remains separate"}: {statusName(item.automatic_state, locale)}</small>}{item.threshold && <small>{pl ? "Próg metodologii" : "Methodology threshold"}: {methodologyThreshold(item.threshold, locale)}</small>}</div>{candidate && isManualExternalResearchItem(item) && onSaved && <ManualExternalResearchWorkflow item={item} candidate={candidate} writable={writable} locale={locale} onSaved={onSaved} />}{manual && <div className="research-manual-note"><span>{pl ? "Prywatny wpis" : "Private entry"}</span>{manual.value_text && <p>{researchEvidencePresentationText(manual.value_text, locale, manual.source_tool)}</p>}{manual.value_number != null && <p>{manual.value_number}</p>}{manual.note && <p>{manual.note}</p>}{manual.source_tool && <small>{pl ? "Narzędzie" : "Tool"}: {manual.source_tool}</small>}{manual.evidence_url && <a href={manual.evidence_url} target="_blank" rel="noopener noreferrer">{pl ? "Otwórz dowód" : "Open evidence"}</a>}</div>}</article>;
 }
 
 const MANUAL_TOOL_DETAILS: Record<ManualResearchTool, { sourceTool: string; title: [string, string]; open: [string, string] }> = {
@@ -267,7 +268,7 @@ function ManualExternalResearchWorkflow({ item, candidate, writable, locale, onS
   const canRecord = target.availability !== "UNSUPPORTED_CHAIN" && target.availability !== "UNAVAILABLE";
   return <section className="research-external-tool" data-manual-research-tool={tool}>
     <strong>{detail.title[pl ? 0 : 1]}</strong>
-    {target.official_url && <a className="product-button secondary" href={target.official_url} target="_blank" rel="noopener noreferrer">{detail.open[pl ? 0 : 1]}</a>}
+    {target.official_url && <a className="research-external-open-action" href={target.official_url} target="_blank" rel="noopener noreferrer">{detail.open[pl ? 0 : 1]} <span aria-hidden="true">↗</span></a>}
     {target.availability === "MANUAL_SEARCH" && <p>{pl ? "Wklej adres kontraktu w narzędziu." : "Paste the contract address into the tool."}</p>}
     {target.availability === "UNSUPPORTED_CHAIN" && <p>{tool === "honeypot"
       ? (pl ? "Honeypot.is nie obsługuje tej sieci." : "Honeypot.is does not support this network.")
@@ -426,66 +427,6 @@ function methodologyThreshold(value: string, locale: "pl" | "en"): string {
   };
   return translations[value.trim().toLowerCase()] ?? value;
 }
-function itemValue(item: ResearchChecklistItem, locale: "pl" | "en"): string {
-  if (item.manual_evidence?.value_text) return presentationText(item.manual_evidence.value_text, locale, item.manual_evidence.source_tool);
-  if (item.value_number != null) {
-    if (item.manual_evidence?.source_tool === "TokenSniffer") return locale === "pl"
-      ? `Ręcznie zapisany wynik TokenSniffer: ${item.value_number}`
-      : `Manually recorded TokenSniffer score: ${item.value_number}`;
-    if (["market_cap", "volume_24h", "liquidity"].includes(item.key)) return formatProductUsd(item.value_number, locale, locale === "pl" ? "Brak danych" : "Missing data");
-    if (["volume_market_cap_ratio", "liquidity_market_cap_ratio"].includes(item.key)) return `${(item.value_number * 100).toFixed(2)}%`;
-    if (["pair_age", "liquidity_lock_days"].includes(item.key)) return `${item.value_number.toFixed(1)} ${locale === "pl" ? "dni" : "days"}`;
-    if (["top1_wallet", "top10_wallets", "buy_tax", "sell_tax"].includes(item.key)) return `${item.value_number.toFixed(2)}%`;
-    return String(item.value_number);
-  }
-  if (item.key === "ownership") {
-    if (item.value_text === "renounced") return locale === "pl" ? "Własność zrzucona" : "Ownership renounced";
-    if (item.value_text === "active") return locale === "pl" ? "Własność aktywna" : "Ownership active";
-    return locale === "pl" ? "Brak danych" : "Missing data";
-  }
-  if (item.value_text) {
-    if (isUnrecordedMachineValue(item.value_text)) return locale === "pl" ? "Brak zapisanego wyniku" : "No recorded result";
-    if (item.value_text === "yes") return locale === "pl" ? "Tak" : "Yes";
-    if (item.value_text === "no") return locale === "pl" ? "Nie" : "No";
-    if (item.value_text === "passed") return locale === "pl" ? "Pozytywny wynik" : "Passed";
-    if (item.value_text === "failed") return locale === "pl" ? "Negatywny wynik" : "Failed";
-    if (item.value_text === "locked") return locale === "pl" ? "Zablokowana" : "Locked";
-    if (item.value_text === "unlocked") return locale === "pl" ? "Niezablokowana" : "Unlocked";
-    return item.value_text;
-  }
-  if (item.key.endsWith("scorecard")) return locale === "pl" ? "Nie obliczono w PC.3A" : "Not calculated in PC.3A";
-  return item.state === "MISSING_DATA" ? (locale === "pl" ? "Brak zapisanych danych" : "No recorded data") : (locale === "pl" ? "Zapisana kontrola" : "Recorded check");
-}
-
-function presentationText(value: string, locale: "pl" | "en", sourceTool: string | null = null): string {
-  if (sourceTool === "Honeypot.is") {
-    if (value === "no_honeypot") return locale === "pl" ? "Brak honeypota" : "No honeypot detected";
-    if (value === "honeypot_detected") return locale === "pl" ? "Honeypot wykryty" : "Honeypot detected";
-    if (value === "could_not_confirm") return locale === "pl" ? "Nie udało się potwierdzić" : "Could not confirm";
-  }
-  if (sourceTool === "Bubblemaps") {
-    if (value === "no_material_cluster") return locale === "pl" ? "Brak istotnego klastra" : "No material cluster";
-    if (value === "needs_attention") return locale === "pl" ? "Wymaga uwagi — dalsza ocena ręczna" : "Needs attention — further manual assessment";
-    if (value === "strong_concentration_or_related_cluster") return locale === "pl" ? "Silna koncentracja / powiązany klaster" : "Strong concentration / related cluster";
-    if (value === "no_data") return locale === "pl" ? "Brak danych" : "No data";
-  }
-  return isUnrecordedMachineValue(value) ? (locale === "pl" ? "Brak zapisanego wyniku" : "No recorded result") : value;
-}
-
 function statusName(state: ResearchChecklistState, locale: "pl" | "en"): string {
   return STATUS_NAMES[state][locale === "pl" ? 0 : 1];
-}
-
-function isUnrecordedMachineValue(value: string): boolean {
-  return [
-    "unknown",
-    "null",
-    "undefined",
-    "missing_data",
-    "open_external_tool",
-    "auto_verified",
-    "manual_verified",
-    "not_applicable",
-    "red_flag",
-  ].includes(value.trim().toLowerCase());
 }
