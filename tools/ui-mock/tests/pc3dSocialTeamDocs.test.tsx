@@ -6,10 +6,12 @@ import { resolve } from "node:path";
 import { test } from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import TestRenderer from "react-test-renderer";
 import { ResearchChecklistDetail } from "../src/components/ResearchChecklist.js";
 import { ProductLocaleProvider } from "../src/productI18n.js";
 import { resolveResearchChecklist } from "../src/researchChecklistResolver.js";
 import { normalizeSafePublicHttpsUrl, normalizeSafeSocialLinkUrl } from "../src/socialLinks.js";
+import type { PublicResearchEvidence, ResearchChecklistItemKey, ResearchChecklistView } from "../src/researchChecklistTypes.js";
 import type { PersistableScannerOutput, UiTokenCandidate } from "../src/types/scannerTypes.js";
 import { createResearchEvidenceRepository } from "../server/researchEvidenceRepository.js";
 import { createScannerApiHandler } from "../server/scannerApiHandler.js";
@@ -17,6 +19,7 @@ import { createScannerApiHandler } from "../server/scannerApiHandler.js";
 const ADDRESS = "0x1111111111111111111111111111111111111111";
 const PAIR = "0x2222222222222222222222222222222222222222";
 const SNAPSHOT_AT = "2026-08-13T12:00:00.000Z";
+const { act, create } = TestRenderer;
 
 test("PC.3D keeps automatic links actionable but does not complete a social-quality check", () => {
   const view = resolveResearchChecklist(candidate());
@@ -40,9 +43,36 @@ test("PC.3D keeps automatic links actionable but does not complete a social-qual
   assert.ok(english.includes("Show Social / Team / Docs details"));
 
   const empty = renderToStaticMarkup(<ProductLocaleProvider initialLocale="pl"><ResearchChecklistDetail candidate={candidate({ socialLinks: [] })} focusedStep={5} /></ProductLocaleProvider>);
-  assert.match(empty, /Nie znaleziono linków społecznościowych w obecnym źródle/);
+  assert.match(empty, /Nie znaleziono automatycznych linków społecznościowych w obecnym źródle/);
+  assert.match(empty, /Research społeczny wymaga ręcznego uzupełnienia/);
   assert.match(empty, /Otwórz źródło tokena/);
   assert.doesNotMatch(empty, /research-checklist-item/);
+});
+
+test("PC.3D Step 5 counters measure final research state rather than automatic-link presence", async () => {
+  const automaticLinksOnly = candidate();
+  const caseA = await renderStep5(automaticLinksOnly, resolveResearchChecklist(automaticLinksOnly));
+  assert.deepEqual(caseA.counters, { available: 3, checked: 0, redFlags: 0, toComplete: 7 }, "automatic source links do not complete research");
+
+  const healthyX = socialEvidence("twitter", "MANUAL_VERIFIED", "healthy");
+  const needsAttentionTelegram = socialEvidence("telegram", "MANUAL_VERIFIED", "needs_attention");
+  const caseB = await renderStep5(automaticLinksOnly, resolveResearchChecklist(automaticLinksOnly, [healthyX, needsAttentionTelegram]));
+  assert.deepEqual(caseB.counters, { available: 3, checked: 2, redFlags: 0, toComplete: 5 });
+
+  const suspiciousDiscord = socialEvidence("discord", "RED_FLAG", "suspicious");
+  const caseC = await renderStep5(automaticLinksOnly, resolveResearchChecklist(automaticLinksOnly, [healthyX, needsAttentionTelegram, suspiciousDiscord]));
+  assert.deepEqual(caseC.counters, { available: 3, checked: 2, redFlags: 1, toComplete: 4 });
+
+  const missingX = socialEvidence("twitter", "MISSING_DATA", "missing");
+  const caseD = await renderStep5(automaticLinksOnly, resolveResearchChecklist(automaticLinksOnly, [missingX]));
+  assert.deepEqual(caseD.counters, { available: 3, checked: 0, redFlags: 0, toComplete: 7 }, "a saved missing finding remains unresolved");
+
+  const noAutomaticLinks = candidate({ socialLinks: [] });
+  const caseE = await renderStep5(noAutomaticLinks, resolveResearchChecklist(noAutomaticLinks, [socialEvidence("team", "MANUAL_VERIFIED", "transparent")]));
+  assert.deepEqual(caseE.counters, { available: 0, checked: 1, redFlags: 0, toComplete: 6 });
+  assert.match(caseE.text, /Nie znaleziono automatycznych linków społecznościowych w obecnym źródle/);
+  assert.match(caseE.text, /Masz zapisane prywatne ustalenia/);
+  assert.doesNotMatch(caseE.text, /Brak dostępnych danych społecznościowych/);
 });
 
 test("PC.3D independently validates every outbound source link before browser presentation", () => {
@@ -121,6 +151,64 @@ function stepItem(view: ReturnType<typeof resolveResearchChecklist>, key: string
   const item = view.steps.find((step) => step.number === 5)?.items.find((entry) => entry.key === key);
   assert.ok(item, `missing Step 5 item ${key}`);
   return item;
+}
+
+function socialEvidence(itemKey: Extract<ResearchChecklistItemKey, "twitter" | "telegram" | "discord" | "team">, manualState: PublicResearchEvidence["manual_state"], valueText: string): PublicResearchEvidence {
+  return {
+    schema_version: "research_evidence_sqlite_v1",
+    chain: "base",
+    contract_address: ADDRESS,
+    step_number: 5,
+    item_key: itemKey,
+    manual_state: manualState,
+    value_text: valueText,
+    value_number: null,
+    note: null,
+    source_tool: `Manual social research: ${itemKey}`,
+    evidence_url: null,
+    observed_at: null,
+    created_at: SNAPSHOT_AT,
+    updated_at: SNAPSHOT_AT,
+  };
+}
+
+async function renderStep5(candidateValue: UiTokenCandidate, view: ResearchChecklistView): Promise<{ counters: { available: number; checked: number; redFlags: number; toComplete: number }; text: string }> {
+  const originalFetch = globalThis.fetch;
+  let renderer: ReturnType<typeof create> | undefined;
+  globalThis.fetch = (async () => new Response(JSON.stringify(view), { status: 200, headers: { "content-type": "application/json" } })) as typeof fetch;
+  try {
+    await act(async () => {
+      renderer = create(<ProductLocaleProvider initialLocale="pl"><ResearchChecklistDetail candidate={candidateValue} focusedStep={5} /></ProductLocaleProvider>);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    const summary = renderer!.root.findByProps({ "data-pc3d-social-beginner": true });
+    const counters = Object.fromEntries(summary.findAllByType("span")
+      .filter((node) => node.findAllByType("b").length === 1)
+      .map((node) => {
+        const label = textContent(node.findByType("b"));
+        return [label, Number(textContent(node).replace(label, ""))];
+      }));
+    return {
+      counters: {
+        available: counters["Dostępne źródła"],
+        checked: counters.Sprawdzone,
+        redFlags: counters["Czerwone flagi"],
+        toComplete: counters["Do uzupełnienia"],
+      },
+      text: textContent(renderer!.root),
+    };
+  } finally {
+    renderer?.unmount();
+    globalThis.fetch = originalFetch;
+  }
+}
+
+function textContent(value: unknown): string {
+  if (typeof value === "string" || typeof value === "number") return String(value);
+  if (Array.isArray(value)) return value.map(textContent).join("");
+  if (value && typeof value === "object" && "children" in value) return textContent((value as { children: unknown[] }).children);
+  return "";
 }
 
 function candidate(overrides: Partial<UiTokenCandidate> = {}): UiTokenCandidate {

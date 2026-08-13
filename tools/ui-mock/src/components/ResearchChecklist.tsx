@@ -196,45 +196,48 @@ function SocialTeamDocsStep({ step, candidate, writable, locale, onSaved }: {
   onSaved: () => Promise<void>;
 }) {
   const pl = locale === "pl";
-  const links = step.items.flatMap((item) => {
+  const automaticLinks = step.items.flatMap((item) => {
     const url = item.automatic_link ? normalizeSafeSocialLinkUrl(item.key as SocialLinkCategory, item.automatic_link.url) : null;
     return url ? [{ item, url }] : [];
   });
-  const manualChecked = step.items.filter((item) => item.manual_evidence && isSimpleChecked(item.state)).length;
-  const redFlags = step.items.filter((item) => item.state === "RED_FLAG");
-  const missing = step.items.filter((item) => !item.automatic_link && !item.manual_evidence);
+  const automaticLinkItemKeys = new Set(automaticLinks.map(({ item }) => item.key));
+  const checkedItems = step.items.filter((item) => isSimpleChecked(item.state));
+  const redFlagItems = step.items.filter((item) => item.state === "RED_FLAG");
+  const unresolvedItems = step.items.filter((item) => isUnresolvedResearchState(item.state));
+  const missingAutomaticLinkItems = step.items.filter((item) => !automaticLinkItemKeys.has(item.key));
+  const hasManualEvidence = step.items.some((item) => item.manual_evidence !== null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   return <section className="research-social-step" data-pc3d-social-step>
     <section className="research-social-simple-summary" data-pc3d-social-beginner aria-label={pl ? "Social / Team / Docs" : "Social / Team / Docs"}>
-      <header><div><span>{pl ? "SOCIAL / TEAM / DOCS" : "SOCIAL / TEAM / DOCS"}</span><strong>{links.length > 0 ? (pl ? "Źródła gotowe do researchu" : "Sources ready for research") : (pl ? "Wymaga researchu ręcznego" : "Manual research required")}</strong></div>{redFlags.length > 0 && <button type="button" className="research-red-flag-reveal" data-pc3d-social-red-flag onClick={() => setDetailsOpen(true)}>{pl ? `Wykryto ${redFlags.length} ${redFlags.length === 1 ? "czerwoną flagę" : "czerwone flagi"}` : `${redFlags.length} red ${redFlags.length === 1 ? "flag" : "flags"}`} <span>{pl ? "Zobacz" : "View"}</span></button>}</header>
+      <header><div><span>{pl ? "SOCIAL / TEAM / DOCS" : "SOCIAL / TEAM / DOCS"}</span><strong>{automaticLinks.length > 0 ? (pl ? "Źródła gotowe do researchu" : "Sources ready for research") : (pl ? "Wymaga researchu ręcznego" : "Manual research required")}</strong></div>{redFlagItems.length > 0 && <button type="button" className="research-red-flag-reveal" data-pc3d-social-red-flag onClick={() => setDetailsOpen(true)}>{pl ? `Wykryto ${redFlagItems.length} ${redFlagItems.length === 1 ? "czerwoną flagę" : "czerwone flagi"}` : `${redFlagItems.length} red ${redFlagItems.length === 1 ? "flag" : "flags"}`} <span>{pl ? "Zobacz" : "View"}</span></button>}</header>
       <div className="research-focused-step-summary">
-        <span><b>{pl ? "Dostępne źródła" : "Available sources"}</b>{links.length}</span>
-        <span><b>{pl ? "Sprawdzone" : "Checked"}</b>{manualChecked}</span>
-        <span className={redFlags.length > 0 ? "has-red-flags" : ""}><b>{pl ? "Czerwone flagi" : "Red flags"}</b>{redFlags.length}</span>
-        <span><b>{pl ? "Do uzupełnienia" : "To complete"}</b>{missing.length}</span>
+        <span><b>{pl ? "Dostępne źródła" : "Available sources"}</b>{automaticLinks.length}</span>
+        <span><b>{pl ? "Sprawdzone" : "Checked"}</b>{checkedItems.length}</span>
+        <span className={redFlagItems.length > 0 ? "has-red-flags" : ""}><b>{pl ? "Czerwone flagi" : "Red flags"}</b>{redFlagItems.length}</span>
+        <span><b>{pl ? "Do uzupełnienia" : "To complete"}</b>{unresolvedItems.length}</span>
       </div>
-      {links.length > 0 ? <><div className="research-social-link-actions" data-pc3d-social-links>{links.map(({ item, url }) => <a key={`${item.key}:${url}`} href={url} target="_blank" rel="noopener noreferrer" data-pc3d-social-link={item.key}>{socialLinkButtonLabel(item.key, locale)} <span aria-hidden="true">↗</span></a>)}</div><small className="research-social-link-provenance">{pl ? "Link ze źródła tokena — wymaga własnej oceny." : "Link from token source — it still requires your own review."}</small></> : <NoSocialLinksState candidate={candidate} locale={locale} />}
+      {automaticLinks.length > 0 ? <><div className="research-social-link-actions" data-pc3d-social-links>{automaticLinks.map(({ item, url }) => <a key={`${item.key}:${url}`} href={url} target="_blank" rel="noopener noreferrer" data-pc3d-social-link={item.key}>{socialLinkButtonLabel(item.key, locale)} <span aria-hidden="true">↗</span></a>)}</div><small className="research-social-link-provenance">{pl ? "Link ze źródła tokena — wymaga własnej oceny." : "Link from token source — it still requires your own review."}</small></> : <NoSocialLinksState candidate={candidate} hasManualEvidence={hasManualEvidence} locale={locale} />}
       <p className="research-social-next-action">{pl ? "Następny krok: otwórz źródło lub dodaj własne ustalenie." : "Next step: open a source or add your own finding."}</p>
     </section>
-    {redFlags.length > 0 && <section className="research-social-red-flags" data-pc3d-social-red-flag-summary><strong>{pl ? "Czerwone flagi wymagają uwagi" : "Red flags require attention"}</strong><ul>{redFlags.map((item) => <li key={item.key}>{itemName(item.key, locale)}: {researchChecklistItemValue(item, locale)}</li>)}</ul></section>}
+    {redFlagItems.length > 0 && <section className="research-social-red-flags" data-pc3d-social-red-flag-summary><strong>{pl ? "Czerwone flagi wymagają uwagi" : "Red flags require attention"}</strong><ul>{redFlagItems.map((item) => <li key={item.key}>{itemName(item.key, locale)}: {researchChecklistItemValue(item, locale)}</li>)}</ul></section>}
     <details className="research-social-details" data-pc3d-social-details open={detailsOpen} onToggle={(event) => setDetailsOpen(event.currentTarget.open)}>
       <summary><span>{pl ? "Pokaż szczegóły Social / Team / Docs" : "Show Social / Team / Docs details"}</span><b>{detailsOpen ? (pl ? "Ukryj" : "Hide") : (pl ? "Pokaż" : "Show")}</b></summary>
       {detailsOpen && <div className="research-social-details-content">
-        {links.length > 0 && <section className="research-social-sources"><h5>{pl ? "Linki ze źródła tokena" : "Links from token source"}</h5>{links.map(({ item, url }) => <article key={`detail:${item.key}:${url}`}><div><strong>{itemName(item.key, locale)}</strong><small>{automaticProvenanceText(item.automatic_link!.provenance.source, item.automatic_link!.provenance.snapshot_at, locale)}</small></div><a href={url} target="_blank" rel="noopener noreferrer">{pl ? "Otwórz link" : "Open link"} ↗</a><p>{pl ? "Link ze źródła tokena — wymaga własnej oceny." : "Link from token source — it still requires your own review."}</p></article>)}</section>}
+        {automaticLinks.length > 0 && <section className="research-social-sources"><h5>{pl ? "Linki ze źródła tokena" : "Links from token source"}</h5>{automaticLinks.map(({ item, url }) => <article key={`detail:${item.key}:${url}`}><div><strong>{itemName(item.key, locale)}</strong><small>{automaticProvenanceText(item.automatic_link!.provenance.source, item.automatic_link!.provenance.snapshot_at, locale)}</small></div><a href={url} target="_blank" rel="noopener noreferrer">{pl ? "Otwórz link" : "Open link"} ↗</a><p>{pl ? "Link ze źródła tokena — wymaga własnej oceny." : "Link from token source — it still requires your own review."}</p></article>)}</section>}
         <section className="research-social-manual" data-pc3d-social-manual>
           <header><div><h5>{pl ? "Prywatne ustalenia" : "Private findings"}</h5><p>{writable ? (pl ? "Widoczne tylko w Twoim workspace. Nie zmieniają wspólnej migawki ani lifecycle." : "Visible only in your workspace. They never change the shared snapshot or lifecycle.") : (pl ? "Tryb tylko do odczytu." : "Read-only mode.")}</p></div></header>
           {step.items.map((item) => <SocialManualEvidenceEditor key={item.key} item={item} candidate={candidate} writable={writable} locale={locale} onSaved={onSaved} />)}
         </section>
-        {missing.length > 0 && <p className="research-social-missing" data-pc3d-social-missing>{pl ? `Brakuje automatycznych linków dla: ${missing.map((item) => itemName(item.key, locale)).join(", ")}.` : `No automatic links for: ${missing.map((item) => itemName(item.key, locale)).join(", ")}.`}</p>}
+        {missingAutomaticLinkItems.length > 0 && <p className="research-social-missing" data-pc3d-social-missing>{pl ? `Brakuje automatycznych linków dla: ${missingAutomaticLinkItems.map((item) => itemName(item.key, locale)).join(", ")}.` : `No automatic links for: ${missingAutomaticLinkItems.map((item) => itemName(item.key, locale)).join(", ")}.`}</p>}
       </div>}
     </details>
   </section>;
 }
 
-function NoSocialLinksState({ candidate, locale }: { candidate: UiTokenCandidate; locale: "pl" | "en" }) {
+function NoSocialLinksState({ candidate, hasManualEvidence, locale }: { candidate: UiTokenCandidate; hasManualEvidence: boolean; locale: "pl" | "en" }) {
   const pl = locale === "pl";
   const source = normalizeSafePublicHttpsUrl(candidate.sourceUrl);
-  return <div className="research-social-empty" data-pc3d-social-empty><p>{pl ? "Nie znaleziono linków społecznościowych w obecnym źródle." : "No social links were found in the current source."}</p><small>{pl ? "Brak dostępnych danych społecznościowych." : "No social research data available."}</small>{source && <a href={source} target="_blank" rel="noopener noreferrer">{pl ? "Otwórz źródło tokena" : "Open token source"} ↗</a>}</div>;
+  return <div className="research-social-empty" data-pc3d-social-empty><p>{pl ? "Nie znaleziono automatycznych linków społecznościowych w obecnym źródle." : "No automatic social links were found in the current source."}</p><small>{hasManualEvidence ? (pl ? "Masz zapisane prywatne ustalenia — znajdziesz je w szczegółach." : "You have saved private findings — find them in the details.") : (pl ? "Research społeczny wymaga ręcznego uzupełnienia." : "Social research requires manual completion.")}</small>{source && <a href={source} target="_blank" rel="noopener noreferrer">{pl ? "Otwórz źródło tokena" : "Open token source"} ↗</a>}</div>;
 }
 
 const SOCIAL_MANUAL_OPTIONS: Record<Extract<ResearchChecklistItemKey, "twitter" | "telegram" | "discord" | "website" | "team" | "whitepaper" | "roadmap">, Array<[string, string, string]>> = {
@@ -449,6 +452,10 @@ function resolveKeyResearchTools(view: ResearchChecklistView): Array<ResearchChe
 
 function isSimpleChecked(state: ResearchChecklistState): boolean {
   return state === "AUTO_VERIFIED" || state === "MANUAL_VERIFIED" || state === "NOT_APPLICABLE";
+}
+
+function isUnresolvedResearchState(state: ResearchChecklistState): boolean {
+  return state === "MISSING_DATA" || state === "OPEN_EXTERNAL_TOOL";
 }
 
 function contextualResearchTools(step: ResearchChecklistStep): Array<ResearchChecklistItem & { manual_external_tool: ManualResearchTool }> {
