@@ -101,6 +101,8 @@ export type ResearchChecklistItem = {
   threshold: string | null;
   source: "AUTOMATIC" | "MANUAL" | "UNAVAILABLE";
   manual_allowed: boolean;
+  /** Present only for the four PC.3B browser-only research workflows. */
+  manual_external_tool: "honeypot" | "tokensniffer" | "defi_scanner" | "bubblemaps" | null;
   manual_evidence: PublicResearchEvidence | null;
 };
 

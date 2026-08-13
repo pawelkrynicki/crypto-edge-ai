@@ -1376,7 +1376,7 @@ function validateResearchEvidenceWriteBody(value: unknown): {
   if (!isResearchStep(value.step_number) || !isResearchChecklistItemKey(value.item_key) || !isPersistedManualResearchState(value.manual_state)) {
     throw new ResearchChecklistRequestError("REQUEST_INVALID", 400);
   }
-  return {
+  const body = {
     ...identity,
     step_number: value.step_number,
     item_key: value.item_key,
@@ -1388,6 +1388,64 @@ function validateResearchEvidenceWriteBody(value: unknown): {
     evidence_url: nullableResearchText(value.evidence_url, 2_048),
     observed_at: nullableResearchTimestamp(value.observed_at),
   };
+  validatePc3bManualResearchEvidence(body);
+  return body;
+}
+
+/** PC.3B's four structured findings are intentionally fail-closed. */
+function validatePc3bManualResearchEvidence(input: {
+  step_number: ResearchStepNumber;
+  item_key: ResearchChecklistItemKey;
+  manual_state: PersistedManualResearchState;
+  value_text: string | null;
+  value_number: number | null;
+  source_tool: string | null;
+}): void {
+  const matches = (step: ResearchStepNumber, item: ResearchChecklistItemKey) => input.step_number === step && input.item_key === item;
+  const isPc3bKey = input.item_key === "honeypot" || input.item_key === "tokensniffer" || input.item_key === "defi_scanner" || input.item_key === "wallet_clustering";
+  if (isPc3bKey && !matches(3, "honeypot") && !matches(3, "tokensniffer") && !matches(3, "defi_scanner") && !matches(4, "wallet_clustering")) {
+    throw new ResearchChecklistRequestError("REQUEST_INVALID", 400);
+  }
+
+  if (matches(3, "honeypot")) {
+    const states: Record<string, PersistedManualResearchState> = {
+      low_honeypot_risk: "MANUAL_VERIFIED",
+      no_conclusive_result: "MISSING_DATA",
+      no_honeypot: "MANUAL_VERIFIED",
+      honeypot_detected: "RED_FLAG",
+      could_not_confirm: "MISSING_DATA",
+    };
+    if (input.source_tool !== "Honeypot.is" || input.value_number !== null || !input.value_text || states[input.value_text] !== input.manual_state) {
+      throw new ResearchChecklistRequestError("REQUEST_INVALID", 400);
+    }
+    return;
+  }
+
+  if (matches(3, "tokensniffer")) {
+    if (input.source_tool !== "TokenSniffer" || input.value_number === null || input.value_number < 0 || input.value_number > 100) {
+      throw new ResearchChecklistRequestError("REQUEST_INVALID", 400);
+    }
+    const expected = input.value_number < 50 ? "RED_FLAG" : "MANUAL_VERIFIED";
+    if (input.manual_state !== expected) throw new ResearchChecklistRequestError("REQUEST_INVALID", 400);
+    return;
+  }
+
+  if (matches(3, "defi_scanner")) {
+    if (input.source_tool !== "De.Fi Scanner") throw new ResearchChecklistRequestError("REQUEST_INVALID", 400);
+    return;
+  }
+
+  if (matches(4, "wallet_clustering")) {
+    const states: Record<string, PersistedManualResearchState> = {
+      no_material_cluster: "MANUAL_VERIFIED",
+      needs_attention: "MANUAL_VERIFIED",
+      strong_concentration_or_related_cluster: "RED_FLAG",
+      no_data: "MISSING_DATA",
+    };
+    if (input.source_tool !== "Bubblemaps" || input.value_number !== null || !input.value_text || states[input.value_text] !== input.manual_state) {
+      throw new ResearchChecklistRequestError("REQUEST_INVALID", 400);
+    }
+  }
 }
 
 function validateResearchEvidenceDeleteBody(value: unknown): {

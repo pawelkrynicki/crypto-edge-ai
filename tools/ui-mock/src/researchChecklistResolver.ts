@@ -1,4 +1,5 @@
 import { resolveProductFilterConditions } from "./productFilterResolver";
+import { resolveManualResearchTarget, type ManualResearchTool } from "./externalVerificationTargets";
 import type { UiTokenCandidate } from "./types/scannerTypes";
 import {
   type PublicResearchEvidence,
@@ -35,6 +36,8 @@ type AutomaticItem = {
   value_text: string | null;
   value_number: number | null;
   threshold: string | null;
+  manual_external_tool: ManualResearchTool | null;
+  manual_external_state: ResearchChecklistState | null;
 };
 
 export function resolveResearchChecklist(
@@ -74,6 +77,8 @@ export function resolveResearchChecklist(
     value_text: null,
     value_number: null,
     threshold: null,
+    manual_external_tool: null,
+    manual_external_state: null,
   }, null);
   steps.push(buildStep(7, [finalItem]));
 
@@ -139,7 +144,7 @@ function buildAutomaticEvidence(candidate: UiTokenCandidate): Map<string, Automa
 
   const goplusAvailable = Boolean(security?.sources.some((source) => source.trim().toLowerCase().includes("goplus")));
   add(output, 3, "goplus_coverage", goplusAvailable ? "AUTO_VERIFIED" : "MISSING_DATA", null, null, null);
-  add(output, 3, "honeypot", honeypotState, null, security?.honeypotStatus ?? null, null);
+  add(output, 3, "honeypot", honeypotState, null, security?.honeypotStatus ?? null, null, "honeypot", honeypotState === "MISSING_DATA" ? manualExternalState(candidate, "honeypot") : honeypotState);
   add(output, 3, "contract_verified", contractState, null, boolText(security?.contractVerified), null);
   add(output, 3, "ownership", stateForKnownOwnership(security?.ownershipStatus), null, ownershipText(security?.ownershipStatus), null);
   add(output, 3, "mint", security ? stateForRiskBoolean(security.mintRisk) : "MISSING_DATA", null, boolText(security?.mintRisk), null);
@@ -150,8 +155,8 @@ function buildAutomaticEvidence(candidate: UiTokenCandidate): Map<string, Automa
   add(output, 3, "buy_tax", buyTaxState, security?.buyTax ?? null, null, "<= 10%");
   add(output, 3, "sell_tax", sellTaxState, security?.sellTax ?? null, null, "<= 10%");
   add(output, 3, "liquidity_lock", liquidityState, null, liquidityLockText, null);
-  add(output, 3, "tokensniffer", "MISSING_DATA", null, null, null);
-  add(output, 3, "defi_scanner", "MISSING_DATA", null, null, null);
+  add(output, 3, "tokensniffer", "MISSING_DATA", null, null, null, "tokensniffer", manualExternalState(candidate, "tokensniffer"));
+  add(output, 3, "defi_scanner", "MISSING_DATA", null, null, null, "defi_scanner", manualExternalState(candidate, "defi_scanner"));
 
   add(output, 4, "top1_wallet", top1State, security?.topWalletPct ?? null, null, "<= 30%");
   add(output, 4, "top10_wallets", security?.top10WalletsPct == null ? "MISSING_DATA" : "AUTO_VERIFIED", security?.top10WalletsPct ?? null, null, null);
@@ -161,7 +166,8 @@ function buildAutomaticEvidence(candidate: UiTokenCandidate): Map<string, Automa
   add(output, 4, "liquidity_market_cap_ratio", liquidityMarketCap == null ? "MISSING_DATA" : "AUTO_VERIFIED", liquidityMarketCap, null, null);
   add(output, 4, "liquidity_lock", liquidityState, null, liquidityLockText, null);
   add(output, 4, "liquidity_lock_days", security?.liquidityLockDays == null ? "MISSING_DATA" : "AUTO_VERIFIED", security?.liquidityLockDays ?? null, null, null);
-  for (const key of ["holder_count", "developer_wallet", "liquidity_lock_end_date", "wallet_clustering", "volume_quality"] as const) add(output, 4, key, "MISSING_DATA", null, null, null);
+  for (const key of ["holder_count", "developer_wallet", "liquidity_lock_end_date", "volume_quality"] as const) add(output, 4, key, "MISSING_DATA", null, null, null);
+  add(output, 4, "wallet_clustering", "MISSING_DATA", null, null, null, "bubblemaps", manualExternalState(candidate, "bubblemaps"));
 
   for (const key of STEP_ITEM_KEYS[5]) add(output, 5, key, "MISSING_DATA", null, null, null);
   for (const key of STEP_ITEM_KEYS[6]) add(output, 6, key, "MISSING_DATA", null, null, "not calculated");
@@ -176,6 +182,8 @@ function add(
   valueNumber: number | null,
   valueText: string | null,
   threshold: string | null,
+  manualExternalTool: ManualResearchTool | null = null,
+  manualExternalState: ResearchChecklistState | null = null,
 ): void {
   output.set(`${step}:${key}`, {
     key,
@@ -184,31 +192,41 @@ function add(
     value_text: valueText,
     value_number: valueNumber,
     threshold,
+    manual_external_tool: manualExternalTool,
+    manual_external_state: manualExternalState,
   });
 }
 
 function missingItem(step: ResearchStepNumber, key: ResearchChecklistItemKey): AutomaticItem {
-  return { key, step_number: step, automatic_state: "MISSING_DATA", value_text: null, value_number: null, threshold: null };
+  return { key, step_number: step, automatic_state: "MISSING_DATA", value_text: null, value_number: null, threshold: null, manual_external_tool: null, manual_external_state: null };
 }
 
 function applyManualEvidence(automatic: AutomaticItem, manual: PublicResearchEvidence | null): ResearchChecklistItem {
   const automaticState = automatic.automatic_state;
-  const manualWins = automaticState === "MISSING_DATA" || automaticState === "OPEN_EXTERNAL_TOOL";
-  const state = automaticState === "RED_FLAG" || manual?.manual_state === "RED_FLAG"
-    ? "RED_FLAG"
-    : manual && manualWins
-      ? manual.manual_state
-      : automaticState;
+  const manualWins = automatic.manual_external_tool !== null || automaticState === "MISSING_DATA" || automaticState === "OPEN_EXTERNAL_TOOL";
+  const manualApplies = Boolean(manual && manualWins);
+  const state = manualApplies && manual
+    ? manual.manual_state
+    : automatic.manual_external_state ?? automaticState;
   const source = state === "MISSING_DATA" || state === "OPEN_EXTERNAL_TOOL"
     ? manual ? "MANUAL" : "UNAVAILABLE"
-    : manual && manualWins ? "MANUAL" : "AUTOMATIC";
+    : manualApplies ? "MANUAL" : "AUTOMATIC";
   return {
     ...automatic,
     state,
     source,
+    value_text: manualApplies && manual ? manual.value_text : automatic.value_text,
+    value_number: manualApplies && manual ? manual.value_number : automatic.value_number,
     manual_allowed: !MANUAL_DISABLED.has(automatic.key),
     manual_evidence: manual,
   };
+}
+
+function manualExternalState(candidate: UiTokenCandidate, tool: ManualResearchTool): ResearchChecklistState {
+  const target = resolveManualResearchTarget(tool, { chain: candidate.chain, contractAddress: candidate.contractAddress });
+  return target.availability === "AVAILABLE" || target.availability === "MANUAL_SEARCH"
+    ? "OPEN_EXTERNAL_TOOL"
+    : "MISSING_DATA";
 }
 
 function buildStep(number: ResearchStepNumber, items: ResearchChecklistItem[]): ResearchChecklistStep {

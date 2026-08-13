@@ -316,7 +316,7 @@ function optionalUrl(value: unknown): string | null {
   if (!raw) return null;
   let parsed: URL;
   try { parsed = new URL(raw); } catch { throw new ResearchEvidenceError("RESEARCH_EVIDENCE_INPUT_INVALID"); }
-  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") throw new ResearchEvidenceError("RESEARCH_EVIDENCE_INPUT_INVALID");
+  if (parsed.protocol !== "https:") throw new ResearchEvidenceError("RESEARCH_EVIDENCE_INPUT_INVALID");
   if (parsed.username || parsed.password || isPrivateHost(parsed.hostname)) throw new ResearchEvidenceError("RESEARCH_EVIDENCE_INPUT_INVALID");
   return parsed.toString();
 }

@@ -2,6 +2,28 @@ export type ExternalVerificationTargetKind = "explorer" | "dex" | "security" | "
 
 export type ExternalVerificationTargetState = "link" | "manual";
 
+/**
+ * These are deliberately browser-only research destinations.  They are not
+ * provider integrations: the app never requests, embeds, or proxies them.
+ */
+export const MANUAL_RESEARCH_TOOLS = ["honeypot", "tokensniffer", "defi_scanner", "bubblemaps"] as const;
+export type ManualResearchTool = (typeof MANUAL_RESEARCH_TOOLS)[number];
+export type ManualResearchTargetAvailability = "AVAILABLE" | "MANUAL_SEARCH" | "UNSUPPORTED_CHAIN" | "UNAVAILABLE";
+
+export interface ManualResearchTargetInput {
+  chain?: string;
+  contractAddress?: string;
+}
+
+export interface ManualResearchTarget {
+  tool: ManualResearchTool;
+  chain: string;
+  contract_address: string;
+  availability: ManualResearchTargetAvailability;
+  official_url: string | null;
+  copy_value: string;
+}
+
 export interface ExternalVerificationInput {
   symbol?: string;
   projectName?: string;
@@ -42,6 +64,29 @@ const ALLOWLISTED_SOURCE_HOSTS = new Set([
   "optimistic.etherscan.io",
   "solscan.io",
 ]);
+
+const MANUAL_RESEARCH_OFFICIAL_HOSTS = new Set([
+  "honeypot.is",
+  "tokensniffer.com",
+  "de.fi",
+  "v2.bubblemaps.io",
+]);
+
+const EVM_MANUAL_SEARCH_CHAINS = new Set(["ethereum", "eth", "bsc", "binance", "base", "polygon", "arbitrum", "optimism"]);
+const HONEYPOT_CHAIN_ALIASES: Record<string, string> = { eth: "ethereum", binance: "bsc" };
+const HONEYPOT_WEBSITE_PATHS = {
+  ethereum: "/ethereum",
+  bsc: "/",
+  base: "/base",
+} as const;
+const BUBBLEMAPS_V2_CHAIN_IDS = {
+  ethereum: "eth",
+  bsc: "bsc",
+  base: "base",
+  solana: "solana",
+  polygon: "polygon",
+  arbitrum: "arbitrum",
+} as const;
 
 const EXPLORER_TARGETS: Record<string, ExplorerTarget> = {
   ethereum: {
@@ -93,6 +138,79 @@ export function buildExternalVerificationTargets(input: ExternalVerificationInpu
     buildSecurityTarget(normalized, copyValue, copyLabel),
     buildSourceTarget(normalized),
   ];
+}
+
+/**
+ * Resolves only URLs we construct from fixed official domains.  Honeypot's
+ * address query is verified against its public site; Bubblemaps has an
+ * official browser deep link. TokenSniffer and De.Fi remain manual searches.
+ */
+export function resolveManualResearchTarget(
+  tool: ManualResearchTool,
+  input: ManualResearchTargetInput,
+): ManualResearchTarget {
+  const chain = normalizeManualResearchChain(input.chain);
+  const contractAddress = (input.contractAddress ?? "").trim();
+  const base = { tool, chain, contract_address: contractAddress, copy_value: contractAddress };
+
+  if (!contractAddress) return { ...base, availability: "UNAVAILABLE", official_url: null };
+
+  if (tool === "honeypot") {
+    const path = HONEYPOT_WEBSITE_PATHS[chain as keyof typeof HONEYPOT_WEBSITE_PATHS];
+    if (!path) {
+      return { ...base, availability: "UNSUPPORTED_CHAIN", official_url: null };
+    }
+    return {
+      ...base,
+      availability: "AVAILABLE",
+      official_url: safeOfficialManualResearchUrl(`https://honeypot.is${path}?address=${encodeURIComponent(contractAddress)}`),
+    };
+  }
+
+  if (tool === "bubblemaps") {
+    const bubblemapsChain = BUBBLEMAPS_V2_CHAIN_IDS[chain as keyof typeof BUBBLEMAPS_V2_CHAIN_IDS];
+    if (!bubblemapsChain) {
+      return {
+        ...base,
+        availability: "MANUAL_SEARCH",
+        official_url: safeOfficialManualResearchUrl("https://v2.bubblemaps.io/"),
+      };
+    }
+    return {
+      ...base,
+      availability: "AVAILABLE",
+      official_url: safeOfficialManualResearchUrl(`https://v2.bubblemaps.io/map?chain=${bubblemapsChain}&address=${encodeURIComponent(contractAddress)}`),
+    };
+  }
+
+  if (!EVM_MANUAL_SEARCH_CHAINS.has(chain)) return { ...base, availability: "UNSUPPORTED_CHAIN", official_url: null };
+  return {
+    ...base,
+    availability: "MANUAL_SEARCH",
+    official_url: safeOfficialManualResearchUrl(tool === "tokensniffer" ? "https://tokensniffer.com/" : "https://de.fi/scanner"),
+  };
+}
+
+export function isSafeOfficialManualResearchUrl(value: string | null | undefined): value is string {
+  if (!value) return false;
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "https:"
+      && !parsed.username
+      && !parsed.password
+      && MANUAL_RESEARCH_OFFICIAL_HOSTS.has(parsed.hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
+function safeOfficialManualResearchUrl(value: string): string | null {
+  return isSafeOfficialManualResearchUrl(value) ? value : null;
+}
+
+function normalizeManualResearchChain(value: string | undefined): string {
+  const normalized = (value ?? "").trim().toLowerCase();
+  return HONEYPOT_CHAIN_ALIASES[normalized] ?? normalized;
 }
 
 export function normalizeExternalVerificationInput(input: ExternalVerificationInput): Required<ExternalVerificationInput> {
