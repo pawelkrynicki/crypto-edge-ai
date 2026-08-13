@@ -23,7 +23,9 @@ test("PC.3C keeps existing Step 4 data factual, provenance-aware, and separate f
   assert.equal(item(view, "top1_wallet").value_number, 8.5);
   assert.equal(item(view, "top1_wallet").threshold, "preferred <10%; deal-breaker >30%");
   assert.equal(item(view, "top1_wallet").automatic_provenance?.source, "GoPlus");
+  assert.equal(item(view, "top10_wallets").state, "AUTO_VERIFIED");
   assert.equal(item(view, "top10_wallets").value_number, 34.2);
+  assert.equal(item(view, "top10_wallets").threshold, "preferred <40%");
   assert.equal(item(view, "liquidity_market_cap_ratio").value_number, 0.12);
   assert.equal(item(view, "liquidity_lock").value_text, "locked");
   assert.equal(item(view, "liquidity_lock_days").value_number, 210);
@@ -34,8 +36,10 @@ test("PC.3C keeps existing Step 4 data factual, provenance-aware, and separate f
   assert.equal(item(view, "volume_quality").state, "MISSING_DATA");
 
   assert.equal(item(resolveResearchChecklist(candidate({ security: { ...security(), topWalletPct: 31 } })), "top1_wallet").state, "RED_FLAG");
+  assert.equal(item(resolveResearchChecklist(candidate({ security: { ...security(), top10WalletsPct: 34.2 } })), "top10_wallets").state, "AUTO_VERIFIED");
   assert.equal(item(resolveResearchChecklist(candidate({ security: { ...security(), top10WalletsPct: 55 } })), "top10_wallets").state, "AUTO_VERIFIED");
-  assert.equal(item(resolveResearchChecklist(candidate({ security: { ...security(), top10WalletsPct: 61 } })), "top10_wallets").state, "RED_FLAG");
+  assert.equal(item(resolveResearchChecklist(candidate({ security: { ...security(), top10WalletsPct: 61 } })), "top10_wallets").state, "AUTO_VERIFIED");
+  assert.equal(item(resolveResearchChecklist(candidate({ security: { ...security(), top10WalletsPct: 80 } })), "top10_wallets").state, "AUTO_VERIFIED");
   assert.equal(item(resolveResearchChecklist(candidate({ liquidity: 20_000 })), "liquidity_market_cap_ratio").state, "RED_FLAG");
   assert.equal(item(resolveResearchChecklist(candidate({ liquidity: 400_000 })), "liquidity_market_cap_ratio").state, "AUTO_VERIFIED", "more than 30% stays neutral rather than becoming an invented risk");
 });
@@ -54,6 +58,7 @@ test("PC.3C renders a compact Step 4 first, surfaces red flags, keeps details cl
   assert.match(markup, /Brakuje danych dla 4 dodatkowych kontroli/);
   assert.match(markup, /31\.00%/);
   assert.match(markup, /34\.20%/);
+  assert.match(markup, /Próg metodologii: Preferowane: &lt;40%/);
   assert.match(markup, /12\.00%/);
   assert.doesNotMatch(markup, /natural volume|naturalny wolumen/i);
 

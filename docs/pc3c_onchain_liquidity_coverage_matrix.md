@@ -7,7 +7,7 @@ evidence store. This audit deliberately made no live provider request.
 | Item | Current normalized field | Raw data exists? | Current source | Current state | Can normalize without new provider? | Manual fallback | Gap |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `top1_wallet` | `security.top_wallet_pct` | Yes | GoPlus security snapshot | Automatic | Already normalized centrally | Not needed for the normal path | Quality preference `<10%`; frozen deal breaker remains `>30%` |
-| `top10_wallets` | `security.top_10_wallets_pct` | Yes | GoPlus security snapshot | Automatic | Already normalized centrally | Not needed for the normal path | Quality preference `<40%`; frozen deal breaker remains `>60%` |
+| `top10_wallets` | `security.top_10_wallets_pct` | Yes | GoPlus security snapshot | Automatic | Already normalized centrally | Not needed for the normal path | Quality preference `<40%`; value remains factual context in PC.3C |
 | `liquidity_market_cap_ratio` | derived from `liquidity_usd / market_cap_usd` | Yes | DexScreener candidate snapshot | Automatic | Yes, from the shared candidate snapshot | Not needed for the normal path | `10–30%` is contextual optimum; only `<3%` is a Step 4 red concern |
 | `liquidity_lock` | `security.liquidity_locked` | Yes | GoPlus security snapshot | Automatic | Already normalized centrally | Not needed for the normal path | Missing remains missing; false remains a red flag |
 | `liquidity_lock_days` | `security.liquidity_lock_days` | Yes | GoPlus security snapshot | Automatic | Already normalized centrally | Not needed for the normal path | `180–365` days is preference context, not an invented end date |

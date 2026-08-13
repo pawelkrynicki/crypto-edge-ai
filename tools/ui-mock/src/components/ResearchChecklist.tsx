@@ -758,6 +758,7 @@ function methodologyThreshold(value: string, locale: "pl" | "en"): string {
   const translations: Record<string, string> = {
     required: "wymagane",
     "must be locked": "płynność musi być zablokowana",
+    "preferred <40%": "Preferowane: <40%",
     "not calculated": "nie obliczono",
   };
   return translations[value.trim().toLowerCase()] ?? value;

@@ -173,11 +173,11 @@ function buildAutomaticEvidence(candidate: UiTokenCandidate): Map<string, Automa
   add(output, 3, "tokensniffer", "MISSING_DATA", null, null, null, "tokensniffer", manualExternalState(candidate, "tokensniffer"));
   add(output, 3, "defi_scanner", "MISSING_DATA", null, null, null, "defi_scanner", manualExternalState(candidate, "defi_scanner"));
 
-  // Step 4 quality context deliberately stays separate from the frozen Step 2
-  // deal-breaker rules. A value between the preferred and deal-breaker ranges
-  // remains factual context, not an invented negative verdict.
+  // Step 4 quality context deliberately stays separate from frozen Step 2
+  // deal-breaker rules. Top 10 concentration has a quality preference only;
+  // every available value remains factual context in PC.3C.
   add(output, 4, "top1_wallet", top1State, security?.topWalletPct ?? null, null, "preferred <10%; deal-breaker >30%", null, null, goPlusProvenance);
-  add(output, 4, "top10_wallets", security?.top10WalletsPct == null ? "MISSING_DATA" : stateForMaximum(security.top10WalletsPct, 60), security?.top10WalletsPct ?? null, null, "preferred <40%; deal-breaker >60%", null, null, goPlusProvenance);
+  add(output, 4, "top10_wallets", security?.top10WalletsPct == null ? "MISSING_DATA" : "AUTO_VERIFIED", security?.top10WalletsPct ?? null, null, "preferred <40%", null, null, goPlusProvenance);
   const liquidityMarketCap = candidate.liquidity == null || candidate.marketCap == null
     ? null
     : liquidityMarketCapRatio(candidate.liquidity, candidate.marketCap);
