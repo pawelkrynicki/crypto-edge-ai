@@ -5,6 +5,7 @@ import { resolveResearchChecklist } from "../researchChecklistResolver";
 import {
   type PersistedManualResearchState,
   type ResearchChecklistItem,
+  type ResearchChecklistItemKey,
   type ResearchChecklistStep,
   type ResearchChecklistState,
   type ResearchChecklistView,
@@ -156,14 +157,14 @@ function FocusedResearchStep({ step, view, candidate, locale, writable, onSaved 
   const contextualTools = contextualResearchTools(step);
   const technicalItems = meaningfulTechnicalItems(step);
   const unavailableItems = unavailableTechnicalItems(step);
-  const meaningfulItems = [...contextualTools, ...technicalItems];
-  const checked = meaningfulItems.filter((item) => isSimpleChecked(item.state));
-  const redFlags = meaningfulItems.filter((item) => item.state === "RED_FLAG");
-  const toCheck = meaningfulItems.filter((item) => !isSimpleChecked(item.state) && item.state !== "RED_FLAG");
+  const summaryItems = step.number === 4 ? step.items : [...contextualTools, ...technicalItems];
+  const checked = summaryItems.filter((item) => isSimpleChecked(item.state));
+  const redFlags = summaryItems.filter((item) => item.state === "RED_FLAG");
+  const toCheck = summaryItems.filter((item) => !isSimpleChecked(item.state) && item.state !== "RED_FLAG");
   const technicalRedFlags = technicalItems.filter((item) => item.state === "RED_FLAG");
   return <ResearchStepCard step={step} candidate={candidate} locale={locale} focused writable={writable} onSaved={onSaved}>
     <section className="research-simple-summary" data-research-simple-summary={step.number} aria-label={pl ? "Prosty status researchu" : "Simple research status"}>
-      <header><div><span>{simpleFocusTitle(step.number, locale)}</span><strong>{simpleResearchStatus(view, step, meaningfulItems, locale)}</strong></div>{technicalRedFlags.length > 0 && <button type="button" className="research-red-flag-reveal" data-research-red-flag-reveal onClick={() => setTechnicalExpanded(true)}>{pl ? `Wykryto ${technicalRedFlags.length} ${technicalRedFlags.length === 1 ? "czerwoną flagę" : "czerwone flagi"}` : `${technicalRedFlags.length} red ${technicalRedFlags.length === 1 ? "flag detected" : "flags detected"}`} <span>{pl ? "Zobacz" : "View"}</span></button>}</header>
+      <header><div><span>{simpleFocusTitle(step.number, locale)}</span><strong>{simpleResearchStatus(view, step, summaryItems, locale)}</strong></div>{technicalRedFlags.length > 0 && <button type="button" className="research-red-flag-reveal" data-research-red-flag-reveal onClick={() => setTechnicalExpanded(true)}>{pl ? `Wykryto ${technicalRedFlags.length} ${technicalRedFlags.length === 1 ? "czerwoną flagę" : "czerwone flagi"}` : `${technicalRedFlags.length} red ${technicalRedFlags.length === 1 ? "flag detected" : "flags detected"}`} <span>{pl ? "Zobacz" : "View"}</span></button>}</header>
       <div className="research-focused-step-summary">
         <span><b>{pl ? "Sprawdzone" : "Checked"}</b>{checked.length}</span>
         <span className={redFlags.length > 0 ? "has-red-flags" : ""}><b>{pl ? "Czerwone flagi" : "Red flags"}</b>{redFlags.length}</span>
@@ -176,6 +177,7 @@ function FocusedResearchStep({ step, view, candidate, locale, writable, onSaved 
       {technicalRedFlags.length > 0 && <div className="research-technical-red-flags" data-research-technical-red-flags><strong>{pl ? `Wykryto ${technicalRedFlags.length} ${technicalRedFlags.length === 1 ? "czerwoną flagę" : "czerwone flagi"}` : `${technicalRedFlags.length} red ${technicalRedFlags.length === 1 ? "flag" : "flags"}`}</strong></div>}
       <div className="research-checklist-items">{technicalItems.map((item) => <ResearchItem key={`${step.number}:${item.key}`} item={item} locale={locale} incompleteResearch={isIncompleteFinalStep(step)} />)}</div>
     </details>}
+    {step.number === 4 && <OnchainManualEvidenceSection items={step.items.filter(isPc3cManualEvidenceItem)} candidate={candidate} writable={writable} locale={locale} onSaved={onSaved} />}
     <ResearchUnavailableState step={step} view={view} items={unavailableItems} locale={locale} />
   </ResearchStepCard>;
 }
@@ -255,7 +257,7 @@ export function ResearchManualEvidencePanel({ candidate }: { candidate: UiTokenC
   const manualItems = view.steps.map((step) => ({ ...step, items: step.items.filter((item) => !isManualExternalResearchItem(item) && item.manual_allowed && (item.state === "MISSING_DATA" || item.state === "OPEN_EXTERNAL_TOOL" || item.manual_evidence)) })).filter((step) => step.items.length > 0);
   return <section className="research-manual-evidence" aria-label={pl ? "Prywatne dowody researchu" : "Private research evidence"}>
     <header><span>{pl ? "PRYWATNE DOWODY RESEARCHU" : "PRIVATE RESEARCH EVIDENCE"}</span><h3>{pl ? "Twoje ręczne ustalenia" : "Your manual findings"}</h3><p>{view.manual_evidence_writable ? (pl ? "Widoczne tylko w Twoim workspace. Nie zmieniają Radaru, lifecycle ani danych wspólnych." : "Visible only in your workspace. They never change Radar, lifecycle, or shared data.") : (pl ? "Tryb tylko do odczytu. Nie możesz zapisywać prywatnych dowodów." : "Read-only mode. You cannot save private evidence.")}</p></header>
-    {manualItems.length === 0 ? <p className="research-empty">{pl ? "Brak pozycji wymagających ręcznego wpisu." : "No items currently require a manual entry."}</p> : manualItems.map((step) => <section key={step.number} className="research-manual-step"><h4>{step.number}. {stepName(step.number, locale)}</h4>{step.items.map((item) => <ManualEvidenceEditor key={`${step.number}:${item.key}`} item={item} candidate={candidate} writable={view.manual_evidence_writable} locale={locale} onSaved={reload} />)}</section>)}
+    {manualItems.length === 0 ? <p className="research-empty">{pl ? "Brak pozycji wymagających ręcznego wpisu." : "No items currently require a manual entry."}</p> : manualItems.map((step) => <section key={step.number} className="research-manual-step"><h4>{step.number}. {stepName(step.number, locale)}</h4>{step.items.map((item) => isPc3cManualEvidenceItem(item) ? <OnchainManualEvidenceEditor key={`${step.number}:${item.key}`} item={item} candidate={candidate} writable={view.manual_evidence_writable} locale={locale} onSaved={reload} /> : <ManualEvidenceEditor key={`${step.number}:${item.key}`} item={item} candidate={candidate} writable={view.manual_evidence_writable} locale={locale} onSaved={reload} />)}</section>)}
   </section>;
 }
 
@@ -293,7 +295,7 @@ function ResearchProgress({ view }: { view: ResearchChecklistView }) {
 function ResearchItem({ item, candidate, locale, writable = false, onSaved, incompleteResearch = false }: { item: ResearchChecklistItem; candidate?: UiTokenCandidate; locale: "pl" | "en"; writable?: boolean; onSaved?: () => Promise<void>; incompleteResearch?: boolean }) {
   const pl = locale === "pl";
   const manual = item.manual_evidence;
-  return <article className={`research-checklist-item ${item.state.toLowerCase()}`}><div><strong>{itemName(item.key, locale)}</strong><ResearchStateBadge state={item.state} labelOverride={incompleteResearch ? researchIncompleteName(locale) : undefined} /><p>{researchChecklistItemValue(item, locale)}</p>{item.manual_external_tool && item.automatic_state && item.automatic_state !== item.state && <small>{pl ? "Dane automatyczne pozostają oddzielne" : "Automatic evidence remains separate"}: {statusName(item.automatic_state, locale)}</small>}{item.threshold && <small>{pl ? "Próg metodologii" : "Methodology threshold"}: {methodologyThreshold(item.threshold, locale)}</small>}</div>{candidate && isManualExternalResearchItem(item) && onSaved && <ManualExternalResearchWorkflow item={item} candidate={candidate} writable={writable} locale={locale} onSaved={onSaved} />}{manual && <div className="research-manual-note"><span>{pl ? "Prywatny wpis" : "Private entry"}</span>{manual.value_text && <p>{researchEvidencePresentationText(manual.value_text, locale, manual.source_tool)}</p>}{manual.value_number != null && <p>{manual.value_number}</p>}{manual.note && <p>{manual.note}</p>}{manual.source_tool && <small>{pl ? "Narzędzie" : "Tool"}: {manual.source_tool}</small>}{manual.evidence_url && <a href={manual.evidence_url} target="_blank" rel="noopener noreferrer">{pl ? "Otwórz dowód" : "Open evidence"}</a>}</div>}</article>;
+  return <article className={`research-checklist-item ${item.state.toLowerCase()}`}><div><strong>{itemName(item.key, locale)}</strong><ResearchStateBadge state={item.state} labelOverride={incompleteResearch ? researchIncompleteName(locale) : undefined} /><p>{researchChecklistItemValue(item, locale)}</p>{item.manual_external_tool && item.automatic_state && item.automatic_state !== item.state && <small>{pl ? "Dane automatyczne pozostają oddzielne" : "Automatic evidence remains separate"}: {statusName(item.automatic_state, locale)}</small>}{item.threshold && <small>{pl ? "Próg metodologii" : "Methodology threshold"}: {methodologyThreshold(item.threshold, locale)}</small>}{item.automatic_provenance && <small className="research-automatic-provenance">{automaticProvenanceText(item.automatic_provenance.source, item.automatic_provenance.snapshot_at, locale)}</small>}</div>{candidate && isManualExternalResearchItem(item) && onSaved && <ManualExternalResearchWorkflow item={item} candidate={candidate} writable={writable} locale={locale} onSaved={onSaved} />}{manual && <div className="research-manual-note"><span>{pl ? "Prywatny wpis" : "Private entry"}</span>{manual.value_text && <p>{researchEvidencePresentationText(manual.value_text, locale, manual.source_tool)}</p>}{manual.value_number != null && <p>{manual.value_number}</p>}{manual.note && <p>{manual.note}</p>}{manual.source_tool && <small>{pl ? "Narzędzie" : "Tool"}: {manual.source_tool}</small>}{manual.evidence_url && <a href={manual.evidence_url} target="_blank" rel="noopener noreferrer">{pl ? "Otwórz dowód" : "Open evidence"}</a>}</div>}</article>;
 }
 
 const MANUAL_TOOL_DETAILS: Record<ManualResearchTool, { sourceTool: string; title: [string, string]; open: [string, string] }> = {
@@ -564,6 +566,147 @@ function manualSearchHelper(tool: ManualResearchTool, locale: "pl" | "en"): stri
     : "Paste the copied address into Bubblemaps search and select the correct network.";
 }
 
+const PC3C_MANUAL_EVIDENCE_KEYS = new Set<ResearchChecklistItemKey>([
+  "holder_count",
+  "developer_wallet",
+  "liquidity_lock_end_date",
+  "volume_quality",
+]);
+
+function isPc3cManualEvidenceItem(item: ResearchChecklistItem): boolean {
+  return item.step_number === 4 && PC3C_MANUAL_EVIDENCE_KEYS.has(item.key);
+}
+
+function OnchainManualEvidenceSection({ items, candidate, writable, locale, onSaved }: {
+  items: ResearchChecklistItem[];
+  candidate: UiTokenCandidate;
+  writable: boolean;
+  locale: "pl" | "en";
+  onSaved: () => Promise<void>;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  if (items.length === 0) return null;
+  const pl = locale === "pl";
+  return <section className="research-onchain-manual-evidence" data-pc3c-onchain-manual data-expanded={expanded ? "true" : "false"}>
+    <button type="button" className="research-onchain-manual-toggle" onClick={() => setExpanded((current) => !current)} aria-expanded={expanded}><span>{pl ? "Dodaj wynik ręczny" : "Add manual finding"}</span><b>{expanded ? (pl ? "Ukryj" : "Hide") : (pl ? "Opcjonalnie" : "Optional")}</b></button>
+    {expanded && <div className="research-onchain-manual-content"><p>{pl ? "Prywatne ustalenia są widoczne tylko w Twoim workspace i nie zmieniają Radaru, lifecycle ani wspólnej migawki." : "Private findings are visible only in your workspace and never change Radar, lifecycle, or the shared snapshot."}</p>{items.map((item) => <OnchainManualEvidenceEditor key={`${item.step_number}:${item.key}`} item={item} candidate={candidate} writable={writable} locale={locale} onSaved={onSaved} />)}</div>}
+  </section>;
+}
+
+function OnchainManualEvidenceEditor({ item, candidate, writable, locale, onSaved }: {
+  item: ResearchChecklistItem;
+  candidate: UiTokenCandidate;
+  writable: boolean;
+  locale: "pl" | "en";
+  onSaved: () => Promise<void>;
+}) {
+  const pl = locale === "pl";
+  const evidence = item.manual_evidence;
+  const [expanded, setExpanded] = useState(Boolean(evidence));
+  const [holderCount, setHolderCount] = useState(item.key === "holder_count" && evidence?.value_number != null ? String(evidence.value_number) : "");
+  const [wallet, setWallet] = useState(item.key === "developer_wallet" ? evidence?.value_text ?? "" : "");
+  const [percentage, setPercentage] = useState(item.key === "developer_wallet" && evidence?.value_number != null ? String(evidence.value_number) : "");
+  const [lockContext, setLockContext] = useState(developerLockContext(evidence?.source_tool));
+  const [lockEndDate, setLockEndDate] = useState(item.key === "liquidity_lock_end_date" ? evidence?.value_text ?? "" : "");
+  const [volumeQuality, setVolumeQuality] = useState(item.key === "volume_quality" ? evidence?.value_text ?? "missing" : "missing");
+  const [note, setNote] = useState(evidence?.note ?? "");
+  const [evidenceUrl, setEvidenceUrl] = useState(evidence?.evidence_url ?? "");
+  const [observedAt, setObservedAt] = useState(evidence?.observed_at ? evidence.observed_at.slice(0, 16) : "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const save = async () => {
+    if (!writable) return;
+    setError(null);
+    const prepared = preparePc3cManualEvidence(item.key, { holderCount, wallet, percentage, lockContext, lockEndDate, volumeQuality }, locale);
+    if (!prepared.ok) { setError(prepared.error); return; }
+    setSaving(true);
+    const saved = await saveResearchEvidence({
+      chain: candidate.chain,
+      contractAddress: candidate.contractAddress,
+      stepNumber: 4,
+      itemKey: item.key,
+      manualState: prepared.manualState,
+      valueText: prepared.valueText,
+      valueNumber: prepared.valueNumber,
+      note: note || null,
+      sourceTool: prepared.sourceTool,
+      evidenceUrl: evidenceUrl || null,
+      observedAt: observedAt ? new Date(observedAt).toISOString() : null,
+    });
+    setSaving(false);
+    if (!saved) { setError(pl ? "Nie zapisano wyniku. Sprawdź pola i spróbuj ponownie." : "The result was not saved. Check the fields and try again."); return; }
+    setExpanded(false);
+    await onSaved();
+  };
+
+  const remove = async () => {
+    if (!writable) return;
+    setSaving(true); setError(null);
+    const deleted = await deleteResearchEvidence({ chain: candidate.chain, contractAddress: candidate.contractAddress, stepNumber: 4, itemKey: item.key });
+    setSaving(false);
+    if (!deleted) { setError(pl ? "Nie usunięto wpisu." : "The entry was not deleted."); return; }
+    setExpanded(false);
+    await onSaved();
+  };
+
+  return <article className="research-manual-editor research-onchain-manual-editor" data-pc3c-manual-item={item.key}>
+    <div className="research-manual-editor-heading"><div><strong>{itemName(item.key, locale)}</strong><ResearchStateBadge state={item.state} compact /></div><ActionButton variant="secondary" onClick={() => setExpanded((current) => !current)}>{expanded ? (pl ? "Zamknij" : "Close") : evidence ? (pl ? "Edytuj wynik" : "Edit result") : (pl ? "Dodaj wynik ręczny" : "Add manual finding")}</ActionButton></div>
+    {expanded && <div className="research-manual-form">
+      {item.key === "holder_count" && <label><span>{pl ? "Liczba holderów" : "Holder count"}</span><input type="number" min="0" step="1" value={holderCount} disabled={!writable} onChange={(event) => setHolderCount(event.target.value)} /></label>}
+      {item.key === "developer_wallet" && <><label><span>{pl ? "Adres / identyfikator portfela dewelopera" : "Developer wallet address / identifier"}</span><input value={wallet} maxLength={128} disabled={!writable} onChange={(event) => setWallet(event.target.value)} /></label><label><span>{pl ? "Udział portfela (%)" : "Wallet share (%)"}</span><input type="number" min="0" max="100" step="0.01" value={percentage} disabled={!writable} onChange={(event) => setPercentage(event.target.value)} /></label><label><span>{pl ? "Kontekst blokady" : "Lock context"}</span><select value={lockContext} disabled={!writable} onChange={(event) => setLockContext(event.target.value as DeveloperLockContext)}><option value="locked">{pl ? "Zablokowany" : "Locked"}</option><option value="unlocked">{pl ? "Niezablokowany" : "Unlocked"}</option><option value="unknown">{pl ? "Nieznany" : "Unknown"}</option></select></label><small>{pl ? ">10% i niezablokowany portfel = czerwona flaga. Nieznany kontekst blokady nie jest pozytywnym wynikiem." : ">10% with an unlocked wallet is a red flag. Unknown lock context is not a positive result."}</small></>}
+      {item.key === "liquidity_lock_end_date" && <label><span>{pl ? "Data końca blokady" : "Liquidity lock end date"}</span><input type="date" value={lockEndDate} disabled={!writable} onChange={(event) => setLockEndDate(event.target.value)} /></label>}
+      {item.key === "volume_quality" && <label><span>{pl ? "Wynik jakości wolumenu" : "Volume-quality finding"}</span><select value={volumeQuality} disabled={!writable} onChange={(event) => setVolumeQuality(event.target.value)}><option value="natural">{pl ? "Naturalny / bez oczywistych anomalii" : "Natural / no obvious anomalies"}</option><option value="requires_attention">{pl ? "Wymaga uwagi" : "Requires attention"}</option><option value="suspicious">{pl ? "Podejrzany / nienaturalny" : "Suspicious / unnatural"}</option><option value="missing">{pl ? "Brak danych" : "Missing data"}</option></select></label>}
+      <label><span>{pl ? "Krótka notatka" : "Short note"}</span><textarea value={note} disabled={!writable} maxLength={1000} rows={2} onChange={(event) => setNote(event.target.value)} /></label>
+      <label><span>{pl ? "URL dowodu" : "Evidence URL"}</span><input type="url" value={evidenceUrl} disabled={!writable} maxLength={2048} placeholder="https://" onChange={(event) => setEvidenceUrl(event.target.value)} /></label>
+      <label><span>{pl ? "Zaobserwowano" : "Observed at"}</span><input type="datetime-local" value={observedAt} disabled={!writable} onChange={(event) => setObservedAt(event.target.value)} /></label>
+      {writable && <div className="research-manual-actions"><ActionButton variant="primary" loading={saving} onClick={() => void save()}>{pl ? "Zapisz wynik" : "Save result"}</ActionButton>{evidence && <ActionButton variant="secondary" loading={saving} onClick={() => void remove()}>{pl ? "Usuń" : "Delete"}</ActionButton>}</div>}
+      {error && <p role="alert">{error}</p>}
+    </div>}
+  </article>;
+}
+
+type DeveloperLockContext = "locked" | "unlocked" | "unknown";
+
+function developerLockContext(sourceTool: string | null | undefined): DeveloperLockContext {
+  if (sourceTool === "Manual developer wallet (locked)") return "locked";
+  if (sourceTool === "Manual developer wallet (unlocked)") return "unlocked";
+  return "unknown";
+}
+
+function preparePc3cManualEvidence(key: ResearchChecklistItemKey, input: {
+  holderCount: string;
+  wallet: string;
+  percentage: string;
+  lockContext: DeveloperLockContext;
+  lockEndDate: string;
+  volumeQuality: string;
+}, locale: "pl" | "en"): { ok: true; manualState: PersistedManualResearchState; valueText: string | null; valueNumber: number | null; sourceTool: string } | { ok: false; error: string } {
+  const error = (pl: string, en: string) => ({ ok: false as const, error: locale === "pl" ? pl : en });
+  if (key === "holder_count") {
+    const value = Number(input.holderCount);
+    if (!Number.isSafeInteger(value) || value < 0) return error("Liczba holderów musi być liczbą całkowitą 0 lub większą.", "Holder count must be an integer greater than or equal to 0.");
+    return { ok: true, manualState: "MANUAL_VERIFIED", valueText: null, valueNumber: value, sourceTool: "Manual holder research" };
+  }
+  if (key === "developer_wallet") {
+    const value = Number(input.percentage);
+    const wallet = input.wallet.trim();
+    if (!wallet || wallet.length > 128 || !Number.isFinite(value) || value < 0 || value > 100) return error("Podaj portfel i udział od 0 do 100%.", "Provide a wallet and a share from 0 to 100%.");
+    return { ok: true, manualState: value > 10 && input.lockContext === "unlocked" ? "RED_FLAG" : "MANUAL_VERIFIED", valueText: wallet, valueNumber: value, sourceTool: `Manual developer wallet (${input.lockContext})` };
+  }
+  if (key === "liquidity_lock_end_date") {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(input.lockEndDate) || !Number.isFinite(Date.parse(`${input.lockEndDate}T00:00:00.000Z`))) return error("Podaj prawidłową datę końca blokady.", "Provide a valid lock end date.");
+    return { ok: true, manualState: "MANUAL_VERIFIED", valueText: input.lockEndDate, valueNumber: null, sourceTool: "Manual liquidity lock research" };
+  }
+  if (key === "volume_quality") {
+    const states: Record<string, PersistedManualResearchState> = { natural: "MANUAL_VERIFIED", requires_attention: "MANUAL_VERIFIED", suspicious: "RED_FLAG", missing: "MISSING_DATA" };
+    const manualState = states[input.volumeQuality];
+    if (!manualState) return error("Wybierz prawidłowy wynik jakości wolumenu.", "Choose a valid volume-quality finding.");
+    return { ok: true, manualState, valueText: input.volumeQuality, valueNumber: null, sourceTool: "Manual volume-quality research" };
+  }
+  return error("Ta pozycja nie obsługuje ręcznego wyniku on-chain.", "This item does not support a manual on-chain finding.");
+}
+
 function ManualEvidenceEditor({ item, candidate, writable, locale, onSaved }: { item: ResearchChecklistItem; candidate: UiTokenCandidate; writable: boolean; locale: "pl" | "en"; onSaved: () => Promise<void> }) {
   const pl = locale === "pl";
   const evidence = item.manual_evidence;
@@ -615,10 +758,16 @@ function methodologyThreshold(value: string, locale: "pl" | "en"): string {
   const translations: Record<string, string> = {
     required: "wymagane",
     "must be locked": "płynność musi być zablokowana",
+    "preferred <40%": "Preferowane: <40%",
     "not calculated": "nie obliczono",
   };
   return translations[value.trim().toLowerCase()] ?? value;
 }
 function statusName(state: ResearchChecklistState, locale: "pl" | "en"): string {
   return STATUS_NAMES[state][locale === "pl" ? 0 : 1];
+}
+function automaticProvenanceText(source: "DexScreener" | "GoPlus", snapshotAt: string | null, locale: "pl" | "en"): string {
+  if (!snapshotAt || Number.isNaN(Date.parse(snapshotAt))) return locale === "pl" ? `Źródło automatyczne: ${source}` : `Automatic source: ${source}`;
+  const timestamp = new Intl.DateTimeFormat(locale === "pl" ? "pl-PL" : "en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" }).format(new Date(snapshotAt));
+  return locale === "pl" ? `Źródło automatyczne: ${source} · migawka ${timestamp} UTC` : `Automatic source: ${source} · snapshot ${timestamp} UTC`;
 }

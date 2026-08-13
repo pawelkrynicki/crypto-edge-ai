@@ -91,6 +91,17 @@ export type PublicResearchEvidence = {
   updated_at: string;
 };
 
+/**
+ * Provenance stays attached to automatic values as they move from the shared
+ * scanner snapshot into the research view. It is deliberately readable and
+ * excludes raw provider payloads, IDs, and implementation errors.
+ */
+export type ResearchAutomaticProvenance = {
+  source: "DexScreener" | "GoPlus";
+  snapshot_at: string | null;
+  normalization_path: "candidate_snapshot" | "security_snapshot" | "derived_from_candidate_snapshot";
+};
+
 export type ResearchChecklistItem = {
   key: ResearchChecklistItemKey;
   step_number: ResearchStepNumber;
@@ -100,6 +111,7 @@ export type ResearchChecklistItem = {
   value_number: number | null;
   threshold: string | null;
   source: "AUTOMATIC" | "MANUAL" | "UNAVAILABLE";
+  automatic_provenance: ResearchAutomaticProvenance | null;
   manual_allowed: boolean;
   /** Present only for the four PC.3B browser-only research workflows. */
   manual_external_tool: "honeypot" | "tokensniffer" | "defi_scanner" | "bubblemaps" | null;

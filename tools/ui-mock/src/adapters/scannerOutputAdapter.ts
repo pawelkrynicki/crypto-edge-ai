@@ -128,6 +128,7 @@ export function mapPersistableScannerOutputToUiCandidates(
       security: security ? mapSecurity(security) : null,
 
       scorecard: scorecard ? mapScorecard(scorecard) : null,
+      candidateSnapshotAt: candidate.created_at,
       lastCheckedAt: resolveLastCheckedAt(candidate, security, scorecard),
     };
   });
