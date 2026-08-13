@@ -266,14 +266,15 @@ function ManualExternalResearchWorkflow({ item, candidate, writable, locale, onS
     } catch { setError(pl ? "Nie udało się skopiować adresu." : "The address could not be copied."); }
   };
   const canRecord = target.availability !== "UNSUPPORTED_CHAIN" && target.availability !== "UNAVAILABLE";
+  const manualSearch = target.availability === "MANUAL_SEARCH";
   return <section className="research-external-tool" data-manual-research-tool={tool}>
     <strong>{detail.title[pl ? 0 : 1]}</strong>
+    {manualSearch && target.copy_value && <button type="button" className="research-copy-address" onClick={() => void copyAddress()}>{copied ? (pl ? "Skopiowano CA" : "CA copied") : (pl ? "Kopiuj CA" : "Copy CA")}</button>}
     {target.official_url && <a className="research-external-open-action" href={target.official_url} target="_blank" rel="noopener noreferrer">{detail.open[pl ? 0 : 1]} <span aria-hidden="true">↗</span></a>}
-    {target.availability === "MANUAL_SEARCH" && <p>{pl ? "Wklej adres kontraktu w narzędziu." : "Paste the contract address into the tool."}</p>}
+    {manualSearch && <p>{manualSearchHelper(tool, locale)}</p>}
     {target.availability === "UNSUPPORTED_CHAIN" && <p>{tool === "honeypot"
       ? (pl ? "Honeypot.is nie obsługuje tej sieci." : "Honeypot.is does not support this network.")
       : (pl ? "To narzędzie nie obsługuje tej sieci." : "This tool does not support this network.")}</p>}
-    {target.copy_value && <button type="button" className="research-copy-address" onClick={() => void copyAddress()}>{copied ? (pl ? "Skopiowano CA" : "CA copied") : (pl ? "Kopiuj CA" : "Copy CA")}</button>}
     {canRecord && <ActionButton variant="secondary" onClick={() => setExpanded((current) => !current)}>{expanded ? (pl ? "Zamknij" : "Close") : evidence ? (pl ? "Edytuj wynik" : "Edit result") : (pl ? "Dodaj wynik" : "Add result")}</ActionButton>}
     {expanded && <ManualExternalResearchForm tool={tool} item={item} candidate={candidate} evidence={evidence} writable={writable} locale={locale} onSaved={async () => { setExpanded(false); await onSaved(); }} onError={setError} />}
     {error && <p role="alert">{error}</p>}
@@ -291,7 +292,7 @@ function ManualExternalResearchForm({ tool, item, candidate, evidence, writable,
   onError: (message: string | null) => void;
 }) {
   const pl = locale === "pl";
-  const [result, setResult] = useState(evidence?.value_text ?? defaultManualResult(tool));
+  const [result, setResult] = useState(normalizeManualResult(tool, evidence?.value_text));
   const [score, setScore] = useState(evidence?.value_number?.toString() ?? "");
   const [valueText, setValueText] = useState(tool === "defi_scanner" ? evidence?.value_text ?? "" : "");
   const [valueNumber, setValueNumber] = useState(tool === "defi_scanner" && evidence?.value_number != null ? String(evidence.value_number) : "");
@@ -344,7 +345,7 @@ function ManualExternalResearchForm({ tool, item, candidate, evidence, writable,
     await onSaved();
   };
   return <div className="research-manual-form research-external-result-form">
-    {tool === "honeypot" && <label><span>{pl ? "Wynik" : "Result"}</span><select value={result} disabled={!writable} onChange={(event) => setResult(event.target.value)}><option value="no_honeypot">{pl ? "Brak honeypota" : "No honeypot detected"}</option><option value="honeypot_detected">{pl ? "Honeypot wykryty" : "Honeypot detected"}</option><option value="could_not_confirm">{pl ? "Nie udało się potwierdzić" : "Could not confirm"}</option></select></label>}
+    {tool === "honeypot" && <label><span>{pl ? "Wynik" : "Result"}</span><select value={result} disabled={!writable} onChange={(event) => setResult(event.target.value)}><option value="low_honeypot_risk">{pl ? "Niskie ryzyko honeypota" : "Low honeypot risk"}</option><option value="honeypot_detected">{pl ? "Honeypot wykryty" : "Honeypot detected"}</option><option value="no_conclusive_result">{pl ? "Brak jednoznacznego wyniku" : "No conclusive result"}</option></select></label>}
     {tool === "tokensniffer" && <label><span>{pl ? "Ręcznie zapisany wynik TokenSniffer (0–100)" : "Manually recorded TokenSniffer score (0–100)"}</span><input type="number" min="0" max="100" step="1" value={score} disabled={!writable} onChange={(event) => setScore(event.target.value)} /></label>}
     {tool === "defi_scanner" && <><label><span>{pl ? "Stan ręczny" : "Manual state"}</span><select value={result} disabled={!writable} onChange={(event) => setResult(event.target.value)}><option value="MANUAL_VERIFIED">{pl ? "Sprawdzone ręcznie" : "Manually checked"}</option><option value="RED_FLAG">{pl ? "Czerwona flaga" : "Red flag"}</option><option value="MISSING_DATA">{pl ? "Brak danych" : "Missing data"}</option><option value="NOT_APPLICABLE">{pl ? "Nie dotyczy" : "Not applicable"}</option></select></label><label><span>{pl ? "Wynik tekstowy (opcjonalnie)" : "Text result (optional)"}</span><input value={valueText} disabled={!writable} maxLength={1000} onChange={(event) => setValueText(event.target.value)} /></label><label><span>{pl ? "Wynik liczbowy (opcjonalnie)" : "Numeric result (optional)"}</span><input type="number" value={valueNumber} disabled={!writable} onChange={(event) => setValueNumber(event.target.value)} /></label></>}
     {tool === "bubblemaps" && <label><span>{pl ? "Wynik klastra" : "Cluster result"}</span><select value={result} disabled={!writable} onChange={(event) => setResult(event.target.value)}><option value="no_material_cluster">{pl ? "Brak istotnego klastra" : "No material cluster"}</option><option value="needs_attention">{pl ? "Wymaga uwagi" : "Needs attention"}</option><option value="strong_concentration_or_related_cluster">{pl ? "Silna koncentracja / powiązany klaster" : "Strong concentration / related cluster"}</option><option value="no_data">{pl ? "Brak danych" : "No data"}</option></select></label>}
@@ -358,7 +359,7 @@ function ManualExternalResearchForm({ tool, item, candidate, evidence, writable,
 }
 
 function defaultManualResult(tool: ManualResearchTool): string {
-  if (tool === "honeypot") return "no_honeypot";
+  if (tool === "honeypot") return "low_honeypot_risk";
   if (tool === "bubblemaps") return "no_material_cluster";
   if (tool === "defi_scanner") return "MANUAL_VERIFIED";
   return "";
@@ -366,10 +367,28 @@ function defaultManualResult(tool: ManualResearchTool): string {
 
 function manualResultState(tool: ManualResearchTool, value: string): PersistedManualResearchState | null {
   const states: Partial<Record<ManualResearchTool, Record<string, PersistedManualResearchState>>> = {
-    honeypot: { no_honeypot: "MANUAL_VERIFIED", honeypot_detected: "RED_FLAG", could_not_confirm: "MISSING_DATA" },
+    honeypot: { low_honeypot_risk: "MANUAL_VERIFIED", honeypot_detected: "RED_FLAG", no_conclusive_result: "MISSING_DATA", no_honeypot: "MANUAL_VERIFIED", could_not_confirm: "MISSING_DATA" },
     bubblemaps: { no_material_cluster: "MANUAL_VERIFIED", needs_attention: "MANUAL_VERIFIED", strong_concentration_or_related_cluster: "RED_FLAG", no_data: "MISSING_DATA" },
   };
   return states[tool]?.[value] ?? null;
+}
+
+function normalizeManualResult(tool: ManualResearchTool, value: string | null | undefined): string {
+  if (tool === "honeypot" && value === "no_honeypot") return "low_honeypot_risk";
+  if (tool === "honeypot" && value === "could_not_confirm") return "no_conclusive_result";
+  return value ?? defaultManualResult(tool);
+}
+
+function manualSearchHelper(tool: ManualResearchTool, locale: "pl" | "en"): string {
+  if (tool === "tokensniffer") return locale === "pl"
+    ? "Wklej skopiowany adres w polu wyszukiwania TokenSniffer."
+    : "Paste the copied address into TokenSniffer search.";
+  if (tool === "defi_scanner") return locale === "pl"
+    ? "Wklej skopiowany adres w wyszukiwarce De.Fi Scanner."
+    : "Paste the copied address into De.Fi Scanner search.";
+  return locale === "pl"
+    ? "Wklej skopiowany adres w wyszukiwarce Bubblemaps i wybierz właściwą sieć."
+    : "Paste the copied address into Bubblemaps search and select the correct network.";
 }
 
 function ManualEvidenceEditor({ item, candidate, writable, locale, onSaved }: { item: ResearchChecklistItem; candidate: UiTokenCandidate; writable: boolean; locale: "pl" | "en"; onSaved: () => Promise<void> }) {

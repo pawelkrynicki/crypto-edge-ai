@@ -1409,6 +1409,8 @@ function validatePc3bManualResearchEvidence(input: {
 
   if (matches(3, "honeypot")) {
     const states: Record<string, PersistedManualResearchState> = {
+      low_honeypot_risk: "MANUAL_VERIFIED",
+      no_conclusive_result: "MISSING_DATA",
       no_honeypot: "MANUAL_VERIFIED",
       honeypot_detected: "RED_FLAG",
       could_not_confirm: "MISSING_DATA",

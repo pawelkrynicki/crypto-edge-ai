@@ -36,9 +36,9 @@ export function researchChecklistItemValue(item: ResearchChecklistItem, locale: 
 
 export function researchEvidencePresentationText(value: string, locale: "pl" | "en", sourceTool: string | null = null): string {
   if (sourceTool === "Honeypot.is") {
-    if (value === "no_honeypot") return locale === "pl" ? "Brak honeypota" : "No honeypot detected";
+    if (value === "low_honeypot_risk" || value === "no_honeypot") return locale === "pl" ? "Niskie ryzyko honeypota" : "Low honeypot risk";
     if (value === "honeypot_detected") return locale === "pl" ? "Honeypot wykryty" : "Honeypot detected";
-    if (value === "could_not_confirm") return locale === "pl" ? "Nie udało się potwierdzić" : "Could not confirm";
+    if (value === "no_conclusive_result" || value === "could_not_confirm") return locale === "pl" ? "Brak jednoznacznego wyniku" : "No conclusive result";
   }
   if (sourceTool === "Bubblemaps") {
     if (value === "no_material_cluster") return locale === "pl" ? "Brak istotnego klastra" : "No material cluster";

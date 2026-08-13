@@ -73,12 +73,19 @@ const MANUAL_RESEARCH_OFFICIAL_HOSTS = new Set([
 ]);
 
 const EVM_MANUAL_SEARCH_CHAINS = new Set(["ethereum", "eth", "bsc", "binance", "base", "polygon", "arbitrum", "optimism"]);
-const BUBBLEMAPS_CHAINS = new Set([...EVM_MANUAL_SEARCH_CHAINS, "solana"]);
 const HONEYPOT_CHAIN_ALIASES: Record<string, string> = { eth: "ethereum", binance: "bsc" };
 const HONEYPOT_WEBSITE_PATHS = {
   ethereum: "/ethereum",
   bsc: "/",
   base: "/base",
+} as const;
+const BUBBLEMAPS_V2_CHAIN_IDS = {
+  ethereum: "eth",
+  bsc: "bsc",
+  base: "base",
+  solana: "solana",
+  polygon: "polygon",
+  arbitrum: "arbitrum",
 } as const;
 
 const EXPLORER_TARGETS: Record<string, ExplorerTarget> = {
@@ -135,8 +142,8 @@ export function buildExternalVerificationTargets(input: ExternalVerificationInpu
 
 /**
  * Resolves only URLs we construct from fixed official domains.  Honeypot's
- * address query is verified against its public site; the other tools use their
- * official search page until a stable, documented deep link is available.
+ * address query is verified against its public site; Bubblemaps has an
+ * official browser deep link. TokenSniffer and De.Fi remain manual searches.
  */
 export function resolveManualResearchTarget(
   tool: ManualResearchTool,
@@ -161,11 +168,18 @@ export function resolveManualResearchTarget(
   }
 
   if (tool === "bubblemaps") {
-    if (!BUBBLEMAPS_CHAINS.has(chain)) return { ...base, availability: "UNSUPPORTED_CHAIN", official_url: null };
+    const bubblemapsChain = BUBBLEMAPS_V2_CHAIN_IDS[chain as keyof typeof BUBBLEMAPS_V2_CHAIN_IDS];
+    if (!bubblemapsChain) {
+      return {
+        ...base,
+        availability: "MANUAL_SEARCH",
+        official_url: safeOfficialManualResearchUrl("https://v2.bubblemaps.io/"),
+      };
+    }
     return {
       ...base,
-      availability: "MANUAL_SEARCH",
-      official_url: safeOfficialManualResearchUrl("https://v2.bubblemaps.io/"),
+      availability: "AVAILABLE",
+      official_url: safeOfficialManualResearchUrl(`https://v2.bubblemaps.io/map?chain=${bubblemapsChain}&address=${encodeURIComponent(contractAddress)}`),
     };
   }
 

@@ -45,12 +45,24 @@ test("PC.3B resolves only safe official browser targets and declares unsupported
   assert.equal(defi.availability, "MANUAL_SEARCH");
   assert.equal(new URL(defi.official_url!).hostname, "de.fi");
   assert.doesNotMatch(defi.official_url!, /defillama/i);
-  const bubbles = resolveManualResearchTarget("bubblemaps", { chain: "solana", contractAddress: "So11111111111111111111111111111111111111112" });
-  assert.equal(bubbles.availability, "MANUAL_SEARCH");
-  assert.equal(new URL(bubbles.official_url!).hostname, "v2.bubblemaps.io");
+  for (const [chain, expectedChain] of [["ethereum", "eth"], ["eth", "eth"], ["bsc", "bsc"], ["binance", "bsc"], ["base", "base"], ["solana", "solana"], ["polygon", "polygon"], ["arbitrum", "arbitrum"]] as const) {
+    const bubbles = resolveManualResearchTarget("bubblemaps", { chain, contractAddress: ADDRESS });
+    assert.equal(bubbles.availability, "AVAILABLE", chain);
+    assert.ok(bubbles.official_url, chain);
+    const url = new URL(bubbles.official_url);
+    assert.equal(url.protocol, "https:", chain);
+    assert.equal(url.hostname, "v2.bubblemaps.io", chain);
+    assert.equal(url.pathname, "/map", chain);
+    assert.equal(url.searchParams.get("chain"), expectedChain, chain);
+    assert.equal(url.searchParams.get("address"), ADDRESS, chain);
+    assert.equal(url.searchParams.get("partnerId"), null, chain);
+  }
+  const unsupportedBubblemaps = resolveManualResearchTarget("bubblemaps", { chain: "optimism", contractAddress: ADDRESS });
+  assert.equal(unsupportedBubblemaps.availability, "MANUAL_SEARCH");
+  assert.equal(unsupportedBubblemaps.official_url, "https://v2.bubblemaps.io/");
   assert.equal(resolveManualResearchTarget("tokensniffer", { chain: "solana", contractAddress: ADDRESS }).availability, "UNSUPPORTED_CHAIN");
   assert.equal(resolveManualResearchTarget("defi_scanner", { chain: "solana", contractAddress: ADDRESS }).availability, "UNSUPPORTED_CHAIN");
-  assert.equal(resolveManualResearchTarget("bubblemaps", { chain: "unknown", contractAddress: ADDRESS }).availability, "UNSUPPORTED_CHAIN");
+  assert.equal(resolveManualResearchTarget("bubblemaps", { chain: "unknown", contractAddress: ADDRESS }).availability, "MANUAL_SEARCH");
 
   for (const unsafe of ["http://honeypot.is/", "javascript:alert(1)", "data:text/html,x", "file:///private", "mailto:test@example.com", "https://evil.example/"]) {
     assert.equal(isSafeOfficialManualResearchUrl(unsafe), false, `rejects ${unsafe}`);
@@ -69,12 +81,16 @@ test("PC.3B maps private manual outcomes without changing automatic evidence", (
   const score50 = evidence(3, "tokensniffer", "MANUAL_VERIFIED", { value_number: 50, source_tool: "TokenSniffer" });
   const score0 = evidence(3, "tokensniffer", "RED_FLAG", { value_number: 0, source_tool: "TokenSniffer" });
   const score100 = evidence(3, "tokensniffer", "MANUAL_VERIFIED", { value_number: 100, source_tool: "TokenSniffer" });
-  const notConfirmed = evidence(3, "honeypot", "MISSING_DATA", { value_text: "could_not_confirm", source_tool: "Honeypot.is" });
+  const lowRisk = evidence(3, "honeypot", "MANUAL_VERIFIED", { value_text: "low_honeypot_risk", source_tool: "Honeypot.is" });
+  const detected = evidence(3, "honeypot", "RED_FLAG", { value_text: "honeypot_detected", source_tool: "Honeypot.is" });
+  const inconclusive = evidence(3, "honeypot", "MISSING_DATA", { value_text: "no_conclusive_result", source_tool: "Honeypot.is" });
   assert.equal(item(resolveResearchChecklist(base, [score49]), 3, "tokensniffer").state, "RED_FLAG");
   assert.equal(item(resolveResearchChecklist(base, [score50]), 3, "tokensniffer").state, "MANUAL_VERIFIED");
   assert.equal(item(resolveResearchChecklist(base, [score0]), 3, "tokensniffer").value_number, 0);
   assert.equal(item(resolveResearchChecklist(base, [score100]), 3, "tokensniffer").value_number, 100);
-  assert.equal(item(resolveResearchChecklist(base, [notConfirmed]), 3, "honeypot").state, "MISSING_DATA");
+  assert.equal(item(resolveResearchChecklist(base, [lowRisk]), 3, "honeypot").state, "MANUAL_VERIFIED");
+  assert.equal(item(resolveResearchChecklist(base, [detected]), 3, "honeypot").state, "RED_FLAG");
+  assert.equal(item(resolveResearchChecklist(base, [inconclusive]), 3, "honeypot").state, "MISSING_DATA");
   assert.equal(item(resolveResearchChecklist(base, [evidence(4, "wallet_clustering", "RED_FLAG", { value_text: "strong_concentration_or_related_cluster", source_tool: "Bubblemaps" })]), 4, "wallet_clustering").state, "RED_FLAG");
   assert.equal(base.finalLabel, "WATCHLIST", "manual research does not mutate lifecycle-derived candidate data");
 });
@@ -125,8 +141,10 @@ test("PC.3B API validates token scores and keeps trusted testers read-only", asy
   const writeRaw = async (body: Record<string, unknown>) => fetch(`${origin}/api/research-evidence`, {
     method: "PUT", headers: { cookie: cookie!, origin, "content-type": "application/json" }, body: JSON.stringify({ chain: "base", contract_address: ADDRESS, ...body }),
   });
-  assert.equal((await writeRaw({ step_number: 3, item_key: "honeypot", manual_state: "MANUAL_VERIFIED", value_text: "no_honeypot", source_tool: "Honeypot.is" })).status, 200);
-  assert.equal((await writeRaw({ step_number: 3, item_key: "honeypot", manual_state: "MANUAL_VERIFIED", value_text: "honeypot_detected", source_tool: "Honeypot.is" })).status, 400);
+  assert.equal((await writeRaw({ step_number: 3, item_key: "honeypot", manual_state: "MANUAL_VERIFIED", value_text: "low_honeypot_risk", source_tool: "Honeypot.is" })).status, 200);
+  assert.equal((await writeRaw({ step_number: 3, item_key: "honeypot", manual_state: "RED_FLAG", value_text: "honeypot_detected", source_tool: "Honeypot.is" })).status, 200);
+  assert.equal((await writeRaw({ step_number: 3, item_key: "honeypot", manual_state: "MISSING_DATA", value_text: "no_conclusive_result", source_tool: "Honeypot.is" })).status, 200);
+  assert.equal((await writeRaw({ step_number: 3, item_key: "honeypot", manual_state: "RED_FLAG", value_text: "low_honeypot_risk", source_tool: "Honeypot.is" })).status, 400);
   assert.equal((await writeRaw({ step_number: 3, item_key: "defi_scanner", manual_state: "NOT_APPLICABLE", value_text: "Not applicable to this contract", source_tool: "De.Fi Scanner" })).status, 200);
   assert.equal((await writeRaw({ step_number: 3, item_key: "defi_scanner", manual_state: "MANUAL_VERIFIED", source_tool: "DefiLlama" })).status, 400);
   assert.equal((await writeRaw({ step_number: 4, item_key: "wallet_clustering", manual_state: "RED_FLAG", value_text: "strong_concentration_or_related_cluster", source_tool: "Bubblemaps" })).status, 200);
@@ -178,15 +196,25 @@ test("PC.3B renders four usable external tool actions, shows saved state truthfu
   assertExternalAction(step3Actions, "Sprawdź Honeypot", `https://honeypot.is/base?address=${ADDRESS}`);
   assertExternalAction(step3Actions, "Otwórz TokenSniffer", "https://tokensniffer.com/");
   assertExternalAction(step3Actions, "Otwórz De.Fi Scanner", "https://de.fi/scanner");
-  assertExternalAction(step4Actions, "Open Bubblemaps", "https://v2.bubblemaps.io/");
+  assertExternalAction(step4Actions, "Open Bubblemaps", `https://v2.bubblemaps.io/map?chain=base&address=${ADDRESS}`);
   assert.match(step3, /Dodaj wynik/);
   assert.match(step3, /Kopiuj CA/);
-  assert.match(step3, /Wklej adres kontraktu w narzędziu\./);
+  assert.match(step3, /Wklej skopiowany adres w polu wyszukiwania TokenSniffer\./);
+  assert.match(step3, /Wklej skopiowany adres w wyszukiwarce De\.Fi Scanner\./);
+  assertActionOrder(manualToolRegion(step3, "tokensniffer"), ["Kopiuj CA", "Otwórz TokenSniffer", "Dodaj wynik"]);
+  assertActionOrder(manualToolRegion(step3, "defi_scanner"), ["Kopiuj CA", "Otwórz De.Fi Scanner", "Dodaj wynik"]);
+  assert.doesNotMatch(manualToolRegion(step3, "honeypot"), /Kopiuj CA/);
+  assert.doesNotMatch(manualToolRegion(step4, "bubblemaps"), /Copy CA/);
   assert.match(css, /\.research-external-open-action\s*\{/);
   assert.match(css, /\.research-external-open-action\s*\{[^}]*cursor:\s*pointer/s);
   assert.match(css, /\.research-external-open-action:hover\s*\{/);
   assert.match(css, /\.research-external-open-action:focus-visible\s*\{/);
-  assert.doesNotMatch(`${researchSource}${presentationSource}${targetsSource}`, /fetch\(|axios|XMLHttpRequest|openai|api\.honeypot\.is/i);
+  assert.match(researchSource, /Niskie ryzyko honeypota/);
+  assert.match(researchSource, /Low honeypot risk/);
+  assert.match(researchSource, /Brak jednoznacznego wyniku/);
+  assert.match(researchSource, /No conclusive result/);
+  assert.doesNotMatch(`${researchSource}${presentationSource}`, /Brak honeypota|No honeypot detected/);
+  assert.doesNotMatch(`${researchSource}${presentationSource}${targetsSource}`, /fetch\(|axios|XMLHttpRequest|openai|api\.honeypot\.is|api\.bubblemaps|<iframe|partnerId/i);
   for (const [markup, tool] of [[step3, "honeypot"], [step3, "tokensniffer"], [step3, "defi_scanner"], [step4, "bubblemaps"]] as const) {
     const toolRegion = manualToolRegion(markup, tool);
     assert.match(toolRegion, /Brak zapisanego wyniku|No saved result/);
@@ -199,12 +227,12 @@ test("PC.3B renders four usable external tool actions, shows saved state truthfu
   }
 
   const recorded = resolveResearchChecklist(candidate(), [
-    evidence(3, "honeypot", "MANUAL_VERIFIED", { value_text: "no_honeypot", source_tool: "Honeypot.is" }),
+    evidence(3, "honeypot", "MANUAL_VERIFIED", { value_text: "low_honeypot_risk", source_tool: "Honeypot.is" }),
     evidence(3, "tokensniffer", "MANUAL_VERIFIED", { value_number: 80, source_tool: "TokenSniffer" }),
     evidence(3, "defi_scanner", "MANUAL_VERIFIED", { source_tool: "De.Fi Scanner" }),
     evidence(4, "wallet_clustering", "MANUAL_VERIFIED", { value_text: "no_material_cluster", source_tool: "Bubblemaps" }),
   ]);
-  assert.equal(researchChecklistItemValue(item(recorded, 3, "honeypot"), "pl"), "Brak honeypota");
+  assert.equal(researchChecklistItemValue(item(recorded, 3, "honeypot"), "pl"), "Niskie ryzyko honeypota");
   assert.equal(researchChecklistItemValue(item(recorded, 3, "tokensniffer"), "pl"), "Ręcznie zapisany wynik TokenSniffer: 80");
   assert.equal(researchChecklistItemValue(item(recorded, 3, "defi_scanner"), "pl"), "Zapisany wynik");
   assert.equal(researchChecklistItemValue(item(recorded, 4, "wallet_clustering"), "pl"), "Brak istotnego klastra");
@@ -214,7 +242,7 @@ test("PC.3B renders four usable external tool actions, shows saved state truthfu
 
 function externalActions(markup: string) {
   return [...markup.matchAll(/<a class="research-external-open-action" href="([^"]+)" target="_blank" rel="noopener noreferrer">([^<]+)<span aria-hidden="true">↗<\/span><\/a>/g)]
-    .map((match) => ({ href: match[1], label: match[2].trim() }));
+    .map((match) => ({ href: match[1].replaceAll("&amp;", "&"), label: match[2].trim() }));
 }
 
 function assertExternalAction(actions: { href: string; label: string }[], label: string, href: string) {
@@ -222,6 +250,12 @@ function assertExternalAction(actions: { href: string; label: string }[], label:
   assert.ok(action, `Missing visible external action: ${label}`);
   assert.equal(action.href, href);
   assert.equal(new URL(action.href).protocol, "https:");
+}
+
+function assertActionOrder(markup: string, labels: string[]) {
+  const positions = labels.map((label) => markup.indexOf(label));
+  assert.ok(positions.every((position) => position >= 0), `Missing workflow actions: ${labels.join(", ")}`);
+  assert.ok(positions.every((position, index) => index === 0 || position > positions[index - 1]), `Workflow action order is incorrect: ${labels.join(" → ")}`);
 }
 
 function manualToolRegion(markup: string, tool: string) {
