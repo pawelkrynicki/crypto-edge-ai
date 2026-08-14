@@ -138,6 +138,9 @@ test("PC.3E keeps Step 6 scorecard counters separate from full-playbook readines
   const scorecard = currentStyleScopeScorecard();
   const scorecardMissing = scorecard.security.missing + scorecard.onchain.missing + scorecard.social.missing + scorecard.narrative.missing;
   const scorecardRedFlags = scorecard.security.red_flags + scorecard.onchain.red_flags + scorecard.social.red_flags + scorecard.narrative.red_flags;
+  const scorecardResolved = scorecard.security.resolved + scorecard.onchain.resolved + scorecard.social.resolved + scorecard.narrative.resolved;
+  const scorecardApplicable = scorecard.security.applicable + scorecard.onchain.applicable + scorecard.social.applicable + scorecard.narrative.applicable;
+  const countersBeforeRender = JSON.stringify(scorecard.readiness);
 
   assert.equal(scorecard.missing_total, 30, "full-playbook missing stays global");
   assert.equal(scorecard.red_flags_total, 4, "full-playbook red flags stay global");
@@ -145,11 +148,25 @@ test("PC.3E keeps Step 6 scorecard counters separate from full-playbook readines
   assert.equal(scorecard.readiness.red_flags, 4);
   assert.equal(scorecardMissing, 28, "Step 6 domain status includes Security, On-chain, Social, and Narrative only");
   assert.equal(scorecardRedFlags, 0);
+  assert.equal(scorecardResolved, 1, "coverage derives from the four scorecard domains");
+  assert.equal(scorecardApplicable, 29, "coverage derives from the four scorecard domains");
 
-  const stepSix = renderToStaticMarkup(<ResearchScorecardStep scorecard={scorecard} locale="pl" />);
+  const stepSix = renderToStaticMarkup(<ResearchScorecardStep scorecard={scorecard} locale="pl" onOpenStep={() => undefined} />);
+  assert.match(stepSix, /Sprawdzone w scorecardzie: <b>1 \/ 29<\/b>/);
   assert.match(stepSix, /W scorecardzie — brakuje danych: <b>28<\/b>/);
   assert.match(stepSix, /W scorecardzie — czerwone flagi: <b>0<\/b>/);
   assert.match(stepSix, /W całym researchu wykryto 4 czerwone flagi\./);
+  assert.match(stepSix, /Scorecard jest niepełny — uzupełnij wcześniejsze kroki researchu\./);
+  assert.match(stepSix, /data-pc3e-scorecard-next-action="security"[^>]*>Uzupełnij Bezpieczeństwo/);
+  assert.match(stepSix, /data-pc3e-scorecard-next-action="onchain"[^>]*>Uzupełnij On-chain/);
+  assert.match(stepSix, /data-pc3e-scorecard-next-action="social"[^>]*>Uzupełnij Social/);
+
+  const noSecurityGap = structuredClone(scorecard);
+  noSecurityGap.security.missing = 0;
+  const withoutSecurityAction = renderToStaticMarkup(<ResearchScorecardStep scorecard={noSecurityGap} locale="pl" onOpenStep={() => undefined} />);
+  assert.doesNotMatch(withoutSecurityAction, /data-pc3e-scorecard-next-action="security"/);
+  assert.match(withoutSecurityAction, /data-pc3e-scorecard-next-action="onchain"/);
+  assert.match(withoutSecurityAction, /data-pc3e-scorecard-next-action="social"/);
 
   const oneGlobalRedFlag = structuredClone(scorecard);
   oneGlobalRedFlag.red_flags_total = 1;
@@ -161,7 +178,15 @@ test("PC.3E keeps Step 6 scorecard counters separate from full-playbook readines
   assert.match(stepSeven, /Sprawdzone<\/dt><dd>6 \/ 36<\/dd>/);
   assert.match(stepSeven, /Czerwone flagi<\/dt><dd>4<\/dd>/);
   assert.match(stepSeven, /Brakuje<\/dt><dd>30<\/dd>/);
-  assert.match(stepSeven, /Bezpieczeństwo, On-chain i Social są już ujęte w krokach 3–5\. W tym miejscu pozostaje Narracja\./);
+  assert.match(stepSeven, /data-pc3e-scorecard-final-summary/);
+  assert.match(stepSeven, /Krok 6: Scorecard[\s\S]*?0 \/ 100 — częściowy/);
+  assert.match(stepSeven, /Bezpieczeństwo: 0 \/ 30[\s\S]*?Braki: 12[\s\S]*?Czerwone flagi: 0/);
+  assert.match(stepSeven, /On-chain: 0 \/ 25[\s\S]*?Braki: 8[\s\S]*?Czerwone flagi: 0/);
+  assert.match(stepSeven, /Social: 0 \/ 25[\s\S]*?Braki: 7[\s\S]*?Czerwone flagi: 0/);
+  assert.match(stepSeven, /Narracja: — \/ 20[\s\S]*?Nieoceniona/);
+  assert.match(stepSeven, /Nie jest liczone ponownie w finalnych licznikach\./);
+  assert.doesNotMatch(stepSeven, /data-pc3e-readiness-group="6"[^>]*>[\s\S]{0,180}Sprawdzone/);
+  assert.equal(JSON.stringify(scorecard.readiness), countersBeforeRender, "Step 6 summaries remain visual references and never alter global counters");
 });
 
 test("PC.3E resolves exact User A/User B evidence from the private repository without touching a shared scorecard", async (t) => {
@@ -206,11 +231,11 @@ test("PC.3E renders Step 6 and 7 with one global readiness aggregation and prese
   assert.match(redMarkup, new RegExp(`Czerwone flagi</dt><dd>${redView.effective_scorecard.red_flags_total}</dd>`));
 });
 
-test("PC.3E API exposes a read-only effective scorecard for trusted testers with no provider, OpenAI, or score-write path", async (t) => {
+test("PC.3E keeps API and Step 6/7 global red-flag counts equal without a score-write path", async (t) => {
   const root = await mkdtemp(resolve(tmpdir(), "crypto-edge-pc3e-"));
   const fixturePath = resolve(root, "scanner.json");
   const repository = await createResearchEvidenceRepository({ databaseFilePath: resolve(root, "research.sqlite") });
-  await writeFile(fixturePath, JSON.stringify(scannerOutput()), "utf8");
+  await writeFile(fixturePath, JSON.stringify(scannerOutput(liveFiveFlagCandidate())), "utf8");
   const priorRole = process.env.CRYPTO_EDGE_PC1_REVIEW_DEFAULT_ACTOR;
   process.env.CRYPTO_EDGE_PC1_REVIEW_DEFAULT_ACTOR = "TRUSTED_TESTER";
   const server = createServer(createScannerApiHandler({ runtimeMode: "DEVELOPMENT_DEMO", scanner: { fixturePath, outputDirPath: resolve(root, "output"), allowFixtureFallback: true }, researchEvidence: { repository } }));
@@ -228,10 +253,17 @@ test("PC.3E API exposes a read-only effective scorecard for trusted testers with
   const get = await fetch(`${origin}/api/research-checklist?chain=base&contract_address=${ADDRESS}`);
   assert.equal(get.status, 200);
   const cookie = get.headers.get("set-cookie")?.split(";")[0];
-  const payload = await get.json() as { effective_scorecard: { schema_version: string; total: { max: number } }; manual_evidence_writable: boolean };
+  const payload = await get.json() as ResearchChecklistView;
   assert.equal(payload.effective_scorecard.schema_version, "research_scorecard_view_v1");
   assert.equal(payload.effective_scorecard.total.max, 100);
   assert.equal(payload.manual_evidence_writable, false);
+  assert.equal(payload.effective_scorecard.red_flags_total, 5);
+  assert.equal(payload.effective_scorecard.readiness.red_flags, 5);
+  const stepSix = renderToStaticMarkup(<ResearchScorecardStep scorecard={payload.effective_scorecard} locale="pl" />);
+  const stepSeven = renderToStaticMarkup(<ResearchFinalReadinessStep scorecard={payload.effective_scorecard} locale="pl" />);
+  assert.match(stepSix, /W całym researchu wykryto 5 czerwonych flag\./);
+  assert.match(stepSeven, /Czerwone flagi<\/dt><dd>5<\/dd>/);
+  assert.equal((stepSeven.match(/research-scorecard-criterion red_flag/g) ?? []).length, 5, "Step 7 renders exactly the API's five global red-flag rows");
   const evidenceWrite = await fetch(`${origin}/api/research-evidence`, { method: "PUT", headers: { cookie: cookie!, origin, "content-type": "application/json" }, body: JSON.stringify({ chain: "base", contract_address: ADDRESS, step_number: 5, item_key: "twitter", manual_state: "MANUAL_VERIFIED" }) });
   assert.equal(evidenceWrite.status, 403);
   const scoreWrite = await fetch(`${origin}/api/research-scorecard`, { method: "PUT", headers: { cookie: cookie!, origin, "content-type": "application/json" }, body: "{}" });
@@ -308,11 +340,29 @@ function security(): NonNullable<UiTokenCandidate["security"]> {
   return { sources: ["goplus", "honeypot"], coverageStatus: null, honeypotStatus: "passed", buyTax: 3, sellTax: 4, contractVerified: true, ownershipStatus: "renounced", liquidityLocked: true, liquidityLockDays: 120, mintRisk: false, blacklistRisk: false, whitelistRisk: false, sellRestrictionRisk: false, proxyRisk: false, topWalletPct: 8.5, top10WalletsPct: 34.2, checkedAt: NOW };
 }
 
-function scannerOutput(): PersistableScannerOutput {
-  const value = candidate();
+function liveFiveFlagCandidate(): UiTokenCandidate {
+  return candidate({
+    marketCap: 7_819,
+    liquidity: 7_640.3,
+    volume24h: 10_578.91,
+    volumeMarketCapRatio: 1.3529748049622714,
+    pairAgeDays: 0,
+    basicFilterStatus: "rejected_basic_filter",
+    filterReasons: [
+      "market_cap_below_300000",
+      "volume_24h_below_30000",
+      "liquidity_below_30000",
+      "volume_market_cap_ratio_above_100_percent",
+      "volume_market_cap_ratio_outside_sweet_spot_5_30_percent",
+      "pair_age_not_above_7_days",
+    ],
+  });
+}
+
+function scannerOutput(value = candidate()): PersistableScannerOutput {
   return {
-    scan_run: { run_id: "run-a", source: "fixture", mode: "fixture", query: "fixture", started_at: null, finished_at: NOW, total_raw: 1, passed_basic_filter: 1, rejected_basic_filter: 0, security_checked: 1, security_passed: 1, needs_manual_verification: 0, critical_risk: 0, watchlist_candidates: 1, errors: [] },
-    candidates: [{ run_id: "run-a", candidate_id: value.id, symbol: value.symbol, name: value.name, chain: value.chain, contract_address: value.contractAddress, pair_address: value.pairAddress, dex: value.dex, source: value.source, source_url: value.sourceUrl, price_usd: value.priceUsd, market_cap_usd: value.marketCap, fdv_usd: value.fdvUsd, liquidity_usd: value.liquidity, volume_24h_usd: value.volume24h, volume_market_cap_ratio: value.volumeMarketCapRatio, pair_created_at: value.pairCreatedAt, pair_age_days: value.pairAgeDays, basic_filter_status: value.basicFilterStatus, filter_reasons: [], final_label: value.finalLabel, final_reasons: [], created_at: NOW }],
+    scan_run: { run_id: "run-a", source: "fixture", mode: "fixture", query: "fixture", started_at: null, finished_at: NOW, total_raw: 1, passed_basic_filter: value.basicFilterStatus === "passed_basic_filter" ? 1 : 0, rejected_basic_filter: value.basicFilterStatus === "rejected_basic_filter" ? 1 : 0, security_checked: 1, security_passed: 1, needs_manual_verification: 0, critical_risk: 0, watchlist_candidates: 1, errors: [] },
+    candidates: [{ run_id: "run-a", candidate_id: value.id, symbol: value.symbol, name: value.name, chain: value.chain, contract_address: value.contractAddress, pair_address: value.pairAddress, dex: value.dex, source: value.source, source_url: value.sourceUrl, price_usd: value.priceUsd, market_cap_usd: value.marketCap, fdv_usd: value.fdvUsd, liquidity_usd: value.liquidity, volume_24h_usd: value.volume24h, volume_market_cap_ratio: value.volumeMarketCapRatio, pair_created_at: value.pairCreatedAt, pair_age_days: value.pairAgeDays, basic_filter_status: value.basicFilterStatus, filter_reasons: value.filterReasons, final_label: value.finalLabel, final_reasons: value.finalReasons, created_at: NOW }],
     security_checks: [{ run_id: "run-a", candidate_id: value.id, sources: security().sources, coverage_status: null, honeypot_status: security().honeypotStatus, buy_tax: security().buyTax, sell_tax: security().sellTax, contract_verified: security().contractVerified, ownership_status: security().ownershipStatus, liquidity_locked: security().liquidityLocked, liquidity_lock_days: security().liquidityLockDays, mint_risk: security().mintRisk, blacklist_risk: security().blacklistRisk, whitelist_risk: security().whitelistRisk, sell_restriction_risk: security().sellRestrictionRisk, proxy_risk: security().proxyRisk, top_wallet_pct: security().topWalletPct, top_10_wallets_pct: security().top10WalletsPct, risk_flags: [], missing_data: [], security_label: "SECURITY_PASSED", critical_reasons: [], warning_reasons: [], checked_at: NOW }],
     scorecards: [],
   };

@@ -890,6 +890,12 @@ button.research-key-tool-heading:hover strong { color: var(--accent); }
 .research-scorecard-total b { color: var(--text-primary); font-size: 24px; line-height: 1; }
 .research-scorecard-total p, .research-scorecard-narrative-note, .research-scorecard-helper, .research-final-readiness-beginner > p { margin: 0; color: var(--text-secondary); font-size: 11px; line-height: 1.45; }
 .research-scorecard-narrative-note { padding: 7px 8px; border-radius: 7px; background: color-mix(in srgb, var(--surface) 84%, var(--border) 16%); }
+.research-scorecard-coverage, .research-scorecard-incomplete { margin: 0; color: var(--text-secondary); font-size: 11px; line-height: 1.45; }
+.research-scorecard-coverage b { color: var(--text-primary); }
+.research-scorecard-incomplete { padding: 7px 8px; border-left: 2px solid var(--warning); background: color-mix(in srgb, var(--warning) 9%, var(--surface)); }
+.research-scorecard-next-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.research-scorecard-next-actions button { min-height: 30px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 7px; color: var(--text-primary); background: var(--surface); cursor: pointer; font: inherit; font-size: 11px; font-weight: 700; }
+.research-scorecard-next-actions button:hover { border-color: var(--accent); }
 .research-scorecard-beginner dl, .research-final-readiness-beginner dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin: 0; }
 .research-scorecard-beginner dl > div, .research-final-readiness-beginner dl > div { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; padding: 7px; border-radius: 7px; background: color-mix(in srgb, var(--surface) 85%, var(--border) 15%); }
 .research-scorecard-beginner dt, .research-final-readiness-beginner dt { color: var(--text-secondary); font-size: 10px; }
@@ -903,6 +909,11 @@ button.research-key-tool-heading:hover strong { color: var(--accent); }
 .research-scorecard-domain, .research-final-readiness-group { display: grid; gap: 5px; padding: 9px; border-top: 1px solid var(--border); }
 .research-scorecard-domain > header, .research-final-readiness-group > header { display: flex; justify-content: space-between; gap: 8px; color: var(--text-primary); font-size: 11px; }
 .research-scorecard-domain > header > span, .research-final-readiness-group > header > span, .research-scorecard-domain > p, .research-final-readiness-group > p { margin: 0; color: var(--text-secondary); font-size: 10px; line-height: 1.4; }
+.research-final-scorecard-summary { background: color-mix(in srgb, var(--accent) 6%, var(--surface)); }
+.research-final-scorecard-domains { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.research-final-scorecard-domains > section { display: grid; gap: 2px; padding: 7px; border-radius: 7px; background: color-mix(in srgb, var(--surface) 85%, var(--border) 15%); color: var(--text-secondary); font-size: 10px; }
+.research-final-scorecard-domains > section > strong { color: var(--text-primary); font-size: 11px; }
+.research-final-scorecard-domains .has-red-flags { color: var(--danger); }
 .research-scorecard-domain ul, .research-final-readiness-group ul { display: grid; gap: 4px; margin: 2px 0 0; padding: 0; list-style: none; }
 .research-scorecard-criterion { display: grid; grid-template-columns: 13px minmax(0, 1fr) auto; gap: 6px; align-items: baseline; color: var(--text-secondary); font-size: 10px; }
 .research-scorecard-criterion > strong { color: var(--text-primary); font-size: inherit; }
