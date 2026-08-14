@@ -21,7 +21,7 @@ export const RESEARCH_SCORECARD_MAXIMUMS = {
 
 type CriterionSpec = {
   key: string;
-  step: 1 | 3 | 4 | 5;
+  step: 1 | 2 | 3 | 4 | 5;
   positive: (item: ResearchChecklistItem) => boolean;
 };
 
@@ -74,6 +74,15 @@ const STEP_ONE_CRITERIA: readonly CriterionSpec[] = [
 ];
 
 /**
+ * Step 2 contributes only its derived, unique Deal Breaker. Its remaining
+ * rows are reconciled read-model mirrors of canonical Security, On-chain, or
+ * Social evidence, so counting them here would duplicate readiness facts.
+ */
+const STEP_TWO_CRITERIA: readonly CriterionSpec[] = [
+  spec("anonymous_team_young_project", 2, () => false),
+];
+
+/**
  * Resolves the effective score from automatic checklist facts plus the current
  * actor's already-filtered private evidence. This function is pure: it has no
  * persistence, provider, lifecycle, Radar, or AI-cache side effects.
@@ -87,7 +96,7 @@ export function resolveResearchScorecard(steps: readonly ResearchChecklistStep[]
   const stepOne = STEP_ONE_CRITERIA.map((criterion) => resolveCriterion(criterion, steps));
   const readinessGroups = [
     readinessGroup(1, stepOne),
-    readinessGroup(2, []),
+    readinessGroup(2, STEP_TWO_CRITERIA.map((criterion) => resolveCriterion(criterion, steps))),
     readinessGroup(3, criteriaForReadiness(security.reasons)),
     readinessGroup(4, criteriaForReadiness(onchain.reasons)),
     readinessGroup(5, criteriaForReadiness(social.reasons)),

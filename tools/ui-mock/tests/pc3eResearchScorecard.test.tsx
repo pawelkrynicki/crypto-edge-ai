@@ -10,7 +10,7 @@ import { CandidateDetailView } from "../src/components/CandidateDetailView.js";
 import { ExternalVerificationLinksView } from "../src/components/ExternalVerificationLinksView.js";
 import { ResearchChecklistDetail } from "../src/components/ResearchChecklist.js";
 import { ProductLocaleProvider } from "../src/productI18n.js";
-import { resolveResearchChecklist } from "../src/researchChecklistResolver.js";
+import { reconcileResearchChecklistStep2, resolveResearchChecklist } from "../src/researchChecklistResolver.js";
 import { RESEARCH_SCORECARD_MAXIMUMS, resolveResearchScorecard } from "../src/researchScorecardResolver.js";
 import type { PublicResearchEvidence, ResearchChecklistItemKey, ResearchChecklistState, ResearchChecklistView } from "../src/researchChecklistTypes.js";
 import type { PersistableScannerOutput, UiTokenCandidate } from "../src/types/scannerTypes.js";
@@ -101,6 +101,39 @@ test("PC.3E keeps Social evidence actor-private, link-only evidence at zero, and
   assert.equal(concerns.social.red_flags, 2);
 });
 
+test("PC.3E reconciles the unique Step 2 Deal Breaker from token age and canonical evidence exactly once", () => {
+  const anonymousYoung = resolvedDealBreaker(20, "anonymous");
+  const anonymousMature = resolvedDealBreaker(45, "anonymous");
+  const anonymousWithoutAge = resolvedDealBreaker(null, "anonymous");
+  const transparentWithoutAge = resolvedDealBreaker(null, "transparent");
+  const group = (scorecard: ReturnType<typeof resolveResearchScorecard>) => scorecard.readiness.groups.find((entry) => entry.step_number === 2)!;
+
+  assert.equal(dealBreakerItem(anonymousYoung.steps).state, "RED_FLAG", "anonymous team and token_age <30 is the unique Deal Breaker red flag");
+  assert.equal(anonymousYoung.scorecard.readiness.status, "RED_FLAGS_DETECTED");
+  assert.equal(group(anonymousYoung.scorecard).red_flags, 1);
+  assert.equal(anonymousYoung.scorecard.red_flags_total, anonymousMature.scorecard.red_flags_total + 1, "the composite contributes one global red flag");
+
+  assert.equal(dealBreakerItem(anonymousMature.steps).state, "AUTO_VERIFIED");
+  assert.equal(group(anonymousMature.scorecard).red_flags, 0);
+  assert.equal(dealBreakerItem(anonymousWithoutAge.steps).state, "MISSING_DATA");
+  assert.equal(dealBreakerItem(transparentWithoutAge.steps).state, "AUTO_VERIFIED", "a transparent team clears the composite without inventing token age");
+  assert.equal(itemAt(transparentWithoutAge.steps, 1, "token_age").state, "MISSING_DATA", "token age remains independently missing");
+
+  const whitepaper = resolveResearchChecklist(candidate(), [evidence(5, "whitepaper", "RED_FLAG", "suspected_copy_paste", null, "Manual social research: whitepaper")]);
+  assert.equal(whitepaper.effective_scorecard.red_flags_total, 1, "whitepaper copy-paste is a Social red flag exactly once globally");
+  assert.equal(group(whitepaper.effective_scorecard).red_flags, 0, "the Step 2 whitepaper mirror never becomes a second readiness criterion");
+
+  const manuallyResolvedHoneypot = resolveResearchChecklist(candidate({ security: null }), [
+    evidence(3, "honeypot", "MANUAL_VERIFIED", "no_honeypot", null, "Honeypot.is"),
+  ]);
+  const canonicalHoneypot = itemAt(manuallyResolvedHoneypot.steps, 3, "honeypot");
+  const mirroredHoneypot = itemAt(manuallyResolvedHoneypot.steps, 2, "honeypot");
+  assert.equal(canonicalHoneypot.state, "MANUAL_VERIFIED");
+  assert.equal(mirroredHoneypot.state, "MANUAL_VERIFIED", "Step 2 reflects the effective canonical result when its own automatic row is absent");
+  assert.equal(canonicalHoneypot.manual_evidence?.step_number, 3);
+  assert.equal(mirroredHoneypot.manual_evidence, null, "Step 2 does not duplicate private evidence storage");
+});
+
 test("PC.3E resolves exact User A/User B evidence from the private repository without touching a shared scorecard", async (t) => {
   const root = await mkdtemp(resolve(tmpdir(), "crypto-edge-pc3e-isolation-"));
   const repository = await createResearchEvidenceRepository({ databaseFilePath: resolve(root, "research.sqlite") });
@@ -129,6 +162,8 @@ test("PC.3E renders Step 6 and 7 with one global readiness aggregation and prese
   assert.match(readinessMarkup, /data-pc3e-final-readiness-beginner/);
   assert.match(readinessMarkup, /Research niekompletny/);
   assert.match(readinessMarkup, /Pokaż pełną checklistę/);
+  assert.match(readinessMarkup, /data-pc3e-readiness-group="2"[\s\S]{0,800}Sprawdzone 0\/1/, "the advanced Step 2 group exposes its one unique Deal Breaker instead of 0/0");
+  assert.match(readinessMarkup, /Bezpieczeństwo, On-chain i Social/, "the Step 2 explanation names every canonical owner");
   assert.doesNotMatch(`${scorecardMarkup}${readinessMarkup}`, /\b(BUY|SELL|INVEST|SAFE|UNSAFE|A\+)\b/);
   assert.equal((detail.match(/role="tab"/g) ?? []).length, 7);
   assert.equal((drawer.match(/role="tab"/g) ?? []).length, 6);
@@ -180,6 +215,29 @@ function criterion(scorecard: ReturnType<typeof resolveResearchChecklist>["effec
 }
 
 function cloneView(view: ResearchChecklistView): ResearchChecklistView { return structuredClone(view); }
+
+function resolvedDealBreaker(tokenAge: number | null, team: "anonymous" | "transparent") {
+  const view = cloneView(resolveResearchChecklist(candidate(), [
+    evidence(5, "team", "MANUAL_VERIFIED", team, null, "Manual social research: team"),
+  ]));
+  const age = itemAt(view.steps, 1, "token_age");
+  age.state = tokenAge == null ? "MISSING_DATA" : "MANUAL_VERIFIED";
+  age.value_number = tokenAge;
+  age.value_text = null;
+  age.manual_evidence = null;
+  const steps = reconcileResearchChecklistStep2(view.steps);
+  return { steps, scorecard: resolveResearchScorecard(steps) };
+}
+
+function dealBreakerItem(steps: readonly ResearchChecklistView["steps"][number][]): ResearchChecklistView["steps"][number]["items"][number] {
+  return itemAt(steps, 2, "anonymous_team_young_project");
+}
+
+function itemAt(steps: readonly ResearchChecklistView["steps"][number][], step: number, key: ResearchChecklistItemKey): ResearchChecklistView["steps"][number]["items"][number] {
+  const item = steps.find((entry) => entry.number === step)?.items.find((entry) => entry.key === key);
+  assert.ok(item, `Missing ${step}:${key}`);
+  return item;
+}
 
 function setStateOnly(view: ResearchChecklistView, step: number, key: ResearchChecklistItemKey, state: ResearchChecklistState): void {
   const item = view.steps.find((entry) => entry.number === step)?.items.find((entry) => entry.key === key);

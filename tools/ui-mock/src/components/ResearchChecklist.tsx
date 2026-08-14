@@ -342,7 +342,7 @@ function ResearchScorecardStep({ scorecard, locale }: { scorecard: ResearchScore
     <section className="research-scorecard-beginner" data-pc3e-scorecard-beginner>
       <span>{pl ? "SCORECARD RESEARCHU" : "RESEARCH SCORECARD"}</span>
       {hasRedFlags && <strong className="research-scorecard-red-flag">{pl ? "Wykryto czerwoną flagę" : "A red flag was detected"}</strong>}
-      <div className="research-scorecard-total"><b>{formatResearchScore(scorecard.total.earned, locale)} / 100</b><p>{pl ? "Wynik częściowy" : "Partial score"}</p></div>
+      <div className="research-scorecard-total"><b>{formatResearchScore(scorecard.total.earned, locale)} / 100</b><p>{scorecard.partial ? (pl ? "Wynik częściowy" : "Partial score") : (pl ? "Wynik kompletny" : "Complete score")}</p></div>
       <dl>
         {domains.map(([name, domain]) => <div key={name}><dt>{scorecardDomainName(name, locale)}</dt><dd>{formatResearchScore(domain.earned, locale)} / {domain.max}</dd></div>)}
         <div><dt>{pl ? "Narracja" : "Narrative"}</dt><dd>{scorecard.narrative.scored ? `${formatResearchScore(scorecard.narrative.earned, locale)} / ${scorecard.narrative.max}` : `— / ${scorecard.narrative.max}`}</dd></div>
@@ -400,7 +400,7 @@ function ResearchFinalReadinessStep({ scorecard, locale }: { scorecard: Research
       <summary>{pl ? "Pokaż pełną checklistę" : "Show full checklist"}</summary>
       {readiness.groups.map((group) => <section key={group.step_number} className="research-final-readiness-group" data-pc3e-readiness-group={group.step_number}>
         <header><strong>{pl ? `Krok ${group.step_number}: ${stepName(group.step_number, locale)}` : `Step ${group.step_number}: ${stepName(group.step_number, locale)}`}</strong><span>{pl ? `Sprawdzone ${group.resolved}/${group.applicable}` : `Checked ${group.resolved}/${group.applicable}`}</span></header>
-        {group.step_number === 2 && <p>{pl ? "Kontrole z kroku 2 są uwzględnione tylko raz — w Bezpieczeństwie i On-chain." : "Step 2 checks are included only once — in Security and On-chain."}</p>}
+        {group.step_number === 2 && <p>{pl ? "Pozostałe kontrole Deal Breaker są liczone tylko raz w odpowiadających sekcjach Bezpieczeństwo, On-chain i Social." : "The remaining Deal Breaker checks are counted only once in their corresponding Security, On-chain, and Social sections."}</p>}
         {group.reasons.length > 0 && <ul>{group.reasons.filter((criterion) => criterion.state !== "NOT_APPLICABLE").map((criterion) => <ScorecardCriterionRow key={criterion.key} criterion={criterion} locale={locale} />)}</ul>}
       </section>)}
     </details>
@@ -1031,6 +1031,7 @@ function methodologyThreshold(value: string, locale: "pl" | "en"): string {
     required: "wymagane",
     "must be locked": "płynność musi być zablokowana",
     "preferred <40%": "Preferowane: <40%",
+    "anonymous team + token age <30 days": "anonimowy team i wiek tokena <30 dni",
     "not calculated": "nie obliczono",
   };
   return translations[value.trim().toLowerCase()] ?? value;

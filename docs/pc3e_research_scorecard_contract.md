@@ -41,7 +41,19 @@ Red flags and missing evidence stay visible independently of the total.
 
 ## Unique criterion mapping
 
-The score resolves overlapping facts exactly once. Step 2 deal-breaker duplicates are represented by the unique Security or On-chain check below; they never create a second allocation.
+The score resolves a single unique readiness registry: Step 1 facts, the one unique Step 2 composite, canonical Security, canonical On-chain, canonical Social, and the unresolved Narrative placeholder. Step 2's overlapping playbook rows are read-model mirrors only; they never create a second global count or allocation.
+
+### Step 2 unique Deal Breaker
+
+`anonymous_team_young_project` is the sole Step 2 readiness criterion. It is derived from the existing Step 1 `token_age` fact and Step 5 `team` finding—never from `pair_age` and without adding a new age source:
+
+- transparent team: resolved, regardless of token-age availability;
+- anonymous team with `token_age < 30`: red flag;
+- anonymous team with `token_age >= 30`: resolved;
+- anonymous team with missing token age: missing;
+- missing team evidence: missing.
+
+The other Step 2 rows reconcile to their canonical owners only when Step 2 has no stronger direct result: honeypot, contract verification, taxes, and TokenSniffer to Security; Top-1 wallet and liquidity lock to On-chain; whitepaper to Social. A reconciled row displays the effective fact but never copies or stores another private evidence record. Suspected whitepaper copy-paste therefore remains exactly one Social red flag globally.
 
 ### Security / 30
 
@@ -85,7 +97,7 @@ Link availability always remains missing for scoring. Positive evidence requires
 
 ## Output shape
 
-`effective_scorecard` contains the scoring/schema versions, all four domain blocks (`earned`, `max`, `resolved`, `applicable`, `missing`, `red_flags`, human-readable reasons), total (`earned`, `max: 100`, `scored_max`, `unresolved_max`), completeness/partiality, global counters, and a single global readiness aggregation grouped by Steps 1–6.
+`effective_scorecard` contains the scoring/schema versions, all four domain blocks (`earned`, `max`, `resolved`, `applicable`, `missing`, `red_flags`, human-readable reasons), total (`earned`, `max: 100`, `scored_max`, `unresolved_max`), completeness/partiality, global counters, and the single unique readiness aggregation grouped by Steps 1–6.
 
 Step 7 derives both its status and counters from this same aggregation:
 
@@ -97,9 +109,9 @@ No state uses buy/sell/invest/safe language.
 
 ## UI contract
 
-Step 6 exposes a beginner-first partial `earned / 100` scorecard, explicit Narrative gap, counters, red-flag notice, and non-advisory helper copy. Its calculation detail is collapsed by default and uses symbols, labels, and translated evidence states only—never IDs, provider internals, or raw JSON.
+Step 6 exposes a beginner-first `earned / 100` scorecard, explicit Narrative gap, counters, red-flag notice, and non-advisory helper copy. Its label follows the calculated `partial` flag (`Wynik częściowy`/`Partial score` or `Wynik kompletny`/`Complete score`). Its calculation detail is collapsed by default and uses symbols, labels, and translated evidence states only—never IDs, provider internals, or raw JSON.
 
-Step 7 exposes one readiness status, score, the same global checked/red/missing counters, one non-trading next action, and a collapsed meaningful checklist grouped by Steps 1–6. Step 2 explains that duplicate facts are intentionally represented once rather than being double-counted.
+Step 7 exposes one readiness status, score, the same global checked/red/missing counters, one non-trading next action, and a collapsed meaningful checklist grouped by Steps 1–6. Its Step 2 group contains the derived composite (never `0/0`) and explains that the remaining Deal Breaker controls are counted once in their corresponding Security, On-chain, and Social sections.
 
 ## Seven-step product audit
 

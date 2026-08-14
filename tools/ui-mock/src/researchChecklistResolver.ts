@@ -50,13 +50,17 @@ export function resolveResearchChecklist(
 ): ResearchChecklistView {
   const manualByLocation = new Map(manualEvidence.map((evidence) => [`${evidence.step_number}:${evidence.item_key}`, evidence]));
   const automatic = buildAutomaticEvidence(candidate);
-  const steps: ResearchChecklistStep[] = ([1, 2, 3, 4, 5] as const).map((number) => {
+  const rawSteps: ResearchChecklistStep[] = ([1, 2, 3, 4, 5] as const).map((number) => {
     const items = STEP_ITEM_KEYS[number].map((key) => applyManualEvidence(
       automatic.get(`${number}:${key}`) ?? missingItem(number, key),
       manualByLocation.get(`${number}:${key}`) ?? null,
     ));
     return buildStep(number, items);
   });
+  // Step 2 is a playbook summary, not a second private-evidence store. Its
+  // overlapping checks mirror their canonical Step 3–5 facts in this
+  // calculated read model; the one unique Deal Breaker is derived below.
+  const steps = reconcileResearchChecklistStep2(rawSteps);
 
   // Effective research scoring is calculated from the just-resolved shared
   // facts plus this actor's private evidence. It never reads or writes the
@@ -289,6 +293,105 @@ function applyManualEvidence(automatic: AutomaticItem, manual: PublicResearchEvi
     manual_allowed: !MANUAL_DISABLED.has(automatic.key),
     manual_evidence: manual,
   };
+}
+
+const STEP_TWO_CANONICAL_SOURCES: Partial<Record<ResearchChecklistItemKey, { step: 3 | 4 | 5; key: ResearchChecklistItemKey }>> = {
+  honeypot: { step: 3, key: "honeypot" },
+  contract_verified: { step: 3, key: "contract_verified" },
+  buy_tax: { step: 3, key: "buy_tax" },
+  sell_tax: { step: 3, key: "sell_tax" },
+  tokensniffer: { step: 3, key: "tokensniffer" },
+  top1_wallet: { step: 4, key: "top1_wallet" },
+  liquidity_unlocked: { step: 4, key: "liquidity_lock" },
+  suspicious_whitepaper: { step: 5, key: "whitepaper" },
+};
+
+/**
+ * Reconciles Step 2 as a calculated playbook view. The function deliberately
+ * creates no evidence and never replaces an actual Step 2 result. It is
+ * exported so the contract can be exercised with token-age fixtures that the
+ * frozen scanner candidate does not currently provide.
+ */
+export function reconcileResearchChecklistStep2(steps: readonly ResearchChecklistStep[]): ResearchChecklistStep[] {
+  const stepOne = steps.find((step) => step.number === 1);
+  const stepTwo = steps.find((step) => step.number === 2);
+  const stepFive = steps.find((step) => step.number === 5);
+  if (!stepTwo) return [...steps];
+
+  const tokenAge = stepOne?.items.find((item) => item.key === "token_age") ?? null;
+  const team = stepFive?.items.find((item) => item.key === "team") ?? null;
+  const items = stepTwo.items.map((item) => {
+    if (hasDirectStepTwoEvidence(item)) return item;
+    if (item.key === "anonymous_team_young_project") return deriveAnonymousTeamYoungProject(item, tokenAge, team);
+    const source = STEP_TWO_CANONICAL_SOURCES[item.key];
+    const canonicalItem = source
+      ? steps.find((step) => step.number === source.step)?.items.find((entry) => entry.key === source.key) ?? null
+      : null;
+    return canonicalItem ? mirrorCanonicalResearchItem(item, canonicalItem) : item;
+  });
+  const reconciled = buildStep(2, items);
+  return steps.map((step) => step.number === 2 ? reconciled : step);
+}
+
+function hasDirectStepTwoEvidence(item: ResearchChecklistItem): boolean {
+  return item.manual_evidence !== null || !["MISSING_DATA", "OPEN_EXTERNAL_TOOL"].includes(item.state);
+}
+
+function mirrorCanonicalResearchItem(stepTwoItem: ResearchChecklistItem, canonicalItem: ResearchChecklistItem): ResearchChecklistItem {
+  return {
+    ...stepTwoItem,
+    state: canonicalItem.state,
+    automatic_state: canonicalItem.automatic_state,
+    value_text: canonicalItem.value_text,
+    value_number: canonicalItem.value_number,
+    source: canonicalItem.source,
+    automatic_provenance: canonicalItem.automatic_provenance,
+    automatic_link: canonicalItem.automatic_link,
+    // The canonical row remains the sole owner of a private research record.
+    // Step 2 exposes only its effective result.
+    manual_evidence: null,
+  };
+}
+
+function deriveAnonymousTeamYoungProject(
+  stepTwoItem: ResearchChecklistItem,
+  tokenAge: ResearchChecklistItem | null,
+  team: ResearchChecklistItem | null,
+): ResearchChecklistItem {
+  const teamValue = normalizedResearchValue(team);
+  const source = team?.source === "MANUAL" ? "MANUAL" : "AUTOMATIC";
+  const resolvedBase = (state: ResearchChecklistState, valueText: string, valueNumber: number | null): ResearchChecklistItem => ({
+    ...stepTwoItem,
+    state,
+    automatic_state: state,
+    value_text: valueText,
+    value_number: valueNumber,
+    threshold: "anonymous team + token age <30 days",
+    source: state === "MISSING_DATA" ? "UNAVAILABLE" : source,
+    automatic_provenance: null,
+    automatic_link: null,
+    manual_evidence: null,
+  });
+
+  // A transparent team clears the composite even if token age is still
+  // unavailable. This is intentionally token age only—never pair age.
+  if (teamValue === "transparent") return resolvedBase("AUTO_VERIFIED", "transparent_team", null);
+  if (teamValue !== "anonymous") return resolvedBase("MISSING_DATA", "team_missing", null);
+
+  const tokenAgeValue = tokenAge?.value_number ?? null;
+  const ageKnown = tokenAge !== null
+    && tokenAgeValue !== null
+    && Number.isFinite(tokenAgeValue)
+    && isResolved(tokenAge.state)
+    && tokenAge.state !== "RED_FLAG";
+  if (!ageKnown || tokenAgeValue === null) return resolvedBase("MISSING_DATA", "anonymous_team_token_age_missing", null);
+  return tokenAgeValue < 30
+    ? resolvedBase("RED_FLAG", "anonymous_team_token_age_under_30", tokenAgeValue)
+    : resolvedBase("AUTO_VERIFIED", "anonymous_team_token_age_30_or_more", tokenAgeValue);
+}
+
+function normalizedResearchValue(item: ResearchChecklistItem | null): string {
+  return (item?.value_text ?? "").trim().toLowerCase().replaceAll(" ", "_");
 }
 
 function manualExternalState(candidate: UiTokenCandidate, tool: ManualResearchTool): ResearchChecklistState {

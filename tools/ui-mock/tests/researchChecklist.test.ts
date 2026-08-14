@@ -25,7 +25,7 @@ test("PC.3A resolves the 7-step checklist from existing product evidence without
   const securityMissing = candidate({ security: null });
   const securityMissingView = resolveResearchChecklist(securityMissing);
   assert.equal(securityMissingView.current_step, 2);
-  assert.equal(item(securityMissingView, 2, "honeypot").state, "MISSING_DATA");
+  assert.equal(item(securityMissingView, 2, "honeypot").state, "OPEN_EXTERNAL_TOOL", "Step 2 mirrors the canonical Honeypot research state");
 
   const topWalletRisk = candidate({ security: { ...security(), topWalletPct: 31, top10WalletsPct: 55 } });
   const topWalletView = resolveResearchChecklist(topWalletRisk);
