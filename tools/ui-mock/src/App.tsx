@@ -501,6 +501,9 @@ export default function App() {
             <ExternalVerificationLinksView
               candidate={externalChecksCandidate}
               focusedResearchStep={focusedResearchStep}
+              onOpenResearchChecklistStep={(step) => {
+                if (externalChecksCandidate) handleOpenExternalChecks(externalChecksCandidate, undefined, step);
+              }}
               onBackToResearchPlaybook={() => {
                 setFocusedResearchStep(null);
                 handleWorkspaceSectionChange("candidate-detail");

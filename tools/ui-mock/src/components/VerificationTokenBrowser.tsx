@@ -21,6 +21,7 @@ type VerificationTokenBrowserProps = {
   onVerificationSaved?: (record: ManualVerificationRecord) => void;
   onReturnToDetail?: () => void;
   onBackToResearchPlaybook?: () => void;
+  onOpenResearchChecklistStep?: (candidate: UiTokenCandidate, step: ResearchStepNumber) => void;
   focusedResearchStep?: ResearchStepNumber | null;
 };
 
@@ -43,6 +44,7 @@ export function VerificationTokenBrowser({
   onVerificationSaved,
   onReturnToDetail,
   onBackToResearchPlaybook,
+  onOpenResearchChecklistStep,
   focusedResearchStep = null,
 }: VerificationTokenBrowserProps) {
   const { locale } = useProductLocale();
@@ -116,6 +118,7 @@ export function VerificationTokenBrowser({
             onVerificationSaved={onVerificationSaved}
             onReturnToDetail={onReturnToDetail}
             onBackToResearchPlaybook={onBackToResearchPlaybook}
+            onOpenResearchChecklistStep={selectedCandidate ? (step) => onOpenResearchChecklistStep?.(selectedCandidate, step) : undefined}
             focusedResearchStep={focusedResearchStep}
           />
         ) : (

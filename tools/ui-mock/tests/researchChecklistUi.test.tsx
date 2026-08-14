@@ -168,12 +168,14 @@ test("PC.3A focus mode localizes methodology values, omits unavailable rows, and
   };
   const polish = renderToStaticMarkup(<ProductLocaleProvider initialLocale="pl"><ResearchChecklistDetail candidate={unknownCandidate} focusedStep={2} /></ProductLocaleProvider>);
   const english = renderToStaticMarkup(<ProductLocaleProvider initialLocale="en"><ResearchChecklistDetail candidate={unknownCandidate} focusedStep={2} /></ProductLocaleProvider>);
-  assert.match(polish, /Brakuje danych dla 6 dodatkowych kontroli/);
+  assert.match(polish, /Brakuje danych dla 5 dodatkowych kontroli/);
   assert.doesNotMatch(polish, /unknown|\bnull\b|\bundefined\b/i);
   assert.doesNotMatch(polish, /<strong>Zweryfikowany kontrakt<\/strong>/);
-  assert.match(english, /Data is unavailable for 6 additional checks/);
+  assert.match(english, /Data is unavailable for 5 additional checks/);
   const scorecardPolish = renderToStaticMarkup(<ProductLocaleProvider initialLocale="pl"><ResearchChecklistDetail candidate={candidate} focusedStep={6} /></ProductLocaleProvider>);
-  assert.match(scorecardPolish, /Brak dostępnego wyniku/);
+  assert.match(scorecardPolish, /SCORECARD RESEARCHU/);
+  assert.match(scorecardPolish, /Wynik częściowy/);
+  assert.match(scorecardPolish, /Narracja: nieoceniona/);
   assert.doesNotMatch(scorecardPolish, /PC\.3A|not calculated/i);
 
   const redFlagCandidate: UiTokenCandidate = {

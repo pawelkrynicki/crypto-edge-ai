@@ -9,6 +9,17 @@ export function researchChecklistItemValue(item: ResearchChecklistItem, locale: 
     return `${wallet}${percentage}`;
   }
   if (item.manual_evidence?.value_text) return researchEvidencePresentationText(item.manual_evidence.value_text, locale, item.manual_evidence.source_tool);
+  if (item.key === "anonymous_team_young_project" && item.value_text) {
+    const labels: Record<string, [string, string]> = {
+      transparent_team: ["Transparentny team", "Transparent team"],
+      anonymous_team_token_age_under_30: ["Anonimowy team, wiek tokena poniżej 30 dni", "Anonymous team, token age under 30 days"],
+      anonymous_team_token_age_30_or_more: ["Anonimowy team, wiek tokena co najmniej 30 dni", "Anonymous team, token age at least 30 days"],
+      anonymous_team_token_age_missing: ["Anonimowy team, brak wieku tokena", "Anonymous team, token age missing"],
+      team_missing: ["Brak danych o teamie", "Team information missing"],
+    };
+    const label = labels[item.value_text];
+    if (label) return label[locale === "pl" ? 0 : 1];
+  }
   if (item.value_number != null) {
     if (item.manual_evidence?.source_tool === "TokenSniffer") return locale === "pl"
       ? `Ręcznie zapisany wynik TokenSniffer: ${item.value_number}`
