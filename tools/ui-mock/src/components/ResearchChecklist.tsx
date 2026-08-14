@@ -330,25 +330,27 @@ function socialManualAdvisory(key: keyof typeof SOCIAL_MANUAL_OPTIONS, value: st
   return null;
 }
 
-function ResearchScorecardStep({ scorecard, locale }: { scorecard: ResearchScorecardView; locale: "pl" | "en" }) {
+export function ResearchScorecardStep({ scorecard, locale }: { scorecard: ResearchScorecardView; locale: "pl" | "en" }) {
   const pl = locale === "pl";
-  const hasRedFlags = scorecard.red_flags_total > 0;
   const domains: Array<["security" | "onchain" | "social", ResearchScorecardDomain]> = [
     ["security", scorecard.security],
     ["onchain", scorecard.onchain],
     ["social", scorecard.social],
   ];
+  const scorecardMissing = domains.reduce((total, [, domain]) => total + domain.missing, scorecard.narrative.missing);
+  const scorecardRedFlags = domains.reduce((total, [, domain]) => total + domain.red_flags, scorecard.narrative.red_flags);
+  const globalRedFlags = scorecard.readiness.red_flags;
   return <section className="research-scorecard" data-pc3e-scorecard aria-label={pl ? "Scorecard researchu" : "Research scorecard"}>
     <section className="research-scorecard-beginner" data-pc3e-scorecard-beginner>
       <span>{pl ? "SCORECARD RESEARCHU" : "RESEARCH SCORECARD"}</span>
-      {hasRedFlags && <strong className="research-scorecard-red-flag">{pl ? "Wykryto czerwoną flagę" : "A red flag was detected"}</strong>}
+      {globalRedFlags > 0 && <strong className="research-scorecard-red-flag" data-pc3e-global-research-red-flags>{fullResearchRedFlagWarning(globalRedFlags, locale)}</strong>}
       <div className="research-scorecard-total"><b>{formatResearchScore(scorecard.total.earned, locale)} / 100</b><p>{scorecard.partial ? (pl ? "Wynik częściowy" : "Partial score") : (pl ? "Wynik kompletny" : "Complete score")}</p></div>
       <dl>
         {domains.map(([name, domain]) => <div key={name}><dt>{scorecardDomainName(name, locale)}</dt><dd>{formatResearchScore(domain.earned, locale)} / {domain.max}</dd></div>)}
         <div><dt>{pl ? "Narracja" : "Narrative"}</dt><dd>{scorecard.narrative.scored ? `${formatResearchScore(scorecard.narrative.earned, locale)} / ${scorecard.narrative.max}` : `— / ${scorecard.narrative.max}`}</dd></div>
       </dl>
       {!scorecard.narrative.scored && <p className="research-scorecard-narrative-note">{pl ? "Narracja: nieoceniona — 20 pkt pozostaje nierozstrzygnięte." : "Narrative: not scored — 20 points remain unresolved."}</p>}
-      <div className="research-scorecard-counters"><span>{pl ? "Brakuje danych" : "Missing"}: <b>{scorecard.missing_total}</b></span><span className={hasRedFlags ? "has-red-flags" : ""}>{pl ? "Czerwone flagi" : "Red flags"}: <b>{scorecard.red_flags_total}</b></span></div>
+      <div className="research-scorecard-counters" data-pc3e-scorecard-counters><span>{pl ? "W scorecardzie — brakuje danych" : "In scorecard — missing"}: <b>{scorecardMissing}</b></span><span className={scorecardRedFlags > 0 ? "has-red-flags" : ""}>{pl ? "W scorecardzie — czerwone flagi" : "In scorecard — red flags"}: <b>{scorecardRedFlags}</b></span></div>
       <p className="research-scorecard-helper">{pl ? "To podsumowanie potwierdzonego researchu, nie rekomendacja inwestycyjna." : "This summarizes confirmed research; it is not an investment recommendation."}</p>
     </section>
     <details className="research-scorecard-details" data-pc3e-scorecard-details>
@@ -381,7 +383,7 @@ function ScorecardCriterionRow({ criterion, locale }: { criterion: ResearchScore
   return <li className={`research-scorecard-criterion ${criterion.state.toLowerCase()}`}><span aria-hidden="true">{scorecardCriterionIcon(criterion.state)}</span><strong>{label}</strong><small>{scorecardCriterionStatus(criterion.state, locale)}</small></li>;
 }
 
-function ResearchFinalReadinessStep({ scorecard, locale }: { scorecard: ResearchScorecardView; locale: "pl" | "en" }) {
+export function ResearchFinalReadinessStep({ scorecard, locale }: { scorecard: ResearchScorecardView; locale: "pl" | "en" }) {
   const pl = locale === "pl";
   const readiness = scorecard.readiness;
   return <section className="research-final-readiness" data-pc3e-final-readiness aria-label={pl ? "Finalna checklista researchu" : "Final research checklist"}>
@@ -401,10 +403,23 @@ function ResearchFinalReadinessStep({ scorecard, locale }: { scorecard: Research
       {readiness.groups.map((group) => <section key={group.step_number} className="research-final-readiness-group" data-pc3e-readiness-group={group.step_number}>
         <header><strong>{pl ? `Krok ${group.step_number}: ${stepName(group.step_number, locale)}` : `Step ${group.step_number}: ${stepName(group.step_number, locale)}`}</strong><span>{pl ? `Sprawdzone ${group.resolved}/${group.applicable}` : `Checked ${group.resolved}/${group.applicable}`}</span></header>
         {group.step_number === 2 && <p>{pl ? "Pozostałe kontrole Deal Breaker są liczone tylko raz w odpowiadających sekcjach Bezpieczeństwo, On-chain i Social." : "The remaining Deal Breaker checks are counted only once in their corresponding Security, On-chain, and Social sections."}</p>}
+        {group.step_number === 6 && <p>{pl ? "Bezpieczeństwo, On-chain i Social są już ujęte w krokach 3–5. W tym miejscu pozostaje Narracja." : "Security, On-chain, and Social are already included in Steps 3–5. Narrative remains here."}</p>}
         {group.reasons.length > 0 && <ul>{group.reasons.filter((criterion) => criterion.state !== "NOT_APPLICABLE").map((criterion) => <ScorecardCriterionRow key={criterion.key} criterion={criterion} locale={locale} />)}</ul>}
       </section>)}
     </details>
   </section>;
+}
+
+function fullResearchRedFlagWarning(count: number, locale: "pl" | "en"): string {
+  if (locale === "en") return `${count} red flag${count === 1 ? " was" : "s were"} detected in the full research.`;
+  const lastDigit = count % 10;
+  const lastTwoDigits = count % 100;
+  const form = count === 1
+    ? "czerwoną flagę"
+    : lastDigit >= 2 && lastDigit <= 4 && (lastTwoDigits < 12 || lastTwoDigits > 14)
+      ? "czerwone flagi"
+      : "czerwonych flag";
+  return `W całym researchu wykryto ${count} ${form}.`;
 }
 
 function scorecardDomainName(name: "security" | "onchain" | "social", locale: "pl" | "en"): string {

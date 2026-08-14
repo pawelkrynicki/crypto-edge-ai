@@ -109,9 +109,9 @@ No state uses buy/sell/invest/safe language.
 
 ## UI contract
 
-Step 6 exposes a beginner-first `earned / 100` scorecard, explicit Narrative gap, counters, red-flag notice, and non-advisory helper copy. Its label follows the calculated `partial` flag (`Wynik częściowy`/`Partial score` or `Wynik kompletny`/`Complete score`). Its calculation detail is collapsed by default and uses symbols, labels, and translated evidence states only—never IDs, provider internals, or raw JSON.
+Step 6 exposes a beginner-first `earned / 100` scorecard, explicit Narrative gap, counters, red-flag notice, and non-advisory helper copy. Its label follows the calculated `partial` flag (`Wynik częściowy`/`Partial score` or `Wynik kompletny`/`Complete score`). The compact `W scorecardzie` / `In scorecard` counters derive only from Security, On-chain, Social, and Narrative; they never borrow the global Step 1 or unique Step 2 readiness counts. When the full Research Playbook has a red flag from any step, Step 6 presents a separate pluralized full-research warning instead of mixing scopes. Its calculation detail is collapsed by default and uses symbols, labels, and translated evidence states only—never IDs, provider internals, or raw JSON.
 
-Step 7 exposes one readiness status, score, the same global checked/red/missing counters, one non-trading next action, and a collapsed meaningful checklist grouped by Steps 1–6. Its Step 2 group contains the derived composite (never `0/0`) and explains that the remaining Deal Breaker controls are counted once in their corresponding Security, On-chain, and Social sections.
+Step 7 exposes one readiness status, score, the same global checked/red/missing counters, one non-trading next action, and a collapsed meaningful checklist grouped by Steps 1–6. Its Step 2 group contains the derived composite (never `0/0`) and explains that the remaining Deal Breaker controls are counted once in their corresponding Security, On-chain, and Social sections. Its Step 6 group explains that Security, On-chain, and Social are already represented by Steps 3–5, so only the unresolved Narrative criterion remains there.
 
 ## Seven-step product audit
 

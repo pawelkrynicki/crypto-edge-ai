@@ -8,7 +8,7 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { CandidateDetailView } from "../src/components/CandidateDetailView.js";
 import { ExternalVerificationLinksView } from "../src/components/ExternalVerificationLinksView.js";
-import { ResearchChecklistDetail } from "../src/components/ResearchChecklist.js";
+import { ResearchChecklistDetail, ResearchFinalReadinessStep, ResearchScorecardStep } from "../src/components/ResearchChecklist.js";
 import { ProductLocaleProvider } from "../src/productI18n.js";
 import { reconcileResearchChecklistStep2, resolveResearchChecklist } from "../src/researchChecklistResolver.js";
 import { RESEARCH_SCORECARD_MAXIMUMS, resolveResearchScorecard } from "../src/researchScorecardResolver.js";
@@ -134,6 +134,36 @@ test("PC.3E reconciles the unique Step 2 Deal Breaker from token age and canonic
   assert.equal(mirroredHoneypot.manual_evidence, null, "Step 2 does not duplicate private evidence storage");
 });
 
+test("PC.3E keeps Step 6 scorecard counters separate from full-playbook readiness", () => {
+  const scorecard = currentStyleScopeScorecard();
+  const scorecardMissing = scorecard.security.missing + scorecard.onchain.missing + scorecard.social.missing + scorecard.narrative.missing;
+  const scorecardRedFlags = scorecard.security.red_flags + scorecard.onchain.red_flags + scorecard.social.red_flags + scorecard.narrative.red_flags;
+
+  assert.equal(scorecard.missing_total, 30, "full-playbook missing stays global");
+  assert.equal(scorecard.red_flags_total, 4, "full-playbook red flags stay global");
+  assert.equal(scorecard.readiness.missing, 30);
+  assert.equal(scorecard.readiness.red_flags, 4);
+  assert.equal(scorecardMissing, 28, "Step 6 domain status includes Security, On-chain, Social, and Narrative only");
+  assert.equal(scorecardRedFlags, 0);
+
+  const stepSix = renderToStaticMarkup(<ResearchScorecardStep scorecard={scorecard} locale="pl" />);
+  assert.match(stepSix, /W scorecardzie — brakuje danych: <b>28<\/b>/);
+  assert.match(stepSix, /W scorecardzie — czerwone flagi: <b>0<\/b>/);
+  assert.match(stepSix, /W całym researchu wykryto 4 czerwone flagi\./);
+
+  const oneGlobalRedFlag = structuredClone(scorecard);
+  oneGlobalRedFlag.red_flags_total = 1;
+  oneGlobalRedFlag.readiness.red_flags = 1;
+  const singular = renderToStaticMarkup(<ResearchScorecardStep scorecard={oneGlobalRedFlag} locale="pl" />);
+  assert.match(singular, /W całym researchu wykryto 1 czerwoną flagę\./);
+
+  const stepSeven = renderToStaticMarkup(<ResearchFinalReadinessStep scorecard={scorecard} locale="pl" />);
+  assert.match(stepSeven, /Sprawdzone<\/dt><dd>6 \/ 36<\/dd>/);
+  assert.match(stepSeven, /Czerwone flagi<\/dt><dd>4<\/dd>/);
+  assert.match(stepSeven, /Brakuje<\/dt><dd>30<\/dd>/);
+  assert.match(stepSeven, /Bezpieczeństwo, On-chain i Social są już ujęte w krokach 3–5\. W tym miejscu pozostaje Narracja\./);
+});
+
 test("PC.3E resolves exact User A/User B evidence from the private repository without touching a shared scorecard", async (t) => {
   const root = await mkdtemp(resolve(tmpdir(), "crypto-edge-pc3e-isolation-"));
   const repository = await createResearchEvidenceRepository({ databaseFilePath: resolve(root, "research.sqlite") });
@@ -215,6 +245,20 @@ function criterion(scorecard: ReturnType<typeof resolveResearchChecklist>["effec
 }
 
 function cloneView(view: ResearchChecklistView): ResearchChecklistView { return structuredClone(view); }
+
+function currentStyleScopeScorecard() {
+  const view = cloneView(resolveResearchChecklist(candidate({ security: null })));
+  for (const key of ["market_cap", "volume_24h", "liquidity", "pair_age"] as const) setStateOnly(view, 1, key, "RED_FLAG");
+  setStateOnly(view, 1, "volume_market_cap_ratio", "AUTO_VERIFIED");
+  setStateOnly(view, 1, "token_age", "MISSING_DATA");
+  for (const key of ["honeypot", "contract_verified", "ownership", "mint", "blacklist", "whitelist", "sell_restriction", "proxy", "buy_tax", "sell_tax", "tokensniffer", "defi_scanner"] as const) setStateOnly(view, 3, key, "MISSING_DATA");
+  for (const key of ["top1_wallet", "top10_wallets", "liquidity_market_cap_ratio", "liquidity_lock", "liquidity_lock_days", "holder_count", "developer_wallet", "wallet_clustering", "volume_quality"] as const) setStateOnly(view, 4, key, "MISSING_DATA");
+  const topWallet = itemAt(view.steps, 4, "top1_wallet");
+  topWallet.state = "MANUAL_VERIFIED";
+  topWallet.value_number = 15;
+  for (const key of ["twitter", "telegram", "discord", "website", "team", "whitepaper", "roadmap"] as const) setStateOnly(view, 5, key, "MISSING_DATA");
+  return resolveResearchScorecard(reconcileResearchChecklistStep2(view.steps));
+}
 
 function resolvedDealBreaker(tokenAge: number | null, team: "anonymous" | "transparent") {
   const view = cloneView(resolveResearchChecklist(candidate(), [
