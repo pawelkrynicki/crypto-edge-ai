@@ -18,8 +18,8 @@ test("PC.3A resolves the 7-step checklist from existing product evidence without
   assert.equal(failedView.current_step, 1);
   assert.equal(item(failedView, 1, "liquidity").state, "RED_FLAG");
   assert.equal(item(failedView, 1, "liquidity").threshold, ">= $30K");
-  assert.equal(item(failedView, 7, "research_readiness").state, "MISSING_DATA");
-  assert.equal(failedView.steps[6]!.state, "MISSING_DATA");
+  assert.equal(item(failedView, 7, "research_readiness").state, "RED_FLAG");
+  assert.equal(failedView.steps[6]!.state, "RED_FLAG");
   assert.equal(item(failedView, 1, "volume_market_cap_ratio").threshold, "1%–100%; preferred 5%–30%");
 
   const securityMissing = candidate({ security: null });
@@ -38,7 +38,7 @@ test("PC.3A resolves the 7-step checklist from existing product evidence without
   assert.equal(item(noWalletView, 4, "top10_wallets").state, "MISSING_DATA");
   assert.equal(item(noWalletView, 1, "token_age").state, "MISSING_DATA");
   assert.equal(item(noWalletView, 6, "security_scorecard").state, "MISSING_DATA");
-  assert.equal(item(noWalletView, 6, "security_scorecard").value_text, null);
+  assert.equal(item(noWalletView, 6, "security_scorecard").value_text, "25/30");
 });
 
 test("PC.3A treats only known ownership states as automatically checked", () => {

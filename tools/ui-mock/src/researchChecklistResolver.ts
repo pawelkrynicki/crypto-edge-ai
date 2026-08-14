@@ -1,5 +1,6 @@
 import { resolveProductFilterConditions } from "./productFilterResolver";
 import { resolveManualResearchTarget, type ManualResearchTool } from "./externalVerificationTargets";
+import { resolveResearchScorecard } from "./researchScorecardResolver";
 import type { UiTokenCandidate } from "./types/scannerTypes";
 import {
   type PublicResearchEvidence,
@@ -49,7 +50,7 @@ export function resolveResearchChecklist(
 ): ResearchChecklistView {
   const manualByLocation = new Map(manualEvidence.map((evidence) => [`${evidence.step_number}:${evidence.item_key}`, evidence]));
   const automatic = buildAutomaticEvidence(candidate);
-  const steps: ResearchChecklistStep[] = ([1, 2, 3, 4, 5, 6] as const).map((number) => {
+  const steps: ResearchChecklistStep[] = ([1, 2, 3, 4, 5] as const).map((number) => {
     const items = STEP_ITEM_KEYS[number].map((key) => applyManualEvidence(
       automatic.get(`${number}:${key}`) ?? missingItem(number, key),
       manualByLocation.get(`${number}:${key}`) ?? null,
@@ -57,21 +58,25 @@ export function resolveResearchChecklist(
     return buildStep(number, items);
   });
 
+  // Effective research scoring is calculated from the just-resolved shared
+  // facts plus this actor's private evidence. It never reads or writes the
+  // scanner PersistableScorecard.
+  const effectiveScorecard = resolveResearchScorecard(steps);
+  steps.push(buildScorecardStep(effectiveScorecard));
   const currentStep = deriveCurrentStep(steps);
-  const baseItems = steps.flatMap((step) => step.items);
-  const hasRedFlag = baseItems.some((item) => item.state === "RED_FLAG");
-  const unresolved = baseItems.some((item) => !isResolved(item.state));
+  const hasRedFlag = effectiveScorecard.readiness.red_flags > 0;
+  const unresolved = effectiveScorecard.readiness.missing > 0;
   const readiness = hasRedFlag
     ? "CRITICAL_RED_FLAG_PRESENT" as const
     : unresolved
-      ? baseItems.some((item) => item.source === "UNAVAILABLE")
-        ? "RESEARCH_INCOMPLETE" as const
-        : "MANUAL_VERIFICATION_REQUIRED" as const
+      ? "RESEARCH_INCOMPLETE" as const
       : "EVIDENCE_COMPLETE_FOR_REVIEW" as const;
-  const finalAutomaticState: ResearchChecklistState = unresolved
-    ? "MISSING_DATA"
-    : hasRedFlag
-      ? "RED_FLAG"
+  // Red flags are intentionally first: the final status and all displayed
+  // counters resolve from one global, unique-check aggregation.
+  const finalAutomaticState: ResearchChecklistState = hasRedFlag
+    ? "RED_FLAG"
+    : unresolved
+      ? "MISSING_DATA"
       : "AUTO_VERIFIED";
   const finalItem = applyManualEvidence({
     key: "research_readiness",
@@ -87,9 +92,6 @@ export function resolveResearchChecklist(
   }, null);
   steps.push(buildStep(7, [finalItem]));
 
-  const allItems = steps.flatMap((step) => step.items);
-  const resolvedChecks = allItems.filter((item) => isResolved(item.state)).length;
-  const redFlags = allItems.filter((item) => item.state === "RED_FLAG").length;
   return {
     schema_version: "research_checklist_view_v1",
     chain: candidate.chain.trim().toLowerCase(),
@@ -97,13 +99,14 @@ export function resolveResearchChecklist(
     manual_evidence_writable: false,
     current_step: currentStep,
     completeness: {
-      resolved_checks: resolvedChecks,
-      total_checks: allItems.length,
-      percentage: allItems.length === 0 ? 0 : Math.round((resolvedChecks / allItems.length) * 100),
-      red_flags: redFlags,
+      resolved_checks: effectiveScorecard.resolved_total,
+      total_checks: effectiveScorecard.applicable_total,
+      percentage: effectiveScorecard.applicable_total === 0 ? 0 : Math.round((effectiveScorecard.resolved_total / effectiveScorecard.applicable_total) * 100),
+      red_flags: effectiveScorecard.red_flags_total,
     },
     readiness,
     steps,
+    effective_scorecard: effectiveScorecard,
   };
 }
 
@@ -205,8 +208,33 @@ function buildAutomaticEvidence(candidate: UiTokenCandidate): Map<string, Automa
       link ? { url: link.url, provenance: { source: link.source, snapshot_at: link.snapshotAt, normalization_path: "candidate_snapshot" } } : null,
     );
   }
-  for (const key of STEP_ITEM_KEYS[6]) add(output, 6, key, "MISSING_DATA", null, null, "not calculated");
   return output;
+}
+
+function buildScorecardStep(scorecard: ReturnType<typeof resolveResearchScorecard>): ResearchChecklistStep {
+  const stateForDomain = (domain: { missing: number; red_flags: number }): ResearchChecklistState => domain.red_flags > 0
+    ? "RED_FLAG"
+    : domain.missing > 0
+      ? "MISSING_DATA"
+      : "AUTO_VERIFIED";
+  const items = [
+    ["security_scorecard", scorecard.security],
+    ["onchain_scorecard", scorecard.onchain],
+    ["social_scorecard", scorecard.social],
+    ["narrative_scorecard", scorecard.narrative],
+  ] as const;
+  return buildStep(6, items.map(([key, domain]) => applyManualEvidence({
+    key,
+    step_number: 6,
+    automatic_state: stateForDomain(domain),
+    value_text: domain === scorecard.narrative && !scorecard.narrative.scored ? null : `${domain.earned}/${domain.max}`,
+    value_number: domain.earned,
+    threshold: null,
+    manual_external_tool: null,
+    manual_external_state: null,
+    automatic_provenance: null,
+    automatic_link: null,
+  }, null)));
 }
 
 function add(

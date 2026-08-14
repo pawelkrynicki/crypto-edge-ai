@@ -139,6 +139,79 @@ export type ResearchChecklistReadiness =
   | "CRITICAL_RED_FLAG_PRESENT"
   | "EVIDENCE_COMPLETE_FOR_REVIEW";
 
+export const RESEARCH_SCORECARD_VERSION = "research_scorecard_v1" as const;
+export const RESEARCH_SCORECARD_VIEW_VERSION = "research_scorecard_view_v1" as const;
+
+export type ResearchScorecardCriterionState = "POSITIVE" | "RESOLVED" | "MISSING" | "RED_FLAG" | "NOT_APPLICABLE";
+
+/**
+ * A calculated, actor-private presentation of existing research evidence.
+ * It deliberately contains no shared scanner score and is never persisted.
+ */
+export type ResearchScorecardCriterion = {
+  key: string;
+  state: ResearchScorecardCriterionState;
+  reason: string;
+};
+
+export type ResearchScorecardDomain = {
+  earned: number;
+  max: number;
+  resolved: number;
+  applicable: number;
+  missing: number;
+  red_flags: number;
+  reasons: ResearchScorecardCriterion[];
+};
+
+export type ResearchScorecardNarrative = ResearchScorecardDomain & {
+  scored: boolean;
+  unresolved_max: number;
+};
+
+export type ResearchReadinessStatus =
+  | "RED_FLAGS_DETECTED"
+  | "RESEARCH_INCOMPLETE"
+  | "RESEARCH_COMPLETE_FOR_OWN_ASSESSMENT";
+
+export type ResearchReadinessGroup = {
+  step_number: Exclude<ResearchStepNumber, 7>;
+  resolved: number;
+  applicable: number;
+  missing: number;
+  red_flags: number;
+  reasons: ResearchScorecardCriterion[];
+};
+
+export type ResearchScorecardView = {
+  schema_version: typeof RESEARCH_SCORECARD_VIEW_VERSION;
+  scoring_version: typeof RESEARCH_SCORECARD_VERSION;
+  security: ResearchScorecardDomain;
+  onchain: ResearchScorecardDomain;
+  social: ResearchScorecardDomain;
+  narrative: ResearchScorecardNarrative;
+  total: {
+    earned: number;
+    max: 100;
+    scored_max: number;
+    unresolved_max: number;
+  };
+  complete: boolean;
+  partial: boolean;
+  red_flags_total: number;
+  missing_total: number;
+  resolved_total: number;
+  applicable_total: number;
+  readiness: {
+    status: ResearchReadinessStatus;
+    resolved: number;
+    applicable: number;
+    missing: number;
+    red_flags: number;
+    groups: ResearchReadinessGroup[];
+  };
+};
+
 export type ResearchChecklistView = {
   schema_version: "research_checklist_view_v1";
   chain: string;
@@ -153,6 +226,8 @@ export type ResearchChecklistView = {
   };
   readiness: ResearchChecklistReadiness;
   steps: ResearchChecklistStep[];
+  /** Backwards-compatible calculated extension; it is never a scanner score. */
+  effective_scorecard: ResearchScorecardView;
 };
 
 export function isResearchChecklistItemKey(value: unknown): value is ResearchChecklistItemKey {

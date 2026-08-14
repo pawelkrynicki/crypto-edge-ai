@@ -388,10 +388,10 @@ test("PC.3B renders only meaningful step data and uses compact unavailable state
   assert.match(step5, /Research społeczny wymaga ręcznego uzupełnienia/);
   for (const name of ["X / Twitter", "Telegram", "Discord", "Strona WWW", "Zespół", "Whitepaper", "Roadmap"]) assert.doesNotMatch(step5, new RegExp(`<strong>${name}<\\/strong>`));
   assert.doesNotMatch(step6, /data-key-research-tool=/);
-  assert.match(step6, /Brak dostępnego wyniku/);
-  assert.match(step6, /<b>Do sprawdzenia<\/b>0/);
+  assert.match(step6, /SCORECARD RESEARCHU/);
+  assert.match(step6, /Wynik częściowy/);
   assert.doesNotMatch(step6, /PC\.3A|<strong>Bezpieczeństwo \(30\)<\/strong>|<strong>On-chain \(25\)<\/strong>/);
-  assert.match(step7, /data-research-derived-readiness/);
+  assert.match(step7, /data-pc3e-final-readiness-beginner/);
   assert.match(step7, /Research niekompletny/);
   assert.doesNotMatch(step7, /<strong>Gotowość researchu<\/strong>|Brak zapisanych danych/);
 });

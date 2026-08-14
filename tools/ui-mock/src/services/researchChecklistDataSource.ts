@@ -91,7 +91,10 @@ function isChecklist(value: unknown): value is ResearchChecklistView {
     && typeof value.manual_evidence_writable === "boolean"
     && Number.isSafeInteger(value.current_step)
     && isRecord(value.completeness)
-    && Array.isArray(value.steps);
+    && Array.isArray(value.steps)
+    && isRecord(value.effective_scorecard)
+    && value.effective_scorecard.schema_version === "research_scorecard_view_v1"
+    && value.effective_scorecard.scoring_version === "research_scorecard_v1";
 }
 
 function isEvidence(value: unknown): value is PublicResearchEvidence {
