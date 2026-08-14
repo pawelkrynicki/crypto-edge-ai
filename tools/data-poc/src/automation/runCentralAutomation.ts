@@ -28,6 +28,7 @@ export type RunCentralSchedulerOnceResult = {
   run_id?: string;
   active_run_id?: string;
   error_code?: string;
+  request_counts?: Record<string, number>;
 };
 
 async function main(): Promise<void> {
@@ -139,6 +140,9 @@ export async function runCentralSchedulerOnce(
     run_status: coordinated.status,
     run_id: coordinated.run_id,
     ...(coordinated.status === "FAILED" ? { error_code: coordinated.error_code } : {}),
+    ...(coordinated.status === "FAILED"
+      ? (coordinated.request_counts ? { request_counts: coordinated.request_counts } : {})
+      : (coordinated.result.request_counts ? { request_counts: coordinated.result.request_counts } : {})),
   };
 }
 
@@ -182,6 +186,9 @@ export async function runCentralLiveCycleOnce(options: {
     run_status: coordinated.status,
     run_id: coordinated.run_id,
     ...(coordinated.status === "FAILED" ? { error_code: coordinated.error_code } : {}),
+    ...(coordinated.status === "FAILED"
+      ? (coordinated.request_counts ? { request_counts: coordinated.request_counts } : {})
+      : (coordinated.result.request_counts ? { request_counts: coordinated.result.request_counts } : {})),
   };
 }
 

@@ -8,15 +8,19 @@ import {
 } from "./persistableScannerModel.js";
 import { REAL_DATA_CONTRACT_VERSION } from "./provenanceManifest.js";
 import { SCANNER_CONTEXT_PROVENANCE_CONTRACT_VERSION } from "./scannerContextProvenance.js";
+import { normalizeSafeSocialUrl } from "./socialLinkNormalization.js";
+import { SOCIAL_LINK_CATEGORIES } from "./types.js";
 
 const CANDIDATE_FIELDS = new Set([
   "run_id", "candidate_id", "symbol", "name", "chain", "contract_address", "pair_address", "dex",
-  "source", "source_url", "price_usd", "market_cap_usd", "fdv_usd", "liquidity_usd",
+  "source", "source_url", "social_links", "price_usd", "market_cap_usd", "fdv_usd", "liquidity_usd",
   "volume_24h_usd", "volume_market_cap_ratio", "pair_created_at", "pair_age_days",
   "basic_filter_status", "filter_reasons", "final_label", "final_reasons", "created_at",
   "discovery_basket", "discovery_method", "observation_only", "established_eligible",
   "universe_version", "universe_entry_index", "address_identity_verified",
 ]);
+const SOCIAL_LINK_FIELDS = new Set(["category", "url", "source", "snapshot_at"]);
+const SOCIAL_LINK_CATEGORY_SET = new Set<string>(SOCIAL_LINK_CATEGORIES);
 const SECURITY_FIELDS = new Set([
   "run_id", "candidate_id", "sources", "honeypot_status", "buy_tax", "sell_tax", "contract_verified",
   "ownership_status", "liquidity_locked", "liquidity_lock_days", "mint_risk", "blacklist_risk",
@@ -152,6 +156,7 @@ export function validateDisplayEligibleScannerSnapshot(output: PersistableScanne
     ) fail("SCANNER_SCHEMA_INVALID");
     validateCandidateDiscoveryMetadata(candidate, metadata);
     if (candidate.source_url !== null) assertDexScreenerUrl(candidate.source_url);
+    validateCandidateSocialLinks(candidate.social_links, candidate.created_at);
   }
   validateCandidateBasketCounts(output.candidates, metadata);
 
@@ -430,6 +435,26 @@ function validateCandidateBasketCounts(candidates: Array<Record<string, unknown>
   ) fail("SCANNER_METADATA_INVALID");
 }
 
+function validateCandidateSocialLinks(value: unknown, candidateCreatedAt: unknown): void {
+  // `social_links` was added in scanner v2 after existing LKG snapshots were
+  // published, so it remains optional. When present it must be canonical,
+  // locally safe, source-bound, and aligned to the candidate snapshot.
+  if (value === undefined) return;
+  if (!Array.isArray(value) || !isCanonicalTimestamp(candidateCreatedAt)) fail("SCANNER_SOCIAL_LINK_INVALID");
+  for (const link of value) {
+    if (!isRecord(link)) fail("SCANNER_SOCIAL_LINK_INVALID");
+    assertExactFields(link, SOCIAL_LINK_FIELDS);
+    if (
+      !SOCIAL_LINK_CATEGORY_SET.has(String(link.category))
+      || link.source !== "DexScreener"
+      || !isCanonicalTimestamp(link.snapshot_at)
+      || link.snapshot_at !== candidateCreatedAt
+      || typeof link.url !== "string"
+      || normalizeSafeSocialUrl(link.category as typeof SOCIAL_LINK_CATEGORIES[number], link.url) !== link.url
+    ) fail("SCANNER_SOCIAL_LINK_INVALID");
+  }
+}
+
 function assertExactFields(value: object, allowlist: Set<string>): void {
   if (Object.keys(value).some((key) => !allowlist.has(key))) fail("SCANNER_UNKNOWN_FIELD");
 }
@@ -463,6 +488,11 @@ function isNonNegativeInteger(value: unknown): value is number {
 
 function isPositiveInteger(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value > 0;
+}
+
+function isCanonicalTimestamp(value: unknown): value is string {
+  if (typeof value !== "string" || !Number.isFinite(Date.parse(value))) return false;
+  return new Date(value).toISOString() === value;
 }
 
 function isSafeRunId(value: unknown): value is string {

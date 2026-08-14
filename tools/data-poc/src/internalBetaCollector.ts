@@ -254,7 +254,11 @@ export async function runInternalBetaCollector(
     goplus_security: clients.goplus_security.getStats().request_count,
     ...contextCollection.request_counts,
   };
-  validateDisplayEligibleContextSnapshot(context);
+  try {
+    validateDisplayEligibleContextSnapshot(context);
+  } catch (error) {
+    throw withAttemptRequestCounts(error, requestCounts);
+  }
   const contextProvenance = buildScannerContextProvenance({
     linkedContextRunId: contextRunId,
     previousValidatedContextRunId: options.previousContext?.provenance.run_id
@@ -303,23 +307,33 @@ export async function runInternalBetaCollector(
         : {}),
     },
   });
-  validateDisplayEligibleScannerSnapshot(scanner);
+  try {
+    validateDisplayEligibleScannerSnapshot(scanner);
+  } catch (error) {
+    throw withAttemptRequestCounts(error, requestCounts);
+  }
 
   const outputDir = options.outputDir ?? DEFAULT_OUTPUT_DIR;
-  const contextPublish = await publishAtomicJson({
-    output: context,
-    baseOutputDir: outputDir,
-    runId: contextRunId,
-    fileName: APPROVED_SOURCES_OUTPUT_FILENAME,
-    validate: validateDisplayEligibleContextSnapshot,
-  });
-  const scannerPublish = await publishAtomicJson({
-    output: scanner,
-    baseOutputDir: outputDir,
-    runId,
-    fileName: "full_output.json",
-    validate: validateDisplayEligibleScannerSnapshot,
-  });
+  let contextPublish: AtomicPublishResult;
+  let scannerPublish: AtomicPublishResult;
+  try {
+    contextPublish = await publishAtomicJson({
+      output: context,
+      baseOutputDir: outputDir,
+      runId: contextRunId,
+      fileName: APPROVED_SOURCES_OUTPUT_FILENAME,
+      validate: validateDisplayEligibleContextSnapshot,
+    });
+    scannerPublish = await publishAtomicJson({
+      output: scanner,
+      baseOutputDir: outputDir,
+      runId,
+      fileName: "full_output.json",
+      validate: validateDisplayEligibleScannerSnapshot,
+    });
+  } catch (error) {
+    throw withAttemptRequestCounts(error, requestCounts);
+  }
 
   let followUpStoreUpdated = false;
   let followUpErrorCode: string | null = null;
@@ -551,6 +565,11 @@ function safeFollowUpErrorCode(error: unknown): string {
   const value = error instanceof Error ? error.message : "FOLLOW_UP_STORE_UPDATE_FAILED";
   const normalized = value.toUpperCase().replace(/[^A-Z0-9_]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 96);
   return normalized || "FOLLOW_UP_STORE_UPDATE_FAILED";
+}
+
+function withAttemptRequestCounts(error: unknown, requestCounts: Record<string, number>): Error & { request_counts: Record<string, number> } {
+  const failure = error instanceof Error ? error : new Error("INTERNAL_BETA_COLLECTOR_FAILED");
+  return Object.assign(failure, { request_counts: { ...requestCounts } });
 }
 
 function clamp(value: number | undefined, fallback: number, min: number, max: number): number {

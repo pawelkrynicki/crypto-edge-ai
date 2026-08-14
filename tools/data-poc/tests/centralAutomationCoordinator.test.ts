@@ -104,6 +104,38 @@ describe("central automation coordinator", () => {
     if (nextLock.status === "ACQUIRED") await nextLock.release();
   });
 
+  it("records runner-attested request counts on a failed attempt without moving LKG pointers", async () => {
+    const automationDirectoryPath = await tempDirectory();
+    const first = await runCentralAutomation({
+      automationDirectoryPath,
+      runIdFactory: () => "run_lkg",
+      runner: async () => ({ request_counts: { dexscreener: 7 }, scanner_run_id: "scan_lkg", context_run_id: "context_lkg" }),
+    });
+    assert.equal(first.status, "SUCCESS");
+
+    const failed = await runCentralAutomation({
+      automationDirectoryPath,
+      runIdFactory: () => "run_attested_failure",
+      runner: async () => {
+        throw Object.assign(new Error("SCANNER_SOCIAL_LINK_INVALID"), {
+          code: "SCANNER_SOCIAL_LINK_INVALID",
+          request_counts: { dexscreener: 4, goplus_security: 0, alternative_me_fng: 1, defillama_api: 1 },
+        });
+      },
+    });
+    assert.deepEqual(failed, {
+      status: "FAILED",
+      run_id: "run_attested_failure",
+      error_code: "SCANNER_SOCIAL_LINK_INVALID",
+      request_counts: { dexscreener: 4, goplus_security: 0, alternative_me_fng: 1, defillama_api: 1 },
+    });
+
+    const state = await createAutomationStateStore(automationDirectoryPath).read();
+    assert.deepEqual(state.request_counts, { dexscreener: 4, goplus_security: 0, alternative_me_fng: 1, defillama_api: 1 });
+    assert.equal(state.last_published_scanner_run_id, "scan_lkg");
+    assert.equal(state.last_published_context_run_id, "context_lkg");
+  });
+
   it("records a partial cycle without presenting it as the last full success", async () => {
     const automationDirectoryPath = await tempDirectory();
     const store = createAutomationStateStore(automationDirectoryPath);

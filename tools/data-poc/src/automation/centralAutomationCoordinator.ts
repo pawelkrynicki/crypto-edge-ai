@@ -46,7 +46,7 @@ export type CentralAutomationOptions<T extends CentralAutomationRunnerResult> = 
 export type CentralAutomationResult<T extends CentralAutomationRunnerResult> =
   | { status: "SUCCESS"; run_id: string; result: T }
   | { status: "PARTIAL"; run_id: string; result: T }
-  | { status: "FAILED"; run_id: string; error_code: string }
+  | { status: "FAILED"; run_id: string; error_code: string; request_counts?: AutomationRequestCounts }
   | { status: "AUTOMATION_SUSPENDED"; reason: string }
   | { status: "RUN_ALREADY_IN_PROGRESS"; active_run_id: string };
 
@@ -118,6 +118,7 @@ export async function runCentralAutomation<T extends CentralAutomationRunnerResu
       if (heartbeatError) throw new CentralAutomationError("COLLECTOR_LOCK_HEARTBEAT_FAILED");
     } catch (error) {
       const errorCode = safeErrorCode(error);
+      const failureRequestCounts = requestCountsFromError(error);
       const failureClass = classifyAutomationFailure(errorCode);
       const consecutiveFailureCount = previous.consecutive_failure_count + 1;
       const shouldSuspend = failureClass === "DETERMINISTIC"
@@ -143,6 +144,7 @@ export async function runCentralAutomation<T extends CentralAutomationRunnerResu
         source_statuses: {},
         failure_code: errorCode,
         safe_error: safeErrorDescription(errorCode),
+        request_counts: failureRequestCounts ?? previous.request_counts,
         consecutive_failure_count: consecutiveFailureCount,
         automation_suspended: shouldSuspend,
         suspended_at: shouldSuspend ? failureAt : null,
@@ -150,7 +152,12 @@ export async function runCentralAutomation<T extends CentralAutomationRunnerResu
         last_failure_class: failureClass,
         resume_required: shouldSuspend,
       });
-      return { status: "FAILED", run_id: runId, error_code: errorCode };
+      return {
+        status: "FAILED",
+        run_id: runId,
+        error_code: errorCode,
+        ...(failureRequestCounts ? { request_counts: failureRequestCounts } : {}),
+      };
     }
 
     const cycleStatus = resolveCycleStatus(result);
@@ -301,6 +308,16 @@ function safeErrorCode(error: unknown): string {
       : "AUTOMATION_RUNNER_FAILED";
   const normalized = candidate.toUpperCase().replace(/[^A-Z0-9_]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 96);
   return normalized || "AUTOMATION_RUNNER_FAILED";
+}
+
+function requestCountsFromError(error: unknown): AutomationRequestCounts | undefined {
+  if (!error || typeof error !== "object" || !("request_counts" in error)) return undefined;
+  const value = error.request_counts;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const entries = Object.entries(value).filter(([key, count]) => (
+    /^[A-Za-z0-9._-]{1,64}$/.test(key) && Number.isSafeInteger(count) && Number(count) >= 0
+  ));
+  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
 }
 
 export function classifyAutomationFailure(errorCode: string): AutomationFailureClass {

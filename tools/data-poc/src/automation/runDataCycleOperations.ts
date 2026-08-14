@@ -71,14 +71,24 @@ async function runOnceLive(): Promise<void> {
   const establishedBefore = await sha256(before.established_universe);
   const backups: Array<Awaited<ReturnType<typeof createDataCycleBackup>>> = [];
   const result = await runCentralLiveCycleOnce({
-    beforeRun: async () => {
+    beforeRun: async (runId) => {
       const backup = await createDataCycleBackup();
       backups.push(backup);
+      const receiptPath = await writeRunOnceReceipt({
+        event: "DATA_CYCLE_ATTEMPT_STARTED",
+        created_at: new Date().toISOString(),
+        run_id: runId,
+        run_status: "IN_PROGRESS",
+        request_counts: null,
+        openai_calls: 0,
+        backup_id: backup.manifest.backup_id,
+      });
       console.log(JSON.stringify({
         event: "BACKUP_CREATED",
         backup_id: backup.manifest.backup_id,
         backup_directory: toRepoRelative(before, backup.backup_directory),
         files: backup.manifest.files,
+        attempt_receipt: toRepoRelative(before, receiptPath),
       }, null, 2));
     },
   });
@@ -87,9 +97,11 @@ async function runOnceLive(): Promise<void> {
   const establishedAfter = await sha256(before.established_universe);
   if (establishedBefore !== establishedAfter) throw new Error("ESTABLISHED_UNIVERSE_CHANGED");
   const receiptPath = await writeRunOnceReceipt({
+    event: "DATA_CYCLE_FINISHED",
     created_at: new Date().toISOString(),
     backup_id: backup.manifest.backup_id,
     result,
+    request_counts: result.request_counts ?? null,
     openai_calls: 0,
     established_universe_changed: false,
     scheduler_installed_by_launcher: false,
