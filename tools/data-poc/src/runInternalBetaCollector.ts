@@ -1,10 +1,9 @@
-import { dirname, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { relative, resolve } from "node:path";
 import { runInternalBetaCollector } from "./internalBetaCollector.js";
 import type { DexScreenerDiscoveryFailureDiagnostics } from "./dexscreenerDiscovery.js";
+import { getDataPocRuntimeRoot } from "./dataPocRuntimeRoot.js";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = resolve(__dirname, "../../../..");
+const REPO_ROOT = resolve(getDataPocRuntimeRoot(), "..", "..");
 
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));

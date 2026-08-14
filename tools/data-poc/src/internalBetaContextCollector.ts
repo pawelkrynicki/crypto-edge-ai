@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
 import { publishAtomicJson, type AtomicPublishResult } from "./atomicPublish.js";
 import type { FetchLike } from "./boundedHttpClient.js";
 import { configureCollectorNetwork } from "./collectorNetworkBootstrap.js";
@@ -12,9 +11,9 @@ import {
 } from "./internalBetaContextCollection.js";
 import { APPROVED_SOURCES_OUTPUT_FILENAME } from "./sources/runApprovedSourcesPoc.js";
 import type { ApprovedSourcesRunOutput } from "./sources/sourceAdapterTypes.js";
+import { getDataPocRuntimeRoot } from "./dataPocRuntimeRoot.js";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const DEFAULT_OUTPUT_DIR = resolve(__dirname, "../../output");
+const DEFAULT_OUTPUT_DIR = resolve(getDataPocRuntimeRoot(), "output");
 
 export type InternalBetaContextCollectorOptions = {
   env?: CollectorEnvironment;

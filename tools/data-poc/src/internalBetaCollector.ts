@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
 import { publishAtomicJson, type AtomicPublishResult } from "./atomicPublish.js";
 import { BoundedHttpClient, type FetchLike } from "./boundedHttpClient.js";
 import { buildCombinedScannerOutput } from "./combinedScanner.js";
@@ -55,14 +54,14 @@ import {
 } from "./internalBetaContextCollection.js";
 import type { ApprovedSourcesRunOutput } from "./sources/sourceAdapterTypes.js";
 import type { CryptoEdgeCandidate } from "./types.js";
+import { getDataPocRuntimeRoot } from "./dataPocRuntimeRoot.js";
 
 export { assertInternalBetaCollectorEnvironment, type CollectorEnvironment } from "./collectorEnvironment.js";
 
 export const DEFAULT_SECURITY_CANDIDATE_LIMIT = 10;
 export const MAX_SECURITY_CANDIDATE_LIMIT = 20;
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const DEFAULT_OUTPUT_DIR = resolve(__dirname, "../../output");
+const DEFAULT_OUTPUT_DIR = resolve(getDataPocRuntimeRoot(), "output");
 
 export type InternalBetaCollectorOptions = {
   env?: CollectorEnvironment;

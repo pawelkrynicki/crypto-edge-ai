@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { access, mkdir, open, readFile, rename } from "node:fs/promises";
-import { isAbsolute, relative, resolve, sep } from "node:path";
-import { fileURLToPath } from "node:url";
+import { isAbsolute, relative, resolve } from "node:path";
 import {
   assertExplicitLiveAutomationOptIn,
   runCentralLiveCycleOnce,
@@ -13,10 +12,11 @@ import { inspectActiveGlobalCollectorLock } from "./globalCollectorLock.js";
 import { readFollowUpStore } from "../followUpBasket.js";
 import { validateDisplayEligibleScannerSnapshot } from "../displaySnapshotValidator.js";
 import { validateDisplayEligibleContextSnapshot } from "../contextSnapshotValidator.js";
+import { getDataPocRuntimeRoot } from "../dataPocRuntimeRoot.js";
 
 export const LOCAL_RC_SOAK_WAKEUP_SCHEMA_VERSION = "local_rc_soak_wakeup_v1";
 
-const DATA_POC_ROOT = resolveDataPocRoot(fileURLToPath(import.meta.url));
+const DATA_POC_ROOT = getDataPocRuntimeRoot();
 const SOAK_ROOT = resolve(DATA_POC_ROOT, "..", "ui-mock", ".local", "local-rc-soak");
 const OUTPUT_ROOT = resolve(DATA_POC_ROOT, "output");
 
@@ -266,13 +266,6 @@ function duplicateIdentityCount(entries: Array<{ chain: string; contract_address
 
 function stamp(value: Date): string {
   return value.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
-}
-
-function resolveDataPocRoot(modulePath: string): string {
-  const marker = `${sep}tools${sep}data-poc${sep}`;
-  const index = modulePath.toLowerCase().indexOf(marker.toLowerCase());
-  if (index < 0) throw new Error("RC1_DATA_POC_ROOT_UNAVAILABLE");
-  return modulePath.slice(0, index + marker.length - 1);
 }
 
 function safeError(error: unknown): string {

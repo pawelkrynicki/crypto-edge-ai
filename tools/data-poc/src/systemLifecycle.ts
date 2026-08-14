@@ -1,7 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, open, readFile, rename, rm } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import {
   getDefaultEstablishedUniverseStorePath,
   normalizeEstablishedAddress,
@@ -28,6 +27,7 @@ import {
   type PersistableCandidate,
   type PersistableScannerOutput,
 } from "./persistableScannerModel.js";
+import { getDataPocRuntimeRoot } from "./dataPocRuntimeRoot.js";
 
 export const SYSTEM_LIFECYCLE_POLICY_VERSION = "system_lifecycle_policy_v1";
 export const NEW_INBOX_SCHEMA_VERSION = "new_inbox_store_v1";
@@ -191,27 +191,22 @@ export type SystemLifecycleRunResult = {
   summary: LifecycleSummary;
 };
 
-const DATA_POC_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const DEFAULT_NEW_INBOX_PATH = resolve(DATA_POC_ROOT, ".local", "lifecycle", "new-inbox.json");
-const DEFAULT_LIFECYCLE_AUDIT_PATH = resolve(DATA_POC_ROOT, ".local", "lifecycle", "audit.json");
-const DEFAULT_LIFECYCLE_JOURNAL_PATH = resolve(DATA_POC_ROOT, ".local", "lifecycle", "operation-journal.json");
-const DEFAULT_LIFECYCLE_CYCLE_RECEIPT_PATH = resolve(DATA_POC_ROOT, ".local", "lifecycle", "cycle-receipts.json");
 const MAX_AUDIT_ENTRIES = 5_000;
 
 export function getDefaultNewInboxStorePath(env: NodeJS.ProcessEnv = process.env): string {
-  return resolve(env.CRYPTO_EDGE_NEW_INBOX_STORE_PATH?.trim() || DEFAULT_NEW_INBOX_PATH);
+  return resolve(env.CRYPTO_EDGE_NEW_INBOX_STORE_PATH?.trim() || resolve(getDataPocRuntimeRoot(env), ".local", "lifecycle", "new-inbox.json"));
 }
 
 export function getDefaultLifecycleAuditStorePath(env: NodeJS.ProcessEnv = process.env): string {
-  return resolve(env.CRYPTO_EDGE_LIFECYCLE_AUDIT_STORE_PATH?.trim() || DEFAULT_LIFECYCLE_AUDIT_PATH);
+  return resolve(env.CRYPTO_EDGE_LIFECYCLE_AUDIT_STORE_PATH?.trim() || resolve(getDataPocRuntimeRoot(env), ".local", "lifecycle", "audit.json"));
 }
 
 export function getDefaultLifecycleOperationJournalPath(env: NodeJS.ProcessEnv = process.env): string {
-  return resolve(env.CRYPTO_EDGE_LIFECYCLE_OPERATION_JOURNAL_PATH?.trim() || DEFAULT_LIFECYCLE_JOURNAL_PATH);
+  return resolve(env.CRYPTO_EDGE_LIFECYCLE_OPERATION_JOURNAL_PATH?.trim() || resolve(getDataPocRuntimeRoot(env), ".local", "lifecycle", "operation-journal.json"));
 }
 
 export function getDefaultLifecycleCycleReceiptPath(env: NodeJS.ProcessEnv = process.env): string {
-  return resolve(env.CRYPTO_EDGE_LIFECYCLE_CYCLE_RECEIPT_PATH?.trim() || DEFAULT_LIFECYCLE_CYCLE_RECEIPT_PATH);
+  return resolve(env.CRYPTO_EDGE_LIFECYCLE_CYCLE_RECEIPT_PATH?.trim() || resolve(getDataPocRuntimeRoot(env), ".local", "lifecycle", "cycle-receipts.json"));
 }
 
 export function createEmptyNewInboxStore(now = new Date(0)): NewInboxStore {

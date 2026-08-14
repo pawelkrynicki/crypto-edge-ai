@@ -1,5 +1,5 @@
 import { readdir, readFile, stat } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { validateDisplayEligibleScannerSnapshot } from "./displaySnapshotValidator.js";
 import {
@@ -10,6 +10,7 @@ import {
   type FollowUpStore,
 } from "./followUpBasket.js";
 import type { PersistableScannerOutput } from "./persistableScannerModel.js";
+import { getDataPocRuntimeRoot } from "./dataPocRuntimeRoot.js";
 
 export type FollowUpBootstrapPlan = {
   mode: "dry-run" | "apply";
@@ -23,7 +24,7 @@ export type FollowUpBootstrapPlan = {
   entries_total_after: number;
 };
 
-const DEFAULT_OUTPUT_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "../../output");
+const DEFAULT_OUTPUT_DIR = resolve(getDataPocRuntimeRoot(), "output");
 
 export function planFollowUpBootstrap(
   current: FollowUpStore,

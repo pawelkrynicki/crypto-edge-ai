@@ -1,6 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
 import { BoundedHttpClient, type FetchLike } from "./boundedHttpClient.js";
 import { validateDisplayEligibleContextSnapshot } from "./contextSnapshotValidator.js";
 import {
@@ -13,11 +12,12 @@ import type {
   NormalizedSourceOutput,
   SourceAdapter,
 } from "./sources/sourceAdapterTypes.js";
+import { getDataPocRuntimeRoot } from "./dataPocRuntimeRoot.js";
 
 export const CONTEXT_SOURCE_IDS = ["alternative_me_fng", "defillama_api"] as const;
 export type ContextSourceId = typeof CONTEXT_SOURCE_IDS[number];
 
-const DEFAULT_OUTPUT_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "../../output");
+const DEFAULT_OUTPUT_DIR = resolve(getDataPocRuntimeRoot(), "output");
 
 export type InternalBetaContextCollectionOptions = {
   fetchImpl?: FetchLike;

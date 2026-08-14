@@ -1,8 +1,9 @@
 import { mkdir, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { getActiveSourceEnvironment, getSourcePolicyDecision, isSourcePolicyError } from "../sourcePolicy.js";
 import { buildSnapshotProvenanceManifest } from "../provenanceManifest.js";
+import { getDataPocRuntimeRoot } from "../dataPocRuntimeRoot.js";
 import { getApprovedSourceAdapters } from "./sourceAdapterRegistry.js";
 import type {
   ApprovedSourcesRunOutput,
@@ -18,8 +19,7 @@ export const DEGRADED_EXTERNAL_SOURCE_STATUS = "degraded_external_source";
 export const CONTEXT_SCHEMA_VERSION = "context_snapshot_v1";
 export const CONTEXT_GENERATOR_VERSION = "approved_sources_poc_v1";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const DEFAULT_OUTPUT_DIR = resolve(__dirname, "../../../output");
+const DEFAULT_OUTPUT_DIR = resolve(getDataPocRuntimeRoot(), "output");
 
 export type RunApprovedSourcesPocOptions = {
   mode?: SourceAdapterMode;

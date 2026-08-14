@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
 import { resolveRepoFile } from "./sourceRegistryValidator.js";
+import { getDataPocRuntimeRoot } from "./dataPocRuntimeRoot.js";
 
 export const ESTABLISHED_UNIVERSE_SCHEMA_VERSION = "established_universe_schema_v1";
 export const ESTABLISHED_UNIVERSE_STORE_SCHEMA_VERSION = "established_universe_store_v1";
@@ -74,9 +74,6 @@ const EVM_CHAINS = new Set<SupportedEstablishedChain>([
   "avalanche",
 ]);
 const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const DEFAULT_LOCAL_STORE_PATH = resolve(__dirname, "../../.local/established-universe/store.json");
-
 export function getDefaultEstablishedUniverseConfigPath(env: NodeJS.ProcessEnv = process.env): string {
   const configured = env.CRYPTO_EDGE_ESTABLISHED_UNIVERSE_CONFIG_PATH?.trim();
   return configured ? resolve(configured) : resolveRepoFile(ESTABLISHED_ADDRESS_UNIVERSE_CONFIG_PATH);
@@ -84,7 +81,7 @@ export function getDefaultEstablishedUniverseConfigPath(env: NodeJS.ProcessEnv =
 
 export function getDefaultEstablishedUniverseStorePath(env: NodeJS.ProcessEnv = process.env): string {
   const configured = env.CRYPTO_EDGE_ESTABLISHED_UNIVERSE_STORE_PATH?.trim();
-  return resolve(configured || DEFAULT_LOCAL_STORE_PATH);
+  return resolve(configured || resolve(getDataPocRuntimeRoot(env), ".local", "established-universe", "store.json"));
 }
 
 export function loadEstablishedAddressUniverse(path?: string, env: NodeJS.ProcessEnv = process.env): EstablishedAddressUniverse {

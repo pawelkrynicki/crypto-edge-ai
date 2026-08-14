@@ -1,7 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, open, readFile, rename, rm } from "node:fs/promises";
-import { dirname, resolve, sep } from "node:path";
-import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
 import {
   loadEstablishedAddressUniverse,
   normalizeEstablishedAddress,
@@ -11,6 +10,7 @@ import {
   type SupportedEstablishedChain,
 } from "./establishedAddressUniverse.js";
 import type { PersistableCandidate, PersistableScannerOutput } from "./persistableScannerModel.js";
+import { getDataPocRuntimeRoot } from "./dataPocRuntimeRoot.js";
 
 export const FOLLOW_UP_STORE_SCHEMA_VERSION = "follow_up_store_v1";
 export const FOLLOW_UP_CHECKPOINT_DAYS = [1, 3, 7, 14, 30] as const;
@@ -192,17 +192,8 @@ const AUDIT_FIELDS = new Set([
   "audit_id", "changed_at", "operation", "entry_id", "from_status", "to_status", "source_run_id",
   "owner_decision", "manual_verification",
 ]);
-const DEFAULT_FOLLOW_UP_STORE_PATH = resolve(resolveDataPocRoot(fileURLToPath(import.meta.url)), ".local/follow-up/store.json");
-
 export function getDefaultFollowUpStorePath(env: NodeJS.ProcessEnv = process.env): string {
-  return resolve(env.CRYPTO_EDGE_FOLLOW_UP_STORE_PATH?.trim() || DEFAULT_FOLLOW_UP_STORE_PATH);
-}
-
-function resolveDataPocRoot(modulePath: string): string {
-  const marker = `${sep}tools${sep}data-poc${sep}`;
-  const index = modulePath.toLowerCase().indexOf(marker.toLowerCase());
-  if (index < 0) throw new Error("FOLLOW_UP_STORE_PATH_UNAVAILABLE");
-  return modulePath.slice(0, index + marker.length - 1);
+  return resolve(env.CRYPTO_EDGE_FOLLOW_UP_STORE_PATH?.trim() || resolve(getDataPocRuntimeRoot(env), ".local", "follow-up", "store.json"));
 }
 
 export function followUpIdentity(chain: string, contractAddress: string): {

@@ -1,10 +1,10 @@
 import { readFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
+import { getDataPocRuntimeRoot } from "../dataPocRuntimeRoot.js";
 import type { AutomationState } from "./automationState.js";
 import type { PublishedSnapshotTimes } from "./schedulerDecision.js";
 
-const DEFAULT_OUTPUT_DIRECTORY = resolve(dirname(fileURLToPath(import.meta.url)), "../../output");
+const DEFAULT_OUTPUT_DIRECTORY = resolve(getDataPocRuntimeRoot(), "output");
 
 export async function readPublishedSnapshotTimes(
   state: AutomationState,

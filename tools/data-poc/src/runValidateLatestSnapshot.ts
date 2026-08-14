@@ -1,14 +1,13 @@
 import { readFile, readdir, stat } from "node:fs/promises";
 import { basename, dirname, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { validateDisplayEligibleContextSnapshot } from "./contextSnapshotValidator.js";
 import { validateDisplayEligibleScannerSnapshot } from "./displaySnapshotValidator.js";
 import type { PersistableScannerOutput } from "./persistableScannerModel.js";
 import { APPROVED_SOURCES_OUTPUT_FILENAME } from "./sources/runApprovedSourcesPoc.js";
 import type { ApprovedSourcesRunOutput } from "./sources/sourceAdapterTypes.js";
+import { getDataPocRuntimeRoot } from "./dataPocRuntimeRoot.js";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const DATA_POC_ROOT = resolve(__dirname, "../..");
+const DATA_POC_ROOT = getDataPocRuntimeRoot();
 const REPO_ROOT = resolve(DATA_POC_ROOT, "../..");
 const OUTPUT_DIR = resolve(DATA_POC_ROOT, "output");
 

@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { copyFile, mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { dirname, relative, resolve, sep } from "node:path";
 import { getDefaultFollowUpStorePath } from "../followUpBasket.js";
+import { getDataPocRuntimeRoot } from "../dataPocRuntimeRoot.js";
 import { createAutomationStateStore } from "./automationState.js";
 import { getDefaultAutomationDirectory } from "./automationPaths.js";
 
@@ -39,7 +40,7 @@ export type DataCycleBackupManifest = {
 export async function resolveCanonicalDataPaths(): Promise<DataCycleCanonicalPaths> {
   const paths = resolveStaticDataPaths();
   const state = await createAutomationStateStore(dirname(paths.automation_state)).read();
-  const dataPocRoot = resolve(dirname(paths.automation_state), "..", "..");
+  const dataPocRoot = getDataPocRuntimeRoot();
   return {
     ...paths,
     scanner_snapshot: state.last_published_scanner_run_id
@@ -53,7 +54,7 @@ export async function resolveCanonicalDataPaths(): Promise<DataCycleCanonicalPat
 
 function resolveStaticDataPaths(): DataCycleCanonicalPaths {
   const automationDirectory = getDefaultAutomationDirectory();
-  const dataPocRoot = resolve(automationDirectory, "..", "..");
+  const dataPocRoot = getDataPocRuntimeRoot();
   const repoRoot = resolve(dataPocRoot, "..", "..");
   return {
     repo_root: repoRoot,

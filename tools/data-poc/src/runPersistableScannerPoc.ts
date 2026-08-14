@@ -1,13 +1,12 @@
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
 import { writePersistableScannerOutput } from "./fileStorage.js";
 import { buildPersistableScannerOutput } from "./persistableScannerModel.js";
 import { runCombinedScannerPoc } from "./runCombinedScannerPoc.js";
 import { getActiveSourceEnvironment, isSourcePolicyError } from "./sourcePolicy.js";
 import type { DexScreenerPocMode } from "./types.js";
+import { getDataPocRuntimeRoot } from "./dataPocRuntimeRoot.js";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const OUTPUT_DIR = resolve(__dirname, "../../output");
+const OUTPUT_DIR = resolve(getDataPocRuntimeRoot(), "output");
 const DEFAULT_MAX_CANDIDATES = 3;
 
 async function main(): Promise<void> {
