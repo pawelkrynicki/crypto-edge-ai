@@ -4,8 +4,8 @@ import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { afterEach, describe, it } from "node:test";
 import { BoundedHttpClient, type FetchLike } from "../src/boundedHttpClient.js";
-import { isSupportedNewRecheckIdentity, runCentralNewRechecks } from "../src/newRecheckEngine.js";
-import { finalizeNewRecheckStore, readNewRecheckStore, updateNewRecheckStore } from "../src/newRecheckStore.js";
+import { isSupportedNewRecheckIdentity, runCentralNewRechecks, validateNewRecheckObservation } from "../src/newRecheckEngine.js";
+import { finalizeNewRecheckStore, readNewRecheckStore, updateNewRecheckStore, type NewRecheckCheckpointDay } from "../src/newRecheckStore.js";
 import { readFollowUpStore } from "../src/followUpBasket.js";
 import { applySystemLifecycle, readLifecycleAuditStore } from "../src/systemLifecycle.js";
 import type { PersistableCandidate, PersistableScannerOutput } from "../src/persistableScannerModel.js";
@@ -91,10 +91,55 @@ describe("central New incubation rechecks", () => {
     const wrong = (await readNewRecheckStore(paths.recheck)).entries[0]!;
     assert.deepEqual(wrong.latest_normalized_candidate, knownGood);
     assert.equal(wrong.completed_checkpoints.includes(3), false);
+    assert.equal(wrong.checkpoint_states.find((state) => state.checkpoint === 3)?.outcome, "RETRY_WAIT");
     await run(paths, new Date("2026-08-04T00:15:00.000Z"), async (input) => Response.json([{ ...pair(decodeURIComponent(String(input).split("/").at(-1) ?? ""), 60_000), marketCap: undefined, fdv: undefined }]));
     const incomplete = (await readNewRecheckStore(paths.recheck)).entries[0]!;
     assert.deepEqual(incomplete.latest_normalized_candidate, knownGood);
     assert.equal(incomplete.completed_checkpoints.includes(3), false);
+    assert.equal(incomplete.checkpoint_states.find((state) => state.checkpoint === 3)?.attempt_count, 1, "a retry-wait checkpoint is not immediately re-attempted");
+  });
+
+  it("persists bounded retry state across runs and lets an exhausted Day-1 checkpoint yield to Day 3", async () => {
+    const paths = await isolatedPaths();
+    const target = address(451);
+    await seedNew(paths, [target], FIRST);
+    let calls = 0;
+    const failure = async () => { calls += 1; return new Response("failure", { status: 500 }); };
+    await run(paths, new Date("2026-08-02T00:00:00.000Z"), failure);
+    let entry = (await readNewRecheckStore(paths.recheck)).entries[0]!;
+    assert.deepEqual(entry.checkpoint_states.find((state) => state.checkpoint === 1), { checkpoint: 1, attempt_count: 1, last_attempt_at: "2026-08-02T00:00:00.000Z", last_error_code: "NEW_RECHECK_BATCH_FAILED", retry_not_before: "2026-08-02T01:00:00.000Z", outcome: "RETRY_WAIT" });
+
+    const waiting = await run(paths, new Date("2026-08-02T00:30:00.000Z"), async () => { throw new Error("RETRY_CALLED_TOO_EARLY"); });
+    assert.equal(waiting.provider_request_count, 0);
+    await run(paths, new Date("2026-08-02T01:00:00.000Z"), failure);
+    await run(paths, new Date("2026-08-02T07:00:00.000Z"), failure);
+    await run(paths, new Date("2026-08-03T07:00:00.000Z"), failure);
+    entry = (await readNewRecheckStore(paths.recheck)).entries[0]!;
+    assert.deepEqual(entry.checkpoint_states.find((state) => state.checkpoint === 1), { checkpoint: 1, attempt_count: 4, last_attempt_at: "2026-08-03T07:00:00.000Z", last_error_code: "NEW_RECHECK_BATCH_FAILED", retry_not_before: null, outcome: "EXHAUSTED" });
+
+    const dayThree = await run(paths, new Date("2026-08-04T00:00:00.000Z"), async (input) => {
+      calls += 1;
+      return Response.json([pair(decodeURIComponent(String(input).split("/").at(-1) ?? ""), 1)]);
+    });
+    assert.equal(dayThree.records_rechecked, 1);
+    entry = (await readNewRecheckStore(paths.recheck)).entries[0]!;
+    assert.equal(entry.checkpoint_states.find((state) => state.checkpoint === 1)?.outcome, "EXHAUSTED");
+    assert.equal(entry.checkpoint_states.find((state) => state.checkpoint === 3)?.outcome, "SUCCESS");
+    assert.equal(calls, 5);
+  });
+
+  it("returns a safe validation diagnostic for a malformed candidate preflight without touching the store", async () => {
+    const paths = await isolatedPaths();
+    const target = address(475);
+    await seedNew(paths, [target], FIRST);
+    await run(paths, new Date("2026-08-01T12:00:00.000Z"), async () => Response.json([]));
+    const entry = (await readNewRecheckStore(paths.recheck)).entries[0]!;
+    const malformed = { ...candidate(target, "rejected_basic_filter"), filter_reasons: [""] };
+    assert.deepEqual(
+      validateNewRecheckObservation(entry, 1, malformed, new Date("2026-08-02T00:00:00.000Z")),
+      { valid: false, code: "NEW_RECHECK_STORE_INVALID_FILTER_RESULT", field: "latest_filter_result.reasons" },
+    );
+    assert.deepEqual((await readNewRecheckStore(paths.recheck)).entries[0], entry);
   });
 
   it("batches chains independently and keeps a partial batch's unmatched identity unchanged", async () => {
@@ -116,6 +161,8 @@ describe("central New incubation rechecks", () => {
     assert.notEqual(entries.get(`base:${baseA}`)?.latest_normalized_candidate, null);
     assert.equal(entries.get(`base:${baseB}`)?.latest_normalized_candidate, null);
     assert.notEqual(entries.get(`solana:${solana}`)?.latest_normalized_candidate, null);
+    assert.equal(entries.get(`base:${baseB}`)?.checkpoint_states.find((state) => state.checkpoint === 1)?.outcome, "RETRY_WAIT", "an unmatched identity gets its own retry state without aborting valid identities");
+    assert.equal(entries.get(`base:${baseA}`)?.checkpoint_states.find((state) => state.checkpoint === 1)?.outcome, "SUCCESS");
   });
 
   it("accepts only exact supported chain + contract identities", () => {
@@ -140,9 +187,18 @@ async function run(paths: Awaited<ReturnType<typeof isolatedPaths>>, now: Date, 
 }
 
 async function setNextCheckpoint(path: string, checkpoint: 3 | 8) {
+  const completed = (checkpoint === 3 ? [1] : [1, 3]) as NewRecheckCheckpointDay[];
   await updateNewRecheckStore((store) => finalizeNewRecheckStore({
     ...store,
-    entries: store.entries.map((entry) => ({ ...entry, completed_checkpoints: checkpoint === 3 ? [1] : [1, 3], last_checkpoint: checkpoint === 3 ? 1 : 3, next_checkpoint: checkpoint })),
+    entries: store.entries.map((entry) => ({
+      ...entry,
+      completed_checkpoints: completed,
+      checkpoint_states: entry.checkpoint_states.map((state) => completed.includes(state.checkpoint)
+        ? { ...state, attempt_count: 1, last_attempt_at: FIRST.toISOString(), last_error_code: null, retry_not_before: null, outcome: "SUCCESS" as const }
+        : { ...state, attempt_count: 0, last_attempt_at: null, last_error_code: null, retry_not_before: null, outcome: "PENDING" as const }),
+      last_checkpoint: checkpoint === 3 ? 1 : 3,
+      next_checkpoint: checkpoint,
+    })),
   }, new Date("2026-08-01T12:00:00.000Z")), path);
 }
 

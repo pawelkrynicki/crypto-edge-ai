@@ -9,16 +9,23 @@ import { applyNewRecheckLifecycle, getDefaultNewInboxStorePath, readNewInboxStor
 import type { CryptoEdgeCandidate } from "./types.js";
 import {
   NEW_RECHECK_CHECKPOINT_DAYS,
+  createNewRecheckCheckpointStates,
+  createNewRecheckFilterResult,
   createEmptyNewRecheckStore,
   finalizeNewRecheckStore,
   getDefaultNewRecheckStorePath,
-  nextCheckpoint,
+  isNewRecheckCheckpointDue,
+  nextAvailableCheckpoint,
   readNewRecheckStore,
+  updateCheckpointAfterFailure,
+  updateCheckpointAfterSuccess,
   updateNewRecheckStore,
   validateNewRecheckStore,
+  validationDiagnostic,
   type NewRecheckCheckpointDay,
   type NewRecheckEntry,
   type NewRecheckReceipt,
+  type NewRecheckValidationDiagnostic,
 } from "./newRecheckStore.js";
 
 export const MAX_NEW_RECHECK_BATCHES_PER_CYCLE = 12;
@@ -68,6 +75,7 @@ export async function runCentralNewRechecks(options: {
         contract_address: entry.contract_address,
         first_seen_at: entry.first_seen_at,
         completed_checkpoints: [],
+        checkpoint_states: createNewRecheckCheckpointStates(),
         last_attempt_at: null,
         last_success_at: null,
         last_checkpoint: null,
@@ -83,8 +91,8 @@ export async function runCentralNewRechecks(options: {
   const prepared = await readNewRecheckStore(storePath);
   const due = prepared.entries.flatMap((entry): DueEntry[] => {
     const inboxEntry = activeByIdentity.get(entry.identity);
-    const checkpoint = nextCheckpoint(entry);
-    if (!inboxEntry || checkpoint === null || !isDue(entry.first_seen_at, checkpoint, now)) return [];
+    const checkpoint = nextDueCheckpoint(entry, now);
+    if (!inboxEntry || checkpoint === null) return [];
     return [{ entry, checkpoint, scanner_run_id: inboxEntry.last_scanner_run_id }];
   });
   const maxBatches = Math.max(1, Math.min(MAX_NEW_RECHECK_BATCHES_PER_CYCLE, options.maxBatches ?? MAX_NEW_RECHECK_BATCHES_PER_CYCLE));
@@ -112,7 +120,8 @@ export async function runCentralNewRechecks(options: {
           if (normalized.chain !== chain || !isSameContractAddress(chain, normalized.contract_address ?? undefined, address)) throw new Error("NEW_RECHECK_IDENTITY_MAPPING_INVALID");
           if (!hasRequiredBaselineInputs(normalized)) throw new Error("NEW_RECHECK_REQUIRED_DATA_UNAVAILABLE");
           const candidate = toPersistableCandidate(normalized, recheckId, now);
-          if (!canPersistObservation(item.entry, item.checkpoint, candidate, now)) throw new Error("NEW_RECHECK_RESULT_INVALID");
+          const persistence = validateNewRecheckObservation(item.entry, item.checkpoint, candidate, now);
+          if (!persistence.valid) throw new Error(persistence.code);
           successes.push({ ...item, candidate });
         } catch (error) {
           failures.push({ ...item, error_code: safeErrorCode(error) });
@@ -122,9 +131,10 @@ export async function runCentralNewRechecks(options: {
       failures.push(...batch.items.map((item) => ({ ...item, error_code: `NEW_RECHECK_BATCH_${safeErrorCode(error)}` })));
     }
   }
-  const attempted = new Set([...successes, ...failures].map((item) => item.entry.identity));
+  const attempted = new Set([...successes, ...failures].map(workKey));
   const promoted: string[] = [];
   let duplicateNoop = 0;
+  const lifecycleFailed = new Set<string>();
   for (const success of successes) {
     try {
       const result = await applyNewRecheckLifecycle(success.candidate, {
@@ -142,9 +152,11 @@ export async function runCentralNewRechecks(options: {
       duplicateNoop += result.duplicate_noop;
     } catch (error) {
       failures.push({ ...success, error_code: `NEW_RECHECK_LIFECYCLE_${safeErrorCode(error)}` });
+      lifecycleFailed.add(workKey(success));
     }
   }
-  const failureByIdentity = new Map(failures.map((failure) => [failure.entry.identity, failure]));
+  const persistedSuccesses = successes.filter((success) => !lifecycleFailed.has(workKey(success)));
+  const failureByWork = new Map(failures.map((failure) => [workKey(failure), failure]));
   const receipt: NewRecheckReceipt = {
     recheck_id: recheckId,
     central_cycle_id: options.centralCycleId ?? null,
@@ -152,36 +164,27 @@ export async function runCentralNewRechecks(options: {
     finished_at: now.toISOString(),
     records_due: due.length,
     records_selected: attempted.size,
-    records_rechecked: successes.length,
-    records_failed: failureByIdentity.size,
+    records_rechecked: persistedSuccesses.length,
+    records_failed: failureByWork.size,
     provider_batches: batches.length,
     provider_request_count: batches.length,
     promoted_to_follow_up: promoted.length,
     duplicate_noop: duplicateNoop,
-    status: failureByIdentity.size === 0 ? "SUCCESS" : successes.length > 0 ? "PARTIAL" : "FAILED",
+    status: failureByWork.size === 0 ? "SUCCESS" : persistedSuccesses.length > 0 ? "PARTIAL" : "FAILED",
   };
   await updateNewRecheckStore((current) => {
-    const successesByIdentity = new Map(successes.map((success) => [success.entry.identity, success]));
+    const successesByIdentity = new Map<string, RecheckSuccess[]>();
+    const failuresByIdentity = new Map<string, RecheckFailure[]>();
+    for (const success of persistedSuccesses) successesByIdentity.set(success.entry.identity, [...(successesByIdentity.get(success.entry.identity) ?? []), success]);
+    for (const failure of failureByWork.values()) failuresByIdentity.set(failure.entry.identity, [...(failuresByIdentity.get(failure.entry.identity) ?? []), failure]);
     const entries = current.entries.map((entry) => {
-      const success = successesByIdentity.get(entry.identity);
-      const failure = failureByIdentity.get(entry.identity);
-      if (success) {
-        const completed = [...new Set([...entry.completed_checkpoints, success.checkpoint])].sort((left, right) => left - right) as NewRecheckCheckpointDay[];
-        return {
-          ...entry,
-          completed_checkpoints: completed,
-          last_attempt_at: now.toISOString(),
-          last_success_at: now.toISOString(),
-          last_checkpoint: success.checkpoint,
-          next_checkpoint: nextCheckpoint({ completed_checkpoints: completed }),
-          latest_source_timestamp: now.toISOString(),
-          latest_normalized_candidate: success.candidate,
-          latest_filter_result: { status: success.candidate.basic_filter_status as "passed_basic_filter" | "rejected_basic_filter", reasons: [...success.candidate.filter_reasons], evaluated_at: now.toISOString() },
-          last_error_code: failure?.error_code ?? null,
-        };
-      }
-      if (failure) return { ...entry, last_attempt_at: now.toISOString(), last_error_code: failure.error_code };
-      return entry;
+      const entrySuccesses = successesByIdentity.get(entry.identity) ?? [];
+      const entryFailures = failuresByIdentity.get(entry.identity) ?? [];
+      if (entrySuccesses.length === 0 && entryFailures.length === 0) return entry;
+      let updated = entry;
+      for (const success of entrySuccesses) updated = entryAfterSuccessfulRefresh(updated, success.checkpoint, success.candidate, now);
+      for (const failure of entryFailures) updated = entryAfterFailedRefresh(updated, failure.checkpoint, failure.error_code, now);
+      return updated;
     });
     return finalizeNewRecheckStore({ ...current, entries, last_receipt: receipt }, now);
   }, storePath);
@@ -189,7 +192,7 @@ export async function runCentralNewRechecks(options: {
     ...receipt,
     store_path: storePath,
     unsupported_identities: unsupported.map((item) => item.entry.identity),
-    failed_identities: [...failureByIdentity.keys()].sort(),
+    failed_identities: [...new Set([...failureByWork.values()].map((item) => item.entry.identity))].sort(),
     promoted_identities: promoted.sort(),
   };
 }
@@ -266,30 +269,52 @@ function hasRequiredBaselineInputs(candidate: CryptoEdgeCandidate): boolean {
     && candidate.pair_age_days !== null;
 }
 
-/** Keep one malformed live response from invalidating an otherwise safe batch. */
-function canPersistObservation(entry: NewRecheckEntry, checkpoint: NewRecheckCheckpointDay, candidate: PersistableCandidate, now: Date): boolean {
+/** Validate only the record about to be committed; a malformed response must not poison its batch. */
+export function validateNewRecheckObservation(entry: NewRecheckEntry, checkpoint: NewRecheckCheckpointDay, candidate: PersistableCandidate, now: Date): NewRecheckValidationDiagnostic {
   try {
-    const completed = [...new Set([...entry.completed_checkpoints, checkpoint])].sort((left, right) => left - right) as NewRecheckCheckpointDay[];
     const empty = createEmptyNewRecheckStore(now);
     validateNewRecheckStore(finalizeNewRecheckStore({
       ...empty,
-      entries: [{
-        ...entry,
-        completed_checkpoints: completed,
-        last_attempt_at: now.toISOString(),
-        last_success_at: now.toISOString(),
-        last_checkpoint: checkpoint,
-        next_checkpoint: nextCheckpoint({ completed_checkpoints: completed }),
-        latest_source_timestamp: now.toISOString(),
-        latest_normalized_candidate: candidate,
-        latest_filter_result: { status: candidate.basic_filter_status as "passed_basic_filter" | "rejected_basic_filter", reasons: [...candidate.filter_reasons], evaluated_at: now.toISOString() },
-        last_error_code: null,
-      }],
+      entries: [entryAfterSuccessfulRefresh(entry, checkpoint, candidate, now)],
     }, now));
-    return true;
-  } catch { return false; }
+    return { valid: true, code: "VALID" };
+  } catch (error) { return validationDiagnostic(error); }
 }
 
-function isDue(firstSeenAt: string, checkpoint: number, now: Date): boolean { return Date.parse(firstSeenAt) + checkpoint * 86_400_000 <= now.getTime(); }
+function nextDueCheckpoint(entry: NewRecheckEntry, now: Date): NewRecheckCheckpointDay | null {
+  return NEW_RECHECK_CHECKPOINT_DAYS.find((checkpoint) => isNewRecheckCheckpointDue(entry, checkpoint, now)) ?? null;
+}
+
+function entryAfterSuccessfulRefresh(entry: NewRecheckEntry, checkpoint: NewRecheckCheckpointDay, candidate: PersistableCandidate, now: Date): NewRecheckEntry {
+  const states = entry.checkpoint_states.map((state) => state.checkpoint === checkpoint ? updateCheckpointAfterSuccess(state, now) : state);
+  const completed = states.filter((state) => state.outcome === "SUCCESS").map((state) => state.checkpoint);
+  return {
+    ...entry,
+    completed_checkpoints: completed,
+    checkpoint_states: states,
+    last_attempt_at: now.toISOString(),
+    last_success_at: now.toISOString(),
+    last_checkpoint: checkpoint,
+    next_checkpoint: nextAvailableCheckpoint(states),
+    latest_source_timestamp: now.toISOString(),
+    latest_normalized_candidate: candidate,
+    latest_filter_result: createNewRecheckFilterResult(candidate.basic_filter_status as "passed_basic_filter" | "rejected_basic_filter", candidate.filter_reasons, now.toISOString()),
+    last_error_code: null,
+  };
+}
+
+function entryAfterFailedRefresh(entry: NewRecheckEntry, checkpoint: NewRecheckCheckpointDay, errorCode: string, now: Date): NewRecheckEntry {
+  const states = entry.checkpoint_states.map((state) => state.checkpoint === checkpoint ? updateCheckpointAfterFailure(state, errorCode, now) : state);
+  return {
+    ...entry,
+    checkpoint_states: states,
+    completed_checkpoints: states.filter((state) => state.outcome === "SUCCESS").map((state) => state.checkpoint),
+    last_attempt_at: now.toISOString(),
+    next_checkpoint: nextAvailableCheckpoint(states),
+    last_error_code: errorCode,
+  };
+}
+
+function workKey(item: Pick<DueEntry, "entry" | "checkpoint">): string { return `${item.entry.identity}\u0000${item.checkpoint}`; }
 function uniqueRecheckId(now: Date): string { return `newrecheck_${now.toISOString().replace(/[^0-9]/g, "").slice(0, 14)}_${randomUUID().replace(/-/g, "").slice(0, 8)}`; }
 function safeErrorCode(error: unknown): string { const message = error instanceof Error ? error.message : "UNKNOWN"; return /^[A-Z0-9_]{3,120}$/.test(message) ? message : "FAILED"; }
