@@ -41,6 +41,7 @@
     "test:stab1": "pnpm --dir ../data-poc run test:pc1 && node --import tsx --test tests/scannerDataSourceValidation.test.ts tests/resilienceFailureDrills.test.tsx",
     "stab1:drills": "node --import tsx scripts/runResilienceFailureDrills.ts",
     "test:stab2": "node --import tsx --test tests/backupRestoreRollback.test.ts",
+    "backup:disc2b-pre-migration": "tsx scripts/disc2bPreMigrationBackup.ts",
     "stab2:drills": "node --import tsx scripts/runBackupRestoreRollback.ts --run-isolated",
     "test:rc1": "node --import tsx --test tests/localRcSoak.test.ts",
     "rc1:soak": "tsx scripts/runLocalRcSoak.ts",

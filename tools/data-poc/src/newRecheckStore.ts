@@ -5,7 +5,8 @@ import { getDataPocRuntimeRoot } from "./dataPocRuntimeRoot.js";
 import type { PersistableCandidate } from "./persistableScannerModel.js";
 
 export const LEGACY_NEW_RECHECK_STORE_SCHEMA_VERSION = "new_recheck_store_v1";
-export const NEW_RECHECK_STORE_SCHEMA_VERSION = "new_recheck_store_v2";
+export const PREVIOUS_NEW_RECHECK_STORE_SCHEMA_VERSION = "new_recheck_store_v2";
+export const NEW_RECHECK_STORE_SCHEMA_VERSION = "new_recheck_store_v3";
 export const NEW_RECHECK_CHECKPOINT_DAYS = [1, 3, 8, 14, 30, 60, 90] as const;
 export const NEW_RECHECK_MAX_ATTEMPTS_PER_CHECKPOINT = 4;
 export type NewRecheckCheckpointDay = (typeof NEW_RECHECK_CHECKPOINT_DAYS)[number];
@@ -30,7 +31,10 @@ export type NewRecheckEntry = {
   identity: string;
   chain: string;
   contract_address: string;
+  /** Immutable historical discovery timestamp. */
   first_seen_at: string;
+  /** Operational origin used to calculate DISC.1 incubation checkpoints. */
+  schedule_origin_at: string;
   completed_checkpoints: NewRecheckCheckpointDay[];
   checkpoint_states: NewRecheckCheckpointState[];
   last_attempt_at: string | null;
@@ -95,7 +99,7 @@ export type NewRecheckValidationDiagnostic = {
   field?: string;
 };
 
-type LegacyNewRecheckEntry = Omit<NewRecheckEntry, "checkpoint_states">;
+type LegacyNewRecheckEntry = Omit<NewRecheckEntry, "checkpoint_states" | "schedule_origin_at">;
 type LegacyNewRecheckStore = {
   schema_version: typeof LEGACY_NEW_RECHECK_STORE_SCHEMA_VERSION;
   generated_at: string;
@@ -103,9 +107,18 @@ type LegacyNewRecheckStore = {
   last_receipt: NewRecheckReceipt | null;
   checksum: string;
 };
+type PreviousNewRecheckEntry = Omit<NewRecheckEntry, "schedule_origin_at">;
+type PreviousNewRecheckStore = {
+  schema_version: typeof PREVIOUS_NEW_RECHECK_STORE_SCHEMA_VERSION;
+  generated_at: string;
+  entries: PreviousNewRecheckEntry[];
+  last_receipt: NewRecheckReceipt | null;
+  checksum: string;
+};
 
 const STORE_FIELDS = new Set(["schema_version", "generated_at", "entries", "last_receipt", "checksum"]);
-const ENTRY_FIELDS = new Set(["identity", "chain", "contract_address", "first_seen_at", "completed_checkpoints", "checkpoint_states", "last_attempt_at", "last_success_at", "last_checkpoint", "next_checkpoint", "latest_source_timestamp", "latest_normalized_candidate", "latest_filter_result", "last_error_code"]);
+const ENTRY_FIELDS = new Set(["identity", "chain", "contract_address", "first_seen_at", "schedule_origin_at", "completed_checkpoints", "checkpoint_states", "last_attempt_at", "last_success_at", "last_checkpoint", "next_checkpoint", "latest_source_timestamp", "latest_normalized_candidate", "latest_filter_result", "last_error_code"]);
+const PREVIOUS_ENTRY_FIELDS = new Set(["identity", "chain", "contract_address", "first_seen_at", "completed_checkpoints", "checkpoint_states", "last_attempt_at", "last_success_at", "last_checkpoint", "next_checkpoint", "latest_source_timestamp", "latest_normalized_candidate", "latest_filter_result", "last_error_code"]);
 const LEGACY_ENTRY_FIELDS = new Set(["identity", "chain", "contract_address", "first_seen_at", "completed_checkpoints", "last_attempt_at", "last_success_at", "last_checkpoint", "next_checkpoint", "latest_source_timestamp", "latest_normalized_candidate", "latest_filter_result", "last_error_code"]);
 const CHECKPOINT_STATE_FIELDS = new Set(["checkpoint", "attempt_count", "last_attempt_at", "last_error_code", "retry_not_before", "outcome"]);
 const FILTER_FIELDS = new Set(["status", "reasons", "evaluated_at"]);
@@ -168,7 +181,7 @@ export function checkpointState(entry: Pick<NewRecheckEntry, "checkpoint_states"
 }
 
 export function isNewRecheckCheckpointDue(entry: NewRecheckEntry, checkpoint: NewRecheckCheckpointDay, now: Date): boolean {
-  if (Date.parse(entry.first_seen_at) + checkpoint * 86_400_000 > now.getTime()) return false;
+  if (Date.parse(entry.schedule_origin_at) + checkpoint * 86_400_000 > now.getTime()) return false;
   const state = checkpointState(entry, checkpoint);
   return state.outcome === "PENDING"
     || state.outcome === "RETRY_WAIT" && state.retry_not_before !== null && Date.parse(state.retry_not_before) <= now.getTime();
@@ -208,26 +221,37 @@ export function validationDiagnostic(error: unknown): NewRecheckValidationDiagno
 export function validateNewRecheckStore(value: unknown): NewRecheckStore {
   if (!record(value)) invalid("INVALID_STORE");
   if (value.schema_version === LEGACY_NEW_RECHECK_STORE_SCHEMA_VERSION) return migrateLegacyStore(validateLegacyStore(value));
+  if (value.schema_version === PREVIOUS_NEW_RECHECK_STORE_SCHEMA_VERSION) return migratePreviousStore(validatePreviousStore(value));
   if (value.schema_version !== NEW_RECHECK_STORE_SCHEMA_VERSION) invalid("INVALID_STORE", "schema_version");
-  return validateV2Store(value);
+  return validateV3Store(value);
 }
 
 export function finalizeNewRecheckStore(store: Omit<NewRecheckStore, "checksum"> | NewRecheckStore, now: Date): NewRecheckStore {
   const base: Omit<NewRecheckStore, "checksum"> = {
     schema_version: NEW_RECHECK_STORE_SCHEMA_VERSION,
     generated_at: iso(now),
-    entries: store.entries.map(validateV2Entry).sort((left, right) => left.identity.localeCompare(right.identity)),
+    entries: store.entries.map(validateV3Entry).sort((left, right) => left.identity.localeCompare(right.identity)),
     last_receipt: store.last_receipt === null ? null : validateReceipt(store.last_receipt),
   };
   return { ...base, checksum: checksum(base) };
 }
 
-function validateV2Store(value: Record<string, unknown>): NewRecheckStore {
+function validateV3Store(value: Record<string, unknown>): NewRecheckStore {
   if (!isoText(value.generated_at) || !Array.isArray(value.entries) || !(value.last_receipt === null || record(value.last_receipt)) || typeof value.checksum !== "string") invalid("INVALID_STORE");
   assertExactFields(value, STORE_FIELDS, "store");
-  const entries = value.entries.map(validateV2Entry).sort((left, right) => left.identity.localeCompare(right.identity));
+  const entries = value.entries.map(validateV3Entry).sort((left, right) => left.identity.localeCompare(right.identity));
   if (new Set(entries.map((entry) => entry.identity)).size !== entries.length) invalid("INVALID_ENTRY", "entries.identity");
   const base: Omit<NewRecheckStore, "checksum"> = { schema_version: NEW_RECHECK_STORE_SCHEMA_VERSION, generated_at: value.generated_at, entries, last_receipt: value.last_receipt === null ? null : validateReceipt(value.last_receipt) };
+  if (value.checksum !== checksum(base)) invalid("CHECKSUM_MISMATCH", "checksum");
+  return { ...base, checksum: value.checksum };
+}
+
+function validatePreviousStore(value: Record<string, unknown>): PreviousNewRecheckStore {
+  if (!isoText(value.generated_at) || !Array.isArray(value.entries) || !(value.last_receipt === null || record(value.last_receipt)) || typeof value.checksum !== "string") invalid("INVALID_STORE");
+  assertExactFields(value, STORE_FIELDS, "store");
+  const entries = value.entries.map(validatePreviousEntry).sort((left, right) => left.identity.localeCompare(right.identity));
+  if (new Set(entries.map((entry) => entry.identity)).size !== entries.length) invalid("INVALID_ENTRY", "entries.identity");
+  const base: Omit<PreviousNewRecheckStore, "checksum"> = { schema_version: PREVIOUS_NEW_RECHECK_STORE_SCHEMA_VERSION, generated_at: value.generated_at, entries, last_receipt: value.last_receipt === null ? null : validateReceipt(value.last_receipt) };
   if (value.checksum !== checksum(base)) invalid("CHECKSUM_MISMATCH", "checksum");
   return { ...base, checksum: value.checksum };
 }
@@ -248,14 +272,34 @@ function migrateLegacyStore(store: LegacyNewRecheckStore): NewRecheckStore {
       ? { ...state, attempt_count: 1, last_attempt_at: entry.last_success_at ?? entry.last_attempt_at, outcome: "SUCCESS" as const }
       : state,
     );
-    return validateV2Entry({ ...entry, checkpoint_states: states, next_checkpoint: nextAvailableCheckpoint(states), latest_filter_result: entry.latest_filter_result === null ? null : createNewRecheckFilterResult(entry.latest_filter_result.status, entry.latest_filter_result.reasons, entry.latest_filter_result.evaluated_at) });
+    return validateV3Entry({ ...entry, schedule_origin_at: entry.first_seen_at, checkpoint_states: states, next_checkpoint: nextAvailableCheckpoint(states), latest_filter_result: entry.latest_filter_result === null ? null : createNewRecheckFilterResult(entry.latest_filter_result.status, entry.latest_filter_result.reasons, entry.latest_filter_result.evaluated_at) });
   });
   return finalizeNewRecheckStore({ schema_version: NEW_RECHECK_STORE_SCHEMA_VERSION, generated_at: store.generated_at, entries, last_receipt: store.last_receipt }, new Date(store.generated_at));
 }
 
-function validateV2Entry(value: unknown): NewRecheckEntry {
+function migratePreviousStore(store: PreviousNewRecheckStore): NewRecheckStore {
+  const entries = store.entries.map((entry) => validateV3Entry({ ...entry, schedule_origin_at: entry.first_seen_at }));
+  return finalizeNewRecheckStore({ schema_version: NEW_RECHECK_STORE_SCHEMA_VERSION, generated_at: store.generated_at, entries, last_receipt: store.last_receipt }, new Date(store.generated_at));
+}
+
+function validateV3Entry(value: unknown): NewRecheckEntry {
   if (!record(value)) invalid("INVALID_ENTRY", "entry");
   assertExactFields(value, ENTRY_FIELDS, "entry");
+  const common = validateEntryCommon(value);
+  if (!isoText(value.schedule_origin_at)) invalid("INVALID_ENTRY", "schedule_origin_at");
+  if (!Array.isArray(value.checkpoint_states)) invalid("INVALID_CHECKPOINT_STATE", "checkpoint_states");
+  const states = value.checkpoint_states.map(validateCheckpointState).sort((left, right) => left.checkpoint - right.checkpoint);
+  if (states.length !== NEW_RECHECK_CHECKPOINT_DAYS.length || states.some((state, index) => state.checkpoint !== NEW_RECHECK_CHECKPOINT_DAYS[index])) invalid("INVALID_CHECKPOINT_STATE", "checkpoint_states");
+  const completed = states.filter((state) => state.outcome === "SUCCESS").map((state) => state.checkpoint);
+  if (canonical(completed) !== canonical(common.completed_checkpoints)) invalid("INVALID_CHECKPOINT_STATE", "completed_checkpoints");
+  const expectedNext = nextAvailableCheckpoint(states);
+  if (common.next_checkpoint !== expectedNext || (common.last_checkpoint !== null && !completed.includes(common.last_checkpoint))) invalid("INVALID_CHECKPOINT_STATE", "next_checkpoint");
+  return { ...common, schedule_origin_at: value.schedule_origin_at, completed_checkpoints: completed, checkpoint_states: states, next_checkpoint: expectedNext };
+}
+
+function validatePreviousEntry(value: unknown): PreviousNewRecheckEntry {
+  if (!record(value)) invalid("INVALID_ENTRY", "entry");
+  assertExactFields(value, PREVIOUS_ENTRY_FIELDS, "entry");
   const common = validateEntryCommon(value);
   if (!Array.isArray(value.checkpoint_states)) invalid("INVALID_CHECKPOINT_STATE", "checkpoint_states");
   const states = value.checkpoint_states.map(validateCheckpointState).sort((left, right) => left.checkpoint - right.checkpoint);
@@ -278,7 +322,7 @@ function validateLegacyEntry(value: unknown): LegacyNewRecheckEntry {
   return { ...common, next_checkpoint: expectedNext };
 }
 
-function validateEntryCommon(value: Record<string, unknown>, canonicalizeFilter = true): Omit<NewRecheckEntry, "checkpoint_states"> {
+function validateEntryCommon(value: Record<string, unknown>, canonicalizeFilter = true): Omit<NewRecheckEntry, "checkpoint_states" | "schedule_origin_at"> {
   if (!text(value.identity, 240) || !text(value.chain, 64) || !text(value.contract_address, 180) || !isoText(value.first_seen_at) || !Array.isArray(value.completed_checkpoints) || !value.completed_checkpoints.every(isCheckpoint) || !nullableIso(value.last_attempt_at) || !nullableIso(value.last_success_at) || !(value.last_checkpoint === null || isCheckpoint(value.last_checkpoint)) || !(value.next_checkpoint === null || isCheckpoint(value.next_checkpoint)) || !nullableIso(value.latest_source_timestamp) || !(value.latest_normalized_candidate === null || validCandidate(value.latest_normalized_candidate)) || !(value.latest_filter_result === null || record(value.latest_filter_result)) || !(value.last_error_code === null || text(value.last_error_code, 160))) invalid("INVALID_ENTRY", "entry");
   const filter = value.latest_filter_result === null ? null : validateFilter(value.latest_filter_result, canonicalizeFilter);
   if (filter && value.latest_normalized_candidate === null) invalid("INVALID_FILTER_RESULT", "latest_filter_result");

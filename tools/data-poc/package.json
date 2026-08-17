@@ -25,6 +25,7 @@
     "sources:approved:live": "tsc && node dist/src/sources/runApprovedSourcesPoc.js --mode live",
     "collect:internal-beta": "tsc && node dist/src/runInternalBetaCollector.js",
     "new-recheck:live": "tsc && node dist/src/runNewRecheckCycle.js --live",
+    "remediation:legacy-follow-up": "tsc && node dist/src/runLegacyFollowUpRemediation.js",
     "automation:run": "tsc && node dist/src/automation/runCentralAutomation.js",
     "automation:resume": "tsc && node dist/src/automation/resumeAutomationState.js",
     "rc1:wakeup": "tsc && node dist/src/automation/runLocalRcSoakWakeup.js",

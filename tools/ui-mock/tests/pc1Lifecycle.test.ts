@@ -243,8 +243,10 @@ describe("PC.1 bounded lifecycle Radar API", () => {
     try {
       const tokenResponse = await requestApi(server, "GET", `/api/lifecycle/token?chain=base&contract_address=${ADDRESS}`);
       const radarResponse = await requestApi(server, "GET", "/api/lifecycle/radar?limit=24");
+      const summaryResponse = await requestApi(server, "GET", "/api/lifecycle/summary");
       assert.equal(tokenResponse.status, 200, tokenResponse.body);
       assert.equal(radarResponse.status, 200, radarResponse.body);
+      assert.equal(summaryResponse.status, 200, summaryResponse.body);
       const detail = JSON.parse(tokenResponse.body) as { conditions: LifecycleConditions };
       const radar = JSON.parse(radarResponse.body) as { follow_up: {
         action_due: { cards: Array<{ conditions: LifecycleConditions }> };
@@ -268,6 +270,9 @@ describe("PC.1 bounded lifecycle Radar API", () => {
       assert.deepEqual(radarCard?.conditions, expected);
       assert.equal(expected.readiness, "CONDITIONS_UNMET");
       assert.equal(expected.conditions_unmet.includes("FRESH_FOLLOW_UP_DATA_CURRENT_CYCLE"), true);
+      const summary = JSON.parse(summaryResponse.body) as { follow_up_action_due: number; follow_up_candidates_ready: number };
+      assert.equal(summary.follow_up_action_due, radar.follow_up.action_due.cards.length, "the summary uses the same current action-due grouping as Radar");
+      assert.equal(summary.follow_up_candidates_ready, radar.follow_up.candidates_ready.cards.length);
     } finally {
       await close(server);
       repository.close();

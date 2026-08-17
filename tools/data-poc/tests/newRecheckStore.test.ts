@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import {
   LEGACY_NEW_RECHECK_STORE_SCHEMA_VERSION,
   NEW_RECHECK_STORE_SCHEMA_VERSION,
+  PREVIOUS_NEW_RECHECK_STORE_SCHEMA_VERSION,
   canonicalizeNewRecheckFilterReasons,
   createNewRecheckCheckpointStates,
   finalizeNewRecheckStore,
@@ -29,7 +30,7 @@ const SAFE_REASONS = [
   "pair_age_outside_preferred_14_90_days",
 ];
 
-describe("New recheck v2 persistence", () => {
+describe("New recheck v3 persistence", () => {
   it("canonicalizes only the persisted filter result before generating and validating its checksum", () => {
     const entry = safeEntry();
     entry.latest_filter_result!.reasons.push(SAFE_REASONS[0]!);
@@ -48,8 +49,10 @@ describe("New recheck v2 persistence", () => {
     const legacyEntry = {
       ...entry,
       checkpoint_states: undefined,
+      schedule_origin_at: undefined,
     };
     delete (legacyEntry as { checkpoint_states?: unknown }).checkpoint_states;
+    delete (legacyEntry as { schedule_origin_at?: unknown }).schedule_origin_at;
     const base = {
       schema_version: LEGACY_NEW_RECHECK_STORE_SCHEMA_VERSION,
       generated_at: NOW_TEXT,
@@ -62,9 +65,23 @@ describe("New recheck v2 persistence", () => {
     assert.equal(migrated.schema_version, NEW_RECHECK_STORE_SCHEMA_VERSION);
     assert.equal(migrated.entries[0]?.identity, `bsc:${SAFE_ADDRESS}`);
     assert.equal(migrated.entries[0]?.first_seen_at, "2026-08-16T09:47:11.403Z");
+    assert.equal(migrated.entries[0]?.schedule_origin_at, "2026-08-16T09:47:11.403Z");
     assert.equal(stateFor(migrated.entries[0]!, 1).outcome, "SUCCESS");
     assert.equal(stateFor(migrated.entries[0]!, 3).outcome, "PENDING");
     assert.deepEqual(migrated.entries[0]?.latest_filter_result?.reasons, canonicalizeNewRecheckFilterReasons(SAFE_REASONS));
+  });
+
+  it("migrates v2 schedules to their historical first observation without changing checkpoint history", () => {
+    const entry = safeEntry();
+    const legacyEntry = {
+      ...entry,
+      latest_filter_result: { ...entry.latest_filter_result!, reasons: canonicalizeNewRecheckFilterReasons(entry.latest_filter_result!.reasons) },
+    } as Record<string, unknown>;
+    delete legacyEntry.schedule_origin_at;
+    const base = { schema_version: PREVIOUS_NEW_RECHECK_STORE_SCHEMA_VERSION, generated_at: NOW_TEXT, entries: [legacyEntry], last_receipt: null };
+    const migrated = validateNewRecheckStore({ ...base, checksum: legacyChecksum(base) });
+    assert.equal(migrated.entries[0]?.schedule_origin_at, migrated.entries[0]?.first_seen_at);
+    assert.deepEqual(migrated.entries[0]?.completed_checkpoints, [1]);
   });
 
   it("rejects malformed filter, candidate, and checkpoint shapes before checksum acceptance", () => {
@@ -90,7 +107,7 @@ describe("New recheck v2 persistence", () => {
   });
 
   it("uses the required one-hour, six-hour, and twenty-four-hour bounded retry schedule", () => {
-    const entry: NewRecheckEntry = { ...safeEntry(), first_seen_at: "2026-08-01T00:00:00.000Z", completed_checkpoints: [], checkpoint_states: createNewRecheckCheckpointStates(), last_attempt_at: null, last_success_at: null, last_checkpoint: null, next_checkpoint: 1 };
+    const entry: NewRecheckEntry = { ...safeEntry(), first_seen_at: "2026-08-01T00:00:00.000Z", schedule_origin_at: "2026-08-01T00:00:00.000Z", completed_checkpoints: [], checkpoint_states: createNewRecheckCheckpointStates(), last_attempt_at: null, last_success_at: null, last_checkpoint: null, next_checkpoint: 1 };
     let state = stateFor(entry, 1);
     state = updateCheckpointAfterFailure(state, "FIRST_FAILURE", NOW);
     assert.deepEqual(persistedRetry(state), { attempt_count: 1, outcome: "RETRY_WAIT", retry_not_before: "2026-08-17T13:14:09.496Z" });
@@ -121,6 +138,7 @@ function safeEntry(): NewRecheckEntry {
     chain: "bsc",
     contract_address: SAFE_ADDRESS,
     first_seen_at: "2026-08-16T09:47:11.403Z",
+    schedule_origin_at: "2026-08-16T09:47:11.403Z",
     completed_checkpoints: [1],
     checkpoint_states: states,
     last_attempt_at: NOW_TEXT,

@@ -74,6 +74,7 @@ export async function runCentralNewRechecks(options: {
         chain: entry.chain,
         contract_address: entry.contract_address,
         first_seen_at: entry.first_seen_at,
+        schedule_origin_at: entry.first_seen_at,
         completed_checkpoints: [],
         checkpoint_states: createNewRecheckCheckpointStates(),
         last_attempt_at: null,

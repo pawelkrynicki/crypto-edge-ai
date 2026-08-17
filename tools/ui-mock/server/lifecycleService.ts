@@ -160,8 +160,19 @@ export function createLifecycleService(options: {
   }
 
   async function summary(): Promise<LifecycleSummary> {
-    const [inbox, followUp, universe, receipt] = await Promise.all([readNewInboxStore(paths.inbox), readFollowUpStore(paths.followUp), readEstablishedUniverseStore(paths.established), readLatestLifecycleCycleReceipt(paths.receipt)]);
-    return buildLifecycleSummary(inbox, followUp, universe.current.entries.filter((entry) => entry.enabled).length, receipt);
+    const [inbox, followUp, universe, receipt, scanner] = await Promise.all([
+      readNewInboxStore(paths.inbox),
+      readFollowUpStore(paths.followUp),
+      readEstablishedUniverseStore(paths.established),
+      readLatestLifecycleCycleReceipt(paths.receipt),
+      readLatestScannerOutput(options.scanner).catch(() => null),
+    ]);
+    const grouping = resolveCurrentSystemFollowUpGrouping(inbox, followUp, universe.current.entries, receipt, scannerOutput(scanner), new Date());
+    return {
+      ...buildLifecycleSummary(inbox, followUp, universe.current.entries.filter((entry) => entry.enabled).length, receipt),
+      follow_up_action_due: grouping.action_due,
+      follow_up_candidates_ready: grouping.candidates_ready,
+    };
   }
 
   async function inbox(): Promise<Awaited<ReturnType<typeof readNewInboxStore>>> { return readNewInboxStore(paths.inbox); }
@@ -274,6 +285,8 @@ export function createLifecycleService(options: {
     const privateFollowUpGroup = pageRadarGroup(cards.filter((card) => card.user_status === "FOLLOW_UP").sort(compareInbox), cursor.private_follow_up, input.limit, "private_follow_up", cursor);
     const privateMainRadarGroup = pageRadarGroup(cards.filter((card) => card.user_status === "MAIN_RADAR").sort(compareInbox), cursor.private_main_radar, input.limit, "private_main_radar", cursor);
     const summary = buildLifecycleSummary(inbox, followUp, mainIdentities.size, receipt, now);
+    summary.follow_up_action_due = dueGroup.total;
+    summary.follow_up_candidates_ready = readyGroup.total;
     summary.follow_up_displayed = dueGroup.displayed + readyGroup.displayed + observedGroup.displayed;
     return {
       schema_version: "lifecycle_radar_view_v1",
@@ -339,6 +352,41 @@ function preferredNewRecheckCandidate(
   if (!fresh || !entry?.latest_source_timestamp || fresh.contract_address === null || safeIdentity(fresh.chain, fresh.contract_address) !== identity) return snapshotCandidate;
   const snapshotTimestamp = snapshotCandidate ? Date.parse(snapshotCandidate.created_at) : Number.NEGATIVE_INFINITY;
   return Date.parse(entry.latest_source_timestamp) > snapshotTimestamp ? fresh : snapshotCandidate;
+}
+
+/** The API summary and rendered Radar must classify the same active system population. */
+function resolveCurrentSystemFollowUpGrouping(
+  inbox: Awaited<ReturnType<typeof readNewInboxStore>>,
+  followUp: Awaited<ReturnType<typeof readFollowUpStore>>,
+  mainEntries: readonly EstablishedAddressUniverseEntry[],
+  receipt: LifecycleCycleReceipt | null,
+  scanner: PersistableScannerOutput | null,
+  now: Date,
+): { action_due: number; candidates_ready: number } {
+  const activeInbox = new Set(inbox.entries
+    .filter((entry) => entry.system_status === "NEW" && entry.archived_at === null && entry.rejected_at === null)
+    .map((entry) => entry.identity));
+  const activeMain = new Set(mainEntries.filter((entry) => entry.enabled).map((entry) => universeIdentityKey(entry.chain, entry.contract_address)));
+  let actionDue = 0;
+  let candidatesReady = 0;
+  for (const entry of followUp.entries) {
+    const identity = universeIdentityKey(entry.chain, entry.contract_address);
+    if (entry.lifecycle_status === "ARCHIVED" || entry.lifecycle_status === "ESTABLISHED" || activeInbox.has(identity) || activeMain.has(identity)) continue;
+    const conditions = evaluateFollowUpToMainRadar(entry, lifecycleEvaluationContext({
+      receipt,
+      scannerRunId: scanner?.scan_run.run_id ?? null,
+      evaluatedAt: now,
+      manualVerification: findLatestManualVerification(followUp, entry.chain, entry.contract_address),
+      establishedMembership: false,
+    }));
+    const card = { follow_up: { lifecycle_status: entry.lifecycle_status, next_check_at: entry.next_check_at }, conditions } as Pick<LifecycleRadarCard, "follow_up" | "conditions">;
+    if (isActionDue(card as LifecycleRadarCard, now)) {
+      actionDue += 1;
+    } else if (entry.lifecycle_status === "CANDIDATE_FOR_ESTABLISHED" && conditions.risks.length === 0) {
+      candidatesReady += 1;
+    }
+  }
+  return { action_due: actionDue, candidates_ready: candidatesReady };
 }
 
 function normalizeIdentity(chain: string, address: string): { identity: string } {

@@ -34,6 +34,7 @@ import {
   validateLifecycleOperationJournalStore,
   validateNewInboxStore,
 } from "../../data-poc/src/systemLifecycle.js";
+import { getDefaultNewRecheckStorePath, validateNewRecheckStore } from "../../data-poc/src/newRecheckStore.js";
 import {
   getDefaultEstablishedUniverseStorePath,
   validateEstablishedAddressUniverse,
@@ -72,6 +73,9 @@ export type ProductRecoveryPaths = {
   lifecycleAuditStore: string;
   lifecycleCycleReceipt: string;
   lifecycleOperationJournal: string;
+  newRecheckStore?: string;
+  disc2aPopulationManifest?: string;
+  disc2aRevalidation?: string;
   establishedStore: string;
   establishedConfig: string;
   feedbackSqlite: string;
@@ -247,6 +251,9 @@ export async function resolveProductRecoveryPaths(
     lifecycleAuditStore: getDefaultLifecycleAuditStorePath(env),
     lifecycleCycleReceipt: getDefaultLifecycleCycleReceiptPath(env),
     lifecycleOperationJournal: getDefaultLifecycleOperationJournalPath(env),
+    newRecheckStore: getDefaultNewRecheckStorePath(env),
+    disc2aPopulationManifest: resolve(dataPocRoot, ".local", "diagnostics", "disc2a-population-manifest.json"),
+    disc2aRevalidation: resolve(dataPocRoot, ".local", "diagnostics", "disc2a-revalidation.json"),
     establishedStore: getDefaultEstablishedUniverseStorePath(env),
     establishedConfig: resolveRepoFile("config/established_address_universe_v1.json"),
     feedbackSqlite: resolveFeedbackDatabasePath(env.CRYPTO_EDGE_FEEDBACK_SQLITE_PATH),
@@ -693,6 +700,15 @@ async function buildStoreInventory(
     descriptor("research_evidence_sqlite", paths.researchEvidenceSqlite, "stores/sqlite/research-evidence.sqlite", "sqlite", true),
     descriptor("central_automation_state", paths.automationState, "stores/automation/automation-state.json", "json", true),
   ];
+  if (paths.newRecheckStore && await exists(paths.newRecheckStore)) {
+    descriptors.push(descriptor("new_recheck_store", paths.newRecheckStore, "stores/new-recheck/store.json", "json", false, ["new_inbox_store"]));
+  }
+  if (paths.disc2aPopulationManifest && await exists(paths.disc2aPopulationManifest)) {
+    descriptors.push(descriptor("disc2a_population_manifest", paths.disc2aPopulationManifest, "stores/diagnostics/disc2a-population-manifest.json", "json", false, ["follow_up_store"]));
+  }
+  if (paths.disc2aRevalidation && await exists(paths.disc2aRevalidation)) {
+    descriptors.push(descriptor("disc2a_revalidation", paths.disc2aRevalidation, "stores/diagnostics/disc2a-revalidation.json", "json", false, ["follow_up_store"]));
+  }
   for (const config of paths.safeConfigFiles) {
     descriptors.push(descriptor(config.logicalStoreId, config.path, config.payloadPath, "config", true));
   }
@@ -767,6 +783,8 @@ async function validateSourceState(
       validateFollowUpStore(JSON.parse(raw) as unknown);
     } else if (item.logicalStoreId === "new_inbox_store") {
       validateNewInboxStore(JSON.parse(raw) as unknown);
+    } else if (item.logicalStoreId === "new_recheck_store") {
+      validateNewRecheckStore(JSON.parse(raw) as unknown);
     } else if (item.logicalStoreId === "lifecycle_audit_store") {
       validateLifecycleAuditStore(JSON.parse(raw) as unknown);
     } else if (item.logicalStoreId === "lifecycle_cycle_receipt") {
@@ -894,6 +912,8 @@ async function validateBackupEntryContent(path: string, logicalStoreId: string):
     validateFollowUpStore(parsed);
   } else if (logicalStoreId === "established_universe_store") {
     validateEstablishedUniverseStore(parsed);
+  } else if (logicalStoreId === "new_recheck_store") {
+    validateNewRecheckStore(parsed);
   } else if (logicalStoreId === "established_address_config") {
     validateEstablishedAddressUniverse(parsed);
   } else if (logicalStoreId === "central_automation_state") {
@@ -912,6 +932,7 @@ async function mapManifestToTargets(manifest: ProductBackupManifest, paths: Prod
     follow_up_store: paths.followUpStore,
     follow_up_backup: paths.followUpBackup,
     new_inbox_store: paths.newInboxStore,
+    ...(paths.newRecheckStore ? { new_recheck_store: paths.newRecheckStore } : {}),
     lifecycle_audit_store: paths.lifecycleAuditStore,
     lifecycle_cycle_receipt: paths.lifecycleCycleReceipt,
     lifecycle_operation_journal: paths.lifecycleOperationJournal,
@@ -923,6 +944,8 @@ async function mapManifestToTargets(manifest: ProductBackupManifest, paths: Prod
     research_evidence_sqlite: paths.researchEvidenceSqlite,
     central_automation_state: paths.automationState,
     central_run_once_receipt: paths.runOnceReceipt,
+    ...(paths.disc2aPopulationManifest ? { disc2a_population_manifest: paths.disc2aPopulationManifest } : {}),
+    ...(paths.disc2aRevalidation ? { disc2a_revalidation: paths.disc2aRevalidation } : {}),
   };
   for (const config of paths.safeConfigFiles) staticTargets[config.logicalStoreId] = config.path;
   return manifest.files.map((entry) => {

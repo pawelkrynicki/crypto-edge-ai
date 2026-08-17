@@ -903,6 +903,11 @@ export async function recoverIncompleteLifecycleOperations(options: {
   return recovered;
 }
 
+/** Builds a checksummed New Inbox snapshot for controlled one-time maintenance. */
+export function finalizeNewInboxStore(store: Omit<NewInboxStore, "checksum"> | NewInboxStore, now: Date): NewInboxStore {
+  return finalizeInbox(store, now);
+}
+
 async function promoteNewCandidateToFollowUp(input: {
   identity: string;
   candidate: PersistableCandidate;
