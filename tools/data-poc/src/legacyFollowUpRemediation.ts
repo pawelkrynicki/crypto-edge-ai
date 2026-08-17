@@ -379,8 +379,8 @@ function remediationNewInboxEntry(item: LegacyFollowUpRemediationArchiveEntry, r
     identity: item.identity,
     chain: original.chain,
     contract_address: original.contract_address,
-    display_name: original.display_name,
-    symbol: item.fresh_remediation_result.symbol ?? original.symbol_hint,
+    display_name: normalizedNullableText(original.display_name, 120),
+    symbol: normalizedNullableText(item.fresh_remediation_result.symbol ?? original.symbol_hint, 64),
     first_seen_at: original.first_seen_at,
     last_seen_at: latestIso(original.last_seen_at, item.fresh_observed_at),
     first_scanner_run_id: original.source_run_id,
@@ -498,6 +498,12 @@ function migrationReasonFor(group: RemediationGroup): string {
   if (group === "B") return LEGACY_FOLLOW_UP_BASELINE_REJECT_REASON;
   if (group === "C") return LEGACY_FOLLOW_UP_DATA_UNRESOLVED_REASON;
   return LEGACY_FOLLOW_UP_REMEDIATION_REASON;
+}
+
+function normalizedNullableText(value: unknown, length: number): string | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim();
+  return normalized.length > 0 && normalized.length <= length ? normalized : null;
 }
 
 function classifyFrozenInput(manifest: Disc2aManifest, revalidation: Disc2aRevalidation): {

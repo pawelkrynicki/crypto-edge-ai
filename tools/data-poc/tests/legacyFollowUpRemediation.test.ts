@@ -57,6 +57,7 @@ describe("DISC.2B legacy Follow-up remediation", () => {
     assert.equal(audit.entries.filter((entry) => entry.reason === "LEGACY_ADMISSION_REMEDIATION_BASELINE_REJECT").length, 325);
 
     const newlyMovedB = recheck.entries.find((entry) => entry.identity === fixture.bMoved)!;
+    assert.equal(inbox.entries.find((entry) => entry.identity === fixture.bMoved)?.symbol, "L4", "new Inbox entries normalize presentation fields without changing archived legacy history");
     assert.equal(newlyMovedB.first_seen_at, FIRST, "historical first observation is preserved");
     assert.equal(newlyMovedB.schedule_origin_at, MIGRATED_AT.toISOString(), "incubation begins at the remediation boundary");
     assert.deepEqual(newlyMovedB.completed_checkpoints, [], "legacy checkpoints are not replayed as DISC.1 success");
@@ -154,7 +155,7 @@ async function createFixture() {
   const results = identities.map((item, index) => index < 3
     ? { identity: item, chain: "base", contract_address: contractOf(item), provider_class: "VALID_CURRENT_OBSERVATION", baseline_status: "PASS", hard_reasons: [], symbol: index === 0 ? "Max" : index === 1 ? "CZ" : "Buddy", data_complete: true }
     : index < 328
-      ? { identity: item, chain: "base", contract_address: contractOf(item), provider_class: "VALID_CURRENT_OBSERVATION", baseline_status: "REJECT", hard_reasons: ["liquidity_below_30000"], symbol: `L${index}`, data_complete: true }
+      ? { identity: item, chain: "base", contract_address: contractOf(item), provider_class: "VALID_CURRENT_OBSERVATION", baseline_status: "REJECT", hard_reasons: ["liquidity_below_30000"], symbol: index === 4 ? " L4 " : `L${index}`, data_complete: true }
       : { identity: item, chain: "base", contract_address: contractOf(item), provider_class: index >= 679 ? "UNUSABLE_PAIR_DATA" : "NO_MATCHING_PAIR", error_code: index >= 679 ? "UNUSABLE_PAIR_DATA" : "NO_MATCHING_PAIR" });
   await writeJson(paths.manifest, { manifest_version: "disc2a_legacy_followup_population_v1", frozen_at: "2026-08-17T12:38:08.764Z", follow_up: { record_count: 683, unique_identity_count: 683 }, entries: manifestEntries });
   await writeJson(paths.revalidation, { report_version: "disc2a_legacy_followup_revalidation_v1", started_at: "2026-08-17T12:30:00.000Z", finished_at: FRESH, population_count: 683, batch_count: 26, provider_request_count: 26, provider_retry_count: 0, results });
