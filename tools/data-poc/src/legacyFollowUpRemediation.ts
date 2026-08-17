@@ -71,6 +71,7 @@ type Disc2aRevalidationResult = {
   symbol?: string;
   data_complete?: boolean;
   safe_error_class?: string;
+  error_code?: string;
 };
 
 type Disc2aRevalidation = {
@@ -546,8 +547,21 @@ function validateRevalidation(value: unknown): Disc2aRevalidation {
 }
 
 function validateRevalidationResult(value: unknown): Disc2aRevalidationResult {
-  if (!record(value) || !text(value.identity, 240) || !text(value.chain, 64) || !text(value.contract_address, 180) || !["VALID_CURRENT_OBSERVATION", "NO_MATCHING_PAIR", "UNUSABLE_PAIR_DATA", "UNSUPPORTED_OR_INVALID"].includes(String(value.provider_class)) || !(value.baseline_status === "PASS" || value.baseline_status === "REJECT" || value.baseline_status === null) || !strings(value.hard_reasons) || !(value.symbol === undefined || text(value.symbol, 80)) || !(value.data_complete === undefined || typeof value.data_complete === "boolean") || !(value.safe_error_class === undefined || text(value.safe_error_class, 160))) throw new Error("LEGACY_REMEDIATION_REVALIDATION_INVALID");
-  return { identity: value.identity, chain: value.chain, contract_address: value.contract_address, provider_class: value.provider_class as ProviderClass, baseline_status: value.baseline_status as BaselineStatus, hard_reasons: [...value.hard_reasons], ...(value.symbol === undefined ? {} : { symbol: value.symbol }), ...(value.data_complete === undefined ? {} : { data_complete: value.data_complete }), ...(value.safe_error_class === undefined ? {} : { safe_error_class: value.safe_error_class }) };
+  if (!record(value) || !text(value.identity, 240) || !text(value.chain, 64) || !text(value.contract_address, 180) || !["VALID_CURRENT_OBSERVATION", "NO_MATCHING_PAIR", "UNUSABLE_PAIR_DATA", "UNSUPPORTED_OR_INVALID"].includes(String(value.provider_class)) || !(value.symbol === undefined || text(value.symbol, 80)) || !(value.data_complete === undefined || typeof value.data_complete === "boolean") || !(value.safe_error_class === undefined || text(value.safe_error_class, 160)) || !(value.error_code === undefined || text(value.error_code, 160))) throw new Error("LEGACY_REMEDIATION_REVALIDATION_INVALID");
+  const currentObservation = value.provider_class === "VALID_CURRENT_OBSERVATION";
+  if (currentObservation && !(value.baseline_status === "PASS" || value.baseline_status === "REJECT") || !currentObservation && !(value.baseline_status === undefined || value.baseline_status === null) || currentObservation && !strings(value.hard_reasons) || !currentObservation && !(value.hard_reasons === undefined || value.hard_reasons === null || strings(value.hard_reasons))) throw new Error("LEGACY_REMEDIATION_REVALIDATION_INVALID");
+  return {
+    identity: value.identity,
+    chain: value.chain,
+    contract_address: value.contract_address,
+    provider_class: value.provider_class as ProviderClass,
+    baseline_status: currentObservation ? value.baseline_status as BaselineStatus : null,
+    hard_reasons: Array.isArray(value.hard_reasons) ? [...value.hard_reasons] : [],
+    ...(value.symbol === undefined ? {} : { symbol: value.symbol }),
+    ...(value.data_complete === undefined ? {} : { data_complete: value.data_complete }),
+    ...(value.safe_error_class === undefined ? {} : { safe_error_class: value.safe_error_class }),
+    ...(value.error_code === undefined ? {} : { error_code: value.error_code }),
+  };
 }
 
 function validateFilter(value: Record<string, unknown>): Disc2aManifestEntry["latest_filter_result"] {
