@@ -541,7 +541,7 @@ function validateManifestEntry(value: unknown): Disc2aManifestEntry {
 }
 
 function validateRevalidation(value: unknown): Disc2aRevalidation {
-  if (!record(value) || value.report_version !== "disc2a_dexscreener_revalidation_v1" || !iso(value.started_at) || !iso(value.finished_at) || !integer(value.population_count) || !integer(value.batch_count) || !integer(value.provider_request_count) || !integer(value.provider_retry_count) || !Array.isArray(value.results)) throw new Error("LEGACY_REMEDIATION_REVALIDATION_INVALID");
+  if (!record(value) || value.report_version !== "disc2a_legacy_followup_revalidation_v1" || !iso(value.started_at) || !iso(value.finished_at) || !integer(value.population_count) || !integer(value.batch_count) || !integer(value.provider_request_count) || !integer(value.provider_retry_count) || !Array.isArray(value.results)) throw new Error("LEGACY_REMEDIATION_REVALIDATION_INVALID");
   return { report_version: value.report_version, started_at: value.started_at, finished_at: value.finished_at, population_count: value.population_count, batch_count: value.batch_count, provider_request_count: value.provider_request_count, provider_retry_count: value.provider_retry_count, results: value.results.map(validateRevalidationResult) };
 }
 

@@ -152,7 +152,7 @@ async function createFixture() {
       ? { identity: item, chain: "base", contract_address: contractOf(item), provider_class: "VALID_CURRENT_OBSERVATION", baseline_status: "REJECT", hard_reasons: ["liquidity_below_30000"], symbol: `L${index}`, data_complete: true }
       : { identity: item, chain: "base", contract_address: contractOf(item), provider_class: "NO_MATCHING_PAIR", baseline_status: null, hard_reasons: [] });
   await writeJson(paths.manifest, { manifest_version: "disc2a_legacy_followup_population_v1", frozen_at: "2026-08-17T12:38:08.764Z", follow_up: { record_count: 683, unique_identity_count: 683 }, entries: manifestEntries });
-  await writeJson(paths.revalidation, { report_version: "disc2a_dexscreener_revalidation_v1", started_at: "2026-08-17T12:30:00.000Z", finished_at: FRESH, population_count: 683, batch_count: 26, provider_request_count: 26, provider_retry_count: 0, results });
+  await writeJson(paths.revalidation, { report_version: "disc2a_legacy_followup_revalidation_v1", started_at: "2026-08-17T12:30:00.000Z", finished_at: FRESH, population_count: 683, batch_count: 26, provider_request_count: 26, provider_retry_count: 0, results });
   return { ...paths, a, b, c, bExisting, bMoved: identities[4]!, cExisting };
 }
 
