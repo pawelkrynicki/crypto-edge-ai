@@ -293,8 +293,8 @@ describe("PC.1 bounded lifecycle Radar API", () => {
     assert.equal((app.match(/data-pc1-review-switch="global"/g) ?? []).length, 1);
     assert.match(app, /isReviewMode\(\)/);
     assert.match(app, /onLifecycleChanged=\{refreshLifecycleRadar\}/);
-    assert.match(presentation, /Status systemowy/);
-    assert.match(presentation, /System status/);
+    assert.match(presentation, /Radar produktu/);
+    assert.match(presentation, /Product Radar/);
     assert.doesNotMatch(component, /conditions_met\.join/);
   });
 
@@ -342,10 +342,10 @@ describe("PC.1 bounded lifecycle Radar API", () => {
       assert.equal(saveButton.props.disabled, false);
       await act(async () => { saveButton.props.onClick(); await flush(); });
       let markup = JSON.stringify(renderer!.toJSON());
-      assert.match(markup, /System status[\s\S]*New/);
-      assert.match(markup, /Your status[\s\S]*Follow-up/);
+      assert.match(markup, /Product Radar[\s\S]*New/);
+      assert.match(markup, /Your Radar[\s\S]*Follow-up/);
       assert.match(markup, /Move to my Main Radar/);
-      assert.equal(renderer!.root.findAllByType("details").length, 0);
+      assert.equal(renderer!.root.findAllByType("details").every((detail) => detail.props.open !== true), true);
       await act(async () => { action().props.onClick(); });
       assert.equal(renderer!.root.findByType("details").props.open, true);
       assert.equal(renderer!.root.findAllByType("textarea").length, 0);
@@ -359,8 +359,8 @@ describe("PC.1 bounded lifecycle Radar API", () => {
       assert.equal(saveButton.props.disabled, false);
       await act(async () => { saveButton.props.onClick(); await flush(); });
       markup = JSON.stringify(renderer!.toJSON());
-      assert.match(markup, /System status[\s\S]*New/);
-      assert.match(markup, /Your status[\s\S]*Main Radar/);
+      assert.match(markup, /Product Radar[\s\S]*New/);
+      assert.match(markup, /Your Radar[\s\S]*Main Radar/);
       assert.equal(renderer!.root.findAllByType("details").length, 0);
       assert.deepEqual(submitted.map(({ target_status, override_reason }) => ({ target_status, override_reason })), [
         { target_status: "FOLLOW_UP", override_reason: "Early private review" },
@@ -438,8 +438,8 @@ describe("PC.1 bounded lifecycle Radar API", () => {
       const markup = JSON.stringify(renderer!.toJSON());
       assert.match(markup, /Durable lifecycle records remain visible/);
       assert.match(markup, /Token 0/);
-      assert.match(markup, /Action due now/);
-      assert.doesNotMatch(markup, /Do działania teraz|Łącznie obserwowane|Wyświetlane teraz/);
+      assert.match(markup, /For review/);
+      assert.doesNotMatch(markup, /Action due now|Do działania teraz|Łącznie obserwowane|Wyświetlane teraz/);
     } finally {
       renderer?.unmount();
     }
@@ -475,7 +475,7 @@ describe("PC.1 bounded lifecycle Radar API", () => {
       assert.ok(detailsButton);
       await act(async () => { detailsButton.props.onClick(); });
       assert.deepEqual(opened, { chain: card.chain, contract_address: card.contract_address });
-      assert.equal(renderer!.root.findAllByType("details").length, 0);
+      assert.equal(renderer!.root.findAllByType("details").every((detail) => detail.props.open !== true), true);
     } finally {
       renderer?.unmount();
     }
@@ -505,7 +505,7 @@ describe("PC.1 bounded lifecycle Radar API", () => {
         await flush();
       });
       const markup = JSON.stringify(renderer!.toJSON());
-      assert.match(markup, /Your private view/);
+      assert.match(markup, /Your view/);
       assert.match(markup, /Token 0/);
       assert.doesNotMatch(markup, /Established basket is empty/);
       const detailsButton = renderer!.root.findAllByType("button").find((node) => node.props["data-action-variant"] === "primary");

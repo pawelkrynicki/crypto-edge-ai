@@ -5720,8 +5720,10 @@ button:disabled,
   gap: var(--space-3);
 }
 
-.product-summary-grid.primary { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.product-summary-grid.primary { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .product-summary-grid.operational { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+.lifecycle-radar-card .contract-line { display: none; }
 
 .product-summary-card {
   position: relative;
@@ -6313,8 +6315,6 @@ button:disabled,
   }
 
   .product-summary-grid.primary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .product-summary-grid.primary .product-summary-card:nth-child(4),
-  .product-summary-grid.primary .product-summary-card:nth-child(5) { grid-column: span 1; }
 }
 
 @media (max-width: 1024px) {

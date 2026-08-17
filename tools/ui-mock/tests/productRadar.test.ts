@@ -635,20 +635,20 @@ describe("Product Radar owner acceptance", () => {
       const fallback = renderSurfaces(locale, fallbackResolution, noDetailedMetadata, fallbackPartialReadiness, 60, "FRESH");
       if (locale === "en") {
         assert.doesNotMatch(ready.header, /<span>Sources<\/span>|Snapshot freshness|API connectivity|Technical details/);
-        assert.match(ready.summary, /<span>Source status<\/span><strong>Available<\/strong>/);
+        assert.match(ready.summary, /<span>Data availability<\/span><strong>Available<\/strong>/);
         assert.match(partialHeader.header, /Some information is temporarily unavailable\./);
-        assert.match(partialSummary.summary, /<span>Source status<\/span><strong>Source partially available<\/strong><p>DefiLlama<\/p>/);
+        assert.match(partialSummary.summary, /<span>Data availability<\/span><strong>Source partially available<\/strong><p>DefiLlama<\/p>/);
         assert.doesNotMatch(partialHeader.summary, /product-freshness/);
         assert.match(fallback.header, /Some information is temporarily unavailable\./);
-        assert.match(fallback.summary, /<span>Source status<\/span><strong>Source partially available<\/strong><p>Source details unavailable<\/p>/);
+        assert.match(fallback.summary, /<span>Data availability<\/span><strong>Source partially available<\/strong><p>Source details unavailable<\/p>/);
       } else {
         assert.doesNotMatch(ready.header, /<span>Źródła<\/span>|Aktualność danych|Połączenie z API|Szczegóły techniczne/);
-        assert.match(ready.summary, /<span>Stan źródeł<\/span><strong>Dostępne<\/strong>/);
+        assert.match(ready.summary, /<span>Dostępność danych<\/span><strong>Dostępne<\/strong>/);
         assert.match(partialHeader.header, /Część informacji jest chwilowo niedostępna\./);
-        assert.match(partialSummary.summary, /<span>Stan źródeł<\/span><strong>Źródło częściowo dostępne<\/strong><p>DefiLlama<\/p>/);
+        assert.match(partialSummary.summary, /<span>Dostępność danych<\/span><strong>Źródło częściowo dostępne<\/strong><p>DefiLlama<\/p>/);
         assert.doesNotMatch(partialHeader.summary, /product-freshness/);
         assert.match(fallback.header, /Część informacji jest chwilowo niedostępna\./);
-        assert.match(fallback.summary, /<span>Stan źródeł<\/span><strong>Źródło częściowo dostępne<\/strong><p>Brak szczegółów źródeł<\/p>/);
+        assert.match(fallback.summary, /<span>Dostępność danych<\/span><strong>Źródło częściowo dostępne<\/strong><p>Brak szczegółów źródeł<\/p>/);
       }
     }
   });
@@ -955,10 +955,10 @@ describe("Product Radar owner acceptance", () => {
       renderWithLocale("pl", React.createElement(ExternalVerificationLinksView, { candidate: establishedCandidate })),
       renderWithLocale("pl", React.createElement(Methodology)),
     ].join(" ");
-    assert.match(english, /Three Radar layers with three different meanings/);
+    assert.match(english, /Project Radar/);
     assert.match(english, /Manual source verification/);
     assert.match(english, /How to read the Radar/);
-    assert.match(polish, /Trzy warstwy Radaru, trzy różne znaczenia/);
+    assert.match(polish, /Radar projektów/);
     assert.match(polish, /Ręczna weryfikacja źródłowa/);
     assert.match(polish, /Jak czytać Radar/);
     assert.equal(PRODUCT_TRANSLATION_KEYS.length, Object.keys(PRODUCT_TRANSLATIONS.pl).length);

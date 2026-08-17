@@ -144,7 +144,7 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
     ?? resolveProductSourceHealth({ metadata, readiness, sourceIds });
   const sourceState = presentProductSourceHealth(resolvedSourceHealth, locale, "summary");
   const stale = freshnessStatus === "STALE" || (ageSeconds !== null && ageSeconds > 1800);
-  const privateViewCopy = locale === "pl" ? "TwĂłj prywatny widok" : "Your private view";
+  const privateViewCopy = locale === "pl" ? "Widok dopasowany do Ciebie" : "Your view";
 
   return (
     <div className="candidate-results-view product-radar">
@@ -161,16 +161,14 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
           <span className="candidate-results-eyebrow">{t("radar.eyebrow")}</span>
           <h3>{t("radar.title")}</h3>
           <p>{t("radar.intro")}</p>
+          <p>{t("radar.explanation")}</p>
         </div>
       </section>
 
       <section className="product-summary-grid primary" aria-label={t("radar.summary")}>
-        <SummaryCard label={t("radar.newProjects")} value={String(lifecycleSummary?.system_new_total ?? newCandidates.length)} detail={lifecycleSummary ? t("lifecycle.persistentNewInbox") : t("radar.observationOnly")} />
-        <SummaryCard label={t("lifecycle.totalObserved")} value={String(followUpTotal)} detail={t("followUp.totalCountDetail")} />
-        <SummaryCard label={t("lifecycle.actionDueNow")} value={String(lifecycleSummary?.follow_up_action_due ?? followUpStatus?.due_count ?? 0)} detail={t("lifecycle.checkpointsAction")} />
-        <SummaryCard label={t("lifecycle.mainRadarCandidates")} value={String(lifecycleSummary?.follow_up_candidates_ready ?? followUpStatus?.candidate_count ?? 0)} detail={t("followUp.candidateCountDetail")} tone="accent" />
-        <SummaryCard label={t("lifecycle.displayedNow")} value={String(followUpDisplayed)} detail={t("followUp.displayedCountDetail")} />
-        <SummaryCard label={t("radar.establishedEntries")} value={String(establishedEntries)} detail={t("radar.activeUniverseAddresses")} />
+        <SummaryCard label={t("radar.newProjects")} value={String(lifecycleSummary?.system_new_total ?? newCandidates.length)} detail={t("radar.newProjectsDetail")} />
+        <SummaryCard label={t("radar.followUpReview")} value={String(lifecycleSummary?.follow_up_action_due ?? followUpStatus?.due_count ?? 0)} detail={t("radar.followUpReviewDetail")} tone="accent" />
+        <SummaryCard label={t("radar.mainRadar")} value={String(lifecycleRadar?.main_radar.total ?? lifecycleSummary?.system_main_radar_total ?? establishedEntries)} detail={t("radar.mainRadarDetail")} />
         <SummaryCard
           label={t("app.generated")}
           value={generatedAt ? formatProductDateTime(generatedAt, locale) : t("status.noTimestamp")}
@@ -201,18 +199,20 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
         </button>
         <ol id="radar-lifecycle-guide-content" hidden={!lifecycleGuideOpen}>
           <li>{locale === "pl" ? "Nowy token zostaje wykryty." : "A new token is detected."}</li>
-          <li>{locale === "pl" ? "System automatycznie awansuje projekt po spełnieniu jawnych warunków; użytkownik może wcześniej przesunąć go w swoim prywatnym Radarze." : "The system promotes a project after explicit conditions are met; a user may move it earlier in their private Radar."}</li>
-          <li>{locale === "pl" ? "Token przechodzi checkpointy 1 / 3 / 7 / 14 / 30 dni." : "The token moves through 1 / 3 / 7 / 14 / 30-day checkpoints."}</li>
-          <li>{locale === "pl" ? "Po spełnieniu filtrów może zostać kandydatem." : "After meeting the filters, it may become a candidate."}</li>
-          <li>{locale === "pl" ? "Prywatny ruch nie zmienia statusu innych użytkowników, a owner/admin nie wykonuje codziennych ręcznych przesunięć." : "A private move does not change other users’ status, and owner/admin do not perform daily manual moves."}</li>
+          <li>{locale === "pl" ? "System obserwuje projekt w czasie i sprawdza, czy spełnia warunki dalszej analizy." : "The system watches the project over time and checks whether it meets the conditions for further analysis."}</li>
+          <li>{locale === "pl" ? "Przy kolejnych ocenach projekt może wymagać Twojej uwagi." : "At later reviews, the project may need your attention."}</li>
+          <li>{locale === "pl" ? "Projekty po pełnym procesie obserwacji i weryfikacji trafiają do Głównego Radaru." : "Projects that complete the observation and verification process move to Main Radar."}</li>
+          <li>{locale === "pl" ? "Twoje ustawienia zmieniają wyłącznie Twój widok." : "Your choices affect only your own view."}</li>
         </ol>
       </section>
 
-      <section className="product-summary-grid operational" aria-label={t("radar.data")}>
-        <SummaryCard label={t("radar.establishedAfterFilters")} value={String(establishedAfterFilters)} detail={t("radar.candidatesForReview")} />
-        <SummaryCard label={t("radar.securityChecked")} value={String(securityChecked)} detail={t("radar.goPlusAfterFilters")} />
-        <SummaryCard label={t("radar.sourceState")} value={sourceState.value} detail={sourceState.detail} tone={sourceState.tone} />
-      </section>
+      <TechnicalDetails label={t("radar.additionalData")} className="radar-operational-details">
+        <section className="product-summary-grid operational" aria-label={t("radar.data")}>
+          <SummaryCard label={t("radar.afterInitialReview")} value={String(establishedAfterFilters)} detail={t("radar.afterInitialReviewDetail")} />
+          <SummaryCard label={t("radar.securityOverview")} value={String(securityChecked)} detail={t("radar.securityOverviewDetail")} />
+          <SummaryCard label={t("radar.dataAvailability")} value={sourceState.value} detail={sourceState.detail} tone={sourceState.tone} />
+        </section>
+      </TechnicalDetails>
 
       <section className="basket-switcher" aria-label={t("radar.basketSelection")}>
         <button
@@ -306,7 +306,7 @@ function PrivateLifecycleBasket({ basket, group, locale, onLoadMore, onOpenDetai
       main_radar: { title: "GĹ‚Ăłwny Radar", empty: "Brak projektĂłw w Twoim prywatnym GĹ‚Ăłwnym Radarze." },
       absent: "Projekt nie wystÄ…piĹ‚ w ostatnim skanie, ale pozostaje w Twoim prywatnym Radarze.",
       more: "PokaĹĽ wiÄ™cej",
-      privateView: "TwĂłj prywatny widok",
+      privateView: "Widok dopasowany do Ciebie",
     }
     : {
       new: { title: "New projects", empty: "No projects in your private New view." },
@@ -314,7 +314,7 @@ function PrivateLifecycleBasket({ basket, group, locale, onLoadMore, onOpenDetai
       main_radar: { title: "Main Radar", empty: "No projects in your private Main Radar." },
       absent: "This project was not present in the latest scan, but remains in your private Radar.",
       more: "Show more",
-      privateView: "Your private view",
+      privateView: "Your view",
     };
   const basketCopy = copy[basket];
   return <section className={`basket-content private-lifecycle-basket private-lifecycle-${basket}`} aria-label={basketCopy.title}>

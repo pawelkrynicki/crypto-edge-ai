@@ -153,7 +153,7 @@ describe("P1.1 Radar operational usability", () => {
     assert.doesNotMatch(markup, /queue|kolejka/i);
   });
 
-  it("shows real New data, the scanner timestamp, context source statuses, and unambiguous counters", () => {
+  it("shows real New data with the beginner Radar hierarchy and distinct counters", () => {
     const candidate = {
       ...mapPersistableScannerOutputToUiCandidates(PERSISTABLE_SCANNER_SAMPLE)[0]!,
       discoveryBasket: "new_emerging" as const,
@@ -179,10 +179,14 @@ describe("P1.1 Radar operational usability", () => {
     assert.match(markup, /DexScreener/);
     assert.match(markup, /Alternative\.me/);
     assert.match(markup, /DefiLlama/);
-    assert.match(markup, /Łącznie obserwowane/);
-    assert.match(markup, /Wyświetlane teraz/);
-    assert.match(markup, /Kandydaci do Głównego Radaru/);
-    assert.match(markup, /Wpisy Established/);
+    assert.match(markup, /Crypto Edge wykrywa nowe projekty i obserwuje je w czasie\./);
+    assert.match(markup, /Nowe \/ obserwacja/);
+    assert.match(markup, /Do sprawdzenia/);
+    assert.match(markup, /Główny Radar/);
+    assert.match(markup, /Projekty wykryte przez system\. Większość nie wymaga teraz Twojej uwagi\./);
+    assert.match(markup, /Projekty, które spełniają aktualne warunki i wymagają dalszej analizy\./);
+    assert.match(markup, /Projekty po pełnym procesie obserwacji i weryfikacji\./);
+    assert.doesNotMatch(markup, /Łącznie obserwowane|Do działania teraz|Wyświetlane teraz|Wpisy Established/);
   });
 
   it("keeps Follow-up usable without scanner data and explains the 100-of-385 limit", () => {
