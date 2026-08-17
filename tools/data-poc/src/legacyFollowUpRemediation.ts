@@ -94,6 +94,7 @@ export type LegacyFollowUpRemediationArchiveEntry = {
   current_baseline: { status: BaselineStatus; reasons: string[] };
   original_first_seen_at: string;
   source_lineage: { source_run_id: string; last_checked_at: string | null };
+  frozen_source_lineage: { source_run_id: string; last_checked_at: string | null };
   completed_legacy_checkpoints: number[];
   security_history: FollowUpEntry["latest_security_status"];
   manual_verification_references: FollowUpStore["audit_log"];
@@ -231,7 +232,7 @@ async function createPreparedArchive(input: {
   for (const item of input.classified.items) {
     const original = followByIdentity.get(item.identity);
     if (!original) throw new Error("LEGACY_REMEDIATION_FROZEN_FOLLOW_UP_MISSING");
-    if (original.first_seen_at !== item.manifest.first_seen_at || original.source_run_id !== item.manifest.source_run_id) {
+    if (original.first_seen_at !== item.manifest.first_seen_at) {
       throw new Error("LEGACY_REMEDIATION_FROZEN_FOLLOW_UP_DRIFT");
     }
     const migrationAction = actionFor(item.group, activeNew.has(item.identity));
@@ -244,6 +245,7 @@ async function createPreparedArchive(input: {
       current_baseline: { status: item.revalidation.baseline_status, reasons: [...item.revalidation.hard_reasons] },
       original_first_seen_at: original.first_seen_at,
       source_lineage: { source_run_id: original.source_run_id, last_checked_at: original.last_checked_at },
+      frozen_source_lineage: { source_run_id: item.manifest.source_run_id, last_checked_at: item.manifest.last_checked_at },
       completed_legacy_checkpoints: [...original.completed_checkpoints],
       security_history: original.latest_security_status,
       manual_verification_references: followUp.audit_log.filter((audit) => audit.entry_id === original.entry_id && audit.manual_verification !== undefined),

@@ -65,11 +65,15 @@ describe("DISC.2B legacy Follow-up remediation", () => {
     assert.equal(existingB.schedule_origin_at, "2026-08-16T00:00:00.000Z", "existing DISC.1 recheck state wins");
     assert.equal(existingB.completed_checkpoints.includes(1), true);
 
-    const archive = JSON.parse(archiveRaw) as { status: string; entries: Array<{ identity: string; original_follow_up_record: unknown; completed_legacy_checkpoints: number[]; security_history: unknown; migration_reason: string }> };
+    const archive = JSON.parse(archiveRaw) as { status: string; entries: Array<{ identity: string; original_follow_up_record: unknown; completed_legacy_checkpoints: number[]; security_history: unknown; migration_reason: string; source_lineage: { source_run_id: string }; frozen_source_lineage: { source_run_id: string } }> };
     assert.equal(archive.status, "APPLIED");
     assert.equal(archive.entries.length, 683);
     assert.equal(archive.entries.every((entry) => entry.original_follow_up_record !== null && Array.isArray(entry.completed_legacy_checkpoints) && entry.security_history !== null), true, "full legacy lineage is retained in the durable archive");
     assert.equal(archive.entries.filter((entry) => entry.migration_reason === LEGACY_FOLLOW_UP_DATA_UNRESOLVED_REASON).length, 355);
+    assert.equal(archive.entries.every((entry) => entry.frozen_source_lineage.source_run_id.length > 0), true, "frozen lineage is retained when a current record was normally refreshed after the freeze");
+    const postFreeze = archive.entries.find((entry) => entry.identity === fixture.postFreezeIdentity);
+    assert.deepEqual(postFreeze?.source_lineage, { source_run_id: "scan_post_freeze", last_checked_at: FRESH });
+    assert.deepEqual(postFreeze?.frozen_source_lineage, { source_run_id: "scan_legacy", last_checked_at: null });
     assert.equal(await readFile(fixture.privateState, "utf8"), privateBefore, "private state is not read or mutated by remediation");
   });
 
@@ -126,6 +130,7 @@ async function createFixture() {
   }, { storePath: paths.followUp, now: new Date(FIRST) });
   const bExisting = identities[3]!;
   const cExisting = identities[328]!;
+  const postFreezeIdentity = identities[329]!;
   const existingEntries = [existingNew(bExisting, "B-existing"), existingNew(cExisting, "C-existing")];
   await writeJson(paths.inbox, finalizeNewInboxStore({ schema_version: "new_inbox_store_v1", store_version: 1, generated_at: "2026-08-16T00:00:00.000Z", entries: existingEntries }, new Date("2026-08-16T00:00:00.000Z")));
   const existingRecheck = existingNewRecheck(bExisting);
@@ -153,7 +158,13 @@ async function createFixture() {
       : { identity: item, chain: "base", contract_address: contractOf(item), provider_class: index >= 679 ? "UNUSABLE_PAIR_DATA" : "NO_MATCHING_PAIR", error_code: index >= 679 ? "UNUSABLE_PAIR_DATA" : "NO_MATCHING_PAIR" });
   await writeJson(paths.manifest, { manifest_version: "disc2a_legacy_followup_population_v1", frozen_at: "2026-08-17T12:38:08.764Z", follow_up: { record_count: 683, unique_identity_count: 683 }, entries: manifestEntries });
   await writeJson(paths.revalidation, { report_version: "disc2a_legacy_followup_revalidation_v1", started_at: "2026-08-17T12:30:00.000Z", finished_at: FRESH, population_count: 683, batch_count: 26, provider_request_count: 26, provider_retry_count: 0, results });
-  return { ...paths, a, b, c, bExisting, bMoved: identities[4]!, cExisting };
+  await updateFollowUpStore((store) => ({
+    ...store,
+    entries: store.entries.map((entry) => followUpIdentity(entry.chain, entry.contract_address).identity === postFreezeIdentity
+      ? { ...entry, source_run_id: "scan_post_freeze", last_checked_at: FRESH }
+      : entry),
+  }), { storePath: paths.followUp, now: new Date(FRESH) });
+  return { ...paths, a, b, c, bExisting, bMoved: identities[4]!, cExisting, postFreezeIdentity };
 }
 
 async function apply(fixture: Awaited<ReturnType<typeof createFixture>>) {
