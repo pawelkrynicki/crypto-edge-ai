@@ -229,6 +229,9 @@ async function defaultScannerAndContextRunner(
     source_statuses: {
       ...result.source_health,
       follow_up_store: result.follow_up.status === "READY" ? "READY" : "DEGRADED",
+      new_recheck: result.new_recheck.status === "SUCCESS"
+        ? "READY"
+        : result.new_recheck.status === "PARTIAL" ? "DEGRADED" : "UNAVAILABLE",
     },
   };
 }

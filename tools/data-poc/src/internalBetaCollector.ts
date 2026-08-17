@@ -39,6 +39,7 @@ import {
   type FollowUpSecurityStatus,
 } from "./followUpBasket.js";
 import { applySystemLifecycle } from "./systemLifecycle.js";
+import { MAX_NEW_RECHECK_BATCHES_PER_CYCLE, runCentralNewRechecks, type NewRecheckRunResult } from "./newRecheckEngine.js";
 import {
   applyFollowUpRecheckBatch,
   collectDueFollowUpRechecks,
@@ -80,6 +81,7 @@ export type InternalBetaCollectorOptions = {
   previousContextRunId?: string | null;
   followUpStorePath?: string;
   newInboxStorePath?: string;
+  newRecheckStorePath?: string;
   lifecycleAuditStorePath?: string;
   establishedStorePath?: string;
   followUpRecheckLimit?: number;
@@ -128,6 +130,7 @@ export type InternalBetaCollectorResult = {
     promoted_to_main_radar: number;
     duplicate_noop: number;
   };
+  new_recheck: NewRecheckRunResult;
 };
 
 export async function runInternalBetaCollector(
@@ -143,6 +146,8 @@ export async function runInternalBetaCollector(
   const runId = uniqueRunId("scan", now);
   const followUpStorePath = options.followUpStorePath
     ?? (options.outputDir ? resolve(options.outputDir, ".follow-up-test", "store.json") : undefined);
+  const newRecheckStorePath = options.newRecheckStorePath
+    ?? (options.outputDir ? resolve(options.outputDir, ".new-recheck-test", "store.json") : undefined);
   let universe: EstablishedAddressUniverse | null = null;
   let universeFailure: typeof ESTABLISHED_UNIVERSE_INVALID | typeof ESTABLISHED_UNIVERSE_UNAVAILABLE | null = null;
   try {
@@ -172,7 +177,8 @@ export async function runInternalBetaCollector(
       sourceId: "dexscreener",
       maxRequests: 1 + seedLimit + Math.min(seedLimit, 5)
         + enabledUniverseEntries + Math.min(enabledUniverseEntries, 5)
-        + dueFollowUpEntries.length + Math.min(dueFollowUpEntries.length, 2),
+        + dueFollowUpEntries.length + Math.min(dueFollowUpEntries.length, 2)
+        + MAX_NEW_RECHECK_BATCHES_PER_CYCLE,
     }),
     goplus_security: new BoundedHttpClient({
       ...common,
@@ -345,6 +351,25 @@ export async function runInternalBetaCollector(
     promoted_to_main_radar: 0,
     duplicate_noop: 0,
   };
+  let newRecheck: NewRecheckRunResult = {
+    recheck_id: `newrecheck_${runId}`,
+    central_cycle_id: runId,
+    started_at: finishedAt,
+    finished_at: finishedAt,
+    records_due: 0,
+    records_selected: 0,
+    records_rechecked: 0,
+    records_failed: 0,
+    provider_batches: 0,
+    provider_request_count: 0,
+    promoted_to_follow_up: 0,
+    duplicate_noop: 0,
+    status: "SUCCESS",
+    store_path: newRecheckStorePath ?? "default",
+    unsupported_identities: [],
+    failed_identities: [],
+    promoted_identities: [],
+  };
   try {
     const beforeStore = followUpPreparation.diagnostics.store_available
       ? followUpPreparation.diagnostics.store
@@ -377,6 +402,24 @@ export async function runInternalBetaCollector(
   } catch (error) {
     followUpErrorCode = safeFollowUpErrorCode(error);
   }
+  try {
+    newRecheck = await runCentralNewRechecks({
+      client: clients.dexscreener,
+      now: new Date(finishedAt),
+      recheckStorePath: newRecheckStorePath,
+      newInboxStorePath: options.newInboxStorePath,
+      followUpStorePath,
+      establishedStorePath: options.establishedStorePath,
+      auditStorePath: options.lifecycleAuditStorePath,
+      centralCycleId: runId,
+    });
+  } catch {
+    newRecheck = { ...newRecheck, status: "FAILED", records_failed: 1 };
+  }
+  // The published scanner metadata intentionally captures discovery requests
+  // only; the operational collector receipt also includes its later New
+  // incubation batch requests.
+  requestCounts.dexscreener = clients.dexscreener.getStats().request_count;
 
   return {
     run_id: runId,
@@ -421,6 +464,7 @@ export async function runInternalBetaCollector(
       error_code: followUpErrorCode,
     },
     lifecycle,
+    new_recheck: newRecheck,
   };
 }
 

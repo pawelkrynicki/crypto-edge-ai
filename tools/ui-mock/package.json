@@ -16,6 +16,7 @@
     "test:runtime": "node --import tsx --test tests/productionRuntime.test.ts tests/runtimeImportBoundary.test.ts tests/automationStatus.test.ts tests/controlCenter.test.ts tests/ownerOperations.test.ts",
     "test:product-radar": "node --import tsx --test tests/productRadar.test.ts",
     "test:pc1": "node --import tsx --test tests/pc1Lifecycle.test.ts",
+    "test:new-recheck": "node --import tsx --test tests/newRecheckReadModel.test.ts",
     "test:pc2": "node --import tsx --test tests/pc2AiProductionPath.test.ts",
     "test:pc3a": "node --import tsx --test tests/researchChecklist.test.ts tests/researchChecklistUi.test.tsx",
     "test:pc3b": "node --import tsx --test tests/pc3bSecurityTools.test.tsx",

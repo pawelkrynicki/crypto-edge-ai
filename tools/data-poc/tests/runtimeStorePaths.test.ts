@@ -10,6 +10,7 @@ import {
 import { getDefaultAutomationDirectory } from "../src/automation/automationPaths.js";
 import { getDefaultEstablishedUniverseStorePath } from "../src/establishedAddressUniverse.js";
 import { getDefaultFollowUpStorePath } from "../src/followUpBasket.js";
+import { getDefaultNewRecheckStorePath } from "../src/newRecheckStore.js";
 import {
   getDefaultLifecycleAuditStorePath,
   getDefaultLifecycleCycleReceiptPath,
@@ -35,12 +36,13 @@ describe("canonical data-poc runtime store paths", () => {
     assert.deepEqual(defaultPaths(), compiledPaths);
   });
 
-  it("uses the canonical default layout for lifecycle, Follow-up, and Established stores", () => {
+  it("uses the canonical default layout for lifecycle, New rechecks, Follow-up, and Established stores", () => {
     assert.equal(getDefaultNewInboxStorePath(), resolve(root, ".local", "lifecycle", "new-inbox.json"));
     assert.equal(getDefaultLifecycleAuditStorePath(), resolve(root, ".local", "lifecycle", "audit.json"));
     assert.equal(getDefaultLifecycleOperationJournalPath(), resolve(root, ".local", "lifecycle", "operation-journal.json"));
     assert.equal(getDefaultLifecycleCycleReceiptPath(), resolve(root, ".local", "lifecycle", "cycle-receipts.json"));
     assert.equal(getDefaultFollowUpStorePath(), resolve(root, ".local", "follow-up", "store.json"));
+    assert.equal(getDefaultNewRecheckStorePath(), resolve(root, ".local", "new-recheck", "store.json"));
     assert.equal(getDefaultEstablishedUniverseStorePath(), resolve(root, ".local", "established-universe", "store.json"));
     assert.equal(getDefaultAutomationDirectory(), resolve(root, ".local", "automation"));
   });
@@ -50,6 +52,7 @@ describe("canonical data-poc runtime store paths", () => {
     assert.equal(getDefaultNewInboxStorePath({ CRYPTO_EDGE_NEW_INBOX_STORE_PATH: temporary }), temporary);
     assert.equal(getDefaultEstablishedUniverseStorePath({ CRYPTO_EDGE_ESTABLISHED_UNIVERSE_STORE_PATH: temporary }), temporary);
     assert.equal(getDefaultFollowUpStorePath({ CRYPTO_EDGE_FOLLOW_UP_STORE_PATH: temporary }), temporary);
+    assert.equal(getDefaultNewRecheckStorePath({ CRYPTO_EDGE_NEW_RECHECK_STORE_PATH: temporary }), temporary);
   });
 
   it("uses a valid explicit data-poc root and rejects an invalid one", async () => {
@@ -60,6 +63,7 @@ describe("canonical data-poc runtime store paths", () => {
     const env = { CRYPTO_EDGE_DATA_POC_ROOT: temporaryRoot };
     assert.equal(getDataPocRuntimeRoot(env), temporaryRoot);
     assert.equal(getDefaultNewInboxStorePath(env), resolve(temporaryRoot, ".local", "lifecycle", "new-inbox.json"));
+    assert.equal(getDefaultNewRecheckStorePath(env), resolve(temporaryRoot, ".local", "new-recheck", "store.json"));
     assert.throws(
       () => getDataPocRuntimeRoot({ CRYPTO_EDGE_DATA_POC_ROOT: resolve(temporaryRoot, "missing") }),
       /DATA_POC_RUNTIME_ROOT_INVALID/,
@@ -73,6 +77,7 @@ describe("canonical data-poc runtime store paths", () => {
       getDefaultLifecycleOperationJournalPath(),
       getDefaultLifecycleCycleReceiptPath(),
       getDefaultFollowUpStorePath(),
+      getDefaultNewRecheckStorePath(),
       getDefaultEstablishedUniverseStorePath(),
       getDefaultAutomationDirectory(),
     ];
@@ -87,6 +92,7 @@ function canonicalPaths(runtimeRoot: string): string[] {
     resolve(runtimeRoot, ".local", "lifecycle", "operation-journal.json"),
     resolve(runtimeRoot, ".local", "lifecycle", "cycle-receipts.json"),
     resolve(runtimeRoot, ".local", "follow-up", "store.json"),
+    resolve(runtimeRoot, ".local", "new-recheck", "store.json"),
     resolve(runtimeRoot, ".local", "established-universe", "store.json"),
   ];
 }
@@ -98,6 +104,7 @@ function defaultPaths(): string[] {
     getDefaultLifecycleOperationJournalPath(),
     getDefaultLifecycleCycleReceiptPath(),
     getDefaultFollowUpStorePath(),
+    getDefaultNewRecheckStorePath(),
     getDefaultEstablishedUniverseStorePath(),
   ];
 }

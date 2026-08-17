@@ -16,6 +16,7 @@ import {
 import { getDefaultEstablishedUniverseStorePath, normalizeEstablishedAddress, normalizeEstablishedChain, universeIdentityKey, type EstablishedAddressUniverseEntry } from "../../data-poc/src/establishedAddressUniverse.js";
 import { readEstablishedUniverseStore } from "../../data-poc/src/establishedUniverseManager.js";
 import { readFollowUpStore, findLatestManualVerification, type FollowUpEntry } from "../../data-poc/src/followUpBasket.js";
+import { getDefaultNewRecheckStorePath, readNewRecheckStore, type NewRecheckStore } from "../../data-poc/src/newRecheckStore.js";
 import type { PersistableScannerOutput } from "../../data-poc/src/persistableScannerModel.js";
 import { readLatestScannerOutput, type LatestScannerOutputOptions } from "./latestScannerOutput.js";
 import type { Pc1SessionContext } from "./lifecycleSession.js";
@@ -71,6 +72,7 @@ export function createLifecycleService(options: {
   newInboxStorePath?: string;
   auditStorePath?: string;
   cycleReceiptPath?: string;
+  newRecheckStorePath?: string;
   workspace?: UserWorkspaceRepository;
   workspaceDatabasePath?: string;
 } = {}) {
@@ -84,23 +86,26 @@ export function createLifecycleService(options: {
     established: options.establishedStorePath ?? getDefaultEstablishedUniverseStorePath(),
     inbox: options.newInboxStorePath ?? getDefaultNewInboxStorePath(),
     receipt: options.cycleReceiptPath ?? getDefaultLifecycleCycleReceiptPath(),
+    newRecheck: options.newRecheckStorePath ?? getDefaultNewRecheckStorePath(),
   };
 
   async function resolveToken(chainInput: string, addressInput: string, session: Pc1SessionContext): Promise<LifecycleTokenView> {
     const identity = normalizeIdentity(chainInput, addressInput);
-    const [inbox, followUp, universe, scanner, receipt, workspaceRepository] = await Promise.all([
+    const [inbox, followUp, universe, scanner, receipt, newRecheck, workspaceRepository] = await Promise.all([
       readNewInboxStore(paths.inbox),
       readFollowUpStore(paths.followUp),
       readEstablishedUniverseStore(paths.established),
       readLatestScannerOutput(options.scanner).catch(() => null),
       readLatestLifecycleCycleReceipt(paths.receipt),
+      readNewRecheckStore(paths.newRecheck),
       workspace(),
     ]);
     const followUpEntry = followUp.entries.find((entry) => universeIdentityKey(entry.chain, entry.contract_address) === identity.identity) ?? null;
     const inboxEntry = inbox.entries.find((entry) => entry.identity === identity.identity) ?? null;
     const main = universe.current.entries.some((entry) => entry.enabled && universeIdentityKey(entry.chain, entry.contract_address) === identity.identity);
     const snapshot = scannerOutput(scanner);
-    const candidate = snapshot?.candidates.find((entry) => entry.contract_address !== null && safeIdentity(entry.chain, entry.contract_address) === identity.identity) ?? null;
+    const snapshotCandidate = snapshot?.candidates.find((entry) => entry.contract_address !== null && safeIdentity(entry.chain, entry.contract_address) === identity.identity) ?? null;
+    const candidate = preferredNewRecheckCandidate(identity.identity, snapshotCandidate, newRecheck);
     const systemStatus: SystemLifecycleStatus = main
       ? "MAIN_RADAR"
       : inboxEntry?.system_status ?? (followUpEntry && followUpEntry.lifecycle_status !== "ARCHIVED" ? "FOLLOW_UP" : "NEW");
@@ -164,12 +169,13 @@ export function createLifecycleService(options: {
   async function workspaceIntegrity() { return (await workspace()).integrity(); }
 
   async function radar(session: Pc1SessionContext, input: { limit: number; cursor: RadarCursor | null }): Promise<LifecycleRadarView> {
-    const [inbox, followUp, universe, scanner, receipt, workspaceRepository] = await Promise.all([
+    const [inbox, followUp, universe, scanner, receipt, newRecheck, workspaceRepository] = await Promise.all([
       readNewInboxStore(paths.inbox),
       readFollowUpStore(paths.followUp),
       readEstablishedUniverseStore(paths.established),
       readLatestScannerOutput(options.scanner).catch(() => null),
       readLatestLifecycleCycleReceipt(paths.receipt),
+      readNewRecheckStore(paths.newRecheck),
       workspace(),
     ]);
     const now = new Date();
@@ -183,6 +189,14 @@ export function createLifecycleService(options: {
       const identity = safeIdentity(candidate.chain, candidate.contract_address);
       return identity ? [[identity, candidate] as const] : [];
     }));
+    const freshRecheckByIdentity = new Map<string, PersistableScannerOutput["candidates"][number]>();
+    for (const entry of newRecheck.entries) {
+      const candidate = preferredNewRecheckCandidate(entry.identity, candidateByIdentity.get(entry.identity) ?? null, { ...newRecheck, entries: [entry] });
+      if (candidate && candidate !== candidateByIdentity.get(entry.identity)) {
+        candidateByIdentity.set(entry.identity, candidate);
+        freshRecheckByIdentity.set(entry.identity, candidate);
+      }
+    }
     const actor = { role: session.role, capabilities: [...session.capabilities] };
     const makeCard = (identity: string, systemStatus: SystemLifecycleStatus, inboxEntry: Awaited<ReturnType<typeof readNewInboxStore>>["entries"][number] | null, followEntry: FollowUpEntry | null, mainEntry: EstablishedAddressUniverseEntry | null): LifecycleRadarCard => {
       const candidate = candidateByIdentity.get(identity) ?? null;
@@ -209,7 +223,7 @@ export function createLifecycleService(options: {
         display_name: inboxEntry?.display_name ?? followEntry?.display_name ?? mainEntry?.display_name ?? candidate?.name ?? null,
         symbol: inboxEntry?.symbol ?? followEntry?.symbol_hint ?? mainEntry?.symbol_hint ?? candidate?.symbol ?? null,
         first_seen_at: inboxEntry?.first_seen_at ?? followEntry?.first_seen_at ?? now.toISOString(),
-        last_seen_at: inboxEntry?.last_seen_at ?? followEntry?.last_seen_at ?? now.toISOString(),
+        last_seen_at: freshRecheckByIdentity.get(identity)?.created_at ?? inboxEntry?.last_seen_at ?? followEntry?.last_seen_at ?? now.toISOString(),
         snapshot_present: candidate !== null,
         snapshot_absence_notice: inboxEntry !== null && candidate === null,
         market: candidate ? {
@@ -314,6 +328,18 @@ function isActionDue(card: LifecycleRadarCard, now: Date): boolean {
   return due || card.follow_up?.lifecycle_status === "CANDIDATE_FOR_ESTABLISHED" && card.conditions.readiness === "CONDITIONS_UNMET" || card.conditions.missing_data.length > 0 || card.conditions.risks.length > 0;
 }
 function finite(value: number | null): number | null { return typeof value === "number" && Number.isFinite(value) ? value : null; }
+
+function preferredNewRecheckCandidate(
+  identity: string,
+  snapshotCandidate: PersistableScannerOutput["candidates"][number] | null,
+  recheck: NewRecheckStore,
+): PersistableScannerOutput["candidates"][number] | null {
+  const entry = recheck.entries.find((candidate) => candidate.identity === identity);
+  const fresh = entry?.latest_normalized_candidate ?? null;
+  if (!fresh || !entry?.latest_source_timestamp || fresh.contract_address === null || safeIdentity(fresh.chain, fresh.contract_address) !== identity) return snapshotCandidate;
+  const snapshotTimestamp = snapshotCandidate ? Date.parse(snapshotCandidate.created_at) : Number.NEGATIVE_INFINITY;
+  return Date.parse(entry.latest_source_timestamp) > snapshotTimestamp ? fresh : snapshotCandidate;
+}
 
 function normalizeIdentity(chain: string, address: string): { identity: string } {
   try {

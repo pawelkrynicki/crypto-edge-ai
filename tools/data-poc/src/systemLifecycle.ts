@@ -6,6 +6,7 @@ import {
   normalizeEstablishedAddress,
   normalizeEstablishedChain,
   universeIdentityKey,
+  type EstablishedAddressUniverse,
   type SupportedEstablishedChain,
 } from "./establishedAddressUniverse.js";
 import {
@@ -84,6 +85,8 @@ export type LifecycleAuditEntry = {
   central_cycle_id: string | null;
   scanner_run_id: string | null;
   context_run_id: string | null;
+  /** Present only for a central New-incubation observation. */
+  recheck_id?: string | null;
   policy_version: typeof SYSTEM_LIFECYCLE_POLICY_VERSION;
   conditions_met: string[];
   conditions_unmet: string[];
@@ -189,6 +192,13 @@ export type SystemLifecycleRunResult = {
   follow_up_store: FollowUpStore;
   lifecycle_receipt: LifecycleCycleReceipt;
   summary: LifecycleSummary;
+};
+
+export type NewRecheckLifecycleResult = {
+  identity: string;
+  evaluation: LifecycleConditions;
+  promoted_to_follow_up: number;
+  duplicate_noop: number;
 };
 
 const MAX_AUDIT_ENTRIES = 5_000;
@@ -546,19 +556,22 @@ async function applySystemLifecycleLocked(snapshot: PersistableScannerOutput, op
   for (const [identity, candidate] of eligibleCandidates) {
     if (followUpStore.entries.some((entry) => universeIdentityKey(entry.chain, entry.contract_address) === identity)) continue;
     const evaluation = evaluateNewToFollowUp(candidate, snapshot, { inFollowUp: false, inMainRadar: false });
-    const transition = newTransition({ identity, previous: "NEW", next: "FOLLOW_UP", now, cycleId, scannerRunId, contextRunId: options.contextRunId ?? null, evaluation, reason: "NEW_TO_FOLLOW_UP_POLICY", dedupe: "APPLIED" });
-    const journal = await createLifecycleOperationJournal({ identity, previous: "NEW", target: "FOLLOW_UP", cycleId, scannerRunId, now, transition }, journalPath);
-    await failAt(options, "PLAN_CREATED", identity);
-    followUpStore = await updateFollowUpStore((current) => ingestScannerSnapshot(current, { ...snapshot, candidates: [candidate] }, universeStore.current), { storePath: options.followUpStorePath, now });
-    await updateLifecycleOperationJournalStage(journal.operation_id, "TARGET_STORE_APPLIED", journalPath, now);
-    await failAt(options, "TARGET_STORE_APPLIED", identity);
-    await setInboxLifecycleStatus(identity, "FOLLOW_UP", transition, newInboxPath, now);
-    await updateLifecycleOperationJournalStage(journal.operation_id, "NEW_INBOX_APPLIED", journalPath, now);
-    await failAt(options, "NEW_INBOX_APPLIED", identity);
-    await appendLifecycleAudit([transition], auditPath, now);
-    await updateLifecycleOperationJournalStage(journal.operation_id, "AUDIT_APPLIED", journalPath, now);
-    await failAt(options, "AUDIT_APPLIED", identity);
-    await updateLifecycleOperationJournalStage(journal.operation_id, "COMMITTED", journalPath, now);
+    followUpStore = await promoteNewCandidateToFollowUp({
+      identity,
+      candidate,
+      snapshot,
+      evaluation,
+      cycleId,
+      scannerRunId,
+      contextRunId: options.contextRunId ?? null,
+      now,
+      journalPath,
+      newInboxPath,
+      auditPath,
+      followUpStorePath: options.followUpStorePath,
+      universe: universeStore.current,
+      failureInjection: options.failureInjection,
+    });
     promotedFollowUp += 1;
   }
   duplicateNoop += snapshot.candidates.filter((candidate) => {
@@ -648,6 +661,77 @@ async function applySystemLifecycleLocked(snapshot: PersistableScannerOutput, op
     lifecycle_receipt: lifecycleReceipt,
     summary: buildLifecycleSummary(updatedInbox, followUpStore, finalUniverse.current.entries.filter((entry) => entry.enabled).length, lifecycleReceipt, now),
   };
+}
+
+/**
+ * Applies the same New -> Follow-up policy used by scanner lifecycle cycles,
+ * but deliberately does not evaluate the legacy Follow-up -> Main path.
+ */
+export async function applyNewRecheckLifecycle(candidate: PersistableCandidate, options: {
+  recheckId: string;
+  centralCycleId?: string | null;
+  scannerRunId: string;
+  newInboxStorePath?: string;
+  auditStorePath?: string;
+  operationJournalPath?: string;
+  followUpStorePath?: string;
+  establishedStorePath?: string;
+  now?: Date;
+  failureInjection?: (stage: LifecycleOperationStage, identity: string) => void | Promise<void>;
+}): Promise<NewRecheckLifecycleResult> {
+  const lifecycleLockPath = `${options.newInboxStorePath ?? getDefaultNewInboxStorePath()}.system-lifecycle`;
+  return withStoreLock(lifecycleLockPath, async () => {
+    const now = options.now ?? new Date();
+    const normalized = safeIdentity(candidate.chain, candidate.contract_address);
+    if (!normalized) throw new Error("NEW_RECHECK_IDENTITY_INVALID");
+    const newInboxPath = options.newInboxStorePath ?? getDefaultNewInboxStorePath();
+    const auditPath = options.auditStorePath ?? getDefaultLifecycleAuditStorePath();
+    const journalPath = options.operationJournalPath ?? (options.newInboxStorePath ? resolve(dirname(newInboxPath), "operation-journal.json") : getDefaultLifecycleOperationJournalPath());
+    const establishedPath = options.establishedStorePath ?? getDefaultEstablishedUniverseStorePath();
+    const [inbox, followUp, universeStore] = await Promise.all([
+      readNewInboxStore(newInboxPath),
+      readFollowUpStore(options.followUpStorePath),
+      readEstablishedUniverseStore(establishedPath),
+    ]);
+    const existing = inbox.entries.find((entry) => entry.identity === normalized.identity);
+    const inFollowUp = followUp.entries.some((entry) => universeIdentityKey(entry.chain, entry.contract_address) === normalized.identity);
+    const inMainRadar = universeStore.current.entries.some((entry) => entry.enabled && universeIdentityKey(entry.chain, entry.contract_address) === normalized.identity);
+    const snapshot = newRecheckSnapshot(options.scannerRunId, now);
+    const evaluation = evaluateNewToFollowUp(candidate, snapshot, { inFollowUp, inMainRadar });
+    if (!existing || existing.system_status !== "NEW" || existing.archived_at || existing.rejected_at) {
+      return { identity: normalized.identity, evaluation, promoted_to_follow_up: 0, duplicate_noop: inFollowUp || inMainRadar ? 1 : 0 };
+    }
+    await updateNewInboxStore((current) => {
+      let changed = false;
+      const entries = current.entries.map((entry) => {
+        if (entry.identity !== normalized.identity || canonical(entry.last_evaluation) === canonical(evaluation)) return entry;
+        changed = true;
+        return { ...entry, last_evaluation: evaluation };
+      });
+      return changed ? finalizeInbox({ ...current, store_version: current.store_version + 1, entries }, now) : current;
+    }, newInboxPath);
+    if (evaluation.readiness !== "CONDITIONS_MET" || inFollowUp || inMainRadar) {
+      return { identity: normalized.identity, evaluation, promoted_to_follow_up: 0, duplicate_noop: inFollowUp || inMainRadar ? 1 : 0 };
+    }
+    await promoteNewCandidateToFollowUp({
+      identity: normalized.identity,
+      candidate,
+      snapshot,
+      evaluation,
+      cycleId: options.centralCycleId ?? options.recheckId,
+      scannerRunId: options.scannerRunId,
+      contextRunId: null,
+      recheckId: options.recheckId,
+      now,
+      journalPath,
+      newInboxPath,
+      auditPath,
+      followUpStorePath: options.followUpStorePath,
+      universe: universeStore.current,
+      failureInjection: options.failureInjection,
+    });
+    return { identity: normalized.identity, evaluation, promoted_to_follow_up: 1, duplicate_noop: 0 };
+  });
 }
 
 export function buildLifecycleSummary(inbox: NewInboxStore, followUp: FollowUpStore, mainRadarTotal = 0, receipt: LifecycleCycleReceipt | null = null, now = new Date()): LifecycleSummary {
@@ -819,6 +903,51 @@ export async function recoverIncompleteLifecycleOperations(options: {
   return recovered;
 }
 
+async function promoteNewCandidateToFollowUp(input: {
+  identity: string;
+  candidate: PersistableCandidate;
+  snapshot: Pick<PersistableScannerOutput, "scan_run" | "provenance">;
+  evaluation: LifecycleConditions;
+  cycleId: string;
+  scannerRunId: string;
+  contextRunId: string | null;
+  recheckId?: string;
+  now: Date;
+  journalPath: string;
+  newInboxPath: string;
+  auditPath: string;
+  followUpStorePath?: string;
+  universe: EstablishedAddressUniverse;
+  failureInjection?: (stage: LifecycleOperationStage, identity: string) => void | Promise<void>;
+}): Promise<FollowUpStore> {
+  const transition = newTransition({
+    identity: input.identity,
+    previous: "NEW",
+    next: "FOLLOW_UP",
+    now: input.now,
+    cycleId: input.cycleId,
+    scannerRunId: input.scannerRunId,
+    contextRunId: input.contextRunId,
+    recheckId: input.recheckId ?? null,
+    evaluation: input.evaluation,
+    reason: "NEW_TO_FOLLOW_UP_POLICY",
+    dedupe: "APPLIED",
+  });
+  const journal = await createLifecycleOperationJournal({ identity: input.identity, previous: "NEW", target: "FOLLOW_UP", cycleId: input.cycleId, scannerRunId: input.scannerRunId, now: input.now, transition }, input.journalPath);
+  await failAt(input, "PLAN_CREATED", input.identity);
+  const followUpStore = await updateFollowUpStore((current) => ingestScannerSnapshot(current, { ...input.snapshot, candidates: [input.candidate] } as PersistableScannerOutput, input.universe), { storePath: input.followUpStorePath, now: input.now });
+  await updateLifecycleOperationJournalStage(journal.operation_id, "TARGET_STORE_APPLIED", input.journalPath, input.now);
+  await failAt(input, "TARGET_STORE_APPLIED", input.identity);
+  await setInboxLifecycleStatus(input.identity, "FOLLOW_UP", transition, input.newInboxPath, input.now);
+  await updateLifecycleOperationJournalStage(journal.operation_id, "NEW_INBOX_APPLIED", input.journalPath, input.now);
+  await failAt(input, "NEW_INBOX_APPLIED", input.identity);
+  await appendLifecycleAudit([transition], input.auditPath, input.now);
+  await updateLifecycleOperationJournalStage(journal.operation_id, "AUDIT_APPLIED", input.journalPath, input.now);
+  await failAt(input, "AUDIT_APPLIED", input.identity);
+  await updateLifecycleOperationJournalStage(journal.operation_id, "COMMITTED", input.journalPath, input.now);
+  return followUpStore;
+}
+
 async function setInboxLifecycleStatus(identity: string, status: Exclude<SystemLifecycleStatus, "NEW">, transition: LifecycleAuditEntry, path: string, now: Date): Promise<NewInboxStore> {
   return updateNewInboxStore((current) => {
     let changed = false;
@@ -872,8 +1001,8 @@ function validateNewInboxEntry(value: unknown): NewInboxEntry {
 }
 
 function validateAuditEntry(value: unknown): LifecycleAuditEntry {
-  if (!record(value) || typeof value.transition_id !== "string" || !/^tr_[A-Za-z0-9_-]{8,80}$/.test(value.transition_id) || !["SYSTEM", "USER"].includes(String(value.transition_kind)) || typeof value.identity !== "string" || !(value.previous_status === null || ["NEW", "FOLLOW_UP", "MAIN_RADAR"].includes(String(value.previous_status))) || !["NEW", "FOLLOW_UP", "MAIN_RADAR"].includes(String(value.new_status)) || !isoText(value.changed_at) || !(value.central_cycle_id === null || safeRun(value.central_cycle_id)) || !(value.scanner_run_id === null || safeRun(value.scanner_run_id)) || !(value.context_run_id === null || safeRun(value.context_run_id)) || value.policy_version !== SYSTEM_LIFECYCLE_POLICY_VERSION || !["APPLIED", "DUPLICATE_NOOP", "BLOCKED"].includes(String(value.dedupe_result)) || typeof value.reason !== "string") throw new Error("LIFECYCLE_AUDIT_STORE_INVALID");
-  return {
+  if (!record(value) || typeof value.transition_id !== "string" || !/^tr_[A-Za-z0-9_-]{8,80}$/.test(value.transition_id) || !["SYSTEM", "USER"].includes(String(value.transition_kind)) || typeof value.identity !== "string" || !(value.previous_status === null || ["NEW", "FOLLOW_UP", "MAIN_RADAR"].includes(String(value.previous_status))) || !["NEW", "FOLLOW_UP", "MAIN_RADAR"].includes(String(value.new_status)) || !isoText(value.changed_at) || !(value.central_cycle_id === null || safeRun(value.central_cycle_id)) || !(value.scanner_run_id === null || safeRun(value.scanner_run_id)) || !(value.context_run_id === null || safeRun(value.context_run_id)) || !(value.recheck_id === undefined || value.recheck_id === null || safeRun(value.recheck_id)) || value.policy_version !== SYSTEM_LIFECYCLE_POLICY_VERSION || !["APPLIED", "DUPLICATE_NOOP", "BLOCKED"].includes(String(value.dedupe_result)) || typeof value.reason !== "string") throw new Error("LIFECYCLE_AUDIT_STORE_INVALID");
+  const base: LifecycleAuditEntry = {
     transition_id: value.transition_id,
     transition_kind: value.transition_kind as "SYSTEM" | "USER",
     identity: value.identity,
@@ -893,6 +1022,7 @@ function validateAuditEntry(value: unknown): LifecycleAuditEntry {
     dedupe_result: value.dedupe_result as LifecycleAuditEntry["dedupe_result"],
     reason: value.reason,
   };
+  return value.recheck_id === undefined ? base : { ...base, recheck_id: value.recheck_id };
 }
 
 function validateJournalEntry(value: unknown): LifecycleOperationJournalEntry {
@@ -941,8 +1071,15 @@ function conditions(met: string[], unmet: string[], missing: string[], risks: st
   return { conditions_met: unique(met), conditions_unmet: unique(unmet), missing_data: unique(missing), risks: unique(risks), readiness: unmet.length === 0 ? "CONDITIONS_MET" : "CONDITIONS_UNMET", security_state: security, verification_state: verification };
 }
 
-function newTransition(input: { identity: string; previous: SystemLifecycleStatus | null; next: SystemLifecycleStatus; now: Date; cycleId: string; scannerRunId: string; contextRunId: string | null; evaluation: LifecycleConditions; reason: string; dedupe: LifecycleAuditEntry["dedupe_result"] }): LifecycleAuditEntry {
-  return { transition_id: `tr_${randomUUID().replace(/-/g, "")}`, transition_kind: "SYSTEM", identity: input.identity, previous_status: input.previous, new_status: input.next, changed_at: iso(input.now), central_cycle_id: input.cycleId, scanner_run_id: input.scannerRunId, context_run_id: input.contextRunId, policy_version: SYSTEM_LIFECYCLE_POLICY_VERSION, conditions_met: input.evaluation.conditions_met, conditions_unmet: input.evaluation.conditions_unmet, missing_data: input.evaluation.missing_data, readiness: input.evaluation.readiness, security_state: input.evaluation.security_state, verification_state: input.evaluation.verification_state, dedupe_result: input.dedupe, reason: input.reason };
+function newTransition(input: { identity: string; previous: SystemLifecycleStatus | null; next: SystemLifecycleStatus; now: Date; cycleId: string; scannerRunId: string; contextRunId: string | null; recheckId?: string | null; evaluation: LifecycleConditions; reason: string; dedupe: LifecycleAuditEntry["dedupe_result"] }): LifecycleAuditEntry {
+  return { transition_id: `tr_${randomUUID().replace(/-/g, "")}`, transition_kind: "SYSTEM", identity: input.identity, previous_status: input.previous, new_status: input.next, changed_at: iso(input.now), central_cycle_id: input.cycleId, scanner_run_id: input.scannerRunId, context_run_id: input.contextRunId, ...(input.recheckId ? { recheck_id: input.recheckId } : {}), policy_version: SYSTEM_LIFECYCLE_POLICY_VERSION, conditions_met: input.evaluation.conditions_met, conditions_unmet: input.evaluation.conditions_unmet, missing_data: input.evaluation.missing_data, readiness: input.evaluation.readiness, security_state: input.evaluation.security_state, verification_state: input.evaluation.verification_state, dedupe_result: input.dedupe, reason: input.reason };
+}
+
+function newRecheckSnapshot(scannerRunId: string, now: Date): Pick<PersistableScannerOutput, "scan_run" | "provenance"> {
+  return {
+    scan_run: { run_id: scannerRunId } as PersistableScannerOutput["scan_run"],
+    provenance: { contract_version: "new_recheck_v1", fixture_used: false, generated_at: iso(now) } as unknown as PersistableScannerOutput["provenance"],
+  };
 }
 
 function finalizeInbox(store: Omit<NewInboxStore, "checksum"> | NewInboxStore, now: Date): NewInboxStore {

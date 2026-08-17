@@ -149,6 +149,7 @@ export type ScannerApiHandlerOptions = {
   aiResearch?: AIResearchApiOptions;
   lifecycle?: {
     newInboxStorePath?: string;
+    newRecheckStorePath?: string;
     auditStorePath?: string;
     cycleReceiptPath?: string;
     workspaceDatabasePath?: string;
@@ -274,6 +275,7 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
     followUpStorePath: options.followUp?.storePath,
     establishedStorePath: options.establishedUniverse?.storeFilePath,
     newInboxStorePath: options.lifecycle?.newInboxStorePath,
+    newRecheckStorePath: options.lifecycle?.newRecheckStorePath,
     auditStorePath: options.lifecycle?.auditStorePath,
     cycleReceiptPath: options.lifecycle?.cycleReceiptPath,
     workspace: options.lifecycle?.workspace,
