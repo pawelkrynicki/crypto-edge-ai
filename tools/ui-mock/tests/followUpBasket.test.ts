@@ -101,7 +101,37 @@ describe("Follow-up read-only product boundary", () => {
     }
   });
 
-  it("renders three Radar layers, sub-24-hour age, lifecycle copy, and no promotion action in EN and PL", () => {
+  it("retains the last valid market snapshot when a newer observation is incomplete", () => {
+    const first = ingestFollowUpObservations(
+      createEmptyFollowUpStore(),
+      [observation()],
+      "2026-06-01T10:00:00.000Z",
+      "scan_valid_market",
+    );
+    const incomplete = {
+      ...observation(),
+      price_usd: null,
+      liquidity_usd: null,
+    };
+    const next = ingestFollowUpObservations(
+      first,
+      [incomplete],
+      "2026-06-01T11:00:00.000Z",
+      "scan_incomplete_market",
+    );
+    assert.deepEqual(next.entries[0]?.last_valid_market_snapshot, {
+      captured_at: "2026-06-01T10:00:00.000Z",
+      price_usd: 1,
+      market_cap_usd: 1_000_000,
+      fdv_usd: 1_000_000,
+      liquidity_usd: 20_000,
+      volume_24h_usd: 100_000,
+      volume_market_cap_ratio: 0.1,
+      pair_age_days: 31,
+    });
+  });
+
+  it("renders the accepted beginner Radar copy, lifecycle labels, and no promotion action in EN and PL", () => {
     const entry = publicEntry();
     const status = publicStatus();
     for (const locale of ["en", "pl"] as const) {
@@ -110,14 +140,14 @@ describe("Follow-up read-only product boundary", () => {
         followUpEntries: [entry],
         followUpStatus: status,
       }));
-      assert.match(markup, locale === "pl" ? /Trzy warstwy Radaru/ : /Three Radar layers/);
+      assert.match(markup, locale === "pl" ? /Radar projektów/ : /Project Radar/);
       assert.match(markup, locale === "pl" ? /Dalsza obserwacja/ : /Maturing \/ follow-up/);
       assert.match(markup, locale === "pl" ? /Główny Radar/ : /Established \/ main Radar/);
       assert.doesNotMatch(markup, /Add to Established|Dodaj do Established/);
       if (locale === "pl") {
         assert.doesNotMatch(markup, />MATURING</);
         assert.doesNotMatch(markup, /CANDIDATE FOR ESTABLISHED/);
-        assert.match(markup, /Kandydaci do Głównego Radaru/);
+        assert.match(markup, /Kandydat do Established/);
       } else {
         assert.match(markup, /Maturing/);
         assert.match(markup, /Candidate for Established/);

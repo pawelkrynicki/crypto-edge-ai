@@ -11,6 +11,7 @@ import { applySystemLifecycle, evaluateFollowUpToMainRadar, type LifecycleCondit
 import { findLatestManualVerification, ingestFollowUpObservations, readFollowUpStore, updateFollowUpStore } from "../../data-poc/src/followUpBasket.js";
 import type { PersistableCandidate, PersistableScannerOutput } from "../../data-poc/src/persistableScannerModel.js";
 import { createScannerApiServer } from "../server/scannerApiServer.js";
+import { resolveLifecycleMarketObservation } from "../server/lifecycleService.js";
 import { createUserWorkspaceRepository, UserWorkspaceError } from "../server/userWorkspaceRepository.js";
 import { ProductAppContent, lifecycleCardToCandidate, lifecycleStatusToBasket, type ProductAppDataSources } from "../src/ProductApp.js";
 import { CandidateResultsView } from "../src/components/CandidateResultsView.js";
@@ -252,7 +253,7 @@ describe("PC.1 bounded lifecycle Radar API", () => {
         action_due: { cards: Array<{ conditions: LifecycleConditions }> };
         candidates_ready: { cards: Array<{ conditions: LifecycleConditions }> };
         observed: { cards: Array<{ conditions: LifecycleConditions }> };
-      } };
+      }; private_baskets: { follow_up: { cards: Array<{ follow_up: { action_due: boolean } | null }> } } };
       const expected = evaluateFollowUpToMainRadar(entry, {
         lastCompletedCentralCycleId: run.lifecycle_receipt.central_cycle_id,
         currentScannerRunId: snapshot.scan_run.run_id,
@@ -270,12 +271,115 @@ describe("PC.1 bounded lifecycle Radar API", () => {
       assert.deepEqual(radarCard?.conditions, expected);
       assert.equal(expected.readiness, "CONDITIONS_UNMET");
       assert.equal(expected.conditions_unmet.includes("FRESH_FOLLOW_UP_DATA_CURRENT_CYCLE"), true);
+      assert.equal(radar.private_baskets.follow_up.cards[0]?.follow_up?.action_due, true, "the CAMP_USER Follow-up basket preserves the current action-due flag");
       const summary = JSON.parse(summaryResponse.body) as { follow_up_action_due: number; follow_up_candidates_ready: number };
       assert.equal(summary.follow_up_action_due, radar.follow_up.action_due.cards.length, "the summary uses the same current action-due grouping as Radar");
       assert.equal(summary.follow_up_candidates_ready, radar.follow_up.candidates_ready.cards.length);
     } finally {
       await close(server);
       repository.close();
+    }
+  });
+
+  it("uses a newer valid Follow-up observation when the latest scanner row is absent or older", () => {
+    const candidate = {
+      ...lifecycleConditionsSnapshot().candidates[0]!,
+      created_at: "2026-08-17T12:00:00.000Z",
+      price_usd: 0.001,
+      market_cap_usd: 1_000_000,
+      liquidity_usd: 100_000,
+      volume_24h_usd: 300_000,
+    };
+    const followUpSnapshot = {
+      captured_at: "2026-08-17T13:32:08.630Z",
+      price_usd: 0.002002,
+      market_cap_usd: 2_002_830,
+      fdv_usd: 2_002_829,
+      liquidity_usd: 156_562.6,
+      volume_24h_usd: 737_569.94,
+      volume_market_cap_ratio: 0.3682638766145903,
+      pair_age_days: 16,
+    };
+    const absentFromScanner = resolveLifecycleMarketObservation({
+      scanner_candidate: null,
+      scanner_observed_at: null,
+      scanner_source: "CURRENT_SCANNER",
+      follow_up_snapshot: followUpSnapshot,
+    });
+    const newerFollowUp = resolveLifecycleMarketObservation({
+      scanner_candidate: candidate,
+      scanner_observed_at: candidate.created_at,
+      scanner_source: "CURRENT_SCANNER",
+      follow_up_snapshot: followUpSnapshot,
+    });
+    assert.deepEqual(absentFromScanner, {
+      price_usd: 0.002002,
+      market_cap_usd: 2_002_830,
+      liquidity_usd: 156_562.6,
+      volume_24h_usd: 737_569.94,
+      observed_at: "2026-08-17T13:32:08.630Z",
+      source: "FOLLOW_UP",
+    });
+    assert.deepEqual(newerFollowUp, absentFromScanner);
+  });
+
+  it("renders Follow-up market data and action-due copy without internal security keys", async () => {
+    const card: LifecycleRadarCard = {
+      ...lifecycleCard(0),
+      system_status: "FOLLOW_UP",
+      user_status: "FOLLOW_UP",
+      market: {
+        price_usd: 0.002002,
+        market_cap_usd: 2_002_830,
+        liquidity_usd: 156_562.6,
+        volume_24h_usd: 737_569.94,
+        observed_at: "2026-08-17T13:32:08.630Z",
+        source: "FOLLOW_UP",
+      },
+      follow_up: {
+        lifecycle_status: "CANDIDATE_FOR_ESTABLISHED",
+        next_check_at: null,
+        last_checked_at: "2026-08-17T13:32:08.630Z",
+        missing_data: ["honeypot_status", "liquidity_locked", "top_10_wallets_pct", "honeypot_source"],
+        risk_flags: [],
+        action_due: true,
+      },
+      conditions: UNMET,
+      actor: { role: "CAMP_USER", capabilities: ["CAMP_USER_WORKSPACE_WRITE"] },
+    };
+    const group = { total: 1, displayed: 1, limit: 24, next_cursor: null, cards: [card] };
+    const empty = { total: 0, displayed: 0, limit: 24, next_cursor: null, cards: [] as LifecycleRadarCard[] };
+    const radar: LifecycleRadarView = {
+      ...lifecycleRadar(0),
+      actor: card.actor,
+      summary: { ...lifecycleRadar(0).summary, system_follow_up_total: 1, follow_up_action_due: 1, follow_up_displayed: 1 },
+      follow_up: { action_due: group, candidates_ready: empty, observed: empty },
+      private_new_total: 0,
+      private_follow_up_total: 1,
+      private_baskets: { new: empty, follow_up: group, main_radar: empty },
+    };
+    let renderer: ReturnType<typeof create> | undefined;
+    try {
+      await act(async () => {
+        renderer = create(React.createElement(
+          ProductLocaleProvider,
+          { initialLocale: "pl" },
+          React.createElement(CandidateResultsView, {
+            candidates: [],
+            lifecycleRadar: radar,
+            lifecycleSummary: radar.summary,
+            preferredLifecycleBasket: "maturing",
+          }),
+        ));
+      });
+      const markup = JSON.stringify(renderer!.toJSON());
+      assert.match(markup, /Ostatnie dane/);
+      assert.match(markup, /Wymaga analizy teraz/);
+      assert.match(markup, /Brakuje 4 elementów bezpieczeństwa/);
+      assert.doesNotMatch(markup, /honeypot_status|liquidity_locked|top_10_wallets_pct|honeypot_source/);
+      assert.equal((markup.match(/Brak danych/g) ?? []).length, 0);
+    } finally {
+      if (renderer) await act(async () => { renderer!.unmount(); });
     }
   });
 

@@ -398,7 +398,11 @@ export function ingestFollowUpObservations(
         lifecycle_status: observedLifecycle,
         candidate_since: observedLifecycle === "CANDIDATE_FOR_ESTABLISHED" ? existing.candidate_since ?? observedAt : null,
         archived_at: observedLifecycle === "ARCHIVED" ? existing.archived_at ?? observedAt : null,
-        last_valid_market_snapshot: marketSnapshot(candidate, observedAt),
+        last_valid_market_snapshot: retainLatestValidMarketSnapshot(
+          existing.last_valid_market_snapshot,
+          candidate,
+          observedAt,
+        ),
         latest_filter_result: filterResult(candidate, observedAt),
         source_run_id: sourceRunId,
       }
@@ -418,7 +422,7 @@ export function ingestFollowUpObservations(
         lifecycle_status: observedLifecycle,
         candidate_since: null,
         archived_at: null,
-        last_valid_market_snapshot: marketSnapshot(candidate, observedAt),
+        last_valid_market_snapshot: retainLatestValidMarketSnapshot(null, candidate, observedAt),
         latest_filter_result: filterResult(candidate, observedAt),
         latest_security_status: manualVerificationSecurityStatus(
           findLatestManualVerification(store, identity.chain, identity.contract_address),
@@ -558,7 +562,11 @@ export function applyFollowUpRecheckSuccess(
       lifecycle_status: lifecycle,
       candidate_since: lifecycle === "CANDIDATE_FOR_ESTABLISHED" ? entry.candidate_since ?? checkedAt : entry.candidate_since,
       archived_at: lifecycle === "ARCHIVED" ? entry.archived_at ?? checkedAt : null,
-      last_valid_market_snapshot: marketSnapshot(result.candidate, checkedAt),
+      last_valid_market_snapshot: retainLatestValidMarketSnapshot(
+        entry.last_valid_market_snapshot,
+        result.candidate,
+        checkedAt,
+      ),
       latest_filter_result: filter,
       latest_security_status: result.security_status ?? manualSecurityStatus(),
       source_run_id: result.source_run_id,
@@ -794,6 +802,32 @@ function marketSnapshot(candidate: FollowUpObservationCandidate, capturedAt: str
     volume_market_cap_ratio: nullableFinite(candidate.volume_market_cap_ratio),
     pair_age_days: nullableFinite(candidate.pair_age_days),
   };
+}
+
+/**
+ * Follow-up market data is last-known-good: a later partial or invalid
+ * observation may update lifecycle state, but cannot erase the most recent
+ * complete market observation for the same chain + contract identity.
+ */
+function retainLatestValidMarketSnapshot(
+  existing: FollowUpMarketSnapshot | null,
+  candidate: FollowUpObservationCandidate,
+  capturedAt: string,
+): FollowUpMarketSnapshot | null {
+  const next = marketSnapshot(candidate, capturedAt);
+  const current = existing !== null && isCompleteMarketSnapshot(existing) ? existing : null;
+  if (!isCompleteMarketSnapshot(next)) return current;
+  if (current !== null && Date.parse(current.captured_at) > Date.parse(next.captured_at)) return current;
+  return next;
+}
+
+function isCompleteMarketSnapshot(snapshot: FollowUpMarketSnapshot): boolean {
+  return [
+    snapshot.price_usd,
+    snapshot.market_cap_usd,
+    snapshot.liquidity_usd,
+    snapshot.volume_24h_usd,
+  ].every((value) => typeof value === "number" && Number.isFinite(value) && value > 0);
 }
 
 function filterResult(candidate: FollowUpObservationCandidate, evaluatedAt: string): FollowUpFilterResult {

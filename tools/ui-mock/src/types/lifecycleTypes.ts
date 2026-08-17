@@ -43,8 +43,8 @@ export type LifecycleRadarCard = LifecycleTokenView & {
   last_seen_at: string;
   snapshot_present: boolean;
   snapshot_absence_notice: boolean;
-  market: { price_usd: number | null; market_cap_usd: number | null; liquidity_usd: number | null; volume_24h_usd: number | null } | null;
-  follow_up: { lifecycle_status: string; next_check_at: string | null; last_checked_at: string | null; missing_data: string[]; risk_flags: string[] } | null;
+  market: { price_usd: number; market_cap_usd: number; liquidity_usd: number; volume_24h_usd: number; observed_at: string; source: "CURRENT_SCANNER" | "NEW_RECHECK" | "FOLLOW_UP" } | null;
+  follow_up: { lifecycle_status: string; next_check_at: string | null; last_checked_at: string | null; missing_data: string[]; risk_flags: string[]; action_due: boolean } | null;
 };
 export type LifecycleRadarGroup = { total: number; displayed: number; limit: number; next_cursor: string | null; cards: LifecycleRadarCard[] };
 export type LifecyclePrivateBaskets = { new: LifecycleRadarGroup; follow_up: LifecycleRadarGroup; main_radar: LifecycleRadarGroup };

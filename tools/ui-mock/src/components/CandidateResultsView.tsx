@@ -327,22 +327,23 @@ function PrivateLifecycleBasket({ basket, group, locale, onLoadMore, onOpenDetai
 function LifecycleRadarCardView({ card, locale, absentNotice, onOpenDetails, onLifecycleChanged }: { card: LifecycleRadarCard; locale: ProductLocale; absentNotice?: string; onOpenDetails?: (identity: { chain: string; contract_address: string }) => void; onLifecycleChanged?: (view: LifecycleTokenView) => void | Promise<void> }) {
   const { t } = useProductLocale();
   const copy = locale === "pl"
-    ? { firstSeen: "Pierwsze wykrycie", lastSeen: "Ostatnie wykrycie", price: "Cena", marketCap: "Kapitalizacja", liquidity: "Płynność", volume: "Wolumen 24h", snapshot: "Snapshot", nextCheck: "Następne sprawdzenie", missingData: "Brakujące dane", none: "Brak" }
-    : { firstSeen: "First seen", lastSeen: "Last seen", price: "Price", marketCap: "Market cap", liquidity: "Liquidity", volume: "24h volume", snapshot: "Snapshot", nextCheck: "Next check", missingData: "Missing data", none: "None" };
+    ? { firstSeen: "Pierwsze wykrycie", lastSeen: "Ostatnie wykrycie", price: "Cena", marketCap: "Kapitalizacja", liquidity: "Płynność", volume: "Wolumen 24h", marketData: "Ostatnie dane", nextCheck: "Następne sprawdzenie", securityData: "Dane bezpieczeństwa", none: "Brak", noMarketData: "Brak aktualnych danych rynkowych", actionNow: "Wymaga analizy teraz", noAutomaticCheck: "Nie zaplanowano kolejnego sprawdzenia" }
+    : { firstSeen: "First seen", lastSeen: "Last seen", price: "Price", marketCap: "Market cap", liquidity: "Liquidity", volume: "24h volume", marketData: "Latest data", nextCheck: "Next check", securityData: "Security data", none: "None", noMarketData: "No current market data", actionNow: "Needs review now", noAutomaticCheck: "No next check is scheduled" };
+  const noData = locale === "pl" ? "Brak danych" : "No data";
   return <article className="product-candidate-card observation token-card-compact lifecycle-radar-card" data-lifecycle-card={card.identity}>
     <header className="product-candidate-topline"><div><span className="candidate-results-eyebrow">{formatChain(card.chain, locale === "pl" ? "Brak sieci" : "Network unavailable")}</span><h4>{card.symbol ?? card.display_name ?? card.contract_address} <small>{card.display_name ?? ""}</small></h4><CopyableAddress value={card.contract_address} displayValue={shortenAddress(card.contract_address, locale === "pl" ? "Brak danych" : "No data")} copyLabel={locale === "pl" ? "Kopiuj kontrakt" : "Copy contract"} copiedLabel={locale === "pl" ? "Skopiowano" : "Copied"} className="contract-line" /></div></header>
     <div className="product-metrics-grid">
       <Metric label={copy.firstSeen} value={formatProductDateTime(card.first_seen_at, locale)} />
       <Metric label={copy.lastSeen} value={formatProductDateTime(card.last_seen_at, locale)} />
-      <Metric label={copy.price} value={formatPrice(card.market?.price_usd ?? null, locale === "pl" ? "Brak danych" : "No data")} />
-      <Metric label={copy.marketCap} value={formatProductUsd(card.market?.market_cap_usd ?? null, locale, locale === "pl" ? "Brak danych" : "No data")} />
-      <Metric label={copy.liquidity} value={formatProductUsd(card.market?.liquidity_usd ?? null, locale, locale === "pl" ? "Brak danych" : "No data")} />
-      <Metric label={copy.volume} value={formatProductUsd(card.market?.volume_24h_usd ?? null, locale, locale === "pl" ? "Brak danych" : "No data")} />
+      <Metric label={copy.price} value={formatPrice(card.market?.price_usd ?? null, noData)} />
+      <Metric label={copy.marketCap} value={formatProductUsd(card.market?.market_cap_usd ?? null, locale, noData)} />
+      <Metric label={copy.liquidity} value={formatProductUsd(card.market?.liquidity_usd ?? null, locale, noData)} />
+      <Metric label={copy.volume} value={formatProductUsd(card.market?.volume_24h_usd ?? null, locale, noData)} />
     </div>
     <div className="candidate-explanation-grid">
-      <Explanation label={copy.snapshot} value={card.snapshot_present ? (locale === "pl" ? "Obecny" : "Present") : (locale === "pl" ? "Brak w ostatnim skanie" : "Absent from latest scan")} />
-      <Explanation label={copy.nextCheck} value={card.follow_up?.next_check_at ? formatProductDateTime(card.follow_up.next_check_at, locale) : copy.none} />
-      <Explanation label={copy.missingData} value={card.follow_up?.missing_data.length ? card.follow_up.missing_data.join(", ") : copy.none} />
+      <Explanation label={copy.marketData} value={card.market?.observed_at ? formatProductDateTime(card.market.observed_at, locale) : copy.noMarketData} />
+      <Explanation label={copy.nextCheck} value={card.follow_up?.action_due && card.follow_up.next_check_at === null ? copy.actionNow : card.follow_up?.next_check_at ? formatProductDateTime(card.follow_up.next_check_at, locale) : copy.noAutomaticCheck} />
+      <Explanation label={copy.securityData} value={formatLifecycleMissingSecurity(card.follow_up?.missing_data ?? [], locale, copy.none)} />
     </div>
     {card.snapshot_absence_notice && absentNotice && <p className="product-inline-warning">{absentNotice}</p>}
     <footer className="product-candidate-footer lifecycle-radar-card-footer">
@@ -359,6 +360,16 @@ function LifecycleRadarCardView({ card, locale, absentNotice, onOpenDetails, onL
       />
     </footer>
   </article>;
+}
+
+function formatLifecycleMissingSecurity(missing: string[], locale: ProductLocale, none: string): string {
+  if (missing.length === 0) return none;
+  if (locale === "pl") return missing.length === 1
+    ? "Brakuje 1 elementu bezpieczeństwa. Uzupełnisz go podczas dalszej analizy."
+    : `Brakuje ${missing.length} elementów bezpieczeństwa. Uzupełnisz je podczas dalszej analizy.`;
+  return missing.length === 1
+    ? "1 security item is missing. Complete it during further review."
+    : `${missing.length} security items are missing. Complete them during further review.`;
 }
 
 export function MaturingFollowUpBasket({

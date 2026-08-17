@@ -40,8 +40,17 @@ export type LifecycleRadarCard = LifecycleTokenView & {
   last_seen_at: string;
   snapshot_present: boolean;
   snapshot_absence_notice: boolean;
-  market: { price_usd: number | null; market_cap_usd: number | null; liquidity_usd: number | null; volume_24h_usd: number | null } | null;
-  follow_up: { lifecycle_status: string; next_check_at: string | null; last_checked_at: string | null; missing_data: string[]; risk_flags: string[] } | null;
+  market: LifecycleMarketObservation | null;
+  follow_up: { lifecycle_status: string; next_check_at: string | null; last_checked_at: string | null; missing_data: string[]; risk_flags: string[]; action_due: boolean } | null;
+};
+
+export type LifecycleMarketObservation = {
+  price_usd: number;
+  market_cap_usd: number;
+  liquidity_usd: number;
+  volume_24h_usd: number;
+  observed_at: string;
+  source: "CURRENT_SCANNER" | "NEW_RECHECK" | "FOLLOW_UP";
 };
 
 export type LifecycleRadarGroup = { total: number; displayed: number; limit: number; next_cursor: string | null; cards: LifecycleRadarCard[] };
@@ -201,11 +210,15 @@ export function createLifecycleService(options: {
       return identity ? [[identity, candidate] as const] : [];
     }));
     const freshRecheckByIdentity = new Map<string, PersistableScannerOutput["candidates"][number]>();
+    const freshRecheckTimestampByIdentity = new Map<string, string>();
     for (const entry of newRecheck.entries) {
       const candidate = preferredNewRecheckCandidate(entry.identity, candidateByIdentity.get(entry.identity) ?? null, { ...newRecheck, entries: [entry] });
       if (candidate && candidate !== candidateByIdentity.get(entry.identity)) {
         candidateByIdentity.set(entry.identity, candidate);
         freshRecheckByIdentity.set(entry.identity, candidate);
+        if (entry.latest_source_timestamp !== null) {
+          freshRecheckTimestampByIdentity.set(entry.identity, entry.latest_source_timestamp);
+        }
       }
     }
     const actor = { role: session.role, capabilities: [...session.capabilities] };
@@ -237,15 +250,19 @@ export function createLifecycleService(options: {
         last_seen_at: freshRecheckByIdentity.get(identity)?.created_at ?? inboxEntry?.last_seen_at ?? followEntry?.last_seen_at ?? now.toISOString(),
         snapshot_present: candidate !== null,
         snapshot_absence_notice: inboxEntry !== null && candidate === null,
-        market: candidate ? {
-          price_usd: finite(candidate.price_usd), market_cap_usd: finite(candidate.market_cap_usd), liquidity_usd: finite(candidate.liquidity_usd), volume_24h_usd: finite(candidate.volume_24h_usd),
-        } : null,
+        market: resolveLifecycleMarketObservation({
+          scanner_candidate: candidate,
+          scanner_observed_at: freshRecheckTimestampByIdentity.get(identity) ?? candidate?.created_at ?? null,
+          scanner_source: freshRecheckByIdentity.has(identity) ? "NEW_RECHECK" : "CURRENT_SCANNER",
+          follow_up_snapshot: followEntry?.last_valid_market_snapshot ?? null,
+        }),
         follow_up: followEntry ? {
           lifecycle_status: followEntry.lifecycle_status,
           next_check_at: followEntry.next_check_at,
           last_checked_at: followEntry.last_checked_at,
           missing_data: [...followEntry.latest_security_status.missing_data],
           risk_flags: [...followEntry.latest_security_status.risk_flags],
+          action_due: false,
         } : null,
         system_status: systemStatus,
         user_status: privateEntry?.private_status ?? systemStatus,
@@ -271,8 +288,11 @@ export function createLifecycleService(options: {
       const systemStatus: SystemLifecycleStatus = mainEntry ? "MAIN_RADAR" : inboxEntry?.system_status ?? (followEntry ? "FOLLOW_UP" : "NEW");
       return makeCard(identity, systemStatus, inboxEntry, followEntry, mainEntry);
     });
-    const newCards = cards.filter((card) => card.system_status === "NEW").sort(compareInbox);
-    const followCards = cards.filter((card) => card.system_status === "FOLLOW_UP");
+    const actionAwareCards = cards.map((card) => card.follow_up
+      ? { ...card, follow_up: { ...card.follow_up, action_due: isActionDue(card, now) } }
+      : card);
+    const newCards = actionAwareCards.filter((card) => card.system_status === "NEW").sort(compareInbox);
+    const followCards = actionAwareCards.filter((card) => card.system_status === "FOLLOW_UP");
     const due = followCards.filter((card) => isActionDue(card, now)).sort(compareFollowUpCards);
     const ready = followCards.filter((card) => !due.includes(card) && card.follow_up?.lifecycle_status === "CANDIDATE_FOR_ESTABLISHED" && card.conditions.risks.length === 0).sort(compareFollowUpCards);
     const observed = followCards.filter((card) => !due.includes(card) && !ready.includes(card)).sort(compareFollowUpCards);
@@ -281,9 +301,9 @@ export function createLifecycleService(options: {
     const dueGroup = pageRadarGroup(due, cursor.action_due, input.limit, "action_due", cursor);
     const readyGroup = pageRadarGroup(ready, cursor.candidates_ready, input.limit, "candidates_ready", cursor);
     const observedGroup = pageRadarGroup(observed, cursor.observed, input.limit, "observed", cursor);
-    const privateNewGroup = pageRadarGroup(cards.filter((card) => card.user_status === "NEW").sort(compareInbox), cursor.private_new, input.limit, "private_new", cursor);
-    const privateFollowUpGroup = pageRadarGroup(cards.filter((card) => card.user_status === "FOLLOW_UP").sort(compareInbox), cursor.private_follow_up, input.limit, "private_follow_up", cursor);
-    const privateMainRadarGroup = pageRadarGroup(cards.filter((card) => card.user_status === "MAIN_RADAR").sort(compareInbox), cursor.private_main_radar, input.limit, "private_main_radar", cursor);
+    const privateNewGroup = pageRadarGroup(actionAwareCards.filter((card) => card.user_status === "NEW").sort(compareInbox), cursor.private_new, input.limit, "private_new", cursor);
+    const privateFollowUpGroup = pageRadarGroup(actionAwareCards.filter((card) => card.user_status === "FOLLOW_UP").sort(compareInbox), cursor.private_follow_up, input.limit, "private_follow_up", cursor);
+    const privateMainRadarGroup = pageRadarGroup(actionAwareCards.filter((card) => card.user_status === "MAIN_RADAR").sort(compareInbox), cursor.private_main_radar, input.limit, "private_main_radar", cursor);
     const summary = buildLifecycleSummary(inbox, followUp, mainIdentities.size, receipt, now);
     summary.follow_up_action_due = dueGroup.total;
     summary.follow_up_candidates_ready = readyGroup.total;
@@ -340,7 +360,53 @@ function isActionDue(card: LifecycleRadarCard, now: Date): boolean {
   const due = card.follow_up?.next_check_at ? Date.parse(card.follow_up.next_check_at) <= now.getTime() : false;
   return due || card.follow_up?.lifecycle_status === "CANDIDATE_FOR_ESTABLISHED" && card.conditions.readiness === "CONDITIONS_UNMET" || card.conditions.missing_data.length > 0 || card.conditions.risks.length > 0;
 }
-function finite(value: number | null): number | null { return typeof value === "number" && Number.isFinite(value) ? value : null; }
+export function resolveLifecycleMarketObservation(input: {
+  scanner_candidate: PersistableScannerOutput["candidates"][number] | null;
+  scanner_observed_at: string | null;
+  scanner_source: "CURRENT_SCANNER" | "NEW_RECHECK";
+  follow_up_snapshot: FollowUpEntry["last_valid_market_snapshot"];
+}): LifecycleMarketObservation | null {
+  const scanner = input.scanner_candidate === null ? null : marketObservation({
+    price_usd: input.scanner_candidate.price_usd,
+    market_cap_usd: input.scanner_candidate.market_cap_usd,
+    liquidity_usd: input.scanner_candidate.liquidity_usd,
+    volume_24h_usd: input.scanner_candidate.volume_24h_usd,
+    observed_at: input.scanner_observed_at,
+    source: input.scanner_source,
+  });
+  const followUp = input.follow_up_snapshot === null ? null : marketObservation({
+    price_usd: input.follow_up_snapshot.price_usd,
+    market_cap_usd: input.follow_up_snapshot.market_cap_usd,
+    liquidity_usd: input.follow_up_snapshot.liquidity_usd,
+    volume_24h_usd: input.follow_up_snapshot.volume_24h_usd,
+    observed_at: input.follow_up_snapshot.captured_at,
+    source: "FOLLOW_UP",
+  });
+  if (scanner === null) return followUp;
+  if (followUp === null) return scanner;
+  return Date.parse(followUp.observed_at) >= Date.parse(scanner.observed_at) ? followUp : scanner;
+}
+
+function marketObservation(input: {
+  price_usd: number | null;
+  market_cap_usd: number | null;
+  liquidity_usd: number | null;
+  volume_24h_usd: number | null;
+  observed_at: string | null;
+  source: LifecycleMarketObservation["source"];
+}): LifecycleMarketObservation | null {
+  const values = [input.price_usd, input.market_cap_usd, input.liquidity_usd, input.volume_24h_usd];
+  if (!values.every((value) => typeof value === "number" && Number.isFinite(value) && value > 0)) return null;
+  if (input.observed_at === null || !Number.isFinite(Date.parse(input.observed_at))) return null;
+  return {
+    price_usd: input.price_usd!,
+    market_cap_usd: input.market_cap_usd!,
+    liquidity_usd: input.liquidity_usd!,
+    volume_24h_usd: input.volume_24h_usd!,
+    observed_at: input.observed_at,
+    source: input.source,
+  };
+}
 
 function preferredNewRecheckCandidate(
   identity: string,
