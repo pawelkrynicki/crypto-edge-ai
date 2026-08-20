@@ -65,8 +65,8 @@ function ManualVerificationStatusCardForIdentity({
         </>
       ) : (
         <>
-          <strong>{pl ? "Brak zapisanej decyzji" : "No saved decision"}</strong>
-          <p>{pl ? "Otwórz ręczną weryfikację, porównaj źródła i zapisz werdykt." : "Open manual verification, compare sources and save a verdict."}</p>
+          <strong>{pl ? "Weryfikacja nieukończona" : "Verification incomplete"}</strong>
+          <p>{pl ? "Otwórz ręczną weryfikację, porównaj źródła i zapisz wynik." : "Open manual verification, compare sources and save the result."}</p>
         </>
       )}
     </section>

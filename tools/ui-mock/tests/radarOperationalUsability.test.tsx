@@ -264,6 +264,15 @@ describe("P1.1 Radar operational usability", () => {
       assert.ok(localRequests.every((request) => request.method === "GET"));
       assert.ok(localRequests.every((request) => request.url.startsWith("/api/")));
       assert.ok(localRequests.every((request) => !/provider|openai|collect|automation\/(?:run|enable|activate)|central/i.test(request.url)));
+
+      await act(async () => { detail.props.onActiveTabChange("security"); });
+      const verificationButton = renderer!.root.find((node) => (
+        node.type === "button" && node.children.some((child) => child === "Przejdź do weryfikacji źródłowej")
+      ));
+      await act(async () => { verificationButton.props.onClick(); await flushPromises(); });
+      assert.equal(globalThis.window.location.hash, "#external-checks");
+      assert.deepEqual(resolveRouteTokenIdentity(), { chain: entry.chain, contract_address: entry.contract_address });
+      assert.equal(renderer!.root.findAll((node) => node.props.role === "tab").length, 6);
     } finally {
       if (renderer) await act(async () => { renderer!.unmount(); });
       browser.restore();

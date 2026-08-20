@@ -48,8 +48,8 @@ const followUpCandidate: FollowUpPublicEntry = {
   },
   filter_status: "passed_basic_filter",
   filter_reasons: [],
-  security_status: "NOT_CHECKED",
-  missing_data: ["honeypot_status"],
+  security_status: "PARTIAL",
+  missing_data: ["honeypot_status", "liquidity_locked", "top_10_wallets_pct", "honeypot_source"],
   established_membership: false,
   next_review_step: "OWNER_DECISION_REQUIRED",
 };
@@ -116,6 +116,16 @@ describe("UX.2 Tabbed Token Detail Workspace", () => {
     }} initialActiveTab="filters" initialOwnerPromotionStatus={null} />);
     assert.match(hardFailure, /Warunki niespełnione[\s\S]*Płynność jest niższa niż 30 tys\. USD/);
     assert.doesNotMatch(hardFailure, /Brakujące dane|liquidity_below_30000/);
+  });
+
+  it("renders Follow-up security gaps as human-readable controls without source provenance", () => {
+    const markup = render("pl", <CandidateDetailView followUp={followUpCandidate} initialActiveTab="security" initialOwnerPromotionStatus={null} />);
+    assert.match(markup, /Dane częściowe; wymagana weryfikacja/);
+    assert.match(markup, /Honeypot — Brak wyniku/);
+    assert.match(markup, /Blokada płynności — Brak danych/);
+    assert.match(markup, /Udział Top 10 portfeli — Brak danych/);
+    assert.match(markup, /Status ręcznej weryfikacji[\s\S]*Weryfikacja nieukończona/);
+    assert.doesNotMatch(markup, /honeypot_source|honeypot_status|liquidity_locked|top_10_wallets_pct/);
   });
 
   it("uses the Follow-up last-known-good observation for Market data values and its timestamp", () => {

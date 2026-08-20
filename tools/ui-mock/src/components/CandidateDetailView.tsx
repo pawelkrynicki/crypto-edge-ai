@@ -155,6 +155,7 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
     filterReasons: candidate.filterReasons,
   });
   const securityResolution = resolveProductSecurityState(candidate);
+  const missingSecurityItems = formatSecurityMissingData(candidate.missingData, locale);
   const filterSummary = candidate.basicFilterStatus === "passed_basic_filter"
     ? t("detail.filterPassedSummary")
     : t("detail.filterRejectedSummary");
@@ -317,7 +318,7 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
               </div>
               <div className="security-lists">
                 <FlagList title={t("detail.riskFlags")} items={candidate.riskFlags.map((reason) => formatSecurityReason(reason, locale, t))} empty={getEmptyRiskFlagsText(securityResolution.state, t)} tone="critical" />
-                <FlagList title={t("detail.missingData")} items={candidate.missingData.map((reason) => formatSecurityReason(reason, locale, t))} empty={t("detail.noMissingData")} tone="warning" />
+                {missingSecurityItems.length > 0 && <FlagList title={t("detail.missingData")} items={missingSecurityItems} empty={t("detail.noMissingData")} tone="warning" />}
               </div>
             </>
           )}
@@ -549,6 +550,7 @@ function FollowUpOnlyDetail({
     ...filterResolution.preferredRangeNotes,
     ...filterResolution.informationalReasons,
   ];
+  const missingSecurityItems = formatSecurityMissingData(followUp.missing_data, locale);
   const marketMissing = Object.values(followUp.market_metrics).filter((value) => value == null).length;
   const completeness = followUp.missing_data.length === 0 && marketMissing === 0 ? copy.complete : copy.partial;
   let content: React.ReactNode = null;
@@ -618,7 +620,7 @@ function FollowUpOnlyDetail({
         <section className="product-detail-section" aria-labelledby="security-heading">
           <SectionHeader id="security-heading" title={t("detail.security")} />
           <DetailField label={t("followUp.securityStatus")} value={formatFollowUpSecurityStatus(followUp.security_status, locale)} tone="warning" />
-          <FlagList title={t("detail.missingData")} items={followUp.missing_data} empty={t("detail.noMissingData")} tone="warning" />
+          {missingSecurityItems.length > 0 && <FlagList title={t("detail.missingData")} items={missingSecurityItems} empty={t("detail.noMissingData")} tone="warning" />}
           {onOpenFollowUpExternalChecks && <div className="product-detail-actions"><ActionButton variant="primary" icon="arrow" iconPosition="end" onClick={() => onOpenFollowUpExternalChecks(followUp)}>{t("detail.openVerification")}</ActionButton></div>}
           <ManualVerificationStatusCard chain={followUp.chain} contractAddress={followUp.contract_address} initialRecord={initialManualVerification} />
         </section>
@@ -945,6 +947,23 @@ function formatFollowUpSecurityStatus(value: string, locale: ProductLocale): str
   if (value === "PARTIAL") return locale === "pl" ? "Dane częściowe; wymagana weryfikacja" : "Partial data; verification required";
   if (value === "UNAVAILABLE") return locale === "pl" ? "Dane niedostępne; wymagana weryfikacja" : "Data unavailable; verification required";
   return locale === "pl" ? "Wymagana ręczna weryfikacja" : "Manual verification required";
+}
+
+function formatSecurityMissingData(values: readonly string[], locale: ProductLocale): string[] {
+  return [...new Set(values.map((value) => formatSecurityMissingItem(value, locale)).filter((value): value is string => value !== null))];
+}
+
+function formatSecurityMissingItem(value: string, locale: ProductLocale): string | null {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "honeypot_source" || normalized === "goplus_source") return null;
+  const pl = locale === "pl";
+  if (normalized === "honeypot_status" || normalized === "honeypot_missing") return pl ? "Honeypot — Brak wyniku" : "Honeypot — No result";
+  if (normalized === "liquidity_locked" || normalized === "liquidity_lock_missing") return pl ? "Blokada płynności — Brak danych" : "Liquidity lock — No data";
+  if (normalized === "top_10_wallets_pct" || normalized === "top_10_wallets_pct_missing") return pl ? "Udział Top 10 portfeli — Brak danych" : "Top 10 wallet share — No data";
+  if (normalized === "top_wallet_pct" || normalized === "top_wallet_pct_missing") return pl ? "Udział największego portfela — Brak danych" : "Largest wallet share — No data";
+  if (normalized === "ownership_status" || normalized === "ownership_unknown") return pl ? "Status właściciela — Brak danych" : "Ownership status — No data";
+  if (normalized === "security_not_checked") return pl ? "Weryfikacja bezpieczeństwa — Nie rozpoczęto" : "Security verification — Not started";
+  return pl ? "Inne dane bezpieczeństwa wymagają uzupełnienia" : "Other security data needs completion";
 }
 
 function formatPrice(value: number | null, missing: string): string {
