@@ -73,7 +73,7 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
   const displayName = candidate?.name ?? followUp?.display_name ?? "";
   const [activeTab, setActiveTab] = useState<VerificationDrawerTabId>(focusedResearchStep ? "data" : initialActiveTab);
   const [ownerStatus, setOwnerStatus] = useState<ManualVerificationOwnerStatus | null>(null);
-  const [verdict, setVerdict] = useState<ManualVerificationVerdict>("NEEDS_MORE_DATA");
+  const [verdict, setVerdict] = useState<ManualVerificationVerdict | null>(null);
   const [note, setNote] = useState("");
   const [preview, setPreview] = useState<ManualVerificationPreview | null>(null);
   const [identityConfirmation, setIdentityConfirmation] = useState("");
@@ -131,13 +131,14 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
     volumeMarketCapRatio: candidate?.volumeMarketCapRatio ?? followUp?.market_metrics.volume_market_cap_ratio ?? null,
     pairAge: candidate?.pairAgeDays ?? followUp?.pair_age ?? null,
   };
+  const marketObservedAt = followUp?.market_observed_at ?? candidate?.lastCheckedAt ?? null;
   const filterResolution = resolveProductFilterConditions({
     basicFilterStatus: candidate?.basicFilterStatus ?? followUp?.filter_status ?? "not_checked",
     filterReasons: candidate?.filterReasons ?? followUp?.filter_reasons ?? [],
   });
 
   const prepareSave = async () => {
-    if (note.trim().length < 3) return;
+    if (!verdict || note.trim().length < 3) return;
     setPreparing(true);
     setSaveError(false);
     setSaveSucceeded(false);
@@ -205,6 +206,7 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
           <VerificationMetric label={locale === "pl" ? "Wiek pary" : "Pair age"} value={formatProductPairAge(market.pairAge, locale, missingText, { pairCreatedAt: candidate?.pairCreatedAt ?? null })} />
           <VerificationMetric label={locale === "pl" ? "Cena" : "Price"} value={formatVerificationPrice(candidate?.priceUsd ?? followUp?.market_metrics.price_usd ?? null, locale, missingText)} />
           <VerificationMetric label={locale === "pl" ? "Zmiana ceny" : "Price change"} value={locale === "pl" ? "Brak danych o zmianie ceny" : "No price-change data"} />
+          <VerificationMetric label={locale === "pl" ? "Dane aktualne na" : "Market data as of"} value={marketObservedAt ? formatProductDateTime(marketObservedAt, locale) : missingText} />
         </div>
       </VerificationSection>
     );
@@ -212,32 +214,40 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
     activeContent = (
       <VerificationSection heading={tabCopy.filters} detail={locale === "pl" ? "Każdy filtr pokazuje osobno stan, aktualną wartość i obowiązujący próg." : "Each filter shows its own state, current value and threshold."}>
         <div className="filter-condition-grid verification-filter-rows">
-          {filterResolution.conditions.map((condition) => <VerificationFilterRow key={condition.category} category={condition.category} state={condition.state} value={filterValue(condition.category, market, locale, missingText)} reasons={condition.failureReasons} locale={locale} />)}
+          {filterResolution.conditions.map((condition) => <VerificationFilterRow key={condition.category} category={condition.category} state={condition.state} value={filterValue(condition.category, market, locale, missingText)} reasons={condition.failureReasons} advisory={filterAdvisory(condition.category, filterResolution.preferredRangeNotes, locale)} locale={locale} />)}
         </div>
       </VerificationSection>
     );
   } else if (activeTab === "security") {
     activeContent = (
       <VerificationSection heading={tabCopy.security} detail={locale === "pl" ? "Brak kontroli jest pokazany jako brak danych — nie jako bezpieczny wynik." : "A missing control is shown as missing data, never as a safe result."}>
-        <div className="external-checks-review-grid">
-          <VerificationMetric label="Honeypot" value={formatSecurityValue(security?.honeypotStatus, locale, missingText)} />
-          <VerificationMetric label={locale === "pl" ? "Podatek kupna" : "Buy tax"} value={formatPercent(security?.buyTax, missingText)} />
-          <VerificationMetric label={locale === "pl" ? "Podatek sprzedaży" : "Sell tax"} value={formatPercent(security?.sellTax, missingText)} />
-          <VerificationMetric label={locale === "pl" ? "Zweryfikowany kontrakt" : "Contract verified"} value={formatNullableBoolean(security?.contractVerified, locale)} />
-          <VerificationMetric label={locale === "pl" ? "Własność" : "Ownership"} value={formatSecurityValue(security?.ownershipStatus, locale, missingText)} />
-          <VerificationMetric label={locale === "pl" ? "Blokada płynności i dni" : "Liquidity lock and days"} value={formatLiquidityLock(security?.liquidityLocked, security?.liquidityLockDays, locale)} />
-          <VerificationMetric label="Mint" value={formatRisk(security?.mintRisk, locale)} />
-          <VerificationMetric label="Blacklist" value={formatRisk(security?.blacklistRisk, locale)} />
-          <VerificationMetric label="Whitelist" value={formatRisk(security?.whitelistRisk, locale)} />
-          <VerificationMetric label={locale === "pl" ? "Ograniczenie sprzedaży" : "Sell restriction"} value={formatRisk(security?.sellRestrictionRisk, locale)} />
-          <VerificationMetric label="Proxy" value={formatRisk(security?.proxyRisk, locale)} />
-          <VerificationMetric label={locale === "pl" ? "Największy portfel" : "Top wallet"} value={formatPercent(security?.topWalletPct, missingText)} />
-          <VerificationMetric label={locale === "pl" ? "Top 10 portfeli" : "Top 10 wallets"} value={formatPercent(security?.top10WalletsPct, missingText)} />
-          <VerificationMetric label={t("verification.securityMetric")} value={securityResolution ? presentVerificationSecurityState(securityResolution.state, t) : (followUp?.security_status || missingText)} />
-          <VerificationMetric label="Manual Verification Required" value={t("verification.manualOnly")} />
-        </div>
+        {followUp && !candidate ? (
+          <div className="external-checks-review-grid">
+            <VerificationMetric label={locale === "pl" ? "Status bezpieczeństwa" : "Security status"} value={formatFollowUpSecuritySummary(followUp.security_status, locale)} />
+            <VerificationMetric label={locale === "pl" ? "Stan ręcznej weryfikacji" : "Manual verification state"} value={formatFollowUpManualState(followUp.security_status, followUp.missing_data, locale)} />
+            {securityMissingFacts(followUp.missing_data, locale).map((item) => <VerificationMetric key={item.label} label={item.label} value={item.value} />)}
+          </div>
+        ) : (
+          <div className="external-checks-review-grid">
+            <VerificationMetric label="Honeypot" value={formatSecurityValue(security?.honeypotStatus, locale, missingText)} />
+            <VerificationMetric label={locale === "pl" ? "Podatek kupna" : "Buy tax"} value={formatPercent(security?.buyTax, missingText)} />
+            <VerificationMetric label={locale === "pl" ? "Podatek sprzedaży" : "Sell tax"} value={formatPercent(security?.sellTax, missingText)} />
+            <VerificationMetric label={locale === "pl" ? "Zweryfikowany kontrakt" : "Contract verified"} value={formatNullableBoolean(security?.contractVerified, locale)} />
+            <VerificationMetric label={locale === "pl" ? "Własność" : "Ownership"} value={formatSecurityValue(security?.ownershipStatus, locale, missingText)} />
+            <VerificationMetric label={locale === "pl" ? "Blokada płynności i dni" : "Liquidity lock and days"} value={formatLiquidityLock(security?.liquidityLocked, security?.liquidityLockDays, locale)} />
+            <VerificationMetric label="Mint" value={formatRisk(security?.mintRisk, locale)} />
+            <VerificationMetric label="Blacklist" value={formatRisk(security?.blacklistRisk, locale)} />
+            <VerificationMetric label="Whitelist" value={formatRisk(security?.whitelistRisk, locale)} />
+            <VerificationMetric label={locale === "pl" ? "Ograniczenie sprzedaży" : "Sell restriction"} value={formatRisk(security?.sellRestrictionRisk, locale)} />
+            <VerificationMetric label="Proxy" value={formatRisk(security?.proxyRisk, locale)} />
+            <VerificationMetric label={locale === "pl" ? "Największy portfel" : "Top wallet"} value={formatPercent(security?.topWalletPct, missingText)} />
+            <VerificationMetric label={locale === "pl" ? "Top 10 portfeli" : "Top 10 wallets"} value={formatPercent(security?.top10WalletsPct, missingText)} />
+            <VerificationMetric label={t("verification.securityMetric")} value={securityResolution ? presentVerificationSecurityState(securityResolution.state, t) : missingText} />
+            <VerificationMetric label={locale === "pl" ? "Stan ręcznej weryfikacji" : "Manual verification state"} value={t("verification.manualOnly")} />
+          </div>
+        )}
         <p className="external-checks-eyebrow">{t("verification.securityManual")}</p>
-        <div className="security-flag-list warning"><strong>{locale === "pl" ? "Brakujące kontrole" : "Missing controls"}</strong><div>{missingData.length > 0 ? missingData.map((item) => <span key={item}>{formatCoverageItem(item, locale)}</span>) : <span>{locale === "pl" ? "Brak zgłoszonych braków" : "No reported gaps"}</span>}</div></div>
+        <div className="security-flag-list warning"><strong>{locale === "pl" ? "Brakujące kontrole" : "Missing controls"}</strong><div>{formatVerificationEvidenceItems(missingData, locale).length > 0 ? formatVerificationEvidenceItems(missingData, locale).map((item) => <span key={item}>{item}</span>) : <span>{locale === "pl" ? "Brak zgłoszonych braków" : "No reported gaps"}</span>}</div></div>
       </VerificationSection>
     );
   } else if (activeTab === "data") {
@@ -246,8 +256,8 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
     ) : (
       <VerificationSection heading={tabCopy.data} detail={locale === "pl" ? "Źródła są opisane i linkowane; otwarcie oraz zmiana zakładki nie wykonują połączeń do dostawców." : "Sources are described and linked; opening and switching tabs do not call providers."}>
         <div className="product-detail-grid data">
-          <VerificationMetric label={locale === "pl" ? "Źródło danych rynkowych i filtrów" : "Market and filter source"} value={candidate ? formatProductSourceLabel(candidate.source) : "Follow-up"} />
-          <VerificationMetric label={locale === "pl" ? "Timestamp danych" : "Data timestamp"} value={lastSeen ? formatProductDateTime(lastSeen, locale) : missingText} />
+          <VerificationMetric label={locale === "pl" ? "Źródło danych rynkowych i filtrów" : "Market and filter source"} value={candidate ? formatProductSourceLabel(candidate.source) : formatFollowUpMarketSource(locale)} />
+          <VerificationMetric label={locale === "pl" ? "Timestamp danych" : "Data timestamp"} value={marketObservedAt ? formatProductDateTime(marketObservedAt, locale) : missingText} />
           <VerificationMetric label={locale === "pl" ? "Status źródła" : "Source status"} value={locale === "pl" ? "Migawka dostępna do ręcznej kontroli" : "Snapshot available for manual review"} />
           <VerificationMetric label={locale === "pl" ? "Źródła kontroli bezpieczeństwa" : "Security check sources"} value={securityResolution?.sources.map(formatProductSourceLabel).join(", ") || missingText} />
         </div>
@@ -258,11 +268,11 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
     );
   } else {
     activeContent = (
-      <VerificationSection heading={tabCopy.decision} detail={locale === "pl" ? "Zapis decyzji aktualizuje od razu Candidate Detail, bez opuszczania listy." : "Saving a decision updates Candidate Detail immediately without leaving the list."}>
-        <div className="filter-condition-grid"><div className="condition-list ready"><strong>{locale === "pl" ? "Dostępne" : "Available"}</strong><ul>{availableData.map((item) => <li key={item}>{formatCoverageItem(item, locale)}</li>)}</ul></div><div className="condition-list warning"><strong>{locale === "pl" ? "Brakujące" : "Missing"}</strong>{missingData.length > 0 ? <ul>{missingData.map((item) => <li key={item}>{formatCoverageItem(item, locale)}</li>)}</ul> : <p>{locale === "pl" ? "Brak" : "None"}</p>}</div></div>
+      <VerificationSection heading={tabCopy.decision} detail={locale === "pl" ? "Zapis decyzji aktualizuje od razu Szczegóły tokena, bez opuszczania listy." : "Saving a decision updates Token details immediately without leaving the list."}>
+        <div className="filter-condition-grid"><div className="condition-list ready"><strong>{locale === "pl" ? "Dostępne" : "Available"}</strong><ul>{availableData.map((item) => <li key={item}>{formatCoverageItem(item, locale)}</li>)}</ul></div><div className="condition-list warning"><strong>{locale === "pl" ? "Brakujące" : "Missing"}</strong>{formatVerificationEvidenceItems(missingData, locale).length > 0 ? <ul>{formatVerificationEvidenceItems(missingData, locale).map((item) => <li key={item}>{item}</li>)}</ul> : <p>{locale === "pl" ? "Brak" : "None"}</p>}</div></div>
         {lastDecision && <p role="status" data-verification-verdict={lastDecision.verdict}>{locale === "pl" ? `Ostatnia decyzja: ${lastDecision.verdict} (${formatProductDateTime(lastDecision.checked_at, locale)})` : `Last decision: ${lastDecision.verdict} (${formatProductDateTime(lastDecision.checked_at, locale)})`}</p>}
-        {ownerStatus && <section className="verification-research-section owner-verification-decision" aria-labelledby="verification-decision-heading"><header><div><h3 id="verification-decision-heading">{locale === "pl" ? "Zapisz decyzję ownera" : "Save owner decision"}</h3></div></header><label><span>{locale === "pl" ? "Werdykt" : "Verdict"}</span><select value={verdict} onChange={(event) => { setVerdict(event.target.value as ManualVerificationVerdict); setPreview(null); }}><option value="VERIFIED">VERIFIED</option><option value="NEEDS_MORE_DATA">NEEDS_MORE_DATA</option><option value="CRITICAL_RISK">CRITICAL_RISK</option><option value="REJECT">REJECT</option></select></label><label><span>{locale === "pl" ? "Krótka notatka ownera" : "Short owner note"}</span><textarea value={note} onChange={(event) => { setNote(event.target.value); setPreview(null); }} minLength={3} maxLength={500} /></label><ActionButton variant="secondary" onClick={() => void prepareSave()} loading={preparing} disabled={note.trim().length < 3}>{locale === "pl" ? "Przygotuj zapis decyzji" : "Prepare decision save"}</ActionButton>{preview && <div className="owner-decision-confirmation"><p>{locale === "pl" ? `Potwierdź dokładną tożsamość: ${expectedIdentity}` : `Confirm the exact identity: ${expectedIdentity}`}</p><input aria-label={locale === "pl" ? "Potwierdzenie tożsamości" : "Identity confirmation"} value={identityConfirmation} onChange={(event) => setIdentityConfirmation(event.target.value)} autoComplete="off" /><label className="owner-confirmation"><input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} /><span>{locale === "pl" ? "Potwierdzam werdykt i zapis w audycie." : "I confirm the verdict and audit record."}</span></label><ActionButton variant="primary" onClick={() => void save()} loading={saving} disabled={!canSave}>{locale === "pl" ? "Zapisz status weryfikacji" : "Save verification status"}</ActionButton></div>}{saveError && <p role="alert">{locale === "pl" ? "Nie zapisano decyzji. Przygotuj nowy zapis i spróbuj ponownie." : "The decision was not saved. Prepare a new save and try again."}</p>}</section>}
-        <section className="verification-return" aria-labelledby="verification-return-heading"><div><h3 id="verification-return-heading">{locale === "pl" ? "Powrót do Candidate Detail" : "Return to Candidate Detail"}</h3><p>{locale === "pl" ? "Lista Weryfikacji pozostaje zachowana po powrocie." : "The Verification list remains intact when returning."}</p></div><ActionButton variant="primary" icon="arrow" iconPosition="end" className="product-primary-button" onClick={() => { if (onReturnToDetail) onReturnToDetail(); else if (savedRecord) onVerificationSaved?.(savedRecord); else if (typeof window !== "undefined") window.location.hash = "candidate-detail"; }}>{locale === "pl" ? "Wróć do szczegółów" : "Return to detail"}</ActionButton></section>
+        {ownerStatus && <section className="verification-research-section verification-save-section" aria-labelledby="verification-decision-heading"><header><div><h3 id="verification-decision-heading">{locale === "pl" ? "Zapisz decyzję" : "Save decision"}</h3></div></header><label><span>{locale === "pl" ? "Werdykt" : "Verdict"}</span><select value={verdict ?? ""} onChange={(event) => { setVerdict(event.target.value as ManualVerificationVerdict); setPreview(null); }}><option value="" disabled>{locale === "pl" ? "Wybierz decyzję" : "Choose a decision"}</option><option value="VERIFIED">VERIFIED</option><option value="NEEDS_MORE_DATA">NEEDS_MORE_DATA</option><option value="CRITICAL_RISK">CRITICAL_RISK</option><option value="REJECT">REJECT</option></select></label><label><span>{locale === "pl" ? "Twoja notatka" : "Your note"}</span><textarea value={note} onChange={(event) => { setNote(event.target.value); setPreview(null); }} minLength={3} maxLength={500} /></label><ActionButton variant="secondary" onClick={() => void prepareSave()} loading={preparing} disabled={!verdict || note.trim().length < 3}>{locale === "pl" ? "Przygotuj zapis decyzji" : "Prepare decision save"}</ActionButton>{preview && <div className="verification-save-confirmation"><p>{locale === "pl" ? `Potwierdź dokładną tożsamość: ${expectedIdentity}` : `Confirm the exact identity: ${expectedIdentity}`}</p><input aria-label={locale === "pl" ? "Potwierdzenie tożsamości" : "Identity confirmation"} value={identityConfirmation} onChange={(event) => setIdentityConfirmation(event.target.value)} autoComplete="off" /><label className="verification-save-consent"><input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} /><span>{locale === "pl" ? "Potwierdzam werdykt i zapis w audycie." : "I confirm the verdict and audit record."}</span></label><ActionButton variant="primary" onClick={() => void save()} loading={saving} disabled={!canSave}>{locale === "pl" ? "Zapisz status weryfikacji" : "Save verification status"}</ActionButton></div>}{saveError && <p role="alert">{locale === "pl" ? "Nie zapisano decyzji. Przygotuj nowy zapis i spróbuj ponownie." : "The decision was not saved. Prepare a new save and try again."}</p>}</section>}
+        <section className="verification-return" aria-labelledby="verification-return-heading"><div><h3 id="verification-return-heading">{locale === "pl" ? "Powrót do Szczegółów tokena" : "Return to token details"}</h3><p>{locale === "pl" ? "Lista Weryfikacji pozostaje zachowana po powrocie." : "The Verification list remains intact when returning."}</p></div><ActionButton variant="primary" icon="arrow" iconPosition="end" className="product-primary-button" onClick={() => { if (onReturnToDetail) onReturnToDetail(); else if (savedRecord) onVerificationSaved?.(savedRecord); else if (typeof window !== "undefined") window.location.hash = "candidate-detail"; }}>{locale === "pl" ? "Wróć do szczegółów" : "Return to detail"}</ActionButton></section>
       </VerificationSection>
     );
   }
@@ -349,7 +359,7 @@ function VerificationDecision({
   candidate: UiTokenCandidate | null | undefined;
   locale: ProductLocale;
   lastDecision: ManualVerificationRecord | null;
-  verdict: ManualVerificationVerdict;
+  verdict: ManualVerificationVerdict | null;
   onVerdictChange: (value: ManualVerificationVerdict) => void;
   note: string;
   onNoteChange: (value: string) => void;
@@ -375,7 +385,7 @@ function VerificationDecision({
 }) {
   const pl = locale === "pl";
   return (
-    <VerificationSection heading={pl ? "Decyzja weryfikacyjna" : "Verification decision"} detail={pl ? "Zapis decyzji aktualizuje od razu Candidate Detail, bez opuszczania listy." : "Saving a decision updates Candidate Detail immediately without leaving the list."}>
+    <VerificationSection heading={pl ? "Decyzja weryfikacyjna" : "Verification decision"} detail={pl ? "Zapis decyzji aktualizuje od razu Szczegóły tokena, bez opuszczania listy." : "Saving a decision updates token details immediately without leaving the list."}>
       <section className="verification-decision-current" aria-label={pl ? "Aktualny status weryfikacji" : "Current verification status"}>
         <span>{pl ? "Aktualny status weryfikacji" : "Current verification status"}</span>
         <strong data-verification-verdict={lastDecision?.verdict}>{lastDecision ? manualVerificationVerdictLabel(lastDecision.verdict, locale) : (pl ? "Brak zapisanej decyzji" : "No saved decision")}</strong>
@@ -390,19 +400,19 @@ function VerificationDecision({
         ))}
       </div>
 
-      <label className="verification-decision-note"><span>{pl ? "Krótka notatka ownera" : "Short owner note"}</span><textarea value={note} onChange={(event) => onNoteChange(event.target.value)} minLength={3} maxLength={500} rows={4} /></label>
+      <label className="verification-decision-note"><span>{pl ? "Twoja notatka" : "Your note"}</span><textarea value={note} onChange={(event) => onNoteChange(event.target.value)} minLength={3} maxLength={500} rows={4} /></label>
 
-      <section className="verification-decision-impact"><strong>{pl ? "Podsumowanie skutków decyzji" : "Decision impact summary"}</strong><p>{decisionImpactCopy(verdict, locale)}</p></section>
+      <section className="verification-decision-impact"><strong>{pl ? "Podsumowanie skutków decyzji" : "Decision impact summary"}</strong><p>{verdict ? decisionImpactCopy(verdict, locale) : (pl ? "Wybierz decyzję, aby zobaczyć jej skutki." : "Choose a decision to see its impact.")}</p></section>
 
-      <section className="verification-decision-coverage"><div className="condition-list ready"><strong>{pl ? "Dostępne" : "Available"}</strong><ul>{availableData.map((item) => <li key={item}>{formatCoverageItem(item, locale)}</li>)}</ul></div><div className="condition-list warning"><strong>{pl ? "Brakujące" : "Missing"}</strong>{missingData.length > 0 ? <ul>{missingData.map((item) => <li key={item}>{formatCoverageItem(item, locale)}</li>)}</ul> : <p>{pl ? "Brak" : "None"}</p>}</div></section>
+      <section className="verification-decision-coverage"><div className="condition-list ready"><strong>{pl ? "Dostępne" : "Available"}</strong><ul>{availableData.map((item) => <li key={item}>{formatCoverageItem(item, locale)}</li>)}</ul></div><div className="condition-list warning"><strong>{pl ? "Brakujące" : "Missing"}</strong>{formatVerificationEvidenceItems(missingData, locale).length > 0 ? <ul>{formatVerificationEvidenceItems(missingData, locale).map((item) => <li key={item}>{item}</li>)}</ul> : <p>{pl ? "Brak" : "None"}</p>}</div></section>
 
       {candidate && <ResearchManualEvidencePanel candidate={candidate} />}
 
-      {ownerStatus && <section className="owner-verification-decision" aria-labelledby="verification-decision-heading"><header><h3 id="verification-decision-heading">{pl ? "Potwierdzenie zapisu" : "Save confirmation"}</h3></header><ActionButton variant="primary" onClick={() => void onPrepare()} loading={preparing} disabled={note.trim().length < 3}>{pl ? "Zapisz decyzję" : "Save decision"}</ActionButton>{preview && <div className="owner-decision-confirmation"><p>{pl ? `Potwierdź dokładną tożsamość: ${expectedIdentity}` : `Confirm the exact identity: ${expectedIdentity}`}</p><input aria-label={pl ? "Potwierdzenie tożsamości" : "Identity confirmation"} value={identityConfirmation} onChange={(event) => onIdentityConfirmationChange(event.target.value)} autoComplete="off" /><label className="owner-confirmation"><input type="checkbox" checked={confirmed} onChange={(event) => onConfirmedChange(event.target.checked)} /><span>{pl ? "Potwierdzam werdykt i zapis w audycie." : "I confirm the verdict and audit record."}</span></label><ActionButton variant="primary" onClick={() => void onSave()} loading={saving} disabled={!canSave}>{pl ? "Zapisz status weryfikacji" : "Save verification status"}</ActionButton></div>}{saveError && <p role="alert">{pl ? "Nie zapisano decyzji. Przygotuj nowy zapis i spróbuj ponownie." : "The decision was not saved. Prepare a new save and try again."}</p>}</section>}
+      {ownerStatus && <section className="verification-save-section" aria-labelledby="verification-decision-heading"><header><h3 id="verification-decision-heading">{pl ? "Potwierdzenie zapisu" : "Save confirmation"}</h3></header><ActionButton variant="primary" onClick={() => void onPrepare()} loading={preparing} disabled={!verdict || note.trim().length < 3}>{pl ? "Zapisz decyzję" : "Save decision"}</ActionButton>{preview && <div className="verification-save-confirmation"><p>{pl ? `Potwierdź dokładną tożsamość: ${expectedIdentity}` : `Confirm the exact identity: ${expectedIdentity}`}</p><input aria-label={pl ? "Potwierdzenie tożsamości" : "Identity confirmation"} value={identityConfirmation} onChange={(event) => onIdentityConfirmationChange(event.target.value)} autoComplete="off" /><label className="verification-save-consent"><input type="checkbox" checked={confirmed} onChange={(event) => onConfirmedChange(event.target.checked)} /><span>{pl ? "Potwierdzam werdykt i zapis w audycie." : "I confirm the verdict and audit record."}</span></label><ActionButton variant="primary" onClick={() => void onSave()} loading={saving} disabled={!canSave}>{pl ? "Zapisz status weryfikacji" : "Save verification status"}</ActionButton></div>}{saveError && <p role="alert">{pl ? "Nie zapisano decyzji. Przygotuj nowy zapis i spróbuj ponownie." : "The decision was not saved. Prepare a new save and try again."}</p>}</section>}
 
       {saveSucceeded && lastDecision && <p className="verification-decision-saved" role="status" data-verification-verdict={lastDecision.verdict}>{pl ? `Zapisano decyzję: ${manualVerificationVerdictLabel(lastDecision.verdict, locale)}` : `Saved decision: ${manualVerificationVerdictLabel(lastDecision.verdict, locale)}`}</p>}
 
-      <section className="verification-return" aria-labelledby="verification-return-heading"><div><h3 id="verification-return-heading">{pl ? "Powrót do Candidate Detail" : "Return to Candidate Detail"}</h3><p>{pl ? "Lista Weryfikacji pozostaje zachowana po powrocie." : "The Verification list remains intact when returning."}</p></div><ActionButton variant="primary" icon="arrow" iconPosition="end" className="product-primary-button" onClick={() => { if (onReturnToDetail) onReturnToDetail(); else if (savedRecord) onVerificationSaved?.(savedRecord); else if (typeof window !== "undefined") window.location.hash = "candidate-detail"; }}>{pl ? "Wróć do szczegółów" : "Return to detail"}</ActionButton></section>
+      <section className="verification-return" aria-labelledby="verification-return-heading"><div><h3 id="verification-return-heading">{pl ? "Powrót do Szczegółów tokena" : "Return to token details"}</h3><p>{pl ? "Lista Weryfikacji pozostaje zachowana po powrocie." : "The Verification list remains intact when returning."}</p></div><ActionButton variant="primary" icon="arrow" iconPosition="end" className="product-primary-button" onClick={() => { if (onReturnToDetail) onReturnToDetail(); else if (savedRecord) onVerificationSaved?.(savedRecord); else if (typeof window !== "undefined") window.location.hash = "candidate-detail"; }}>{pl ? "Wróć do szczegółów" : "Return to detail"}</ActionButton></section>
     </VerificationSection>
   );
 }
@@ -421,10 +431,15 @@ function decisionImpactCopy(verdict: ManualVerificationVerdict, locale: ProductL
   return pl ? "Werdykt wskaże, że przed decyzją potrzebne są dodatkowe dane." : "The verdict will mark that more data is needed before a decision.";
 }
 
-function VerificationFilterRow({ category, state, value, reasons, locale }: { category: BasicFilterCategory; state: BasicFilterConditionState; value: string; reasons: string[]; locale: ProductLocale }) {
+function VerificationFilterRow({ category, state, value, reasons, advisory, locale }: { category: BasicFilterCategory; state: BasicFilterConditionState; value: string; reasons: string[]; advisory: string | null; locale: ProductLocale }) {
   const copy = filterCopy(category, locale);
   const stateLabel = state === "passed" ? locale === "pl" ? "Spełniony" : "Passed" : state === "failed" ? locale === "pl" ? "Niespełniony" : "Failed" : locale === "pl" ? "Brak danych" : "Missing data";
-  return <article className={`condition-list ${state === "passed" ? "ready" : state === "failed" ? "warning" : "neutral"}`}><strong>{copy.label}</strong><p>{stateLabel}</p><dl><div><dt>{locale === "pl" ? "Wartość" : "Value"}</dt><dd>{value}</dd></div><div><dt>{locale === "pl" ? "Próg" : "Threshold"}</dt><dd>{copy.threshold}</dd></div></dl>{reasons.length > 0 && <p>{reasons.join(", ")}</p>}</article>;
+  return <article className={`condition-list ${state === "passed" ? "ready" : state === "failed" ? "warning" : "neutral"}`}><strong>{copy.label}</strong><p>{stateLabel}</p><dl><div><dt>{locale === "pl" ? "Wartość" : "Value"}</dt><dd>{value}</dd></div><div><dt>{locale === "pl" ? "Próg" : "Threshold"}</dt><dd>{copy.threshold}</dd></div></dl>{advisory && <p className="filter-preferred-advisory">{advisory}</p>}{reasons.length > 0 && <p>{reasons.join(", ")}</p>}</article>;
+}
+
+function filterAdvisory(category: BasicFilterCategory, notes: readonly string[], locale: ProductLocale): string | null {
+  if (category !== "volume_market_cap_ratio" || !notes.includes("volume_market_cap_ratio_outside_sweet_spot_5_30_percent")) return null;
+  return locale === "pl" ? "Uwaga: poza preferowanym zakresem 5–30%." : "Note: outside the preferred 5–30% range.";
 }
 
 function ExternalCheckCard({ target }: { target: ExternalVerificationTarget }) {
@@ -497,6 +512,56 @@ function formatSecurityValue(value: string | null | undefined, locale: ProductLo
   return value;
 }
 
+type SecurityMissingFact = { label: string; value: string };
+
+function securityMissingFacts(values: readonly string[], locale: ProductLocale): SecurityMissingFact[] {
+  const pl = locale === "pl";
+  const facts: SecurityMissingFact[] = [];
+  const seen = new Set<string>();
+  for (const value of values) {
+    const normalized = value.trim().toLowerCase();
+    let fact: SecurityMissingFact | null = null;
+    if (normalized === "honeypot_status" || normalized === "honeypot_missing") fact = { label: "Honeypot", value: pl ? "Brak wyniku" : "No result" };
+    if (normalized === "liquidity_locked" || normalized === "liquidity_lock_missing") fact = { label: pl ? "Blokada płynności" : "Liquidity lock", value: pl ? "Brak danych" : "No data" };
+    if (normalized === "top_10_wallets_pct" || normalized === "top_10_wallets_pct_missing") fact = { label: pl ? "Udział Top 10 portfeli" : "Top 10 wallet share", value: pl ? "Brak danych" : "No data" };
+    if (normalized === "top_wallet_pct" || normalized === "top_wallet_pct_missing") fact = { label: pl ? "Udział największego portfela" : "Largest wallet share", value: pl ? "Brak danych" : "No data" };
+    if (normalized === "ownership_status" || normalized === "ownership_unknown") fact = { label: pl ? "Status własności" : "Ownership status", value: pl ? "Brak danych" : "No data" };
+    if (fact && !seen.has(fact.label)) {
+      seen.add(fact.label);
+      facts.push(fact);
+    }
+  }
+  return facts;
+}
+
+function formatVerificationEvidenceItems(values: readonly string[], locale: ProductLocale): string[] {
+  const securityFacts = securityMissingFacts(values, locale).map((fact) => `${fact.label} — ${fact.value}`);
+  const covered = new Set<string>();
+  for (const value of values) {
+    const normalized = value.trim().toLowerCase();
+    if (["honeypot_status", "honeypot_missing", "liquidity_locked", "liquidity_lock_missing", "top_10_wallets_pct", "top_10_wallets_pct_missing", "top_wallet_pct", "top_wallet_pct_missing", "ownership_status", "ownership_unknown", "honeypot_source", "goplus_source"].includes(normalized)) covered.add(value);
+  }
+  const other = values.filter((value) => !covered.has(value)).map((value) => formatCoverageItem(value, locale));
+  return [...new Set([...securityFacts, ...other])];
+}
+
+function formatFollowUpSecuritySummary(status: string, locale: ProductLocale): string {
+  if (status === "PARTIAL") return locale === "pl" ? "Dane częściowe" : "Partial data";
+  if (status === "CHECKED") return locale === "pl" ? "Sprawdzone" : "Checked";
+  if (status === "CRITICAL_RISK") return locale === "pl" ? "Wykryto ryzyko" : "Risk reported";
+  if (status === "UNAVAILABLE") return locale === "pl" ? "Brak danych bezpieczeństwa" : "Security data unavailable";
+  return locale === "pl" ? "Wymaga ręcznej weryfikacji" : "Manual verification required";
+}
+
+function formatFollowUpManualState(status: string, missingData: readonly string[], locale: ProductLocale): string {
+  if (status === "CHECKED" && missingData.length === 0) return locale === "pl" ? "Ukończona" : "Complete";
+  return locale === "pl" ? "Wymaga ręcznej weryfikacji" : "Requires manual verification";
+}
+
+function formatFollowUpMarketSource(locale: ProductLocale): string {
+  return locale === "pl" ? "Brak informacji o źródle" : "No source information";
+}
+
 function formatLiquidityLock(locked: boolean | null | undefined, days: number | null | undefined, locale: ProductLocale): string {
   if (locked == null) return locale === "pl" ? "Brak danych" : "No data";
   const value = locked ? locale === "pl" ? "Zablokowana" : "Locked" : locale === "pl" ? "Niezablokowana" : "Not locked";
@@ -513,12 +578,12 @@ function presentVerificationSecurityState(state: ProductSecurityState, t: Return
 }
 
 function buildInput(candidate?: UiTokenCandidate | null, followUp?: FollowUpPublicEntry | null): ExternalVerificationInput {
-  return { symbol: candidate?.symbol ?? followUp?.symbol ?? "", projectName: candidate?.name ?? followUp?.display_name ?? "", chain: candidate?.chain ?? followUp?.chain ?? "", contractAddress: candidate?.contractAddress ?? followUp?.contract_address ?? "", pairAddress: candidate?.pairAddress ?? "", sourceUrl: candidate?.sourceUrl ?? "", tokenInput: candidate?.contractAddress ?? followUp?.contract_address ?? "" };
+  return { symbol: candidate?.symbol ?? followUp?.symbol ?? "", projectName: candidate?.name ?? followUp?.display_name ?? "", chain: candidate?.chain ?? followUp?.chain ?? "", contractAddress: candidate?.contractAddress ?? followUp?.contract_address ?? "", pairAddress: candidate?.pairAddress ?? followUp?.pair_address ?? "", sourceUrl: candidate?.sourceUrl ?? "", tokenInput: candidate?.contractAddress ?? followUp?.contract_address ?? "" };
 }
 
 function formatCoverageItem(value: string, locale: ProductLocale): string {
   const labels: Record<string, [string, string]> = { chain: ["Network", "Sieć"], contract_address: ["Contract address", "Adres kontraktu"], symbol: ["Symbol", "Symbol"], display_name: ["Name", "Nazwa"], liquidity: ["Liquidity", "Płynność"], market_cap: ["Market cap", "Kapitalizacja"], volume_24h: ["24h volume", "Wolumen 24 h"], security_data: ["Security data", "Dane bezpieczeństwa"], security_not_checked: ["Security check", "Sprawdzenie bezpieczeństwa"], liquidity_missing: ["Liquidity", "Płynność"], market_cap_missing: ["Market cap", "Kapitalizacja"], volume_24h_missing: ["24h volume", "Wolumen 24 h"] };
-  return (labels[value] ?? [value, value])[locale === "pl" ? 1 : 0];
+  return (labels[value] ?? ["Additional verification data", "Dodatkowe dane do weryfikacji"])[locale === "pl" ? 1 : 0];
 }
 
 function translateStatus(value: string, t: ReturnType<typeof useProductLocale>["t"]): string {

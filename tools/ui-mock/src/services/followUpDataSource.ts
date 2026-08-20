@@ -59,7 +59,7 @@ function isFollowUpList(value: unknown): value is FollowUpPublicList {
 function isFollowUpEntry(value: unknown): value is FollowUpPublicEntry {
   if (!isRecord(value) || typeof value.entry_id !== "string" || !/^fup_[0-9a-f]{16}$/.test(value.entry_id)) return false;
   if (typeof value.chain !== "string" || typeof value.contract_address !== "string" || !LIFECYCLE.has(value.lifecycle_status as FollowUpLifecycleStatus)) return false;
-  if (!isNullableString(value.display_name) || !isNullableString(value.symbol) || !isNullableNumber(value.pair_age)) return false;
+  if (!isNullableString(value.display_name) || !isNullableString(value.symbol) || (value.pair_address !== undefined && !isNullableString(value.pair_address)) || !isNullableNumber(value.pair_age)) return false;
   if (!isIso(value.first_seen_at) || !isIso(value.last_seen_at) || !isNullableIso(value.last_checked_at) || (value.market_observed_at !== undefined && !isNullableIso(value.market_observed_at)) || !isNullableIso(value.next_check_at)) return false;
   if (!Array.isArray(value.completed_checkpoints) || value.completed_checkpoints.some((day) => ![1, 3, 7, 14, 30].includes(Number(day)))) return false;
   if (!isRecord(value.market_metrics) || Object.values(value.market_metrics).some((metric) => !isNullableNumber(metric))) return false;

@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { describe, it } from "node:test";
 import React, { useState } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import TestRenderer from "react-test-renderer";
 import { mapPersistableScannerOutputToUiCandidates } from "../src/adapters/scannerOutputAdapter.js";
 import { CandidateDetailView } from "../src/components/CandidateDetailView.js";
@@ -16,6 +17,36 @@ void React;
 const { act, create } = TestRenderer;
 const candidate = mapPersistableScannerOutputToUiCandidates(PERSISTABLE_SCANNER_SAMPLE)[0]!;
 const identity = `${candidate.chain}:${candidate.contractAddress}`;
+const followUpCandidate = {
+  entry_id: "fup_efec70c089b1dfe9",
+  chain: "bsc",
+  contract_address: "0xe9bc5c6a86caa44fd7b469bf3cc7c563e4f77777",
+  display_name: "Giggle Mascot",
+  symbol: "Max",
+  pair_address: "0xa2b1926Cb477e92445Cf70602f1A7200361F761D",
+  lifecycle_status: "MATURING" as const,
+  pair_age: 16,
+  first_seen_at: "2026-08-01T07:47:39.000Z",
+  last_seen_at: "2026-08-17T12:40:12.000Z",
+  last_checked_at: "2026-08-17T13:32:08.630Z",
+  market_observed_at: "2026-08-17T13:32:08.630Z",
+  next_check_at: "2026-08-31T09:47:39.000Z",
+  completed_checkpoints: [1, 3, 7, 14],
+  market_metrics: {
+    price_usd: 0.002002,
+    market_cap_usd: 2_002_830,
+    fdv_usd: 2_002_829,
+    liquidity_usd: 156_562.6,
+    volume_24h_usd: 737_569.94,
+    volume_market_cap_ratio: 0.36826387661459,
+  },
+  filter_status: "passed_basic_filter" as const,
+  filter_reasons: ["volume_market_cap_ratio_outside_sweet_spot_5_30_percent"],
+  security_status: "PARTIAL",
+  missing_data: ["honeypot_status", "liquidity_locked", "top_10_wallets_pct", "honeypot_source"],
+  established_membership: false,
+  next_review_step: "WAIT_FOR_NEXT_CHECKPOINT" as const,
+};
 
 describe("Verification drawer tabs", () => {
   it("opens from the Verification list, defaults to Identity, and exposes the six required tabs", async () => {
@@ -66,6 +97,47 @@ describe("Verification drawer tabs", () => {
     } finally {
       globalThis.fetch = originalFetch;
     }
+  });
+
+  it("keeps Follow-up verification data tied to its LKG snapshot and exposes only approved manual links", () => {
+    const market = followUpMarkup("market");
+    const data = followUpMarkup("data");
+    const filters = followUpMarkup("filters");
+    const security = followUpMarkup("security");
+
+    for (const markup of [market, data]) {
+      assert.match(markup, /17\.08\.2026, 15:32/);
+      assert.doesNotMatch(markup, /17\.08\.2026, 14:40|20\.08\.2026/);
+    }
+    assert.match(market, /Dane aktualne na/);
+    assert.match(data, /Brak informacji o źródle/);
+    assert.doesNotMatch(data, />Follow-up</);
+    assert.match(data, /https:\/\/dexscreener\.com\/bsc\/0xa2b1926Cb477e92445Cf70602f1A7200361F761D/);
+    assert.match(data, /https:\/\/honeypot\.is\/\?address=0xe9bc5c6a86caa44fd7b469bf3cc7c563e4f77777/);
+    assert.match(data, /Źródło niedostępne/);
+
+    assert.match(filters, /Wolumen \/ kapitalizacja[\s\S]*Spełniony[\s\S]*Uwaga: poza preferowanym zakresem 5–30%\./);
+    assert.doesNotMatch(filters, /Wolumen \/ kapitalizacja[\s\S]*Niespełniony/);
+
+    const decision = followUpMarkup("decision");
+    assert.match(security, /<span>Honeypot<\/span><strong>Brak wyniku/);
+    assert.match(security, /<span>Blokada płynności<\/span><strong>Brak danych/);
+    assert.match(security, /<span>Udział Top 10 portfeli<\/span><strong>Brak danych/);
+    for (const markup of [security, decision]) {
+      assert.doesNotMatch(markup, /honeypot_source|honeypot_status|liquidity_locked|top_10_wallets_pct|PARTIAL|MANUAL VERIFICATION REQUIRED/);
+    }
+    for (const item of ["Honeypot — Brak wyniku", "Blokada płynności — Brak danych", "Udział Top 10 portfeli — Brak danych"]) assert.match(decision, new RegExp(item));
+    assert.match(security, /Dane częściowe/);
+    assert.match(security, /Wymaga ręcznej weryfikacji/);
+  });
+
+  it("leaves an unsaved Follow-up decision unselected and removes internal Polish copy", () => {
+    const decision = followUpMarkup("decision");
+
+    assert.match(decision, /Brak zapisanej decyzji/);
+    assert.match(decision, /Twoja notatka/);
+    assert.match(decision, /Szczegółów tokena/);
+    assert.doesNotMatch(decision, /aria-checked="true"|owner|Candidate Detail|Krótka notatka ownera/);
   });
 
   it("stacks token heading, metadata and tabs without letting long metadata overlap the drawer tabs", async () => {
@@ -194,6 +266,10 @@ function DecisionToDetailHarness() {
 
 function VerificationDecisionLocaleHarness({ locale }: { locale: "pl" | "en" }) {
   return <ProductLocaleProvider initialLocale={locale}><ExternalVerificationLinksView candidate={candidate} initialActiveTab="decision" /></ProductLocaleProvider>;
+}
+
+function followUpMarkup(initialActiveTab: "market" | "filters" | "security" | "data" | "decision") {
+  return renderToStaticMarkup(<ProductLocaleProvider initialLocale="pl"><ExternalVerificationLinksView followUp={followUpCandidate} initialActiveTab={initialActiveTab} /></ProductLocaleProvider>);
 }
 
 async function render(node: React.ReactNode): Promise<ReturnType<typeof create>> {

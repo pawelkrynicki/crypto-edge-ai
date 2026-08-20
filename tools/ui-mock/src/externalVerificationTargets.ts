@@ -323,6 +323,24 @@ function buildSecurityTarget(
     return getMissingContractTarget("security", "Honeypot / Security Manual Check", copyValue, copyLabel);
   }
 
+  const honeypot = resolveManualResearchTarget("honeypot", {
+    chain: input.chain,
+    contractAddress: input.contractAddress,
+  });
+  if (honeypot.availability === "AVAILABLE" && honeypot.official_url) {
+    return {
+      id: "security",
+      title: "Honeypot / Security Manual Check",
+      label: "Manual External Check",
+      status: "Security Not Verified",
+      detail: "Open External Check",
+      state: "link",
+      href: honeypot.official_url,
+      copyValue,
+      copyLabel,
+    };
+  }
+
   return {
     id: "security",
     title: "Honeypot / Security Manual Check",

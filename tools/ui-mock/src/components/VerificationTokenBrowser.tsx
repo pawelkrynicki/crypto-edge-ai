@@ -124,7 +124,7 @@ export function VerificationTokenBrowser({
         ) : (
           <section className="verification-token-drawer-placeholder" aria-label={locale === "pl" ? "Wybór tokena do weryfikacji" : "Verification token selection"}>
             <h3>{locale === "pl" ? "Wybierz token do weryfikacji" : "Select a token for verification"}</h3>
-            <p>{locale === "pl" ? "Lista pozostaje widoczna podczas przeglądania i zapisywania decyzji ownera." : "The list remains visible while the owner reviews and saves a decision."}</p>
+            <p>{locale === "pl" ? "Lista pozostaje widoczna podczas przeglądania i zapisywania decyzji." : "The list remains visible while a decision is reviewed and saved."}</p>
           </section>
         )}
       </div>

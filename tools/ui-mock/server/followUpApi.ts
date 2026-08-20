@@ -39,6 +39,7 @@ export type FollowUpPublicEntry = {
   contract_address: string;
   display_name: string | null;
   symbol: string | null;
+  pair_address: string | null;
   lifecycle_status: FollowUpLifecycleStatus;
   pair_age: number | null;
   first_seen_at: string;
@@ -162,6 +163,7 @@ function publicEntry(
     contract_address: entry.contract_address,
     display_name: entry.display_name,
     symbol: entry.symbol_hint,
+    pair_address: entry.pair_address,
     lifecycle_status: lifecycle,
     pair_age: market?.pair_age_days ?? null,
     first_seen_at: entry.first_seen_at,

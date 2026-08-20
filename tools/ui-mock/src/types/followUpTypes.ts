@@ -26,6 +26,8 @@ export type FollowUpPublicEntry = {
   contract_address: string;
   display_name: string | null;
   symbol: string | null;
+  /** Pair context is optional for compatibility with older Follow-up responses. */
+  pair_address?: string | null;
   lifecycle_status: FollowUpLifecycleStatus;
   pair_age: number | null;
   first_seen_at: string;
