@@ -260,6 +260,9 @@ describe("FLOW.1 visible token lifecycle contracts", () => {
     assert.match(markup, /Gdzie jest teraz[\s\S]*Dalsza obserwacja/);
     assert.match(markup, /Obecny wynik filtrów[\s\S]*Podstawowe filtry spełnione/);
     assert.match(markup, /Status bezpieczeństwa[\s\S]*Dane częściowe; wymagana weryfikacja/);
+    assert.equal((markup.match(/Obecny wynik filtrów/g) ?? []).length, 1);
+    assert.equal((markup.match(/Status bezpieczeństwa/g) ?? []).length, 1);
+    assert.equal((markup.match(/class="lifecycle-source-facts"/g) ?? []).length, 1);
     assert.match(markup, /Następny krok[\s\S]*Dokończ weryfikację/);
     assert.match(markup, /Obecna blokada[\s\S]*Brakuje pełnej weryfikacji/);
     assert.doesNotMatch(markup, /Established|owner|właściciela|candidate_for_established/i);
