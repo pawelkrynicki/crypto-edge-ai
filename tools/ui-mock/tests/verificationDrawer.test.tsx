@@ -77,7 +77,7 @@ describe("Verification drawer tabs", () => {
   it("presents manual-verification verdicts in Polish and English without exposing backend enums", async () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = (async (input: RequestInfo | URL) => {
-      if (String(input).startsWith("/api/owner-operations/manual-verification/status")) return response(ownerStatus(savedRecord()));
+      if (String(input).startsWith("/api/manual-verification?")) return response({ schema_version: "manual_verification_lookup_v1", record: savedRecord() });
       return new Response("{}", { status: 404, headers: { "content-type": "application/json" } });
     }) as typeof fetch;
 
@@ -166,19 +166,23 @@ describe("Verification drawer tabs", () => {
     assert.doesNotMatch(verificationHeaderCss, /position:\s*absolute|margin-[^:]+:\s*-\d/);
   });
 
-  it("saves the Verification decision into Candidate Detail without provider or OpenAI calls", async () => {
+  it("requires an explicit CAMP_USER save and keeps the saved decision in Candidate Detail without provider or OpenAI calls", async () => {
     const originalFetch = globalThis.fetch;
     const externalCalls: string[] = [];
-    let previewPayload: Record<string, unknown> | null = null;
+    const writes: Record<string, unknown>[] = [];
+    let persisted: ReturnType<typeof needsMoreRecord> | null = null;
     globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (/provider|openai/i.test(url)) externalCalls.push(url);
-      if (url.startsWith("/api/owner-operations/manual-verification/status")) return response(ownerStatus());
-      if (url === "/api/owner-operations/manual-verification-preview") {
-        previewPayload = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
-        return response({ ...ownerStatus(), preview_id: "preview-12345678", created_at: "2026-08-02T12:00:00.000Z", expires_at: "2026-08-02T12:10:00.000Z", one_time: true, verdict: "VERIFIED", note: "Identity checked", action_plan: "SAVE" });
+      if (url.startsWith("/api/manual-verification?")) {
+        return response({ schema_version: "manual_verification_lookup_v1", record: persisted });
       }
-      if (url === "/api/owner-operations/manual-verification") return response({ status: "SAVED", record: savedRecord(), audit_created: true });
+      if (url === "/api/manual-verification" && init?.method === "POST") {
+        const payload = JSON.parse(String(init.body ?? "{}")) as Record<string, unknown>;
+        writes.push(payload);
+        persisted = needsMoreRecord(String(payload.note));
+        return response({ status: "SAVED", record: persisted, audit_created: true });
+      }
       return new Response("{}", { status: 404, headers: { "content-type": "application/json" } });
     }) as typeof fetch;
 
@@ -188,19 +192,26 @@ describe("Verification drawer tabs", () => {
       const textarea = renderer.root.findByType("textarea");
       await act(async () => { textarea.props.onChange({ target: { value: "Identity checked" } }); });
       assert.equal(renderer.root.findAll((node) => node.props.role === "radio").length, 4);
-      await act(async () => { button(renderer, "Zweryfikowany").props.onClick(); });
-      await act(async () => { button(renderer, "Zapisz decyzję").props.onClick(); await flushPromises(); });
-      const confirmation = renderer.root.findByProps({ "aria-label": "Potwierdzenie tożsamości" });
-      await act(async () => { confirmation.props.onChange({ target: { value: identity } }); });
-      const checkbox = renderer.root.findAllByType("input").find((input) => input.props.type === "checkbox");
-      assert.ok(checkbox);
-      await act(async () => { checkbox.props.onChange({ target: { checked: true } }); });
-      await act(async () => { button(renderer, "Zapisz status weryfikacji").props.onClick(); await flushPromises(); });
+      const saveButton = button(renderer, "Zapisz wynik weryfikacji");
+      assert.equal(saveButton.props.disabled, true, "no verdict keeps Save disabled");
+      await act(async () => { button(renderer, "Potrzebne dodatkowe dane").props.onClick(); });
+      assert.match(visibleText(renderer.toJSON()), /Werdykt wskaże, że przed decyzją potrzebne są dodatkowe dane\./);
+      assert.deepEqual(writes, [], "selecting a draft never writes");
+      assert.equal(button(renderer, "Zapisz wynik weryfikacji").props.disabled, false);
+      await act(async () => { button(renderer, "Zapisz wynik weryfikacji").props.onClick(); await flushPromises(); });
 
-      assert.equal(renderer.root.findAllByProps({ "data-verification-verdict": "VERIFIED" }).length >= 2, true);
-      assert.equal(previewPayload?.verdict, "VERIFIED");
-      assert.match(visibleText(renderer.toJSON()), /Zapisano decyzję: Zweryfikowany/);
+      assert.deepEqual(writes, [{ chain: candidate.chain, contract_address: candidate.contractAddress, verdict: "NEEDS_MORE_DATA", note: "Identity checked" }]);
+      assert.equal(renderer.root.findAllByProps({ "data-verification-verdict": "NEEDS_MORE_DATA" }).length >= 2, true);
+      assert.match(visibleText(renderer.toJSON()), /Zapisano wynik weryfikacji: Potrzebne dodatkowe dane/);
+      assert.match(visibleText(renderer.toJSON()), /Identity checked/);
       assert.deepEqual(externalCalls, []);
+
+      await act(async () => { renderer.unmount(); });
+      const refreshed = await render(<DecisionToDetailHarness />);
+      await act(async () => { await flushPromises(); });
+      assert.match(visibleText(refreshed.toJSON()), /Potrzebne dodatkowe dane/);
+      assert.match(visibleText(refreshed.toJSON()), /Identity checked/);
+      await act(async () => { refreshed.unmount(); });
     } finally {
       globalThis.fetch = originalFetch;
     }
@@ -212,7 +223,7 @@ describe("Verification drawer tabs", () => {
     globalThis.fetch = (async (input: RequestInfo | URL) => {
       const url = String(input);
       calls.push(url);
-      if (url.startsWith("/api/owner-operations/manual-verification/status")) return response(ownerStatus());
+      if (url.startsWith("/api/manual-verification?")) return response({ schema_version: "manual_verification_lookup_v1", record: null });
       return new Response("{}", { status: 404, headers: { "content-type": "application/json" } });
     }) as typeof fetch;
 
@@ -284,12 +295,12 @@ function button(renderer: ReturnType<typeof create>, label: string) {
   return found;
 }
 
-function ownerStatus(currentRecord: ReturnType<typeof savedRecord> | null = null) {
-  return { mode: "ENABLED", owner_controls_visible: true, owner_actions_enabled: true, chain: candidate.chain, contract_address: candidate.contractAddress, display_name: candidate.name, symbol: candidate.symbol, current_layer: "NEW", missing_data: [], available_data: ["chain", "contract_address"], current_record: currentRecord } as const;
-}
-
 function savedRecord() {
   return { chain: candidate.chain, contract_address: candidate.contractAddress, display_name: candidate.name, symbol: candidate.symbol, verdict: "VERIFIED" as const, note: "Identity checked", checked_at: "2026-08-02T12:00:00.000Z", missing_data: [], available_data: ["chain", "contract_address"] };
+}
+
+function needsMoreRecord(note = "Identity checked") {
+  return { chain: candidate.chain, contract_address: candidate.contractAddress, display_name: candidate.name, symbol: candidate.symbol, verdict: "NEEDS_MORE_DATA" as const, note, checked_at: "2026-08-02T12:00:00.000Z", missing_data: [], available_data: ["chain", "contract_address"] };
 }
 
 function response(value: unknown): Response {

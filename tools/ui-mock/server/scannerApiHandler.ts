@@ -865,6 +865,27 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
       return;
     }
 
+    if (req.method === "POST" && path === "/api/manual-verification") {
+      try {
+        requireResearchEvidenceMutationRequest(req);
+        const session = pc1Sessions.resolve(req);
+        if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
+        if (!session.context.capabilities.includes("CAMP_USER_WORKSPACE_WRITE")) {
+          throw new ManualOwnerActionError("VERIFICATION_WRITE_FORBIDDEN", 403);
+        }
+        const body = validateManualVerificationPreviewBody(await readResearchEvidenceJsonBody(req));
+        sendJson(req, res, 200, await manualOwnerActions.saveVerificationFromCampUser(
+          body.chain,
+          body.contract_address,
+          body.verdict,
+          body.note,
+        ), runtimeMode);
+      } catch (error) {
+        sendManualOwnerActionError(req, res, error, runtimeMode);
+      }
+      return;
+    }
+
     if (req.method === "GET" && path === "/api/follow-up/status") {
       sendJson(req, res, 200, await readFollowUpStatus(options.followUp), runtimeMode);
       return;

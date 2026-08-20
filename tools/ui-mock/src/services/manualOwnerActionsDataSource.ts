@@ -158,6 +158,37 @@ export async function loadManualVerification(
   }
 }
 
+/**
+ * Saves the existing, system-shared Follow-up verification record. The server
+ * derives the CAMP_USER from its session; the browser never supplies an actor.
+ */
+export async function saveManualVerificationDecision(input: {
+  chain: string;
+  contractAddress: string;
+  verdict: ManualVerificationVerdict;
+  note: string;
+}): Promise<ManualVerificationResult> {
+  const response = await fetch("/api/manual-verification", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: {
+      accept: "application/json",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      chain: input.chain,
+      contract_address: input.contractAddress,
+      verdict: input.verdict,
+      note: input.note,
+    }),
+  });
+  const value: unknown = await response.json();
+  if (!response.ok || !isManualVerificationResult(value)) {
+    throw new Error(isRecord(value) && typeof value.error === "string" ? value.error : "VERIFICATION_SAVE_REJECTED");
+  }
+  return value;
+}
+
 export async function createManualVerificationPreview(input: {
   chain: string;
   contractAddress: string;

@@ -21,11 +21,8 @@ import type { UiTokenCandidate } from "../types/scannerTypes";
 import type { FollowUpPublicEntry } from "../types/followUpTypes";
 import type { ResearchStepNumber } from "../researchChecklistTypes";
 import {
-  createManualVerificationPreview,
-  loadManualVerificationOwnerStatus,
-  saveManualVerification,
-  type ManualVerificationOwnerStatus,
-  type ManualVerificationPreview,
+  loadManualVerification,
+  saveManualVerificationDecision,
   type ManualVerificationRecord,
   type ManualVerificationVerdict,
 } from "../services/manualOwnerActionsDataSource";
@@ -72,13 +69,8 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
   const symbol = candidate?.symbol ?? followUp?.symbol ?? "";
   const displayName = candidate?.name ?? followUp?.display_name ?? "";
   const [activeTab, setActiveTab] = useState<VerificationDrawerTabId>(focusedResearchStep ? "data" : initialActiveTab);
-  const [ownerStatus, setOwnerStatus] = useState<ManualVerificationOwnerStatus | null>(null);
   const [verdict, setVerdict] = useState<ManualVerificationVerdict | null>(null);
   const [note, setNote] = useState("");
-  const [preview, setPreview] = useState<ManualVerificationPreview | null>(null);
-  const [identityConfirmation, setIdentityConfirmation] = useState("");
-  const [confirmed, setConfirmed] = useState(false);
-  const [preparing, setPreparing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const [saveSucceeded, setSaveSucceeded] = useState(false);
@@ -87,14 +79,13 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
   useEffect(() => {
     if (!chain || !contractAddress) return;
     let cancelled = false;
-    void loadManualVerificationOwnerStatus(chain, contractAddress).then((value) => {
+    void loadManualVerification(chain, contractAddress).then((value) => {
       if (cancelled) return;
-      setOwnerStatus(value);
-      if (value?.current_record) {
-        setVerdict(value.current_record.verdict);
-        setNote(value.current_record.note);
-        setSavedRecord(value.current_record);
-      }
+      setSavedRecord(value);
+      setVerdict(value?.verdict ?? null);
+      setNote(value?.note ?? "");
+      setSaveError(false);
+      setSaveSucceeded(false);
     });
     return () => { cancelled = true; };
   }, [chain, contractAddress]);
@@ -118,10 +109,8 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
   const normalizedInput = normalizeExternalVerificationInput(input);
   const targets = buildExternalVerificationTargets(input);
   const securityResolution = candidate ? resolveProductSecurityState(candidate) : null;
-  const missingData = ownerStatus?.missing_data ?? fallbackMissing;
-  const availableData = ownerStatus?.available_data ?? fallbackAvailable;
-  const expectedIdentity = `${chain}:${contractAddress}`;
-  const canSave = Boolean(preview && preview.action_plan === "SAVE" && ownerStatus?.mode === "ENABLED" && ownerStatus.owner_actions_enabled && identityConfirmation === expectedIdentity && confirmed && !saving);
+  const missingData = fallbackMissing;
+  const availableData = fallbackAvailable;
   const missingText = t("radar.missingData");
   const tabCopy = getVerificationTabCopy(locale);
   const market = {
@@ -137,32 +126,14 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
     filterReasons: candidate?.filterReasons ?? followUp?.filter_reasons ?? [],
   });
 
-  const prepareSave = async () => {
-    if (!verdict || note.trim().length < 3) return;
-    setPreparing(true);
-    setSaveError(false);
-    setSaveSucceeded(false);
-    setConfirmed(false);
-    try {
-      setPreview(await createManualVerificationPreview({ chain, contractAddress, verdict, note: note.trim() }));
-    } catch {
-      setPreview(null);
-      setSaveError(true);
-    } finally {
-      setPreparing(false);
-    }
-  };
-
   const save = async () => {
-    if (!preview || !canSave) return;
+    if (!verdict || note.trim().length < 3 || saving) return;
     setSaving(true);
     setSaveError(false);
+    setSaveSucceeded(false);
     try {
-      const result = await saveManualVerification(preview, { identityConfirmation, ownerReason: note.trim() });
+      const result = await saveManualVerificationDecision({ chain, contractAddress, verdict, note: note.trim() });
       setSavedRecord(result.record);
-      setOwnerStatus((current) => current ? { ...current, current_record: result.record } : current);
-      setPreview(null);
-      setConfirmed(false);
       setSaveSucceeded(true);
       onVerificationSaved?.(result.record);
     } catch {
@@ -178,7 +149,7 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
     ? candidate.discoveryBasket === "established" ? "Established" : locale === "pl" ? "Nowe / Emerging" : "New / Emerging"
     : followUp ? formatFollowUpLifecycleStatus(followUp.lifecycle_status, locale) : missingText;
   const security = candidate?.security ?? null;
-  const lastDecision = savedRecord ?? ownerStatus?.current_record ?? null;
+  const lastDecision = savedRecord;
 
   let activeContent: React.ReactNode;
   if (activeTab === "identity") {
@@ -267,14 +238,7 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
       </VerificationSection>
     );
   } else {
-    activeContent = (
-      <VerificationSection heading={tabCopy.decision} detail={locale === "pl" ? "Zapis decyzji aktualizuje od razu Szczegóły tokena, bez opuszczania listy." : "Saving a decision updates Token details immediately without leaving the list."}>
-        <div className="filter-condition-grid"><div className="condition-list ready"><strong>{locale === "pl" ? "Dostępne" : "Available"}</strong><ul>{availableData.map((item) => <li key={item}>{formatCoverageItem(item, locale)}</li>)}</ul></div><div className="condition-list warning"><strong>{locale === "pl" ? "Brakujące" : "Missing"}</strong>{formatVerificationEvidenceItems(missingData, locale).length > 0 ? <ul>{formatVerificationEvidenceItems(missingData, locale).map((item) => <li key={item}>{item}</li>)}</ul> : <p>{locale === "pl" ? "Brak" : "None"}</p>}</div></div>
-        {lastDecision && <p role="status" data-verification-verdict={lastDecision.verdict}>{locale === "pl" ? `Ostatnia decyzja: ${lastDecision.verdict} (${formatProductDateTime(lastDecision.checked_at, locale)})` : `Last decision: ${lastDecision.verdict} (${formatProductDateTime(lastDecision.checked_at, locale)})`}</p>}
-        {ownerStatus && <section className="verification-research-section verification-save-section" aria-labelledby="verification-decision-heading"><header><div><h3 id="verification-decision-heading">{locale === "pl" ? "Zapisz decyzję" : "Save decision"}</h3></div></header><label><span>{locale === "pl" ? "Werdykt" : "Verdict"}</span><select value={verdict ?? ""} onChange={(event) => { setVerdict(event.target.value as ManualVerificationVerdict); setPreview(null); }}><option value="" disabled>{locale === "pl" ? "Wybierz decyzję" : "Choose a decision"}</option><option value="VERIFIED">VERIFIED</option><option value="NEEDS_MORE_DATA">NEEDS_MORE_DATA</option><option value="CRITICAL_RISK">CRITICAL_RISK</option><option value="REJECT">REJECT</option></select></label><label><span>{locale === "pl" ? "Twoja notatka" : "Your note"}</span><textarea value={note} onChange={(event) => { setNote(event.target.value); setPreview(null); }} minLength={3} maxLength={500} /></label><ActionButton variant="secondary" onClick={() => void prepareSave()} loading={preparing} disabled={!verdict || note.trim().length < 3}>{locale === "pl" ? "Przygotuj zapis decyzji" : "Prepare decision save"}</ActionButton>{preview && <div className="verification-save-confirmation"><p>{locale === "pl" ? `Potwierdź dokładną tożsamość: ${expectedIdentity}` : `Confirm the exact identity: ${expectedIdentity}`}</p><input aria-label={locale === "pl" ? "Potwierdzenie tożsamości" : "Identity confirmation"} value={identityConfirmation} onChange={(event) => setIdentityConfirmation(event.target.value)} autoComplete="off" /><label className="verification-save-consent"><input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} /><span>{locale === "pl" ? "Potwierdzam werdykt i zapis w audycie." : "I confirm the verdict and audit record."}</span></label><ActionButton variant="primary" onClick={() => void save()} loading={saving} disabled={!canSave}>{locale === "pl" ? "Zapisz status weryfikacji" : "Save verification status"}</ActionButton></div>}{saveError && <p role="alert">{locale === "pl" ? "Nie zapisano decyzji. Przygotuj nowy zapis i spróbuj ponownie." : "The decision was not saved. Prepare a new save and try again."}</p>}</section>}
-        <section className="verification-return" aria-labelledby="verification-return-heading"><div><h3 id="verification-return-heading">{locale === "pl" ? "Powrót do Szczegółów tokena" : "Return to token details"}</h3><p>{locale === "pl" ? "Lista Weryfikacji pozostaje zachowana po powrocie." : "The Verification list remains intact when returning."}</p></div><ActionButton variant="primary" icon="arrow" iconPosition="end" className="product-primary-button" onClick={() => { if (onReturnToDetail) onReturnToDetail(); else if (savedRecord) onVerificationSaved?.(savedRecord); else if (typeof window !== "undefined") window.location.hash = "candidate-detail"; }}>{locale === "pl" ? "Wróć do szczegółów" : "Return to detail"}</ActionButton></section>
-      </VerificationSection>
-    );
+    activeContent = null;
   }
 
   if (activeTab === "decision") {
@@ -284,28 +248,16 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
         locale={locale}
         lastDecision={lastDecision}
         verdict={verdict}
-        onVerdictChange={(value) => { setVerdict(value); setPreview(null); setSaveSucceeded(false); }}
+        onVerdictChange={(value) => { setVerdict(value); setSaveSucceeded(false); }}
         note={note}
-        onNoteChange={(value) => { setNote(value); setPreview(null); setSaveSucceeded(false); }}
+        onNoteChange={(value) => { setNote(value); setSaveSucceeded(false); }}
         availableData={availableData}
         missingData={missingData}
-        ownerStatus={ownerStatus}
-        preparing={preparing}
-        preview={preview}
-        identityConfirmation={identityConfirmation}
-        onIdentityConfirmationChange={setIdentityConfirmation}
-        confirmed={confirmed}
-        onConfirmedChange={setConfirmed}
-        canSave={canSave}
         saving={saving}
         saveError={saveError}
         saveSucceeded={saveSucceeded}
-        expectedIdentity={expectedIdentity}
-        onPrepare={prepareSave}
         onSave={save}
         onReturnToDetail={onReturnToDetail}
-        onVerificationSaved={onVerificationSaved}
-        savedRecord={savedRecord}
       />
     );
   }
@@ -338,23 +290,11 @@ function VerificationDecision({
   onNoteChange,
   availableData,
   missingData,
-  ownerStatus,
-  preparing,
-  preview,
-  identityConfirmation,
-  onIdentityConfirmationChange,
-  confirmed,
-  onConfirmedChange,
-  canSave,
   saving,
   saveError,
   saveSucceeded,
-  expectedIdentity,
-  onPrepare,
   onSave,
   onReturnToDetail,
-  onVerificationSaved,
-  savedRecord,
 }: {
   candidate: UiTokenCandidate | null | undefined;
   locale: ProductLocale;
@@ -365,23 +305,11 @@ function VerificationDecision({
   onNoteChange: (value: string) => void;
   availableData: string[];
   missingData: string[];
-  ownerStatus: ManualVerificationOwnerStatus | null;
-  preparing: boolean;
-  preview: ManualVerificationPreview | null;
-  identityConfirmation: string;
-  onIdentityConfirmationChange: (value: string) => void;
-  confirmed: boolean;
-  onConfirmedChange: (value: boolean) => void;
-  canSave: boolean;
   saving: boolean;
   saveError: boolean;
   saveSucceeded: boolean;
-  expectedIdentity: string;
-  onPrepare: () => Promise<void>;
   onSave: () => Promise<void>;
   onReturnToDetail?: () => void;
-  onVerificationSaved?: (record: ManualVerificationRecord) => void;
-  savedRecord: ManualVerificationRecord | null;
 }) {
   const pl = locale === "pl";
   return (
@@ -408,11 +336,14 @@ function VerificationDecision({
 
       {candidate && <ResearchManualEvidencePanel candidate={candidate} />}
 
-      {ownerStatus && <section className="verification-save-section" aria-labelledby="verification-decision-heading"><header><h3 id="verification-decision-heading">{pl ? "Potwierdzenie zapisu" : "Save confirmation"}</h3></header><ActionButton variant="primary" onClick={() => void onPrepare()} loading={preparing} disabled={!verdict || note.trim().length < 3}>{pl ? "Zapisz decyzję" : "Save decision"}</ActionButton>{preview && <div className="verification-save-confirmation"><p>{pl ? `Potwierdź dokładną tożsamość: ${expectedIdentity}` : `Confirm the exact identity: ${expectedIdentity}`}</p><input aria-label={pl ? "Potwierdzenie tożsamości" : "Identity confirmation"} value={identityConfirmation} onChange={(event) => onIdentityConfirmationChange(event.target.value)} autoComplete="off" /><label className="verification-save-consent"><input type="checkbox" checked={confirmed} onChange={(event) => onConfirmedChange(event.target.checked)} /><span>{pl ? "Potwierdzam werdykt i zapis w audycie." : "I confirm the verdict and audit record."}</span></label><ActionButton variant="primary" onClick={() => void onSave()} loading={saving} disabled={!canSave}>{pl ? "Zapisz status weryfikacji" : "Save verification status"}</ActionButton></div>}{saveError && <p role="alert">{pl ? "Nie zapisano decyzji. Przygotuj nowy zapis i spróbuj ponownie." : "The decision was not saved. Prepare a new save and try again."}</p>}</section>}
+      <section className="verification-save-section" aria-label={pl ? "Zapis wyniku weryfikacji" : "Save verification result"}>
+        <ActionButton variant="primary" onClick={() => void onSave()} loading={saving} disabled={!verdict || note.trim().length < 3 || saving}>{pl ? "Zapisz wynik weryfikacji" : "Save verification result"}</ActionButton>
+        {saveError && <p role="alert">{pl ? "Nie zapisano wyniku. Wprowadzone dane pozostają na ekranie — spróbuj ponownie." : "The result was not saved. Your entered data remains on screen — try again."}</p>}
+      </section>
 
-      {saveSucceeded && lastDecision && <p className="verification-decision-saved" role="status" data-verification-verdict={lastDecision.verdict}>{pl ? `Zapisano decyzję: ${manualVerificationVerdictLabel(lastDecision.verdict, locale)}` : `Saved decision: ${manualVerificationVerdictLabel(lastDecision.verdict, locale)}`}</p>}
+      {saveSucceeded && lastDecision && <p className="verification-decision-saved" role="status" data-verification-verdict={lastDecision.verdict}>{pl ? `Zapisano wynik weryfikacji: ${manualVerificationVerdictLabel(lastDecision.verdict, locale)}` : `Verification result saved: ${manualVerificationVerdictLabel(lastDecision.verdict, locale)}`}</p>}
 
-      <section className="verification-return" aria-labelledby="verification-return-heading"><div><h3 id="verification-return-heading">{pl ? "Powrót do Szczegółów tokena" : "Return to token details"}</h3><p>{pl ? "Lista Weryfikacji pozostaje zachowana po powrocie." : "The Verification list remains intact when returning."}</p></div><ActionButton variant="primary" icon="arrow" iconPosition="end" className="product-primary-button" onClick={() => { if (onReturnToDetail) onReturnToDetail(); else if (savedRecord) onVerificationSaved?.(savedRecord); else if (typeof window !== "undefined") window.location.hash = "candidate-detail"; }}>{pl ? "Wróć do szczegółów" : "Return to detail"}</ActionButton></section>
+      <section className="verification-return" aria-labelledby="verification-return-heading"><div><h3 id="verification-return-heading">{pl ? "Powrót do Szczegółów tokena" : "Return to token details"}</h3><p>{pl ? "Lista Weryfikacji pozostaje zachowana po powrocie." : "The Verification list remains intact when returning."}</p></div><ActionButton variant="primary" icon="arrow" iconPosition="end" className="product-primary-button" onClick={() => { if (onReturnToDetail) onReturnToDetail(); else if (typeof window !== "undefined") window.location.hash = "candidate-detail"; }}>{pl ? "Wróć do szczegółów" : "Return to detail"}</ActionButton></section>
     </VerificationSection>
   );
 }
