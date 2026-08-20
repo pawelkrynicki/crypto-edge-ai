@@ -112,13 +112,13 @@ const MANUAL_SOURCE_GUIDANCE: Record<ManualSourceGuidanceTopic, { pl: readonly s
       "Potwierdź adres kontraktu i nazwę tokena.",
       "Zakładka Holders może pomóc sprawdzić koncentrację portfeli.",
       "Nie musisz analizować kodu kontraktu, jeśli nie wiesz jak.",
-      "Nie udało się potwierdzić lub potrzebne dodatkowe dane to prawidłowy wynik.",
+      "Jeśli nie możesz czegoś potwierdzić, pozostaw brak danych lub wybierz „Potrzebne dodatkowe dane”.",
     ],
     en: [
       "Confirm the contract address and token name.",
       "The Holders tab can help check wallet concentration.",
       "You do not need to analyze contract code if you do not know how.",
-      "Could not confirm or more data needed is a valid result.",
+      "If you cannot confirm something, leave it as missing data or choose “Needs more data”.",
     ],
   },
 };

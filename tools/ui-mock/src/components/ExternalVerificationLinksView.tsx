@@ -219,6 +219,7 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
         )}
         <p className="external-checks-eyebrow">{t("verification.securityManual")}</p>
         <div className="security-flag-list warning"><strong>{locale === "pl" ? "Brakujące kontrole" : "Missing controls"}</strong><div>{formatVerificationEvidenceItems(missingData, locale).length > 0 ? formatVerificationEvidenceItems(missingData, locale).map((item) => <span key={item}>{item}</span>) : <span>{locale === "pl" ? "Brak zgłoszonych braków" : "No reported gaps"}</span>}</div></div>
+        <MissingSecurityGuidance locale={locale} />
       </VerificationSection>
     );
   } else if (activeTab === "data") {
@@ -390,6 +391,28 @@ function externalGuidanceTopic(id: ExternalVerificationTarget["id"]): ManualSour
   if (id === "security") return "honeypot";
   if (id === "explorer") return "explorer";
   return null;
+}
+
+function MissingSecurityGuidance({ locale }: { locale: ProductLocale }) {
+  const pl = locale === "pl";
+  return <details className="manual-source-guidance missing-security-guidance" data-missing-security-guidance>
+    <summary>{pl ? "Jak sprawdzić brakujące dane?" : "How to check missing data?"}</summary>
+    <div className="missing-security-guidance-content">
+      <section><strong>{pl ? "KONCENTRACJA PORTFELI" : "WALLET CONCENTRATION"}</strong><ul>
+        <li>{pl ? "Sprawdź udział największych portfeli." : "Check the share held by the largest wallets."}</li>
+        <li>{pl ? "Preferowane: największy portfel <10%." : "Preferred: the largest wallet is below 10%."}</li>
+        <li>{pl ? "Preferowane: Top 10 portfeli łącznie <40%." : "Preferred: the Top 10 wallets together are below 40%."}</li>
+        <li>{pl ? "Adresy burn, LP i kontrakty mogą wymagać osobnej interpretacji." : "Burn, LP and contract addresses may need separate interpretation."}</li>
+      </ul></section>
+      <section><strong>{pl ? "PŁYNNOŚĆ" : "LIQUIDITY"}</strong><ul>
+        <li>{pl ? "Sprawdź, czy płynność jest spalona lub zablokowana." : "Check whether liquidity is burned or locked."}</li>
+        <li>{pl ? "LP wysłane na adres burn, np. 0x...dead, oznaczają spaloną płynność." : "LP sent to a burn address, for example 0x...dead, means the liquidity is burned."}</li>
+        <li>{pl ? "Jeśli użyto lockera, sprawdź czy blokada nadal obowiązuje." : "If a locker was used, check whether the lock is still active."}</li>
+        <li>{pl ? "Jeżeli nie da się tego ustalić, pozostaw brak danych." : "If this cannot be determined, leave it as missing data."}</li>
+      </ul></section>
+      <p>{pl ? "Linki do źródeł znajdziesz w zakładce Dane i źródła." : "Source links are available in the Data & sources tab."}</p>
+    </div>
+  </details>;
 }
 
 function VerificationMetric({ label, value }: { label: string; value: string }) {

@@ -123,6 +123,11 @@ describe("Verification drawer tabs", () => {
     assert.match(security, /<span>Honeypot<\/span><strong>Brak wyniku/);
     assert.match(security, /<span>Blokada płynności<\/span><strong>Brak danych/);
     assert.match(security, /<span>Udział Top 10 portfeli<\/span><strong>Brak danych/);
+    assert.match(security, /Jak sprawdzić brakujące dane\?/);
+    assert.match(security, /KONCENTRACJA PORTFELI[\s\S]*największy portfel &lt;10%[\s\S]*Top 10 portfeli łącznie &lt;40%/);
+    assert.match(security, /PŁYNNOŚĆ[\s\S]*płynność jest spalona lub zablokowana[\s\S]*0x\.\.\.dead/);
+    assert.match(security, /Linki do źródeł znajdziesz w zakładce Dane i źródła/);
+    assert.doesNotMatch(security, /data-missing-security-guidance[^>]*\sopen(?:=|\s|>)/, "missing-security guidance starts collapsed");
     for (const markup of [security, decision]) {
       assert.doesNotMatch(markup, /honeypot_source|honeypot_status|liquidity_locked|top_10_wallets_pct|PARTIAL|MANUAL VERIFICATION REQUIRED/);
     }

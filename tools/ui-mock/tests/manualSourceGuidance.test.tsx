@@ -54,6 +54,7 @@ test("manual source guidance is collapsed, localized, and has no fetch or persis
     assert.match(liquidity, /pozostaw brak danych/);
     const explorer = renderGuidance("explorer", "pl");
     assert.match(explorer, /Nie musisz analizować kodu kontraktu/);
+    assert.match(explorer, /Jeśli nie możesz czegoś potwierdzić, pozostaw brak danych lub wybierz „Potrzebne dodatkowe dane”/);
     assert.doesNotMatch(explorer, /owner\(\)|mint|proxy|upgrade|blacklist|whitelist|Solidity/i);
     assert.equal(fetchCalls, 0, "rendering or expanding native details never calls a provider");
   } finally {
