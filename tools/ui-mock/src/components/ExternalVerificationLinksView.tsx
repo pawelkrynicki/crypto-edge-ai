@@ -29,7 +29,7 @@ import {
 import { ActionButton, CopyButton, ExternalLinkAction } from "./ProductUi";
 import { TokenDetailDrawer } from "./TokenDetailDrawer";
 import { TokenDetailTabPanel, TokenDetailTabs } from "./TokenDetailTabs";
-import { ResearchChecklistDetail, ResearchManualEvidencePanel } from "./ResearchChecklist";
+import { ManualSourceGuidance, ResearchChecklistDetail, ResearchManualEvidencePanel, type ManualSourceGuidanceTopic } from "./ResearchChecklist";
 
 const VERIFICATION_DRAWER_TAB_IDS = ["identity", "market", "filters", "security", "data", "decision"] as const;
 export type VerificationDrawerTabId = (typeof VERIFICATION_DRAWER_TAB_IDS)[number];
@@ -374,14 +374,22 @@ function filterAdvisory(category: BasicFilterCategory, notes: readonly string[],
 }
 
 function ExternalCheckCard({ target }: { target: ExternalVerificationTarget }) {
-  const { t } = useProductLocale();
+  const { t, locale } = useProductLocale();
   const copyValue = target.copyValue ?? "";
   const copyLabelKey = target.copyLabel === "Copy Pair Address" ? "verification.copyPair" : target.copyLabel === "Copy Link" ? "verification.copyLink" : target.copyLabel === "Copy Token Input" ? "verification.copyInput" : "verification.copyContract";
   const labelKey = target.id === "explorer" ? "verification.networkExplorer" : target.id === "dex" ? "verification.dexScreener" : target.id === "source" ? "verification.recordSourceLabel" : "verification.securityManual";
   const titleKey = target.id === "explorer" ? "verification.explorerTitle" : target.id === "dex" ? "verification.dexTitle" : target.id === "source" ? "verification.sourceTitle" : "verification.securityTitle";
   const explanationKey = target.id === "explorer" ? "verification.explorerExplanation" : target.id === "dex" ? "verification.dexExplanation" : target.id === "source" ? "verification.sourceExplanation" : "verification.securityExplanation";
   const title = t(titleKey);
-  return <article className={`external-check-card ${target.state === "manual" ? "manual" : ""}`}><div className="external-check-card-main"><span className="external-checks-eyebrow">{t(labelKey)}</span><h4>{title}</h4><p>{target.state === "link" ? t(explanationKey) : translateStatus(target.status, t)}</p></div><div className="external-check-card-status"><span>{t("verification.status")}</span><strong>{target.state === "link" ? t("verification.allowlisted") : translateStatus(target.status, t)}</strong>{target.state === "manual" && <p>{t("verification.manualMissing")}</p>}</div><div className="external-check-actions">{target.href ? <ExternalLinkAction variant="secondary" className="external-check-link" href={target.href} aria-label={t("verification.openSourceLabel", { source: title })}>{t("verification.openSource")}</ExternalLinkAction> : <span className="external-check-disabled" aria-disabled="true">{t("verification.sourceUnavailable")}</span>}{copyValue && <CopyButton className="external-check-copy-button" value={copyValue} label={t(copyLabelKey)} copiedLabel={t("app.copied")} />}</div></article>;
+  const guidanceTopic = externalGuidanceTopic(target.id);
+  return <article className={`external-check-card ${target.state === "manual" ? "manual" : ""}`}><div className="external-check-card-main"><span className="external-checks-eyebrow">{t(labelKey)}</span><h4>{title}</h4><p>{target.state === "link" ? t(explanationKey) : translateStatus(target.status, t)}</p>{guidanceTopic && <ManualSourceGuidance topic={guidanceTopic} locale={locale} />}</div><div className="external-check-card-status"><span>{t("verification.status")}</span><strong>{target.state === "link" ? t("verification.allowlisted") : translateStatus(target.status, t)}</strong>{target.state === "manual" && <p>{t("verification.manualMissing")}</p>}</div><div className="external-check-actions">{target.href ? <ExternalLinkAction variant="secondary" className="external-check-link" href={target.href} aria-label={t("verification.openSourceLabel", { source: title })}>{t("verification.openSource")}</ExternalLinkAction> : <span className="external-check-disabled" aria-disabled="true">{t("verification.sourceUnavailable")}</span>}{copyValue && <CopyButton className="external-check-copy-button" value={copyValue} label={t(copyLabelKey)} copiedLabel={t("app.copied")} />}</div></article>;
+}
+
+function externalGuidanceTopic(id: ExternalVerificationTarget["id"]): ManualSourceGuidanceTopic | null {
+  if (id === "dex") return "dex";
+  if (id === "security") return "honeypot";
+  if (id === "explorer") return "explorer";
+  return null;
 }
 
 function VerificationMetric({ label, value }: { label: string; value: string }) {

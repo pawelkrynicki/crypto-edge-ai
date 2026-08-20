@@ -52,6 +52,86 @@ const STATUS_NAMES: Record<ResearchChecklistState, [string, string]> = {
   RED_FLAG: ["Czerwona flaga", "Red flag"],
 };
 
+export type ManualSourceGuidanceTopic = "dex" | "honeypot" | "holders" | "liquidity" | "explorer";
+
+const MANUAL_SOURCE_GUIDANCE: Record<ManualSourceGuidanceTopic, { pl: readonly string[]; en: readonly string[] }> = {
+  dex: {
+    pl: [
+      "Potwierdź, że otworzyła się właściwa para i sieć.",
+      "Porównaj cenę, kapitalizację, płynność i wolumen z danymi Crypto Edge.",
+      "Różnice są normalne, jeśli dane Crypto Edge pochodzą z wcześniejszej migawki.",
+    ],
+    en: [
+      "Confirm that the correct pair and network opened.",
+      "Compare price, market cap, liquidity and volume with the Crypto Edge data.",
+      "Differences are normal when Crypto Edge data comes from an earlier snapshot.",
+    ],
+  },
+  honeypot: {
+    pl: [
+      "Sprawdź, czy token można normalnie kupić i sprzedać.",
+      "Zwróć uwagę na wynik Honeypot oraz podatek kupna i sprzedaży.",
+      "Podatek powyżej 10% traktujemy jako sygnał ostrzegawczy.",
+    ],
+    en: [
+      "Check whether the token can be bought and sold normally.",
+      "Note the Honeypot result and the buy and sell tax.",
+      "Treat a tax above 10% as a warning sign.",
+    ],
+  },
+  holders: {
+    pl: [
+      "Sprawdź koncentrację największych portfeli.",
+      "Preferowane: największy portfel <10%.",
+      "Preferowane: Top 10 portfeli łącznie <40%.",
+      "Adresy burn, LP i kontrakty mogą wymagać osobnej interpretacji.",
+    ],
+    en: [
+      "Check the concentration of the largest wallets.",
+      "Preferred: the largest wallet is below 10%.",
+      "Preferred: the Top 10 wallets together are below 40%.",
+      "Burn, LP and contract addresses may need separate interpretation.",
+    ],
+  },
+  liquidity: {
+    pl: [
+      "Sprawdź, czy twórca może łatwo wycofać płynność.",
+      "LP wysłane na adres burn, np. 0x...dead, oznaczają spaloną płynność.",
+      "Jeśli użyto lockera, sprawdź czy blokada nadal obowiązuje.",
+      "Jeżeli nie da się tego ustalić, pozostaw brak danych.",
+    ],
+    en: [
+      "Check whether the creator can easily remove liquidity.",
+      "LP sent to a burn address, for example 0x...dead, means the liquidity is burned.",
+      "If a locker was used, check whether the lock is still active.",
+      "If this cannot be determined, leave it as missing data.",
+    ],
+  },
+  explorer: {
+    pl: [
+      "Potwierdź adres kontraktu i nazwę tokena.",
+      "Zakładka Holders może pomóc sprawdzić koncentrację portfeli.",
+      "Nie musisz analizować kodu kontraktu, jeśli nie wiesz jak.",
+      "Nie udało się potwierdzić lub potrzebne dodatkowe dane to prawidłowy wynik.",
+    ],
+    en: [
+      "Confirm the contract address and token name.",
+      "The Holders tab can help check wallet concentration.",
+      "You do not need to analyze contract code if you do not know how.",
+      "Could not confirm or more data needed is a valid result.",
+    ],
+  },
+};
+
+/** Static, browser-only guidance. Expanding it never requests or records data. */
+export function ManualSourceGuidance({ topic, locale }: { topic: ManualSourceGuidanceTopic; locale: "pl" | "en" }) {
+  const lines = MANUAL_SOURCE_GUIDANCE[topic][locale];
+  return <details className="manual-source-guidance" data-manual-source-guidance={topic}>
+    <summary>{locale === "pl" ? "Czego szukać?" : "What to look for?"}</summary>
+    <ul>{lines.map((line) => <li key={line}>{line}</li>)}</ul>
+  </details>;
+}
+
 export function ResearchChecklistSummary({
   candidate,
   onOpenStep,
@@ -770,6 +850,8 @@ function ManualExternalResearchWorkflow({ item, candidate, writable, locale, onS
     {manualSearch && target.copy_value && <button type="button" className="research-copy-address" onClick={() => void copyAddress()}>{copied ? (pl ? "Skopiowano CA" : "CA copied") : (pl ? "Kopiuj CA" : "Copy CA")}</button>}
     {target.official_url && <a className="research-external-open-action" href={target.official_url} target="_blank" rel="noopener noreferrer">{detail.open[pl ? 0 : 1]} <span aria-hidden="true">↗</span></a>}
     {manualSearch && <p>{manualSearchHelper(tool, locale)}</p>}
+    {tool === "honeypot" && <ManualSourceGuidance topic="honeypot" locale={locale} />}
+    {tool === "bubblemaps" && <ManualSourceGuidance topic="holders" locale={locale} />}
     {target.availability === "UNSUPPORTED_CHAIN" && <p>{tool === "honeypot"
       ? (pl ? "Honeypot.is nie obsługuje tej sieci." : "Honeypot.is does not support this network.")
       : (pl ? "To narzędzie nie obsługuje tej sieci." : "This tool does not support this network.")}</p>}
@@ -912,6 +994,7 @@ function OnchainManualEvidenceSection({ items, candidate, writable, locale, onSa
   const pl = locale === "pl";
   return <section className="research-onchain-manual-evidence" data-pc3c-onchain-manual data-expanded={expanded ? "true" : "false"}>
     <button type="button" className="research-onchain-manual-toggle" onClick={() => setExpanded((current) => !current)} aria-expanded={expanded}><span>{pl ? "Dodaj wynik ręczny" : "Add manual finding"}</span><b>{expanded ? (pl ? "Ukryj" : "Hide") : (pl ? "Opcjonalnie" : "Optional")}</b></button>
+    <ManualSourceGuidance topic="liquidity" locale={locale} />
     {expanded && <div className="research-onchain-manual-content"><p>{pl ? "Prywatne ustalenia są widoczne tylko w Twoim workspace i nie zmieniają Radaru, lifecycle ani wspólnej migawki." : "Private findings are visible only in your workspace and never change Radar, lifecycle, or the shared snapshot."}</p>{items.map((item) => <OnchainManualEvidenceEditor key={`${item.step_number}:${item.key}`} item={item} candidate={candidate} writable={writable} locale={locale} onSaved={onSaved} />)}</div>}
   </section>;
 }
