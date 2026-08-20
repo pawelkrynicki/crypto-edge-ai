@@ -880,7 +880,12 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
           throw new ManualOwnerActionError("VERIFICATION_WRITE_FORBIDDEN", 403);
         }
         const body = validateManualVerificationPreviewBody(await readResearchEvidenceJsonBody(req));
-        await resolveResearchChecklistCandidate(body.chain, body.contract_address, scannerOptions);
+        await ensurePrivateVerificationSubject(
+          body.chain,
+          body.contract_address,
+          scannerOptions,
+          options.followUp,
+        );
         const saved = (await researchEvidenceRepository).saveVerificationDecision({
           actorId: session.context.actor_id,
           chain: body.chain,
@@ -2197,6 +2202,27 @@ function sendManualOwnerActionError(
     error: actionError.code,
     message: "Owner token action rejected",
   }, runtimeMode);
+}
+
+/**
+ * A private verification decision can be attached to a current scanner
+ * candidate or to a canonical Follow-up entry that has aged out of the latest
+ * scanner snapshot. Neither case changes shared lifecycle state.
+ */
+async function ensurePrivateVerificationSubject(
+  chain: string,
+  contractAddress: string,
+  scannerOptions: LatestScannerOutputOptions,
+  followUpOptions: FollowUpApiOptions | undefined,
+): Promise<void> {
+  try {
+    await resolveResearchChecklistCandidate(chain, contractAddress, scannerOptions);
+    return;
+  } catch (error) {
+    if (!(error instanceof ResearchChecklistRequestError) || error.code !== "NOT_FOUND") throw error;
+  }
+  const followUp = await readFollowUpByIdentity(chain, contractAddress, followUpOptions);
+  if (!followUp) throw new ResearchChecklistRequestError("NOT_FOUND", 404);
 }
 
 function sendPrivateVerificationError(

@@ -182,7 +182,7 @@ describe("manual owner Radar actions", () => {
     assert.equal((await inspectFollowUpStore(storePath)).store.entries.length, 0);
   });
 
-  it("starts a normal-launcher-equivalent CAMP_USER runtime with private verification saves", async () => {
+  it("starts a normal-launcher-equivalent CAMP_USER runtime with private saves for a Follow-up-only identity", async () => {
     const directory = await mkdtemp(join(tmpdir(), "crypto-edge-camp-api-"));
     temporaryDirectories.push(directory);
     const storePath = join(directory, "follow-up.json");
@@ -194,13 +194,14 @@ describe("manual owner Radar actions", () => {
     );
     await writeFile(storePath, `${JSON.stringify(initial, null, 2)}\n`, "utf8");
     const scannerPath = join(directory, "scanner.json");
-    await writeFile(scannerPath, JSON.stringify({ ...PERSISTABLE_SCANNER_SAMPLE, candidates: [TEST_CANDIDATE] }), "utf8");
+    await writeFile(scannerPath, JSON.stringify({ ...PERSISTABLE_SCANNER_SAMPLE, candidates: [] }), "utf8");
     const repository = await createResearchEvidenceRepository({ databaseFilePath: join(directory, "research-evidence.sqlite") });
     const originalActor = process.env.CRYPTO_EDGE_PC1_REVIEW_DEFAULT_ACTOR;
     process.env.CRYPTO_EDGE_PC1_REVIEW_DEFAULT_ACTOR = "CAMP_USER";
     const server = createScannerApiServer({
       runtimeMode: "DEVELOPMENT_DEMO",
       scanner: { fixturePath: scannerPath, outputDirPath: join(directory, "output"), allowFixtureFallback: true },
+      followUp: { storePath, now: () => new Date(NOW) },
       manualOwnerActions: {
         storePath,
         now: () => new Date(NOW),
@@ -215,6 +216,8 @@ describe("manual owner Radar actions", () => {
       const baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
       const session = await fetch(`${baseUrl}/api/lifecycle/session`);
       assert.deepEqual(await session.json(), { actor: { role: "CAMP_USER", capabilities: ["CAMP_USER_WORKSPACE_WRITE"] } });
+      const scannerOnlyLookup = await fetch(`${baseUrl}/api/research-checklist?chain=${TEST_CANDIDATE.chain}&contract_address=${TEST_CANDIDATE.contract_address}`);
+      assert.equal(scannerOnlyLookup.status, 404, "the token exists only in canonical Follow-up, not in the latest scanner output");
       const lookup = async (cookie?: string) => fetch(`${baseUrl}/api/manual-verification?chain=${TEST_CANDIDATE.chain}&contract_address=${TEST_CANDIDATE.contract_address}`, {
         headers: cookie ? { cookie } : undefined,
       });
