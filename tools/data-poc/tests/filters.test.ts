@@ -70,6 +70,15 @@ describe("applyBasicFilters", () => {
     assert.ok(result.filter_reasons.includes("volume_market_cap_ratio_above_100_percent"));
   });
 
+  it("keeps the 5–30% volume/market-cap range informational inside the 1–100% hard range", () => {
+    for (const ratio of [0.01, 1]) {
+      const result = applyBasicFilters(candidate({ volume_market_cap_ratio: ratio }));
+      assert.equal(result.status, "passed_basic_filter");
+      assert.ok(result.filter_reasons.includes("volume_market_cap_ratio_outside_sweet_spot_5_30_percent"));
+      assert.equal(result.filter_reasons.some((reason) => reason === "volume_market_cap_ratio_below_1_percent" || reason === "volume_market_cap_ratio_above_100_percent"), false);
+    }
+  });
+
   it("passes a valid candidate", () => {
     const result = applyBasicFilters(candidate());
     assert.equal(result.status, "passed_basic_filter");

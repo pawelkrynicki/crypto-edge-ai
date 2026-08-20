@@ -85,6 +85,39 @@ describe("UX.2 Tabbed Token Detail Workspace", () => {
     assert.doesNotMatch(markup, /Established|established universe|candidate_for_established|owner|właściciela/i);
   });
 
+  it("keeps a Follow-up advisory separate from missing data and raw filter keys", () => {
+    const entry = {
+      ...followUpCandidate,
+      filter_reasons: ["volume_market_cap_ratio_outside_sweet_spot_5_30_percent"],
+    };
+    const polish = render("pl", <CandidateDetailView followUp={entry} initialActiveTab="filters" initialOwnerPromotionStatus={null} />);
+    assert.match(polish, /Obecny wynik filtrów[\s\S]*Podstawowe filtry spełnione/);
+    assert.match(polish, /Uwagi[\s\S]*Relacja wolumenu do kapitalizacji jest poza preferowanym zakresem 5–30%/);
+    assert.doesNotMatch(polish, /Brakujące dane|volume_market_cap_ratio_outside_sweet_spot_5_30_percent/);
+
+    const english = render("en", <CandidateDetailView followUp={entry} initialActiveTab="filters" initialOwnerPromotionStatus={null} />);
+    assert.match(english, /Notes[\s\S]*Volume-to-market-cap ratio is outside the preferred 5–30% range/);
+    assert.doesNotMatch(english, /volume_market_cap_ratio_outside_sweet_spot_5_30_percent/);
+  });
+
+  it("renders genuine missing inputs and hard filter failures in their own human-readable sections", () => {
+    const missing = render("pl", <CandidateDetailView followUp={{
+      ...followUpCandidate,
+      filter_status: "rejected_basic_filter",
+      filter_reasons: ["volume_market_cap_ratio_missing"],
+    }} initialActiveTab="filters" initialOwnerPromotionStatus={null} />);
+    assert.match(missing, /Brakujące dane[\s\S]*Relacja wolumenu do kapitalizacji jest niedostępna/);
+    assert.doesNotMatch(missing, /volume_market_cap_ratio_missing/);
+
+    const hardFailure = render("pl", <CandidateDetailView followUp={{
+      ...followUpCandidate,
+      filter_status: "rejected_basic_filter",
+      filter_reasons: ["liquidity_below_30000"],
+    }} initialActiveTab="filters" initialOwnerPromotionStatus={null} />);
+    assert.match(hardFailure, /Warunki niespełnione[\s\S]*Płynność jest niższa niż 30 tys\. USD/);
+    assert.doesNotMatch(hardFailure, /Brakujące dane|liquidity_below_30000/);
+  });
+
   it("uses the Follow-up last-known-good observation for Market data values and its timestamp", () => {
     const candidateWithNewerAppUpdate = {
       ...candidateA,

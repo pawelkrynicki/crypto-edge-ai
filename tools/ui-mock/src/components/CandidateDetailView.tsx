@@ -280,7 +280,7 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
           <div className="filter-additional-notes">
             {filterResolution.preferredRangeNotes.length > 0 && <FilterNoteList title={t("detail.preferredRangeNotes")} reasons={filterResolution.preferredRangeNotes} locale={locale} />}
             {(filterResolution.informationalReasons.length > 0 || filterResolution.unknownReasons.length > 0) && (
-              <FilterNoteList title={t("detail.additionalFilterInfo")} reasons={[...filterResolution.informationalReasons, ...filterResolution.unknownReasons]} locale={locale} showUnknownCodes />
+              <FilterNoteList title={t("detail.additionalFilterInfo")} reasons={[...filterResolution.informationalReasons, ...filterResolution.unknownReasons]} locale={locale} />
             )}
           </div>
         )}
@@ -541,6 +541,14 @@ function FollowUpOnlyDetail({
   const symbol = followUp.symbol ?? t("radar.missingData");
   const systemStatus = candidateDetailSystemStatusLabel(lifecycle, locale);
   const nextStep = candidateDetailNextStep(lifecycle, followUp, locale);
+  const filterResolution = resolveProductFilterConditions({
+    basicFilterStatus: followUp.filter_status,
+    filterReasons: followUp.filter_reasons,
+  });
+  const advisoryReasons = [
+    ...filterResolution.preferredRangeNotes,
+    ...filterResolution.informationalReasons,
+  ];
   const marketMissing = Object.values(followUp.market_metrics).filter((value) => value == null).length;
   const completeness = followUp.missing_data.length === 0 && marketMissing === 0 ? copy.complete : copy.partial;
   let content: React.ReactNode = null;
@@ -590,7 +598,18 @@ function FollowUpOnlyDetail({
       <section className="product-detail-section" aria-labelledby="filters-heading">
         <SectionHeader id="filters-heading" title={t("detail.filters")} />
         <DetailField label={t("followUp.filterStatus")} value={formatFollowUpFilterStatus(followUp.filter_status, locale)} tone={followUp.filter_status === "passed_basic_filter" ? "ready" : "warning"} />
-        <FlagList title={t("detail.missingData")} items={followUp.filter_reasons} empty={t("detail.noMissingData")} tone="warning" />
+        {filterResolution.hardFailureReasons.length > 0 && (
+          <FilterNoteList title={t("detail.conditionsNotMet")} reasons={filterResolution.hardFailureReasons} locale={locale} />
+        )}
+        {advisoryReasons.length > 0 && (
+          <FilterNoteList title={t("detail.preferredRangeNotes")} reasons={advisoryReasons} locale={locale} />
+        )}
+        {filterResolution.missingDataReasons.length > 0 && (
+          <FilterNoteList title={t("detail.missingData")} reasons={filterResolution.missingDataReasons} locale={locale} />
+        )}
+        {filterResolution.unknownReasons.length > 0 && (
+          <FilterNoteList title={t("detail.additionalFilterInfo")} reasons={filterResolution.unknownReasons} locale={locale} />
+        )}
       </section>
     );
   } else if (activeTab === "security") {
@@ -802,14 +821,11 @@ function FilterNoteList({
   title,
   reasons,
   locale,
-  showUnknownCodes = false,
 }: {
   title: string;
   reasons: string[];
   locale: ProductLocale;
-  showUnknownCodes?: boolean;
 }) {
-  const { t } = useProductLocale();
   return (
     <div className="condition-list neutral">
       <strong>{title}</strong>
@@ -818,11 +834,6 @@ function FilterNoteList({
         return (
           <li key={reason}>
             {presentation.summary}
-            {showUnknownCodes && !presentation.known && (
-              <TechnicalDetails label={t("app.technicalDetails")}>
-                <code>{presentation.rawReason}</code>
-              </TechnicalDetails>
-            )}
           </li>
         );
       })}</ul>

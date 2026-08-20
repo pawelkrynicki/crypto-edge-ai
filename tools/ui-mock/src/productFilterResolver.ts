@@ -17,6 +17,8 @@ export type BasicFilterConditionResolution = {
 
 export type ProductFilterResolution = {
   conditions: BasicFilterConditionResolution[];
+  hardFailureReasons: string[];
+  missingDataReasons: string[];
   preferredRangeNotes: string[];
   informationalReasons: string[];
   unknownReasons: string[];
@@ -65,6 +67,14 @@ const PREFERRED_RANGE_REASONS = new Set([
   "pair_age_outside_preferred_14_90_days",
 ]);
 
+const MISSING_DATA_REASONS = new Set([
+  "market_cap_missing",
+  "volume_24h_missing",
+  "liquidity_missing",
+  "volume_market_cap_ratio_missing",
+  "pair_age_missing",
+]);
+
 const INFORMATIONAL_REASONS = new Set([
   "market_cap_missing_using_fdv",
 ]);
@@ -74,6 +84,8 @@ export function resolveProductFilterConditions(
 ): ProductFilterResolution {
   const reasons = [...new Set(input.filterReasons.filter((reason) => reason.trim().length > 0))];
   const failures = new Map<BasicFilterCategory, string[]>();
+  const hardFailureReasons: string[] = [];
+  const missingDataReasons: string[] = [];
   const preferredRangeNotes: string[] = [];
   const informationalReasons: string[] = [];
   const unknownReasons: string[] = [];
@@ -83,6 +95,8 @@ export function resolveProductFilterConditions(
       reason as keyof typeof HARD_FAILURE_CATEGORY_BY_REASON
     ];
     if (category) {
+      if (MISSING_DATA_REASONS.has(reason)) missingDataReasons.push(reason);
+      else hardFailureReasons.push(reason);
       const categoryReasons = failures.get(category) ?? [];
       categoryReasons.push(reason);
       failures.set(category, categoryReasons);
@@ -110,6 +124,8 @@ export function resolveProductFilterConditions(
           : "unknown";
       return { category, state, failureReasons };
     }),
+    hardFailureReasons,
+    missingDataReasons,
     preferredRangeNotes,
     informationalReasons,
     unknownReasons,

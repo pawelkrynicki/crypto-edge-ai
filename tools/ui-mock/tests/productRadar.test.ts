@@ -292,6 +292,20 @@ describe("Product Radar owner acceptance", () => {
     assert.deepEqual(age.preferredRangeNotes, ["pair_age_outside_preferred_14_90_days"]);
   });
 
+  it("separates actual missing data, hard failures, and advisory filter reasons", () => {
+    const resolution = resolveProductFilterConditions({
+      basicFilterStatus: "rejected_basic_filter",
+      filterReasons: [
+        "volume_market_cap_ratio_outside_sweet_spot_5_30_percent",
+        "liquidity_below_30000",
+        "volume_market_cap_ratio_missing",
+      ],
+    });
+    assert.deepEqual(resolution.preferredRangeNotes, ["volume_market_cap_ratio_outside_sweet_spot_5_30_percent"]);
+    assert.deepEqual(resolution.hardFailureReasons, ["liquidity_below_30000"]);
+    assert.deepEqual(resolution.missingDataReasons, ["volume_market_cap_ratio_missing"]);
+  });
+
   it("keeps FDV fallback and unknown filter codes neutral while supporting legacy codes", () => {
     const fallback = resolveProductFilterConditions({
       basicFilterStatus: "passed_basic_filter",
