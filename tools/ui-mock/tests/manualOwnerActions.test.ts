@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import type { AddressInfo } from "node:net";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import type { Server } from "node:http";
 import { afterEach, describe, it } from "node:test";
@@ -32,6 +32,13 @@ afterEach(async () => {
 });
 
 describe("manual owner Radar actions", () => {
+  it("configures the canonical Product Radar launcher with a CAMP_USER server session", async () => {
+    const reviewLauncher = await readFile(resolve(import.meta.dirname, "..", "..", "..", "scripts", "win", "start-product-radar-review.cmd"), "utf8");
+    const apiLauncher = await readFile(resolve(import.meta.dirname, "..", "..", "..", "scripts", "win", "start-product-radar-api.cmd"), "utf8");
+    assert.match(reviewLauncher, /set "CRYPTO_EDGE_PC1_REVIEW_DEFAULT_ACTOR=CAMP_USER"/);
+    assert.match(apiLauncher, /set "CRYPTO_EDGE_PC1_REVIEW_DEFAULT_ACTOR=CAMP_USER"/);
+  });
+
   it("moves New to Follow-up once, persists verification, audits the decision, and performs no provider reads", async () => {
     const directory = await mkdtemp(join(tmpdir(), "crypto-edge-owner-actions-"));
     temporaryDirectories.push(directory);
@@ -175,7 +182,7 @@ describe("manual owner Radar actions", () => {
     assert.equal((await inspectFollowUpStore(storePath)).store.entries.length, 0);
   });
 
-  it("keeps CAMP_USER verification decisions actor-private and leaves shared Follow-up state untouched", async () => {
+  it("starts a normal-launcher-equivalent CAMP_USER runtime with private verification saves", async () => {
     const directory = await mkdtemp(join(tmpdir(), "crypto-edge-camp-api-"));
     temporaryDirectories.push(directory);
     const storePath = join(directory, "follow-up.json");
@@ -206,6 +213,8 @@ describe("manual owner Radar actions", () => {
     await listen(server);
     try {
       const baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+      const session = await fetch(`${baseUrl}/api/lifecycle/session`);
+      assert.deepEqual(await session.json(), { actor: { role: "CAMP_USER", capabilities: ["CAMP_USER_WORKSPACE_WRITE"] } });
       const lookup = async (cookie?: string) => fetch(`${baseUrl}/api/manual-verification?chain=${TEST_CANDIDATE.chain}&contract_address=${TEST_CANDIDATE.contract_address}`, {
         headers: cookie ? { cookie } : undefined,
       });
