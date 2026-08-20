@@ -185,9 +185,9 @@ export function AIResearchSection({
       >
         <span>{ui.title}</span>
         <StatusBadge tone={availabilityTone(availability)}>{availabilityLabel(availability, locale)}</StatusBadge>
-        <strong>{stateTitle(availability, locale)}</strong>
+        {availability !== "PROVIDER_DISABLED" && <strong>{stateTitle(availability, locale)}</strong>}
         <p>{stateDetail(availability, effectiveError, effectiveRetryAfter, locale, Boolean(brief))}</p>
-        <small>{ui.summaryNextStep}</small>
+        {availability !== "PROVIDER_DISABLED" && <small>{ui.summaryNextStep}</small>}
         <i aria-hidden="true">→</i>
       </button>
     );
@@ -201,7 +201,7 @@ export function AIResearchSection({
       </header>
       <div className="ai-research-section-summary">
         <div>
-          <strong>{stateTitle(availability, locale)}</strong>
+          {availability !== "PROVIDER_DISABLED" && <strong>{stateTitle(availability, locale)}</strong>}
           <p>{stateDetail(availability, effectiveError, effectiveRetryAfter, locale, Boolean(brief))}</p>
           {(brief || analysis) && (!brief || !brief.render_preview) && <span className="ai-prepared-status">{ui.analysisPrepared}</span>}
         </div>

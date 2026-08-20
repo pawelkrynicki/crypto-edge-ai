@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  formatFollowUpLifecycleStatus,
   formatProductDateTime,
   formatProductPairAge,
   formatProductUsd,
@@ -195,7 +194,8 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
       : securityResolution.state === "not_invoked" || securityResolution.state === "unavailable"
         ? workspaceCopy.verificationRequired
         : workspaceCopy.noCurrentBlockers;
-  const nextStep = lifecycleActionLabel(lifecycle.next_action_type, locale);
+  const systemStatus = candidateDetailSystemStatusLabel(lifecycle, locale);
+  const nextStep = candidateDetailNextStep(lifecycle, locale);
   let activeTabContent: React.ReactNode = null;
   if (activeTab === "summary") {
     activeTabContent = (
@@ -206,7 +206,7 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
         </header>
         <div className="candidate-summary-facts">
           <SummaryFact label={workspaceCopy.whatIsIt} value={`${candidate.symbol} · ${candidate.name || candidate.chain}`} />
-          <SummaryFact label={workspaceCopy.radarLayer} value={lifecycleStageLabel(lifecycle.current_stage, locale)} />
+          <SummaryFact label={workspaceCopy.radarLayer} value={systemStatus} />
           <SummaryFact label={workspaceCopy.dataCompleteness} value={completeness} tone={completeness === workspaceCopy.complete ? "ready" : "warning"} />
           <SummaryFact label={workspaceCopy.blockers} value={blockingSummary} tone={blockingSummary === workspaceCopy.noCurrentBlockers ? "ready" : "warning"} />
           <SummaryFact label={workspaceCopy.nextResearchStep} value={nextStep} />
@@ -370,7 +370,7 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
           {candidate.discoveryBasket !== "new_emerging" && <StatusBadge tone={candidate.finalLabel === "WATCHLIST" ? "manual" : candidate.basicFilterStatus === "passed_basic_filter" ? "ready" : "warning"}>{status}</StatusBadge>}
         </div>
         <div className="token-detail-header-meta">
-          <HeaderFact label={workspaceCopy.radarLayer} value={lifecycleStageLabel(lifecycle.current_stage, locale)} />
+          <HeaderFact label={workspaceCopy.radarLayer} value={systemStatus} />
           <HeaderFact label={t("detail.chain")} value={candidate.chain || t("detail.networkMissing")} />
           <HeaderFact label="DEX" value={candidate.dex || t("detail.dexMissing")} />
           <HeaderFact label={workspaceCopy.dataCompleteness} value={completeness} tone={completeness === workspaceCopy.complete ? "ready" : "warning"} />
@@ -412,7 +412,7 @@ function getTabbedWorkspaceCopy(locale: ProductLocale) {
       tablistLabel: "Zakładki szczegółów tokena",
       summaryIntro: "Najważniejsze odpowiedzi o tokenie, kompletności danych, blokadach i następnym kroku.",
       whatIsIt: "Co to jest?",
-      radarLayer: "Warstwa Radaru",
+      radarLayer: "Status systemowy",
       dataCompleteness: "Kompletność danych",
       blockers: "Główne blokady",
       nextResearchStep: "Następny krok",
@@ -437,7 +437,7 @@ function getTabbedWorkspaceCopy(locale: ProductLocale) {
     tablistLabel: "Token detail tabs",
     summaryIntro: "The essential answers about the token, data completeness, blockers and next step.",
     whatIsIt: "What is it?",
-    radarLayer: "Radar layer",
+    radarLayer: "System status",
     dataCompleteness: "Data completeness",
     blockers: "Main blockers",
     nextResearchStep: "Next step",
@@ -547,6 +547,8 @@ function FollowUpOnlyDetail({
   const { locale, t } = useProductLocale();
   const copy = getTabbedWorkspaceCopy(locale);
   const symbol = followUp.symbol ?? t("radar.missingData");
+  const systemStatus = candidateDetailSystemStatusLabel(lifecycle, locale);
+  const nextStep = candidateDetailNextStep(lifecycle, locale);
   const marketMissing = Object.values(followUp.market_metrics).filter((value) => value == null).length;
   const completeness = followUp.missing_data.length === 0 && marketMissing === 0 ? copy.complete : copy.partial;
   let content: React.ReactNode = null;
@@ -559,10 +561,10 @@ function FollowUpOnlyDetail({
         </header>
         <div className="candidate-summary-facts">
           <SummaryFact label={copy.whatIsIt} value={`${symbol} · ${followUp.display_name ?? followUp.chain}`} />
-          <SummaryFact label={copy.radarLayer} value={lifecycleStageLabel(lifecycle.current_stage, locale)} />
+          <SummaryFact label={copy.radarLayer} value={systemStatus} />
           <SummaryFact label={copy.dataCompleteness} value={completeness} tone="warning" />
           <SummaryFact label={copy.blockers} value={followUp.missing_data.length > 0 ? copy.verificationRequired : copy.noCurrentBlockers} tone={followUp.missing_data.length > 0 ? "warning" : "ready"} />
-          <SummaryFact label={copy.nextResearchStep} value={lifecycleActionLabel(lifecycle.next_action_type, locale)} />
+          <SummaryFact label={copy.nextResearchStep} value={nextStep} />
         </div>
         <div className="candidate-summary-supporting-grid">
           <section className="candidate-summary-identity" aria-labelledby="summary-identity-heading">
@@ -657,17 +659,17 @@ function FollowUpOnlyDetail({
             <span className="candidate-detail-eyebrow">{locale === "pl" ? "Dalsza obserwacja" : "Follow-up"}</span>
             <h2>{symbol} <small>{followUp.display_name ?? ""}</small></h2>
           </div>
-          <StatusBadge tone={followUp.lifecycle_status === "CANDIDATE_FOR_ESTABLISHED" ? "manual" : "neutral"}>{formatFollowUpLifecycleStatus(followUp.lifecycle_status, locale)}</StatusBadge>
+          <StatusBadge tone="neutral">{systemStatus}</StatusBadge>
         </div>
         <div className="token-detail-header-meta">
-          <HeaderFact label={copy.radarLayer} value={lifecycleStageLabel(lifecycle.current_stage, locale)} />
+          <HeaderFact label={copy.radarLayer} value={systemStatus} />
           <HeaderFact label={t("detail.chain")} value={followUp.chain} />
           <HeaderFact label={copy.dataCompleteness} value={completeness} tone="warning" />
           <CopyableAddress value={followUp.contract_address} displayValue={shortenAddress(followUp.contract_address, t("radar.missingData"))} copyLabel={t("verification.copyContract")} copiedLabel={t("app.copied")} buttonLabel={t("app.copy")} className="token-detail-address" />
         </div>
         <div className="token-detail-next-step">
           <span>{copy.nextResearchStep}</span>
-          <strong>{lifecycleActionLabel(lifecycle.next_action_type, locale)}</strong>
+          <strong>{nextStep}</strong>
           <PersonalRadarPanel chain={followUp.chain} contractAddress={followUp.contract_address} onChanged={onLifecycleChanged} placement="detail" />
         </div>
       </header>
@@ -677,6 +679,20 @@ function FollowUpOnlyDetail({
       </TokenDetailTabPanel>
     </div>
   );
+}
+
+function candidateDetailSystemStatusLabel(model: TokenLifecycleViewModel, locale: ProductLocale): string {
+  // CANDIDATE_FOR_ESTABLISHED is a legacy Follow-up store value. CAMP_USER sees
+  // the system basket it is actually in, not that internal promotion label.
+  if (model.current_stage === "candidate") return locale === "pl" ? "Dalsza obserwacja" : "Further observation";
+  return lifecycleStageLabel(model.current_stage, locale);
+}
+
+function candidateDetailNextStep(model: TokenLifecycleViewModel, locale: ProductLocale): string {
+  if (model.next_action_type === "owner_decision" || model.blocking_conditions.includes("OWNER_DECISION_PENDING")) {
+    return locale === "pl" ? "Dokończ weryfikację" : "Complete verification";
+  }
+  return lifecycleActionLabel(model.next_action_type, locale);
 }
 
 function SectionHeader({ id, title }: { id: string; title: string }) {

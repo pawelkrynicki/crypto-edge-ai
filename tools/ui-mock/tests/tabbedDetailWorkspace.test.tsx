@@ -14,6 +14,7 @@ import { PERSISTABLE_SCANNER_SAMPLE } from "../src/fixtures/persistableScannerSa
 import { ProductLocaleProvider, type ProductLocale } from "../src/productI18n.js";
 import { resolveProductSourceHealth } from "../src/productSourceHealth.js";
 import type { AIResearchBriefLookup } from "../src/types/aiResearchTypes.js";
+import type { FollowUpPublicEntry } from "../src/types/followUpTypes.js";
 
 void React;
 
@@ -23,6 +24,34 @@ const ADDRESS_B = "0x2222222222222222222222222222222222222222";
 const baseCandidate = mapPersistableScannerOutputToUiCandidates(PERSISTABLE_SCANNER_SAMPLE)[0]!;
 const candidateA = { ...baseCandidate, id: "base:a", chain: "base", contractAddress: ADDRESS_A, pairAddress: ADDRESS_B, addressIdentityVerified: true };
 const candidateB = { ...candidateA, id: "base:b", symbol: "NEXT", name: "Next Token", contractAddress: ADDRESS_B };
+const followUpCandidate: FollowUpPublicEntry = {
+  entry_id: "follow-up:max",
+  chain: "bsc",
+  contract_address: "0xe9bc5c6a86caa44fd7b469bf3cc7c563e4f77777",
+  display_name: "Giggle Mascot",
+  symbol: "Max",
+  lifecycle_status: "CANDIDATE_FOR_ESTABLISHED",
+  pair_age: 16,
+  first_seen_at: "2026-08-01T00:00:00.000Z",
+  last_seen_at: "2026-08-17T13:32:08.630Z",
+  last_checked_at: "2026-08-17T13:32:08.630Z",
+  next_check_at: null,
+  completed_checkpoints: [1, 3, 7, 14],
+  market_metrics: {
+    price_usd: 0.002002,
+    market_cap_usd: 2_002_830,
+    fdv_usd: 2_002_829,
+    liquidity_usd: 156_562.6,
+    volume_24h_usd: 737_569.94,
+    volume_market_cap_ratio: 0.3683,
+  },
+  filter_status: "passed_basic_filter",
+  filter_reasons: [],
+  security_status: "NOT_CHECKED",
+  missing_data: ["honeypot_status"],
+  established_membership: false,
+  next_review_step: "OWNER_DECISION_REQUIRED",
+};
 
 describe("UX.2 Tabbed Token Detail Workspace", () => {
   it("renders seven complete PL/EN tabs, Summary by default and exactly one tabpanel", () => {
@@ -44,6 +73,15 @@ describe("UX.2 Tabbed Token Detail Workspace", () => {
       assert.doesNotMatch(markup, /Wybierz moduł|Choose a module|candidate-(?:context|summary|layer)-column|candidate-layer-body/);
       assert.doesNotMatch(markup, /id="market-heading"|id="filters-heading"|id="security-heading"/);
     }
+  });
+
+  it("uses natural CAMP_USER copy for a Follow-up candidate on the default summary", () => {
+    const markup = render("pl", <CandidateDetailView followUp={followUpCandidate} initialOwnerPromotionStatus={null} />);
+    assert.equal((markup.match(/role="tab"/g) ?? []).length, 7);
+    assert.match(markup, /Status systemowy[\s\S]*Dalsza obserwacja/);
+    assert.match(markup, /Następny krok[\s\S]*Dokończ weryfikację/);
+    assert.match(markup, /Max[\s\S]*Giggle Mascot/);
+    assert.doesNotMatch(markup, /Established|established universe|candidate_for_established|owner|właściciela/i);
   });
 
   it("switches Market and AI inside the same single panel and removes prior full content", async () => {
@@ -228,7 +266,13 @@ describe("UX.3 client header and UX.4 provider-neutral AI", () => {
     };
     const client = render("en", <AIResearchSection chain="base" contractAddress={ADDRESS_A} symbol="PASS" name="Pass" initialLookup={lookup} mode="summary" />);
     assert.match(client, /AI analysis is currently unavailable/);
+    assert.equal((client.match(/AI analysis is currently unavailable/g) ?? []).length, 1);
     assert.doesNotMatch(client, /OpenAI|gpt-5-mini|provider mode|PROVIDER_DISABLED/i);
+    assert.doesNotMatch(client, /Open the AI analysis tab to see the full summary/);
+    const polishClient = render("pl", <AIResearchSection chain="base" contractAddress={ADDRESS_A} symbol="PASS" name="Pass" initialLookup={lookup} mode="summary" />);
+    assert.match(polishClient, /Niedostępna/);
+    assert.equal((polishClient.match(/Analiza AI jest obecnie niedostępna/g) ?? []).length, 1);
+    assert.doesNotMatch(polishClient, /Otwórz zakładkę Analiza AI, aby zobaczyć pełne podsumowanie/);
 
     const canvas = await source("src/components/AIResearchBriefCanvas.tsx");
     const handler = await source("server/scannerApiHandler.ts");
