@@ -10,7 +10,7 @@ import {
   type TokenLifecycleTrackingStatus,
   type TokenLifecycleViewModel,
 } from "../tokenLifecycle";
-import { useProductLocale, type ProductLocale } from "../productI18n";
+import { formatProductDateTime, useProductLocale, type ProductLocale } from "../productI18n";
 
 type TokenLifecycleFlowProps = {
   model: TokenLifecycleViewModel;
@@ -48,10 +48,13 @@ const FLOW_COPY = {
     checkpoints: "Checkpoint path",
     checkpointState: {
       completed: "Completed",
-      current: "Expected now",
-      future: "Future",
-      skipped: "Data unavailable — pending retry",
+      current: "Needs checking",
+      future: "Scheduled",
+      skipped: "Needs checking",
     },
+    nextAutomaticCheck: "Next automatic check",
+    dueNow: "Needs checking now",
+    noNextAutomaticCheck: "No further automatic check scheduled",
     nextAction: "Next action",
     action: {
       automatic_enrollment: "Automatic enrollment during the next central data cycle",
@@ -111,10 +114,13 @@ const FLOW_COPY = {
     checkpoints: "Oś checkpointów",
     checkpointState: {
       completed: "Ukończony",
-      current: "Oczekiwany teraz",
-      future: "Przyszły",
-      skipped: "Brak danych — oczekuje na ponowienie",
+      current: "Do sprawdzenia",
+      future: "Zaplanowany",
+      skipped: "Do sprawdzenia",
     },
+    nextAutomaticCheck: "Następne automatyczne sprawdzenie",
+    dueNow: "Do sprawdzenia teraz",
+    noNextAutomaticCheck: "Brak kolejnego automatycznego sprawdzenia",
     nextAction: "Następny krok",
     action: {
       automatic_enrollment: "Automatyczny zapis w najbliższym centralnym cyklu danych",
@@ -263,15 +269,34 @@ export function TokenCheckpointAxis({ model }: { model: TokenLifecycleViewModel 
           <li key={checkpoint.day} className={checkpoint.state} data-checkpoint-state={checkpoint.state}>
             <span>{checkpoint.day}</span>
             <strong>{checkpoint.day === 1 ? (locale === "pl" ? "dzień" : "day") : (locale === "pl" ? "dni" : "days")}</strong>
-            <small>{copy.checkpointState[checkpoint.state]}</small>
+            <small>{checkpointStateLabel(checkpoint, locale)}</small>
           </li>
         ))}
       </ol>
+      <p className="token-checkpoint-next"><strong>{copy.nextAutomaticCheck}:</strong> {nextAutomaticCheckLabel(model, locale)}</p>
       <p>{locale === "pl"
         ? "Checkpoint oznacza termin ponownej oceny danych, a nie akceptację tokena."
         : "A checkpoint is a data reassessment date, not token acceptance."}</p>
     </div>
   );
+}
+
+function checkpointStateLabel(checkpoint: TokenLifecycleViewModel["checkpoints"][number], locale: ProductLocale): string {
+  const copy = FLOW_COPY[locale];
+  if (checkpoint.state === "future" && checkpoint.scheduled_at) {
+    return locale === "pl"
+      ? `${copy.checkpointState.future} na ${formatProductDateTime(checkpoint.scheduled_at, locale)}`
+      : `${copy.checkpointState.future} for ${formatProductDateTime(checkpoint.scheduled_at, locale)}`;
+  }
+  return copy.checkpointState[checkpoint.state];
+}
+
+function nextAutomaticCheckLabel(model: TokenLifecycleViewModel, locale: ProductLocale): string {
+  const copy = FLOW_COPY[locale];
+  if (!model.next_checkpoint_at) return copy.noNextAutomaticCheck;
+  const next = model.checkpoints.find((checkpoint) => checkpoint.scheduled_at === model.next_checkpoint_at);
+  if (next?.state === "current" || next?.state === "skipped") return copy.dueNow;
+  return formatProductDateTime(model.next_checkpoint_at, locale);
 }
 
 export function lifecycleStageLabel(stage: TokenLifecycleStage, locale: ProductLocale): string {

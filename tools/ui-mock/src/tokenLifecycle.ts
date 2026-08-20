@@ -48,6 +48,7 @@ export type TokenLifecycleBlockingCondition =
 export type TokenLifecycleCheckpointView = {
   day: TokenLifecycleCheckpoint;
   state: TokenLifecycleCheckpointState;
+  scheduled_at: string | null;
 };
 
 export type TokenLifecycleStageView = {
@@ -213,7 +214,6 @@ export function resolveTokenLifecycle(input: ResolveTokenLifecycleInput): TokenL
   const checkpointViews = resolveCheckpointViews(
     completedCheckpoints,
     followUp?.next_check_at ?? null,
-    followUp?.missing_data ?? [],
     input.now ?? new Date(),
   );
 
@@ -358,7 +358,6 @@ function normalizeCompletedCheckpoints(values: number[]): TokenLifecycleCheckpoi
 function resolveCheckpointViews(
   completed: TokenLifecycleCheckpoint[],
   nextCheckpointAt: string | null,
-  missingData: string[],
   now: Date,
 ): TokenLifecycleCheckpointView[] {
   const completedSet = new Set(completed);
@@ -367,20 +366,15 @@ function resolveCheckpointViews(
     && Number.isFinite(Date.parse(nextCheckpointAt))
     && Date.parse(nextCheckpointAt) <= now.getTime();
   return TOKEN_LIFECYCLE_CHECKPOINTS.map((day) => {
-    if (completedSet.has(day)) return { day, state: "completed" };
-    if (day === nextDay) {
-      return {
-        day,
-        state: nextIsDue && missingData.length > 0 ? "skipped" : "current",
-      };
-    }
-    return { day, state: "future" };
+    if (completedSet.has(day)) return { day, state: "completed", scheduled_at: null };
+    if (day === nextDay && nextIsDue) return { day, state: "current", scheduled_at: nextCheckpointAt };
+    return { day, state: "future", scheduled_at: day === nextDay ? nextCheckpointAt : null };
   });
 }
 
 function isValidSolanaAddress(value: string): boolean {
   if (value.length < 32 || value.length > 44) return false;
-  let bytes: number[] = [0];
+  const bytes: number[] = [0];
   for (const character of value) {
     const digit = BASE58_ALPHABET.indexOf(character);
     if (digit < 0) return false;

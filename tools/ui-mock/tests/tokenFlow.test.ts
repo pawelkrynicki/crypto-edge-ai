@@ -8,10 +8,10 @@ import { mapPersistableScannerOutputToUiCandidates } from "../src/adapters/scann
 import { CandidateDetailView } from "../src/components/CandidateDetailView.js";
 import {
   CandidateResultsView,
-  MaturingFollowUpBasket,
   NewEmergingBasket,
 } from "../src/components/CandidateResultsView.js";
 import {
+  TokenCheckpointAxis,
   TokenLifecycleFlow,
   TokenLifecycleStatus,
 } from "../src/components/TokenLifecycleFlow.js";
@@ -134,7 +134,7 @@ describe("FLOW.1 visible token lifecycle contracts", () => {
     assert.match(unavailableMarkup, /Dane Follow-up są niedostępne/);
   });
 
-  it("presents 1/3/7/14/30 checkpoints as reassessment dates, including a data-unavailable retry", () => {
+  it("presents 1/3/7/14/30 checkpoints with truthful completed, due, future, and unscheduled states", () => {
     const entry = followUpEntry({
       lifecycle_status: "MATURING",
       completed_checkpoints: [1, 3],
@@ -143,15 +143,52 @@ describe("FLOW.1 visible token lifecycle contracts", () => {
     });
     const model = resolveTokenLifecycle({ followUp: entry, followUpStatus: followUpStatus(), now: NOW });
     assert.deepEqual(model.checkpoints.map(({ day }) => day), [1, 3, 7, 14, 30]);
-    assert.deepEqual(model.checkpoints.map(({ state }) => state), ["completed", "completed", "skipped", "future", "future"]);
+    assert.deepEqual(model.checkpoints.map(({ state }) => state), ["completed", "completed", "current", "future", "future"]);
 
-    const markup = render("pl", React.createElement(MaturingFollowUpBasket, {
-      entries: [entry],
-      status: followUpStatus(),
-    }));
+    const markup = render("pl", React.createElement(TokenCheckpointAxis, { model }));
     for (const day of [1, 3, 7, 14, 30]) assert.match(markup, new RegExp(`>${day}<`));
-    assert.match(markup, /Brak danych — oczekuje na ponowienie/);
+    assert.match(markup, /Ukończony/);
+    assert.match(markup, /Do sprawdzenia/);
     assert.match(markup, /Checkpoint oznacza termin ponownej oceny danych, a nie akceptację tokena/);
+
+    const futureEntry = followUpEntry({
+      completed_checkpoints: [1, 3, 7, 14],
+      next_check_at: "2026-08-31T09:47:39.451Z",
+    });
+    const futureModel = resolveTokenLifecycle({
+      followUp: futureEntry,
+      followUpStatus: followUpStatus(),
+      now: new Date("2026-08-20T10:22:24.842Z"),
+    });
+    assert.equal(futureModel.checkpoints[4]?.state, "future");
+    const futureMarkup = render("pl", React.createElement(TokenCheckpointAxis, { model: futureModel }));
+    assert.match(futureMarkup, /Zaplanowany na 31\.08\.2026/);
+    assert.match(futureMarkup, /Następne automatyczne sprawdzenie:[\s\S]*31\.08\.2026/);
+    assert.doesNotMatch(futureMarkup, /Oczekiwany teraz/);
+
+    const dueNowModel = resolveTokenLifecycle({
+      followUp: followUpEntry({ completed_checkpoints: [1, 3, 7, 14], next_check_at: "2026-08-20T10:22:24.842Z" }),
+      followUpStatus: followUpStatus(),
+      now: new Date("2026-08-20T10:22:24.842Z"),
+    });
+    assert.equal(dueNowModel.checkpoints[4]?.state, "current");
+
+    const timezoneBoundary = resolveTokenLifecycle({
+      followUp: followUpEntry({ completed_checkpoints: [1, 3, 7, 14], next_check_at: "2026-08-31T00:00:00.000Z" }),
+      followUpStatus: followUpStatus(),
+      now: new Date("2026-08-30T23:30:00.000Z"),
+    });
+    assert.equal(timezoneBoundary.checkpoints[4]?.state, "future");
+
+    const unscheduledModel = resolveTokenLifecycle({
+      followUp: followUpEntry({ completed_checkpoints: [1, 3, 7, 14, 30], next_check_at: null }),
+      followUpStatus: followUpStatus(),
+      now: NOW,
+    });
+    assert.match(
+      render("pl", React.createElement(TokenCheckpointAxis, { model: unscheduledModel })),
+      /Brak kolejnego automatycznego sprawdzenia/,
+    );
   });
 
   it("keeps Candidate separate from Established until enabled universe membership is supplied", () => {
