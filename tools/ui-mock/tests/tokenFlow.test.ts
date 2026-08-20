@@ -198,9 +198,18 @@ describe("FLOW.1 visible token lifecycle contracts", () => {
     }
   });
 
-  it("puts the complete Observation flow high in Candidate Detail and hides owner controls from testers", () => {
+  it("renders a three-stage CAMP_USER Observation flow without internal lifecycle copy", () => {
     const candidate = productCandidate();
-    const entry = followUpEntry({ chain: candidate.chain, contract_address: candidate.contractAddress });
+    const entry = followUpEntry({
+      chain: candidate.chain,
+      contract_address: candidate.contractAddress,
+      lifecycle_status: "CANDIDATE_FOR_ESTABLISHED",
+      filter_status: "passed_basic_filter",
+      security_status: "PARTIAL",
+      missing_data: ["honeypot_status"],
+      next_check_at: null,
+      next_review_step: "OWNER_DECISION_REQUIRED",
+    });
     const markup = render("pl", React.createElement(CandidateDetailView, {
       candidate,
       followUp: entry,
@@ -210,11 +219,13 @@ describe("FLOW.1 visible token lifecycle contracts", () => {
     assert.ok(markup.indexOf("Przepływ obserwacji") > markup.indexOf("Tożsamość"));
     assert.match(markup, /data-active-detail-tab="observation"/);
     assert.doesNotMatch(markup, /id="market-heading"/);
-    assert.match(markup, /Co nastąpi automatycznie/);
-    assert.match(markup, /Co wymaga decyzji/);
-    assert.match(markup, /Najbliższy termin/);
-    assert.match(markup, /Warunki blokujące/);
-    assert.doesNotMatch(markup, /established-promotion-panel|Dodaj do Established/);
+    assert.equal((markup.match(/class="token-lifecycle-stage /g) ?? []).length, 3);
+    assert.match(markup, /Gdzie jest teraz[\s\S]*Dalsza obserwacja/);
+    assert.match(markup, /Obecny wynik filtrów[\s\S]*Podstawowe filtry spełnione/);
+    assert.match(markup, /Status bezpieczeństwa[\s\S]*Dane częściowe; wymagana weryfikacja/);
+    assert.match(markup, /Następny krok[\s\S]*Dokończ weryfikację/);
+    assert.match(markup, /Obecna blokada[\s\S]*Brakuje pełnej weryfikacji/);
+    assert.doesNotMatch(markup, /Established|owner|właściciela|candidate_for_established/i);
   });
 
   it("separates valid technical identity from required source verification and blocks invalid identities", () => {

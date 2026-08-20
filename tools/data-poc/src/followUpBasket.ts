@@ -502,13 +502,9 @@ export function selectDueFollowUpEntries(
   const checkedAt = validDate(now).getTime();
   const boundedLimit = clampLimit(limit);
   return store.entries
-    .filter((entry) => (
-      (entry.lifecycle_status === "NEW" || entry.lifecycle_status === "MATURING")
-      && entry.next_check_at !== null
-      && Date.parse(entry.next_check_at) <= checkedAt
-    ))
+    .filter((entry) => isDueForFollowUpRecheck(entry, checkedAt))
     .sort((left, right) => (
-      Date.parse(left.next_check_at ?? "") - Date.parse(right.next_check_at ?? "")
+      (scheduledFollowUpRecheckAt(left) ?? "").localeCompare(scheduledFollowUpRecheckAt(right) ?? "")
       || left.entry_id.localeCompare(right.entry_id)
     ))
     .slice(0, boundedLimit)
@@ -517,11 +513,7 @@ export function selectDueFollowUpEntries(
 
 export function dueFollowUpCount(store: FollowUpStore, now = new Date()): number {
   const nowMs = validDate(now).getTime();
-  return store.entries.filter((entry) => (
-    (entry.lifecycle_status === "NEW" || entry.lifecycle_status === "MATURING")
-    && entry.next_check_at !== null
-    && Date.parse(entry.next_check_at) <= nowMs
-  )).length;
+  return store.entries.filter((entry) => isDueForFollowUpRecheck(entry, nowMs)).length;
 }
 
 export function applyFollowUpRecheckSuccess(
@@ -544,7 +536,7 @@ export function applyFollowUpRecheckSuccess(
     const completedPlan = completed.includes(30);
     const lifecycle: FollowUpLifecycleStatus = isEstablished
       ? "ESTABLISHED"
-      : passed
+      : passed && completedPlan
         ? "CANDIDATE_FOR_ESTABLISHED"
         : completedPlan ? "ARCHIVED" : "MATURING";
     const nextCheckpoint = lifecycle === "MATURING"
@@ -560,7 +552,7 @@ export function applyFollowUpRecheckSuccess(
       next_check_at: nextCheckpoint,
       completed_checkpoints: completed,
       lifecycle_status: lifecycle,
-      candidate_since: lifecycle === "CANDIDATE_FOR_ESTABLISHED" ? entry.candidate_since ?? checkedAt : entry.candidate_since,
+      candidate_since: lifecycle === "CANDIDATE_FOR_ESTABLISHED" ? entry.candidate_since ?? checkedAt : null,
       archived_at: lifecycle === "ARCHIVED" ? entry.archived_at ?? checkedAt : null,
       last_valid_market_snapshot: retainLatestValidMarketSnapshot(
         entry.last_valid_market_snapshot,
@@ -599,6 +591,7 @@ export function synchronizeFollowUpEstablishedMembership(
       next_check_at: lifecycle === "MATURING" || lifecycle === "NEW"
         ? nextFutureCheckpoint(entry.first_seen_at, changedAt, entry.completed_checkpoints)
         : null,
+      candidate_since: lifecycle === "CANDIDATE_FOR_ESTABLISHED" ? entry.candidate_since ?? changedAt : null,
       archived_at: lifecycle === "ARCHIVED" ? entry.archived_at ?? changedAt : null,
     };
     audits.unshift(audit("MEMBERSHIP_SYNC", changedAt, entry.entry_id, entry.lifecycle_status, lifecycle, sourceRunId));
@@ -758,7 +751,9 @@ function deduplicateObservations(candidates: FollowUpObservationCandidate[]): Fo
 }
 
 function resolveNonEstablishedLifecycle(entry: FollowUpEntry, at: string): FollowUpLifecycleStatus {
-  if (entry.latest_filter_result?.status === "passed_basic_filter" && entry.candidate_since) return "CANDIDATE_FOR_ESTABLISHED";
+  if (entry.latest_filter_result?.status === "passed_basic_filter"
+    && entry.candidate_since
+    && FOLLOW_UP_CHECKPOINT_DAYS.every((day) => entry.completed_checkpoints.includes(day))) return "CANDIDATE_FOR_ESTABLISHED";
   if (entry.completed_checkpoints.includes(30)) return "ARCHIVED";
   return Date.parse(at) - Date.parse(entry.first_seen_at) < DAY_MS ? "NEW" : "MATURING";
 }
@@ -771,9 +766,30 @@ function lifecycleAfterObservation(
 ): FollowUpLifecycleStatus {
   if (isEstablished) return "ESTABLISHED";
   if (Date.parse(observedAt) - Date.parse(entry.first_seen_at) < DAY_MS) return "NEW";
-  if (candidate.basic_filter_status === "passed_basic_filter") return "CANDIDATE_FOR_ESTABLISHED";
+  if (candidate.basic_filter_status === "passed_basic_filter"
+    && FOLLOW_UP_CHECKPOINT_DAYS.every((day) => entry.completed_checkpoints.includes(day))) return "CANDIDATE_FOR_ESTABLISHED";
   if (entry.completed_checkpoints.includes(30)) return "ARCHIVED";
   return "MATURING";
+}
+
+function isDueForFollowUpRecheck(entry: FollowUpEntry, nowMs: number): boolean {
+  if (entry.lifecycle_status === "NEW" || entry.lifecycle_status === "MATURING") {
+    const next = scheduledFollowUpRecheckAt(entry);
+    return next !== null && Date.parse(next) <= nowMs;
+  }
+  // Recover a legacy pre-day-30 candidate without changing its identity or
+  // bypassing the normal central scheduler. It remains Follow-up work until
+  // the canonical checkpoint plan is complete.
+  if (entry.lifecycle_status !== "CANDIDATE_FOR_ESTABLISHED") return false;
+  const next = scheduledFollowUpRecheckAt(entry);
+  return next !== null && Date.parse(next) <= nowMs;
+}
+
+function scheduledFollowUpRecheckAt(entry: FollowUpEntry): string | null {
+  if (entry.lifecycle_status === "CANDIDATE_FOR_ESTABLISHED") {
+    return entry.next_check_at ?? firstUncompletedCheckpoint(entry.first_seen_at, entry.completed_checkpoints);
+  }
+  return entry.next_check_at;
 }
 
 function firstUncompletedCheckpoint(

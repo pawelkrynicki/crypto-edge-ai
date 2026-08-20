@@ -374,7 +374,7 @@ describe("owner established promotion mutation security", () => {
   it("lets Follow-up resolve ESTABLISHED from active membership without rewriting its store", async () => {
     const harness = await createHarness("ENABLED");
     const followUpPath = join(harness.directory, "follow-up.json");
-    const observedAt = "2026-07-20T09:00:00.000Z";
+    const observedAt = "2026-06-23T09:00:00.000Z";
     const candidate = observationCandidate(ADDRESS);
     const ingested = ingestFollowUpObservations(
       createEmptyFollowUpStore(new Date(observedAt)),

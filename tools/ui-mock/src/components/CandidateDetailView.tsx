@@ -43,7 +43,6 @@ import {
   lifecycleBlockingLabel,
   lifecycleStageLabel,
   TokenLifecycleFlow,
-  TokenLifecycleStatus,
 } from "./TokenLifecycleFlow";
 
 interface CandidateDetailViewProps {
@@ -195,7 +194,7 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
         ? workspaceCopy.verificationRequired
         : workspaceCopy.noCurrentBlockers;
   const systemStatus = candidateDetailSystemStatusLabel(lifecycle, locale);
-  const nextStep = candidateDetailNextStep(lifecycle, locale);
+  const nextStep = candidateDetailNextStep(lifecycle, followUp, locale);
   let activeTabContent: React.ReactNode = null;
   if (activeTab === "summary") {
     activeTabContent = (
@@ -469,36 +468,28 @@ function LifecycleDetailSection({
   universeVersion: string | null;
 }) {
   const { locale, t } = useProductLocale();
-  const blockers = model.blocking_conditions.length > 0
-    ? model.blocking_conditions.map((condition) => lifecycleBlockingLabel(condition, locale)).join(" · ")
-    : (locale === "pl" ? "Brak blokady bieżącego kroku" : "No blocker for the current step");
-  const automatic = model.next_action_type === "owner_decision"
-    ? (locale === "pl" ? "Automatyczne checkpointy zakończyły bieżący etap." : "Automatic checkpoints completed the current stage.")
-    : lifecycleActionLabel(model.next_action_type, locale);
-  const manual = model.owner_decision_required
-    ? (locale === "pl" ? "Decyzja właściciela. Token nie został dodany automatycznie." : "Owner decision. The token was not promoted automatically.")
-    : model.tracking_status === "established"
-      ? (locale === "pl" ? "Brak ręcznej akcji w tym widoku." : "No manual action in this view.")
-      : (locale === "pl" ? "Nie wymaga ręcznego przenoszenia do dalszej obserwacji." : "No manual move to follow-up is required.");
-  const howItGotHere = lifecycleOrigin(model, locale);
+  const observation = campUserObservation(model, followUp, locale);
   return (
     <section className="product-detail-section lifecycle-detail-section" aria-labelledby="follow-up-heading">
       <SectionHeader id="follow-up-heading" title={locale === "pl" ? "Przepływ obserwacji" : "Observation flow"} />
-      {model.owner_decision_required && (
-        <p className="follow-up-candidate-boundary">{t("followUp.detailBoundary")}</p>
-      )}
-      <TokenLifecycleFlow model={model} showCheckpoints={Boolean(followUp)} />
-      <TokenLifecycleStatus model={model} />
+      <TokenLifecycleFlow model={model} showCheckpoints={Boolean(followUp)} campUser />
+      <div className="token-lifecycle-status active" role="status" data-interaction="status">
+        <div>
+          <strong>{observation.statusTitle}</strong>
+          <p>{observation.statusDetail}</p>
+        </div>
+        <dl>
+          <div><dt>{locale === "pl" ? "Następny krok" : "Next step"}</dt><dd>{observation.nextStep}</dd></div>
+          <div><dt>{locale === "pl" ? "Obecna blokada" : "Current blocker"}</dt><dd>{observation.blocker}</dd></div>
+        </dl>
+      </div>
       <div className="lifecycle-detail-grid">
-        <DetailField label={locale === "pl" ? "Gdzie jest teraz" : "Current position"} value={lifecycleStageLabel(model.current_stage, locale)} />
-        <DetailField label={locale === "pl" ? "Jak trafił na ten etap" : "How it reached this stage"} value={howItGotHere} />
-        <DetailField label={locale === "pl" ? "Co nastąpi automatycznie" : "What happens automatically"} value={automatic} />
-        <DetailField label={locale === "pl" ? "Co wymaga decyzji" : "What requires a decision"} value={manual} tone={model.owner_decision_required ? "warning" : "neutral"} />
-        <DetailField
-          label={locale === "pl" ? "Najbliższy termin" : "Next due date"}
-          value={model.next_checkpoint_at ? formatProductDateTime(model.next_checkpoint_at, locale) : t("followUp.noAutomaticCheck")}
-        />
-        <DetailField label={locale === "pl" ? "Warunki blokujące" : "Blocking conditions"} value={blockers} tone={model.blocking_conditions.length > 0 ? "warning" : "neutral"} />
+        <DetailField label={locale === "pl" ? "Gdzie jest teraz" : "Current position"} value={observation.position} />
+        <DetailField label={locale === "pl" ? "Jak trafił na ten etap" : "How it reached this stage"} value={observation.arrival} />
+        <DetailField label={locale === "pl" ? "Obecny wynik filtrów" : "Current filter result"} value={observation.filters} tone={observation.filtersReady ? "ready" : "warning"} />
+        <DetailField label={locale === "pl" ? "Status bezpieczeństwa" : "Security status"} value={observation.security} tone={observation.needsVerification ? "warning" : "ready"} />
+        <DetailField label={locale === "pl" ? "Następny krok" : "Next step"} value={observation.nextStep} tone={observation.needsVerification ? "warning" : "neutral"} />
+        <DetailField label={locale === "pl" ? "Obecna blokada" : "Current blocker"} value={observation.blocker} tone={observation.blocker === observation.noBlocker ? "ready" : "warning"} />
       </div>
       {followUp && (
         <div className="lifecycle-source-facts">
@@ -548,7 +539,7 @@ function FollowUpOnlyDetail({
   const copy = getTabbedWorkspaceCopy(locale);
   const symbol = followUp.symbol ?? t("radar.missingData");
   const systemStatus = candidateDetailSystemStatusLabel(lifecycle, locale);
-  const nextStep = candidateDetailNextStep(lifecycle, locale);
+  const nextStep = candidateDetailNextStep(lifecycle, followUp, locale);
   const marketMissing = Object.values(followUp.market_metrics).filter((value) => value == null).length;
   const completeness = followUp.missing_data.length === 0 && marketMissing === 0 ? copy.complete : copy.partial;
   let content: React.ReactNode = null;
@@ -688,11 +679,49 @@ function candidateDetailSystemStatusLabel(model: TokenLifecycleViewModel, locale
   return lifecycleStageLabel(model.current_stage, locale);
 }
 
-function candidateDetailNextStep(model: TokenLifecycleViewModel, locale: ProductLocale): string {
-  if (model.next_action_type === "owner_decision" || model.blocking_conditions.includes("OWNER_DECISION_PENDING")) {
+function candidateDetailNextStep(model: TokenLifecycleViewModel, followUp: FollowUpPublicEntry | null, locale: ProductLocale): string {
+  if (requiresCampUserVerification(followUp)) {
     return locale === "pl" ? "Dokończ weryfikację" : "Complete verification";
   }
+  if (model.current_stage === "candidate") return locale === "pl" ? "Poczekaj na ponowną ocenę systemu" : "Wait for the next system reassessment";
   return lifecycleActionLabel(model.next_action_type, locale);
+}
+
+function campUserObservation(model: TokenLifecycleViewModel, followUp: FollowUpPublicEntry | null, locale: ProductLocale) {
+  const filtersReady = followUp?.filter_status === "passed_basic_filter";
+  const needsVerification = requiresCampUserVerification(followUp);
+  const position = candidateDetailSystemStatusLabel(model, locale);
+  const noBlocker = locale === "pl" ? "Brak bieżącej blokady" : "No current blocker";
+  const blocker = needsVerification
+    ? (locale === "pl" ? "Brakuje pełnej weryfikacji" : "Full verification is still required")
+    : model.current_stage === "candidate"
+      ? (locale === "pl" ? "System ocenia pozostałe warunki przejścia" : "The system is evaluating the remaining transition conditions")
+      : model.blocking_conditions.length > 0
+        ? model.blocking_conditions.map((condition) => lifecycleBlockingLabel(condition, locale)).join(" · ")
+        : noBlocker;
+  const filters = filtersReady
+    ? (locale === "pl" ? "Podstawowe filtry spełnione" : "Basic filters passed")
+    : followUp?.filter_status === "rejected_basic_filter"
+      ? (locale === "pl" ? "Podstawowe filtry niespełnione" : "Basic filters not met")
+      : (locale === "pl" ? "Wynik filtrów wymaga ponownej oceny" : "Filter result needs reassessment");
+  const security = needsVerification
+    ? (locale === "pl" ? "Dane częściowe; wymagana weryfikacja" : "Partial data; verification required")
+    : followUp?.security_status === "CHECKED"
+      ? (locale === "pl" ? "Weryfikacja kompletna" : "Verification complete")
+      : (locale === "pl" ? "Status bezpieczeństwa wymaga potwierdzenia" : "Security status needs confirmation");
+  const nextStep = candidateDetailNextStep(model, followUp, locale);
+  const arrival = filtersReady
+    ? (locale === "pl" ? "Spełnił podstawowe warunki i przeszedł do dalszej obserwacji." : "It met the basic conditions and moved into further observation.")
+    : (locale === "pl" ? "Przeszedł do dalszej obserwacji, aby system mógł ponownie ocenić dane." : "It moved into further observation so the system can reassess the data.");
+  const statusTitle = filtersReady ? (locale === "pl" ? "Warunki rynkowe spełnione" : "Market conditions met") : position;
+  const statusDetail = needsVerification
+    ? (locale === "pl" ? "Brakuje pełnej weryfikacji. Po jej uzupełnieniu system ponownie oceni warunki przejścia do Głównego Radaru." : "Full verification is still required. Once it is complete, the system will reassess the conditions for Main Radar.")
+    : (locale === "pl" ? "System ocenia warunki przejścia do Głównego Radaru w centralnym cyklu danych." : "The system evaluates Main Radar conditions in the central data cycle.");
+  return { position, arrival, filters, filtersReady, security, needsVerification, nextStep, blocker, noBlocker, statusTitle, statusDetail };
+}
+
+function requiresCampUserVerification(followUp: FollowUpPublicEntry | null): boolean {
+  return Boolean(followUp && (followUp.missing_data.length > 0 || ["PARTIAL", "MANUAL_VERIFICATION_REQUIRED"].includes(followUp.security_status)));
 }
 
 function SectionHeader({ id, title }: { id: string; title: string }) {
@@ -886,32 +915,6 @@ function getSecurityTone(state: ProductSecurityState): "ready" | "warning" | "cr
   if (state === "checked_critical") return "critical";
   if (state === "checked") return "ready";
   return "warning";
-}
-
-function lifecycleOrigin(model: TokenLifecycleViewModel, locale: ProductLocale): string {
-  if (model.tracking_status === "established") {
-    return locale === "pl"
-      ? "Właściciel dodał tę tożsamość do aktywnego Established Universe."
-      : "The owner added this identity to the enabled Established Universe.";
-  }
-  if (model.tracking_status === "candidate") {
-    return locale === "pl"
-      ? "Automatyczna obserwacja potwierdziła spełnienie podstawowych filtrów."
-      : "Automatic observation confirmed that the basic filters were met.";
-  }
-  if (model.tracking_status === "active" || model.tracking_status === "complete") {
-    return locale === "pl"
-      ? "Centralny collector automatycznie zapisał poprawne chain + contract_address."
-      : "The central collector automatically enrolled the valid chain + contract address.";
-  }
-  if (model.tracking_status === "waiting") {
-    return locale === "pl"
-      ? "Token został wykryty w warstwie Nowe i ma poprawną tożsamość."
-      : "The token was detected in New and has a valid identity.";
-  }
-  return locale === "pl"
-    ? "Token został wykryty, ale dalszy etap wymaga dostępnej i poprawnej tożsamości."
-    : "The token was detected, but the next stage requires an available, valid identity.";
 }
 
 function formatFollowUpFilterStatus(

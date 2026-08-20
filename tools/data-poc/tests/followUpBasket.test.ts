@@ -16,6 +16,7 @@ import {
   readFollowUpStore,
   resolveFollowUpStatusAt,
   selectDueFollowUpEntries,
+  synchronizeFollowUpEstablishedMembership,
   updateFollowUpStore,
   type FollowUpObservationCandidate,
 } from "../src/followUpBasket.js";
@@ -66,7 +67,7 @@ describe("Follow-up Basket model and store", () => {
     assert.equal(checked.entries[0]?.next_check_at, "2026-07-01T00:00:00.000Z");
   });
 
-  it("moves NEW to MATURING after 24 hours, candidate only after a successful check, and keeps missing security manual", () => {
+  it("keeps Follow-up checkpoints scheduled until day 30, then records the internal candidate state", () => {
     const store = seededStore({ basic_filter_status: "passed_basic_filter", filter_reasons: [] });
     assert.equal(resolveFollowUpStatusAt(store.entries[0]!, "2026-06-01T23:59:59.000Z"), "NEW");
     assert.equal(resolveFollowUpStatusAt(store.entries[0]!, "2026-06-02T00:00:00.000Z"), "MATURING");
@@ -77,9 +78,39 @@ describe("Follow-up Basket model and store", () => {
       checked_at: "2026-06-02T00:00:00.000Z",
       source_run_id: "scan_candidate",
     });
-    assert.equal(checked.entries[0]?.lifecycle_status, "CANDIDATE_FOR_ESTABLISHED");
+    assert.equal(checked.entries[0]?.lifecycle_status, "MATURING");
+    assert.equal(checked.entries[0]?.next_check_at, "2026-06-04T00:00:00.000Z");
     assert.equal(checked.entries[0]?.latest_security_status.status, "MANUAL_VERIFICATION_REQUIRED");
-    assert.equal(checked.entries[0]?.candidate_since, "2026-06-02T00:00:00.000Z");
+    assert.equal(checked.entries[0]?.candidate_since, null);
+    const legacyCandidate = structuredClone(checked);
+    legacyCandidate.entries[0] = {
+      ...legacyCandidate.entries[0]!,
+      lifecycle_status: "CANDIDATE_FOR_ESTABLISHED",
+      candidate_since: "2026-06-02T00:00:00.000Z",
+      next_check_at: null,
+    };
+    assert.equal(
+      selectDueFollowUpEntries(legacyCandidate, new Date("2026-07-01T00:00:00.000Z"), 5)[0]?.entry_id,
+      checked.entries[0]?.entry_id,
+    );
+    const repairedLegacy = synchronizeFollowUpEstablishedMembership(
+      legacyCandidate,
+      null,
+      "2026-06-15T00:00:00.000Z",
+      "scan_repair_legacy_candidate",
+    );
+    assert.equal(repairedLegacy.entries[0]?.lifecycle_status, "MATURING");
+    assert.equal(repairedLegacy.entries[0]?.candidate_since, null);
+    assert.equal(repairedLegacy.entries[0]?.next_check_at, "2026-07-01T00:00:00.000Z");
+    const completed = applyFollowUpRecheckSuccess(checked, {
+      entry_id: checked.entries[0]!.entry_id,
+      candidate: candidate({ basic_filter_status: "passed_basic_filter", filter_reasons: [] }),
+      checked_at: "2026-07-01T00:00:00.000Z",
+      source_run_id: "scan_complete_plan",
+    });
+    assert.equal(completed.entries[0]?.lifecycle_status, "CANDIDATE_FOR_ESTABLISHED");
+    assert.equal(completed.entries[0]?.candidate_since, "2026-07-01T00:00:00.000Z");
+    assert.equal(completed.entries[0]?.next_check_at, null);
   });
 
   it("derives ESTABLISHED only from an enabled universe entry without mutating that universe", () => {

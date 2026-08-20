@@ -187,23 +187,18 @@ describe("Follow-up read-only product boundary", () => {
     assert.equal(resolveControlCenterStatus(notReadyControlCenterInput()).overallStatus, "NOT_READY");
   });
 
-  it("shows Candidate for Established as an owner decision and links detail only through safe identity", () => {
+  it("keeps an internal candidate status out of the CAMP_USER Observation view", () => {
     const candidate = {
       ...mapPersistableScannerOutputToUiCandidates(PERSISTABLE_SCANNER_SAMPLE)[0]!,
       contractAddress: "So11111111111111111111111111111111111111112",
     };
     const entry = { ...publicEntry(), chain: candidate.chain, contract_address: candidate.contractAddress, lifecycle_status: "CANDIDATE_FOR_ESTABLISHED" as const, next_review_step: "OWNER_DECISION_REQUIRED" as const };
-    const englishBasket = render("en", React.createElement(MaturingFollowUpBasket, { entries: [entry], status: publicStatus() }));
-    const polishBasket = render("pl", React.createElement(MaturingFollowUpBasket, { entries: [entry], status: publicStatus() }));
-    assert.match(englishBasket, /Candidate for an owner decision\. It has not been added to Established automatically\./);
-    assert.match(polishBasket, /Kandydat do ręcznej decyzji ownera\. Nie został automatycznie dodany do Established\./);
-    const englishDetail = render("en", React.createElement(CandidateDetailView, { candidate, followUp: entry, initialActiveTab: "observation" }));
     const polishDetail = render("pl", React.createElement(CandidateDetailView, { candidate, followUp: entry, initialActiveTab: "observation" }));
-    assert.match(englishDetail, /Candidate for Established/);
-    assert.match(polishDetail, /Kandydat do Established/);
-    assert.doesNotMatch(polishDetail, /CANDIDATE_FOR_ESTABLISHED|CANDIDATE FOR ESTABLISHED/);
-    assert.match(englishDetail, /Adding this token to Established requires a separate owner decision\./);
-    assert.match(polishDetail, /Dodanie do Established wymaga osobnej, ręcznej decyzji ownera\./);
+    assert.equal((polishDetail.match(/class="token-lifecycle-stage /g) ?? []).length, 3);
+    assert.match(polishDetail, /Dalsza obserwacja/);
+    assert.match(polishDetail, /Dokończ weryfikację/);
+    assert.match(polishDetail, /Brakuje pełnej weryfikacji/);
+    assert.doesNotMatch(polishDetail, /Established|owner|właściciela|candidate_for_established/i);
   });
 });
 

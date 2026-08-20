@@ -17,6 +17,7 @@ type TokenLifecycleFlowProps = {
   compact?: boolean;
   showCheckpoints?: boolean;
   className?: string;
+  campUser?: boolean;
 };
 
 const FLOW_COPY = {
@@ -153,19 +154,21 @@ export function TokenLifecycleFlow({
   compact = false,
   showCheckpoints = false,
   className = "",
+  campUser = false,
 }: TokenLifecycleFlowProps) {
   const { locale } = useProductLocale();
   const copy = FLOW_COPY[locale];
+  const stages = campUser ? campUserStages(model) : model.stages;
   return (
-    <div className={`token-lifecycle-flow ${compact ? "compact" : ""} ${className}`.trim()}>
+    <div className={`token-lifecycle-flow ${compact ? "compact" : ""} ${className}`.trim()} data-lifecycle-presentation={campUser ? "camp-user" : "legacy"}>
       <ol className="token-lifecycle-stages" aria-label={copy.aria}>
-        {model.stages.map((stage, index) => (
+        {stages.map((stage, index) => (
           <li
             key={stage.id}
             className={`token-lifecycle-stage ${stage.state}`}
             aria-current={stage.state === "current" ? "step" : undefined}
             data-interaction="read-only"
-            data-stage={stage.id}
+            data-stage={campUser ? campUserStageId(stage.id) : stage.id}
             data-state={stage.state}
           >
             <span className="token-lifecycle-index" aria-hidden="true">{index + 1}</span>
@@ -179,6 +182,34 @@ export function TokenLifecycleFlow({
       {showCheckpoints && <TokenCheckpointAxis model={model} />}
     </div>
   );
+}
+
+function campUserStages(model: TokenLifecycleViewModel): TokenLifecycleViewModel["stages"] {
+  if (model.current_stage === "new") {
+    return [
+      { id: "new", state: "current" },
+      { id: "follow_up", state: "pending" },
+      { id: "established", state: "pending" },
+    ];
+  }
+  if (model.current_stage === "established") {
+    return [
+      { id: "new", state: "completed" },
+      { id: "follow_up", state: "completed" },
+      { id: "established", state: "current" },
+    ];
+  }
+  return [
+    { id: "new", state: "completed" },
+    { id: "follow_up", state: "current" },
+    { id: "established", state: "pending" },
+  ];
+}
+
+function campUserStageId(stage: TokenLifecycleStage): string {
+  if (stage === "established") return "main_radar";
+  if (stage === "candidate") return "follow_up";
+  return stage;
 }
 
 export function TokenLifecycleStatus({ model }: { model: TokenLifecycleViewModel }) {
