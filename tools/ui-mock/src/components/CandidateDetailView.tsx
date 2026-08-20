@@ -195,6 +195,8 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
         : workspaceCopy.noCurrentBlockers;
   const systemStatus = candidateDetailSystemStatusLabel(lifecycle, locale);
   const nextStep = candidateDetailNextStep(lifecycle, followUp, locale);
+  const market = followUp?.market_metrics;
+  const marketObservedAt = followUp?.market_observed_at ?? null;
   let activeTabContent: React.ReactNode = null;
   if (activeTab === "summary") {
     activeTabContent = (
@@ -246,13 +248,14 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
       <section className="product-detail-section" aria-labelledby="market-heading">
         <SectionHeader id="market-heading" title={t("detail.marketData")} />
         <div className="product-detail-grid market">
-          <DetailField label={t("radar.price")} value={formatPrice(candidate.priceUsd, t("radar.missingData"))} />
-          <DetailField label={t("radar.marketCap")} value={formatProductUsd(candidate.marketCap, locale, t("radar.missingData"))} />
-          <DetailField label={t("detail.fdv")} value={formatProductUsd(candidate.fdvUsd, locale, t("radar.missingData"))} />
-          <DetailField label={t("radar.liquidity")} value={formatProductUsd(candidate.liquidity, locale, t("radar.missingData"))} />
-          <DetailField label={t("radar.volume24h")} value={formatProductUsd(candidate.volume24h, locale, t("radar.missingData"))} />
-          <DetailField label={t("radar.ratio")} value={candidate.volumeMarketCapRatio == null ? t("radar.missingData") : candidate.volumeMarketCapRatio.toFixed(4)} />
-          <DetailField label={t("radar.pairAge")} value={formatProductPairAge(candidate.pairAgeDays, locale, t("radar.missingData"), { pairCreatedAt: candidate.pairCreatedAt })} />
+          <DetailField label={t("radar.price")} value={formatPrice(market?.price_usd ?? candidate.priceUsd, t("radar.missingData"))} />
+          <DetailField label={t("radar.marketCap")} value={formatProductUsd(market?.market_cap_usd ?? candidate.marketCap, locale, t("radar.missingData"))} />
+          <DetailField label={t("detail.fdv")} value={formatProductUsd(market?.fdv_usd ?? candidate.fdvUsd, locale, t("radar.missingData"))} />
+          <DetailField label={t("radar.liquidity")} value={formatProductUsd(market?.liquidity_usd ?? candidate.liquidity, locale, t("radar.missingData"))} />
+          <DetailField label={t("radar.volume24h")} value={formatProductUsd(market?.volume_24h_usd ?? candidate.volume24h, locale, t("radar.missingData"))} />
+          <DetailField label={t("radar.ratio")} value={(market?.volume_market_cap_ratio ?? candidate.volumeMarketCapRatio) == null ? t("radar.missingData") : (market?.volume_market_cap_ratio ?? candidate.volumeMarketCapRatio)!.toFixed(4)} />
+          <DetailField label={t("radar.pairAge")} value={formatProductPairAge(followUp?.pair_age ?? candidate.pairAgeDays, locale, t("radar.missingData"), { pairCreatedAt: candidate.pairCreatedAt })} />
+          <DetailField label={locale === "pl" ? "Dane aktualne na" : "Market data as of"} value={marketObservedAt ? formatProductDateTime(marketObservedAt, locale) : t("app.noData")} />
         </div>
       </section>
     );
@@ -572,12 +575,13 @@ function FollowUpOnlyDetail({
   } else if (activeTab === "market") {
     content = (
       <section className="product-detail-section" aria-labelledby="follow-up-data-heading">
-        <SectionHeader id="follow-up-data-heading" title={locale === "pl" ? "Bieżące dane obserwacji" : "Current observation data"} />
+        <SectionHeader id="follow-up-data-heading" title={t("detail.marketData")} />
         <div className="product-detail-grid market">
           <DetailField label={t("radar.price")} value={formatPrice(followUp.market_metrics.price_usd, t("radar.missingData"))} />
           <DetailField label={t("radar.marketCap")} value={formatProductUsd(followUp.market_metrics.market_cap_usd, locale, t("radar.missingData"))} />
           <DetailField label={t("radar.liquidity")} value={formatProductUsd(followUp.market_metrics.liquidity_usd, locale, t("radar.missingData"))} />
           <DetailField label={t("radar.volume24h")} value={formatProductUsd(followUp.market_metrics.volume_24h_usd, locale, t("radar.missingData"))} />
+          <DetailField label={locale === "pl" ? "Dane aktualne na" : "Market data as of"} value={followUp.market_observed_at ? formatProductDateTime(followUp.market_observed_at, locale) : t("app.noData")} />
         </div>
       </section>
     );

@@ -57,6 +57,7 @@ describe("Follow-up read-only product boundary", () => {
         assert.equal(list.status, 200);
         assert.equal((list.body.entries as unknown[]).length, 1);
         assert.equal((list.body.entries as Array<Record<string, unknown>>)[0]?.lifecycle_status, "MATURING");
+        assert.equal((list.body.entries as Array<Record<string, unknown>>)[0]?.market_observed_at, START);
 
         assert.equal((await request(server, "GET", "/api/follow-up/fup_0000000000000000")).status, 404);
         for (const method of ["POST", "PUT", "PATCH", "DELETE"]) {

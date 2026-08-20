@@ -35,6 +35,7 @@ const followUpCandidate: FollowUpPublicEntry = {
   first_seen_at: "2026-08-01T00:00:00.000Z",
   last_seen_at: "2026-08-17T13:32:08.630Z",
   last_checked_at: "2026-08-17T13:32:08.630Z",
+  market_observed_at: "2026-08-17T13:32:08.630Z",
   next_check_at: null,
   completed_checkpoints: [1, 3, 7, 14],
   market_metrics: {
@@ -82,6 +83,55 @@ describe("UX.2 Tabbed Token Detail Workspace", () => {
     assert.match(markup, /Następny krok[\s\S]*Dokończ weryfikację/);
     assert.match(markup, /Max[\s\S]*Giggle Mascot/);
     assert.doesNotMatch(markup, /Established|established universe|candidate_for_established|owner|właściciela/i);
+  });
+
+  it("uses the Follow-up last-known-good observation for Market data values and its timestamp", () => {
+    const candidateWithNewerAppUpdate = {
+      ...candidateA,
+      chain: followUpCandidate.chain,
+      contractAddress: followUpCandidate.contract_address,
+      priceUsd: 99,
+      marketCap: 99_000_000,
+      fdvUsd: 99_000_000,
+      liquidity: 99_000_000,
+      volume24h: 99_000_000,
+      volumeMarketCapRatio: 1,
+      lastCheckedAt: "2026-08-20T10:00:00.000Z",
+    };
+    const followUpWithLaterCheck = {
+      ...followUpCandidate,
+      last_checked_at: "2026-08-20T10:00:00.000Z",
+    };
+
+    const markup = render(
+      "pl",
+      <CandidateDetailView
+        candidate={candidateWithNewerAppUpdate}
+        followUp={followUpWithLaterCheck}
+        initialActiveTab="market"
+        initialOwnerPromotionStatus={null}
+      />,
+    );
+
+    assert.match(markup, /Dane rynkowe/);
+    assert.match(markup, /\$0\.002002/);
+    assert.match(markup, /Dane aktualne na[\s\S]*17\.08\.2026, 15:32/);
+    assert.doesNotMatch(markup, /20\.08\.2026/);
+  });
+
+  it("does not substitute an app update or Follow-up check for a missing market observation timestamp", () => {
+    const markup = render(
+      "pl",
+      <CandidateDetailView
+        candidate={{ ...candidateA, chain: followUpCandidate.chain, contractAddress: followUpCandidate.contract_address, lastCheckedAt: "2026-08-20T10:00:00.000Z" }}
+        followUp={{ ...followUpCandidate, market_observed_at: null, last_checked_at: "2026-08-20T10:00:00.000Z" }}
+        initialActiveTab="market"
+        initialOwnerPromotionStatus={null}
+      />,
+    );
+
+    assert.match(markup, /Dane aktualne na[\s\S]*Brak/);
+    assert.doesNotMatch(markup, /20\.08\.2026/);
   });
 
   it("switches Market and AI inside the same single panel and removes prior full content", async () => {

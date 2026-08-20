@@ -31,6 +31,7 @@ export type FollowUpPublicEntry = {
   first_seen_at: string;
   last_seen_at: string;
   last_checked_at: string | null;
+  market_observed_at?: string | null;
   next_check_at: string | null;
   completed_checkpoints: number[];
   market_metrics: {
