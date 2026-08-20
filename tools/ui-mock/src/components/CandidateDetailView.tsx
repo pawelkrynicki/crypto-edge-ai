@@ -35,7 +35,7 @@ import { AIResearchSection } from "./AIResearchSection";
 import { ManualVerificationStatusCard } from "./ManualVerificationStatusCard";
 import { OwnerFollowUpActionPanel } from "./OwnerFollowUpActionPanel";
 import { PersonalRadarPanel } from "./PersonalRadarPanel";
-import type { ManualVerificationRecord } from "../services/manualOwnerActionsDataSource";
+import type { PrivateVerificationRecord } from "../services/manualOwnerActionsDataSource";
 import { ActionButton, CopyButton, CopyableAddress, StatusBadge, TechnicalDetails } from "./ProductUi";
 import { ResearchChecklistSummary } from "./ResearchChecklist";
 import {
@@ -54,7 +54,7 @@ interface CandidateDetailViewProps {
   onOpenResearchChecklistStep?: (candidate: UiTokenCandidate, step: ResearchStepNumber) => void;
   onOpenFollowUpExternalChecks?: (followUp: FollowUpPublicEntry) => void;
   onOpenControlCenter?: () => void;
-  initialManualVerification?: ManualVerificationRecord | null;
+  initialManualVerification?: PrivateVerificationRecord | null;
   onLifecycleChanged?: () => void | Promise<void>;
   initialOwnerPromotionStatus?: EstablishedPromotionStatus | null;
   activeTab?: CandidateDetailTabId;
@@ -532,7 +532,7 @@ function FollowUpOnlyDetail({
   onBackToResults?: () => void;
   onOpenFollowUpExternalChecks?: (followUp: FollowUpPublicEntry) => void;
   onOpenControlCenter?: () => void;
-  initialManualVerification?: ManualVerificationRecord | null;
+  initialManualVerification?: PrivateVerificationRecord | null;
   onLifecycleChanged?: () => void | Promise<void>;
   activeTab: CandidateDetailTabId;
   onActiveTabChange: (tab: CandidateDetailTabId) => void;

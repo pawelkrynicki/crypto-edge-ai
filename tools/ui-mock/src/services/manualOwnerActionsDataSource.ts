@@ -12,6 +12,21 @@ export type ManualVerificationRecord = {
   available_data: string[];
 };
 
+/** The current CAMP_USER's private research conclusion. */
+export type PrivateVerificationRecord = {
+  chain: string;
+  contract_address: string;
+  verdict: ManualVerificationVerdict;
+  note: string;
+  checked_at: string;
+};
+
+export type PrivateVerificationResult = {
+  status: "SAVED" | "NO_ACTION_SAME_RESULT";
+  record: PrivateVerificationRecord;
+  audit_created: false;
+};
+
 export type FollowUpOwnerActionStatus = {
   mode: "DISABLED" | "REVIEW_SAFE" | "ENABLED";
   owner_controls_visible: true;
@@ -137,7 +152,7 @@ export async function loadManualVerificationOwnerStatus(
 export async function loadManualVerification(
   chain: string,
   contractAddress: string,
-): Promise<ManualVerificationRecord | null> {
+): Promise<PrivateVerificationRecord | null> {
   if (!chain || !contractAddress) return null;
   try {
     const query = new URLSearchParams({ chain, contract_address: contractAddress });
@@ -149,8 +164,8 @@ export async function loadManualVerification(
     if (!response.ok) return null;
     const value: unknown = await response.json();
     return isRecord(value)
-      && value.schema_version === "manual_verification_lookup_v1"
-      && (value.record === null || isManualVerificationRecord(value.record))
+      && value.schema_version === "private_manual_verification_lookup_v1"
+      && (value.record === null || isPrivateVerificationRecord(value.record))
       ? value.record
       : null;
   } catch {
@@ -158,16 +173,13 @@ export async function loadManualVerification(
   }
 }
 
-/**
- * Saves the existing, system-shared Follow-up verification record. The server
- * derives the CAMP_USER from its session; the browser never supplies an actor.
- */
+/** Saves only the current CAMP_USER's private verification conclusion. */
 export async function saveManualVerificationDecision(input: {
   chain: string;
   contractAddress: string;
   verdict: ManualVerificationVerdict;
   note: string;
-}): Promise<ManualVerificationResult> {
+}): Promise<PrivateVerificationResult> {
   const response = await fetch("/api/manual-verification", {
     method: "POST",
     credentials: "same-origin",
@@ -183,7 +195,7 @@ export async function saveManualVerificationDecision(input: {
     }),
   });
   const value: unknown = await response.json();
-  if (!response.ok || !isManualVerificationResult(value)) {
+  if (!response.ok || !isPrivateVerificationResult(value)) {
     throw new Error(isRecord(value) && typeof value.error === "string" ? value.error : "VERIFICATION_SAVE_REJECTED");
   }
   return value;
@@ -322,6 +334,13 @@ function isManualVerificationResult(value: unknown): value is ManualVerification
     && typeof value.audit_created === "boolean";
 }
 
+function isPrivateVerificationResult(value: unknown): value is PrivateVerificationResult {
+  return isRecord(value)
+    && (value.status === "SAVED" || value.status === "NO_ACTION_SAME_RESULT")
+    && isPrivateVerificationRecord(value.record)
+    && value.audit_created === false;
+}
+
 function isManualVerificationRecord(value: unknown): value is ManualVerificationRecord {
   return isRecord(value)
     && isText(value.chain, 32)
@@ -333,6 +352,15 @@ function isManualVerificationRecord(value: unknown): value is ManualVerification
     && isIso(value.checked_at)
     && isTextArray(value.missing_data)
     && isTextArray(value.available_data);
+}
+
+function isPrivateVerificationRecord(value: unknown): value is PrivateVerificationRecord {
+  return isRecord(value)
+    && isText(value.chain, 32)
+    && isText(value.contract_address, 128)
+    && isVerdict(value.verdict)
+    && isText(value.note, 500)
+    && isIso(value.checked_at);
 }
 
 function isOwnerBase(value: Record<string, unknown>): boolean {

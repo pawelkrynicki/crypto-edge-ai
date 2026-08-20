@@ -170,7 +170,6 @@ export function createManualOwnerActionsService(options: ManualOwnerActionsOptio
     ? null
     : normalizeSessionSecret(options.sessionSecret) ?? createOwnerSessionSecret(undefined);
   const consumedPreflights = new Map<string, number>();
-  const campVerificationSaves = new Map<string, Promise<ManualVerificationResult>>();
 
   async function getFollowUpStatus(
     chain: string,
@@ -399,87 +398,6 @@ export function createManualOwnerActionsService(options: ManualOwnerActionsOptio
     return { status: "SAVED", record: saved, audit_created: true };
   }
 
-  /**
-   * CAMP_USER writes remain in the canonical, system-shared Follow-up
-   * verification history. Session authorization happens at the API boundary;
-   * this service never accepts a browser-provided actor identifier.
-   */
-  async function saveVerificationFromCampUser(
-    chain: string,
-    contractAddress: string,
-    verdict: ManualVerificationVerdict,
-    note: string,
-  ): Promise<ManualVerificationResult> {
-    const normalizedNote = normalizeVerificationNote(note);
-    if (!isManualVerificationVerdict(verdict)) throw new ManualOwnerActionError("VERIFICATION_VERDICT_INVALID", 400);
-    const identity = followUpIdentity(chain, contractAddress);
-    const saveKey = `${identity.identity}:${verdict}:${normalizedNote}`;
-    const inFlight = campVerificationSaves.get(saveKey);
-    if (inFlight) return inFlight;
-    const operation = persistVerificationFromCampUser(chain, contractAddress, verdict, normalizedNote);
-    campVerificationSaves.set(saveKey, operation);
-    try {
-      return await operation;
-    } finally {
-      campVerificationSaves.delete(saveKey);
-    }
-  }
-
-  async function persistVerificationFromCampUser(
-    chain: string,
-    contractAddress: string,
-    verdict: ManualVerificationVerdict,
-    normalizedNote: string,
-  ): Promise<ManualVerificationResult> {
-    const evaluation = await evaluate(chain, contractAddress);
-    const record: ManualVerificationRecord = {
-      chain: evaluation.identity.chain,
-      contract_address: evaluation.identity.contract_address,
-      display_name: evaluation.displayName,
-      symbol: evaluation.symbol,
-      verdict,
-      note: normalizedNote,
-      checked_at: now().toISOString(),
-      missing_data: [...evaluation.missingData],
-      available_data: [...evaluation.availableData],
-    };
-    let unchanged: ManualVerificationRecord | null = null;
-    let updated: FollowUpStore;
-    try {
-      updated = await updateFollowUpStore((store) => {
-        const current = findLatestManualVerification(
-          store,
-          evaluation.identity.chain,
-          evaluation.identity.contract_address,
-        );
-        if (current && current.verdict === record.verdict && current.note === record.note) {
-          unchanged = current;
-          return store;
-        }
-        if (store.checksum !== evaluation.store.checksum) {
-          throw new ManualOwnerActionError("STALE_VERIFICATION_CONTEXT", 409);
-        }
-        return recordManualVerification(
-          store,
-          record,
-          evaluation.sourceRunId,
-          decisionAudit(evaluation, evaluation.currentLayer, evaluation.currentLayer, normalizedNote),
-        );
-      }, { storePath: options.storePath, now: now() });
-    } catch (error) {
-      if (error instanceof ManualOwnerActionError) throw error;
-      throw new ManualOwnerActionError(safeErrorCode(error, "VERIFICATION_WRITE_FAILED"), 500);
-    }
-    if (unchanged) return { status: "NO_ACTION_SAME_RESULT", record: unchanged, audit_created: false };
-    const saved = findLatestManualVerification(
-      updated,
-      evaluation.identity.chain,
-      evaluation.identity.contract_address,
-    );
-    if (!saved) throw new ManualOwnerActionError("VERIFICATION_WRITE_FAILED", 500);
-    return { status: "SAVED", record: saved, audit_created: true };
-  }
-
   async function evaluate(chain: string, contractAddress: string): Promise<ProductEvaluation> {
     let identity;
     try {
@@ -607,7 +525,6 @@ export function createManualOwnerActionsService(options: ManualOwnerActionsOptio
     getPublicVerification,
     createVerificationPreview,
     saveVerification,
-    saveVerificationFromCampUser,
   };
 }
 

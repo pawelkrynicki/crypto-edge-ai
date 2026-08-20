@@ -12,6 +12,26 @@ import {
 } from "../src/researchChecklistTypes.js";
 
 export const RESEARCH_EVIDENCE_SCHEMA_VERSION = "research_evidence_sqlite_v1";
+export const PRIVATE_VERIFICATION_DECISION_SCHEMA_VERSION = "private_verification_decision_sqlite_v1";
+
+export type PrivateVerificationVerdict = "VERIFIED" | "NEEDS_MORE_DATA" | "CRITICAL_RISK" | "REJECT";
+
+/**
+ * A CAMP_USER research conclusion. The actor key is deliberately private to
+ * this repository and never appears in the public record returned to a user.
+ */
+export type PrivateVerificationDecision = {
+  chain: string;
+  contract_address: string;
+  verdict: PrivateVerificationVerdict;
+  note: string;
+  checked_at: string;
+};
+
+export type PrivateVerificationDecisionSaveResult = {
+  status: "SAVED" | "NO_ACTION_SAME_RESULT";
+  record: PrivateVerificationDecision;
+};
 
 type SqliteStatement = { all(...params: unknown[]): unknown[]; get(...params: unknown[]): unknown; run(...params: unknown[]): unknown };
 type SqliteDatabase = { exec(sql: string): void; prepare(sql: string): SqliteStatement; close(): void };
@@ -167,6 +187,69 @@ WHERE actor_id = ? AND chain = ? AND contract_address = ? AND step_number = ? AN
       }
     },
 
+    getVerificationDecision(actorId: string, chain: string, contractAddress: string): PrivateVerificationDecision | null {
+      const actor = safeActor(actorId);
+      const identity = normalizeIdentity(chain, contractAddress);
+      try {
+        const row = database.prepare(`
+SELECT schema_version, chain, contract_address, verdict, note, updated_at
+FROM private_verification_decisions
+WHERE actor_id = ? AND chain = ? AND contract_address = ?
+`).get(actor, identity.chain, identity.contract_address);
+        return row ? mapPrivateVerificationDecision(row) : null;
+      } catch {
+        throw new ResearchEvidenceError("RESEARCH_EVIDENCE_UNAVAILABLE");
+      }
+    },
+
+    saveVerificationDecision(input: {
+      actorId: string;
+      chain: string;
+      contractAddress: string;
+      verdict: PrivateVerificationVerdict;
+      note: string;
+      now?: Date;
+    }): PrivateVerificationDecisionSaveResult {
+      const actor = safeActor(input.actorId);
+      const identity = normalizeIdentity(input.chain, input.contractAddress);
+      const verdict = safePrivateVerificationVerdict(input.verdict);
+      const note = requiredText(input.note, 3, 500);
+      const now = input.now ?? new Date();
+      if (!Number.isFinite(now.getTime())) throw new ResearchEvidenceError("RESEARCH_EVIDENCE_INPUT_INVALID");
+      const existing = this.getVerificationDecision(actor, identity.chain, identity.contract_address);
+      if (existing && existing.verdict === verdict && existing.note === note) {
+        return { status: "NO_ACTION_SAME_RESULT", record: existing };
+      }
+      const checkedAt = now.toISOString();
+      try {
+        database.prepare(`
+INSERT INTO private_verification_decisions (
+  actor_id, schema_version, chain, contract_address, verdict, note, created_at, updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(actor_id, chain, contract_address) DO UPDATE SET
+  schema_version = excluded.schema_version,
+  verdict = excluded.verdict,
+  note = excluded.note,
+  updated_at = excluded.updated_at
+`).run(
+          actor,
+          PRIVATE_VERIFICATION_DECISION_SCHEMA_VERSION,
+          identity.chain,
+          identity.contract_address,
+          verdict,
+          note,
+          checkedAt,
+          checkedAt,
+        );
+        const record = this.getVerificationDecision(actor, identity.chain, identity.contract_address);
+        if (!record) throw new Error("private verification not found");
+        return { status: "SAVED", record };
+      } catch (error) {
+        if (error instanceof ResearchEvidenceError) throw error;
+        throw new ResearchEvidenceError("RESEARCH_EVIDENCE_UNAVAILABLE");
+      }
+    },
+
     integrity(): { ok: true; schema_version: typeof RESEARCH_EVIDENCE_SCHEMA_VERSION; entries: number } {
       try {
         const integrity = database.prepare("PRAGMA integrity_check").get();
@@ -212,9 +295,24 @@ CREATE TABLE IF NOT EXISTS research_evidence (
 );
 CREATE INDEX IF NOT EXISTS research_evidence_actor_identity_idx
   ON research_evidence(actor_id, chain, contract_address, updated_at DESC);
+CREATE TABLE IF NOT EXISTS private_verification_decisions (
+  actor_id TEXT NOT NULL,
+  schema_version TEXT NOT NULL,
+  chain TEXT NOT NULL,
+  contract_address TEXT NOT NULL,
+  verdict TEXT NOT NULL,
+  note TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (actor_id, chain, contract_address)
+);
+CREATE INDEX IF NOT EXISTS private_verification_decisions_actor_identity_idx
+  ON private_verification_decisions(actor_id, chain, contract_address, updated_at DESC);
 `);
   database.prepare("INSERT INTO research_evidence_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
     .run("schema_version", RESEARCH_EVIDENCE_SCHEMA_VERSION);
+  database.prepare("INSERT INTO research_evidence_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+    .run("private_verification_decision_schema_version", PRIVATE_VERIFICATION_DECISION_SCHEMA_VERSION);
 }
 
 function mapEvidence(value: unknown): PublicResearchEvidence {
@@ -247,6 +345,21 @@ function mapEvidence(value: unknown): PublicResearchEvidence {
   };
 }
 
+function mapPrivateVerificationDecision(value: unknown): PrivateVerificationDecision {
+  if (!isRecord(value)) throw new ResearchEvidenceError("RESEARCH_EVIDENCE_UNAVAILABLE");
+  const identity = normalizeIdentity(value.chain, value.contract_address);
+  if (value.schema_version !== PRIVATE_VERIFICATION_DECISION_SCHEMA_VERSION) {
+    throw new ResearchEvidenceError("RESEARCH_EVIDENCE_UNAVAILABLE");
+  }
+  return {
+    chain: identity.chain,
+    contract_address: identity.contract_address,
+    verdict: safePrivateVerificationVerdict(value.verdict),
+    note: requiredText(value.note, 3, 500),
+    checked_at: strictTimestamp(value.updated_at),
+  };
+}
+
 function normalizeIdentity(chain: unknown, contractAddress: unknown): Identity {
   if (typeof chain !== "string" || typeof contractAddress !== "string") throw new ResearchEvidenceError("RESEARCH_EVIDENCE_INPUT_INVALID");
   const resolved = resolveTokenIdentity(chain, contractAddress);
@@ -274,12 +387,26 @@ function safeManualState(value: unknown): PersistedManualResearchState {
   return value;
 }
 
+function safePrivateVerificationVerdict(value: unknown): PrivateVerificationVerdict {
+  if (value !== "VERIFIED" && value !== "NEEDS_MORE_DATA" && value !== "CRITICAL_RISK" && value !== "REJECT") {
+    throw new ResearchEvidenceError("RESEARCH_EVIDENCE_INPUT_INVALID");
+  }
+  return value;
+}
+
 function optionalText(value: unknown, limit: number): string | null {
   if (value === null || value === undefined) return null;
   if (typeof value !== "string") throw new ResearchEvidenceError("RESEARCH_EVIDENCE_INPUT_INVALID");
   const normalized = value.trim();
   if (!normalized) return null;
   if (normalized.length > limit) throw new ResearchEvidenceError("RESEARCH_EVIDENCE_INPUT_INVALID");
+  return normalized;
+}
+
+function requiredText(value: unknown, minimum: number, limit: number): string {
+  if (typeof value !== "string") throw new ResearchEvidenceError("RESEARCH_EVIDENCE_INPUT_INVALID");
+  const normalized = value.trim();
+  if (normalized.length < minimum || normalized.length > limit) throw new ResearchEvidenceError("RESEARCH_EVIDENCE_INPUT_INVALID");
   return normalized;
 }
 

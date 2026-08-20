@@ -23,8 +23,8 @@ import type { ResearchStepNumber } from "../researchChecklistTypes";
 import {
   loadManualVerification,
   saveManualVerificationDecision,
-  type ManualVerificationRecord,
   type ManualVerificationVerdict,
+  type PrivateVerificationRecord,
 } from "../services/manualOwnerActionsDataSource";
 import { ActionButton, CopyButton, ExternalLinkAction } from "./ProductUi";
 import { TokenDetailDrawer } from "./TokenDetailDrawer";
@@ -38,7 +38,7 @@ interface ExternalVerificationLinksViewProps {
   candidate?: UiTokenCandidate | null;
   followUp?: FollowUpPublicEntry | null;
   onOpenResearchBrief?: () => void;
-  onVerificationSaved?: (record: ManualVerificationRecord) => void;
+  onVerificationSaved?: (record: PrivateVerificationRecord) => void;
   onReturnToDetail?: () => void;
   onClose?: () => void;
   /** Supports focused UI tests. A selected token always uses the identity tab. */
@@ -74,7 +74,7 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const [saveSucceeded, setSaveSucceeded] = useState(false);
-  const [savedRecord, setSavedRecord] = useState<ManualVerificationRecord | null>(null);
+  const [savedRecord, setSavedRecord] = useState<PrivateVerificationRecord | null>(null);
 
   useEffect(() => {
     if (!chain || !contractAddress) return;
@@ -298,7 +298,7 @@ function VerificationDecision({
 }: {
   candidate: UiTokenCandidate | null | undefined;
   locale: ProductLocale;
-  lastDecision: ManualVerificationRecord | null;
+  lastDecision: PrivateVerificationRecord | null;
   verdict: ManualVerificationVerdict | null;
   onVerdictChange: (value: ManualVerificationVerdict) => void;
   note: string;
@@ -313,11 +313,11 @@ function VerificationDecision({
 }) {
   const pl = locale === "pl";
   return (
-    <VerificationSection heading={pl ? "Decyzja weryfikacyjna" : "Verification decision"} detail={pl ? "Zapis decyzji aktualizuje od razu Szczegóły tokena, bez opuszczania listy." : "Saving a decision updates token details immediately without leaving the list."}>
-      <section className="verification-decision-current" aria-label={pl ? "Aktualny status weryfikacji" : "Current verification status"}>
-        <span>{pl ? "Aktualny status weryfikacji" : "Current verification status"}</span>
+    <VerificationSection heading={pl ? "Decyzja weryfikacyjna" : "Verification decision"} detail={pl ? "Zapisujesz swój wynik weryfikacji. Nie zmienia on wspólnego Radaru ani lifecycle." : "You save your own verification result. It does not change the shared Radar or lifecycle."}>
+      <section className="verification-decision-current" aria-label={pl ? "Twój wynik weryfikacji" : "Your verification result"}>
+        <span>{pl ? "Twój wynik weryfikacji" : "Your verification result"}</span>
         <strong data-verification-verdict={lastDecision?.verdict}>{lastDecision ? manualVerificationVerdictLabel(lastDecision.verdict, locale) : (pl ? "Brak zapisanej decyzji" : "No saved decision")}</strong>
-        {lastDecision && <p>{pl ? `Ostatnia decyzja: ${formatProductDateTime(lastDecision.checked_at, locale)}` : `Last decision: ${formatProductDateTime(lastDecision.checked_at, locale)}`}</p>}
+        {lastDecision && <p>{pl ? `Twój zapis: ${formatProductDateTime(lastDecision.checked_at, locale)}` : `Your saved result: ${formatProductDateTime(lastDecision.checked_at, locale)}`}</p>}
       </section>
 
       <div className="verification-decision-options" role="radiogroup" aria-label={pl ? "Wybierz decyzję weryfikacyjną" : "Choose verification decision"}>

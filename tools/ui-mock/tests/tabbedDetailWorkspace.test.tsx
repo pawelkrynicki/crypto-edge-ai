@@ -124,7 +124,7 @@ describe("UX.2 Tabbed Token Detail Workspace", () => {
     assert.match(markup, /Honeypot — Brak wyniku/);
     assert.match(markup, /Blokada płynności — Brak danych/);
     assert.match(markup, /Udział Top 10 portfeli — Brak danych/);
-    assert.match(markup, /Status ręcznej weryfikacji[\s\S]*Weryfikacja nieukończona/);
+    assert.match(markup, /Twój wynik weryfikacji[\s\S]*Weryfikacja nieukończona/);
     assert.doesNotMatch(markup, /honeypot_source|honeypot_status|liquidity_locked|top_10_wallets_pct/);
   });
 

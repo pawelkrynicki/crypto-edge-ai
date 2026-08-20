@@ -6,7 +6,7 @@ import { useProductLocale } from "../productI18n";
 import { isSameTokenIdentity } from "../tokenLifecycle";
 import type { UiTokenCandidate } from "../types/scannerTypes";
 import type { FollowUpPublicEntry } from "../types/followUpTypes";
-import type { ManualVerificationRecord } from "../services/manualOwnerActionsDataSource";
+import type { PrivateVerificationRecord } from "../services/manualOwnerActionsDataSource";
 import type { ResearchStepNumber } from "../researchChecklistTypes";
 import { ExternalVerificationLinksView } from "./ExternalVerificationLinksView";
 
@@ -18,7 +18,7 @@ type VerificationTokenBrowserProps = {
   onSelectToken: (token: UiTokenCandidate | FollowUpPublicEntry) => void;
   onCloseToken: () => void;
   onOpenResearchBrief?: () => void;
-  onVerificationSaved?: (record: ManualVerificationRecord) => void;
+  onVerificationSaved?: (record: PrivateVerificationRecord) => void;
   onReturnToDetail?: () => void;
   onBackToResearchPlaybook?: () => void;
   onOpenResearchChecklistStep?: (candidate: UiTokenCandidate, step: ResearchStepNumber) => void;

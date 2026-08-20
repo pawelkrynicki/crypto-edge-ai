@@ -77,7 +77,7 @@ describe("Verification drawer tabs", () => {
   it("presents manual-verification verdicts in Polish and English without exposing backend enums", async () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = (async (input: RequestInfo | URL) => {
-      if (String(input).startsWith("/api/manual-verification?")) return response({ schema_version: "manual_verification_lookup_v1", record: savedRecord() });
+      if (String(input).startsWith("/api/manual-verification?")) return response({ schema_version: "private_manual_verification_lookup_v1", record: savedRecord() });
       return new Response("{}", { status: 404, headers: { "content-type": "application/json" } });
     }) as typeof fetch;
 
@@ -175,13 +175,13 @@ describe("Verification drawer tabs", () => {
       const url = String(input);
       if (/provider|openai/i.test(url)) externalCalls.push(url);
       if (url.startsWith("/api/manual-verification?")) {
-        return response({ schema_version: "manual_verification_lookup_v1", record: persisted });
+        return response({ schema_version: "private_manual_verification_lookup_v1", record: persisted });
       }
       if (url === "/api/manual-verification" && init?.method === "POST") {
         const payload = JSON.parse(String(init.body ?? "{}")) as Record<string, unknown>;
         writes.push(payload);
         persisted = needsMoreRecord(String(payload.note));
-        return response({ status: "SAVED", record: persisted, audit_created: true });
+        return response({ status: "SAVED", record: persisted, audit_created: false });
       }
       return new Response("{}", { status: 404, headers: { "content-type": "application/json" } });
     }) as typeof fetch;
@@ -223,7 +223,7 @@ describe("Verification drawer tabs", () => {
     globalThis.fetch = (async (input: RequestInfo | URL) => {
       const url = String(input);
       calls.push(url);
-      if (url.startsWith("/api/manual-verification?")) return response({ schema_version: "manual_verification_lookup_v1", record: null });
+      if (url.startsWith("/api/manual-verification?")) return response({ schema_version: "private_manual_verification_lookup_v1", record: null });
       return new Response("{}", { status: 404, headers: { "content-type": "application/json" } });
     }) as typeof fetch;
 

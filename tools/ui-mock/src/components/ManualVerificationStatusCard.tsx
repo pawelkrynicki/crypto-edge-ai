@@ -5,7 +5,7 @@ import { formatProductDateTime, useProductLocale } from "../productI18n";
 import { manualVerificationVerdictLabel } from "../manualVerificationVerdictLabel";
 import {
   loadManualVerification,
-  type ManualVerificationRecord,
+  type PrivateVerificationRecord,
 } from "../services/manualOwnerActionsDataSource";
 
 export function ManualVerificationStatusCard({
@@ -15,7 +15,7 @@ export function ManualVerificationStatusCard({
 }: {
   chain: string;
   contractAddress: string;
-  initialRecord?: ManualVerificationRecord | null;
+  initialRecord?: PrivateVerificationRecord | null;
 }) {
   const identityKey = `${chain.toLowerCase()}:${contractAddress.toLowerCase()}:${initialRecord?.checked_at ?? ""}`;
   return (
@@ -35,10 +35,10 @@ function ManualVerificationStatusCardForIdentity({
 }: {
   chain: string;
   contractAddress: string;
-  initialRecord?: ManualVerificationRecord | null;
+  initialRecord?: PrivateVerificationRecord | null;
 }) {
   const { locale } = useProductLocale();
-  const [record, setRecord] = useState<ManualVerificationRecord | null>(() => (
+  const [record, setRecord] = useState<PrivateVerificationRecord | null>(() => (
     matchesIdentity(initialRecord, chain, contractAddress) ? initialRecord : null
   ));
 
@@ -55,11 +55,12 @@ function ManualVerificationStatusCardForIdentity({
 
   const pl = locale === "pl";
   return (
-    <section className="manual-verification-status" aria-label={pl ? "Status ręcznej weryfikacji" : "Manual verification status"}>
-      <span>{pl ? "Status ręcznej weryfikacji" : "Manual verification status"}</span>
+    <section className="manual-verification-status" aria-label={pl ? "Twój wynik weryfikacji" : "Your verification result"}>
+      <span>{pl ? "Twój wynik weryfikacji" : "Your verification result"}</span>
       {record ? (
         <>
           <strong data-verification-verdict={record.verdict}>{manualVerificationVerdictLabel(record.verdict, locale)}</strong>
+          <small>{pl ? "Twoja notatka" : "Your note"}</small>
           <p>{record.note}</p>
           <small>{formatProductDateTime(record.checked_at, locale)}</small>
         </>
@@ -74,10 +75,10 @@ function ManualVerificationStatusCardForIdentity({
 }
 
 function matchesIdentity(
-  record: ManualVerificationRecord | null | undefined,
+  record: PrivateVerificationRecord | null | undefined,
   chain: string,
   contractAddress: string,
-): record is ManualVerificationRecord {
+): record is PrivateVerificationRecord {
   return Boolean(
     record
     && record.chain.toLowerCase() === chain.toLowerCase()

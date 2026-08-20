@@ -73,7 +73,7 @@ import {
   resolveGlobalProductTimestamp,
   resolveProductScannerRefreshState,
 } from "./productRefreshState";
-import type { ManualVerificationRecord } from "./services/manualOwnerActionsDataSource";
+import type { PrivateVerificationRecord } from "./services/manualOwnerActionsDataSource";
 import type { ResearchStepNumber } from "./researchChecklistTypes";
 
 export {
@@ -207,7 +207,7 @@ export function ProductAppContent({
   const [reviewPollingDiagnostics, setReviewPollingDiagnostics] = useState<ProductVersionPollingDiagnostics | null>(null);
   const [followUpEntries, setFollowUpEntries] = useState<FollowUpPublicEntry[]>([]);
   const [selectedFollowUpEntryId, setSelectedFollowUpEntryId] = useState<string | null>(null);
-  const [manualVerificationRecord, setManualVerificationRecord] = useState<ManualVerificationRecord | null>(null);
+  const [manualVerificationRecord, setManualVerificationRecord] = useState<PrivateVerificationRecord | null>(null);
   const [feedbackContext, setFeedbackContext] = useState<FeedbackScreenContext>(() => (
     resolveSection() === "feedback" ? "feedback" : resolveSection()
   ));
@@ -668,7 +668,7 @@ export function ProductAppContent({
     setActiveSection("external-checks");
   }, []);
 
-  const saveVerificationInPlace = useCallback((record: ManualVerificationRecord) => {
+  const saveVerificationInPlace = useCallback((record: PrivateVerificationRecord) => {
     setManualVerificationRecord(record);
   }, []);
 

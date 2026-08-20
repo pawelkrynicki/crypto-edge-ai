@@ -11,6 +11,7 @@ import {
   inspectFollowUpStore,
 } from "../../data-poc/src/followUpBasket.js";
 import { createManualOwnerActionsService } from "../server/manualOwnerActions.js";
+import { createResearchEvidenceRepository } from "../server/researchEvidenceRepository.js";
 import { createScannerApiServer } from "../server/scannerApiServer.js";
 import { PERSISTABLE_SCANNER_SAMPLE } from "../src/fixtures/persistableScannerSample.js";
 
@@ -174,48 +175,7 @@ describe("manual owner Radar actions", () => {
     assert.equal((await inspectFollowUpStore(storePath)).store.entries.length, 0);
   });
 
-  it("persists one shared CAMP_USER verification result without changing the Follow-up lifecycle", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "crypto-edge-camp-verification-"));
-    temporaryDirectories.push(directory);
-    const storePath = join(directory, "follow-up.json");
-    const initial = ingestFollowUpObservations(
-      createEmptyFollowUpStore(new Date(NOW)),
-      [TEST_CANDIDATE],
-      NOW,
-      PERSISTABLE_SCANNER_SAMPLE.scan_run.run_id,
-    );
-    await writeFile(storePath, `${JSON.stringify(initial, null, 2)}\n`, "utf8");
-    const service = createManualOwnerActionsService({
-      mode: "DISABLED",
-      storePath,
-      now: () => new Date(NOW),
-      readScanner: async () => ({ ...PERSISTABLE_SCANNER_SAMPLE, candidates: [TEST_CANDIDATE], _source_meta: {} as never }),
-    });
-    const chain = TEST_CANDIDATE.chain;
-    const address = TEST_CANDIDATE.contract_address!;
-    const lifecycleBefore = (await inspectFollowUpStore(storePath)).store.entries[0]?.lifecycle_status;
-
-    const [first, duplicate] = await Promise.all([
-      service.saveVerificationFromCampUser(chain, address, "NEEDS_MORE_DATA", "Potrzebne jest dalsze potwierdzenie źródeł."),
-      service.saveVerificationFromCampUser(chain, address, "NEEDS_MORE_DATA", "Potrzebne jest dalsze potwierdzenie źródeł."),
-    ]);
-
-    assert.deepEqual([first.status, duplicate.status], ["SAVED", "SAVED"], "the in-flight duplicate shares one canonical result");
-    assert.equal(first.record.verdict, "NEEDS_MORE_DATA");
-    assert.equal(duplicate.record.note, "Potrzebne jest dalsze potwierdzenie źródeł.");
-    assert.deepEqual(await service.getPublicVerification(chain, address), first.record, "the canonical record is intentionally system-shared");
-
-    const repeated = await service.saveVerificationFromCampUser(chain, address, "NEEDS_MORE_DATA", "Potrzebne jest dalsze potwierdzenie źródeł.");
-    assert.equal(repeated.status, "NO_ACTION_SAME_RESULT");
-    assert.equal(repeated.audit_created, false);
-
-    const diagnostics = await inspectFollowUpStore(storePath);
-    assert.equal(diagnostics.store.entries[0]?.lifecycle_status, lifecycleBefore, "a verification result never performs a lifecycle move");
-    assert.equal(diagnostics.store.entries[0]?.latest_security_status.status, "PARTIAL");
-    assert.equal(diagnostics.store.audit_log.filter((entry) => entry.operation === "OWNER_MANUAL_VERIFICATION").length, 1, "a duplicate click creates one logical verification record");
-  });
-
-  it("accepts a canonical CAMP_USER save without a client actor and rejects an actor field", async () => {
+  it("keeps CAMP_USER verification decisions actor-private and leaves shared Follow-up state untouched", async () => {
     const directory = await mkdtemp(join(tmpdir(), "crypto-edge-camp-api-"));
     temporaryDirectories.push(directory);
     const storePath = join(directory, "follow-up.json");
@@ -226,41 +186,117 @@ describe("manual owner Radar actions", () => {
       PERSISTABLE_SCANNER_SAMPLE.scan_run.run_id,
     );
     await writeFile(storePath, `${JSON.stringify(initial, null, 2)}\n`, "utf8");
+    const scannerPath = join(directory, "scanner.json");
+    await writeFile(scannerPath, JSON.stringify({ ...PERSISTABLE_SCANNER_SAMPLE, candidates: [TEST_CANDIDATE] }), "utf8");
+    const repository = await createResearchEvidenceRepository({ databaseFilePath: join(directory, "research-evidence.sqlite") });
     const originalActor = process.env.CRYPTO_EDGE_PC1_REVIEW_DEFAULT_ACTOR;
     process.env.CRYPTO_EDGE_PC1_REVIEW_DEFAULT_ACTOR = "CAMP_USER";
     const server = createScannerApiServer({
-      runtimeMode: "INTERNAL_BETA",
+      runtimeMode: "DEVELOPMENT_DEMO",
+      scanner: { fixturePath: scannerPath, outputDirPath: join(directory, "output"), allowFixtureFallback: true },
       manualOwnerActions: {
         storePath,
         now: () => new Date(NOW),
         readScanner: async () => ({ ...PERSISTABLE_SCANNER_SAMPLE, candidates: [TEST_CANDIDATE], _source_meta: {} as never }),
       },
+      researchEvidence: { repository },
     });
     if (originalActor === undefined) delete process.env.CRYPTO_EDGE_PC1_REVIEW_DEFAULT_ACTOR;
     else process.env.CRYPTO_EDGE_PC1_REVIEW_DEFAULT_ACTOR = originalActor;
     await listen(server);
     try {
       const baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+      const lookup = async (cookie?: string) => fetch(`${baseUrl}/api/manual-verification?chain=${TEST_CANDIDATE.chain}&contract_address=${TEST_CANDIDATE.contract_address}`, {
+        headers: cookie ? { cookie } : undefined,
+      });
+      const before = await inspectFollowUpStore(storePath);
+      const userAStart = await lookup();
+      const userACookie = userAStart.headers.get("set-cookie")?.split(";")[0];
+      assert.ok(userACookie);
+      assert.deepEqual((await userAStart.json() as { record: unknown }).record, null);
+      const querySpoof = await fetch(`${baseUrl}/api/manual-verification?chain=${TEST_CANDIDATE.chain}&contract_address=${TEST_CANDIDATE.contract_address}&actor_id=another-user`, {
+        headers: { cookie: userACookie! },
+      });
+      assert.equal(querySpoof.status, 400, "the browser cannot choose an actor through the query");
       const invalid = await fetch(`${baseUrl}/api/manual-verification`, {
         method: "POST",
-        headers: { origin: baseUrl, "content-type": "application/json" },
+        headers: { cookie: userACookie!, origin: baseUrl, "content-type": "application/json" },
         body: JSON.stringify({ chain: TEST_CANDIDATE.chain, contract_address: TEST_CANDIDATE.contract_address, verdict: "NEEDS_MORE_DATA", note: "Wymaga dalszej analizy.", actor_id: "another-user" }),
       });
       assert.equal(invalid.status, 400, "the browser cannot supply an actor identifier");
 
-      const saved = await fetch(`${baseUrl}/api/manual-verification`, {
+      const savedA = await fetch(`${baseUrl}/api/manual-verification`, {
         method: "POST",
-        headers: { origin: baseUrl, "content-type": "application/json" },
+        headers: { cookie: userACookie!, origin: baseUrl, "content-type": "application/json" },
         body: JSON.stringify({ chain: TEST_CANDIDATE.chain, contract_address: TEST_CANDIDATE.contract_address, verdict: "NEEDS_MORE_DATA", note: "Wymaga dalszej analizy." }),
       });
-      const savedText = await saved.text();
-      assert.equal(saved.status, 200, savedText);
-      const body = JSON.parse(savedText) as { status: string; record: { verdict: string; note: string } };
-      assert.equal(body.status, "SAVED");
-      assert.equal(body.record.verdict, "NEEDS_MORE_DATA");
-      assert.equal(body.record.note, "Wymaga dalszej analizy.");
+      const savedAText = await savedA.text();
+      assert.equal(savedA.status, 200, savedAText);
+      const bodyA = JSON.parse(savedAText) as { status: string; audit_created: boolean; record: { verdict: string; note: string } };
+      assert.equal(bodyA.status, "SAVED");
+      assert.equal(bodyA.audit_created, false);
+      assert.equal(bodyA.record.verdict, "NEEDS_MORE_DATA");
+      assert.equal(bodyA.record.note, "Wymaga dalszej analizy.");
+      const repeatedA = await fetch(`${baseUrl}/api/manual-verification`, {
+        method: "POST",
+        headers: { cookie: userACookie!, origin: baseUrl, "content-type": "application/json" },
+        body: JSON.stringify({ chain: TEST_CANDIDATE.chain, contract_address: TEST_CANDIDATE.contract_address, verdict: "NEEDS_MORE_DATA", note: "Wymaga dalszej analizy." }),
+      });
+      assert.equal((await repeatedA.json() as { status: string }).status, "NO_ACTION_SAME_RESULT", "a repeated click has no additional write");
+      const refreshedA = await lookup(userACookie);
+      assert.deepEqual((await refreshedA.json() as { record: { verdict: string; note: string } }).record, bodyA.record, "User A refreshes their own decision");
+
+      const userBStart = await lookup();
+      const userBCookie = userBStart.headers.get("set-cookie")?.split(";")[0];
+      assert.ok(userBCookie);
+      assert.deepEqual((await userBStart.json() as { record: unknown }).record, null, "User B cannot read User A's decision");
+      const savedB = await fetch(`${baseUrl}/api/manual-verification`, {
+        method: "POST",
+        headers: { cookie: userBCookie!, origin: baseUrl, "content-type": "application/json", "x-actor-id": "camp-user-a" },
+        body: JSON.stringify({ chain: TEST_CANDIDATE.chain, contract_address: TEST_CANDIDATE.contract_address, verdict: "CRITICAL_RISK", note: "Niezależna notatka drugiego użytkownika." }),
+      });
+      assert.equal(savedB.status, 200);
+      const afterB = await lookup(userACookie);
+      const userAAfterB = await afterB.json() as { record: { verdict: string; note: string } };
+      assert.equal(userAAfterB.record.verdict, "NEEDS_MORE_DATA", "User B cannot overwrite User A");
+      assert.equal(userAAfterB.record.note, "Wymaga dalszej analizy.");
+
+      const after = await inspectFollowUpStore(storePath);
+      assert.deepEqual(after.store, before.store, "CAMP_USER decisions never mutate shared Follow-up verification or lifecycle");
+      assert.equal(after.store.entries[0]?.lifecycle_status, before.store.entries[0]?.lifecycle_status);
+      assert.equal(after.store.entries[0]?.established_membership, before.store.entries[0]?.established_membership);
     } finally {
       await close(server);
+      repository.close();
+    }
+  });
+
+  it("keeps trusted testers read-only for private verification decisions", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "crypto-edge-trusted-verification-"));
+    temporaryDirectories.push(directory);
+    const repository = await createResearchEvidenceRepository({ databaseFilePath: join(directory, "research-evidence.sqlite") });
+    const originalActor = process.env.CRYPTO_EDGE_PC1_REVIEW_DEFAULT_ACTOR;
+    process.env.CRYPTO_EDGE_PC1_REVIEW_DEFAULT_ACTOR = "TRUSTED_TESTER";
+    const server = createScannerApiServer({ runtimeMode: "DEVELOPMENT_DEMO", researchEvidence: { repository } });
+    if (originalActor === undefined) delete process.env.CRYPTO_EDGE_PC1_REVIEW_DEFAULT_ACTOR;
+    else process.env.CRYPTO_EDGE_PC1_REVIEW_DEFAULT_ACTOR = originalActor;
+    await listen(server);
+    try {
+      const baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+      const lookup = await fetch(`${baseUrl}/api/manual-verification?chain=${TEST_CANDIDATE.chain}&contract_address=${TEST_CANDIDATE.contract_address}`);
+      assert.equal(lookup.status, 200);
+      const cookie = lookup.headers.get("set-cookie")?.split(";")[0];
+      assert.ok(cookie);
+      const denied = await fetch(`${baseUrl}/api/manual-verification`, {
+        method: "POST",
+        headers: { cookie: cookie!, origin: baseUrl, "content-type": "application/json" },
+        body: JSON.stringify({ chain: TEST_CANDIDATE.chain, contract_address: TEST_CANDIDATE.contract_address, verdict: "NEEDS_MORE_DATA", note: "Read-only test." }),
+      });
+      assert.equal(denied.status, 403);
+      assert.equal(repository.getVerificationDecision("trusted-tester", TEST_CANDIDATE.chain, TEST_CANDIDATE.contract_address!), null);
+    } finally {
+      await close(server);
+      repository.close();
     }
   });
 });

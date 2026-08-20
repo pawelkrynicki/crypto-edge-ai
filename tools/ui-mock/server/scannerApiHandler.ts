@@ -854,13 +854,19 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
 
     if (req.method === "GET" && path === "/api/manual-verification") {
       try {
+        const session = pc1Sessions.resolve(req);
+        if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
         const query = validateManualOwnerQuery(req.url);
         sendJson(req, res, 200, {
-          schema_version: "manual_verification_lookup_v1",
-          record: await manualOwnerActions.getPublicVerification(query.chain, query.contract_address),
+          schema_version: "private_manual_verification_lookup_v1",
+          record: (await researchEvidenceRepository).getVerificationDecision(
+            session.context.actor_id,
+            query.chain,
+            query.contract_address,
+          ),
         }, runtimeMode);
       } catch (error) {
-        sendManualOwnerActionError(req, res, error, runtimeMode);
+        sendPrivateVerificationError(req, res, error, runtimeMode);
       }
       return;
     }
@@ -874,14 +880,17 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
           throw new ManualOwnerActionError("VERIFICATION_WRITE_FORBIDDEN", 403);
         }
         const body = validateManualVerificationPreviewBody(await readResearchEvidenceJsonBody(req));
-        sendJson(req, res, 200, await manualOwnerActions.saveVerificationFromCampUser(
-          body.chain,
-          body.contract_address,
-          body.verdict,
-          body.note,
-        ), runtimeMode);
+        await resolveResearchChecklistCandidate(body.chain, body.contract_address, scannerOptions);
+        const saved = (await researchEvidenceRepository).saveVerificationDecision({
+          actorId: session.context.actor_id,
+          chain: body.chain,
+          contractAddress: body.contract_address,
+          verdict: body.verdict,
+          note: body.note,
+        });
+        sendJson(req, res, 200, { ...saved, audit_created: false }, runtimeMode);
       } catch (error) {
-        sendManualOwnerActionError(req, res, error, runtimeMode);
+        sendPrivateVerificationError(req, res, error, runtimeMode);
       }
       return;
     }
@@ -2188,6 +2197,22 @@ function sendManualOwnerActionError(
     error: actionError.code,
     message: "Owner token action rejected",
   }, runtimeMode);
+}
+
+function sendPrivateVerificationError(
+  req: IncomingMessage,
+  res: ServerResponse,
+  error: unknown,
+  runtimeMode: ResolvedProductRuntimeMode,
+): void {
+  if (error instanceof ManualOwnerActionError) {
+    sendJson(req, res, error.httpStatus, {
+      error: error.httpStatus === 403 ? "forbidden" : "verification_request_invalid",
+      message: error.httpStatus === 403 ? "Verification write is not permitted" : "Verification request is invalid",
+    }, runtimeMode);
+    return;
+  }
+  sendResearchChecklistError(req, res, error, runtimeMode);
 }
 
 function validateLifecycleRadarQuery(url: string | undefined): { limit: number; cursor: ReturnType<typeof parseRadarCursor> } {
