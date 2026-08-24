@@ -9,6 +9,7 @@ import { hydrateAIResearchBrief } from "../server/aiResearchService.js";
 import {
   AIResearchValidationError,
   auditAIResearchSemanticQuality,
+  buildAIResearchProviderJsonSchema,
   parseAIResearchProviderNarrative,
 } from "../server/aiResearchSchema.js";
 import { PERSISTABLE_SCANNER_SAMPLE } from "../src/fixtures/persistableScannerSample.js";
@@ -29,6 +30,12 @@ await writeFile(fixturePath, JSON.stringify(scanner), "utf8");
 after(async () => { await rm(root, { recursive: true, force: true }); });
 
 describe("AI v5 closed evidence-bound narrative contract", () => {
+  it("keeps the provider schema within the supported strict Structured Outputs subset", async () => {
+    const context = await stepThreeContext();
+    const schema = buildAIResearchProviderJsonSchema(context);
+    assert.equal(containsSchemaKeyword(schema, "uniqueItems"), false);
+  });
+
   it("rejects the sanitized current bad result with bounded evidence-fidelity codes", async () => {
     const context = await stepThreeContext();
     const candidate = validNarrative(context);
@@ -195,6 +202,12 @@ function validNarrative(context: AIResearchContext) {
 function assertRejected(value: ReturnType<typeof validNarrative>, context: AIResearchContext, violation: string): void {
   assert.throws(() => parseAIResearchProviderNarrative(JSON.stringify(value), context),
     (error) => error instanceof AIResearchValidationError && error.violations.includes(violation as never));
+}
+
+function containsSchemaKeyword(value: unknown, keyword: string): boolean {
+  if (Array.isArray(value)) return value.some((item) => containsSchemaKeyword(item, keyword));
+  if (typeof value !== "object" || value === null) return false;
+  return Object.entries(value).some(([key, item]) => key === keyword || containsSchemaKeyword(item, keyword));
 }
 
 type BadFixture = { fixture_version: string; summary: { en: string; pl: string } };

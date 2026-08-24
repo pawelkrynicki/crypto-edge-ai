@@ -26,7 +26,6 @@ const narrativeBindingSchema = (maxLength: number) => ({
       type: "array",
       minItems: 1,
       maxItems: 16,
-      uniqueItems: true,
       items: { type: "string", maxLength: 120 },
     },
     en: { type: "string", maxLength },
@@ -100,7 +99,6 @@ export function buildAIResearchProviderJsonSchema(context: AIResearchContext): R
       type: "array",
       minItems: 1,
       maxItems: 16,
-      uniqueItems: true,
       items: { type: "string", enum: supportIds },
     };
   };
@@ -111,7 +109,6 @@ export function buildAIResearchProviderJsonSchema(context: AIResearchContext): R
     type: "array",
     minItems: 1,
     maxItems: 16,
-    uniqueItems: true,
     items: { type: "string", enum: supportIds },
   };
   configure("fact_narratives", context.narrative_contract.slots.facts.map(({ id }) => id));
