@@ -9,10 +9,11 @@ if not "%~1"=="" (
   echo ERROR: Ta sciezka ownera nie przyjmuje parametrow.
   exit /b 64
 )
-if "%OPENAI_API_KEY%"=="" (
-  echo ERROR: OWNER_LIVE_SMOKE_API_KEY_MISSING
+if not defined OPENAI_API_KEY (
+  echo OPENAI_API_KEY: MISSING
   exit /b 1
 )
+echo OPENAI_API_KEY: PRESENT
 
 set "CRYPTO_EDGE_RUNTIME_MODE=INTERNAL_BETA"
 set "CRYPTO_EDGE_PC1_REVIEW_DEFAULT_ACTOR=OWNER"
@@ -35,7 +36,6 @@ echo === Crypto Edge AI: owner-only live AI smoke ===
 echo Runtime: INTERNAL_BETA
 echo Execution: central shared worker, one cycle only
 echo Budget: at most one OpenAI call
-echo The API key is read only from the environment and is never printed.
 
 cd /d "%UI_DIR%"
 call node_modules\.bin\tsx.cmd server\runOwnerAIResearchLiveSmoke.ts
