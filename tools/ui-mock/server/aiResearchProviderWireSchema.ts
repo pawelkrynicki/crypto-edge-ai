@@ -7,7 +7,7 @@ import { buildAIResearchProviderJsonSchema } from "./aiResearchSchema.js";
  * public-result contracts. Dynamic enum values remain covered by the canonical
  * evidence snapshot in the queue identity.
  */
-export const AI_RESEARCH_PROVIDER_WIRE_SCHEMA_VERSION = "ai_research_wire_schema_v2" as const;
+export const AI_RESEARCH_PROVIDER_WIRE_SCHEMA_VERSION = "ai_research_wire_schema_v3" as const;
 
 const MAX_NESTING_DEPTH = 12;
 const MAX_OBJECT_PROPERTIES = 128;

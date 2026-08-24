@@ -11,6 +11,7 @@ import {
 } from "../src/types/aiResearchTypes.js";
 import { buildAIResearchContext, isAIResearchBriefEvidenceCurrent, sha256, stableJson, type AIResearchContext, type AIResearchContextOptions } from "./aiResearchContext.js";
 import { AI_RESEARCH_NARRATIVE_VERSION, aiResearchNarrativeId } from "./aiResearchNarrativeContract.js";
+import { AI_RESEARCH_SEMANTIC_POLICY_VERSION } from "./aiResearchSemanticPolicy.js";
 import { AI_RESEARCH_PROVIDER_WIRE_SCHEMA_VERSION, buildAIResearchProviderWireSchema } from "./aiResearchProviderWireSchema.js";
 import {
   assertAIResearchSemanticQuality,
@@ -117,6 +118,7 @@ export function createAIResearchService(options: AIResearchServiceOptions = {}) 
       snapshot_fingerprint: context.snapshot_fingerprint,
       prompt_version: context.prompt_version,
       narrative_contract_version: AI_RESEARCH_NARRATIVE_VERSION,
+      semantic_policy_version: AI_RESEARCH_SEMANTIC_POLICY_VERSION,
       provider_wire_schema_version: wireSchema.version,
       model_id: modelId,
       analysis_schema_version: AI_RESEARCH_SCHEMA_VERSION,
@@ -264,6 +266,7 @@ export function hydrateAIResearchBrief(
     snapshot_fingerprint: context.snapshot_fingerprint,
     prompt_version: context.prompt_version,
     narrative_contract_version: AI_RESEARCH_NARRATIVE_VERSION,
+    semantic_policy_version: AI_RESEARCH_SEMANTIC_POLICY_VERSION,
     provider_wire_schema_version: AI_RESEARCH_PROVIDER_WIRE_SCHEMA_VERSION,
     model,
   }));
@@ -291,13 +294,13 @@ export function hydrateAIResearchBrief(
       ...item,
       explanation: { en: narrative.missing_narratives[index]!.en, pl: narrative.missing_narratives[index]!.pl },
     })),
-    next_actions: context.action_catalog.map((action, index) => ({
+    next_actions: context.action_catalog.map((action) => ({
       ...action,
-      reason: { en: narrative.action_narratives[index]!.en, pl: narrative.action_narratives[index]!.pl },
+      reason: deterministicActionNarrative(action.action_type),
     })),
-    status_change_conditions: context.status_change_conditions.map((condition, index) => ({
+    status_change_conditions: context.status_change_conditions.map((condition) => ({
       ...condition,
-      explanation: { en: narrative.status_change_narratives[index]!.en, pl: narrative.status_change_narratives[index]!.pl },
+      explanation: deterministicStatusConditionNarrative(condition.key),
     })),
     source_references: context.source_references,
     coverage: context.coverage,
@@ -313,6 +316,32 @@ export function hydrateAIResearchBrief(
   assertAIResearchSemanticQuality(base, context);
   const outputHash = sha256(stableJson(base));
   return validateStoredAIResearchBrief({ ...base, output_hash: outputHash });
+}
+
+function deterministicActionNarrative(action: string): { en: string; pl: string } {
+  const copy: Record<string, { en: string; pl: string }> = {
+    REVIEW_SECURITY: { en: "This fixed product action corresponds to the recorded security evidence gap.", pl: "To ustalone działanie produktu odpowiada zapisanej luce w danych bezpieczeństwa." },
+    OPEN_VERIFICATION: { en: "This fixed product action corresponds to the recorded source or identity evidence gap.", pl: "To ustalone działanie produktu odpowiada zapisanej luce dotyczącej źródła lub tożsamości." },
+    WAIT_FOR_CHECKPOINT: { en: "This fixed product action corresponds to the next recorded observation checkpoint.", pl: "To ustalone działanie produktu odpowiada kolejnemu zapisanemu punktowi obserwacji." },
+    REVIEW_CHECKPOINTS: { en: "This fixed product action corresponds to the recorded observation history.", pl: "To ustalone działanie produktu odpowiada zapisanej historii obserwacji." },
+  };
+  return copy[action] ?? {
+    en: "This fixed product action corresponds to the current server-issued evidence context.",
+    pl: "To ustalone działanie produktu odpowiada obecnemu kontekstowi danych ustalonych przez system.",
+  };
+}
+
+function deterministicStatusConditionNarrative(key: string): { en: string; pl: string } {
+  const copy: Record<string, { en: string; pl: string }> = {
+    next_checkpoint: { en: "A newly recorded checkpoint changes the available observation context.", pl: "Nowo zapisany punkt kontrolny zmienia dostępny kontekst obserwacji." },
+    filter_thresholds: { en: "Updated recorded metrics can change the available filter context.", pl: "Zaktualizowane zapisane metryki mogą zmienić dostępny kontekst filtrów." },
+    fresh_snapshot: { en: "A fresher recorded snapshot can change the current evidence context.", pl: "Nowsza zapisana migawka może zmienić obecny kontekst danych." },
+    owner_decision: { en: "A manual decision remains separate from this research result.", pl: "Ręczna decyzja pozostaje oddzielna od tego wyniku analizy." },
+  };
+  return copy[key] ?? {
+    en: "A recorded change in this area can change the current research context.",
+    pl: "Zapisana zmiana w tym obszarze może zmienić obecny kontekst analizy.",
+  };
 }
 
 export function buildDeterministicPreview(context: AIResearchContext, generatedAt = new Date()): AIResearchBrief {
@@ -424,15 +453,6 @@ export function buildDeterministicPreview(context: AIResearchContext, generatedA
       "Ten brak ogranicza wnioski, które można wyciągnąć z dostarczonych danych.",
     );
   };
-  const actionNarrative = (action: string) => {
-    const copy: Record<string, ReturnType<typeof bilingual>> = {
-      REVIEW_SECURITY: bilingual("Review security evidence first because it is the highest-impact unresolved gap.", "Najpierw sprawdź dane bezpieczeństwa, ponieważ to luka o największym wpływie na dalszą analizę."),
-      OPEN_VERIFICATION: bilingual("Verify the listed source or identity next so the recorded context can be relied on.", "Następnie zweryfikuj wskazane źródło lub tożsamość, aby można było oprzeć się na zapisanym kontekście."),
-      WAIT_FOR_CHECKPOINT: bilingual("Wait for the next recorded checkpoint to compare the current observation with new evidence.", "Poczekaj na kolejny zapisany punkt kontrolny, aby porównać obecną obserwację z nowymi danymi."),
-      REVIEW_CHECKPOINTS: bilingual("Review the recorded checkpoints to see whether the open gap has changed over time.", "Przejrzyj zapisane punkty kontrolne, aby sprawdzić, czy otwarta luka zmieniła się w czasie."),
-    };
-    return copy[action] ?? bilingual("Use this permitted research step to verify the listed evidence gap.", "Wykorzystaj ten dozwolony krok analizy, aby sprawdzić wskazaną lukę w danych.");
-  };
   const narrative: AIResearchProviderNarrative = {
     narrative_version: AI_RESEARCH_NARRATIVE_VERSION,
     summary: {
@@ -458,43 +478,8 @@ export function buildDeterministicPreview(context: AIResearchContext, generatedA
       support_ids: [context.narrative_contract.slots.missing_information.find(({ id }) => id === aiResearchNarrativeId("missing", item.key))!.allowed_support_ids[0]!],
       ...missingNarrative(item.key),
     })),
-    action_narratives: context.action_catalog.map((action, index) => ({
-      id: aiResearchNarrativeId("action", index),
-      support_ids: [context.narrative_contract.slots.actions[index]!.allowed_support_ids[0]!],
-      ...actionNarrative(action.action_type),
-    })),
-    status_change_narratives: context.status_change_conditions.map((condition) => ({
-      id: aiResearchNarrativeId("condition", condition.key),
-      support_ids: [context.narrative_contract.slots.status_change_conditions.find(({ id }) => id === aiResearchNarrativeId("condition", condition.key))!.allowed_support_ids[0]!],
-      ...statusConditionNarrative(condition.key),
-    })),
   };
   return hydrateAIResearchBrief(context, narrative, "render-preview", { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }, generatedAt, true);
-}
-
-function statusConditionNarrative(key: string): { en: string; pl: string } {
-  const copy: Record<string, { en: string; pl: string }> = {
-    next_checkpoint: {
-      en: "A new recorded checkpoint would allow the current observation to be compared with a later state.",
-      pl: "Nowy zapisany punkt kontrolny pozwoli porównać obecną obserwację ze stanem po czasie.",
-    },
-    filter_thresholds: {
-      en: "Updated recorded metrics can change the filter result and should be checked before drawing a stronger conclusion.",
-      pl: "Zaktualizowane zapisane metryki mogą zmienić wynik filtrów i warto je sprawdzić przed mocniejszym wnioskiem.",
-    },
-    fresh_snapshot: {
-      en: "A fresher recorded snapshot can update the assessment of the current gaps and risks.",
-      pl: "Nowsza zapisana migawka może zaktualizować ocenę obecnych braków i ryzyk.",
-    },
-    owner_decision: {
-      en: "An owner decision is separate from this research result and is not automated by the analysis.",
-      pl: "Decyzja ownera jest oddzielna od tego wyniku analizy i nie jest automatyzowana przez AI.",
-    },
-  };
-  return copy[key] ?? {
-    en: "A recorded change in this area would justify revisiting the current research view.",
-    pl: "Zapisana zmiana w tym obszarze uzasadni ponowne sprawdzenie obecnej analizy.",
-  };
 }
 
 function lookup(

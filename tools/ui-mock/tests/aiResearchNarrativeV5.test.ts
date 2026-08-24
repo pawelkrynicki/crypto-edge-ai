@@ -11,6 +11,7 @@ import {
   auditAIResearchSemanticQuality,
   buildAIResearchProviderJsonSchema,
   parseAIResearchProviderNarrative,
+  parseAIResearchProviderNarrativeWithDiagnostics,
 } from "../server/aiResearchSchema.js";
 import { PERSISTABLE_SCANNER_SAMPLE } from "../src/fixtures/persistableScannerSample.js";
 
@@ -34,6 +35,8 @@ describe("AI v5 closed evidence-bound narrative contract", () => {
     const context = await stepThreeContext();
     const schema = buildAIResearchProviderJsonSchema(context);
     assert.equal(containsSchemaKeyword(schema, "uniqueItems"), false);
+    assert.equal(JSON.stringify(schema).includes("action_narratives"), false);
+    assert.equal(JSON.stringify(schema).includes("status_change_narratives"), false);
   });
 
   it("rejects the sanitized current bad result with bounded evidence-fidelity codes", async () => {
@@ -58,11 +61,26 @@ describe("AI v5 closed evidence-bound narrative contract", () => {
     assert.doesNotThrow(() => parseAIResearchProviderNarrative(JSON.stringify(narrative), context));
     const pl = parseAIResearchProviderNarrative(JSON.stringify(narrative), context);
     const en = parseAIResearchProviderNarrative(JSON.stringify(narrative), context);
-    assert.deepEqual(pl.action_narratives.map(({ id, support_ids }) => ({ id, support_ids })), en.action_narratives.map(({ id, support_ids }) => ({ id, support_ids })));
     assert.deepEqual(pl.fact_narratives.map(({ id, support_ids }) => ({ id, support_ids })), en.fact_narratives.map(({ id, support_ids }) => ({ id, support_ids })));
   });
 
-  it("rejects a support reference, entity, number, instruction, later-stage action, foreign script, and truncation", async () => {
+  it("replaces an action-bound style-only instruction without a provider retry", async () => {
+    const context = await stepThreeContext();
+    const styleOnly = validNarrative(context);
+    const actionSupport = context.narrative_contract.slots.actions[0]!.allowed_support_ids[0]!;
+    styleOnly.summary.support_ids = [actionSupport];
+    styleOnly.summary.en = "Review the fixed product action now.";
+    styleOnly.summary.pl = "Musisz teraz sprawdzić ustalone działanie produktu.";
+    const parsed = parseAIResearchProviderNarrativeWithDiagnostics(JSON.stringify(styleOnly), context);
+    assert.deepEqual(parsed.presentation_fallbacks.map(({ classification, target, locale, violations }) => ({ classification, target, locale, violations })), [
+      { classification: "STYLE_ONLY_INSTRUCTIONAL", target: "summary", locale: "en", violations: ["INSTRUCTIONAL_NARRATIVE"] },
+      { classification: "STYLE_ONLY_INSTRUCTIONAL", target: "summary", locale: "pl", violations: ["INSTRUCTIONAL_NARRATIVE"] },
+    ]);
+    assert.doesNotMatch(parsed.narrative.summary.en, /review|must|should|need|you\b/i);
+    assert.doesNotMatch(parsed.narrative.summary.pl, /sprawdź|należy|trzeba|musisz/i);
+  });
+
+  it("rejects a support reference, entity, number, material instruction, later-stage action, foreign script, and truncation", async () => {
     const context = await stepThreeContext();
     const support = validNarrative(context);
     support.fact_narratives[0]!.support_ids = ["source:not-issued"];
@@ -81,9 +99,12 @@ describe("AI v5 closed evidence-bound narrative contract", () => {
     number.summary.en = "The recorded evidence has 987654 unresolved checks.";
     assertRejected(number, context, "INVENTED_NUMBER");
 
-    const instruction = validNarrative(context);
-    instruction.summary.en = "Review the current security evidence now.";
-    assertRejected(instruction, context, "INSTRUCTIONAL_NARRATIVE");
+    const materialInstruction = validNarrative(context);
+    materialInstruction.summary.support_ids = [context.narrative_contract.slots.actions[0]!.allowed_support_ids[0]!];
+    materialInstruction.summary.en = "Inspect bytecode before the current security review.";
+    assertRejected(materialInstruction, context, "INSTRUCTIONAL_NARRATIVE");
+    assertRejected(materialInstruction, context, "MATERIAL_INSTRUCTIONAL");
+    assertRejected(materialInstruction, context, "CURRENT_STEP_BOUNDARY_VIOLATION");
 
     const laterStage = validNarrative(context);
     laterStage.summary.en = "Inspect bytecode now before completing the current security review.";
@@ -132,7 +153,7 @@ describe("AI v5 closed evidence-bound narrative contract", () => {
     assert.ok(auditAIResearchSemanticQuality(redFlagRemoved, context).includes("RISK_SKELETON_MISMATCH"));
   });
 
-  it("preserves an auditable v4 row but excludes it from v5 exact and last-known-good lookup", async () => {
+  it("preserves an auditable v4 row but excludes it from v6 exact and last-known-good lookup", async () => {
     const context = await stepThreeContext();
     const store = await createAIAnalysisQueueStore({ databaseFilePath: resolve(root, "v4-audit-v5-lookup.sqlite") });
     const v4 = buildAIAnalysisCacheIdentity({
@@ -159,18 +180,18 @@ describe("AI v5 closed evidence-bound narrative contract", () => {
     store.complete({ analysis_id: claimed!.analysis_id, worker_id: "v4-audit-worker", brief: storedLegacy, validation_status: "VALID", latency_ms: 1, provider_response_id: null, now: NOW });
     assert.equal(store.findByAnalysisId(claimed!.analysis_id)?.result?.prompt_version, "ai_research_prompt_v4");
 
-    const v5 = buildAIAnalysisCacheIdentity({
+    const v6 = buildAIAnalysisCacheIdentity({
       ...context.identity,
       snapshot_fingerprint: context.snapshot_fingerprint,
-      prompt_version: "ai_research_prompt_v5",
-      narrative_contract_version: "ai_research_narrative_v4",
+      prompt_version: "ai_research_prompt_v6",
+      narrative_contract_version: "ai_research_narrative_v5",
       model_id: "gpt-5-mini",
       analysis_schema_version: "ai_research_brief_v2",
       locale: "en",
     });
-    assert.equal(store.lookup(v5).record, null);
-    assert.equal(store.lookup(v5).last_known_good, null);
-    assert.deepEqual(store.findRecentValidResults(v5), []);
+    assert.equal(store.lookup(v6).record, null);
+    assert.equal(store.lookup(v6).last_known_good, null);
+    assert.deepEqual(store.findRecentValidResults(v6), []);
     store.close();
   });
 });
@@ -194,13 +215,11 @@ async function stepThreeContext(): Promise<AIResearchContext> {
 function validNarrative(context: AIResearchContext) {
   const slot = (entry: { id: string; allowed_support_ids: string[] }, en: string, pl: string) => ({ id: entry.id, support_ids: [entry.allowed_support_ids[0]!], en, pl });
   return {
-    narrative_version: "ai_research_narrative_v4" as const,
+    narrative_version: "ai_research_narrative_v5" as const,
     summary: slot(context.narrative_contract.slots.summary, correctedEn.summary, correctedPl.summary),
     fact_narratives: context.narrative_contract.slots.facts.map((entry) => slot(entry, correctedEn.fact, correctedPl.fact)),
     risk_narratives: context.narrative_contract.slots.risks.map((entry) => slot(entry, correctedEn.risk, correctedPl.risk)),
     missing_narratives: context.narrative_contract.slots.missing_information.map((entry) => slot(entry, correctedEn.missing, correctedPl.missing)),
-    action_narratives: context.narrative_contract.slots.actions.map((entry) => slot(entry, correctedEn.action, correctedPl.action)),
-    status_change_narratives: context.narrative_contract.slots.status_change_conditions.map((entry) => slot(entry, correctedEn.condition, correctedPl.condition)),
   };
 }
 

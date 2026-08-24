@@ -1,7 +1,7 @@
 export const AI_RESEARCH_SCHEMA_VERSION = "ai_research_brief_v2" as const;
 // One shared heavy generation carries evidence-bound English and Polish wording.
 // Request locale never owns the cache key or triggers a second provider call.
-export const AI_RESEARCH_PROMPT_VERSION = "ai_research_prompt_v5" as const;
+export const AI_RESEARCH_PROMPT_VERSION = "ai_research_prompt_v6" as const;
 export const AI_ANALYSIS_QUEUE_SCHEMA_VERSION = "ai_analysis_queue_v1" as const;
 export const AI_RESEARCH_DATA_CONTRACT_VERSION = "ai_research_data_contract_v2" as const;
 export const AI_RESEARCH_TARGET_MODEL = "gpt-5-mini" as const;
@@ -160,7 +160,7 @@ export type AIResearchBrief = {
   identity: { chain: string; contract_address: string };
   analysis_language: "bilingual";
   snapshot_fingerprint: string;
-  prompt_version: typeof AI_RESEARCH_PROMPT_VERSION | "ai_research_prompt_v4";
+  prompt_version: typeof AI_RESEARCH_PROMPT_VERSION | "ai_research_prompt_v4" | "ai_research_prompt_v5";
   model: string;
   generated_at: string;
   data_generated_at: string;

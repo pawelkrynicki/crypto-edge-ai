@@ -42,8 +42,6 @@ export const AI_RESEARCH_PROVIDER_JSON_SCHEMA = {
     "fact_narratives",
     "risk_narratives",
     "missing_narratives",
-    "action_narratives",
-    "status_change_narratives",
   ],
   properties: {
     narrative_version: { type: "string", enum: [AI_RESEARCH_NARRATIVE_VERSION] },
@@ -63,17 +61,6 @@ export const AI_RESEARCH_PROVIDER_JSON_SCHEMA = {
     missing_narratives: {
       type: "array",
       maxItems: 5,
-      items: narrativeBindingSchema(),
-    },
-    action_narratives: {
-      type: "array",
-      minItems: 1,
-      maxItems: 4,
-      items: narrativeBindingSchema(),
-    },
-    status_change_narratives: {
-      type: "array",
-      maxItems: 3,
       items: narrativeBindingSchema(),
     },
   },
@@ -114,8 +101,6 @@ export function buildAIResearchProviderJsonSchema(context: AIResearchContext): R
   configure("fact_narratives", context.narrative_contract.slots.facts.map(({ id }) => id));
   configure("risk_narratives", context.narrative_contract.slots.risks.map(({ id }) => id));
   configure("missing_narratives", context.narrative_contract.slots.missing_information.map(({ id }) => id));
-  configure("action_narratives", context.narrative_contract.slots.actions.map(({ id }) => id));
-  configure("status_change_narratives", context.narrative_contract.slots.status_change_conditions.map(({ id }) => id));
   return schema;
 }
 
@@ -127,14 +112,14 @@ export type AIResearchProviderNarrative = {
   fact_narratives: AIResearchNarrativeBinding[];
   risk_narratives: AIResearchNarrativeBinding[];
   missing_narratives: AIResearchNarrativeBinding[];
-  action_narratives: AIResearchNarrativeBinding[];
-  status_change_narratives: AIResearchNarrativeBinding[];
 };
 
 export type AIResearchPresentationFallback = {
-  target: string;
+  classification: "STYLE_ONLY_INSTRUCTIONAL";
+  target: "summary" | "fact" | "risk" | "missing";
+  slot_id: string;
   locale: "en" | "pl";
-  violations: Array<"RAW_ENUM_IN_NARRATIVE" | "MACHINE_VALUE_IN_NARRATIVE" | "LANGUAGE_MISMATCH">;
+  violations: ["INSTRUCTIONAL_NARRATIVE"];
 };
 
 export type AIResearchProviderNarrativeParseResult = {
@@ -166,7 +151,8 @@ export type AIResearchSemanticViolation =
   | "UNSUPPORTED_ENTITY_OR_CAPABILITY"
   | "FOREIGN_SCRIPT_CONTAMINATION"
   | "INCOMPLETE_NARRATIVE"
-  | "INSTRUCTIONAL_NARRATIVE";
+  | "INSTRUCTIONAL_NARRATIVE"
+  | "MATERIAL_INSTRUCTIONAL";
 
 export class AIResearchValidationError extends Error {
   readonly code:
@@ -203,7 +189,6 @@ export function parseAIResearchProviderNarrativeWithDiagnostics(raw: string, con
   }
   if (!isRecord(value) || !hasExactKeys(value, [
     "narrative_version", "summary", "fact_narratives", "risk_narratives", "missing_narratives",
-    "action_narratives", "status_change_narratives",
   ]) || value.narrative_version !== AI_RESEARCH_NARRATIVE_VERSION) fail();
 
   const result: AIResearchProviderNarrative = {
@@ -224,18 +209,8 @@ export function parseAIResearchProviderNarrativeWithDiagnostics(raw: string, con
       context.narrative_contract.slots.missing_information,
       280,
     ),
-    action_narratives: parseBindings(
-      value.action_narratives,
-      context.narrative_contract.slots.actions,
-      280,
-    ),
-    status_change_narratives: parseBindings(
-      value.status_change_narratives,
-      context.narrative_contract.slots.status_change_conditions,
-      280,
-    ),
   };
-  const violations = auditProviderNarrative(result, context);
+  const { narrative, violations, presentationFallbacks } = normalizeProviderNarrative(result, context);
   if (violations.length > 0) {
     const code = violations.includes("FORBIDDEN_CONTENT") || violations.includes("GENERATED_URL")
       ? "FORBIDDEN_CONTENT"
@@ -244,28 +219,67 @@ export function parseAIResearchProviderNarrativeWithDiagnostics(raw: string, con
         : "SEMANTIC_MISMATCH";
     throw new AIResearchValidationError(code, violations);
   }
-  return { narrative: result, presentation_fallbacks: [] };
+  return { narrative, presentation_fallbacks: presentationFallbacks };
 }
 
-function auditProviderNarrative(
+function normalizeProviderNarrative(
   narrative: AIResearchProviderNarrative,
   context: AIResearchContext,
-): AIResearchSemanticViolation[] {
+): { narrative: AIResearchProviderNarrative; violations: AIResearchSemanticViolation[]; presentationFallbacks: AIResearchPresentationFallback[] } {
   const result = new Set<AIResearchSemanticViolation>();
-  const bindings = [
-    narrative.summary,
-    ...narrative.fact_narratives,
-    ...narrative.risk_narratives,
-    ...narrative.missing_narratives,
-    ...narrative.action_narratives,
-    ...narrative.status_change_narratives,
+  const presentationFallbacks: AIResearchPresentationFallback[] = [];
+  const bindings: Array<{ target: AIResearchPresentationFallback["target"]; binding: AIResearchNarrativeBinding }> = [
+    { target: "summary", binding: narrative.summary },
+    ...narrative.fact_narratives.map((binding) => ({ target: "fact" as const, binding })),
+    ...narrative.risk_narratives.map((binding) => ({ target: "risk" as const, binding })),
+    ...narrative.missing_narratives.map((binding) => ({ target: "missing" as const, binding })),
   ];
-  for (const binding of bindings) {
+  for (const { target, binding } of bindings) {
     for (const locale of ["en", "pl"] as const) {
-      for (const violation of narrativePresentationViolations(binding[locale], locale, context)) result.add(violation);
+      const violations = narrativePresentationViolations(binding[locale], locale, context);
+      if (isStyleOnlyInstructional(violations, binding, target)) {
+        binding[locale] = deterministicDescriptiveFallback(target, locale);
+        presentationFallbacks.push({ classification: "STYLE_ONLY_INSTRUCTIONAL", target, slot_id: binding.id, locale, violations: ["INSTRUCTIONAL_NARRATIVE"] });
+      } else {
+        for (const violation of violations) result.add(violation);
+        if (violations.includes("INSTRUCTIONAL_NARRATIVE")) result.add("MATERIAL_INSTRUCTIONAL");
+      }
     }
   }
-  return [...result];
+  return { narrative, violations: [...result], presentationFallbacks };
+}
+
+/**
+ * A replacement is allowed only for an otherwise-valid slot structurally bound
+ * to a current server action. Anything else is a material semantic mismatch.
+ */
+function isStyleOnlyInstructional(
+  violations: AIResearchSemanticViolation[],
+  binding: AIResearchNarrativeBinding,
+  target: AIResearchPresentationFallback["target"],
+): boolean {
+  return target === "summary"
+    && violations.length === 1
+    && violations[0] === "INSTRUCTIONAL_NARRATIVE"
+    && binding.support_ids.some((id) => id.startsWith("action:"));
+}
+
+function deterministicDescriptiveFallback(target: AIResearchPresentationFallback["target"], locale: "en" | "pl"): string {
+  const text = {
+    en: {
+      summary: "The recorded evidence describes the current research context. Product actions remain fixed by the server-issued evidence set.",
+      fact: "This recorded fact adds context within the current evidence set.",
+      risk: "This recorded risk remains part of the current evidence context.",
+      missing: "This evidence gap limits the current research context.",
+    },
+    pl: {
+      summary: "Zapisane dane opisują obecny kontekst analizy. Działania produktu wynikają z danych ustalonych przez system.",
+      fact: "Ten zapisany fakt uzupełnia obecny zestaw danych.",
+      risk: "To zapisane ryzyko pozostaje częścią obecnego kontekstu danych.",
+      missing: "Ta luka w danych ogranicza obecny kontekst analizy.",
+    },
+  } as const;
+  return text[locale][target];
 }
 
 function narrativePresentationViolations(
@@ -396,8 +410,8 @@ export function assertAIResearchSemanticQuality(value: unknown, context: AIResea
 }
 
 /**
- * Historical v4 records are parsed only so they remain auditable.  Eligibility
- * for a current lookup is enforced by the queue's full v5 cache identity.
+ * Historical v4/v5 records are parsed only so they remain auditable. Eligibility
+ * for a current lookup is enforced by the queue's full v6 cache identity.
  */
 export function validateStoredAIResearchBrief(value: unknown): AIResearchBrief {
   if (!isRecord(value) || !hasExactKeys(value, [
@@ -407,8 +421,8 @@ export function validateStoredAIResearchBrief(value: unknown): AIResearchBrief {
     "source_references", "coverage", "checkpoints", "token_usage", "input_hash", "output_hash", "render_preview",
   ])) fail();
   if (value.schema_version !== AI_RESEARCH_SCHEMA_VERSION
-    || (value.prompt_version !== AI_RESEARCH_PROMPT_VERSION && value.prompt_version !== "ai_research_prompt_v4")) fail();
-  const historicalV4 = value.prompt_version === "ai_research_prompt_v4";
+    || (value.prompt_version !== AI_RESEARCH_PROMPT_VERSION && value.prompt_version !== "ai_research_prompt_v4" && value.prompt_version !== "ai_research_prompt_v5")) fail();
+  const historicalV4 = value.prompt_version === "ai_research_prompt_v4" || value.prompt_version === "ai_research_prompt_v5";
   const analysisId = text(value.analysis_id, 40, 40);
   if (!/^air_[0-9a-f-]{36}$/.test(analysisId)) fail();
   if (!isRecord(value.identity) || !hasExactKeys(value.identity, ["chain", "contract_address"])) fail();
@@ -630,7 +644,7 @@ function hasIncompleteNarrative(strings: string[]): boolean {
 function hasInstructionalNarrative(strings: string[]): boolean {
   return strings.some((value) => splitSentences(value).some((sentence) => (
     /^(?:review|check|inspect|investigate|perform|run|open|verify|wait|use|sprawdź|przejrzyj|zbadaj|uruchom|otwórz|zweryfikuj|poczekaj|użyj)\b/iu.test(sentence.trim())
-      || /\b(?:you should|you need to|must (?:review|check|inspect|investigate|run|verify)|należy|powinien(?:eś|eś|naś)?|trzeba (?:sprawdzić|zbadać|uruchomić|zweryfikować))\b/iu.test(sentence)
+      || /\b(?:you|your|you should|you need(?: to)?|must\b|should\b|need(?:s| to)?\b|należy|powinien(?:eś|eś|naś)?|trzeba\b|musisz|potrzebujesz|twoj\w*)\b/iu.test(sentence)
   )));
 }
 

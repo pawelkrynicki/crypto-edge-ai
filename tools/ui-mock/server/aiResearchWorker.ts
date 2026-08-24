@@ -6,6 +6,7 @@ import {
 import { resolveProductRuntimeMode } from "../src/runtimeMode.js";
 import { AIResearchContextError, buildAIResearchContext, type AIResearchContextOptions } from "./aiResearchContext.js";
 import { AI_RESEARCH_NARRATIVE_VERSION } from "./aiResearchNarrativeContract.js";
+import { AI_RESEARCH_SEMANTIC_POLICY_VERSION } from "./aiResearchSemanticPolicy.js";
 import {
   AI_RESEARCH_PROVIDER_WIRE_SCHEMA_VERSION,
   AIResearchProviderWireSchemaError,
@@ -232,6 +233,7 @@ async function processClaim(
       snapshot_fingerprint: context.snapshot_fingerprint,
       prompt_version: context.prompt_version,
       narrative_contract_version: AI_RESEARCH_NARRATIVE_VERSION,
+      semantic_policy_version: AI_RESEARCH_SEMANTIC_POLICY_VERSION,
       provider_wire_schema_version: AI_RESEARCH_PROVIDER_WIRE_SCHEMA_VERSION,
       model_id: claimed.model_id,
       analysis_schema_version: claimed.analysis_schema_version,
@@ -311,7 +313,7 @@ async function processClaim(
       store.recordValidationDiagnostics({
         analysis_id: claimed.analysis_id,
         worker_id: workerId,
-        validation_code: "PRESENTATION_FALLBACK",
+        validation_code: "STYLE_ONLY_INSTRUCTIONAL",
         violations: [...new Set(parsedNarrative.presentation_fallbacks.flatMap((item) => item.violations))],
         now: now(),
       });

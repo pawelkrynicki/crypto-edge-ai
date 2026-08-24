@@ -99,8 +99,8 @@ describe("AI.2C deterministic actions and PL/EN narrative boundary", () => {
   it("accepts natural PL/EN narrative and rejects raw enums, machine values and mixed language", async () => {
     const pl = await researchContext("pl");
     const en = await researchContext("en");
-    assert.equal(parseAIResearchProviderNarrative(JSON.stringify(providerNarrative(pl)), pl).narrative_version, "ai_research_narrative_v4");
-    assert.equal(parseAIResearchProviderNarrative(JSON.stringify(providerNarrative(en)), en).narrative_version, "ai_research_narrative_v4");
+    assert.equal(parseAIResearchProviderNarrative(JSON.stringify(providerNarrative(pl)), pl).narrative_version, "ai_research_narrative_v5");
+    assert.equal(parseAIResearchProviderNarrative(JSON.stringify(providerNarrative(en)), en).narrative_version, "ai_research_narrative_v5");
 
     const rawEnum = providerNarrative(pl);
     rawEnum.summary.pl = "Stan DATA_STALE wymaga sprawdzenia.";
@@ -132,7 +132,7 @@ function semanticCandidate(context: AIResearchContext, fixture: CapturedFixture 
     ...action,
     reason: bilingual(
       "This fixed research step addresses the listed evidence.",
-      "action_reason" in fixture ? fixture.action_reason : "Wykorzystaj ten dozwolony krok analizy, aby sprawdzić dane.",
+      "action_reason" in fixture ? fixture.action_reason : "Ten stały krok pozostaje częścią obecnego kontekstu danych.",
     ),
   }));
   if (capturedFixture) {
@@ -146,7 +146,7 @@ function semanticCandidate(context: AIResearchContext, fixture: CapturedFixture 
   return {
     schema_version: "ai_research_brief_v2",
     research_state: context.research_state,
-    summary: bilingual("Recorded evidence requires a focused follow-up review.", fixture.summary),
+    summary: bilingual("Recorded evidence describes the current follow-up context.", fixture.summary),
     known_facts: context.fact_candidates.map((fact) => ({
       ...fact,
       interpretation: bilingual(
@@ -156,7 +156,7 @@ function semanticCandidate(context: AIResearchContext, fixture: CapturedFixture 
     })),
     risk_factors: context.risk_candidates.map((risk) => ({
       ...risk,
-      explanation: bilingual("This recorded risk needs verification against the listed evidence.", "risk_explanation" in fixture ? fixture.risk_explanation : "To zapisane ryzyko wymaga sprawdzenia względem wskazanych danych."),
+      explanation: bilingual("This recorded risk remains part of the listed evidence context.", "risk_explanation" in fixture ? fixture.risk_explanation : "To zapisane ryzyko pozostaje częścią wskazanego kontekstu danych."),
     })),
     missing_information: [
       ...context.missing_information.map((item) => ({
@@ -168,7 +168,7 @@ function semanticCandidate(context: AIResearchContext, fixture: CapturedFixture 
     next_actions: actions,
     status_change_conditions: context.status_change_conditions.map((condition) => ({
       ...condition,
-      explanation: bilingual("This condition would justify reviewing the research view.", "condition_explanation" in fixture ? fixture.condition_explanation : "Ten warunek uzasadnia ponowne sprawdzenie analizy."),
+      explanation: bilingual("This condition describes a possible change in the research context.", "condition_explanation" in fixture ? fixture.condition_explanation : "Ten warunek opisuje możliwą zmianę kontekstu analizy."),
     })),
     source_references: context.source_references,
   };
@@ -177,13 +177,11 @@ function semanticCandidate(context: AIResearchContext, fixture: CapturedFixture 
 function providerNarrative(context: AIResearchContext) {
   const slot = (entry: { id: string; allowed_support_ids: string[] }, en: string, pl: string) => ({ id: entry.id, support_ids: [entry.allowed_support_ids[0]!], en, pl });
   return {
-    narrative_version: "ai_research_narrative_v4" as const,
-    summary: slot(context.narrative_contract.slots.summary, "The recorded data needs further review within the current research boundary.", "Zapisane dane wymagają dalszego sprawdzenia w granicach bieżącej analizy."),
+    narrative_version: "ai_research_narrative_v5" as const,
+    summary: slot(context.narrative_contract.slots.summary, "The recorded data describes the current research boundary.", "Zapisane dane opisują granicę bieżącej analizy."),
     fact_narratives: context.narrative_contract.slots.facts.map((entry) => slot(entry, "This recorded fact adds context to the research view.", "Ten zapisany fakt uzupełnia obecną analizę.")),
-    risk_narratives: context.narrative_contract.slots.risks.map((entry) => slot(entry, "This recorded risk needs verification against the listed evidence.", "To zapisane ryzyko wymaga sprawdzenia względem wskazanych danych.")),
+    risk_narratives: context.narrative_contract.slots.risks.map((entry) => slot(entry, "This recorded risk remains part of the listed evidence context.", "To zapisane ryzyko pozostaje częścią wskazanego kontekstu danych.")),
     missing_narratives: context.narrative_contract.slots.missing_information.map((entry) => slot(entry, "This evidence gap limits the current research view.", "Ta luka w danych ogranicza obecną analizę.")),
-    action_narratives: context.narrative_contract.slots.actions.map((entry) => slot(entry, "The fixed action addresses the current evidence gap.", "Stałe działanie dotyczy bieżącej luki w danych.")),
-    status_change_narratives: context.narrative_contract.slots.status_change_conditions.map((entry) => slot(entry, "This condition would justify reviewing the research view.", "Ten warunek uzasadnia ponowne sprawdzenie analizy.")),
   };
 }
 

@@ -15,6 +15,7 @@ import {
 import { resolveTokenIdentity } from "../src/tokenLifecycle.js";
 import { sha256, stableJson } from "./aiResearchContext.js";
 import { AI_RESEARCH_NARRATIVE_VERSION } from "./aiResearchNarrativeContract.js";
+import { AI_RESEARCH_SEMANTIC_POLICY_VERSION } from "./aiResearchSemanticPolicy.js";
 import { AI_RESEARCH_PROVIDER_WIRE_SCHEMA_VERSION } from "./aiResearchProviderWireSchema.js";
 import { validateStoredAIResearchBrief } from "./aiResearchSchema.js";
 
@@ -56,6 +57,7 @@ export type AIAnalysisCacheIdentity = {
   snapshot_fingerprint: string;
   prompt_version: string;
   narrative_contract_version: string | null;
+  semantic_policy_version: string | null;
   provider_wire_schema_version: string | null;
   model_id: string;
   analysis_schema_version: string;
@@ -185,6 +187,7 @@ export function buildAIAnalysisCacheIdentity(input: {
   snapshot_fingerprint: string;
   prompt_version?: string;
   narrative_contract_version?: string;
+  semantic_policy_version?: string;
   provider_wire_schema_version?: string;
   model_id: string;
   analysis_schema_version?: string;
@@ -195,6 +198,7 @@ export function buildAIAnalysisCacheIdentity(input: {
     || !/^[0-9a-f]{64}$/.test(input.snapshot_fingerprint)
     || !safeVersion(input.prompt_version ?? AI_RESEARCH_PROMPT_VERSION)
     || !safeVersion(input.narrative_contract_version ?? AI_RESEARCH_NARRATIVE_VERSION)
+    || !safeVersion(input.semantic_policy_version ?? AI_RESEARCH_SEMANTIC_POLICY_VERSION)
     || !safeVersion(input.provider_wire_schema_version ?? AI_RESEARCH_PROVIDER_WIRE_SCHEMA_VERSION)
     || !safeVersion(input.model_id)
     || !safeVersion(input.analysis_schema_version ?? AI_RESEARCH_SCHEMA_VERSION)) {
@@ -207,6 +211,7 @@ export function buildAIAnalysisCacheIdentity(input: {
     model_id: input.model_id,
     prompt_version: input.prompt_version ?? AI_RESEARCH_PROMPT_VERSION,
     narrative_contract_version: input.narrative_contract_version ?? AI_RESEARCH_NARRATIVE_VERSION,
+    semantic_policy_version: input.semantic_policy_version ?? AI_RESEARCH_SEMANTIC_POLICY_VERSION,
     provider_wire_schema_version: input.provider_wire_schema_version ?? AI_RESEARCH_PROVIDER_WIRE_SCHEMA_VERSION,
     snapshot_fingerprint: input.snapshot_fingerprint,
   };
@@ -259,13 +264,14 @@ export async function createAIAnalysisQueueStore(options: AIAnalysisQueueStoreOp
       return requireDb().prepare(`
 SELECT * FROM crypto_ai_analysis_queue
 WHERE chain = ? AND contract_address = ? AND prompt_version = ?
-  AND narrative_contract_version = ? AND provider_wire_schema_version = ? AND model_id = ? AND analysis_schema_version = ? AND result_json IS NOT NULL AND validation_status = 'VALID'
+  AND narrative_contract_version = ? AND semantic_policy_version = ? AND provider_wire_schema_version = ? AND model_id = ? AND analysis_schema_version = ? AND result_json IS NOT NULL AND validation_status = 'VALID'
 ORDER BY completed_at DESC LIMIT 20
 `).all(
         identity.chain,
         identity.contract_address,
         identity.prompt_version,
         identity.narrative_contract_version,
+        identity.semantic_policy_version,
         identity.provider_wire_schema_version,
         identity.model_id,
         identity.analysis_schema_version,
@@ -327,12 +333,12 @@ WHERE cache_key = ?
         } else {
           db.prepare(`
 INSERT INTO crypto_ai_analysis_queue (
-  analysis_id, cache_key, chain, contract_address, snapshot_fingerprint, prompt_version, narrative_contract_version, provider_wire_schema_version, model_id,
+  analysis_id, cache_key, chain, contract_address, snapshot_fingerprint, prompt_version, narrative_contract_version, semantic_policy_version, provider_wire_schema_version, model_id,
   analysis_schema_version, locale, status, requested_at, queued_at, attempt_count, result_json,
   validation_status, safe_error_code, prompt_tokens, completion_tokens, total_tokens, latency_ms,
   provider_response_id, provider_attempt_count, provider_attempt_started_at, provider_attempt_completed_at,
   provider_attempt_status, provider_attempt_safe_error_code, failure_stage, lease_owner, lease_expires_at, created_at, updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'QUEUED', ?, ?, 0, NULL, 'PENDING', NULL, 0, 0, 0, NULL, NULL, 0, NULL, NULL, 'NOT_ATTEMPTED', NULL, NULL, NULL, NULL, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'QUEUED', ?, ?, 0, NULL, 'PENDING', NULL, 0, 0, 0, NULL, NULL, 0, NULL, NULL, 'NOT_ATTEMPTED', NULL, NULL, NULL, NULL, ?, ?)
 `).run(
             `air_${randomUUID()}`,
             input.identity.cache_key,
@@ -341,6 +347,7 @@ INSERT INTO crypto_ai_analysis_queue (
             input.identity.snapshot_fingerprint,
             input.identity.prompt_version,
             input.identity.narrative_contract_version,
+            input.identity.semantic_policy_version,
             input.identity.provider_wire_schema_version,
             input.identity.model_id,
             input.identity.analysis_schema_version,
@@ -565,6 +572,7 @@ SELECT * FROM crypto_ai_analysis_queue WHERE analysis_id = ? AND status = 'PROCE
           snapshot_fingerprint: brief.snapshot_fingerprint,
           prompt_version: brief.prompt_version,
           narrative_contract_version: owned.narrative_contract_version ?? "legacy",
+          semantic_policy_version: owned.semantic_policy_version ?? "legacy",
           provider_wire_schema_version: owned.provider_wire_schema_version ?? "legacy",
           model_id: brief.model,
           analysis_schema_version: brief.schema_version,
@@ -811,6 +819,7 @@ CREATE TABLE IF NOT EXISTS crypto_ai_analysis_queue (
   snapshot_fingerprint TEXT NOT NULL,
   prompt_version TEXT NOT NULL,
   narrative_contract_version TEXT,
+  semantic_policy_version TEXT,
   provider_wire_schema_version TEXT,
   model_id TEXT NOT NULL,
   analysis_schema_version TEXT NOT NULL,
@@ -892,6 +901,7 @@ PRAGMA user_version = 1;
 `);
   ensureQueueColumn(database, "provider_attempt_count", "INTEGER NOT NULL DEFAULT 0 CHECK (provider_attempt_count >= 0)");
   ensureQueueColumn(database, "narrative_contract_version", "TEXT");
+  ensureQueueColumn(database, "semantic_policy_version", "TEXT");
   ensureQueueColumn(database, "provider_wire_schema_version", "TEXT");
   ensureQueueColumn(database, "provider_attempt_started_at", "TEXT");
   ensureQueueColumn(database, "provider_attempt_completed_at", "TEXT");
@@ -911,7 +921,7 @@ PRAGMA user_version = 1;
   ensureQueueColumn(database, "internal_provider_failure_phase", "TEXT");
   ensureQueueColumn(database, "internal_provider_request_id", "TEXT");
   ensureQueueColumn(database, "failure_stage", "TEXT CHECK (failure_stage IN ('CONTEXT_BUILD','IDENTITY_CHECK','CIRCUIT','PROVIDER_CALL','PROVIDER_RESPONSE','PROVIDER_PARSE','HYDRATE','STORE_COMPLETE','USAGE_RECORD','UNKNOWN'))");
-  database.exec("PRAGMA user_version = 6");
+  database.exec("PRAGMA user_version = 7");
 }
 
 function ensureQueueColumn(database: SqliteDatabase, name: string, definition: string): void {
@@ -923,7 +933,7 @@ function assertSchema(database: SqliteDatabase): void {
   const columns = database.prepare("PRAGMA table_info(crypto_ai_analysis_queue)").all();
   const names = new Set(columns.map((row) => isRecord(row) ? row.name : null));
   const required = [
-    "analysis_id", "cache_key", "chain", "contract_address", "snapshot_fingerprint", "prompt_version", "narrative_contract_version", "provider_wire_schema_version",
+    "analysis_id", "cache_key", "chain", "contract_address", "snapshot_fingerprint", "prompt_version", "narrative_contract_version", "semantic_policy_version", "provider_wire_schema_version",
     "model_id", "analysis_schema_version", "status", "requested_at", "queued_at", "started_at", "completed_at",
     "failed_at", "next_retry_at", "attempt_count", "result_json", "validation_status", "safe_error_code",
     "prompt_tokens", "completion_tokens", "total_tokens", "latency_ms", "provider_response_id",
@@ -945,6 +955,7 @@ function safeRecord(value: unknown): AIAnalysisQueueRecord | null {
     || typeof value.snapshot_fingerprint !== "string"
     || typeof value.prompt_version !== "string"
     || (value.narrative_contract_version !== null && typeof value.narrative_contract_version !== "string")
+    || (value.semantic_policy_version !== null && typeof value.semantic_policy_version !== "string")
     || (value.provider_wire_schema_version !== null && typeof value.provider_wire_schema_version !== "string")
     || typeof value.model_id !== "string"
     || typeof value.analysis_schema_version !== "string"
@@ -960,6 +971,7 @@ function safeRecord(value: unknown): AIAnalysisQueueRecord | null {
     snapshot_fingerprint: value.snapshot_fingerprint,
     prompt_version: value.prompt_version,
     narrative_contract_version: stringField(value.narrative_contract_version),
+    semantic_policy_version: stringField(value.semantic_policy_version),
     provider_wire_schema_version: stringField(value.provider_wire_schema_version),
     model_id: value.model_id,
     analysis_schema_version: value.analysis_schema_version,
@@ -1021,13 +1033,14 @@ function findLastKnownGood(
   const rows = database.prepare(`
 SELECT * FROM crypto_ai_analysis_queue
 WHERE chain = ? AND contract_address = ? AND prompt_version = ?
-  AND narrative_contract_version = ? AND provider_wire_schema_version = ? AND model_id = ? AND analysis_schema_version = ? AND result_json IS NOT NULL AND validation_status = 'VALID'
+  AND narrative_contract_version = ? AND semantic_policy_version = ? AND provider_wire_schema_version = ? AND model_id = ? AND analysis_schema_version = ? AND result_json IS NOT NULL AND validation_status = 'VALID'
 ORDER BY completed_at DESC LIMIT 20
 `).all(
     identity.chain,
     identity.contract_address,
     identity.prompt_version,
     identity.narrative_contract_version,
+    identity.semantic_policy_version,
     identity.provider_wire_schema_version,
     identity.model_id,
     identity.analysis_schema_version,

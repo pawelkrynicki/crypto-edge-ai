@@ -91,6 +91,7 @@ describe("AI Research canonical identity, fingerprint and input boundary", () =>
     assert.notEqual(cacheIdentity(ADDRESS, "b".repeat(64)).cache_key, base.cache_key);
     assert.notEqual(cacheIdentity(ADDRESS, "a".repeat(64), { prompt_version: "ai_research_prompt_v3" }).cache_key, base.cache_key);
     assert.notEqual(cacheIdentity(ADDRESS, "a".repeat(64), { narrative_contract_version: "ai_research_narrative_v3" }).cache_key, base.cache_key);
+    assert.notEqual(cacheIdentity(ADDRESS, "a".repeat(64), { semantic_policy_version: "ai_research_semantic_policy_v1" }).cache_key, base.cache_key);
     assert.notEqual(cacheIdentity(ADDRESS, "a".repeat(64), { model_id: "different-model" }).cache_key, base.cache_key);
     assert.notEqual(cacheIdentity(ADDRESS, "a".repeat(64), { analysis_schema_version: "ai_research_brief_v1" }).cache_key, base.cache_key);
   });
@@ -100,7 +101,7 @@ describe("AI Research v2 brief and v5 bilingual prompt contract", () => {
   it("accepts bounded narrative only and rejects skeleton changes, invented facts and unsafe advice", async () => {
     const value = await context("base", ADDRESS, "pl");
     const valid = narrative(value);
-    assert.equal(parseAIResearchProviderNarrative(JSON.stringify(valid), value).narrative_version, "ai_research_narrative_v4");
+    assert.equal(parseAIResearchProviderNarrative(JSON.stringify(valid), value).narrative_version, "ai_research_narrative_v5");
     assert.throws(() => parseAIResearchProviderNarrative("not-json", value), (error) => error instanceof AIResearchValidationError && error.code === "INVALID_JSON");
     const advice = structuredClone(valid);
     advice.summary.pl = "Kup token teraz.";
@@ -109,7 +110,7 @@ describe("AI Research v2 brief and v5 bilingual prompt contract", () => {
     invented.summary.pl = "Wartość 999999 wymaga weryfikacji.";
     assert.throws(() => parseAIResearchProviderNarrative(JSON.stringify(invented), value), /UNKNOWN_FACT/);
     const reordered = structuredClone(valid);
-    reordered.action_narratives.reverse();
+    reordered.fact_narratives.reverse();
     assert.throws(() => parseAIResearchProviderNarrative(JSON.stringify(reordered), value), /SKELETON_MISMATCH/);
   });
 
@@ -177,7 +178,7 @@ describe("AI Research v2 brief and v5 bilingual prompt contract", () => {
     const value = await context("base", ADDRESS, "pl");
     const brief = buildDeterministicPreview(value, NOW);
     assert.equal(brief.schema_version, "ai_research_brief_v2");
-    assert.equal(brief.prompt_version, "ai_research_prompt_v5");
+    assert.equal(brief.prompt_version, "ai_research_prompt_v6");
     assert.equal(brief.research_state, value.research_state);
     assert.deepEqual(brief.risk_factors.map(({ severity }) => severity), value.risk_candidates.map(({ severity }) => severity));
     assert.equal(brief.next_actions.some(({ action_type }) => action_type === "OWNER_REVIEW"), value.action_catalog.some(({ action_type }) => action_type === "OWNER_REVIEW"));
@@ -210,14 +211,15 @@ describe("AI Research v2 brief and v5 bilingual prompt contract", () => {
 function cacheIdentity(
   address: string,
   fingerprint: string,
-  overrides: Partial<{ prompt_version: string; narrative_contract_version: string; model_id: string; analysis_schema_version: string }> = {},
+  overrides: Partial<{ prompt_version: string; narrative_contract_version: string; semantic_policy_version: string; model_id: string; analysis_schema_version: string }> = {},
 ) {
   return buildAIAnalysisCacheIdentity({
     chain: "base",
     contract_address: address,
     snapshot_fingerprint: fingerprint,
-    prompt_version: overrides.prompt_version ?? "ai_research_prompt_v5",
-    narrative_contract_version: overrides.narrative_contract_version ?? "ai_research_narrative_v4",
+    prompt_version: overrides.prompt_version ?? "ai_research_prompt_v6",
+    narrative_contract_version: overrides.narrative_contract_version ?? "ai_research_narrative_v5",
+    semantic_policy_version: overrides.semantic_policy_version ?? "ai_research_semantic_policy_v2",
     model_id: overrides.model_id ?? "gpt-5-mini",
     analysis_schema_version: overrides.analysis_schema_version ?? "ai_research_brief_v2",
     locale: "pl",
@@ -239,13 +241,11 @@ function contextOptions() {
 function narrative(ctx: AIResearchContext) {
   const slot = (entry: { id: string; allowed_support_ids: string[] }, en: string, pl: string) => ({ id: entry.id, support_ids: [entry.allowed_support_ids[0]!], en, pl });
   return {
-    narrative_version: "ai_research_narrative_v4" as const,
+    narrative_version: "ai_research_narrative_v5" as const,
     summary: slot(ctx.narrative_contract.slots.summary, "Recorded evidence identifies the current research focus and the current verification boundary.", "Zapisane dane wskazują obecny cel analizy i granicę bieżącej weryfikacji."),
     fact_narratives: ctx.narrative_contract.slots.facts.map((entry) => slot(entry, "This recorded fact adds context to the research view.", "Ten zapisany fakt uzupełnia obecną analizę.")),
-    risk_narratives: ctx.narrative_contract.slots.risks.map((entry) => slot(entry, "This recorded risk needs verification against the listed evidence.", "To zapisane ryzyko wymaga sprawdzenia względem wskazanych danych.")),
+    risk_narratives: ctx.narrative_contract.slots.risks.map((entry) => slot(entry, "This recorded risk remains part of the listed evidence context.", "To zapisane ryzyko pozostaje częścią wskazanego kontekstu danych.")),
     missing_narratives: ctx.narrative_contract.slots.missing_information.map((entry) => slot(entry, "This evidence gap limits the current research view.", "Ta luka w danych ogranicza obecną analizę.")),
-    action_narratives: ctx.narrative_contract.slots.actions.map((entry) => slot(entry, "The fixed action addresses the current evidence gap.", "Stałe działanie dotyczy bieżącej luki w danych.")),
-    status_change_narratives: ctx.narrative_contract.slots.status_change_conditions.map((entry) => slot(entry, "This condition would justify reviewing the research view.", "Ten warunek uzasadnia ponowne sprawdzenie analizy.")),
   };
 }
 
@@ -257,13 +257,11 @@ function maximumLengthNarrative(ctx: AIResearchContext) {
   const plItem = text("Zapisane dane wymagają dokładnej weryfikacji. ", 280);
   const slot = (entry: { id: string; allowed_support_ids: string[] }, en: string, pl: string) => ({ id: entry.id, support_ids: [entry.allowed_support_ids[0]!], en: `${en.slice(0, -1)}.`, pl: `${pl.slice(0, -1)}.` });
   return {
-    narrative_version: "ai_research_narrative_v4" as const,
+    narrative_version: "ai_research_narrative_v5" as const,
     summary: slot(ctx.narrative_contract.slots.summary, enSummary, plSummary),
     fact_narratives: ctx.narrative_contract.slots.facts.map((entry) => slot(entry, enItem, plItem)),
     risk_narratives: ctx.narrative_contract.slots.risks.map((entry) => slot(entry, enItem, plItem)),
     missing_narratives: ctx.narrative_contract.slots.missing_information.map((entry) => slot(entry, enItem, plItem)),
-    action_narratives: ctx.narrative_contract.slots.actions.map((entry) => slot(entry, enItem, plItem)),
-    status_change_narratives: ctx.narrative_contract.slots.status_change_conditions.map((entry) => slot(entry, enItem, plItem)),
   };
 }
 

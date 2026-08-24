@@ -1,10 +1,10 @@
 /**
- * v4 makes the narrative a closed, evidence-bound presentation layer.  The
+ * v5 makes the narrative a closed, evidence-bound presentation layer.  The
  * provider writes only prose for server-issued slots; it does not own facts,
  * risks, actions, targets, priorities, conditions, sources, or playbook
  * progression.
  */
-export const AI_RESEARCH_NARRATIVE_VERSION = "ai_research_narrative_v4" as const;
+export const AI_RESEARCH_NARRATIVE_VERSION = "ai_research_narrative_v5" as const;
 
 export type AIResearchNarrativeKind = "fact" | "risk" | "missing" | "action" | "condition";
 

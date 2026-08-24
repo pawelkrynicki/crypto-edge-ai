@@ -31,13 +31,24 @@ const NOW = new Date("2026-08-11T12:00:00.000Z");
 after(async () => { await rm(root, { recursive: true, force: true }); });
 
 describe("PC.2 shared production AI path", () => {
-  it("fan-outs one normalized analysis across 100 users and serves 500 mixed READY reads without another AI call", async () => {
+  it("shares one v6 cold job and warm result across 100 isolated user contexts", async () => {
     await writeFixture(100_000);
     const store = await createAIAnalysisQueueStore({ databaseFilePath: resolve(root, "concurrency.sqlite") });
     let calls = 0;
     const service = createService(store);
-    const requests = await Promise.all(Array.from({ length: 100 }, (_, index) => (
-      service.generate(request(index % 2 === 0 ? "pl" : "en", `pc2_mixed_request_${index.toString().padStart(4, "0")}`), `camp-user-${index}`)
+    const users = Array.from({ length: 100 }, (_, index) => ({
+      actor_id: `camp-user-${index.toString().padStart(3, "0")}`,
+      session_id: `pc2-v6-session-${index.toString().padStart(3, "0")}`,
+      private_workspace: `private-workspace-${index.toString().padStart(3, "0")}`,
+      role_context: `camp-context-${index.toString().padStart(3, "0")}`,
+      locale: index < 50 ? "pl" as const : "en" as const,
+    }));
+    assert.equal(new Set(users.map(({ actor_id }) => actor_id)).size, 100);
+    assert.equal(new Set(users.map(({ session_id }) => session_id)).size, 100);
+    assert.equal(new Set(users.map(({ private_workspace }) => private_workspace)).size, 100);
+    assert.equal(new Set(users.map(({ role_context }) => role_context)).size, 100);
+    const requests = await Promise.all(users.map((user, index) => (
+      service.generate(request(user.locale, `pc2_mixed_request_${index.toString().padStart(4, "0")}`), user.session_id)
     )));
     assert.equal(store.stats().records, 1);
     assert.equal(requests.filter((item) => item.request_outcome === "QUEUED").length, 1);
@@ -49,15 +60,29 @@ describe("PC.2 shared production AI path", () => {
       provider: provider(async (context) => { calls += 1; return JSON.stringify(narrative(context)); }),
       now: () => NOW,
     });
-    assert.equal((await worker.runCycle()).completed, 1);
+    const coldCycle = await worker.runCycle();
+    assert.equal(coldCycle.claimed, 1);
+    assert.equal(coldCycle.completed, 1);
     assert.equal(calls, 1);
 
-    const reads = await Promise.all(Array.from({ length: 500 }, (_, index) => service.getBrief("base", ADDRESS, index % 2 === 0 ? "pl" : "en")));
+    const reads = await Promise.all(users.map((user) => service.getBrief("base", ADDRESS, user.locale)));
     assert.equal(reads.every((item) => item.availability === "READY"), true);
     assert.equal(new Set(reads.map((item) => item.brief?.analysis_id)).size, 1);
     assert.equal(calls, 1, "cache reads must not invoke a provider");
-    assert.equal((await service.getBrief("base", ADDRESS, "en")).availability, "READY", "locale is not a second analysis key");
+    assert.equal(store.stats().queued + store.stats().processing, 0);
     assert.equal(store.stats().records, 1);
+    const warmRequests = await Promise.all(users.map((user, index) => (
+      service.generate(request(user.locale, `pc2_v6_warm_request_${index.toString().padStart(4, "0")}`), user.session_id)
+    )));
+    assert.equal(warmRequests.every((item) => item.request_outcome === "READY"), true);
+    const warmCycle = await worker.runCycle();
+    assert.equal(warmCycle.claimed, 0);
+    assert.equal(warmCycle.provider_calls, 0);
+    assert.equal(calls, 1);
+    const plBrief = reads.find((item) => item.brief && users[reads.indexOf(item)]!.locale === "pl")!.brief!;
+    const enBrief = reads.find((item) => item.brief && users[reads.indexOf(item)]!.locale === "en")!.brief!;
+    assert.deepEqual(plBrief.known_facts.map(({ key, value }) => ({ key, value })), enBrief.known_facts.map(({ key, value }) => ({ key, value })));
+    assert.deepEqual(plBrief.next_actions.map(({ action_type, priority, target_reference }) => ({ action_type, priority, target_reference })), enBrief.next_actions.map(({ action_type, priority, target_reference }) => ({ action_type, priority, target_reference })));
     store.close();
   });
 
@@ -101,13 +126,8 @@ describe("PC.2 shared production AI path", () => {
         const result = narrative(context);
         result.summary = {
           ...result.summary,
-          en: "Unique provider interpretation explains why the recorded liquidity context still needs security verification.",
-          pl: "Unikalna interpretacja dostawcy wyjaśnia, dlaczego zapisany kontekst płynności nadal wymaga weryfikacji bezpieczeństwa.",
-        };
-        result.status_change_narratives[0] = {
-          ...result.status_change_narratives[0]!,
-          en: "Unique provider reassessment signal identifies the recorded condition that should trigger another review.",
-          pl: "Unikalny sygnał dostawcy wskazuje zapisany warunek, po którym warto wrócić do analizy.",
+          en: "Unique provider interpretation explains that the recorded liquidity context has incomplete security evidence.",
+          pl: "Unikalna interpretacja dostawcy wyjaśnia, że zapisany kontekst płynności ma niepełne dane bezpieczeństwa.",
         };
         return JSON.stringify(result);
       }),
@@ -117,8 +137,8 @@ describe("PC.2 shared production AI path", () => {
     const en = presentAIProductionLookup(await service.getBrief("base", ADDRESS, "en"), "en");
     assert.match(en.analysis?.analysis_summary ?? "", /Unique provider interpretation/);
     assert.match(pl.analysis?.analysis_summary ?? "", /Unikalna interpretacja dostawcy/);
-    assert.match(en.analysis?.reassessment_signals[0]?.detail ?? "", /Unique provider reassessment signal/);
-    assert.match(pl.analysis?.reassessment_signals[0]?.detail ?? "", /Unikalny sygnał dostawcy/);
+    assert.ok((en.analysis?.reassessment_signals[0]?.detail ?? "").length > 0);
+    assert.ok((pl.analysis?.reassessment_signals[0]?.detail ?? "").length > 0);
     store.close();
   });
 
@@ -330,7 +350,7 @@ async function assertLocaleOrder(firstLocale: "pl" | "en", secondLocale: "pl" | 
 function cacheIdentity(context: AIResearchContext) {
   return buildAIAnalysisCacheIdentity({
     ...context.identity, snapshot_fingerprint: context.snapshot_fingerprint, prompt_version: context.prompt_version,
-    narrative_contract_version: "ai_research_narrative_v4",
+    narrative_contract_version: "ai_research_narrative_v5",
     model_id: "gpt-5-mini", analysis_schema_version: "ai_research_brief_v2", locale: context.locale,
   });
 }
@@ -347,13 +367,11 @@ function provider(generate: (context: AIResearchContext) => Promise<string>): AI
 function narrative(context: AIResearchContext) {
   const slot = (entry: { id: string; allowed_support_ids: string[] }, en: string, pl: string) => ({ id: entry.id, support_ids: [entry.allowed_support_ids[0]!], en, pl });
   return {
-    narrative_version: "ai_research_narrative_v4",
-    summary: slot(context.narrative_contract.slots.summary, "The recorded snapshot gives market context while evidence gaps still need verification.", "Zapisana migawka daje kontekst rynkowy, ale luki w danych nadal wymagają sprawdzenia."),
+    narrative_version: "ai_research_narrative_v5",
+    summary: slot(context.narrative_contract.slots.summary, "The recorded snapshot gives market context while evidence gaps remain in the current evidence set.", "Zapisana migawka daje kontekst rynkowy, a luki pozostają w obecnym zestawie danych."),
     fact_narratives: context.narrative_contract.slots.facts.map((entry) => slot(entry, "This recorded fact adds context to the research view.", "Ten zapisany fakt uzupełnia obecną analizę.")),
-    risk_narratives: context.narrative_contract.slots.risks.map((entry) => slot(entry, "This recorded risk needs verification against the listed evidence.", "To zapisane ryzyko wymaga sprawdzenia względem wskazanych danych.")),
+    risk_narratives: context.narrative_contract.slots.risks.map((entry) => slot(entry, "This recorded risk remains part of the listed evidence context.", "To zapisane ryzyko pozostaje częścią wskazanego kontekstu danych.")),
     missing_narratives: context.narrative_contract.slots.missing_information.map((entry) => slot(entry, "This evidence gap limits the current research view.", "Ta luka w danych ogranicza obecną analizę.")),
-    action_narratives: context.narrative_contract.slots.actions.map((entry) => slot(entry, "The fixed action addresses the current evidence gap.", "Stałe działanie dotyczy bieżącej luki w danych.")),
-    status_change_narratives: context.narrative_contract.slots.status_change_conditions.map((entry) => slot(entry, "This condition would justify reviewing the research view.", "Ten warunek uzasadnia ponowne sprawdzenie analizy.")),
   };
 }
 

@@ -30,6 +30,7 @@ import {
   buildAIResearchNarrativeContract,
   type AIResearchNarrativeContract,
 } from "./aiResearchNarrativeContract.js";
+import { AI_RESEARCH_SEMANTIC_POLICY_VERSION } from "./aiResearchSemanticPolicy.js";
 import { readFollowUpList, readFollowUpStatus, type FollowUpApiOptions } from "./followUpApi.js";
 import { readLatestScannerOutput, type LatestScannerOutputOptions } from "./latestScannerOutput.js";
 import { readReportsList, type ReportsLibraryOptions } from "./reportsLibrary.js";
@@ -271,7 +272,9 @@ export async function buildAIResearchContext(
     guidance,
     narrative_contract: narrativeContract,
     provider_context: {
+      prompt_version: AI_RESEARCH_PROMPT_VERSION,
       contract_version: AI_RESEARCH_NARRATIVE_VERSION,
+      semantic_policy_version: AI_RESEARCH_SEMANTIC_POLICY_VERSION,
       locale,
       project_fields_are_untrusted_data: { symbol, name },
       deterministic_state_label: presentResearchState(researchState, locale),
@@ -292,14 +295,6 @@ export async function buildAIResearchContext(
         missing_information: missingInformation.map((item) => ({
           id: aiResearchNarrativeId("missing", item.key),
           label: item.label,
-        })),
-        actions: actionCatalog.map((action, index) => ({
-          id: aiResearchNarrativeId("action", index),
-          label: action.label,
-        })),
-        status_change_conditions: statusChangeConditions.map((condition) => ({
-          id: aiResearchNarrativeId("condition", condition.key),
-          label: condition.label,
         })),
       },
     },

@@ -1229,13 +1229,11 @@ function mockProvider(generateJson: (context: AIResearchContext) => Promise<stri
 function validNarrative(context: AIResearchContext) {
   const slot = (entry: { id: string; allowed_support_ids: string[] }, en: string, pl: string) => ({ id: entry.id, support_ids: [entry.allowed_support_ids[0]!], en, pl });
   return {
-    narrative_version: "ai_research_narrative_v4",
-    summary: slot(context.narrative_contract.slots.summary, "The recorded snapshot gives market context while evidence gaps still need verification.", "Zapisana migawka daje kontekst rynkowy, ale luki w danych nadal wymagają sprawdzenia."),
+    narrative_version: "ai_research_narrative_v5",
+    summary: slot(context.narrative_contract.slots.summary, "The recorded snapshot gives market context while evidence gaps remain in the current evidence set.", "Zapisana migawka daje kontekst rynkowy, a luki pozostają w obecnym zestawie danych."),
     fact_narratives: context.narrative_contract.slots.facts.map((entry) => slot(entry, "This recorded fact adds context to the research view.", "Ten zapisany fakt uzupełnia obecną analizę.")),
-    risk_narratives: context.narrative_contract.slots.risks.map((entry) => slot(entry, "Recorded risk needs review.", "Zapisane ryzyko wymaga sprawdzenia.")),
+    risk_narratives: context.narrative_contract.slots.risks.map((entry) => slot(entry, "Recorded risk remains part of the current evidence context.", "Zapisane ryzyko pozostaje częścią obecnego kontekstu danych.")),
     missing_narratives: context.narrative_contract.slots.missing_information.map((entry) => slot(entry, "This evidence gap limits the current research view.", "Ta luka w danych ogranicza obecną analizę.")),
-    action_narratives: context.narrative_contract.slots.actions.map((entry) => slot(entry, "The fixed action addresses the current evidence gap.", "Stałe działanie dotyczy bieżącej luki w danych.")),
-    status_change_narratives: context.narrative_contract.slots.status_change_conditions.map((entry) => slot(entry, "This condition would justify revisiting the research view.", "Ten warunek uzasadnia ponowne sprawdzenie analizy.")),
   };
 }
 
