@@ -102,7 +102,7 @@ import {
 import type { ManualVerificationVerdict } from "../../data-poc/src/followUpBasket.js";
 import type { LifecycleCycleReceipt } from "../../data-poc/src/systemLifecycle.js";
 import { createLifecycleService, LifecycleServiceError, parseRadarCursor } from "./lifecycleService.js";
-import { createPc1SessionContextService } from "./lifecycleSession.js";
+import { createPc1SessionContextService, type Pc1ActorRole } from "./lifecycleSession.js";
 import { getDefaultUserWorkspaceDatabasePath, type UserWorkspaceRepository } from "./userWorkspaceRepository.js";
 import {
   createResearchEvidenceRepository,
@@ -154,6 +154,7 @@ export type ScannerApiHandlerOptions = {
     cycleReceiptPath?: string;
     workspaceDatabasePath?: string;
     workspace?: UserWorkspaceRepository;
+    defaultSessionRole?: Pc1ActorRole;
   };
   researchEvidence?: {
     databaseFilePath?: string;
@@ -269,7 +270,7 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
   const presentResearchLookup = async (chain: string, contractAddress: string, locale: "pl" | "en") => presentResearchLookupValue(
     await aiResearchService.getBrief(chain, contractAddress, locale), chain, contractAddress, locale,
   );
-  const pc1Sessions = createPc1SessionContextService();
+  const pc1Sessions = createPc1SessionContextService({ defaultRole: options.lifecycle?.defaultSessionRole });
   const lifecycle = createLifecycleService({
     scanner: scannerOptions,
     followUpStorePath: options.followUp?.storePath,
@@ -991,6 +992,12 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
     }
 
     if (req.method === "GET" && path === "/api/control-center/status") {
+      const session = pc1Sessions.resolve(req);
+      if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
+      if (!isOperationalControlCenterRole(session.context.role)) {
+        sendJson(req, res, 403, { error: "control_center_forbidden" }, runtimeMode);
+        return;
+      }
       const [scanner, context, automation, establishedUniverse, reviewStorage, reportsLibrary, followUp, feedback] = await Promise.all([
         getReadinessEntry(() => readLatestScannerOutput(scannerOptions)),
         getReadinessEntry(() => readLatestContextOutput(contextOptions)),
@@ -2440,6 +2447,10 @@ function isPc1ReviewRequest(req: IncomingMessage): boolean {
 }
 
 function isReviewDiagnosticsRole(role: "TRUSTED_TESTER" | "CAMP_USER" | "OWNER" | "ADMIN"): boolean {
+  return role === "OWNER" || role === "ADMIN";
+}
+
+function isOperationalControlCenterRole(role: Pc1ActorRole): boolean {
   return role === "OWNER" || role === "ADMIN";
 }
 

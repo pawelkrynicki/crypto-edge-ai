@@ -10,6 +10,7 @@ set "OWNER_OPERATIONS_REVIEW=0"
 set "ESTABLISHED_PROMOTION_REVIEW=0"
 set "RUN_CHECK=0"
 set "OPEN_BROWSER=1"
+set "REVIEW_ACTOR=CAMP_USER"
 
 :parse_args
 if "%~1"=="" goto args_done
@@ -26,6 +27,9 @@ goto parse_args
 
 :args_done
 if "%ESTABLISHED_PROMOTION_REVIEW%"=="1" set "RADAR_VIEW=candidate-detail"
+if /i "%RADAR_VIEW%"=="control-center" set "REVIEW_ACTOR=OWNER"
+if "%OWNER_OPERATIONS_REVIEW%"=="1" set "REVIEW_ACTOR=OWNER"
+if "%ESTABLISHED_PROMOTION_REVIEW%"=="1" set "REVIEW_ACTOR=OWNER"
 if "%OWNER_OPERATIONS_REVIEW%"=="1" if /i not "%RADAR_VIEW%"=="control-center" if /i not "%RADAR_VIEW%"=="feedback" (
   echo ERROR: --owner-operations-review wymaga --control-center albo --feedback.
   exit /b 1
@@ -38,7 +42,7 @@ set "RADAR_URL=http://127.0.0.1:5173/#!RADAR_VIEW!"
 set "HAS_SCANNER_OUTPUT=0"
 set "CRYPTO_EDGE_RUNTIME_MODE=INTERNAL_BETA"
 set "SCANNER_API_PORT=5177"
-set "CRYPTO_EDGE_PC1_REVIEW_DEFAULT_ACTOR=CAMP_USER"
+set "CRYPTO_EDGE_PC1_REVIEW_DEFAULT_ACTOR=%REVIEW_ACTOR%"
 set "CRYPTO_EDGE_OWNER_OPERATIONS_MODE=DISABLED"
 if "%OWNER_OPERATIONS_REVIEW%"=="1" set "CRYPTO_EDGE_OWNER_OPERATIONS_MODE=REVIEW_SAFE"
 if "%ESTABLISHED_PROMOTION_REVIEW%"=="1" set "CRYPTO_EDGE_OWNER_OPERATIONS_MODE=REVIEW_SAFE"
@@ -47,6 +51,7 @@ echo.
 echo === Crypto Edge AI: Product Radar owner review ===
 echo Repo root: %REPO_ROOT%
 echo Runtime: INTERNAL_BETA
+echo Session role: %CRYPTO_EDGE_PC1_REVIEW_DEFAULT_ACTOR%
 echo Owner operations: %CRYPTO_EDGE_OWNER_OPERATIONS_MODE%
 
 if not exist "%UI_DIR%\node_modules\.bin\tsx.cmd" (

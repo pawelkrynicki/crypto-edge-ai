@@ -430,6 +430,7 @@ describe("Control Center read-only API", () => {
       },
       reviewSessionProvider: reviewProvider,
       health: { buildSha: "control-center-test" },
+      lifecycle: { defaultSessionRole: "OWNER" },
     });
     await listen(server);
     try {
@@ -466,6 +467,34 @@ describe("Control Center read-only API", () => {
       }
     } finally {
       await close(server);
+    }
+  });
+
+  it("permits operational Control Center reads only for server-resolved OWNER and ADMIN sessions", async () => {
+    const server = createScannerApiServer({ runtimeMode: "DEVELOPMENT_DEMO" });
+    await listen(server);
+    try {
+      const trusted = await requestRaw(server, "GET", "/api/control-center/status");
+      assert.equal(trusted.status, 403, trusted.body);
+      assert.equal(JSON.parse(trusted.body).error, "control_center_forbidden");
+
+      const campSession = await requestRaw(server, "POST", "/api/lifecycle/review-session/camp-user");
+      const camp = await requestRaw(server, "GET", "/api/control-center/status", { cookie: sessionCookie(campSession) });
+      assert.equal(camp.status, 403, camp.body);
+
+      const ownerSession = await requestRaw(server, "POST", "/api/lifecycle/review-session/owner");
+      const owner = await requestRaw(server, "GET", "/api/control-center/status", { cookie: sessionCookie(ownerSession) });
+      assert.equal(owner.status, 200, owner.body);
+    } finally {
+      await close(server);
+    }
+
+    const adminServer = createScannerApiServer({ runtimeMode: "DEVELOPMENT_DEMO", lifecycle: { defaultSessionRole: "ADMIN" } });
+    await listen(adminServer);
+    try {
+      assert.equal((await requestRaw(adminServer, "GET", "/api/control-center/status")).status, 200);
+    } finally {
+      await close(adminServer);
     }
   });
 
@@ -665,18 +694,27 @@ function requestRaw(
   server: ReturnType<typeof createScannerApiServer>,
   method: string,
   path: string,
-): Promise<{ status: number; body: string }> {
+  headers: Record<string, string> = {},
+): Promise<{ status: number; body: string; headers: Record<string, string | string[] | undefined> }> {
   const port = (server.address() as AddressInfo).port;
   return new Promise((resolveRequest, rejectRequest) => {
-    const req = request({ hostname: "127.0.0.1", port, method, path }, (res) => {
+    const req = request({ hostname: "127.0.0.1", port, method, path, headers }, (res) => {
       const chunks: Buffer[] = [];
       res.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
       res.on("end", () => resolveRequest({
         status: res.statusCode ?? 0,
         body: Buffer.concat(chunks).toString("utf8"),
+        headers: res.headers,
       }));
     });
     req.once("error", rejectRequest);
     req.end();
   });
+}
+
+function sessionCookie(response: { headers: Record<string, string | string[] | undefined> }): string {
+  const value = response.headers["set-cookie"];
+  const entry = Array.isArray(value) ? value[0] : value;
+  assert.ok(entry, "session cookie missing");
+  return entry.split(";", 1)[0]!;
 }

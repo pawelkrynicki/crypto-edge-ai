@@ -91,6 +91,27 @@ const HASH_TO_SECTION: Record<string, ProductSectionId> = {
   "#methodology": "methodology",
   "#control-center": "control-center",
 };
+
+export function canAccessOperationalControlCenter(role: LifecycleRadarView["actor"]["role"] | undefined): boolean {
+  return role === "OWNER" || role === "ADMIN";
+}
+
+export function resolveProductSectionForRole(
+  section: ProductSectionId,
+  role: LifecycleRadarView["actor"]["role"] | undefined,
+): ProductSectionId {
+  return section === "control-center" && role !== undefined && !canAccessOperationalControlCenter(role)
+    ? "candidate-results"
+    : section;
+}
+
+export function getProductNavItemsForRole(
+  navItems: ProductNavItem[],
+  role: LifecycleRadarView["actor"]["role"] | undefined,
+): ProductNavItem[] {
+  return navItems.filter((item) => item.id !== "control-center" || canAccessOperationalControlCenter(role));
+}
+
 type RadarBasketId = "new_emerging" | "maturing" | "established";
 
 const SECTION_TO_HASH: Record<ProductSectionId, string> = {
@@ -244,6 +265,9 @@ export function ProductAppContent({
     lifecycleRadar,
   } = productView;
 
+  const operationalRole = lifecycleRadar?.actor.role;
+  const controlCenterAllowed = canAccessOperationalControlCenter(operationalRole);
+
   const navItems = useMemo<ProductNavItem[]>(() => [
     { id: "candidate-results", label: t("nav.radar"), icon: "R", description: t("nav.radarDescription"), groupLabel: t("nav.groupProductFlow"), groupDescription: t("nav.groupProductFlowDescription") },
     { id: "candidate-detail", label: t("nav.details"), icon: "D", description: t("nav.detailsDescription"), groupLabel: t("nav.groupProductFlow"), groupDescription: t("nav.groupProductFlowDescription") },
@@ -253,6 +277,10 @@ export function ProductAppContent({
     { id: "methodology", label: t("nav.methodology"), icon: "M", description: t("nav.methodologyDescription"), groupLabel: t("nav.groupStatus"), groupDescription: t("nav.groupStatusDescription") },
     { id: "control-center", label: t("nav.controlCenter"), icon: "C", description: t("nav.controlCenterDescription"), groupLabel: t("nav.groupStatus"), groupDescription: t("nav.groupStatusDescription") },
   ], [t]);
+  const visibleNavItems = useMemo(
+    () => getProductNavItemsForRole(navItems, operationalRole),
+    [navItems, operationalRole],
+  );
 
   const sectionCopy = useMemo<Record<ProductSectionId, { title: string; description: string }>>(() => ({
     "candidate-results": { title: t("nav.radar"), description: t("section.radarDescription") },
@@ -320,14 +348,22 @@ export function ProductAppContent({
     const refresh = (async () => {
       setLoading(true);
 
-      const [scannerResult, readinessResult, automationResult, universeStatusResult, controlCenterResult, lifecycleRadarResult] = await Promise.all([
+      const [scannerResult, readinessResult, automationResult, universeStatusResult, lifecycleRadarResult] = await Promise.all([
         dataSources.loadScanner({ runtimeMode }),
         dataSources.loadReadiness({ runtimeMode }),
         dataSources.loadAutomation(),
         dataSources.loadEstablishedUniverse(),
-        dataSources.loadControlCenter(),
         dataSources.loadLifecycleRadar?.() ?? Promise.resolve(null),
       ]);
+      const controlCenterResult = lifecycleRadarResult && canAccessOperationalControlCenter(lifecycleRadarResult.actor.role)
+        ? await dataSources.loadControlCenter()
+        : null;
+      if (lifecycleRadarResult
+        && !canAccessOperationalControlCenter(lifecycleRadarResult.actor.role)
+        && resolveSection() === "control-center"
+        && window.location.hash !== SECTION_TO_HASH["candidate-results"]) {
+        window.location.hash = SECTION_TO_HASH["candidate-results"];
+      }
       const nextScannerView = resolveProductScannerRefreshState(
         productViewRef.current.scanner,
         scannerResult,
@@ -433,13 +469,14 @@ export function ProductAppContent({
   }, [dataSources]);
 
   const refreshControlCenterAfterFeedback = useCallback(() => {
-    void loadControlCenterStatus().then((value) => {
+    if (!controlCenterAllowed) return;
+    void dataSources.loadControlCenter().then((value) => {
       if (!value) return;
       const nextProductView = { ...productViewRef.current, controlCenterStatus: value };
       productViewRef.current = nextProductView;
       setProductView(nextProductView);
     });
-  }, []);
+  }, [controlCenterAllowed, dataSources]);
 
   useEffect(() => {
     if (!loadVersionPointer) {
@@ -528,7 +565,14 @@ export function ProductAppContent({
 
   useEffect(() => {
     const handleRouteChange = () => {
-      const section = resolveSection();
+      const requestedSection = resolveSection();
+      const section = resolveProductSectionForRole(
+        requestedSection,
+        productViewRef.current.lifecycleRadar?.actor.role,
+      );
+      if (section !== requestedSection && window.location.hash !== SECTION_TO_HASH[section]) {
+        window.location.hash = SECTION_TO_HASH[section];
+      }
       setActiveSection(section);
       const identity = resolveRouteTokenIdentity();
       routeTokenIdentityRef.current = identity;
@@ -548,13 +592,14 @@ export function ProductAppContent({
   }, []);
 
   const navigate = useCallback((section: ProductSectionId) => {
-    setActiveSection(section);
-    if (section !== "candidate-detail") setFocusResearchPlaybook(false);
-    if (section !== "external-checks") setFocusedResearchStep(null);
-    if (window.location.hash !== SECTION_TO_HASH[section]) {
-      window.location.hash = SECTION_TO_HASH[section];
+    const permittedSection = resolveProductSectionForRole(section, operationalRole);
+    setActiveSection(permittedSection);
+    if (permittedSection !== "candidate-detail") setFocusResearchPlaybook(false);
+    if (permittedSection !== "external-checks") setFocusedResearchStep(null);
+    if (window.location.hash !== SECTION_TO_HASH[permittedSection]) {
+      window.location.hash = SECTION_TO_HASH[permittedSection];
     }
-  }, []);
+  }, [operationalRole]);
 
   const openFeedback = useCallback(() => {
     const context = activeSection === "feedback" ? feedbackContext : activeSection;
@@ -717,6 +762,13 @@ export function ProductAppContent({
 
   const renderSection = () => {
     const copy = sectionCopy[activeSection];
+    if (activeSection === "control-center" && !controlCenterAllowed) {
+      return (
+        <ProductWorkspaceSection {...sectionCopy["candidate-results"]}>
+          <LoadingState label={t("app.loading")} />
+        </ProductWorkspaceSection>
+      );
+    }
     if (activeSection === "feedback") {
       return (
         <ProductWorkspaceSection {...copy}>
@@ -797,7 +849,6 @@ export function ProductAppContent({
             onOpenExternalChecks={openVerification}
             onOpenResearchChecklistStep={(candidate, step) => openVerification(candidate, step)}
             onOpenFollowUpExternalChecks={openVerification}
-            onOpenControlCenter={() => navigate("control-center")}
             initialManualVerification={manualVerificationRecord}
             onLifecycleChanged={refreshLifecycleRadar}
             activeTab={activeDetailTab}
@@ -853,7 +904,7 @@ export function ProductAppContent({
         pollingDiagnostics={reviewPollingDiagnostics}
       />}
       <ProductWorkspaceShell
-        navItems={navItems}
+        navItems={visibleNavItems}
         activeSection={activeSection}
         onSectionChange={(section) => section === "feedback" ? openFeedback() : navigate(section)}
         onSendFeedback={openFeedback}

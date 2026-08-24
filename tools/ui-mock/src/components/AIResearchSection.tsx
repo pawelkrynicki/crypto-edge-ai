@@ -56,7 +56,6 @@ export function AIResearchSection({
   mode = "detail",
   active = false,
   onOpen,
-  onOpenControlCenter,
 }: {
   chain: string;
   contractAddress: string;
@@ -66,7 +65,6 @@ export function AIResearchSection({
   mode?: "summary" | "detail";
   active?: boolean;
   onOpen?: () => void;
-  onOpenControlCenter?: () => void;
 }) {
   const { locale } = useProductLocale();
   const ui = COPY[locale];
@@ -185,7 +183,7 @@ export function AIResearchSection({
       >
         <span>{ui.title}</span>
         <StatusBadge tone={availabilityTone(availability)}>{availabilityLabel(availability, locale)}</StatusBadge>
-        {availability !== "PROVIDER_DISABLED" && <strong>{stateTitle(availability, locale)}</strong>}
+        <strong>{stateTitle(availability, locale)}</strong>
         <p>{stateDetail(availability, effectiveError, effectiveRetryAfter, locale, Boolean(brief))}</p>
         {availability !== "PROVIDER_DISABLED" && <small>{ui.summaryNextStep}</small>}
         <i aria-hidden="true">→</i>
@@ -201,7 +199,7 @@ export function AIResearchSection({
       </header>
       <div className="ai-research-section-summary">
         <div>
-          {availability !== "PROVIDER_DISABLED" && <strong>{stateTitle(availability, locale)}</strong>}
+          <strong>{stateTitle(availability, locale)}</strong>
           <p>{stateDetail(availability, effectiveError, effectiveRetryAfter, locale, Boolean(brief))}</p>
           {(brief || analysis) && (!brief || !brief.render_preview) && <span className="ai-prepared-status">{ui.analysisPrepared}</span>}
         </div>
@@ -216,9 +214,6 @@ export function AIResearchSection({
             >
               {availability === "FAILED" || availability === "ERROR" ? ui.retry : ui.request}
             </ActionButton>
-          )}
-          {availability === "PROVIDER_DISABLED" && onOpenControlCenter && (
-            <ActionButton variant="secondary" onClick={onOpenControlCenter}>{ui.openControlCenter}</ActionButton>
           )}
           {waitingToRetry && (
             <ActionButton variant="secondary" disabled>
@@ -287,13 +282,13 @@ function applyRenderReviewOverride(value: AIResearchBriefLookup): AIResearchBrie
 function availabilityLabel(value: AIResearchBriefLookup["availability"], locale: "pl" | "en") {
   const labels: Record<AIResearchBriefLookup["availability"], [string, string]> = {
     ABSENT: ["Not available", "Brak analizy"],
-    QUEUED: ["Queued", "W kolejce"],
+    QUEUED: ["Waiting", "Oczekuje"],
     PROCESSING: ["Preparing", "Przygotowywana"],
     READY: ["Available", "Dostępna"],
     STALE: ["Last analysis", "Ostatnia analiza"],
     FAILED: ["Temporarily unavailable", "Chwilowo niedostępna"],
-    SUSPENDED: ["Suspended", "Wstrzymana"],
-    COOLDOWN: ["Cooldown", "Czas oczekiwania"],
+    SUSPENDED: ["Temporarily unavailable", "Chwilowo niedostępna"],
+    COOLDOWN: ["Temporarily unavailable", "Chwilowo niedostępna"],
     PROVIDER_DISABLED: ["Unavailable", "Niedostępna"],
     INSUFFICIENT_DATA: ["Insufficient data", "Niewystarczające dane"],
     RATE_LIMITED: ["Temporarily limited", "Limit czasowy"],
@@ -319,41 +314,37 @@ function availabilityTone(value: AIResearchBriefLookup["availability"]): "neutra
 function stateTitle(value: AIResearchBriefLookup["availability"], locale: "pl" | "en") {
   const pl = locale === "pl";
   if (value === "READY") return pl ? "Analiza gotowa" : "Analysis ready";
-  if (value === "QUEUED") return pl ? "Analiza jest przygotowywana" : "Analysis is being prepared";
+  if (value === "QUEUED") return pl ? "Analiza oczekuje na przygotowanie" : "Analysis is waiting to be prepared";
   if (value === "PROCESSING") return pl ? "Analiza jest przygotowywana" : "Analysis is being prepared";
   if (value === "STALE") return pl ? "Ostatnia analiza dostępna" : "Last analysis available";
-  if (value === "PROVIDER_DISABLED") return pl ? "Analiza AI jest obecnie niedostępna." : "AI analysis is currently unavailable.";
-  if (value === "SUSPENDED") return pl ? "Przygotowanie analizy jest wstrzymane" : "Analysis preparation is paused";
+  if (value === "PROVIDER_DISABLED") return pl ? "Analiza AI jest chwilowo niedostępna." : "AI analysis is temporarily unavailable.";
+  if (value === "SUSPENDED") return pl ? "Analiza AI jest chwilowo niedostępna." : "AI analysis is temporarily unavailable.";
   if (["FAILED", "ERROR"].includes(value)) {
-    return pl ? "Analiza nie mogła zostać teraz przygotowana." : "The analysis could not be prepared right now.";
+    return pl ? "Nie udało się przygotować analizy." : "The analysis could not be prepared.";
   }
-  if (value === "COOLDOWN" || value === "RATE_LIMITED") return pl ? "Spróbuj ponownie później." : "Try again later.";
+  if (value === "COOLDOWN" || value === "RATE_LIMITED") return pl ? "Analiza AI jest chwilowo niedostępna." : "AI analysis is temporarily unavailable.";
   if (value === "INSUFFICIENT_DATA") return pl ? "Za mało danych do analizy" : "Not enough data for analysis";
-  return pl ? "Analiza nie została jeszcze przygotowana" : "Analysis has not been prepared yet";
+  return pl ? "Analiza nie jest jeszcze dostępna." : "The analysis is not available yet.";
 }
 
 function stateDetail(
   value: AIResearchBriefLookup["availability"],
   _error: string | null,
-  retry: number | null,
+  _retry: number | null,
   locale: "pl" | "en",
   hasBrief: boolean,
 ) {
   const pl = locale === "pl";
   if (value === "READY") return pl ? "Poniżej znajdziesz najważniejsze wnioski, ryzyka, braki danych i kolejne kroki researchu." : "Below you will find the key findings, risks, data gaps and next research steps.";
-  if (value === "QUEUED") return pl ? "Przygotowanie analizy rozpocznie się, gdy będzie dostępna." : "The analysis will be prepared when it becomes available.";
+  if (value === "QUEUED") return pl ? "Nie musisz nic robić. Wynik pojawi się tutaj, gdy analiza będzie dostępna." : "You do not need to do anything. The result will appear here when the analysis is available.";
   if (value === "PROCESSING") return pl ? "Przygotowanie analizy trwa." : "The analysis is being prepared.";
   if (value === "STALE") return pl ? "Dane zmieniły się, a aktualizacja jest przygotowywana. Poprzedni prawidłowy wynik pozostaje dostępny." : "Data changed and an update is being prepared. The previous valid result remains available.";
-  if (value === "FAILED" && hasBrief) return pl ? "Spróbuj ponownie później. Ostatni poprawny wynik pozostaje dostępny." : "Try again later. The last valid result remains available.";
-  if (value === "FAILED") return pl ? "Spróbuj ponownie później." : "Try again later.";
-  if (value === "SUSPENDED") return pl ? "Przygotowanie będzie możliwe, gdy analiza będzie dostępna." : "Preparation will be available when analysis becomes available.";
-  if (value === "COOLDOWN" || value === "RATE_LIMITED") return pl
-    ? `Spróbuj ponownie${retry ? ` za ${retry} s` : " później"}.`
-    : `Try again${retry ? ` in ${retry} sec` : " later"}.`;
-  if (value === "PROVIDER_DISABLED") return pl ? "Analiza AI jest obecnie niedostępna." : "AI analysis is currently unavailable.";
+  if (value === "FAILED" && hasBrief) return pl ? "Ostatni poprawny wynik pozostaje dostępny." : "The last valid result remains available.";
+  if (value === "FAILED" || value === "SUSPENDED" || value === "COOLDOWN" || value === "RATE_LIMITED" || value === "PROVIDER_DISABLED" || value === "ERROR") {
+    return pl ? "Nie musisz nic robić. Gdy analiza będzie dostępna, wynik pojawi się tutaj." : "You do not need to do anything. When the analysis is available, the result will appear here.";
+  }
   if (value === "INSUFFICIENT_DATA") return pl ? "Serwer nie posiada zwalidowanych danych pozwalających przygotować wiarygodny brief." : "The server has no validated data that can prepare a reliable brief.";
-  if (value === "ERROR") return pl ? "Spróbuj ponownie później." : "Try again later.";
-  return pl ? "Możesz poprosić o przygotowanie analizy." : "You can request analysis preparation.";
+  return pl ? "Nie musisz nic robić. Gdy analiza będzie dostępna, wynik pojawi się tutaj." : "You do not need to do anything. When the analysis is available, the result will appear here.";
 }
 
 const COPY = {
@@ -362,7 +353,6 @@ const COPY = {
     intro: "Podsumowanie zweryfikowanych danych — bez sygnałów transakcyjnych.",
     request: "Zleć analizę AI",
     retry: "Ponów zlecenie analizy",
-    openControlCenter: "Aktywuj analizę AI w Centrum sterowania",
     requesting: "Przygotowywanie analizy…",
     requestingStatus: "Trwa przygotowywanie analizy.",
     tryAgainLater: "Spróbuj ponownie później",
@@ -380,7 +370,6 @@ const COPY = {
     intro: "A summary of verified data — without trading signals.",
     request: "Request analysis preparation",
     retry: "Retry analysis request",
-    openControlCenter: "Enable AI analysis in Control Center",
     requesting: "Preparing analysis…",
     requestingStatus: "The analysis is being prepared.",
     tryAgainLater: "Try again later",

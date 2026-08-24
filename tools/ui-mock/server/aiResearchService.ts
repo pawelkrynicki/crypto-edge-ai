@@ -282,7 +282,10 @@ export function hydrateAIResearchBrief(
     })),
     source_references: context.source_references,
     coverage: context.coverage,
-    checkpoints: context.checkpoints,
+    // The persisted AI brief has a deliberately narrow checkpoint contract.
+    // Lifecycle may carry presentation-only timing metadata (for example
+    // `scheduled_at`), but that must not leak into the frozen AI result shape.
+    checkpoints: context.checkpoints.map(({ day, state }) => ({ day, state })),
     token_usage: tokenUsage,
     input_hash: inputHash,
     output_hash: "0".repeat(64),

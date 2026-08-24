@@ -358,13 +358,13 @@ describe("UX.3 client header and UX.4 provider-neutral AI", () => {
       error_code: null,
     };
     const client = render("en", <AIResearchSection chain="base" contractAddress={ADDRESS_A} symbol="PASS" name="Pass" initialLookup={lookup} mode="summary" />);
-    assert.match(client, /AI analysis is currently unavailable/);
-    assert.equal((client.match(/AI analysis is currently unavailable/g) ?? []).length, 1);
+    assert.match(client, /AI analysis is temporarily unavailable\./);
+    assert.equal((client.match(/AI analysis is temporarily unavailable\./g) ?? []).length, 1);
     assert.doesNotMatch(client, /OpenAI|gpt-5-mini|provider mode|PROVIDER_DISABLED/i);
     assert.doesNotMatch(client, /Open the AI analysis tab to see the full summary/);
     const polishClient = render("pl", <AIResearchSection chain="base" contractAddress={ADDRESS_A} symbol="PASS" name="Pass" initialLookup={lookup} mode="summary" />);
     assert.match(polishClient, /Niedostępna/);
-    assert.equal((polishClient.match(/Analiza AI jest obecnie niedostępna/g) ?? []).length, 1);
+    assert.equal((polishClient.match(/Analiza AI jest chwilowo niedostępna\./g) ?? []).length, 1);
     assert.doesNotMatch(polishClient, /Otwórz zakładkę Analiza AI, aby zobaczyć pełne podsumowanie/);
 
     const canvas = await source("src/components/AIResearchBriefCanvas.tsx");

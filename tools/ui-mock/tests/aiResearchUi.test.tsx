@@ -128,9 +128,9 @@ describe("AI.1 Visual Candidate Research Canvas", () => {
 
   it("renders all Candidate Detail states with aria-live, aria-busy and UX.1 hierarchy", () => {
     const states: Array<[AIResearchBriefLookup["availability"], RegExp]> = [
-      ["ABSENT", /Brak analizy/], ["QUEUED", /W kolejce/], ["PROCESSING", /Przygotowywana/], ["READY", /Dostępna/],
-      ["STALE", /Ostatnia analiza/], ["FAILED", /Chwilowo niedostępna/], ["SUSPENDED", /Wstrzymana/],
-      ["COOLDOWN", /Czas oczekiwania/], ["PROVIDER_DISABLED", /Niedostępna/],
+      ["ABSENT", /Brak analizy/], ["QUEUED", /Oczekuje/], ["PROCESSING", /Przygotowywana/], ["READY", /Dostępna/],
+      ["STALE", /Ostatnia analiza/], ["FAILED", /Chwilowo niedostępna/], ["SUSPENDED", /Chwilowo niedostępna/],
+      ["COOLDOWN", /Chwilowo niedostępna/], ["PROVIDER_DISABLED", /Niedostępna/],
       ["INSUFFICIENT_DATA", /Niewystarczające dane/], ["RATE_LIMITED", /Limit czasowy/], ["ERROR", /Niedostępna/],
     ];
     for (const [availability, label] of states) {
@@ -147,7 +147,26 @@ describe("AI.1 Visual Candidate Research Canvas", () => {
       assert.match(markup, /aria-live="polite"/);
       if (["ABSENT", "STALE"].includes(availability)) assert.match(markup, /Zleć analizę AI/);
       if (["ERROR", "FAILED"].includes(availability)) assert.match(markup, /Ponów zlecenie analizy/);
+      assert.doesNotMatch(markup, /provider|model|OpenAI|kolejk/i);
     }
+  });
+
+  it("keeps the unavailable CAMP state passive and free of the Control Center activation CTA", () => {
+    const lookup: AIResearchBriefLookup = {
+      schema_version: "ai_research_lookup_v1",
+      availability: "PROVIDER_DISABLED",
+      provider_mode: "DISABLED",
+      brief: null,
+      retry_after_seconds: null,
+      error_code: "PROVIDER_DISABLED",
+    };
+    const pl = render("pl", <AIResearchSection chain="base" contractAddress={ADDRESS} symbol="PASS" name="Pass Token" initialLookup={lookup} />);
+    const en = render("en", <AIResearchSection chain="base" contractAddress={ADDRESS} symbol="PASS" name="Pass Token" initialLookup={lookup} />);
+    assert.match(pl, /Analiza AI jest chwilowo niedostępna\./);
+    assert.match(pl, /Nie musisz nic robić\. Gdy analiza będzie dostępna, wynik pojawi się tutaj\./);
+    assert.match(en, /AI analysis is temporarily unavailable\./);
+    assert.match(en, /You do not need to do anything\. When the analysis is available, the result will appear here\./);
+    for (const markup of [pl, en]) assert.doesNotMatch(markup, /Control Center|Centrum sterowania|Aktywuj|Enable AI|<button\b/i);
   });
 
   it("places AI Research in Summary and the dedicated tab while keeping Radar and Verification actions", () => {
@@ -465,8 +484,8 @@ describe("AI.3 shared queue UI", () => {
 
     assert.match(markup, />Temporarily unavailable</);
     assert.doesNotMatch(markup, />Preparing</);
-    assert.match(markup, /The analysis could not be prepared right now\./);
-    assert.match(markup, /Try again later\. The last valid result remains available\./);
+    assert.match(markup, /The analysis could not be prepared\./);
+    assert.match(markup, /The last valid result remains available\./);
   });
 
   it("renders every owner review state from an initial render-preview lookup", () => {
@@ -477,12 +496,12 @@ describe("AI.3 shared queue UI", () => {
     }> = [
       { reviewState: null, expectedLabel: />Available</, expectedCanvas: true },
       { reviewState: "absent", expectedLabel: />Not available</, expectedCanvas: false },
-      { reviewState: "queued", expectedLabel: />Queued</, expectedCanvas: false },
+      { reviewState: "queued", expectedLabel: />Waiting</, expectedCanvas: false },
       { reviewState: "processing", expectedLabel: />Preparing</, expectedCanvas: false },
       { reviewState: "stale", expectedLabel: />Last analysis</, expectedCanvas: true },
       { reviewState: "failed", expectedLabel: />Temporarily unavailable</, expectedCanvas: true },
-      { reviewState: "suspended", expectedLabel: />Suspended</, expectedCanvas: false },
-      { reviewState: "cooldown", expectedLabel: />Cooldown</, expectedCanvas: false },
+      { reviewState: "suspended", expectedLabel: />Temporarily unavailable</, expectedCanvas: false },
+      { reviewState: "cooldown", expectedLabel: />Temporarily unavailable</, expectedCanvas: false },
     ];
 
     for (const { reviewState, expectedLabel, expectedCanvas } of cases) {
@@ -572,8 +591,8 @@ describe("AI.3 shared queue UI", () => {
     assert.equal(failure.brief, null);
     const markup = render("pl", <AIResearchSection chain="base" contractAddress={ADDRESS} symbol="SCOOBERT" name="Scoobert" initialLookup={failure} />);
     assert.match(markup, /Niedostępna/);
-    assert.match(markup, /Analiza nie mogła zostać teraz przygotowana\./);
-    assert.match(markup, /Spróbuj ponownie później\./);
+    assert.match(markup, /Nie udało się przygotować analizy\./);
+    assert.match(markup, /Nie musisz nic robić\. Gdy analiza będzie dostępna, wynik pojawi się tutaj\./);
     assert.match(markup, /Ponów zlecenie analizy/);
     assert.doesNotMatch(markup, /Wygeneruj analizę AI/);
     assert.doesNotMatch(markup, /Brak analizy/);
@@ -650,8 +669,8 @@ describe("AI.3 shared queue UI", () => {
       error_code: "WORKER_SUSPENDED",
       queue_status: "SUSPENDED",
     }} />);
-    assert.match(suspended, /Przygotowanie analizy jest wstrzymane/);
-    assert.match(suspended, /Przygotowanie będzie możliwe, gdy analiza będzie dostępna\./);
+    assert.match(suspended, /Analiza AI jest chwilowo niedostępna\./);
+    assert.match(suspended, /Nie musisz nic robić\. Gdy analiza będzie dostępna, wynik pojawi się tutaj\./);
     assert.doesNotMatch(suspended, /Zleć analizę AI|Ponów zlecenie analizy/);
 
     const queued = render("pl", <AIResearchSection chain="base" contractAddress={ADDRESS} symbol="SCOOBERT" name="Scoobert" initialLookup={{
@@ -663,7 +682,7 @@ describe("AI.3 shared queue UI", () => {
       error_code: null,
       queue_status: "QUEUED",
     }} />);
-    assert.match(queued, /Analiza jest przygotowywana/);
+    assert.match(queued, /Analiza oczekuje na przygotowanie/);
     assert.doesNotMatch(queued, /Zleć analizę AI|Ponów zlecenie analizy/);
   });
 });

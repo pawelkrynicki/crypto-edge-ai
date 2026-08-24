@@ -35,8 +35,10 @@ describe("manual owner Radar actions", () => {
   it("configures the canonical Product Radar launcher with a CAMP_USER server session", async () => {
     const reviewLauncher = await readFile(resolve(import.meta.dirname, "..", "..", "..", "scripts", "win", "start-product-radar-review.cmd"), "utf8");
     const apiLauncher = await readFile(resolve(import.meta.dirname, "..", "..", "..", "scripts", "win", "start-product-radar-api.cmd"), "utf8");
-    assert.match(reviewLauncher, /set "CRYPTO_EDGE_PC1_REVIEW_DEFAULT_ACTOR=CAMP_USER"/);
-    assert.match(apiLauncher, /set "CRYPTO_EDGE_PC1_REVIEW_DEFAULT_ACTOR=CAMP_USER"/);
+    assert.match(reviewLauncher, /set "REVIEW_ACTOR=CAMP_USER"/);
+    assert.match(reviewLauncher, /set "CRYPTO_EDGE_PC1_REVIEW_DEFAULT_ACTOR=%REVIEW_ACTOR%"/);
+    assert.match(reviewLauncher, /if \/i "%RADAR_VIEW%"=="control-center" set "REVIEW_ACTOR=OWNER"/);
+    assert.match(apiLauncher, /if "%CRYPTO_EDGE_PC1_REVIEW_DEFAULT_ACTOR%"=="" set "CRYPTO_EDGE_PC1_REVIEW_DEFAULT_ACTOR=CAMP_USER"/);
   });
 
   it("moves New to Follow-up once, persists verification, audits the decision, and performs no provider reads", async () => {

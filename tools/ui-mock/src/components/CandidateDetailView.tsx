@@ -53,7 +53,6 @@ interface CandidateDetailViewProps {
   onOpenExternalChecks?: (candidate: UiTokenCandidate) => void;
   onOpenResearchChecklistStep?: (candidate: UiTokenCandidate, step: ResearchStepNumber) => void;
   onOpenFollowUpExternalChecks?: (followUp: FollowUpPublicEntry) => void;
-  onOpenControlCenter?: () => void;
   initialManualVerification?: PrivateVerificationRecord | null;
   onLifecycleChanged?: () => void | Promise<void>;
   initialOwnerPromotionStatus?: EstablishedPromotionStatus | null;
@@ -76,7 +75,6 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
   onOpenExternalChecks,
   onOpenResearchChecklistStep,
   onOpenFollowUpExternalChecks,
-  onOpenControlCenter,
   initialManualVerification,
   onLifecycleChanged,
   initialOwnerPromotionStatus,
@@ -135,7 +133,6 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
         onOwnerPromotionStatusChange={setOwnerPromotionStatus}
         onBackToResults={onBackToResults}
         onOpenFollowUpExternalChecks={onOpenFollowUpExternalChecks}
-        onOpenControlCenter={onOpenControlCenter}
         initialManualVerification={initialManualVerification}
         onLifecycleChanged={onLifecycleChanged}
         activeTab={activeTab}
@@ -223,7 +220,7 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
               <DetailField label={t("detail.sourceVerification")} value={candidate.addressIdentityVerified ? t("detail.sourceVerificationConfirmed") : t("detail.sourceVerificationRequired")} tone={candidate.addressIdentityVerified ? "ready" : "warning"} />
             </div>
           </section>
-          <AIResearchSection chain={candidate.chain} contractAddress={candidate.contractAddress} symbol={candidate.symbol} name={candidate.name} mode="summary" onOpen={() => setActiveTab("ai")} onOpenControlCenter={onOpenControlCenter} />
+          <AIResearchSection chain={candidate.chain} contractAddress={candidate.contractAddress} symbol={candidate.symbol} name={candidate.name} mode="summary" onOpen={() => setActiveTab("ai")} />
         </div>
         <ResearchChecklistSummary
           candidate={candidate}
@@ -330,7 +327,7 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
       </>
     );
   } else if (activeTab === "ai") {
-    activeTabContent = <AIResearchSection chain={candidate.chain} contractAddress={candidate.contractAddress} symbol={candidate.symbol} name={candidate.name} mode="detail" active onOpenControlCenter={onOpenControlCenter} />;
+    activeTabContent = <AIResearchSection chain={candidate.chain} contractAddress={candidate.contractAddress} symbol={candidate.symbol} name={candidate.name} mode="detail" active />;
   } else if (activeTab === "data") {
     activeTabContent = (
       <div className="candidate-data-sources-tab">
@@ -519,7 +516,6 @@ function FollowUpOnlyDetail({
   onOwnerPromotionStatusChange,
   onBackToResults,
   onOpenFollowUpExternalChecks,
-  onOpenControlCenter,
   initialManualVerification,
   onLifecycleChanged,
   activeTab,
@@ -531,7 +527,6 @@ function FollowUpOnlyDetail({
   onOwnerPromotionStatusChange: (status: EstablishedPromotionStatus) => void;
   onBackToResults?: () => void;
   onOpenFollowUpExternalChecks?: (followUp: FollowUpPublicEntry) => void;
-  onOpenControlCenter?: () => void;
   initialManualVerification?: PrivateVerificationRecord | null;
   onLifecycleChanged?: () => void | Promise<void>;
   activeTab: CandidateDetailTabId;
@@ -576,7 +571,7 @@ function FollowUpOnlyDetail({
               <DetailField label={t("detail.chain")} value={followUp.chain} />
             </div>
           </section>
-          <AIResearchSection chain={followUp.chain} contractAddress={followUp.contract_address} symbol={followUp.symbol ?? ""} name={followUp.display_name ?? followUp.symbol ?? ""} mode="summary" onOpen={() => onActiveTabChange("ai")} onOpenControlCenter={onOpenControlCenter} />
+          <AIResearchSection chain={followUp.chain} contractAddress={followUp.contract_address} symbol={followUp.symbol ?? ""} name={followUp.display_name ?? followUp.symbol ?? ""} mode="summary" onOpen={() => onActiveTabChange("ai")} />
         </div>
       </section>
     );
@@ -638,7 +633,6 @@ function FollowUpOnlyDetail({
         name={followUp.display_name ?? followUp.symbol ?? ""}
         mode="detail"
         active
-        onOpenControlCenter={onOpenControlCenter}
       />
     );
   } else if (activeTab === "data") {

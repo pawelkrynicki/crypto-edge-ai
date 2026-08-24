@@ -95,7 +95,6 @@ describe("P1.1 Radar operational usability", () => {
           symbol={candidate.symbol}
           name={candidate.name}
           mode="detail"
-          onOpenControlCenter={() => undefined}
           initialLookup={{
             schema_version: "ai_research_lookup_v1",
             availability: "PROVIDER_DISABLED",
@@ -108,9 +107,9 @@ describe("P1.1 Radar operational usability", () => {
       </ProductLocaleProvider>,
     );
     assert.match(aiMarkup, /Niedostępna/);
-    assert.match(aiMarkup, /Analiza AI jest obecnie niedostępna\./);
-    assert.match(aiMarkup, /Aktywuj analizę AI w Centrum sterowania/);
-    assert.doesNotMatch(aiMarkup, /provider|model|api[_ -]?key/i);
+    assert.match(aiMarkup, /Analiza AI jest chwilowo niedostępna\./);
+    assert.match(aiMarkup, /Nie musisz nic robić\. Gdy analiza będzie dostępna, wynik pojawi się tutaj\./);
+    assert.doesNotMatch(aiMarkup, /provider|model|api[_ -]?key|Centrum sterowania|Aktywuj/i);
 
     const verificationMarkup = renderToStaticMarkup(
       <ProductLocaleProvider initialLocale="pl">
@@ -260,7 +259,7 @@ describe("P1.1 Radar operational usability", () => {
       detail = renderer!.root.findByType(CandidateDetailView);
       assert.equal(detail.props.followUp.contract_address, entry.contract_address);
       assert.equal(detail.props.activeTab, "market");
-      assert.deepEqual(calls, { scanner: 2, readiness: 2, automation: 2, universe: 2, control: 2, status: 2, list: 2 });
+      assert.deepEqual(calls, { scanner: 2, readiness: 2, automation: 2, universe: 2, control: 0, status: 2, list: 2 });
       assert.ok(localRequests.every((request) => request.method === "GET"));
       assert.ok(localRequests.every((request) => request.url.startsWith("/api/")));
       assert.ok(localRequests.every((request) => !/provider|openai|collect|automation\/(?:run|enable|activate)|central/i.test(request.url)));
