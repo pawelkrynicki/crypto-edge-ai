@@ -1,0 +1,6 @@
+{
+  "fixture_version": "sanitized_failed_v6_semantic_v1",
+  "slot": "summary:overall",
+  "en": "The recorded value is 999999 while the queue state remains READY.",
+  "pl": "Zapisana wartość 999999 pozostaje w stanie lifecycle new."
+}

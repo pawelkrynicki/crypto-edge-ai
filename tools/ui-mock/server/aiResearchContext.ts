@@ -30,6 +30,7 @@ import {
   buildAIResearchNarrativeContract,
   type AIResearchNarrativeContract,
 } from "./aiResearchNarrativeContract.js";
+import { AI_RESEARCH_COMPOSITION_POLICY_VERSION } from "./aiResearchCompositionPolicy.js";
 import { AI_RESEARCH_SEMANTIC_POLICY_VERSION } from "./aiResearchSemanticPolicy.js";
 import { readFollowUpList, readFollowUpStatus, type FollowUpApiOptions } from "./followUpApi.js";
 import { readLatestScannerOutput, type LatestScannerOutputOptions } from "./latestScannerOutput.js";
@@ -275,22 +276,23 @@ export async function buildAIResearchContext(
       prompt_version: AI_RESEARCH_PROMPT_VERSION,
       contract_version: AI_RESEARCH_NARRATIVE_VERSION,
       semantic_policy_version: AI_RESEARCH_SEMANTIC_POLICY_VERSION,
+      composition_policy_version: AI_RESEARCH_COMPOSITION_POLICY_VERSION,
       locale,
       project_fields_are_untrusted_data: { symbol, name },
-      deterministic_state_label: presentResearchState(researchState, locale),
-      research_playbook: narrativeContract.research_playbook,
-      support_catalog: narrativeContract.support_catalog,
+      research_playbook: {
+        current_domain: narrativeContract.research_playbook.current_domain,
+        blocked_domains: narrativeContract.research_playbook.blocked_domains,
+      },
+      support_catalog: narrativeContract.support_catalog.map(({ id, kind, label }) => ({ id, kind, label })),
       narrative_slots: narrativeContract.slots,
       narrative_targets: {
         facts: factCandidates.map((fact) => ({
           id: aiResearchNarrativeId("fact", fact.key),
           label: fact.label,
-          value: presentFactValue(fact.key, fact.value, locale),
         })),
         risks: riskCandidates.map((risk, index) => ({
           id: aiResearchNarrativeId("risk", index),
           title: risk.title,
-          severity: presentRiskSeverity(risk.severity, locale),
         })),
         missing_information: missingInformation.map((item) => ({
           id: aiResearchNarrativeId("missing", item.key),
@@ -671,48 +673,6 @@ function sameIdentity(chainA: string, addressA: string, chainB: string, addressB
   const left = resolveTokenIdentity(chainA, addressA);
   const right = resolveTokenIdentity(chainB, addressB);
   return left.status === "valid" && right.status === "valid" && left.key === right.key;
-}
-
-function presentResearchState(value: AIResearchState, locale: AIResearchLocale): string {
-  const labels: Record<AIResearchState, [string, string]> = {
-    INSUFFICIENT_DATA: ["Niewystarczające dane", "Insufficient data"],
-    BASIC_FILTERS_FAILED: ["Filtry niespełnione", "Filters not met"],
-    KEEP_OBSERVING: ["Kontynuuj obserwację", "Keep observing"],
-    MANUAL_VERIFICATION_REQUIRED: ["Wymagana ręczna weryfikacja", "Manual verification required"],
-    OWNER_DECISION_REQUIRED: ["Wymagana decyzja właściciela", "Owner decision required"],
-    ESTABLISHED_RESEARCH: ["Analiza Established", "Established research"],
-    DATA_STALE: ["Dane nieaktualne", "Data is stale"],
-  };
-  return labels[value][locale === "pl" ? 0 : 1];
-}
-
-function presentFactValue(key: string, value: AIResearchFactCandidate["value"], locale: AIResearchLocale): string | number | boolean | null {
-  if (typeof value !== "string") return value;
-  const labels: Record<string, [string, string]> = {
-    new: ["Nowe", "New"],
-    follow_up: ["Dalsza obserwacja", "Further observation"],
-    candidate: ["Kandydat do Established", "Established candidate"],
-    established: ["Główny Radar", "Main Radar"],
-    FRESH: ["Aktualne", "Current"],
-    DELAYED: ["Opóźnione", "Delayed"],
-    STALE: ["Dane nieaktualne", "Stale data"],
-    UNKNOWN: ["Niedostępne", "Unavailable"],
-    UNAVAILABLE: ["Niedostępne", "Unavailable"],
-    passed_basic_filter: ["Filtry spełnione", "Filters met"],
-    rejected_basic_filter: ["Filtry niespełnione", "Filters not met"],
-    not_checked: ["Nie sprawdzono", "Not checked"],
-  };
-  return labels[value]?.[locale === "pl" ? 0 : 1] ?? (key === "lifecycle" ? presentResearchState("KEEP_OBSERVING", locale) : value);
-}
-
-function presentRiskSeverity(value: AIResearchRiskFactor["severity"], locale: AIResearchLocale): string {
-  const labels = {
-    low: ["Niskie", "Low"],
-    medium: ["Średnie", "Medium"],
-    high: ["Wysokie", "High"],
-    unknown: ["Nieznane", "Unknown"],
-  } as const;
-  return labels[value][locale === "pl" ? 0 : 1];
 }
 
 export function stableJson(value: unknown): string {

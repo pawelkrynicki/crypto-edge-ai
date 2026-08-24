@@ -6,6 +6,7 @@ import {
 import { resolveProductRuntimeMode } from "../src/runtimeMode.js";
 import { AIResearchContextError, buildAIResearchContext, type AIResearchContextOptions } from "./aiResearchContext.js";
 import { AI_RESEARCH_NARRATIVE_VERSION } from "./aiResearchNarrativeContract.js";
+import { AI_RESEARCH_COMPOSITION_POLICY_VERSION } from "./aiResearchCompositionPolicy.js";
 import { AI_RESEARCH_SEMANTIC_POLICY_VERSION } from "./aiResearchSemanticPolicy.js";
 import {
   AI_RESEARCH_PROVIDER_WIRE_SCHEMA_VERSION,
@@ -234,6 +235,7 @@ async function processClaim(
       prompt_version: context.prompt_version,
       narrative_contract_version: AI_RESEARCH_NARRATIVE_VERSION,
       semantic_policy_version: AI_RESEARCH_SEMANTIC_POLICY_VERSION,
+      composition_policy_version: AI_RESEARCH_COMPOSITION_POLICY_VERSION,
       provider_wire_schema_version: AI_RESEARCH_PROVIDER_WIRE_SCHEMA_VERSION,
       model_id: claimed.model_id,
       analysis_schema_version: claimed.analysis_schema_version,
@@ -309,12 +311,23 @@ async function processClaim(
     if (providerResult.model !== claimed.model_id) throw new AIResearchWorkerContractError("MODEL_MISMATCH");
     stage = "PROVIDER_PARSE";
     const parsedNarrative = parseAIResearchProviderNarrativeWithDiagnostics(providerResult.raw_json, context);
-    if (parsedNarrative.presentation_fallbacks.length > 0) {
+    store.recordCompositionDiagnostics({
+      analysis_id: claimed.analysis_id,
+      worker_id: workerId,
+      diagnostics: {
+        accepted_provider_slot_count: parsedNarrative.accepted_provider_slot_count,
+        fallback_slot_ids: parsedNarrative.slot_fallbacks.map(({ slot_id }) => slot_id),
+        fallback_reasons: [...new Set(parsedNarrative.slot_fallbacks.flatMap(({ violations }) => violations))],
+        full_deterministic_fallback: parsedNarrative.full_deterministic_fallback,
+      },
+      now: now(),
+    });
+    if (parsedNarrative.slot_fallbacks.length > 0) {
       store.recordValidationDiagnostics({
         analysis_id: claimed.analysis_id,
         worker_id: workerId,
-        validation_code: "STYLE_ONLY_INSTRUCTIONAL",
-        violations: [...new Set(parsedNarrative.presentation_fallbacks.flatMap((item) => item.violations))],
+        validation_code: "SLOT_FALLBACK_APPLIED",
+        violations: [...new Set(parsedNarrative.slot_fallbacks.flatMap((item) => item.violations))],
         now: now(),
       });
     }

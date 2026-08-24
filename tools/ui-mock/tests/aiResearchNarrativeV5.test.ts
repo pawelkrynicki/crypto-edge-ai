@@ -3,236 +3,146 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { after, describe, it } from "node:test";
-import { buildAIResearchContext, sha256, stableJson, type AIResearchContext } from "../server/aiResearchContext.js";
-import { buildAIAnalysisCacheIdentity, createAIAnalysisQueueStore, hashAIAnalysisRateScope } from "../server/aiResearchQueueStore.js";
+import { buildAIResearchContext, type AIResearchContext } from "../server/aiResearchContext.js";
+import { buildAIAnalysisCacheIdentity } from "../server/aiResearchQueueStore.js";
 import { hydrateAIResearchBrief } from "../server/aiResearchService.js";
 import {
   AIResearchValidationError,
   auditAIResearchSemanticQuality,
-  buildAIResearchProviderJsonSchema,
-  parseAIResearchProviderNarrative,
   parseAIResearchProviderNarrativeWithDiagnostics,
 } from "../server/aiResearchSchema.js";
 import { PERSISTABLE_SCANNER_SAMPLE } from "../src/fixtures/persistableScannerSample.js";
 
-const root = await mkdtemp(resolve(tmpdir(), "crypto-edge-ai-narrative-v5-"));
+const root = await mkdtemp(resolve(tmpdir(), "crypto-edge-ai-narrative-v7-"));
 const fixturePath = resolve(root, "scanner.json");
-const ADDRESS = "0x3333333333333333333333333333333333333333";
-const NOW = new Date("2026-08-24T10:00:00.000Z");
-const bad = JSON.parse(await readFile(resolve(import.meta.dirname, "fixtures", "aiResearchV5BadContent.invalid.json"), "utf8")) as BadFixture;
-const correctedPl = JSON.parse(await readFile(resolve(import.meta.dirname, "fixtures", "aiResearchV5CorrectedPL.valid.json"), "utf8")) as CorrectedFixture;
-const correctedEn = JSON.parse(await readFile(resolve(import.meta.dirname, "fixtures", "aiResearchV5CorrectedEN.valid.json"), "utf8")) as CorrectedFixture;
-
+const ADDRESS = "0x1111111111111111111111111111111111111111";
+const NOW = new Date("2026-08-24T12:00:00.000Z");
+const failedV6 = JSON.parse(await readFile(resolve(import.meta.dirname, "fixtures", "aiResearchV6SemanticFallback.invalid.json"), "utf8")) as { slot: string; en: string; pl: string };
 const scanner = structuredClone(PERSISTABLE_SCANNER_SAMPLE);
 scanner.candidates[0]!.chain = "base";
 scanner.candidates[0]!.contract_address = ADDRESS;
 scanner.candidates[0]!.source_url = `https://dexscreener.com/base/${ADDRESS}`;
+scanner.candidates[0]!.address_identity_verified = true;
 await writeFile(fixturePath, JSON.stringify(scanner), "utf8");
 after(async () => { await rm(root, { recursive: true, force: true }); });
 
-describe("AI v5 closed evidence-bound narrative contract", () => {
-  it("keeps the provider schema within the supported strict Structured Outputs subset", async () => {
-    const context = await stepThreeContext();
-    const schema = buildAIResearchProviderJsonSchema(context);
-    assert.equal(containsSchemaKeyword(schema, "uniqueItems"), false);
-    assert.equal(JSON.stringify(schema).includes("action_narratives"), false);
-    assert.equal(JSON.stringify(schema).includes("status_change_narratives"), false);
+describe("AI v7 slot composition policy", () => {
+  it("accepts valid declarative Polish and English narrative slots without fallback", async () => {
+    const context = await researchContext();
+    const parsed = parseAIResearchProviderNarrativeWithDiagnostics(JSON.stringify(validNarrative(context)), context);
+    assert.equal(parsed.accepted_provider_slot_count, issuedSlotCount(context));
+    assert.equal(parsed.slot_fallbacks.length, 0);
+    assert.equal(parsed.full_deterministic_fallback, false);
+    assertSafe(context, parsed.narrative);
   });
 
-  it("rejects the sanitized current bad result with bounded evidence-fidelity codes", async () => {
-    const context = await stepThreeContext();
-    const candidate = validNarrative(context);
-    candidate.summary.en = bad.summary.en;
-    candidate.summary.pl = bad.summary.pl;
-    assert.throws(
-      () => parseAIResearchProviderNarrative(JSON.stringify(candidate), context),
-      (error) => error instanceof AIResearchValidationError
-        && error.code === "SEMANTIC_MISMATCH"
-        && error.violations.includes("CURRENT_STEP_BOUNDARY_VIOLATION")
-        && error.violations.includes("UNSUPPORTED_ENTITY_OR_CAPABILITY")
-        && error.violations.includes("FOREIGN_SCRIPT_CONTAMINATION")
-        && error.violations.includes("INCOMPLETE_NARRATIVE"),
-    );
+  it("uses the sanitized failed v6 regression fixture as a slot fallback, not a complete-result failure", async () => {
+    const context = await researchContext();
+    const value = validNarrative(context);
+    value.summary = { ...value.summary, en: failedV6.en, pl: failedV6.pl };
+    const parsed = parseAIResearchProviderNarrativeWithDiagnostics(JSON.stringify(value), context);
+    assert.deepEqual(parsed.slot_fallbacks.map(({ slot_id }) => slot_id), [failedV6.slot]);
+    assert.ok(parsed.slot_fallbacks[0]!.violations.includes("UNKNOWN_FACT"));
+    assert.ok(parsed.slot_fallbacks[0]!.violations.includes("INVENTED_NUMBER"));
+    assert.ok(parsed.slot_fallbacks[0]!.violations.includes("MACHINE_VALUE_IN_NARRATIVE"));
+    assert.doesNotMatch(parsed.narrative.summary.en, /999999|READY|lifecycle|new/u);
+    assert.doesNotMatch(parsed.narrative.summary.pl, /999999|lifecycle|new/u);
+    assertSafe(context, parsed.narrative);
   });
 
-  it("accepts corrected PL and EN fixtures with the same closed evidence and action structure", async () => {
-    const context = await stepThreeContext();
-    const narrative = validNarrative(context);
-    assert.doesNotThrow(() => parseAIResearchProviderNarrative(JSON.stringify(narrative), context));
-    const pl = parseAIResearchProviderNarrative(JSON.stringify(narrative), context);
-    const en = parseAIResearchProviderNarrative(JSON.stringify(narrative), context);
-    assert.deepEqual(pl.fact_narratives.map(({ id, support_ids }) => ({ id, support_ids })), en.fact_narratives.map(({ id, support_ids }) => ({ id, support_ids })));
-  });
-
-  it("replaces an action-bound style-only instruction without a provider retry", async () => {
-    const context = await stepThreeContext();
-    const styleOnly = validNarrative(context);
-    const actionSupport = context.narrative_contract.slots.actions[0]!.allowed_support_ids[0]!;
-    styleOnly.summary.support_ids = [actionSupport];
-    styleOnly.summary.en = "Review the fixed product action now.";
-    styleOnly.summary.pl = "Musisz teraz sprawdzić ustalone działanie produktu.";
-    const parsed = parseAIResearchProviderNarrativeWithDiagnostics(JSON.stringify(styleOnly), context);
-    assert.deepEqual(parsed.presentation_fallbacks.map(({ classification, target, locale, violations }) => ({ classification, target, locale, violations })), [
-      { classification: "STYLE_ONLY_INSTRUCTIONAL", target: "summary", locale: "en", violations: ["INSTRUCTIONAL_NARRATIVE"] },
-      { classification: "STYLE_ONLY_INSTRUCTIONAL", target: "summary", locale: "pl", violations: ["INSTRUCTIONAL_NARRATIVE"] },
+  it("preserves safe slots while replacing invented numbers, machine values, and out-of-scope entities", async () => {
+    const context = await researchContext();
+    const value = validNarrative(context);
+    const untouched = value.fact_narratives[1]!.en;
+    value.fact_narratives[0]!.en = "The recorded amount is 999999.";
+    value.risk_narratives[0]!.pl = "Stan lifecycle follow_up pozostaje niepełny.";
+    value.missing_narratives[0]!.en = "Bytecode investigation is required before the current security context.";
+    const parsed = parseAIResearchProviderNarrativeWithDiagnostics(JSON.stringify(value), context);
+    assert.deepEqual(parsed.slot_fallbacks.map(({ slot_id }) => slot_id), [
+      value.fact_narratives[0]!.id,
+      value.risk_narratives[0]!.id,
+      value.missing_narratives[0]!.id,
     ]);
-    assert.doesNotMatch(parsed.narrative.summary.en, /review|must|should|need|you\b/i);
-    assert.doesNotMatch(parsed.narrative.summary.pl, /sprawdź|należy|trzeba|musisz/i);
+    assert.equal(parsed.narrative.fact_narratives[1]!.en, untouched);
+    assertSafe(context, parsed.narrative);
   });
 
-  it("rejects a support reference, entity, number, material instruction, later-stage action, foreign script, and truncation", async () => {
-    const context = await stepThreeContext();
-    const support = validNarrative(context);
-    support.fact_narratives[0]!.support_ids = ["source:not-issued"];
-    assertRejected(support, context, "UNSUPPORTED_SUPPORT_REFERENCE");
-
-    const duplicateSupport = validNarrative(context);
-    const supportId = duplicateSupport.fact_narratives[0]!.support_ids[0]!;
-    duplicateSupport.fact_narratives[0]!.support_ids = [supportId, supportId];
-    assertRejected(duplicateSupport, context, "UNSUPPORTED_SUPPORT_REFERENCE");
-
-    const entity = validNarrative(context);
-    entity.summary.en = "A new exchange partner changes the current research view.";
-    assertRejected(entity, context, "UNSUPPORTED_ENTITY_OR_CAPABILITY");
-
-    const number = validNarrative(context);
-    number.summary.en = "The recorded evidence has 987654 unresolved checks.";
-    assertRejected(number, context, "INVENTED_NUMBER");
-
-    const materialInstruction = validNarrative(context);
-    materialInstruction.summary.support_ids = [context.narrative_contract.slots.actions[0]!.allowed_support_ids[0]!];
-    materialInstruction.summary.en = "Inspect bytecode before the current security review.";
-    assertRejected(materialInstruction, context, "INSTRUCTIONAL_NARRATIVE");
-    assertRejected(materialInstruction, context, "MATERIAL_INSTRUCTIONAL");
-    assertRejected(materialInstruction, context, "CURRENT_STEP_BOUNDARY_VIOLATION");
-
-    const laterStage = validNarrative(context);
-    laterStage.summary.en = "Inspect bytecode now before completing the current security review.";
-    assertRejected(laterStage, context, "CURRENT_STEP_BOUNDARY_VIOLATION");
-
-    const blockedFuture = validNarrative(context);
-    blockedFuture.summary.en = "The on-chain stage remains blocked until the security review is complete.";
-    assert.doesNotThrow(() => parseAIResearchProviderNarrative(JSON.stringify(blockedFuture), context));
-
-    const foreign = validNarrative(context);
-    foreign.summary.pl = "Ta luka wymaga sprawdzenia 新增.";
-    assertRejected(foreign, context, "FOREIGN_SCRIPT_CONTAMINATION");
-
-    const truncated = validNarrative(context);
-    truncated.summary.en = "The recorded evidence requires";
-    assertRejected(truncated, context, "INCOMPLETE_NARRATIVE");
+  it("replaces instructions, foreign script, truncation, and language mismatch slot by slot", async () => {
+    const context = await researchContext();
+    const value = validNarrative(context);
+    value.summary.en = "Review the evidence now.";
+    value.fact_narratives[0]!.pl = "Ta analiza obejmuje 新增.";
+    value.risk_narratives[0]!.en = "The recorded evidence remains";
+    value.missing_narratives[0]!.en = "Dane pozostają niepełne.";
+    const parsed = parseAIResearchProviderNarrativeWithDiagnostics(JSON.stringify(value), context);
+    assert.equal(parsed.slot_fallbacks.length, 4);
+    assertSafe(context, parsed.narrative);
   });
 
-  it("keeps actions, targets, priorities, lifecycle, scorecard boundaries, sources and red flags server-owned", async () => {
-    const context = await stepThreeContext();
-    const narrative = parseAIResearchProviderNarrative(JSON.stringify(validNarrative(context)), context);
-    const brief = hydrateAIResearchBrief(context, narrative, "gpt-5-mini", { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 }, NOW, false);
-
-    const reordered = structuredClone(brief);
-    reordered.next_actions.reverse();
-    assert.ok(auditAIResearchSemanticQuality(reordered, context).includes("ACTION_SKELETON_MISMATCH"));
-
-    const targetChanged = structuredClone(brief);
-    targetChanged.next_actions[0]!.target_reference = "#invented-target";
-    assert.ok(auditAIResearchSemanticQuality(targetChanged, context).includes("ACTION_SKELETON_MISMATCH"));
-
-    const priorityChanged = structuredClone(brief);
-    priorityChanged.next_actions[0]!.priority = "tertiary";
-    assert.ok(auditAIResearchSemanticQuality(priorityChanged, context).includes("ACTION_SKELETON_MISMATCH"));
-
-    const lifecycleChanged = structuredClone(brief);
-    lifecycleChanged.research_state = "ESTABLISHED_RESEARCH";
-    assert.ok(auditAIResearchSemanticQuality(lifecycleChanged, context).includes("RESEARCH_STATE_MISMATCH"));
-
-    const sourceAdded = structuredClone(brief);
-    sourceAdded.source_references.push({ id: "new-source", source_type: "report", label: "New source", observed_at: null, completeness: "complete", url: null });
-    assert.ok(auditAIResearchSemanticQuality(sourceAdded, context).includes("SOURCE_SKELETON_MISMATCH"));
-
-    const redFlagRemoved = structuredClone(brief);
-    redFlagRemoved.risk_factors[0]!.severity = "low";
-    assert.ok(auditAIResearchSemanticQuality(redFlagRemoved, context).includes("RISK_SKELETON_MISMATCH"));
+  it("allows full deterministic fallback when every structurally valid provider slot is unsafe", async () => {
+    const context = await researchContext();
+    const value = validNarrative(context);
+    for (const binding of allBindings(value)) {
+      binding.en = "Review the evidence now.";
+      binding.pl = "Sprawdź dane teraz.";
+    }
+    const parsed = parseAIResearchProviderNarrativeWithDiagnostics(JSON.stringify(value), context);
+    assert.equal(parsed.accepted_provider_slot_count, 0);
+    assert.equal(parsed.slot_fallbacks.length, issuedSlotCount(context));
+    assert.equal(parsed.full_deterministic_fallback, true);
+    assertSafe(context, parsed.narrative);
   });
 
-  it("preserves an auditable v4 row but excludes it from v6 exact and last-known-good lookup", async () => {
-    const context = await stepThreeContext();
-    const store = await createAIAnalysisQueueStore({ databaseFilePath: resolve(root, "v4-audit-v5-lookup.sqlite") });
-    const v4 = buildAIAnalysisCacheIdentity({
-      ...context.identity,
-      snapshot_fingerprint: context.snapshot_fingerprint,
-      prompt_version: "ai_research_prompt_v4",
-      narrative_contract_version: "ai_research_narrative_v3",
-      model_id: "gpt-5-mini",
-      analysis_schema_version: "ai_research_brief_v2",
-      locale: "en",
-    });
-    const queued = store.enqueue({
-      identity: v4,
-      session_scope_hash: hashAIAnalysisRateScope("v4-audit"),
-      now: NOW,
-      rate_limits: { windowMs: 60_000, session: 5, identity: 5, global: 5, cooldownMs: 1_000 },
-    });
-    const claimed = store.claimNext({ worker_id: "v4-audit-worker", now: NOW, lease_ms: 60_000 });
-    assert.equal(claimed?.analysis_id, queued.record?.analysis_id);
-    const narrative = parseAIResearchProviderNarrative(JSON.stringify(validNarrative(context)), context);
-    const current = hydrateAIResearchBrief(context, narrative, "gpt-5-mini", { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 }, NOW, false, claimed!.analysis_id);
-    const legacy = { ...current, prompt_version: "ai_research_prompt_v4" as const, output_hash: "0".repeat(64) };
-    const storedLegacy = { ...legacy, output_hash: sha256(stableJson(legacy)) };
-    store.complete({ analysis_id: claimed!.analysis_id, worker_id: "v4-audit-worker", brief: storedLegacy, validation_status: "VALID", latency_ms: 1, provider_response_id: null, now: NOW });
-    assert.equal(store.findByAnalysisId(claimed!.analysis_id)?.result?.prompt_version, "ai_research_prompt_v4");
+  it("keeps unknown slots and invalid response structure hard failures", async () => {
+    const context = await researchContext();
+    const unknown = validNarrative(context);
+    unknown.fact_narratives[0]!.id = "fact:unknown";
+    assert.throws(() => parseAIResearchProviderNarrativeWithDiagnostics(JSON.stringify(unknown), context),
+      (error) => error instanceof AIResearchValidationError && error.code === "SKELETON_MISMATCH");
+    assert.throws(() => parseAIResearchProviderNarrativeWithDiagnostics("{not-json", context),
+      (error) => error instanceof AIResearchValidationError && error.code === "INVALID_JSON");
+  });
 
+  it("keeps v6 cache records incompatible with the v7 composition identity", async () => {
+    const context = await researchContext();
     const v6 = buildAIAnalysisCacheIdentity({
-      ...context.identity,
-      snapshot_fingerprint: context.snapshot_fingerprint,
-      prompt_version: "ai_research_prompt_v6",
-      narrative_contract_version: "ai_research_narrative_v5",
-      model_id: "gpt-5-mini",
-      analysis_schema_version: "ai_research_brief_v2",
-      locale: "en",
+      ...context.identity, snapshot_fingerprint: context.snapshot_fingerprint, locale: "en", model_id: "gpt-5-mini",
+      prompt_version: "ai_research_prompt_v6", narrative_contract_version: "ai_research_narrative_v5",
+      semantic_policy_version: "ai_research_semantic_policy_v2", composition_policy_version: "legacy", provider_wire_schema_version: "ai_research_wire_schema_v3",
     });
-    assert.equal(store.lookup(v6).record, null);
-    assert.equal(store.lookup(v6).last_known_good, null);
-    assert.deepEqual(store.findRecentValidResults(v6), []);
-    store.close();
+    const v7 = buildAIAnalysisCacheIdentity({ ...context.identity, snapshot_fingerprint: context.snapshot_fingerprint, locale: "en", model_id: "gpt-5-mini" });
+    assert.notEqual(v6.cache_key, v7.cache_key);
   });
 });
 
-async function stepThreeContext(): Promise<AIResearchContext> {
-  const context = await buildAIResearchContext("base", ADDRESS, "en", {
+async function researchContext(): Promise<AIResearchContext> {
+  return buildAIResearchContext("base", ADDRESS, "en", {
     scanner: { runtimeMode: "DEVELOPMENT_DEMO", fixturePath, outputDirPath: resolve(root, "missing-output") },
     followUp: { storePath: resolve(root, "missing-follow-up.json"), now: () => NOW },
-    reports: { reportsRootPath: resolve(root, "missing-reports"), now: NOW },
-    now: () => NOW,
+    reports: { reportsRootPath: resolve(root, "missing-reports"), now: NOW }, now: () => NOW,
   });
-  context.narrative_contract.research_playbook = {
-    current_step: 3,
-    current_domain: "security",
-    unresolved_controls: ["Honeypot", "TokenSniffer", "De.Fi Scanner"],
-    blocked_domains: ["onchain", "social", "team", "docs", "narrative"],
-  };
-  return context;
 }
 
 function validNarrative(context: AIResearchContext) {
   const slot = (entry: { id: string; allowed_support_ids: string[] }, en: string, pl: string) => ({ id: entry.id, support_ids: [entry.allowed_support_ids[0]!], en, pl });
   return {
-    narrative_version: "ai_research_narrative_v5" as const,
-    summary: slot(context.narrative_contract.slots.summary, correctedEn.summary, correctedPl.summary),
-    fact_narratives: context.narrative_contract.slots.facts.map((entry) => slot(entry, correctedEn.fact, correctedPl.fact)),
-    risk_narratives: context.narrative_contract.slots.risks.map((entry) => slot(entry, correctedEn.risk, correctedPl.risk)),
-    missing_narratives: context.narrative_contract.slots.missing_information.map((entry) => slot(entry, correctedEn.missing, correctedPl.missing)),
+    narrative_version: "ai_research_narrative_v6" as const,
+    summary: slot(context.narrative_contract.slots.summary, "Recorded evidence describes the current research context without a final conclusion.", "Zapisane dane opisują obecny kontekst analizy bez ostatecznego wniosku."),
+    fact_narratives: context.narrative_contract.slots.facts.map((entry) => slot(entry, "This recorded fact adds context to the evidence view.", "Ten zapisany fakt uzupełnia kontekst danych.")),
+    risk_narratives: context.narrative_contract.slots.risks.map((entry) => slot(entry, "This recorded risk remains unresolved in the evidence view.", "To zapisane ryzyko pozostaje nierozstrzygnięte w kontekście danych.")),
+    missing_narratives: context.narrative_contract.slots.missing_information.map((entry) => slot(entry, "This evidence gap limits the current research context.", "Ta luka w danych ogranicza obecny kontekst analizy.")),
   };
 }
 
-function assertRejected(value: ReturnType<typeof validNarrative>, context: AIResearchContext, violation: string): void {
-  assert.throws(() => parseAIResearchProviderNarrative(JSON.stringify(value), context),
-    (error) => error instanceof AIResearchValidationError && error.violations.includes(violation as never));
+function allBindings(value: ReturnType<typeof validNarrative>) {
+  return [value.summary, ...value.fact_narratives, ...value.risk_narratives, ...value.missing_narratives];
 }
 
-function containsSchemaKeyword(value: unknown, keyword: string): boolean {
-  if (Array.isArray(value)) return value.some((item) => containsSchemaKeyword(item, keyword));
-  if (typeof value !== "object" || value === null) return false;
-  return Object.entries(value).some(([key, item]) => key === keyword || containsSchemaKeyword(item, keyword));
+function issuedSlotCount(context: AIResearchContext) {
+  return 1 + context.narrative_contract.slots.facts.length + context.narrative_contract.slots.risks.length + context.narrative_contract.slots.missing_information.length;
 }
 
-type BadFixture = { fixture_version: string; summary: { en: string; pl: string } };
-type CorrectedFixture = { fixture_version: string; summary: string; fact: string; risk: string; missing: string; action: string; condition: string };
+function assertSafe(context: AIResearchContext, narrative: ReturnType<typeof validNarrative>) {
+  const brief = hydrateAIResearchBrief(context, narrative, "gpt-5-mini", { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 }, NOW, false);
+  assert.deepEqual(auditAIResearchSemanticQuality(brief, context), []);
+}

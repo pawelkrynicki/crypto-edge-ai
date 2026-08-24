@@ -11,6 +11,7 @@ import {
 } from "../src/types/aiResearchTypes.js";
 import { buildAIResearchContext, isAIResearchBriefEvidenceCurrent, sha256, stableJson, type AIResearchContext, type AIResearchContextOptions } from "./aiResearchContext.js";
 import { AI_RESEARCH_NARRATIVE_VERSION, aiResearchNarrativeId } from "./aiResearchNarrativeContract.js";
+import { AI_RESEARCH_COMPOSITION_POLICY_VERSION } from "./aiResearchCompositionPolicy.js";
 import { AI_RESEARCH_SEMANTIC_POLICY_VERSION } from "./aiResearchSemanticPolicy.js";
 import { AI_RESEARCH_PROVIDER_WIRE_SCHEMA_VERSION, buildAIResearchProviderWireSchema } from "./aiResearchProviderWireSchema.js";
 import {
@@ -119,6 +120,7 @@ export function createAIResearchService(options: AIResearchServiceOptions = {}) 
       prompt_version: context.prompt_version,
       narrative_contract_version: AI_RESEARCH_NARRATIVE_VERSION,
       semantic_policy_version: AI_RESEARCH_SEMANTIC_POLICY_VERSION,
+      composition_policy_version: AI_RESEARCH_COMPOSITION_POLICY_VERSION,
       provider_wire_schema_version: wireSchema.version,
       model_id: modelId,
       analysis_schema_version: AI_RESEARCH_SCHEMA_VERSION,
@@ -267,6 +269,7 @@ export function hydrateAIResearchBrief(
     prompt_version: context.prompt_version,
     narrative_contract_version: AI_RESEARCH_NARRATIVE_VERSION,
     semantic_policy_version: AI_RESEARCH_SEMANTIC_POLICY_VERSION,
+    composition_policy_version: AI_RESEARCH_COMPOSITION_POLICY_VERSION,
     provider_wire_schema_version: AI_RESEARCH_PROVIDER_WIRE_SCHEMA_VERSION,
     model,
   }));

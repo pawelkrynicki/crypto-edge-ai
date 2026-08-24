@@ -96,24 +96,24 @@ describe("AI.2C deterministic actions and PL/EN narrative boundary", () => {
     assert.ok(context.action_catalog.some(({ action_type }) => action_type === "WAIT_FOR_CHECKPOINT"));
   });
 
-  it("accepts natural PL/EN narrative and rejects raw enums, machine values and mixed language", async () => {
+  it("accepts natural PL/EN narrative and deterministically replaces raw enums, machine values and mixed language", async () => {
     const pl = await researchContext("pl");
     const en = await researchContext("en");
-    assert.equal(parseAIResearchProviderNarrative(JSON.stringify(providerNarrative(pl)), pl).narrative_version, "ai_research_narrative_v5");
-    assert.equal(parseAIResearchProviderNarrative(JSON.stringify(providerNarrative(en)), en).narrative_version, "ai_research_narrative_v5");
+    assert.equal(parseAIResearchProviderNarrative(JSON.stringify(providerNarrative(pl)), pl).narrative_version, "ai_research_narrative_v6");
+    assert.equal(parseAIResearchProviderNarrative(JSON.stringify(providerNarrative(en)), en).narrative_version, "ai_research_narrative_v6");
 
     const rawEnum = providerNarrative(pl);
     rawEnum.summary.pl = "Stan DATA_STALE wymaga sprawdzenia.";
-    assert.throws(() => parseAIResearchProviderNarrativeWithDiagnostics(JSON.stringify(rawEnum), pl),
-      (error) => error instanceof AIResearchValidationError && error.violations.includes("RAW_ENUM_IN_NARRATIVE"));
+    assert.ok(parseAIResearchProviderNarrativeWithDiagnostics(JSON.stringify(rawEnum), pl).slot_fallbacks
+      .some(({ violations }) => violations.includes("RAW_ENUM_IN_NARRATIVE")));
     const machineValue = providerNarrative(pl);
     machineValue.fact_narratives[0]!.pl = "Etap lifecycle ma wartość new.";
-    assert.throws(() => parseAIResearchProviderNarrativeWithDiagnostics(JSON.stringify(machineValue), pl),
-      (error) => error instanceof AIResearchValidationError && error.violations.includes("MACHINE_VALUE_IN_NARRATIVE"));
+    assert.ok(parseAIResearchProviderNarrativeWithDiagnostics(JSON.stringify(machineValue), pl).slot_fallbacks
+      .some(({ violations }) => violations.includes("MACHINE_VALUE_IN_NARRATIVE")));
     const mixed = providerNarrative(en);
     mixed.summary.en = "Dane wymagają świeżej migawki.";
-    assert.throws(() => parseAIResearchProviderNarrativeWithDiagnostics(JSON.stringify(mixed), en),
-      (error) => error instanceof AIResearchValidationError && error.violations.includes("LANGUAGE_MISMATCH"));
+    assert.ok(parseAIResearchProviderNarrativeWithDiagnostics(JSON.stringify(mixed), en).slot_fallbacks
+      .some(({ violations }) => violations.includes("LANGUAGE_MISMATCH")));
   });
 });
 
@@ -177,7 +177,7 @@ function semanticCandidate(context: AIResearchContext, fixture: CapturedFixture 
 function providerNarrative(context: AIResearchContext) {
   const slot = (entry: { id: string; allowed_support_ids: string[] }, en: string, pl: string) => ({ id: entry.id, support_ids: [entry.allowed_support_ids[0]!], en, pl });
   return {
-    narrative_version: "ai_research_narrative_v5" as const,
+    narrative_version: "ai_research_narrative_v6" as const,
     summary: slot(context.narrative_contract.slots.summary, "The recorded data describes the current research boundary.", "Zapisane dane opisują granicę bieżącej analizy."),
     fact_narratives: context.narrative_contract.slots.facts.map((entry) => slot(entry, "This recorded fact adds context to the research view.", "Ten zapisany fakt uzupełnia obecną analizę.")),
     risk_narratives: context.narrative_contract.slots.risks.map((entry) => slot(entry, "This recorded risk remains part of the listed evidence context.", "To zapisane ryzyko pozostaje częścią wskazanego kontekstu danych.")),

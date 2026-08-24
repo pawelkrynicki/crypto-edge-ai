@@ -31,7 +31,7 @@ const NOW = new Date("2026-08-11T12:00:00.000Z");
 after(async () => { await rm(root, { recursive: true, force: true }); });
 
 describe("PC.2 shared production AI path", () => {
-  it("shares one v6 cold job and warm result across 100 isolated user contexts", async () => {
+  it("shares one v7 cold job and warm result across 100 isolated user contexts", async () => {
     await writeFixture(100_000);
     const store = await createAIAnalysisQueueStore({ databaseFilePath: resolve(root, "concurrency.sqlite") });
     let calls = 0;
@@ -350,7 +350,9 @@ async function assertLocaleOrder(firstLocale: "pl" | "en", secondLocale: "pl" | 
 function cacheIdentity(context: AIResearchContext) {
   return buildAIAnalysisCacheIdentity({
     ...context.identity, snapshot_fingerprint: context.snapshot_fingerprint, prompt_version: context.prompt_version,
-    narrative_contract_version: "ai_research_narrative_v5",
+    narrative_contract_version: "ai_research_narrative_v6",
+    semantic_policy_version: "ai_research_semantic_policy_v3",
+    composition_policy_version: "ai_research_composition_policy_v1",
     model_id: "gpt-5-mini", analysis_schema_version: "ai_research_brief_v2", locale: context.locale,
   });
 }
@@ -367,7 +369,7 @@ function provider(generate: (context: AIResearchContext) => Promise<string>): AI
 function narrative(context: AIResearchContext) {
   const slot = (entry: { id: string; allowed_support_ids: string[] }, en: string, pl: string) => ({ id: entry.id, support_ids: [entry.allowed_support_ids[0]!], en, pl });
   return {
-    narrative_version: "ai_research_narrative_v5",
+    narrative_version: "ai_research_narrative_v6",
     summary: slot(context.narrative_contract.slots.summary, "The recorded snapshot gives market context while evidence gaps remain in the current evidence set.", "Zapisana migawka daje kontekst rynkowy, a luki pozostają w obecnym zestawie danych."),
     fact_narratives: context.narrative_contract.slots.facts.map((entry) => slot(entry, "This recorded fact adds context to the research view.", "Ten zapisany fakt uzupełnia obecną analizę.")),
     risk_narratives: context.narrative_contract.slots.risks.map((entry) => slot(entry, "This recorded risk remains part of the listed evidence context.", "To zapisane ryzyko pozostaje częścią wskazanego kontekstu danych.")),

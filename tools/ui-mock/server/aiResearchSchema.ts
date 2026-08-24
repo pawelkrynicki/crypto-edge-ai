@@ -114,17 +114,19 @@ export type AIResearchProviderNarrative = {
   missing_narratives: AIResearchNarrativeBinding[];
 };
 
-export type AIResearchPresentationFallback = {
-  classification: "STYLE_ONLY_INSTRUCTIONAL";
+export type AIResearchSlotFallback = {
+  classification: "SLOT_SEMANTIC_FALLBACK";
   target: "summary" | "fact" | "risk" | "missing";
   slot_id: string;
-  locale: "en" | "pl";
-  violations: ["INSTRUCTIONAL_NARRATIVE"];
+  support_ids: string[];
+  violations: AIResearchSemanticViolation[];
 };
 
 export type AIResearchProviderNarrativeParseResult = {
   narrative: AIResearchProviderNarrative;
-  presentation_fallbacks: AIResearchPresentationFallback[];
+  slot_fallbacks: AIResearchSlotFallback[];
+  accepted_provider_slot_count: number;
+  full_deterministic_fallback: boolean;
 };
 
 export type AIResearchSemanticViolation =
@@ -145,12 +147,16 @@ export type AIResearchSemanticViolation =
   | "FORBIDDEN_CONTENT"
   | "GENERATED_URL"
   | "INVENTED_NUMBER"
+  | "UNKNOWN_FACT"
   | "UNSUPPORTED_SUPPORT_REFERENCE"
   | "MISSING_SUPPORT_REFERENCE"
   | "CURRENT_STEP_BOUNDARY_VIOLATION"
   | "UNSUPPORTED_ENTITY_OR_CAPABILITY"
   | "FOREIGN_SCRIPT_CONTAMINATION"
   | "INCOMPLETE_NARRATIVE"
+  | "TRUNCATED_NARRATIVE"
+  | "UNSUPPORTED_SOURCE"
+  | "UNSUPPORTED_INFERENCE"
   | "INSTRUCTIONAL_NARRATIVE"
   | "MATERIAL_INSTRUCTIONAL";
 
@@ -210,70 +216,78 @@ export function parseAIResearchProviderNarrativeWithDiagnostics(raw: string, con
       280,
     ),
   };
-  const { narrative, violations, presentationFallbacks } = normalizeProviderNarrative(result, context);
-  if (violations.length > 0) {
-    const code = violations.includes("FORBIDDEN_CONTENT") || violations.includes("GENERATED_URL")
-      ? "FORBIDDEN_CONTENT"
-      : violations.includes("INVENTED_NUMBER")
-        ? "UNKNOWN_FACT"
-        : "SEMANTIC_MISMATCH";
-    throw new AIResearchValidationError(code, violations);
-  }
-  return { narrative, presentation_fallbacks: presentationFallbacks };
+  return composeProviderNarrative(result, context);
 }
 
-function normalizeProviderNarrative(
+/**
+ * Wire parsing above is deliberately all-or-nothing. Once the response has
+ * been mapped to the exact issued slot set, prose is optional: each unsafe
+ * slot is discarded and replaced before it can reach the public brief.
+ */
+function composeProviderNarrative(
   narrative: AIResearchProviderNarrative,
   context: AIResearchContext,
-): { narrative: AIResearchProviderNarrative; violations: AIResearchSemanticViolation[]; presentationFallbacks: AIResearchPresentationFallback[] } {
-  const result = new Set<AIResearchSemanticViolation>();
-  const presentationFallbacks: AIResearchPresentationFallback[] = [];
-  const bindings: Array<{ target: AIResearchPresentationFallback["target"]; binding: AIResearchNarrativeBinding }> = [
+): AIResearchProviderNarrativeParseResult {
+  const slotFallbacks: AIResearchSlotFallback[] = [];
+  let acceptedProviderSlotCount = 0;
+  const bindings: Array<{ target: AIResearchSlotFallback["target"]; binding: AIResearchNarrativeBinding }> = [
     { target: "summary", binding: narrative.summary },
     ...narrative.fact_narratives.map((binding) => ({ target: "fact" as const, binding })),
     ...narrative.risk_narratives.map((binding) => ({ target: "risk" as const, binding })),
     ...narrative.missing_narratives.map((binding) => ({ target: "missing" as const, binding })),
   ];
   for (const { target, binding } of bindings) {
-    for (const locale of ["en", "pl"] as const) {
-      const violations = narrativePresentationViolations(binding[locale], locale, context);
-      if (isStyleOnlyInstructional(violations, binding, target)) {
-        binding[locale] = deterministicDescriptiveFallback(target, locale);
-        presentationFallbacks.push({ classification: "STYLE_ONLY_INSTRUCTIONAL", target, slot_id: binding.id, locale, violations: ["INSTRUCTIONAL_NARRATIVE"] });
-      } else {
-        for (const violation of violations) result.add(violation);
-        if (violations.includes("INSTRUCTIONAL_NARRATIVE")) result.add("MATERIAL_INSTRUCTIONAL");
-      }
+    const violations = [...new Set([
+      ...narrativePresentationViolations(binding.en, "en", context),
+      ...narrativePresentationViolations(binding.pl, "pl", context),
+    ])];
+    // These indicate transport/structure or secret-like data and must never be
+    // converted into apparently-valid content through a prose fallback.
+    if (violations.includes("FORBIDDEN_CONTENT") || violations.includes("GENERATED_URL")) {
+      throw new AIResearchValidationError("FORBIDDEN_CONTENT", violations);
     }
+    if (violations.length === 0) {
+      acceptedProviderSlotCount += 1;
+      continue;
+    }
+    binding.en = deterministicDescriptiveFallback(target, "en", binding.support_ids, context);
+    binding.pl = deterministicDescriptiveFallback(target, "pl", binding.support_ids, context);
+    slotFallbacks.push({
+      classification: "SLOT_SEMANTIC_FALLBACK",
+      target,
+      slot_id: binding.id,
+      support_ids: [...binding.support_ids],
+      violations,
+    });
   }
-  return { narrative, violations: [...result], presentationFallbacks };
+  return {
+    narrative,
+    slot_fallbacks: slotFallbacks,
+    accepted_provider_slot_count: acceptedProviderSlotCount,
+    full_deterministic_fallback: acceptedProviderSlotCount === 0,
+  };
 }
 
-/**
- * A replacement is allowed only for an otherwise-valid slot structurally bound
- * to a current server action. Anything else is a material semantic mismatch.
- */
-function isStyleOnlyInstructional(
-  violations: AIResearchSemanticViolation[],
-  binding: AIResearchNarrativeBinding,
-  target: AIResearchPresentationFallback["target"],
-): boolean {
-  return target === "summary"
-    && violations.length === 1
-    && violations[0] === "INSTRUCTIONAL_NARRATIVE"
-    && binding.support_ids.some((id) => id.startsWith("action:"));
-}
-
-function deterministicDescriptiveFallback(target: AIResearchPresentationFallback["target"], locale: "en" | "pl"): string {
+function deterministicDescriptiveFallback(
+  target: AIResearchSlotFallback["target"],
+  locale: "en" | "pl",
+  supportIds: string[],
+  context: AIResearchContext,
+): string {
+  // The template selection is deterministic. Support IDs are intentionally
+  // retained only for ownership/audit; no provider wording or untrusted value
+  // is copied into the replacement.
+  void supportIds;
+  void context;
   const text = {
     en: {
-      summary: "The recorded evidence describes the current research context. Product actions remain fixed by the server-issued evidence set.",
+      summary: "The recorded evidence describes the current research context without resolving the remaining gaps.",
       fact: "This recorded fact adds context within the current evidence set.",
       risk: "This recorded risk remains part of the current evidence context.",
       missing: "This evidence gap limits the current research context.",
     },
     pl: {
-      summary: "Zapisane dane opisują obecny kontekst analizy. Działania produktu wynikają z danych ustalonych przez system.",
+      summary: "Zapisane dane opisują obecny kontekst analizy, ale nie rozstrzygają pozostałych braków.",
       fact: "Ten zapisany fakt uzupełnia obecny zestaw danych.",
       risk: "To zapisane ryzyko pozostaje częścią obecnego kontekstu danych.",
       missing: "Ta luka w danych ogranicza obecny kontekst analizy.",
@@ -289,16 +303,20 @@ function narrativePresentationViolations(
 ): AIResearchSemanticViolation[] {
   const violations: AIResearchSemanticViolation[] = [];
   if (hasForbiddenContent([value])) violations.push("FORBIDDEN_CONTENT");
+  if (hasSecretLikeContent([value])) violations.push("FORBIDDEN_CONTENT");
   if (hasGeneratedUrl([value])) violations.push("GENERATED_URL");
-  if (hasInventedNumber([value], context)) violations.push("INVENTED_NUMBER");
+  if (hasInventedNumber([value], context)) violations.push("INVENTED_NUMBER", "UNKNOWN_FACT");
   if (hasRawEnum([value])) violations.push("RAW_ENUM_IN_NARRATIVE");
   if (hasMachineValue([value], locale)) violations.push("MACHINE_VALUE_IN_NARRATIVE");
   if (hasLanguageMismatch([value], locale)) violations.push("LANGUAGE_MISMATCH");
   if (hasForeignScript([value])) violations.push("FOREIGN_SCRIPT_CONTAMINATION");
   if (hasIncompleteNarrative([value])) violations.push("INCOMPLETE_NARRATIVE");
+  if (hasTruncatedNarrative([value])) violations.push("TRUNCATED_NARRATIVE");
   if (hasInstructionalNarrative([value])) violations.push("INSTRUCTIONAL_NARRATIVE");
   if (hasOutOfScopeDomain([value], context)) violations.push("CURRENT_STEP_BOUNDARY_VIOLATION");
   if (hasUnsupportedEntityOrCapability([value], context)) violations.push("UNSUPPORTED_ENTITY_OR_CAPABILITY");
+  if (hasUnsupportedSource([value], context)) violations.push("UNSUPPORTED_SOURCE");
+  if (hasUnsupportedInference([value])) violations.push("UNSUPPORTED_INFERENCE");
   return violations;
 }
 
@@ -421,8 +439,8 @@ export function validateStoredAIResearchBrief(value: unknown): AIResearchBrief {
     "source_references", "coverage", "checkpoints", "token_usage", "input_hash", "output_hash", "render_preview",
   ])) fail();
   if (value.schema_version !== AI_RESEARCH_SCHEMA_VERSION
-    || (value.prompt_version !== AI_RESEARCH_PROMPT_VERSION && value.prompt_version !== "ai_research_prompt_v4" && value.prompt_version !== "ai_research_prompt_v5")) fail();
-  const historicalV4 = value.prompt_version === "ai_research_prompt_v4" || value.prompt_version === "ai_research_prompt_v5";
+    || (value.prompt_version !== AI_RESEARCH_PROMPT_VERSION && value.prompt_version !== "ai_research_prompt_v4" && value.prompt_version !== "ai_research_prompt_v5" && value.prompt_version !== "ai_research_prompt_v6")) fail();
+  const historicalV4 = value.prompt_version === "ai_research_prompt_v4" || value.prompt_version === "ai_research_prompt_v5" || value.prompt_version === "ai_research_prompt_v6";
   const analysisId = text(value.analysis_id, 40, 40);
   if (!/^air_[0-9a-f-]{36}$/.test(analysisId)) fail();
   if (!isRecord(value.identity) || !hasExactKeys(value.identity, ["chain", "contract_address"])) fail();
@@ -626,6 +644,10 @@ function hasLanguageMismatch(strings: string[], locale: "pl" | "en"): boolean {
   return /\b(?:lifecycle|security|the\s+data|the\s+product|filters?\s+(?:are|is)|wait\s+for)\b/iu.test(content);
 }
 
+function hasSecretLikeContent(strings: string[]): boolean {
+  return /\b(?:sk|rk|pk)_[A-Za-z0-9_-]{12,}|\b(?:api[_ -]?key|authorization|bearer)\s*[:=]/iu.test(strings.join("\n"));
+}
+
 /** Rejects script families that cannot occur in a normal English or Polish fragment. */
 function hasForeignScript(strings: string[]): boolean {
   return /[\p{Script=Greek}\p{Script=Cyrillic}\p{Script=Arabic}\p{Script=Devanagari}\p{Script=Hangul}\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(strings.join("\n"));
@@ -635,9 +657,12 @@ function hasForeignScript(strings: string[]): boolean {
 function hasIncompleteNarrative(strings: string[]): boolean {
   return strings.some((value) => {
     const text = value.trim();
-    if (text.length < 12 || !/[.!?…]$/u.test(text)) return true;
-    return /(?:\b(?:and|or|to|with|for|the|a|an|oraz|lub|i|z|do|na|w|od|bez)|[,;:–—(]|\[)[.!?…]$/iu.test(text);
+    return text.length < 12 || !/[.!?…]$/u.test(text);
   });
+}
+
+function hasTruncatedNarrative(strings: string[]): boolean {
+  return strings.some((value) => /(?:\.\.\.|…|[,;:–—(])\s*$/u.test(value.trim()));
 }
 
 /** Provider prose may explain server-issued actions, never issue an instruction. */
@@ -680,6 +705,20 @@ function hasUnsupportedEntityOrCapability(strings: string[], context: AIResearch
     const matched = sentence.match(entry.terms)?.[0] ?? "";
     return !available.has(normalizeNarrativeTerm(matched)) && entry.earliest_step > context.narrative_contract.research_playbook.current_step;
   })));
+}
+
+/** Named providers outside the issued source catalog are not explanatory prose. */
+function hasUnsupportedSource(strings: string[], context: AIResearchContext): boolean {
+  const issued = new Set(context.source_references.map(({ label }) => normalizeNarrativeTerm(label)));
+  const namedSources = /\b(?:coingecko|coinmarketcap|binance|okx|bybit|moralis|quicknode|alchemy)\b/iu;
+  return strings.some((value) => {
+    const match = value.match(namedSources)?.[0];
+    return Boolean(match && !issued.has(normalizeNarrativeTerm(match)));
+  });
+}
+
+function hasUnsupportedInference(strings: string[]): boolean {
+  return strings.some((value) => /\b(?:proves?|confirms?|demonstrates?|guarantees?|therefore\s+(?:it|this)\s+(?:is|remains)|potwierdza\s+(?:bezpieczeństwo|wynik)|dowodzi\s+(?:bezpieczeństwa|wyniku))\b/iu.test(value));
 }
 
 function isExplicitlyBlockedOrFuture(sentence: string): boolean {

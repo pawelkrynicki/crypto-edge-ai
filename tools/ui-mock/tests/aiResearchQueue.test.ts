@@ -142,6 +142,67 @@ describe("AI.3 central worker, single-flight and last-known-good", () => {
     secondStore.close();
   });
 
+  it("persists bounded owner-only composition diagnostics while storing only safe fallback prose", async () => {
+    await writeFixture(100_000, true);
+    const store = await createAIAnalysisQueueStore({ databaseFilePath: resolve(root, "slot-fallback.sqlite") });
+    const contextValue = await context(ADDRESS);
+    const queued = enqueue(store, fromContext(contextValue), "slot-fallback-session");
+    const provider = mockProvider(async (value) => {
+      const response = narrative(value);
+      response.summary.en = "The recorded amount is 999999.";
+      return JSON.stringify(response);
+    });
+    const worker = createAIResearchWorker({ ...contextOptions(), store, provider, now: () => NOW });
+    assert.equal((await worker.runCycle()).completed, 1);
+    const record = store.findByAnalysisId(queued.record!.analysis_id)!;
+    assert.equal(record.status, "READY");
+    assert.deepEqual(record.internal_composition_diagnostics, {
+      accepted_provider_slot_count: issuedSlotCount(contextValue) - 1,
+      fallback_slot_ids: ["summary:overall"],
+      fallback_reasons: ["INVENTED_NUMBER", "UNKNOWN_FACT"],
+      full_deterministic_fallback: false,
+    });
+    assert.doesNotMatch(JSON.stringify(record.result), /999999/u);
+    store.close();
+  });
+
+  it("persists READY through a full deterministic fallback without another provider attempt", async () => {
+    await writeFixture(100_000, true);
+    const store = await createAIAnalysisQueueStore({ databaseFilePath: resolve(root, "full-slot-fallback.sqlite") });
+    const contextValue = await context(ADDRESS);
+    const queued = enqueue(store, fromContext(contextValue), "full-slot-fallback-session");
+    let providerCalls = 0;
+    const provider = mockProvider(async (value) => {
+      providerCalls += 1;
+      const response = narrative(value);
+      for (const binding of [response.summary, ...response.fact_narratives, ...response.risk_narratives, ...response.missing_narratives]) {
+        binding.en = "Review the evidence now.";
+        binding.pl = "Sprawdź dane teraz.";
+      }
+      return JSON.stringify(response);
+    });
+    const worker = createAIResearchWorker({ ...contextOptions(), store, provider, now: () => NOW });
+    assert.equal((await worker.runCycle()).completed, 1);
+    const record = store.findByAnalysisId(queued.record!.analysis_id)!;
+    assert.equal(providerCalls, 1);
+    assert.equal(record.status, "READY");
+    assert.equal(record.provider_attempt_count, 1);
+    assert.deepEqual(record.internal_composition_diagnostics, {
+      accepted_provider_slot_count: 0,
+      fallback_slot_ids: ["summary:overall", ...contextValue.narrative_contract.slots.facts.map(({ id }) => id), ...contextValue.narrative_contract.slots.risks.map(({ id }) => id), ...contextValue.narrative_contract.slots.missing_information.map(({ id }) => id)],
+      fallback_reasons: ["INSTRUCTIONAL_NARRATIVE"],
+      full_deterministic_fallback: true,
+    });
+    const renderedNarratives = JSON.stringify({
+      summary: record.result?.summary,
+      facts: record.result?.known_facts.map(({ interpretation }) => interpretation),
+      risks: record.result?.risk_factors.map(({ explanation }) => explanation),
+      missing: record.result?.missing_information.map(({ explanation }) => explanation),
+    });
+    assert.doesNotMatch(renderedNarratives, /Review|Sprawdź/u);
+    store.close();
+  });
+
   it("shares READY between sessions and exposes last-known-good while a new fingerprint is queued", async () => {
     await writeFixture(100_000, true);
     const store = await createAIAnalysisQueueStore({ databaseFilePath: resolve(root, "shared-ready.sqlite") });
@@ -296,7 +357,7 @@ describe("AI.3 central worker, single-flight and last-known-good", () => {
   });
 });
 
-function cacheIdentity(chain: string, address: string, fingerprint: string, promptVersion = "ai_research_prompt_v6") {
+function cacheIdentity(chain: string, address: string, fingerprint: string, promptVersion = "ai_research_prompt_v7") {
   return buildAIAnalysisCacheIdentity({
     chain,
     contract_address: address,
@@ -313,7 +374,9 @@ function fromContext(value: AIResearchContext): AIAnalysisCacheIdentity {
     ...value.identity,
     snapshot_fingerprint: value.snapshot_fingerprint,
     prompt_version: value.prompt_version,
-    narrative_contract_version: "ai_research_narrative_v5",
+    narrative_contract_version: "ai_research_narrative_v6",
+    semantic_policy_version: "ai_research_semantic_policy_v3",
+    composition_policy_version: "ai_research_composition_policy_v1",
     model_id: "gpt-5-mini",
     analysis_schema_version: "ai_research_brief_v2",
     locale: "en",
@@ -365,12 +428,16 @@ function mockProvider(generateJson: (context: AIResearchContext) => Promise<stri
 function narrative(ctx: AIResearchContext) {
   const slot = (entry: { id: string; allowed_support_ids: string[] }, en: string, pl: string) => ({ id: entry.id, support_ids: [entry.allowed_support_ids[0]!], en, pl });
   return {
-    narrative_version: "ai_research_narrative_v5",
+    narrative_version: "ai_research_narrative_v6",
     summary: slot(ctx.narrative_contract.slots.summary, "The recorded snapshot gives market context while evidence gaps remain in the current evidence set.", "Zapisana migawka daje kontekst rynkowy, a luki pozostają w obecnym zestawie danych."),
     fact_narratives: ctx.narrative_contract.slots.facts.map((entry) => slot(entry, "This recorded fact adds context to the research view.", "Ten zapisany fakt uzupełnia obecną analizę.")),
     risk_narratives: ctx.narrative_contract.slots.risks.map((entry) => slot(entry, "This recorded risk remains part of the listed evidence context.", "To zapisane ryzyko pozostaje częścią wskazanego kontekstu danych.")),
     missing_narratives: ctx.narrative_contract.slots.missing_information.map((entry) => slot(entry, "This evidence gap limits the current research view.", "Ta luka w danych ogranicza obecną analizę.")),
   };
+}
+
+function issuedSlotCount(context: AIResearchContext): number {
+  return 1 + context.narrative_contract.slots.facts.length + context.narrative_contract.slots.risks.length + context.narrative_contract.slots.missing_information.length;
 }
 
 async function writeFixture(liquidity: number, includeOther = false, otherLiquidity = liquidity) {

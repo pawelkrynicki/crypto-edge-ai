@@ -1,12 +1,12 @@
 /**
- * v5 makes the narrative a closed, evidence-bound presentation layer.  The
+ * v6 makes the narrative a closed, evidence-bound presentation layer.  The
  * provider writes only prose for server-issued slots; it does not own facts,
  * risks, actions, targets, priorities, conditions, sources, or playbook
  * progression.
  */
-export const AI_RESEARCH_NARRATIVE_VERSION = "ai_research_narrative_v5" as const;
+export const AI_RESEARCH_NARRATIVE_VERSION = "ai_research_narrative_v6" as const;
 
-export type AIResearchNarrativeKind = "fact" | "risk" | "missing" | "action" | "condition";
+export type AIResearchNarrativeKind = "fact" | "risk" | "missing";
 
 export function aiResearchNarrativeId(kind: AIResearchNarrativeKind, key: string | number): string {
   return `${kind}:${key}`;
@@ -14,7 +14,7 @@ export function aiResearchNarrativeId(kind: AIResearchNarrativeKind, key: string
 
 export type AIResearchNarrativeSupport = {
   id: string;
-  kind: "fact" | "risk" | "missing" | "action" | "condition" | "source" | "playbook";
+  kind: "fact" | "risk" | "missing" | "source" | "playbook";
   label: string;
   value: string | number | boolean | null;
 };
@@ -40,8 +40,6 @@ export type AIResearchNarrativeContract = {
     facts: AIResearchNarrativeSlot[];
     risks: AIResearchNarrativeSlot[];
     missing_information: AIResearchNarrativeSlot[];
-    actions: AIResearchNarrativeSlot[];
-    status_change_conditions: AIResearchNarrativeSlot[];
   };
 };
 
@@ -64,8 +62,6 @@ export function buildAIResearchNarrativeContract(input: NarrativeContractInput):
     ...input.fact_candidates.map((item) => ({ id: `fact:${item.key}`, kind: "fact" as const, label: item.label, value: item.value })),
     ...input.risk_candidates.map((item, index) => ({ id: `risk:${index}`, kind: "risk" as const, label: item.title, value: null })),
     ...input.missing_information.map((item) => ({ id: `missing:${item.key}`, kind: "missing" as const, label: item.label, value: null })),
-    ...input.action_catalog.map((item, index) => ({ id: `action:${index}`, kind: "action" as const, label: item.label, value: null })),
-    ...input.status_change_conditions.map((item) => ({ id: `condition:${item.key}`, kind: "condition" as const, label: item.label, value: null })),
     ...input.source_references.map((item) => ({ id: `source:${item.id}`, kind: "source" as const, label: item.label, value: null })),
   ];
   const sourceSupports = (ids: string[]) => ids.map((id) => `source:${id}`);
@@ -82,14 +78,6 @@ export function buildAIResearchNarrativeContract(input: NarrativeContractInput):
     aiResearchNarrativeId("missing", item.key),
     [`missing:${item.key}`, ...sourceSupports(item.source_reference_ids), `playbook:${playbook.current_step}`],
   ));
-  const actionSlots = input.action_catalog.map((_item, index) => slot(
-    aiResearchNarrativeId("action", index),
-    [`action:${index}`, `playbook:${playbook.current_step}`],
-  ));
-  const conditionSlots = input.status_change_conditions.map((item) => slot(
-    aiResearchNarrativeId("condition", item.key),
-    [`condition:${item.key}`, ...sourceSupports(item.source_reference_ids), `playbook:${playbook.current_step}`],
-  ));
   return {
     version: AI_RESEARCH_NARRATIVE_VERSION,
     research_playbook: playbook,
@@ -99,8 +87,6 @@ export function buildAIResearchNarrativeContract(input: NarrativeContractInput):
       facts: factSlots,
       risks: riskSlots,
       missing_information: missingSlots,
-      actions: actionSlots,
-      status_change_conditions: conditionSlots,
     },
   };
 }

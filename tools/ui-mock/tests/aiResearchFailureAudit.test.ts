@@ -225,7 +225,7 @@ describe("PC.2 provider attempt and failure-stage audit", () => {
     store.close();
   });
 
-  it("C3: rejects presentation-invalid provider prose without a canonical READY fallback", async () => {
+  it("C3: replaces presentation-invalid provider prose before canonical READY persistence", async () => {
     const store = await storeFor("presentation-fallback.sqlite");
     const queued = await enqueueReal(store, "presentation-fallback");
     const worker = createAIResearchWorker({
@@ -242,13 +242,14 @@ describe("PC.2 provider attempt and failure-stage audit", () => {
 
     await worker.runCycle();
     const record = required(store, queued);
-    assert.equal(record.status, "SUSPENDED");
-    assert.equal(record.safe_error_code, "PROVIDER_CONTRACT_INVALID");
-    assert.equal(record.internal_validation_code, "SEMANTIC_MISMATCH");
+    assert.equal(record.status, "READY");
+    assert.equal(record.safe_error_code, null);
+    assert.equal(record.internal_validation_code, "SLOT_FALLBACK_APPLIED");
     assert.deepEqual(record.internal_validation_violations, ["MACHINE_VALUE_IN_NARRATIVE", "LANGUAGE_MISMATCH"]);
     assert.equal(record.provider_attempt_count, 1);
     assert.equal(record.attempt_count, 1);
-    assert.equal(record.result, null);
+    assert.equal(record.result?.known_facts[0]?.interpretation.pl, "Ten zapisany fakt uzupełnia obecny zestaw danych.");
+    assert.deepEqual(record.internal_composition_diagnostics?.fallback_slot_ids, ["fact:lifecycle"]);
     store.close();
   });
 
@@ -435,7 +436,7 @@ function provider(generateJson: (context: AIResearchContext) => Promise<string>)
 function narrative(context: AIResearchContext) {
   const slot = (entry: { id: string; allowed_support_ids: string[] }, en: string, pl: string) => ({ id: entry.id, support_ids: [entry.allowed_support_ids[0]!], en, pl });
   return {
-    narrative_version: "ai_research_narrative_v5",
+    narrative_version: "ai_research_narrative_v6",
     summary: slot(context.narrative_contract.slots.summary, "The recorded snapshot gives market context while evidence gaps remain in the current evidence set.", "Zapisana migawka daje kontekst rynkowy, a luki pozostają w obecnym zestawie danych."),
     fact_narratives: context.narrative_contract.slots.facts.map((entry) => slot(entry, "This recorded fact adds context to the research view.", "Ten zapisany fakt uzupełnia obecną analizę.")),
     risk_narratives: context.narrative_contract.slots.risks.map((entry) => slot(entry, "This recorded risk remains part of the listed evidence context.", "To zapisane ryzyko pozostaje częścią wskazanego kontekstu danych.")),
