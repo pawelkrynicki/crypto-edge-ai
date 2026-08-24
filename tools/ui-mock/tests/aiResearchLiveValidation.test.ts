@@ -110,6 +110,7 @@ describe("AI.2C provider contract compatibility under AI.3", () => {
       response_status: "completed", incomplete_reason: null, output_tokens: 50, reasoning_tokens: 12, max_output_tokens: 8_000,
       http_status: 200, provider_error_type: null, provider_error_code: null, provider_error_param: null,
       response_received: true, failure_phase: "STRUCTURED_OUTPUT", request_id: "mock_request_id",
+      transport_stage: null, request_body_status: "SENT", ip_family: null, proxy_active: false,
     });
     assert.equal(result.request_id, "mock_request_id");
   });
@@ -201,6 +202,64 @@ describe("AI.2C provider contract compatibility under AI.3", () => {
       && error.response_metadata.response_received === false
       && error.response_metadata.failure_phase === "NETWORK");
     assert.equal(calls, 1);
+  });
+
+  it("retains bounded transport stages without a retry or secret-bearing diagnostics", async () => {
+    const context = await buildAIResearchContext("base", ADDRESS, "pl", contextOptions());
+    const cases = [
+      ["ENOTFOUND", "DNS", "NOT_SENT"],
+      ["ECONNREFUSED", "TCP", "NOT_SENT"],
+      ["ECONNRESET", "CONNECTION_RESET", "UNKNOWN"],
+      ["CERT_HAS_EXPIRED", "TLS", "NOT_SENT"],
+      ["ERR_PROXY_CONNECTION_FAILED", "PROXY", "NOT_SENT"],
+      ["ETIMEDOUT", "CONNECT_TIMEOUT", "NOT_SENT"],
+    ] as const;
+    for (const [code, stage, bodyStatus] of cases) {
+      let calls = 0;
+      const provider = createAIResearchProvider({
+        config: openAiConfig(),
+        fetch: async () => {
+          calls += 1;
+          const error = Object.assign(new TypeError("secret-test-value must not persist"), { code, family: 4 });
+          throw error;
+        },
+      });
+      await assert.rejects(provider.generate(context), (error: unknown) => {
+        assert.ok(error instanceof AIResearchProviderError);
+        assert.equal(error.code, "PROVIDER_NETWORK");
+        assert.equal(error.response_metadata.transport_stage, stage);
+        assert.equal(error.response_metadata.request_body_status, bodyStatus);
+        assert.equal(error.response_metadata.ip_family, "IPV4");
+        assert.doesNotMatch(JSON.stringify(error.response_metadata), /secret-test-value/i);
+        return true;
+      });
+      assert.equal(calls, 1);
+    }
+  });
+
+  it("distinguishes a response timeout and an HTTP response without a readable body", async () => {
+    const context = await buildAIResearchContext("base", ADDRESS, "pl", contextOptions());
+    const timeoutProvider = createAIResearchProvider({
+      config: openAiConfig(),
+      fetch: async () => {
+        const error = new Error("deadline");
+        error.name = "APIConnectionTimeoutError";
+        throw error;
+      },
+    });
+    await assert.rejects(timeoutProvider.generate(context), (error: unknown) => error instanceof AIResearchProviderError
+      && error.code === "PROVIDER_TIMEOUT"
+      && error.response_metadata.transport_stage === "RESPONSE_TIMEOUT"
+      && error.response_metadata.request_body_status === "UNKNOWN");
+    const emptyBodyProvider = createAIResearchProvider({
+      config: openAiConfig(),
+      fetch: async () => new Response(null, { status: 502, headers: { "x-request-id": "headers_only" } }),
+    });
+    await assert.rejects(emptyBodyProvider.generate(context), (error: unknown) => error instanceof AIResearchProviderError
+      && error.code === "PROVIDER_UNAVAILABLE"
+      && error.response_metadata.response_received === true
+      && error.response_metadata.request_body_status === "SENT"
+      && error.response_metadata.request_id === "headers_only");
   });
 
   it("records a refusal as a bounded structured-output failure", async () => {

@@ -75,6 +75,10 @@ export type AIAnalysisCompositionDiagnostics = {
 
 export type AIAnalysisQueueRecord = AIAnalysisCacheIdentity & {
   analysis_id: string;
+  /** The immutable shared heavy-analysis identity. Recovery rows retain it here. */
+  shared_cache_key: string | null;
+  recovery_attempt_id: string | null;
+  recovered_from_analysis_id: string | null;
   status: Exclude<AIAnalysisStatus, "ABSENT">;
   requested_at: string;
   queued_at: string | null;
@@ -111,6 +115,10 @@ export type AIAnalysisQueueRecord = AIAnalysisCacheIdentity & {
     response_received: boolean;
     failure_phase: string | null;
     request_id: string | null;
+    transport_stage: string | null;
+    request_body_status: string | null;
+    ip_family: "IPV4" | "IPV6" | "UNKNOWN" | null;
+    proxy_active: boolean | null;
   };
   failure_stage: AIAnalysisFailureStage | null;
   lease_owner: string | null;
@@ -259,7 +267,7 @@ export async function createAIAnalysisQueueStore(options: AIAnalysisQueueStoreOp
 
   const lookup = (identity: AIAnalysisCacheIdentity): AIAnalysisQueueLookup => {
     const db = requireDb();
-    const record = safeRecord(db.prepare("SELECT * FROM crypto_ai_analysis_queue WHERE cache_key = ? LIMIT 1").get(identity.cache_key));
+    const record = lookupSharedRecord(db, identity.cache_key);
     return { record, last_known_good: findLastKnownGood(db, identity, record) };
   };
 
@@ -307,7 +315,7 @@ ORDER BY completed_at DESC LIMIT 20
       const nowMs = input.now.getTime();
       db.exec("BEGIN IMMEDIATE TRANSACTION");
       try {
-        const existing = safeRecord(db.prepare("SELECT * FROM crypto_ai_analysis_queue WHERE cache_key = ? LIMIT 1").get(input.identity.cache_key));
+        const existing = lookupSharedRecord(db, input.identity.cache_key);
         const lastKnownGood = findLastKnownGood(db, input.identity, existing);
         if (existing && !input.force) {
           if (existing.status === "READY" || (existing.status === "STALE" && existing.result)) {
@@ -374,10 +382,76 @@ INSERT INTO crypto_ai_analysis_queue (
           );
         }
         recordRateRequest(db, input.identity, input.session_scope_hash, nowIso);
-        const record = safeRecord(db.prepare("SELECT * FROM crypto_ai_analysis_queue WHERE cache_key = ? LIMIT 1").get(input.identity.cache_key));
+        const record = lookupSharedRecord(db, input.identity.cache_key);
         if (!record) throw new AIAnalysisQueueStoreError("STORE_UNAVAILABLE");
         db.exec("COMMIT");
         return { record, last_known_good: lastKnownGood, outcome: "QUEUED", retry_after_seconds: null };
+      } catch (error) {
+        try { db.exec("ROLLBACK"); } catch { /* preserve original */ }
+        if (error instanceof AIAnalysisQueueStoreError) throw error;
+        throw new AIAnalysisQueueStoreError("STORE_UNAVAILABLE");
+      }
+    },
+
+    /**
+     * An owner-only caller can make exactly one new queue row for a previously
+     * suspended transport attempt. The original row is never updated or reused.
+     */
+    recoverSuspendedProviderNetwork(input: {
+      identity: AIAnalysisCacheIdentity;
+      owner_scope_hash: string;
+      now: Date;
+    }): AIAnalysisEnqueueResult & { recovery_attempt_id: string | null; previous_analysis_id: string | null } {
+      const db = requireDb();
+      const nowIso = input.now.toISOString();
+      db.exec("BEGIN IMMEDIATE TRANSACTION");
+      try {
+        const existing = lookupSharedRecord(db, input.identity.cache_key);
+        const lastKnownGood = findLastKnownGood(db, input.identity, existing);
+        if (!existing) {
+          db.exec("COMMIT");
+          return { record: null, last_known_good: lastKnownGood, outcome: "SUSPENDED", retry_after_seconds: null, recovery_attempt_id: null, previous_analysis_id: null };
+        }
+        if (existing.status === "READY" || (existing.status === "STALE" && existing.result)) {
+          db.exec("COMMIT");
+          return { record: existing, last_known_good: existing.result, outcome: "READY", retry_after_seconds: null, recovery_attempt_id: null, previous_analysis_id: null };
+        }
+        if (existing.status === "QUEUED" || existing.status === "PROCESSING") {
+          db.exec("COMMIT");
+          return { record: existing, last_known_good: lastKnownGood, outcome: "ALREADY_EXISTS", retry_after_seconds: null, recovery_attempt_id: existing.recovery_attempt_id, previous_analysis_id: existing.recovered_from_analysis_id };
+        }
+        if (existing.status !== "SUSPENDED" || !["PROVIDER_NETWORK", "PROVIDER_TIMEOUT"].includes(existing.safe_error_code ?? "")) {
+          db.exec("COMMIT");
+          return { record: existing, last_known_good: lastKnownGood, outcome: "SUSPENDED", retry_after_seconds: null, recovery_attempt_id: null, previous_analysis_id: null };
+        }
+        const recoveryAttemptId = `airr_${randomUUID()}`;
+        const analysisId = `air_${randomUUID()}`;
+        const queueCacheKey = sha256(stableJson({ recovery_attempt_id: recoveryAttemptId, shared_cache_key: input.identity.cache_key }));
+        db.prepare(`
+INSERT INTO crypto_ai_analysis_queue (
+  analysis_id, cache_key, shared_cache_key, recovery_attempt_id, recovered_from_analysis_id,
+  chain, contract_address, snapshot_fingerprint, prompt_version, narrative_contract_version, semantic_policy_version, composition_policy_version, provider_wire_schema_version, model_id,
+  analysis_schema_version, locale, status, requested_at, queued_at, attempt_count, result_json,
+  validation_status, safe_error_code, prompt_tokens, completion_tokens, total_tokens, latency_ms,
+  provider_response_id, provider_attempt_count, provider_attempt_started_at, provider_attempt_completed_at,
+  provider_attempt_status, provider_attempt_safe_error_code, failure_stage, lease_owner, lease_expires_at, created_at, updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'QUEUED', ?, ?, 0, NULL, 'PENDING', NULL, 0, 0, 0, NULL, NULL, 0, NULL, NULL, 'NOT_ATTEMPTED', NULL, NULL, NULL, NULL, ?, ?)
+`).run(
+          analysisId, queueCacheKey, input.identity.cache_key, recoveryAttemptId, existing.analysis_id,
+          input.identity.chain, input.identity.contract_address, input.identity.snapshot_fingerprint, input.identity.prompt_version,
+          input.identity.narrative_contract_version, input.identity.semantic_policy_version, input.identity.composition_policy_version,
+          input.identity.provider_wire_schema_version, input.identity.model_id, input.identity.analysis_schema_version, input.identity.locale,
+          nowIso, nowIso, nowIso, nowIso,
+        );
+        db.prepare(`
+INSERT INTO crypto_ai_analysis_recovery_audit (
+  recovery_attempt_id, previous_analysis_id, new_analysis_id, shared_cache_key, owner_scope_hash, requested_at
+) VALUES (?, ?, ?, ?, ?, ?)
+`).run(recoveryAttemptId, existing.analysis_id, analysisId, input.identity.cache_key, hashAIAnalysisRateScope(input.owner_scope_hash), nowIso);
+        const record = safeRecord(db.prepare("SELECT * FROM crypto_ai_analysis_queue WHERE analysis_id = ? LIMIT 1").get(analysisId));
+        if (!record) throw new AIAnalysisQueueStoreError("STORE_UNAVAILABLE");
+        db.exec("COMMIT");
+        return { record, last_known_good: lastKnownGood, outcome: "QUEUED", retry_after_seconds: null, recovery_attempt_id: recoveryAttemptId, previous_analysis_id: existing.analysis_id };
       } catch (error) {
         try { db.exec("ROLLBACK"); } catch { /* preserve original */ }
         if (error instanceof AIAnalysisQueueStoreError) throw error;
@@ -435,7 +509,9 @@ UPDATE crypto_ai_analysis_queue SET provider_attempt_count = provider_attempt_co
   internal_provider_http_status = NULL, internal_provider_error_type = NULL,
   internal_provider_error_code = NULL, internal_provider_error_param = NULL,
   internal_provider_response_received = 0, internal_provider_failure_phase = NULL,
-  internal_provider_request_id = NULL, updated_at = ?
+  internal_provider_request_id = NULL, internal_provider_transport_stage = NULL,
+  internal_provider_request_body_status = NULL, internal_provider_ip_family = NULL,
+  internal_provider_proxy_active = NULL, updated_at = ?
 WHERE analysis_id = ? AND status = 'PROCESSING' AND lease_owner = ?
 `).run(nowIso, nowIso, input.analysis_id, input.worker_id);
       if (changes(result) !== 1) throw new AIAnalysisQueueStoreError("STORE_UNAVAILABLE");
@@ -532,6 +608,10 @@ WHERE analysis_id = ? AND status = 'PROCESSING' AND lease_owner = ?
       response_received?: boolean;
       failure_phase?: string | null;
       request_id?: string | null;
+      transport_stage?: string | null;
+      request_body_status?: string | null;
+      ip_family?: "IPV4" | "IPV6" | "UNKNOWN" | null;
+      proxy_active?: boolean | null;
       now: Date;
     }): AIAnalysisQueueRecord {
       const db = requireDb();
@@ -539,7 +619,9 @@ WHERE analysis_id = ? AND status = 'PROCESSING' AND lease_owner = ?
 UPDATE crypto_ai_analysis_queue SET internal_provider_response_status = ?, internal_provider_incomplete_reason = ?,
   internal_provider_output_tokens = ?, internal_provider_reasoning_tokens = ?,
   internal_provider_http_status = ?, internal_provider_error_type = ?, internal_provider_error_code = ?, internal_provider_error_param = ?,
-  internal_provider_response_received = ?, internal_provider_failure_phase = ?, internal_provider_request_id = ?, updated_at = ?
+  internal_provider_response_received = ?, internal_provider_failure_phase = ?, internal_provider_request_id = ?,
+  internal_provider_transport_stage = ?, internal_provider_request_body_status = ?, internal_provider_ip_family = ?,
+  internal_provider_proxy_active = ?, updated_at = ?
 WHERE analysis_id = ? AND status = 'PROCESSING' AND lease_owner = ?
 `).run(
         safeProviderDetail(input.response_status),
@@ -553,6 +635,10 @@ WHERE analysis_id = ? AND status = 'PROCESSING' AND lease_owner = ?
         input.response_received === true ? 1 : 0,
         safeProviderDiagnostic(input.failure_phase),
         safeProviderRequestId(input.request_id),
+        safeTransportStage(input.transport_stage),
+        safeRequestBodyStatus(input.request_body_status),
+        safeIpFamily(input.ip_family),
+        typeof input.proxy_active === "boolean" ? (input.proxy_active ? 1 : 0) : null,
         input.now.toISOString(),
         input.analysis_id,
         input.worker_id,
@@ -603,7 +689,7 @@ WHERE analysis_id = ? AND status = 'PROCESSING' AND lease_owner = ?
         const owned = safeRecord(db.prepare(`
 SELECT * FROM crypto_ai_analysis_queue WHERE analysis_id = ? AND status = 'PROCESSING' AND lease_owner = ? LIMIT 1
 `).get(input.analysis_id, input.worker_id));
-        if (!owned || owned.cache_key !== buildAIAnalysisCacheIdentity({
+        if (!owned || (owned.shared_cache_key ?? owned.cache_key) !== buildAIAnalysisCacheIdentity({
           chain: brief.identity.chain,
           contract_address: brief.identity.contract_address,
           snapshot_fingerprint: brief.snapshot_fingerprint,
@@ -619,7 +705,21 @@ SELECT * FROM crypto_ai_analysis_queue WHERE analysis_id = ? AND status = 'PROCE
         db.prepare(`
 UPDATE crypto_ai_analysis_queue SET status = 'STALE', updated_at = ?
 WHERE chain = ? AND contract_address = ? AND status = 'READY' AND analysis_id <> ?
-`).run(nowIso, owned.chain, owned.contract_address, owned.analysis_id);
+  AND prompt_version = ? AND narrative_contract_version IS ? AND semantic_policy_version IS ?
+  AND composition_policy_version IS ? AND provider_wire_schema_version IS ? AND model_id = ? AND analysis_schema_version = ?
+`).run(
+          nowIso,
+          owned.chain,
+          owned.contract_address,
+          owned.analysis_id,
+          owned.prompt_version,
+          owned.narrative_contract_version,
+          owned.semantic_policy_version,
+          owned.composition_policy_version,
+          owned.provider_wire_schema_version,
+          owned.model_id,
+          owned.analysis_schema_version,
+        );
         db.prepare(`
 UPDATE crypto_ai_analysis_queue SET status = 'READY', completed_at = ?, failed_at = NULL, next_retry_at = NULL,
   result_json = ?, validation_status = ?, safe_error_code = NULL, prompt_tokens = ?, completion_tokens = ?,
@@ -852,6 +952,9 @@ function migrate(database: SqliteDatabase, busyTimeoutMs: number): void {
 CREATE TABLE IF NOT EXISTS crypto_ai_analysis_queue (
   analysis_id TEXT PRIMARY KEY,
   cache_key TEXT NOT NULL UNIQUE,
+  shared_cache_key TEXT,
+  recovery_attempt_id TEXT UNIQUE,
+  recovered_from_analysis_id TEXT,
   chain TEXT NOT NULL,
   contract_address TEXT NOT NULL,
   snapshot_fingerprint TEXT NOT NULL,
@@ -898,6 +1001,10 @@ CREATE TABLE IF NOT EXISTS crypto_ai_analysis_queue (
   internal_provider_response_received INTEGER NOT NULL DEFAULT 0 CHECK (internal_provider_response_received IN (0,1)),
   internal_provider_failure_phase TEXT,
   internal_provider_request_id TEXT,
+  internal_provider_transport_stage TEXT,
+  internal_provider_request_body_status TEXT,
+  internal_provider_ip_family TEXT,
+  internal_provider_proxy_active INTEGER CHECK (internal_provider_proxy_active IN (0,1)),
   failure_stage TEXT CHECK (failure_stage IN ('CONTEXT_BUILD','IDENTITY_CHECK','CIRCUIT','PROVIDER_CALL','PROVIDER_RESPONSE','PROVIDER_PARSE','HYDRATE','STORE_COMPLETE','USAGE_RECORD','UNKNOWN')),
   lease_owner TEXT,
   lease_expires_at TEXT,
@@ -917,6 +1024,14 @@ CREATE TABLE IF NOT EXISTS crypto_ai_analysis_request_log (
 CREATE INDEX IF NOT EXISTS idx_ai_analysis_rate_session ON crypto_ai_analysis_request_log(session_scope_hash, requested_at);
 CREATE INDEX IF NOT EXISTS idx_ai_analysis_rate_identity ON crypto_ai_analysis_request_log(identity_scope_hash, requested_at);
 CREATE INDEX IF NOT EXISTS idx_ai_analysis_rate_time ON crypto_ai_analysis_request_log(requested_at);
+CREATE TABLE IF NOT EXISTS crypto_ai_analysis_recovery_audit (
+  recovery_attempt_id TEXT PRIMARY KEY,
+  previous_analysis_id TEXT NOT NULL,
+  new_analysis_id TEXT NOT NULL UNIQUE,
+  shared_cache_key TEXT NOT NULL,
+  owner_scope_hash TEXT NOT NULL,
+  requested_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS crypto_ai_worker_state (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   schema_version TEXT NOT NULL CHECK (schema_version = 'ai_analysis_queue_v1'),
@@ -944,6 +1059,9 @@ PRAGMA user_version = 1;
   ensureQueueColumn(database, "semantic_policy_version", "TEXT");
   ensureQueueColumn(database, "composition_policy_version", "TEXT");
   ensureQueueColumn(database, "provider_wire_schema_version", "TEXT");
+  ensureQueueColumn(database, "shared_cache_key", "TEXT");
+  ensureQueueColumn(database, "recovery_attempt_id", "TEXT");
+  ensureQueueColumn(database, "recovered_from_analysis_id", "TEXT");
   ensureQueueColumn(database, "provider_attempt_started_at", "TEXT");
   ensureQueueColumn(database, "provider_attempt_completed_at", "TEXT");
   ensureQueueColumn(database, "provider_attempt_status", "TEXT NOT NULL DEFAULT 'NOT_ATTEMPTED' CHECK (provider_attempt_status IN ('NOT_ATTEMPTED','STARTED','RESPONSE_RECEIVED','FAILED'))");
@@ -962,8 +1080,21 @@ PRAGMA user_version = 1;
   ensureQueueColumn(database, "internal_provider_response_received", "INTEGER NOT NULL DEFAULT 0 CHECK (internal_provider_response_received IN (0,1))");
   ensureQueueColumn(database, "internal_provider_failure_phase", "TEXT");
   ensureQueueColumn(database, "internal_provider_request_id", "TEXT");
+  ensureQueueColumn(database, "internal_provider_transport_stage", "TEXT");
+  ensureQueueColumn(database, "internal_provider_request_body_status", "TEXT");
+  ensureQueueColumn(database, "internal_provider_ip_family", "TEXT");
+  ensureQueueColumn(database, "internal_provider_proxy_active", "INTEGER CHECK (internal_provider_proxy_active IN (0,1))");
   ensureQueueColumn(database, "failure_stage", "TEXT CHECK (failure_stage IN ('CONTEXT_BUILD','IDENTITY_CHECK','CIRCUIT','PROVIDER_CALL','PROVIDER_RESPONSE','PROVIDER_PARSE','HYDRATE','STORE_COMPLETE','USAGE_RECORD','UNKNOWN'))");
-  database.exec("PRAGMA user_version = 8");
+  database.exec("CREATE INDEX IF NOT EXISTS idx_ai_analysis_shared_cache_key ON crypto_ai_analysis_queue(shared_cache_key, created_at)");
+  database.exec(`CREATE TABLE IF NOT EXISTS crypto_ai_analysis_recovery_audit (
+    recovery_attempt_id TEXT PRIMARY KEY,
+    previous_analysis_id TEXT NOT NULL,
+    new_analysis_id TEXT NOT NULL UNIQUE,
+    shared_cache_key TEXT NOT NULL,
+    owner_scope_hash TEXT NOT NULL,
+    requested_at TEXT NOT NULL
+  )`);
+  database.exec("PRAGMA user_version = 9");
 }
 
 function ensureQueueColumn(database: SqliteDatabase, name: string, definition: string): void {
@@ -975,14 +1106,14 @@ function assertSchema(database: SqliteDatabase): void {
   const columns = database.prepare("PRAGMA table_info(crypto_ai_analysis_queue)").all();
   const names = new Set(columns.map((row) => isRecord(row) ? row.name : null));
   const required = [
-    "analysis_id", "cache_key", "chain", "contract_address", "snapshot_fingerprint", "prompt_version", "narrative_contract_version", "semantic_policy_version", "composition_policy_version", "provider_wire_schema_version",
+    "analysis_id", "cache_key", "shared_cache_key", "recovery_attempt_id", "recovered_from_analysis_id", "chain", "contract_address", "snapshot_fingerprint", "prompt_version", "narrative_contract_version", "semantic_policy_version", "composition_policy_version", "provider_wire_schema_version",
     "model_id", "analysis_schema_version", "status", "requested_at", "queued_at", "started_at", "completed_at",
     "failed_at", "next_retry_at", "attempt_count", "result_json", "validation_status", "safe_error_code",
     "prompt_tokens", "completion_tokens", "total_tokens", "latency_ms", "provider_response_id",
     "provider_attempt_count", "provider_attempt_started_at", "provider_attempt_completed_at", "provider_attempt_status",
     "provider_attempt_safe_error_code", "internal_validation_code", "internal_validation_violations_json", "internal_composition_diagnostics_json",
     "internal_provider_response_status", "internal_provider_incomplete_reason", "internal_provider_output_tokens", "internal_provider_reasoning_tokens",
-    "internal_provider_http_status", "internal_provider_error_type", "internal_provider_error_code", "internal_provider_error_param", "internal_provider_response_received", "internal_provider_failure_phase", "internal_provider_request_id",
+    "internal_provider_http_status", "internal_provider_error_type", "internal_provider_error_code", "internal_provider_error_param", "internal_provider_response_received", "internal_provider_failure_phase", "internal_provider_request_id", "internal_provider_transport_stage", "internal_provider_request_body_status", "internal_provider_ip_family", "internal_provider_proxy_active",
     "failure_stage", "created_at", "updated_at",
   ];
   if (required.some((name) => !names.has(name))) throw new AIAnalysisQueueStoreError("STORE_SCHEMA_INVALID");
@@ -1009,6 +1140,9 @@ function safeRecord(value: unknown): AIAnalysisQueueRecord | null {
   return {
     analysis_id: value.analysis_id,
     cache_key: value.cache_key,
+    shared_cache_key: stringField(value.shared_cache_key),
+    recovery_attempt_id: stringField(value.recovery_attempt_id),
+    recovered_from_analysis_id: stringField(value.recovered_from_analysis_id),
     chain: value.chain,
     contract_address: value.contract_address,
     snapshot_fingerprint: value.snapshot_fingerprint,
@@ -1060,6 +1194,10 @@ function safeRecord(value: unknown): AIAnalysisQueueRecord | null {
       response_received: value.internal_provider_response_received === 1,
       failure_phase: safeProviderDiagnostic(value.internal_provider_failure_phase),
       request_id: safeProviderRequestId(value.internal_provider_request_id),
+      transport_stage: safeTransportStage(value.internal_provider_transport_stage),
+      request_body_status: safeRequestBodyStatus(value.internal_provider_request_body_status),
+      ip_family: safeIpFamily(value.internal_provider_ip_family),
+      proxy_active: value.internal_provider_proxy_active === 1 ? true : value.internal_provider_proxy_active === 0 ? false : null,
     },
     failure_stage: safeFailureStage(value.failure_stage),
     lease_owner: stringField(value.lease_owner),
@@ -1221,6 +1359,15 @@ function safeProviderDetail(value: string | null): string | null {
   return value !== null && /^[a-z0-9_]{1,80}$/i.test(value) ? value : null;
 }
 
+function lookupSharedRecord(database: SqliteDatabase, sharedCacheKey: string): AIAnalysisQueueRecord | null {
+  return safeRecord(database.prepare(`
+SELECT * FROM crypto_ai_analysis_queue
+WHERE cache_key = ? OR shared_cache_key = ?
+ORDER BY created_at DESC, analysis_id DESC
+LIMIT 1
+`).get(sharedCacheKey, sharedCacheKey));
+}
+
 function safeCompositionDiagnostics(value: AIAnalysisCompositionDiagnostics): AIAnalysisCompositionDiagnostics {
   return {
     accepted_provider_slot_count: Math.max(0, Math.min(32, integer(value.accepted_provider_slot_count))),
@@ -1259,6 +1406,20 @@ function safeProviderDiagnostic(value: unknown): string | null {
 
 function safeProviderRequestId(value: unknown): string | null {
   return typeof value === "string" && /^[A-Za-z0-9._-]{1,200}$/.test(value) ? value : null;
+}
+
+function safeTransportStage(value: unknown): string | null {
+  return value === "DNS" || value === "TCP" || value === "TLS" || value === "PROXY"
+    || value === "CONNECT_TIMEOUT" || value === "RESPONSE_TIMEOUT" || value === "CONNECTION_RESET" || value === "NETWORK_UNKNOWN"
+    ? value : null;
+}
+
+function safeRequestBodyStatus(value: unknown): string | null {
+  return value === "NOT_SENT" || value === "SENT" || value === "UNKNOWN" ? value : null;
+}
+
+function safeIpFamily(value: unknown): "IPV4" | "IPV6" | "UNKNOWN" | null {
+  return value === "IPV4" || value === "IPV6" || value === "UNKNOWN" ? value : null;
 }
 
 function providerAttemptStatus(value: unknown): AIAnalysisProviderAttemptStatus {

@@ -36,6 +36,12 @@ export type AIResearchProviderResponseDiagnostics = {
   response_received: boolean;
   failure_phase: "PRE_PROVIDER" | "REQUEST_REJECTED" | "NETWORK" | "STRUCTURED_OUTPUT" | null;
   request_id: string | null;
+  /** Server-only, bounded transport evidence. It intentionally omits host, IP and proxy values. */
+  transport_stage: "DNS" | "TCP" | "TLS" | "PROXY" | "CONNECT_TIMEOUT" | "RESPONSE_TIMEOUT" | "CONNECTION_RESET" | "NETWORK_UNKNOWN" | null;
+  /** The transport cannot prove a body write for every socket error, so unknown stays explicit. */
+  request_body_status: "NOT_SENT" | "SENT" | "UNKNOWN" | null;
+  ip_family: "IPV4" | "IPV6" | "UNKNOWN" | null;
+  proxy_active: boolean | null;
 };
 
 export interface AIResearchProvider {
@@ -106,6 +112,10 @@ export class AIResearchProviderError extends Error {
       response_received: responseMetadata.response_received === true,
       failure_phase: safeFailurePhase(responseMetadata.failure_phase),
       request_id: safeRequestId(responseMetadata.request_id ?? null),
+      transport_stage: safeTransportStage(responseMetadata.transport_stage),
+      request_body_status: safeRequestBodyStatus(responseMetadata.request_body_status),
+      ip_family: safeIpFamily(responseMetadata.ip_family),
+      proxy_active: typeof responseMetadata.proxy_active === "boolean" ? responseMetadata.proxy_active : null,
     };
   }
 }
@@ -204,7 +214,12 @@ function createOpenAIResearchProvider(options: OpenAIResearchProviderOptions): A
         if (error instanceof AIResearchProviderError) throw error;
         const diagnostics = diagnosticsFromProviderError(error);
         if (isTimeoutError(error)) {
-          throw new AIResearchProviderError("PROVIDER_TIMEOUT", { ...diagnostics, failure_phase: "NETWORK" });
+          throw new AIResearchProviderError("PROVIDER_TIMEOUT", {
+            ...diagnostics,
+            failure_phase: "NETWORK",
+            transport_stage: diagnostics.transport_stage === "NETWORK_UNKNOWN" ? "RESPONSE_TIMEOUT" : diagnostics.transport_stage ?? "RESPONSE_TIMEOUT",
+            request_body_status: diagnostics.request_body_status ?? "UNKNOWN",
+          });
         }
         if (diagnostics.http_status === 429) throw new AIResearchProviderError("PROVIDER_RATE_LIMITED", diagnostics);
         if (diagnostics.http_status === 401 || diagnostics.http_status === 403) throw new AIResearchProviderError("PROVIDER_AUTHENTICATION", diagnostics);
@@ -293,6 +308,10 @@ function responseMetadataFromPayload(
     response_received: overrides.response_received === true,
     failure_phase: safeFailurePhase(overrides.failure_phase),
     request_id: safeRequestId(overrides.request_id ?? null),
+    transport_stage: safeTransportStage(overrides.transport_stage),
+    request_body_status: safeRequestBodyStatus(overrides.request_body_status) ?? (overrides.response_received === true ? "SENT" : null),
+    ip_family: safeIpFamily(overrides.ip_family),
+    proxy_active: typeof overrides.proxy_active === "boolean" ? overrides.proxy_active : hasProxyEnvironment(),
   };
 }
 
@@ -314,17 +333,75 @@ function safeRequestId(value: string | null): string | null {
 
 function diagnosticsFromProviderError(error: unknown): Partial<AIResearchProviderResponseDiagnostics> {
   const status = providerStatus(error);
-  const record = isRecord(error) ? error : {};
-  const providerError = isRecord(record.error) ? record.error : {};
+  const records = errorRecords(error);
+  const record = records[0] ?? {};
+  const providerError = records.flatMap((value) => isRecord(value.error) ? [value.error] : [])[0] ?? {};
+  const code = firstSafeDiagnostic(records, "code") ?? firstSafeDiagnostic([providerError], "code");
+  const type = firstSafeDiagnostic(records, "type") ?? firstSafeDiagnostic([providerError], "type")
+    ?? (error instanceof Error ? safeProviderDiagnostic(error.name) : null);
+  const transport = transportEvidence(records, status);
   return {
     http_status: status,
-    provider_error_type: safeProviderDiagnostic(typeof record.type === "string" ? record.type : typeof providerError.type === "string" ? providerError.type : error instanceof Error ? error.name : null),
-    provider_error_code: safeProviderDiagnostic(typeof record.code === "string" ? record.code : typeof providerError.code === "string" ? providerError.code : null),
+    provider_error_type: type,
+    provider_error_code: code,
     provider_error_param: safeProviderDiagnostic(typeof record.param === "string" ? record.param : typeof providerError.param === "string" ? providerError.param : null),
     response_received: status !== null,
     failure_phase: status !== null ? "REQUEST_REJECTED" : "NETWORK",
     request_id: safeRequestId(typeof record.request_id === "string" ? record.request_id : typeof record.requestID === "string" ? record.requestID : null),
+    transport_stage: transport.transport_stage,
+    request_body_status: transport.request_body_status,
+    ip_family: transport.ip_family,
+    proxy_active: hasProxyEnvironment(),
   };
+}
+
+function errorRecords(error: unknown): Record<string, unknown>[] {
+  const records: Record<string, unknown>[] = [];
+  const pending: unknown[] = [error];
+  const seen = new Set<unknown>();
+  while (pending.length > 0 && records.length < 8) {
+    const current = pending.shift();
+    if (!isRecord(current) || seen.has(current)) continue;
+    seen.add(current);
+    records.push(current);
+    pending.push(current.cause, current.error);
+  }
+  return records;
+}
+
+function firstSafeDiagnostic(records: Record<string, unknown>[], key: string): string | null {
+  for (const record of records) {
+    const value = safeProviderDiagnostic(record[key]);
+    if (value) return value;
+  }
+  return null;
+}
+
+function transportEvidence(
+  records: Record<string, unknown>[],
+  httpStatus: number | null,
+): Pick<AIResearchProviderResponseDiagnostics, "transport_stage" | "request_body_status" | "ip_family"> {
+  const code = firstSafeDiagnostic(records, "code");
+  const errorNames = records.flatMap((record) => typeof record.name === "string" ? [record.name] : []);
+  const address = records.flatMap((record) => typeof record.address === "string" ? [record.address] : [])[0] ?? "";
+  const family = records.flatMap((record) => record.family === 4 || record.family === 6 ? [record.family] : [])[0] ?? null;
+  const ip_family = family === 4 || (!family && /^\d{1,3}(?:\.\d{1,3}){3}$/.test(address)) ? "IPV4"
+    : family === 6 || (!family && address.includes(":")) ? "IPV6" : "UNKNOWN";
+  if (httpStatus !== null) return { transport_stage: null, request_body_status: "SENT", ip_family };
+  if (code === "ENOTFOUND" || code === "EAI_AGAIN") return { transport_stage: "DNS", request_body_status: "NOT_SENT", ip_family };
+  if (code === "ECONNREFUSED" || code === "EHOSTUNREACH" || code === "ENETUNREACH") return { transport_stage: "TCP", request_body_status: "NOT_SENT", ip_family };
+  if (code === "ECONNRESET" || code === "EPIPE") return { transport_stage: "CONNECTION_RESET", request_body_status: "UNKNOWN", ip_family };
+  if (code === "ETIMEDOUT" || errorNames.includes("ConnectTimeoutError")) return { transport_stage: "CONNECT_TIMEOUT", request_body_status: "NOT_SENT", ip_family };
+  if (errorNames.includes("APIConnectionTimeoutError") || errorNames.includes("AbortError")) return { transport_stage: "RESPONSE_TIMEOUT", request_body_status: "UNKNOWN", ip_family };
+  if (code?.startsWith("ERR_TLS") || code?.startsWith("CERT_") || code === "UNABLE_TO_VERIFY_LEAF_SIGNATURE" || code === "DEPTH_ZERO_SELF_SIGNED_CERT") {
+    return { transport_stage: "TLS", request_body_status: "NOT_SENT", ip_family };
+  }
+  if (code?.includes("PROXY") || errorNames.some((value) => value.toUpperCase().includes("PROXY"))) return { transport_stage: "PROXY", request_body_status: "NOT_SENT", ip_family };
+  return { transport_stage: "NETWORK_UNKNOWN", request_body_status: "UNKNOWN", ip_family };
+}
+
+function hasProxyEnvironment(env: NodeJS.ProcessEnv = process.env): boolean {
+  return ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY"].some((key) => Boolean(env[key]?.trim()));
 }
 
 function safeHttpStatus(value: unknown): number | null {
@@ -337,6 +414,20 @@ function safeProviderDiagnostic(value: unknown): string | null {
 
 function safeFailurePhase(value: unknown): AIResearchProviderResponseDiagnostics["failure_phase"] {
   return value === "PRE_PROVIDER" || value === "REQUEST_REJECTED" || value === "NETWORK" || value === "STRUCTURED_OUTPUT" ? value : null;
+}
+
+function safeTransportStage(value: unknown): AIResearchProviderResponseDiagnostics["transport_stage"] {
+  return value === "DNS" || value === "TCP" || value === "TLS" || value === "PROXY"
+    || value === "CONNECT_TIMEOUT" || value === "RESPONSE_TIMEOUT" || value === "CONNECTION_RESET" || value === "NETWORK_UNKNOWN"
+    ? value : null;
+}
+
+function safeRequestBodyStatus(value: unknown): AIResearchProviderResponseDiagnostics["request_body_status"] {
+  return value === "NOT_SENT" || value === "SENT" || value === "UNKNOWN" ? value : null;
+}
+
+function safeIpFamily(value: unknown): AIResearchProviderResponseDiagnostics["ip_family"] {
+  return value === "IPV4" || value === "IPV6" || value === "UNKNOWN" ? value : null;
 }
 
 function isTimeoutError(error: unknown): boolean {

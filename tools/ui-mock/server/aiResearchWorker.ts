@@ -240,7 +240,7 @@ async function processClaim(
       model_id: claimed.model_id,
       analysis_schema_version: claimed.analysis_schema_version,
     });
-    if (currentIdentity.cache_key !== claimed.cache_key) {
+    if (currentIdentity.cache_key !== (claimed.shared_cache_key ?? claimed.cache_key)) {
       throw new AIResearchWorkerContractError("DATA_STALE");
     }
     // The schema gate runs before an attempt is started, so an existing
@@ -305,6 +305,10 @@ async function processClaim(
         response_received: providerResult.response_metadata.response_received,
         failure_phase: providerResult.response_metadata.failure_phase,
         request_id: providerResult.response_metadata.request_id,
+        transport_stage: providerResult.response_metadata.transport_stage,
+        request_body_status: providerResult.response_metadata.request_body_status,
+        ip_family: providerResult.response_metadata.ip_family,
+        proxy_active: providerResult.response_metadata.proxy_active,
         now: now(),
       });
     }
@@ -407,6 +411,10 @@ async function processClaim(
           response_received: error.response_metadata.response_received,
           failure_phase: error.response_metadata.failure_phase,
           request_id: error.response_metadata.request_id,
+          transport_stage: error.response_metadata.transport_stage,
+          request_body_status: error.response_metadata.request_body_status,
+          ip_family: error.response_metadata.ip_family,
+          proxy_active: error.response_metadata.proxy_active,
           now: now(),
         });
         if (error.code === "PROVIDER_OUTPUT_INCOMPLETE") {

@@ -130,6 +130,10 @@ describe("PC.2 provider attempt and failure-stage audit", () => {
         response_received: testCase.response,
         failure_phase: testCase.phase,
         request_id: `fixture_${testCase.name}`,
+        transport_stage: null,
+        request_body_status: null,
+        ip_family: null,
+        proxy_active: null,
       }, testCase.name);
       assert.doesNotMatch(JSON.stringify(record.internal_provider_failure), /authorization|api[_-]?key|raw provider|prompt/i, testCase.name);
       store.close();

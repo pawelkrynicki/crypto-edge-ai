@@ -33,7 +33,11 @@ import {
 import { AI_RESEARCH_COMPOSITION_POLICY_VERSION } from "./aiResearchCompositionPolicy.js";
 import { AI_RESEARCH_SEMANTIC_POLICY_VERSION } from "./aiResearchSemanticPolicy.js";
 import { readFollowUpList, readFollowUpStatus, type FollowUpApiOptions } from "./followUpApi.js";
-import { readLatestScannerOutput, type LatestScannerOutputOptions } from "./latestScannerOutput.js";
+import {
+  readLatestScannerOutput,
+  type LatestScannerOutputOptions,
+  type ScannerOutputWithMeta,
+} from "./latestScannerOutput.js";
 import { readReportsList, type ReportsLibraryOptions } from "./reportsLibrary.js";
 
 export const AI_RESEARCH_METHODOLOGY_VERSION = "crypto_edge_methodology_v1";
@@ -112,6 +116,46 @@ export class AIResearchContextError extends Error {
   }
 }
 
+type ScannerOutputReader = (options?: LatestScannerOutputOptions) => Promise<ScannerOutputWithMeta>;
+
+// A large fan-out of public AI reads must not open one filesystem scan per
+// session.  The canonical scanner directory can contain many historical runs;
+// on Windows, simultaneously opening every run for every session can exhaust
+// file handles and make an otherwise valid canonical snapshot look invalid.
+// This is deliberately single-flight only: once the read settles, the next
+// product request performs a fresh canonical read and can observe new data.
+const scannerReadsInFlight = new WeakMap<ScannerOutputReader, Map<string, Promise<ScannerOutputWithMeta>>>();
+
+export function readAIResearchScannerSingleFlight(
+  options: LatestScannerOutputOptions = {},
+  reader: ScannerOutputReader = readLatestScannerOutput,
+): Promise<ScannerOutputWithMeta> {
+  const key = JSON.stringify({
+    output_dir_path: options.outputDirPath ?? null,
+    fixture_path: options.fixturePath ?? null,
+    allow_fixture_fallback: options.allowFixtureFallback ?? null,
+    runtime_mode: options.runtimeMode ?? null,
+    committed_run_id: options.committedRunId ?? null,
+    automation_state_path: options.automationStatePath ?? null,
+    snapshot_time: options.now?.toISOString() ?? null,
+  });
+  let reads = scannerReadsInFlight.get(reader);
+  if (!reads) {
+    reads = new Map();
+    scannerReadsInFlight.set(reader, reads);
+  }
+  const existing = reads.get(key);
+  if (existing) return existing;
+
+  const pending = Promise.resolve()
+    .then(() => reader(options))
+    .finally(() => {
+      if (reads?.get(key) === pending) reads.delete(key);
+    });
+  reads.set(key, pending);
+  return pending;
+}
+
 export async function buildAIResearchContext(
   chainInput: string,
   addressInput: string,
@@ -127,7 +171,7 @@ export async function buildAIResearchContext(
   }
 
   const [scannerResult, followUpList, followUpStatus, reportList] = await Promise.allSettled([
-    readLatestScannerOutput(options.scanner),
+    readAIResearchScannerSingleFlight(options.scanner),
     readFollowUpList(options.followUp),
     readFollowUpStatus(options.followUp),
     readReportsList(options.reports),

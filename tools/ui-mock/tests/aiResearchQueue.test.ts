@@ -3,7 +3,12 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { after, describe, it } from "node:test";
-import { buildAIResearchContext, type AIResearchContext } from "../server/aiResearchContext.js";
+import {
+  buildAIResearchContext,
+  readAIResearchScannerSingleFlight,
+  type AIResearchContext,
+} from "../server/aiResearchContext.js";
+import type { ScannerOutputWithMeta } from "../server/latestScannerOutput.js";
 import { AIResearchProviderError, type AIResearchProvider } from "../server/aiResearchProvider.js";
 import {
   buildAIAnalysisCacheIdentity,
@@ -30,6 +35,35 @@ await writeFixture(100_000, true);
 after(async () => { await rm(root, { recursive: true, force: true }); });
 
 describe("AI.3 canonical cache identity and persistent queue", () => {
+  it("shares one canonical scanner read across concurrent public-context requests", async () => {
+    let calls = 0;
+    const scanner: ScannerOutputWithMeta = {
+      _source_meta: {
+        source: "real-output",
+        reason: "test",
+        selected_run_id: "scan_test",
+        loaded_at: NOW.toISOString(),
+        runtime_mode: "INTERNAL_BETA",
+        age_seconds: 0,
+        source_ids: [],
+        freshness_status: "FRESH",
+      },
+    };
+    const reader = async (): Promise<ScannerOutputWithMeta> => {
+      calls += 1;
+      await new Promise((resolveDelay) => setTimeout(resolveDelay, 10));
+      return scanner;
+    };
+
+    const results = await Promise.all(Array.from(
+      { length: 100 },
+      () => readAIResearchScannerSingleFlight({ runtimeMode: "INTERNAL_BETA" }, reader),
+    ));
+
+    assert.equal(calls, 1);
+    assert.equal(new Set(results).size, 1);
+  });
+
   it("builds one cache key for the same normalized token and fingerprint", () => {
     const first = cacheIdentity("BASE", ADDRESS.toUpperCase().replace("0X", "0x"), "a".repeat(64));
     const second = cacheIdentity("base", ADDRESS, "a".repeat(64));
@@ -102,6 +136,74 @@ describe("AI.3 canonical cache identity and persistent queue", () => {
       () => enqueue(store, cacheIdentity("base", ADDRESS, "f".repeat(64)), "limited-session", NOW, strict),
       /RATE_LIMITED/,
     );
+    store.close();
+  });
+
+  it("creates one immutable owner recovery attempt for a suspended network row and lets 100 users join it", async () => {
+    const store = await createAIAnalysisQueueStore({ databaseFilePath: resolve(root, "owner-recovery.sqlite") });
+    const identity = fromContext(await context(ADDRESS));
+    const original = enqueue(store, identity, "owner-before-recovery").record;
+    assert.ok(original);
+    const claim = store.claimNext({ worker_id: "network-worker", now: NOW, lease_ms: 5_000 });
+    assert.ok(claim);
+    const suspended = store.fail({
+      analysis_id: claim.analysis_id,
+      worker_id: "network-worker",
+      safe_error_code: "PROVIDER_NETWORK",
+      transient: true,
+      max_attempts: 1,
+      retry_base_ms: 1_000,
+      now: NOW,
+    });
+    assert.equal(suspended.status, "SUSPENDED");
+    const preserved = { analysis_id: suspended.analysis_id, status: suspended.status, safe_error_code: suspended.safe_error_code, failed_at: suspended.failed_at };
+
+    const recovery = store.recoverSuspendedProviderNetwork({
+      identity,
+      owner_scope_hash: "owner-only-recovery",
+      now: new Date(NOW.getTime() + 1_000),
+    });
+    assert.equal(recovery.outcome, "QUEUED");
+    assert.ok(recovery.record);
+    assert.notEqual(recovery.record.analysis_id, original.analysis_id);
+    assert.equal(recovery.record.shared_cache_key, identity.cache_key);
+    assert.equal(recovery.previous_analysis_id, original.analysis_id);
+    assert.match(recovery.recovery_attempt_id ?? "", /^airr_[0-9a-f-]{36}$/);
+    assert.deepEqual(store.findByAnalysisId(original.analysis_id) && {
+      analysis_id: store.findByAnalysisId(original.analysis_id)?.analysis_id,
+      status: store.findByAnalysisId(original.analysis_id)?.status,
+      safe_error_code: store.findByAnalysisId(original.analysis_id)?.safe_error_code,
+      failed_at: store.findByAnalysisId(original.analysis_id)?.failed_at,
+    }, preserved);
+
+    const joined = Array.from({ length: 100 }, (_, index) => store.enqueue({
+      identity,
+      session_scope_hash: hashAIAnalysisRateScope(`joined-user-${index}`),
+      now: new Date(NOW.getTime() + 1_001),
+      rate_limits: RATE_LIMITS,
+    }));
+    assert.equal(new Set(joined.map((value) => value.record?.analysis_id)).size, 1);
+    assert.equal(new Set(joined.map((value) => value.outcome)).size, 1);
+    assert.equal(joined[0]?.outcome, "ALREADY_EXISTS");
+    assert.equal(store.stats().queued, 1);
+    let providerCalls = 0;
+    const worker = createAIResearchWorker({
+      ...contextOptions(),
+      store,
+      provider: mockProvider(async (value) => { providerCalls += 1; return JSON.stringify(narrative(value)); }),
+      now: () => new Date(NOW.getTime() + 1_002),
+      workerId: "recovery-worker",
+      limits: { maxAttempts: 1 },
+    });
+    const cycle = await worker.runCycle();
+    assert.equal(providerCalls, 1);
+    assert.equal(cycle.claimed, 1);
+    assert.equal(cycle.completed, 1);
+    assert.equal(store.findByAnalysisId(recovery.record.analysis_id)?.status, "READY");
+    const service = createAIResearchService({ ...contextOptions(), queueStore: store, providerEnabled: true, modelId: "gpt-5-mini", now: () => NOW });
+    const reads = await Promise.all(Array.from({ length: 100 }, (_, index) => service.getBrief("base", ADDRESS, index < 50 ? "pl" : "en")));
+    assert.equal(reads.filter((value) => value.availability === "READY" && value.analysis_id === recovery.record?.analysis_id).length, 100);
+    assert.equal(providerCalls, 1);
     store.close();
   });
 });

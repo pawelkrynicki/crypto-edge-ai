@@ -1,9 +1,21 @@
 import { AI_RESEARCH_TARGET_MODEL } from "../src/types/aiResearchTypes.js";
 import { fileURLToPath } from "node:url";
+import { buildAIResearchContext } from "./aiResearchContext.js";
+import { buildAIAnalysisCacheIdentity, createAIAnalysisQueueStore } from "./aiResearchQueueStore.js";
 import { resolveAIResearchProviderConfig } from "./aiResearchProvider.js";
-import { createAIResearchWorker } from "./aiResearchWorker.js";
+import { createAIResearchWorker, resolveAIResearchWorkerContextOptions } from "./aiResearchWorker.js";
+import { AI_RESEARCH_NARRATIVE_VERSION } from "./aiResearchNarrativeContract.js";
+import { AI_RESEARCH_COMPOSITION_POLICY_VERSION } from "./aiResearchCompositionPolicy.js";
+import { AI_RESEARCH_SEMANTIC_POLICY_VERSION } from "./aiResearchSemanticPolicy.js";
+import { AI_RESEARCH_PROVIDER_WIRE_SCHEMA_VERSION } from "./aiResearchProviderWireSchema.js";
+import { AI_RESEARCH_PROMPT_VERSION, AI_RESEARCH_SCHEMA_VERSION } from "../src/types/aiResearchTypes.js";
 
 type OwnerLiveSmokePreflight = { allowed: true } | { allowed: false; code: string };
+
+const OWNER_LIVE_SMOKE_IDENTITY = {
+  chain: "bsc",
+  contract_address: "0xe9bc5c6a86caa44fd7b469bf3cc7c563e4f77777",
+} as const;
 
 export function validateOwnerLiveSmokeEnvironment(env: NodeJS.ProcessEnv = process.env): OwnerLiveSmokePreflight {
   const provider = resolveAIResearchProviderConfig(env);
@@ -17,6 +29,52 @@ export function validateOwnerLiveSmokeEnvironment(env: NodeJS.ProcessEnv = proce
   return { allowed: true };
 }
 
+async function recoverOwnerAuthorizedNetworkAttempt(): Promise<{
+  analysis_id: string;
+  recovery_attempt_id: string;
+  previous_analysis_id: string;
+}> {
+  const contextOptions = resolveAIResearchWorkerContextOptions({}, process.env);
+  const context = await buildAIResearchContext(
+    OWNER_LIVE_SMOKE_IDENTITY.chain,
+    OWNER_LIVE_SMOKE_IDENTITY.contract_address,
+    "en",
+    contextOptions,
+  );
+  const identity = buildAIAnalysisCacheIdentity({
+    ...context.identity,
+    locale: "en",
+    snapshot_fingerprint: context.snapshot_fingerprint,
+    prompt_version: AI_RESEARCH_PROMPT_VERSION,
+    narrative_contract_version: AI_RESEARCH_NARRATIVE_VERSION,
+    semantic_policy_version: AI_RESEARCH_SEMANTIC_POLICY_VERSION,
+    composition_policy_version: AI_RESEARCH_COMPOSITION_POLICY_VERSION,
+    provider_wire_schema_version: AI_RESEARCH_PROVIDER_WIRE_SCHEMA_VERSION,
+    model_id: AI_RESEARCH_TARGET_MODEL,
+    analysis_schema_version: AI_RESEARCH_SCHEMA_VERSION,
+  });
+  const store = await createAIAnalysisQueueStore();
+  try {
+    const recovery = store.recoverSuspendedProviderNetwork({
+      identity,
+      owner_scope_hash: "owner_live_smoke",
+      now: new Date(),
+    });
+    if (recovery.outcome !== "QUEUED" || !recovery.record || !recovery.recovery_attempt_id || !recovery.previous_analysis_id) {
+      throw new Error("OWNER_LIVE_SMOKE_RECOVERY_NOT_QUEUED");
+    }
+    // This is an explicit owner recovery, never an automatic worker retry.
+    store.resumeWorker(new Date());
+    return {
+      analysis_id: recovery.record.analysis_id,
+      recovery_attempt_id: recovery.recovery_attempt_id,
+      previous_analysis_id: recovery.previous_analysis_id,
+    };
+  } finally {
+    store.close();
+  }
+}
+
 async function main(): Promise<void> {
   if (process.argv.length !== 2) {
     console.error("OWNER_LIVE_SMOKE_ARGUMENT_INVALID");
@@ -26,6 +84,15 @@ async function main(): Promise<void> {
   const preflight = validateOwnerLiveSmokeEnvironment();
   if (!preflight.allowed) {
     console.error(preflight.code);
+    process.exitCode = 1;
+    return;
+  }
+  let recovery: Awaited<ReturnType<typeof recoverOwnerAuthorizedNetworkAttempt>>;
+  try {
+    recovery = await recoverOwnerAuthorizedNetworkAttempt();
+  } catch (error) {
+    console.error(error instanceof Error && error.message === "OWNER_LIVE_SMOKE_RECOVERY_NOT_QUEUED"
+      ? error.message : "OWNER_LIVE_SMOKE_RECOVERY_FAILED");
     process.exitCode = 1;
     return;
   }
@@ -46,6 +113,7 @@ async function main(): Promise<void> {
     suspended: cycle.suspended,
     provider_calls: cycle.provider_calls,
     safe_error_code: cycle.safe_error_code,
+    recovery,
   }));
 }
 
