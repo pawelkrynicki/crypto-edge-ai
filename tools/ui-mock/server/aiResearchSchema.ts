@@ -16,20 +16,20 @@ import { getAIResearchCapability, isCapabilitySourceSupported } from "./aiResear
 import { sha256, stableJson, type AIResearchContext } from "./aiResearchContext.js";
 import { AI_RESEARCH_NARRATIVE_VERSION } from "./aiResearchNarrativeContract.js";
 
-const narrativeBindingSchema = (maxLength: number) => ({
+const narrativeBindingSchema = () => ({
   type: "object",
   additionalProperties: false,
   required: ["id", "support_ids", "en", "pl"],
   properties: {
-    id: { type: "string", maxLength: 120 },
+    id: { type: "string" },
     support_ids: {
       type: "array",
       minItems: 1,
       maxItems: 16,
-      items: { type: "string", maxLength: 120 },
+      items: { type: "string" },
     },
-    en: { type: "string", maxLength },
-    pl: { type: "string", maxLength },
+    en: { type: "string" },
+    pl: { type: "string" },
   },
 }) as const;
 
@@ -47,34 +47,34 @@ export const AI_RESEARCH_PROVIDER_JSON_SCHEMA = {
   ],
   properties: {
     narrative_version: { type: "string", enum: [AI_RESEARCH_NARRATIVE_VERSION] },
-    summary: narrativeBindingSchema(600),
+    summary: narrativeBindingSchema(),
     fact_narratives: {
       type: "array",
       minItems: 3,
       maxItems: 5,
-      items: narrativeBindingSchema(280),
+      items: narrativeBindingSchema(),
     },
     risk_narratives: {
       type: "array",
       minItems: 1,
       maxItems: 5,
-      items: narrativeBindingSchema(360),
+      items: narrativeBindingSchema(),
     },
     missing_narratives: {
       type: "array",
       maxItems: 5,
-      items: narrativeBindingSchema(280),
+      items: narrativeBindingSchema(),
     },
     action_narratives: {
       type: "array",
       minItems: 1,
       maxItems: 4,
-      items: narrativeBindingSchema(280),
+      items: narrativeBindingSchema(),
     },
     status_change_narratives: {
       type: "array",
       maxItems: 3,
-      items: narrativeBindingSchema(280),
+      items: narrativeBindingSchema(),
     },
   },
 } as const;

@@ -68,6 +68,11 @@ describe("AI v5 closed evidence-bound narrative contract", () => {
     support.fact_narratives[0]!.support_ids = ["source:not-issued"];
     assertRejected(support, context, "UNSUPPORTED_SUPPORT_REFERENCE");
 
+    const duplicateSupport = validNarrative(context);
+    const supportId = duplicateSupport.fact_narratives[0]!.support_ids[0]!;
+    duplicateSupport.fact_narratives[0]!.support_ids = [supportId, supportId];
+    assertRejected(duplicateSupport, context, "UNSUPPORTED_SUPPORT_REFERENCE");
+
     const entity = validNarrative(context);
     entity.summary.en = "A new exchange partner changes the current research view.";
     assertRejected(entity, context, "UNSUPPORTED_ENTITY_OR_CAPABILITY");

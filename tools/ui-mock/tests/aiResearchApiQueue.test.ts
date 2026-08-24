@@ -108,7 +108,7 @@ describe("AI.3 versioned public queue API", () => {
     assert.match(client, /\/api\/v1\/ai-analyses\/requests/);
     assert.match(client, /\/api\/v1\/ai-analyses\/result/);
     assert.doesNotMatch(client, /OPENAI_API_KEY|api\.openai\.com|createAIResearchProvider|from ["']openai["']/i);
-    assert.doesNotMatch(service, /createAIResearchProvider|from "\.\/aiResearchProvider/);
+    assert.doesNotMatch(service, /createAIResearchProvider|from "\.\/aiResearchProvider\.js"/);
     assert.doesNotMatch(handler, /createAIResearchProvider|OPENAI_API_KEY|api\.openai\.com/);
     assert.match(worker, /createAIResearchProvider/);
     assert.match(component, /Zleć analizę AI/);

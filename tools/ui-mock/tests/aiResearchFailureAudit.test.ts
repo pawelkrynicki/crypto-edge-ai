@@ -78,6 +78,64 @@ describe("PC.2 provider attempt and failure-stage audit", () => {
     store.close();
   });
 
+  it("B1: retains only bounded diagnostics for provider failures and never creates a READY result", async () => {
+    const cases = [
+      { name: "http-400", code: "PROVIDER_REQUEST_REJECTED" as const, http: 400, response: true, phase: "REQUEST_REJECTED" as const },
+      { name: "http-401", code: "PROVIDER_AUTHENTICATION" as const, http: 401, response: true, phase: "REQUEST_REJECTED" as const },
+      { name: "http-429", code: "PROVIDER_RATE_LIMITED" as const, http: 429, response: true, phase: "REQUEST_REJECTED" as const },
+      { name: "http-500", code: "PROVIDER_UNAVAILABLE" as const, http: 500, response: true, phase: "REQUEST_REJECTED" as const },
+      { name: "network", code: "PROVIDER_NETWORK" as const, http: null, response: false, phase: "NETWORK" as const },
+      { name: "timeout", code: "PROVIDER_TIMEOUT" as const, http: null, response: false, phase: "NETWORK" as const },
+    ];
+    for (const testCase of cases) {
+      const store = await storeFor(`diagnostic-${testCase.name}.sqlite`);
+      const queued = await enqueueReal(store, testCase.name);
+      let calls = 0;
+      const worker = createAIResearchWorker({
+        ...contextOptions(),
+        store,
+        provider: {
+          mode: "OPENAI",
+          model: "gpt-5-mini",
+          async generate() {
+            calls += 1;
+            throw new AIResearchProviderError(testCase.code, {
+              http_status: testCase.http,
+              provider_error_type: "fixture_error",
+              provider_error_code: "fixture_code",
+              provider_error_param: "text.format.schema",
+              response_received: testCase.response,
+              failure_phase: testCase.phase,
+              request_id: `fixture_${testCase.name}`,
+            });
+          },
+        },
+        now: () => NOW,
+        limits: { maxAttempts: 1, retryJitterRatio: 0 },
+      });
+
+      await worker.runCycle();
+      const record = required(store, queued);
+      assert.equal(calls, 1, testCase.name);
+      assert.equal(record.provider_attempt_count, 1, testCase.name);
+      assert.equal(record.attempt_count, 1, testCase.name);
+      assert.equal(record.status, "SUSPENDED", testCase.name);
+      assert.equal(record.result, null, testCase.name);
+      assert.equal(record.safe_error_code, testCase.code, testCase.name);
+      assert.deepEqual(record.internal_provider_failure, {
+        http_status: testCase.http,
+        error_type: "fixture_error",
+        error_code: "fixture_code",
+        error_param: "text.format.schema",
+        response_received: testCase.response,
+        failure_phase: testCase.phase,
+        request_id: `fixture_${testCase.name}`,
+      }, testCase.name);
+      assert.doesNotMatch(JSON.stringify(record.internal_provider_failure), /authorization|api[_-]?key|raw provider|prompt/i, testCase.name);
+      store.close();
+    }
+  });
+
   it("C: records a thrown provider timeout as an entered provider attempt", async () => {
     const store = await storeFor("timeout.sqlite");
     const queued = await enqueueReal(store, "timeout");
@@ -281,6 +339,14 @@ describe("PC.2 provider attempt and failure-stage audit", () => {
         "internal_provider_incomplete_reason",
         "internal_provider_output_tokens",
         "internal_provider_reasoning_tokens",
+        "internal_provider_http_status",
+        "internal_provider_error_type",
+        "internal_provider_error_code",
+        "internal_provider_error_param",
+        "internal_provider_response_received",
+        "internal_provider_failure_phase",
+        "internal_provider_request_id",
+        "internal_provider_failure",
         "failure_stage",
       ]) assert.equal(JSON.stringify(body).includes(forbidden), false, forbidden);
     } finally {

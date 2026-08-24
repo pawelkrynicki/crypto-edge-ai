@@ -196,7 +196,7 @@ describe("AI Research v2 brief and v5 bilingual prompt contract", () => {
     ]);
     assert.match(provider, /OPENAI_API_KEY/);
     assert.match(worker, /createAIResearchProvider/);
-    assert.doesNotMatch(service, /createAIResearchProvider|from "\.\/aiResearchProvider/);
+    assert.doesNotMatch(service, /createAIResearchProvider|from "\.\/aiResearchProvider\.js"/);
     assert.doesNotMatch(client, /OPENAI_API_KEY|api\.openai\.com|createAIResearchProvider/);
     assert.match(client, /\/api\/v1\/ai-analyses\/result/);
     assert.match(client, /\/api\/v1\/ai-analyses\/requests/);

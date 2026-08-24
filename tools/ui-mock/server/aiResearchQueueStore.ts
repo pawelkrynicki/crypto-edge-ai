@@ -15,6 +15,7 @@ import {
 import { resolveTokenIdentity } from "../src/tokenLifecycle.js";
 import { sha256, stableJson } from "./aiResearchContext.js";
 import { AI_RESEARCH_NARRATIVE_VERSION } from "./aiResearchNarrativeContract.js";
+import { AI_RESEARCH_PROVIDER_WIRE_SCHEMA_VERSION } from "./aiResearchProviderWireSchema.js";
 import { validateStoredAIResearchBrief } from "./aiResearchSchema.js";
 
 type SqliteRunResult = { changes?: number | bigint };
@@ -55,6 +56,7 @@ export type AIAnalysisCacheIdentity = {
   snapshot_fingerprint: string;
   prompt_version: string;
   narrative_contract_version: string | null;
+  provider_wire_schema_version: string | null;
   model_id: string;
   analysis_schema_version: string;
   locale: AIResearchLocale;
@@ -88,6 +90,15 @@ export type AIAnalysisQueueRecord = AIAnalysisCacheIdentity & {
     incomplete_reason: string | null;
     output_tokens: number | null;
     reasoning_tokens: number | null;
+  };
+  internal_provider_failure: {
+    http_status: number | null;
+    error_type: string | null;
+    error_code: string | null;
+    error_param: string | null;
+    response_received: boolean;
+    failure_phase: string | null;
+    request_id: string | null;
   };
   failure_stage: AIAnalysisFailureStage | null;
   lease_owner: string | null;
@@ -174,6 +185,7 @@ export function buildAIAnalysisCacheIdentity(input: {
   snapshot_fingerprint: string;
   prompt_version?: string;
   narrative_contract_version?: string;
+  provider_wire_schema_version?: string;
   model_id: string;
   analysis_schema_version?: string;
   locale: AIResearchLocale;
@@ -183,6 +195,7 @@ export function buildAIAnalysisCacheIdentity(input: {
     || !/^[0-9a-f]{64}$/.test(input.snapshot_fingerprint)
     || !safeVersion(input.prompt_version ?? AI_RESEARCH_PROMPT_VERSION)
     || !safeVersion(input.narrative_contract_version ?? AI_RESEARCH_NARRATIVE_VERSION)
+    || !safeVersion(input.provider_wire_schema_version ?? AI_RESEARCH_PROVIDER_WIRE_SCHEMA_VERSION)
     || !safeVersion(input.model_id)
     || !safeVersion(input.analysis_schema_version ?? AI_RESEARCH_SCHEMA_VERSION)) {
     throw new AIAnalysisQueueStoreError("STORE_SCHEMA_INVALID");
@@ -194,6 +207,7 @@ export function buildAIAnalysisCacheIdentity(input: {
     model_id: input.model_id,
     prompt_version: input.prompt_version ?? AI_RESEARCH_PROMPT_VERSION,
     narrative_contract_version: input.narrative_contract_version ?? AI_RESEARCH_NARRATIVE_VERSION,
+    provider_wire_schema_version: input.provider_wire_schema_version ?? AI_RESEARCH_PROVIDER_WIRE_SCHEMA_VERSION,
     snapshot_fingerprint: input.snapshot_fingerprint,
   };
   // The legacy database column is retained for compatibility. Production writes use
@@ -245,13 +259,14 @@ export async function createAIAnalysisQueueStore(options: AIAnalysisQueueStoreOp
       return requireDb().prepare(`
 SELECT * FROM crypto_ai_analysis_queue
 WHERE chain = ? AND contract_address = ? AND prompt_version = ?
-  AND narrative_contract_version = ? AND model_id = ? AND analysis_schema_version = ? AND result_json IS NOT NULL AND validation_status = 'VALID'
+  AND narrative_contract_version = ? AND provider_wire_schema_version = ? AND model_id = ? AND analysis_schema_version = ? AND result_json IS NOT NULL AND validation_status = 'VALID'
 ORDER BY completed_at DESC LIMIT 20
 `).all(
         identity.chain,
         identity.contract_address,
         identity.prompt_version,
         identity.narrative_contract_version,
+        identity.provider_wire_schema_version,
         identity.model_id,
         identity.analysis_schema_version,
       ).flatMap((row) => {
@@ -312,12 +327,12 @@ WHERE cache_key = ?
         } else {
           db.prepare(`
 INSERT INTO crypto_ai_analysis_queue (
-  analysis_id, cache_key, chain, contract_address, snapshot_fingerprint, prompt_version, narrative_contract_version, model_id,
+  analysis_id, cache_key, chain, contract_address, snapshot_fingerprint, prompt_version, narrative_contract_version, provider_wire_schema_version, model_id,
   analysis_schema_version, locale, status, requested_at, queued_at, attempt_count, result_json,
   validation_status, safe_error_code, prompt_tokens, completion_tokens, total_tokens, latency_ms,
   provider_response_id, provider_attempt_count, provider_attempt_started_at, provider_attempt_completed_at,
   provider_attempt_status, provider_attempt_safe_error_code, failure_stage, lease_owner, lease_expires_at, created_at, updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'QUEUED', ?, ?, 0, NULL, 'PENDING', NULL, 0, 0, 0, NULL, NULL, 0, NULL, NULL, 'NOT_ATTEMPTED', NULL, NULL, NULL, NULL, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'QUEUED', ?, ?, 0, NULL, 'PENDING', NULL, 0, 0, 0, NULL, NULL, 0, NULL, NULL, 'NOT_ATTEMPTED', NULL, NULL, NULL, NULL, ?, ?)
 `).run(
             `air_${randomUUID()}`,
             input.identity.cache_key,
@@ -326,6 +341,7 @@ INSERT INTO crypto_ai_analysis_queue (
             input.identity.snapshot_fingerprint,
             input.identity.prompt_version,
             input.identity.narrative_contract_version,
+            input.identity.provider_wire_schema_version,
             input.identity.model_id,
             input.identity.analysis_schema_version,
             input.identity.locale,
@@ -393,7 +409,11 @@ UPDATE crypto_ai_analysis_queue SET provider_attempt_count = provider_attempt_co
   provider_attempt_status = 'STARTED', provider_attempt_safe_error_code = NULL,
   internal_validation_code = NULL, internal_validation_violations_json = NULL,
   internal_provider_response_status = NULL, internal_provider_incomplete_reason = NULL,
-  internal_provider_output_tokens = NULL, internal_provider_reasoning_tokens = NULL, updated_at = ?
+  internal_provider_output_tokens = NULL, internal_provider_reasoning_tokens = NULL,
+  internal_provider_http_status = NULL, internal_provider_error_type = NULL,
+  internal_provider_error_code = NULL, internal_provider_error_param = NULL,
+  internal_provider_response_received = 0, internal_provider_failure_phase = NULL,
+  internal_provider_request_id = NULL, updated_at = ?
 WHERE analysis_id = ? AND status = 'PROCESSING' AND lease_owner = ?
 `).run(nowIso, nowIso, input.analysis_id, input.worker_id);
       if (changes(result) !== 1) throw new AIAnalysisQueueStoreError("STORE_UNAVAILABLE");
@@ -461,18 +481,34 @@ WHERE analysis_id = ? AND status = 'PROCESSING' AND lease_owner = ?
       incomplete_reason: string | null;
       output_tokens: number | null;
       reasoning_tokens: number | null;
+      http_status?: number | null;
+      error_type?: string | null;
+      error_code?: string | null;
+      error_param?: string | null;
+      response_received?: boolean;
+      failure_phase?: string | null;
+      request_id?: string | null;
       now: Date;
     }): AIAnalysisQueueRecord {
       const db = requireDb();
       const result = db.prepare(`
 UPDATE crypto_ai_analysis_queue SET internal_provider_response_status = ?, internal_provider_incomplete_reason = ?,
-  internal_provider_output_tokens = ?, internal_provider_reasoning_tokens = ?, updated_at = ?
+  internal_provider_output_tokens = ?, internal_provider_reasoning_tokens = ?,
+  internal_provider_http_status = ?, internal_provider_error_type = ?, internal_provider_error_code = ?, internal_provider_error_param = ?,
+  internal_provider_response_received = ?, internal_provider_failure_phase = ?, internal_provider_request_id = ?, updated_at = ?
 WHERE analysis_id = ? AND status = 'PROCESSING' AND lease_owner = ?
 `).run(
         safeProviderDetail(input.response_status),
         safeProviderDetail(input.incomplete_reason),
         nullableInteger(input.output_tokens),
         nullableInteger(input.reasoning_tokens),
+        providerHttpStatus(input.http_status),
+        safeProviderDiagnostic(input.error_type),
+        safeProviderDiagnostic(input.error_code),
+        safeProviderDiagnostic(input.error_param),
+        input.response_received === true ? 1 : 0,
+        safeProviderDiagnostic(input.failure_phase),
+        safeProviderRequestId(input.request_id),
         input.now.toISOString(),
         input.analysis_id,
         input.worker_id,
@@ -529,6 +565,7 @@ SELECT * FROM crypto_ai_analysis_queue WHERE analysis_id = ? AND status = 'PROCE
           snapshot_fingerprint: brief.snapshot_fingerprint,
           prompt_version: brief.prompt_version,
           narrative_contract_version: owned.narrative_contract_version ?? "legacy",
+          provider_wire_schema_version: owned.provider_wire_schema_version ?? "legacy",
           model_id: brief.model,
           analysis_schema_version: brief.schema_version,
           locale: "en",
@@ -774,6 +811,7 @@ CREATE TABLE IF NOT EXISTS crypto_ai_analysis_queue (
   snapshot_fingerprint TEXT NOT NULL,
   prompt_version TEXT NOT NULL,
   narrative_contract_version TEXT,
+  provider_wire_schema_version TEXT,
   model_id TEXT NOT NULL,
   analysis_schema_version TEXT NOT NULL,
   locale TEXT NOT NULL CHECK (locale IN ('pl','en')),
@@ -804,6 +842,13 @@ CREATE TABLE IF NOT EXISTS crypto_ai_analysis_queue (
   internal_provider_incomplete_reason TEXT,
   internal_provider_output_tokens INTEGER CHECK (internal_provider_output_tokens IS NULL OR internal_provider_output_tokens >= 0),
   internal_provider_reasoning_tokens INTEGER CHECK (internal_provider_reasoning_tokens IS NULL OR internal_provider_reasoning_tokens >= 0),
+  internal_provider_http_status INTEGER CHECK (internal_provider_http_status IS NULL OR (internal_provider_http_status >= 100 AND internal_provider_http_status <= 599)),
+  internal_provider_error_type TEXT,
+  internal_provider_error_code TEXT,
+  internal_provider_error_param TEXT,
+  internal_provider_response_received INTEGER NOT NULL DEFAULT 0 CHECK (internal_provider_response_received IN (0,1)),
+  internal_provider_failure_phase TEXT,
+  internal_provider_request_id TEXT,
   failure_stage TEXT CHECK (failure_stage IN ('CONTEXT_BUILD','IDENTITY_CHECK','CIRCUIT','PROVIDER_CALL','PROVIDER_RESPONSE','PROVIDER_PARSE','HYDRATE','STORE_COMPLETE','USAGE_RECORD','UNKNOWN')),
   lease_owner TEXT,
   lease_expires_at TEXT,
@@ -847,6 +892,7 @@ PRAGMA user_version = 1;
 `);
   ensureQueueColumn(database, "provider_attempt_count", "INTEGER NOT NULL DEFAULT 0 CHECK (provider_attempt_count >= 0)");
   ensureQueueColumn(database, "narrative_contract_version", "TEXT");
+  ensureQueueColumn(database, "provider_wire_schema_version", "TEXT");
   ensureQueueColumn(database, "provider_attempt_started_at", "TEXT");
   ensureQueueColumn(database, "provider_attempt_completed_at", "TEXT");
   ensureQueueColumn(database, "provider_attempt_status", "TEXT NOT NULL DEFAULT 'NOT_ATTEMPTED' CHECK (provider_attempt_status IN ('NOT_ATTEMPTED','STARTED','RESPONSE_RECEIVED','FAILED'))");
@@ -857,8 +903,15 @@ PRAGMA user_version = 1;
   ensureQueueColumn(database, "internal_provider_incomplete_reason", "TEXT");
   ensureQueueColumn(database, "internal_provider_output_tokens", "INTEGER CHECK (internal_provider_output_tokens IS NULL OR internal_provider_output_tokens >= 0)");
   ensureQueueColumn(database, "internal_provider_reasoning_tokens", "INTEGER CHECK (internal_provider_reasoning_tokens IS NULL OR internal_provider_reasoning_tokens >= 0)");
+  ensureQueueColumn(database, "internal_provider_http_status", "INTEGER CHECK (internal_provider_http_status IS NULL OR (internal_provider_http_status >= 100 AND internal_provider_http_status <= 599))");
+  ensureQueueColumn(database, "internal_provider_error_type", "TEXT");
+  ensureQueueColumn(database, "internal_provider_error_code", "TEXT");
+  ensureQueueColumn(database, "internal_provider_error_param", "TEXT");
+  ensureQueueColumn(database, "internal_provider_response_received", "INTEGER NOT NULL DEFAULT 0 CHECK (internal_provider_response_received IN (0,1))");
+  ensureQueueColumn(database, "internal_provider_failure_phase", "TEXT");
+  ensureQueueColumn(database, "internal_provider_request_id", "TEXT");
   ensureQueueColumn(database, "failure_stage", "TEXT CHECK (failure_stage IN ('CONTEXT_BUILD','IDENTITY_CHECK','CIRCUIT','PROVIDER_CALL','PROVIDER_RESPONSE','PROVIDER_PARSE','HYDRATE','STORE_COMPLETE','USAGE_RECORD','UNKNOWN'))");
-  database.exec("PRAGMA user_version = 5");
+  database.exec("PRAGMA user_version = 6");
 }
 
 function ensureQueueColumn(database: SqliteDatabase, name: string, definition: string): void {
@@ -870,13 +923,14 @@ function assertSchema(database: SqliteDatabase): void {
   const columns = database.prepare("PRAGMA table_info(crypto_ai_analysis_queue)").all();
   const names = new Set(columns.map((row) => isRecord(row) ? row.name : null));
   const required = [
-    "analysis_id", "cache_key", "chain", "contract_address", "snapshot_fingerprint", "prompt_version", "narrative_contract_version",
+    "analysis_id", "cache_key", "chain", "contract_address", "snapshot_fingerprint", "prompt_version", "narrative_contract_version", "provider_wire_schema_version",
     "model_id", "analysis_schema_version", "status", "requested_at", "queued_at", "started_at", "completed_at",
     "failed_at", "next_retry_at", "attempt_count", "result_json", "validation_status", "safe_error_code",
     "prompt_tokens", "completion_tokens", "total_tokens", "latency_ms", "provider_response_id",
     "provider_attempt_count", "provider_attempt_started_at", "provider_attempt_completed_at", "provider_attempt_status",
     "provider_attempt_safe_error_code", "internal_validation_code", "internal_validation_violations_json",
     "internal_provider_response_status", "internal_provider_incomplete_reason", "internal_provider_output_tokens", "internal_provider_reasoning_tokens",
+    "internal_provider_http_status", "internal_provider_error_type", "internal_provider_error_code", "internal_provider_error_param", "internal_provider_response_received", "internal_provider_failure_phase", "internal_provider_request_id",
     "failure_stage", "created_at", "updated_at",
   ];
   if (required.some((name) => !names.has(name))) throw new AIAnalysisQueueStoreError("STORE_SCHEMA_INVALID");
@@ -891,6 +945,7 @@ function safeRecord(value: unknown): AIAnalysisQueueRecord | null {
     || typeof value.snapshot_fingerprint !== "string"
     || typeof value.prompt_version !== "string"
     || (value.narrative_contract_version !== null && typeof value.narrative_contract_version !== "string")
+    || (value.provider_wire_schema_version !== null && typeof value.provider_wire_schema_version !== "string")
     || typeof value.model_id !== "string"
     || typeof value.analysis_schema_version !== "string"
     || (value.locale !== "pl" && value.locale !== "en")
@@ -905,6 +960,7 @@ function safeRecord(value: unknown): AIAnalysisQueueRecord | null {
     snapshot_fingerprint: value.snapshot_fingerprint,
     prompt_version: value.prompt_version,
     narrative_contract_version: stringField(value.narrative_contract_version),
+    provider_wire_schema_version: stringField(value.provider_wire_schema_version),
     model_id: value.model_id,
     analysis_schema_version: value.analysis_schema_version,
     locale: value.locale,
@@ -939,6 +995,15 @@ function safeRecord(value: unknown): AIAnalysisQueueRecord | null {
       output_tokens: nullableInteger(value.internal_provider_output_tokens),
       reasoning_tokens: nullableInteger(value.internal_provider_reasoning_tokens),
     },
+    internal_provider_failure: {
+      http_status: providerHttpStatus(value.internal_provider_http_status),
+      error_type: safeProviderDiagnostic(value.internal_provider_error_type),
+      error_code: safeProviderDiagnostic(value.internal_provider_error_code),
+      error_param: safeProviderDiagnostic(value.internal_provider_error_param),
+      response_received: value.internal_provider_response_received === 1,
+      failure_phase: safeProviderDiagnostic(value.internal_provider_failure_phase),
+      request_id: safeProviderRequestId(value.internal_provider_request_id),
+    },
     failure_stage: safeFailureStage(value.failure_stage),
     lease_owner: stringField(value.lease_owner),
     lease_expires_at: stringField(value.lease_expires_at),
@@ -956,13 +1021,14 @@ function findLastKnownGood(
   const rows = database.prepare(`
 SELECT * FROM crypto_ai_analysis_queue
 WHERE chain = ? AND contract_address = ? AND prompt_version = ?
-  AND narrative_contract_version = ? AND model_id = ? AND analysis_schema_version = ? AND result_json IS NOT NULL AND validation_status = 'VALID'
+  AND narrative_contract_version = ? AND provider_wire_schema_version = ? AND model_id = ? AND analysis_schema_version = ? AND result_json IS NOT NULL AND validation_status = 'VALID'
 ORDER BY completed_at DESC LIMIT 20
 `).all(
     identity.chain,
     identity.contract_address,
     identity.prompt_version,
     identity.narrative_contract_version,
+    identity.provider_wire_schema_version,
     identity.model_id,
     identity.analysis_schema_version,
   );
@@ -1094,6 +1160,18 @@ function safeCode(value: string): string {
 
 function safeProviderDetail(value: string | null): string | null {
   return value !== null && /^[a-z0-9_]{1,80}$/i.test(value) ? value : null;
+}
+
+function providerHttpStatus(value: unknown): number | null {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 100 && value <= 599 ? value : null;
+}
+
+function safeProviderDiagnostic(value: unknown): string | null {
+  return typeof value === "string" && /^[A-Za-z0-9._-]{1,120}$/.test(value) ? value : null;
+}
+
+function safeProviderRequestId(value: unknown): string | null {
+  return typeof value === "string" && /^[A-Za-z0-9._-]{1,200}$/.test(value) ? value : null;
 }
 
 function providerAttemptStatus(value: unknown): AIAnalysisProviderAttemptStatus {

@@ -7,6 +7,11 @@ import { resolveProductRuntimeMode } from "../src/runtimeMode.js";
 import { AIResearchContextError, buildAIResearchContext, type AIResearchContextOptions } from "./aiResearchContext.js";
 import { AI_RESEARCH_NARRATIVE_VERSION } from "./aiResearchNarrativeContract.js";
 import {
+  AI_RESEARCH_PROVIDER_WIRE_SCHEMA_VERSION,
+  AIResearchProviderWireSchemaError,
+  buildAIResearchProviderWireSchema,
+} from "./aiResearchProviderWireSchema.js";
+import {
   createAIResearchProvider,
   NOOP_AI_RESEARCH_USAGE_RECORDER,
   resolveAIResearchProviderConfig,
@@ -227,11 +232,31 @@ async function processClaim(
       snapshot_fingerprint: context.snapshot_fingerprint,
       prompt_version: context.prompt_version,
       narrative_contract_version: AI_RESEARCH_NARRATIVE_VERSION,
+      provider_wire_schema_version: AI_RESEARCH_PROVIDER_WIRE_SCHEMA_VERSION,
       model_id: claimed.model_id,
       analysis_schema_version: claimed.analysis_schema_version,
     });
     if (currentIdentity.cache_key !== claimed.cache_key) {
       throw new AIResearchWorkerContractError("DATA_STALE");
+    }
+    // The schema gate runs before an attempt is started, so an existing
+    // persistent database can represent it with the established identity stage.
+    stage = "IDENTITY_CHECK";
+    try {
+      const wireSchema = buildAIResearchProviderWireSchema(context);
+      if (wireSchema.version !== claimed.provider_wire_schema_version) throw new AIResearchWorkerContractError("PROVIDER_SCHEMA_INVALID");
+    } catch (error) {
+      if (error instanceof AIResearchProviderWireSchemaError) {
+        store.recordValidationDiagnostics({
+          analysis_id: claimed.analysis_id,
+          worker_id: workerId,
+          validation_code: error.code,
+          violations: [error.code],
+          now: now(),
+        });
+        throw new AIResearchWorkerContractError("PROVIDER_SCHEMA_INVALID");
+      }
+      throw error;
     }
     stage = "CIRCUIT";
     let circuitPermitted: boolean;
@@ -269,6 +294,13 @@ async function processClaim(
         incomplete_reason: providerResult.response_metadata.incomplete_reason,
         output_tokens: providerResult.response_metadata.output_tokens,
         reasoning_tokens: providerResult.response_metadata.reasoning_tokens,
+        http_status: providerResult.response_metadata.http_status,
+        error_type: providerResult.response_metadata.provider_error_type,
+        error_code: providerResult.response_metadata.provider_error_code,
+        error_param: providerResult.response_metadata.provider_error_param,
+        response_received: providerResult.response_metadata.response_received,
+        failure_phase: providerResult.response_metadata.failure_phase,
+        request_id: providerResult.response_metadata.request_id,
         now: now(),
       });
     }
@@ -344,7 +376,7 @@ async function processClaim(
         failure = { code: "AI_STORE_FAILURE", transient: false, stage: "PROVIDER_PARSE" };
       }
     }
-    if (error instanceof AIResearchProviderError && error.response_metadata.response_status !== null) {
+    if (error instanceof AIResearchProviderError) {
       try {
         store.recordProviderResponseDiagnostics({
           analysis_id: claimed.analysis_id,
@@ -353,6 +385,13 @@ async function processClaim(
           incomplete_reason: error.response_metadata.incomplete_reason,
           output_tokens: error.response_metadata.output_tokens,
           reasoning_tokens: error.response_metadata.reasoning_tokens,
+          http_status: error.response_metadata.http_status,
+          error_type: error.response_metadata.provider_error_type,
+          error_code: error.response_metadata.provider_error_code,
+          error_param: error.response_metadata.provider_error_param,
+          response_received: error.response_metadata.response_received,
+          failure_phase: error.response_metadata.failure_phase,
+          request_id: error.response_metadata.request_id,
           now: now(),
         });
         if (error.code === "PROVIDER_OUTPUT_INCOMPLETE") {
@@ -493,7 +532,7 @@ function classifyFailure(error: unknown, stage: AIAnalysisFailureStage): {
     return { code: stage === "PROVIDER_PARSE" ? "PROVIDER_CONTRACT_INVALID" : "VALIDATION_FAILURE", transient: false, stage };
   }
   if (error instanceof AIResearchProviderError) {
-    if (["PROVIDER_TIMEOUT", "PROVIDER_RATE_LIMITED", "PROVIDER_UNAVAILABLE", "PROVIDER_ERROR"].includes(error.code)) {
+    if (["PROVIDER_TIMEOUT", "PROVIDER_RATE_LIMITED", "PROVIDER_UNAVAILABLE", "PROVIDER_NETWORK", "PROVIDER_ERROR"].includes(error.code)) {
       return { code: error.code, transient: true, stage };
     }
     if (error.code === "INVALID_PROVIDER_RESPONSE") return { code: "PROVIDER_CONTRACT_INVALID", transient: false, stage };

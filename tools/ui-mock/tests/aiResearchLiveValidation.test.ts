@@ -14,6 +14,10 @@ import {
   resolveAIResearchProviderConfig,
 } from "../server/aiResearchProvider.js";
 import { resolveAIResearchWorkerLimits } from "../server/aiResearchWorker.js";
+import {
+  buildAIResearchProviderWireSchema,
+  validateAIResearchProviderWireSchema,
+} from "../server/aiResearchProviderWireSchema.js";
 import { PERSISTABLE_SCANNER_SAMPLE } from "../src/fixtures/persistableScannerSample.js";
 
 const root = await mkdtemp(resolve(tmpdir(), "crypto-edge-ai2c-compat-tests-"));
@@ -65,7 +69,11 @@ describe("AI.2C provider contract compatibility under AI.3", () => {
         throw error;
       },
     });
-    await assert.rejects(provider.generate(context), (error: unknown) => error instanceof AIResearchProviderError && error.code === "PROVIDER_TIMEOUT");
+    await assert.rejects(provider.generate(context), (error: unknown) => error instanceof AIResearchProviderError
+      && error.code === "PROVIDER_TIMEOUT"
+      && error.response_metadata.http_status === null
+      && error.response_metadata.response_received === false
+      && error.response_metadata.failure_phase === "NETWORK");
     assert.equal(mockCalls, 1);
   });
 
@@ -98,7 +106,11 @@ describe("AI.2C provider contract compatibility under AI.3", () => {
     assert.equal(mockCalls, 1);
     assert.equal(result.model, "gpt-5-mini");
     assert.deepEqual(result.token_usage, { prompt_tokens: 100, completion_tokens: 50, total_tokens: 150 });
-    assert.deepEqual(result.response_metadata, { response_status: "completed", incomplete_reason: null, output_tokens: 50, reasoning_tokens: 12, max_output_tokens: 8_000 });
+    assert.deepEqual(result.response_metadata, {
+      response_status: "completed", incomplete_reason: null, output_tokens: 50, reasoning_tokens: 12, max_output_tokens: 8_000,
+      http_status: 200, provider_error_type: null, provider_error_code: null, provider_error_param: null,
+      response_received: true, failure_phase: "STRUCTURED_OUTPUT", request_id: "mock_request_id",
+    });
     assert.equal(result.request_id, "mock_request_id");
   });
 
@@ -135,6 +147,123 @@ describe("AI.2C provider contract compatibility under AI.3", () => {
     await assert.rejects(provider.generate(context), (error: unknown) => error instanceof AIResearchProviderError && error.code === "PROVIDER_OUTPUT_INCOMPLETE");
   });
 
+  it("captures bounded diagnostics for HTTP request failures without retrying", async () => {
+    const context = await buildAIResearchContext("base", ADDRESS, "pl", contextOptions());
+    const cases = [
+      { status: 400, code: "invalid_json_schema", param: "text.format.schema", expected: "PROVIDER_REQUEST_REJECTED" },
+      { status: 401, code: "invalid_api_key", param: null, expected: "PROVIDER_AUTHENTICATION" },
+      { status: 429, code: "rate_limit_exceeded", param: null, expected: "PROVIDER_RATE_LIMITED" },
+      { status: 500, code: "server_error", param: null, expected: "PROVIDER_UNAVAILABLE" },
+    ] as const;
+    for (const testCase of cases) {
+      let calls = 0;
+      const provider = createAIResearchProvider({
+        config: openAiConfig(),
+        fetch: async () => {
+          calls += 1;
+          return new Response(JSON.stringify({ error: {
+            message: "bounded local fixture",
+            type: "invalid_request_error",
+            code: testCase.code,
+            param: testCase.param,
+          } }), {
+            status: testCase.status,
+            headers: { "content-type": "application/json", "x-request-id": `request_${testCase.status}` },
+          });
+        },
+      });
+      await assert.rejects(provider.generate(context), (error: unknown) => {
+        assert.ok(error instanceof AIResearchProviderError);
+        assert.equal(error.code, testCase.expected);
+        assert.equal(error.response_metadata.http_status, testCase.status);
+        assert.equal(error.response_metadata.provider_error_code, testCase.code);
+        assert.equal(error.response_metadata.provider_error_param, testCase.param);
+        assert.equal(error.response_metadata.response_received, true);
+        assert.equal(error.response_metadata.failure_phase, "REQUEST_REJECTED");
+        assert.equal(error.response_metadata.request_id, `request_${testCase.status}`);
+        assert.doesNotMatch(JSON.stringify(error.response_metadata), /bounded local fixture/i);
+        return true;
+      });
+      assert.equal(calls, 1);
+    }
+  });
+
+  it("classifies a network failure without a response and never re-enters the SDK", async () => {
+    const context = await buildAIResearchContext("base", ADDRESS, "pl", contextOptions());
+    let calls = 0;
+    const provider = createAIResearchProvider({
+      config: openAiConfig(),
+      fetch: async () => { calls += 1; throw new TypeError("offline test transport"); },
+    });
+    await assert.rejects(provider.generate(context), (error: unknown) => error instanceof AIResearchProviderError
+      && error.code === "PROVIDER_NETWORK"
+      && error.response_metadata.http_status === null
+      && error.response_metadata.response_received === false
+      && error.response_metadata.failure_phase === "NETWORK");
+    assert.equal(calls, 1);
+  });
+
+  it("records a refusal as a bounded structured-output failure", async () => {
+    const context = await buildAIResearchContext("base", ADDRESS, "pl", contextOptions());
+    const provider = createAIResearchProvider({
+      config: openAiConfig(),
+      fetch: async () => new Response(JSON.stringify({
+        status: "completed",
+        output: [{ type: "message", content: [{ type: "refusal", refusal: "fixture refusal text" }] }],
+      }), { status: 200, headers: { "content-type": "application/json", "x-request-id": "refusal_fixture" } }),
+    });
+    await assert.rejects(provider.generate(context), (error: unknown) => error instanceof AIResearchProviderError
+      && error.code === "INVALID_PROVIDER_RESPONSE"
+      && error.response_metadata.http_status === 200
+      && error.response_metadata.response_received === true
+      && error.response_metadata.failure_phase === "STRUCTURED_OUTPUT"
+      && error.response_metadata.request_id === "refusal_fixture");
+  });
+
+  it("captures the exact serialized SDK wire schema and fails closed on incompatible fixtures", async () => {
+    const context = await buildAIResearchContext("base", ADDRESS, "pl", contextOptions());
+    const current = buildAIResearchProviderWireSchema(context);
+    assert.equal(current.audit.root_type, "object");
+    assert.equal(current.audit.required_fields_valid, true);
+    assert.equal(current.audit.additional_properties_valid, true);
+    assert.ok(current.audit.required_field_checks.length > 0);
+    assert.ok(current.audit.additional_properties_checks.length > 0);
+    assert.doesNotMatch(JSON.stringify(current.schema), /uniqueItems/);
+    assert.deepEqual(validateAIResearchProviderWireSchema(current.schema), current.audit);
+
+    const incompatible = (mutate: (schema: Record<string, unknown>) => void, code: string) => {
+      const fixture = structuredClone(current.schema);
+      mutate(fixture);
+      assert.throws(() => validateAIResearchProviderWireSchema(fixture), (error: unknown) => error instanceof Error && error.message === code);
+    };
+    incompatible((schema) => { schema.x_custom = true; }, "WIRE_SCHEMA_UNSUPPORTED_KEYWORD");
+    incompatible((schema) => {
+      const summary = (schema.properties as Record<string, Record<string, unknown>>).summary!;
+      const supportIds = (summary.properties as Record<string, Record<string, unknown>>).support_ids!;
+      supportIds.uniqueItems = true;
+    }, "WIRE_SCHEMA_UNSUPPORTED_KEYWORD");
+    incompatible((schema) => { (schema.required as string[]).pop(); }, "WIRE_SCHEMA_MISSING_REQUIRED");
+    incompatible((schema) => { delete schema.additionalProperties; }, "WIRE_SCHEMA_ADDITIONAL_PROPERTIES");
+    incompatible((schema) => { schema.anyOf = [{ type: "object" }, { type: "object" }]; }, "WIRE_SCHEMA_ROOT_ANY_OF");
+    incompatible((schema) => { (schema.properties as Record<string, unknown>).summary = { $ref: "#/$defs/missing" }; }, "WIRE_SCHEMA_BROKEN_REF");
+
+    let serializedSchema: unknown = null;
+    const provider = createAIResearchProvider({
+      config: openAiConfig(),
+      fetch: async (_input, init) => {
+        serializedSchema = JSON.parse(String(init?.body)).text.format.schema;
+        return new Response(JSON.stringify({
+          status: "completed",
+          output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(narrative(context)) }] }],
+          usage: { input_tokens: 1, output_tokens: 1 },
+        }), { status: 200, headers: { "content-type": "application/json" } });
+      },
+    });
+    await provider.generate(context);
+    assert.deepEqual(serializedSchema, current.schema);
+    assert.equal(validateAIResearchProviderWireSchema(serializedSchema).required_fields_valid, true);
+  });
+
   it("keeps the SDK call non-persistent, bounded and without SDK retries", async () => {
     const providerSource = await source("server/aiResearchProvider.ts");
     assert.match(providerSource, /store: false/);
@@ -155,7 +284,7 @@ describe("AI.2C provider contract compatibility under AI.3", () => {
     assert.match(launcher, /--live-one zostal wycofany/);
     assert.match(launcher, /OpenAI calls: 0/);
     assert.doesNotMatch(launcher, /ALLOW_LIVE_PROVIDER_CALLS=1|CRYPTO_EDGE_AI_WORKER_ENABLED=1/);
-    assert.doesNotMatch(service, /createAIResearchProvider|from "\.\/aiResearchProvider/);
+    assert.doesNotMatch(service, /createAIResearchProvider|from "\.\/aiResearchProvider\.js"/);
     assert.match(worker, /createAIResearchProvider/);
     assert.match(worker, /parseAIResearchProviderNarrative/);
   });

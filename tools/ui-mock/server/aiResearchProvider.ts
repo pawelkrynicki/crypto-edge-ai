@@ -1,6 +1,10 @@
 import OpenAI from "openai";
 import type { AIResearchContext } from "./aiResearchContext.js";
-import { buildAIResearchProviderJsonSchema } from "./aiResearchSchema.js";
+import {
+  AIResearchProviderWireSchemaError,
+  buildAIResearchProviderWireSchema,
+  type AIResearchProviderWireSchema,
+} from "./aiResearchProviderWireSchema.js";
 
 export const OPENAI_RESEARCH_CLIENT_MAX_RETRIES = 0;
 export const OPENAI_RESEARCH_DEFAULT_TIMEOUT_MS = 90_000;
@@ -24,6 +28,13 @@ export type AIResearchProviderResponseDiagnostics = {
   output_tokens: number | null;
   reasoning_tokens: number | null;
   max_output_tokens: number;
+  http_status: number | null;
+  provider_error_type: string | null;
+  provider_error_code: string | null;
+  provider_error_param: string | null;
+  response_received: boolean;
+  failure_phase: "PRE_PROVIDER" | "REQUEST_REJECTED" | "NETWORK" | "STRUCTURED_OUTPUT" | null;
+  request_id: string | null;
 };
 
 export interface AIResearchProvider {
@@ -67,7 +78,11 @@ export class AIResearchProviderError extends Error {
     | "MISSING_API_KEY"
     | "PROVIDER_TIMEOUT"
     | "PROVIDER_RATE_LIMITED"
+    | "PROVIDER_AUTHENTICATION"
     | "PROVIDER_UNAVAILABLE"
+    | "PROVIDER_NETWORK"
+    | "PROVIDER_REQUEST_REJECTED"
+    | "PROVIDER_SCHEMA_INVALID"
     | "PROVIDER_ERROR"
     | "PROVIDER_OUTPUT_INCOMPLETE"
     | "INVALID_PROVIDER_RESPONSE";
@@ -83,6 +98,13 @@ export class AIResearchProviderError extends Error {
       output_tokens: responseMetadata.output_tokens ?? null,
       reasoning_tokens: responseMetadata.reasoning_tokens ?? null,
       max_output_tokens: OPENAI_RESEARCH_MAX_OUTPUT_TOKENS,
+      http_status: safeHttpStatus(responseMetadata.http_status),
+      provider_error_type: safeProviderDiagnostic(responseMetadata.provider_error_type),
+      provider_error_code: safeProviderDiagnostic(responseMetadata.provider_error_code),
+      provider_error_param: safeProviderDiagnostic(responseMetadata.provider_error_param),
+      response_received: responseMetadata.response_received === true,
+      failure_phase: safeFailurePhase(responseMetadata.failure_phase),
+      request_id: safeRequestId(responseMetadata.request_id ?? null),
     };
   }
 }
@@ -130,6 +152,20 @@ function createOpenAIResearchProvider(options: OpenAIResearchProviderOptions): A
     async generate(context) {
       if (!config.model) throw new AIResearchProviderError("MODEL_NOT_CONFIGURED");
       if (!config.apiKey || !client) throw new AIResearchProviderError("MISSING_API_KEY");
+      let wire: AIResearchProviderWireSchema;
+      try {
+        wire = buildAIResearchProviderWireSchema(context);
+      } catch (error) {
+        if (error instanceof AIResearchProviderWireSchemaError) {
+          throw new AIResearchProviderError("PROVIDER_SCHEMA_INVALID", {
+            provider_error_type: error.name,
+            provider_error_code: error.code,
+            response_received: false,
+            failure_phase: "PRE_PROVIDER",
+          });
+        }
+        throw error;
+      }
       const startedAt = Date.now();
       try {
         const { data, response } = await client.responses.create({
@@ -148,28 +184,32 @@ function createOpenAIResearchProvider(options: OpenAIResearchProviderOptions): A
               type: "json_schema",
               name: "ai_research_narrative_v4",
               strict: true,
-              schema: buildAIResearchProviderJsonSchema(context),
+              schema: wire.schema,
             },
           },
           max_output_tokens: OPENAI_RESEARCH_MAX_OUTPUT_TOKENS,
         }).withResponse();
-        const parsed = parseResponsesPayload(data);
+        const requestId = safeRequestId(response.headers.get("x-request-id"));
+        const parsed = parseResponsesPayload(data, requestId);
         return {
           raw_json: parsed.text,
           model: config.model,
           token_usage: parsed.usage,
           response_metadata: parsed.response_metadata,
           latency_ms: Math.max(0, Date.now() - startedAt),
-          request_id: safeRequestId(response.headers.get("x-request-id")),
+          request_id: requestId,
         };
       } catch (error) {
         if (error instanceof AIResearchProviderError) throw error;
+        const diagnostics = diagnosticsFromProviderError(error);
         if (isTimeoutError(error)) {
-          throw new AIResearchProviderError("PROVIDER_TIMEOUT");
+          throw new AIResearchProviderError("PROVIDER_TIMEOUT", { ...diagnostics, failure_phase: "NETWORK" });
         }
-        if (providerStatus(error) === 429) throw new AIResearchProviderError("PROVIDER_RATE_LIMITED");
-        if ((providerStatus(error) ?? 0) >= 500) throw new AIResearchProviderError("PROVIDER_UNAVAILABLE");
-        throw new AIResearchProviderError("PROVIDER_ERROR");
+        if (diagnostics.http_status === 429) throw new AIResearchProviderError("PROVIDER_RATE_LIMITED", diagnostics);
+        if (diagnostics.http_status === 401 || diagnostics.http_status === 403) throw new AIResearchProviderError("PROVIDER_AUTHENTICATION", diagnostics);
+        if ((diagnostics.http_status ?? 0) >= 500) throw new AIResearchProviderError("PROVIDER_UNAVAILABLE", diagnostics);
+        if ((diagnostics.http_status ?? 0) >= 400) throw new AIResearchProviderError("PROVIDER_REQUEST_REJECTED", diagnostics);
+        throw new AIResearchProviderError("PROVIDER_NETWORK", diagnostics);
       }
     },
   };
@@ -198,12 +238,12 @@ export function buildSystemPrompt(): string {
   ].join("\n");
 }
 
-function parseResponsesPayload(value: unknown): {
+function parseResponsesPayload(value: unknown, requestId: string | null): {
   text: string;
   usage: AIResearchProviderResult["token_usage"];
   response_metadata: AIResearchProviderResponseDiagnostics;
 } {
-  const responseMetadata = responseMetadataFromPayload(value);
+  const responseMetadata = responseMetadataFromPayload(value, { http_status: 200, response_received: true, failure_phase: "STRUCTURED_OUTPUT", request_id: requestId });
   if (responseMetadata.response_status === "incomplete") {
     throw new AIResearchProviderError("PROVIDER_OUTPUT_INCOMPLETE", responseMetadata);
   }
@@ -229,7 +269,10 @@ function parseResponsesPayload(value: unknown): {
   };
 }
 
-function responseMetadataFromPayload(value: unknown): AIResearchProviderResponseDiagnostics {
+function responseMetadataFromPayload(
+  value: unknown,
+  overrides: Partial<AIResearchProviderResponseDiagnostics> = {},
+): AIResearchProviderResponseDiagnostics {
   const record = isRecord(value) ? value : {};
   const usage = isRecord(record.usage) ? record.usage : {};
   const outputDetails = isRecord(usage.output_tokens_details) ? usage.output_tokens_details : {};
@@ -240,6 +283,13 @@ function responseMetadataFromPayload(value: unknown): AIResearchProviderResponse
     output_tokens: optionalTokenCount(usage.output_tokens),
     reasoning_tokens: optionalTokenCount(outputDetails.reasoning_tokens),
     max_output_tokens: OPENAI_RESEARCH_MAX_OUTPUT_TOKENS,
+    http_status: safeHttpStatus(overrides.http_status),
+    provider_error_type: safeProviderDiagnostic(overrides.provider_error_type),
+    provider_error_code: safeProviderDiagnostic(overrides.provider_error_code),
+    provider_error_param: safeProviderDiagnostic(overrides.provider_error_param),
+    response_received: overrides.response_received === true,
+    failure_phase: safeFailurePhase(overrides.failure_phase),
+    request_id: safeRequestId(overrides.request_id ?? null),
   };
 }
 
@@ -257,6 +307,33 @@ function safeResponseDetail(value: unknown): string | null {
 
 function safeRequestId(value: string | null): string | null {
   return value && /^[A-Za-z0-9._-]{1,200}$/.test(value) ? value : null;
+}
+
+function diagnosticsFromProviderError(error: unknown): Partial<AIResearchProviderResponseDiagnostics> {
+  const status = providerStatus(error);
+  const record = isRecord(error) ? error : {};
+  const providerError = isRecord(record.error) ? record.error : {};
+  return {
+    http_status: status,
+    provider_error_type: safeProviderDiagnostic(typeof record.type === "string" ? record.type : typeof providerError.type === "string" ? providerError.type : error instanceof Error ? error.name : null),
+    provider_error_code: safeProviderDiagnostic(typeof record.code === "string" ? record.code : typeof providerError.code === "string" ? providerError.code : null),
+    provider_error_param: safeProviderDiagnostic(typeof record.param === "string" ? record.param : typeof providerError.param === "string" ? providerError.param : null),
+    response_received: status !== null,
+    failure_phase: status !== null ? "REQUEST_REJECTED" : "NETWORK",
+    request_id: safeRequestId(typeof record.request_id === "string" ? record.request_id : typeof record.requestID === "string" ? record.requestID : null),
+  };
+}
+
+function safeHttpStatus(value: unknown): number | null {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 100 && value <= 599 ? value : null;
+}
+
+function safeProviderDiagnostic(value: unknown): string | null {
+  return typeof value === "string" && /^[A-Za-z0-9._-]{1,120}$/.test(value) ? value : null;
+}
+
+function safeFailurePhase(value: unknown): AIResearchProviderResponseDiagnostics["failure_phase"] {
+  return value === "PRE_PROVIDER" || value === "REQUEST_REJECTED" || value === "NETWORK" || value === "STRUCTURED_OUTPUT" ? value : null;
 }
 
 function isTimeoutError(error: unknown): boolean {
