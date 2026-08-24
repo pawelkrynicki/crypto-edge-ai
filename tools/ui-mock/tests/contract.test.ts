@@ -901,7 +901,7 @@ const candidateResultsMarkup = renderToStaticMarkup(React.createElement(Candidat
   onOpenExternalChecks: () => undefined,
 }));
 
-assert.match(candidateResultsMarkup, /Three Radar layers with three different meanings/, "product radar explains the three layers");
+assert.match(candidateResultsMarkup, /New \/ observation is where projects first appear/, "product radar explains the three layers");
 assert.match(candidateResultsMarkup, /New \/ observation/, "product radar renders new-emerging basket selector");
 assert.match(candidateResultsMarkup, /Maturing \/ follow-up/, "product radar renders follow-up basket selector");
 assert.match(candidateResultsMarkup, /Established \/ main Radar/, "product radar renders established basket selector");
@@ -915,7 +915,7 @@ assert.match(candidateResultsMarkup, /observation_only=true/, "new-emerging pres
 assert.match(candidateResultsMarkup, /No automated recommendation/, "new-emerging does not imply an automatic recommendation");
 assert.match(candidateResultsMarkup, /Last updated/, "radar summary renders generated data state");
 assert.match(candidateResultsMarkup, /Current/, "fresh timestamp is displayed as current");
-assert.match(candidateResultsMarkup, /Source status/, "radar summary renders source health");
+assert.match(candidateResultsMarkup, /Data availability/, "radar summary renders source health");
 assert.ok(
   (candidateResultsMarkup.match(/product-candidate-card/g) ?? []).length >= 3,
   "candidate results renders at least three candidate cards",
@@ -1244,18 +1244,18 @@ assert.match(externalChecksMarkup, /opening and switching tabs do not call provi
 assert.match(externalChecksMarkup, /No automated Honeypot\.is/i, "external checks does not run Honeypot automatically");
 assert.match(
   externalChecksMarkup,
-  /target="_blank" rel="noreferrer noopener"/,
+  /target="_blank" rel="(?:noopener noreferrer|noreferrer noopener)"/,
   "external check links open in a new tab with noreferrer noopener",
 );
 assert.ok(
-  (externalChecksMarkup.match(/rel="noreferrer noopener"/g) ?? []).length >= 2,
+  (externalChecksMarkup.match(/rel="(?:noopener noreferrer|noreferrer noopener)"/g) ?? []).length >= 2,
   "external checks renders multiple external links with noreferrer noopener",
 );
 const externalCheckHttpAnchors = [...externalChecksMarkup.matchAll(/<a\b[^>]*href="https?:\/\/[^"]+"[^>]*>/g)];
 assert.ok(externalCheckHttpAnchors.length >= 2, "external checks renders user-clicked external anchors");
 for (const [anchor] of externalCheckHttpAnchors) {
   assert.match(anchor, /target="_blank"/, "external check external anchor opens in a new tab");
-  assert.match(anchor, /rel="noreferrer noopener"/, "external check external anchor uses noreferrer noopener");
+  assert.match(anchor, /rel="(?:noopener noreferrer|noreferrer noopener)"/, "external check external anchor uses noreferrer noopener");
 }
 for (const action of externalChecksMarkup.matchAll(/<(?:button|a)\b[^>]*>([\s\S]*?)<\/(?:button|a)>/g)) {
   assert.doesNotMatch(action[1], /\b(?:buy|sell|entry|signal|recommendation|safe token|approved token|verified safe|guaranteed|profit|pump)\b/i, "external checks does not render forbidden trading words as actions");
@@ -2295,6 +2295,8 @@ try {
     reviewSession: {
       storageFilePath,
     },
+    reviewPublication: { enabled: true },
+    lifecycle: { defaultSessionRole: "OWNER" },
   });
   await new Promise<void>((resolveListen) => server.listen(0, "127.0.0.1", resolveListen));
 
@@ -2316,7 +2318,7 @@ try {
       "GET /api/review-session includes file-backed source metadata",
     );
 
-    const initialDiagnosticsResponse = await getJson(`${baseUrl}/api/review-session/diagnostics`) as Record<string, unknown>;
+    const initialDiagnosticsResponse = await getJson(`${baseUrl}/api/review-session/diagnostics?pc1_review=1`) as Record<string, unknown>;
 
     assert.equal(
       initialDiagnosticsResponse.source_kind,
@@ -2364,7 +2366,7 @@ try {
       "PUT /api/review-session writes file-backed storage",
     );
 
-    const savedDiagnosticsResponse = await getJson(`${baseUrl}/api/review-session/diagnostics`) as Record<string, unknown>;
+    const savedDiagnosticsResponse = await getJson(`${baseUrl}/api/review-session/diagnostics?pc1_review=1`) as Record<string, unknown>;
 
     assert.equal(
       savedDiagnosticsResponse.file_exists,
@@ -2411,6 +2413,8 @@ try {
   const sqliteProvider = createSqliteReviewSessionStorageProvider({ databaseFilePath });
   const sqliteServer = createScannerApiServer({
     reviewSessionProvider: sqliteProvider,
+    reviewPublication: { enabled: true },
+    lifecycle: { defaultSessionRole: "OWNER" },
   });
   await new Promise<void>((resolveListen) => sqliteServer.listen(0, "127.0.0.1", resolveListen));
 
@@ -2432,7 +2436,7 @@ try {
       "GET /api/review-session includes SQLite source metadata",
     );
 
-    const initialDiagnosticsResponse = await getJson(`${baseUrl}/api/review-session/diagnostics`) as Record<string, unknown>;
+    const initialDiagnosticsResponse = await getJson(`${baseUrl}/api/review-session/diagnostics?pc1_review=1`) as Record<string, unknown>;
 
     assert.equal(
       initialDiagnosticsResponse.source_kind,
@@ -2470,7 +2474,7 @@ try {
       "PUT /api/review-session writes SQLite storage",
     );
 
-    const savedDiagnosticsResponse = await getJson(`${baseUrl}/api/review-session/diagnostics`) as Record<string, unknown>;
+    const savedDiagnosticsResponse = await getJson(`${baseUrl}/api/review-session/diagnostics?pc1_review=1`) as Record<string, unknown>;
 
     assert.equal(savedDiagnosticsResponse.file_exists, true, "SQLite diagnostics endpoint reports existing database");
     assert.equal(savedDiagnosticsResponse.valid, true, "SQLite diagnostics endpoint reports valid database");
@@ -2585,6 +2589,8 @@ const fakeReviewSessionProvider: ReviewSessionStorageProvider = {
 };
 const providerServer = createScannerApiServer({
   reviewSessionProvider: fakeReviewSessionProvider,
+  reviewPublication: { enabled: true },
+  lifecycle: { defaultSessionRole: "OWNER" },
 });
 await new Promise<void>((resolveListen) => providerServer.listen(0, "127.0.0.1", resolveListen));
 
@@ -2623,7 +2629,7 @@ try {
   assert.equal(fakeProviderWriteCount, 1, "PUT /api/review-session calls provider write once");
   assert.deepEqual(fakeProviderState, savedReviewState, "provider state is updated after valid PUT");
 
-  const providerDiagnosticsResponse = await getJson(`${baseUrl}/api/review-session/diagnostics`) as Record<string, unknown>;
+  const providerDiagnosticsResponse = await getJson(`${baseUrl}/api/review-session/diagnostics?pc1_review=1`) as Record<string, unknown>;
 
   assert.equal(
     providerDiagnosticsResponse.storage_file,

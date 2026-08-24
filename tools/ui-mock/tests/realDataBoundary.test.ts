@@ -1075,51 +1075,47 @@ type ScannerFactoryOutput = PersistableScannerOutput & {
   candidates: Array<Record<string, unknown> & PersistableCandidate>;
 };
 
-type ContextFactoryOutput = ReturnType<typeof makeContextOutputShape>;
-
-function makeContextOutputShape() {
-  return {
-    provenance: {
-      schema_version: "",
-      contract_version: "",
-      generator_version: "",
-      environment: "",
-      mode: "live",
-      fixture_used: false,
-      run_id: "",
-      generated_at: "",
-      finished_at: "",
-      source_ids: [] as string[],
-      policy_decisions: {} as Record<string, ReturnType<typeof allowedPolicy>>,
-      metadata: {
-        request_counts: {} as Record<string, number>,
-        attributions: {} as Record<string, ReturnType<typeof alternativeMeAttribution>>,
-        raw_payload: undefined as unknown,
-      },
-    },
-    run_id: "",
-    generated_at: "",
-    environment: "",
-    sources: [] as Array<{
-      source_id: "alternative_me_fng" | "defillama_api";
-      source_name: string;
-      mode: "live";
-      fetched_at: string;
-      health_status?: "degraded_external_source";
-      attribution: ReturnType<typeof alternativeMeAttribution>;
-      policy: ReturnType<typeof internalFetchPolicy>;
-      data_category: "sentiment" | "defi_context";
-      records: Array<Record<string, unknown>>;
-      warnings: string[];
-      errors: string[];
-    }>,
-    summary: {
-      sources_requested: 0,
-      sources_allowed: 0,
-      sources_denied: 0,
-      records_total: 0,
-      warnings_total: 0,
-      errors_total: 0,
-    },
+type ContextFactoryOutput = {
+  provenance: {
+    schema_version: string;
+    contract_version: string;
+    generator_version: string;
+    environment: string;
+    mode: "live";
+    fixture_used: boolean;
+    run_id: string;
+    generated_at: string;
+    finished_at: string;
+    source_ids: string[];
+    policy_decisions: Record<string, ReturnType<typeof allowedPolicy>>;
+    metadata: {
+      request_counts: Record<string, number>;
+      attributions: Record<string, ReturnType<typeof alternativeMeAttribution>>;
+      raw_payload: unknown;
+    };
   };
-}
+  run_id: string;
+  generated_at: string;
+  environment: string;
+  sources: Array<{
+    source_id: "alternative_me_fng" | "defillama_api";
+    source_name: string;
+    mode: "live";
+    fetched_at: string;
+    health_status?: "degraded_external_source";
+    attribution: ReturnType<typeof alternativeMeAttribution>;
+    policy: ReturnType<typeof internalFetchPolicy>;
+    data_category: "sentiment" | "defi_context";
+    records: Array<Record<string, unknown>>;
+    warnings: string[];
+    errors: string[];
+  }>;
+  summary: {
+    sources_requested: number;
+    sources_allowed: number;
+    sources_denied: number;
+    records_total: number;
+    warnings_total: number;
+    errors_total: number;
+  };
+};

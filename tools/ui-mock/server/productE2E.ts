@@ -616,7 +616,7 @@ export async function runFullProductE2E(options: ProductE2EOptions = {}): Promis
       `/api/v1/ai-analyses/result?chain=${encodeURIComponent(selection!.identity.chain)}&contract_address=${encodeURIComponent(selection!.identity.contract_address)}&locale=pl`,
     ));
     assert(ready.status === 200 && ready.body.status === "READY", "AI_READY_RESULT_MISSING");
-    assert(isRecord(ready.body.analysis) && ready.body.analysis.schema_version === "ai_production_analysis_v2", "AI_BRIEF_SCHEMA_INVALID");
+    assert(isRecord(ready.body.analysis) && ready.body.analysis.schema_version === "ai_production_analysis_v3", "AI_BRIEF_SCHEMA_INVALID");
     assert(!["analysis_id", "cache_key", "queue_status", "provider_mode", "model"].some((key) => Object.hasOwn(ready.body, key)), "AI_READY_RESULT_LEAKED_INTERNALS");
 
     await runStep(steps, "invalid-mock-fails-closed", [analysisId], async () => {
@@ -867,7 +867,7 @@ export function assertReadyAnalysisForProductReport(value: unknown): asserts val
     !isRecord(value)
     || value.status !== "READY"
     || !isRecord(value.analysis)
-    || value.analysis.schema_version !== "ai_production_analysis_v2"
+    || value.analysis.schema_version !== "ai_production_analysis_v3"
   ) {
     throw new ProductE2EError("READY_ANALYSIS_REQUIRED_FOR_REPORT");
   }

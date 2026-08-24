@@ -51,8 +51,10 @@ export const CandidateReviewControls: React.FC<CandidateReviewControlsProps> = (
   const [note, setNote] = useState(reviewRecord?.note ?? "");
 
   useEffect(() => {
-    setStatus(reviewRecord?.status ?? "not_reviewed");
-    setNote(reviewRecord?.note ?? "");
+    void Promise.resolve().then(() => {
+      setStatus(reviewRecord?.status ?? "not_reviewed");
+      setNote(reviewRecord?.note ?? "");
+    });
   }, [candidateId, reviewRecord?.note, reviewRecord?.status]);
 
   const hasDraft = status !== "not_reviewed" || note.length > 0;

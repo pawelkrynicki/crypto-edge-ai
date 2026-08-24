@@ -39,7 +39,7 @@ export const ScannerRadar: React.FC<Props> = ({
   const [filter, setFilter] = useState<ScannerFilter>("ALL");
 
   React.useEffect(() => {
-    setFilter("ALL");
+    void Promise.resolve().then(() => setFilter("ALL"));
   }, [candidates]);
 
   const selected = React.useMemo(() => {

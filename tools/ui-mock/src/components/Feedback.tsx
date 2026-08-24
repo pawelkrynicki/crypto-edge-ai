@@ -289,15 +289,17 @@ function OwnerFeedbackInbox({
   useEffect(() => {
     if (initialStatus !== undefined) return;
     let active = true;
-    setItemsLoading(true);
-    setListUnavailable(false);
-    void Promise.all([
-      loadOwnerFeedbackStatus(),
-      loadOwnerFeedbackList({
-        ...(category ? { category } : {}),
-        ...(feedbackStatus ? { status: feedbackStatus } : {}),
-      }),
-    ]).then(([nextStatus, nextItems]) => {
+    void Promise.resolve().then(async () => {
+      if (!active) return;
+      setItemsLoading(true);
+      setListUnavailable(false);
+      const [nextStatus, nextItems] = await Promise.all([
+        loadOwnerFeedbackStatus(),
+        loadOwnerFeedbackList({
+          ...(category ? { category } : {}),
+          ...(feedbackStatus ? { status: feedbackStatus } : {}),
+        }),
+      ]);
       if (!active) return;
       if (nextStatus) setStatus(nextStatus);
       if (nextItems) setItems(nextItems);
@@ -455,6 +457,7 @@ function createSubmissionKey(): string {
   return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}0000-4000-8000-000000000000`.slice(-36);
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- Form parser is shared with deterministic feedback tests.
 export function resolveSelectedFeedbackCategory(
   selectedValue: FormDataEntryValue | null,
   fallback: FeedbackCategory | null,
@@ -465,6 +468,7 @@ export function resolveSelectedFeedbackCategory(
     : fallback;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- Status formatter is shared with deterministic feedback tests.
 export function formatOwnerFeedbackStatus(status: FeedbackStatus, locale: ProductLocale): string {
   if (status === "NEW") return locale === "pl" ? "Nowe" : "New";
   if (status === "TRIAGED") return locale === "pl" ? "Przejrzane" : "Triaged";
@@ -485,11 +489,13 @@ function readinessTone(value: OwnerFeedbackStatus["feedback_status"]): "ready" |
   return "not-ready";
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- Privacy formatter is shared with deterministic feedback tests.
 export function formatPseudonymousSessionGroup(sessionGroup: string): string {
   const match = /^session_([0-9a-f]{12})$/i.exec(sessionGroup);
   return match ? `SES-${match[1].slice(0, 6).toUpperCase()}` : "—";
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- Version formatter is shared with deterministic feedback tests.
 export function formatProductVersion(productVersion: string): string {
   return /^[0-9a-f]{7,64}$/i.test(productVersion) ? productVersion.slice(0, 8) : "—";
 }

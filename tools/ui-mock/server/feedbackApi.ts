@@ -428,11 +428,19 @@ function validateSubjectRef(value: unknown): FeedbackSubjectRef {
 function normalizeText(value: unknown, field: string, multiline: boolean): string {
   if (typeof value !== "string") throw new FeedbackApiError(`INVALID_${field}`, 400);
   const normalized = value.normalize("NFC").replace(/\r\n?/g, "\n").trim();
-  const forbidden = multiline
-    ? /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/u
-    : /[\u0000-\u001F\u007F-\u009F]/u;
-  if (forbidden.test(normalized)) throw new FeedbackApiError(`INVALID_${field}`, 400);
+  if (hasForbiddenControlCharacter(normalized, multiline)) {
+    throw new FeedbackApiError(`INVALID_${field}`, 400);
+  }
   return normalized;
+}
+
+function hasForbiddenControlCharacter(value: string, multiline: boolean): boolean {
+  return [...value].some((character) => {
+    const code = character.codePointAt(0);
+    if (code === undefined) return false;
+    if (code >= 0x7f && code <= 0x9f) return true;
+    return code <= 0x1f && (!multiline || character !== "\n");
+  });
 }
 
 function assertLength(value: string, minimum: number, maximum: number, field: string): void {

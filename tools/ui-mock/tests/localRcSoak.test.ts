@@ -59,7 +59,7 @@ describe("RC.1 local release candidate soak", () => {
     assert.match(wakeup, /runCentralSchedulerOnce\(\{ enabled: true, stateStore \}\)/);
     assert.match(wakeup, /claimInitialFullCycle/);
     assert.match(wakeup, /RC1_OPENAI_NOT_DISABLED/);
-    assert.match(wakeup, /resolveDataPocRoot/);
+    assert.match(wakeup, /getDataPocRuntimeRoot/);
     assert.match(wakeup, /validateDisplayEligibleScannerSnapshot/);
     assert.match(wakeup, /while \(args\[0\] === "--"\) args\.shift\(\)/);
     assert.doesNotMatch(wakeup, /honeypot/i);

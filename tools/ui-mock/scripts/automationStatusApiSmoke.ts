@@ -10,7 +10,7 @@ const distPath = resolve(tempRoot, "dist");
 await mkdir(distPath, { recursive: true });
 await writeFile(resolve(distPath, "index.html"), "<!doctype html><title>offline smoke</title>", "utf8");
 let stateReads = 0;
-let runnerCalls = 0;
+const runnerCalls = 0;
 const state = {
   schema_version: "central_automation_state_v1",
   active_run_id: null,

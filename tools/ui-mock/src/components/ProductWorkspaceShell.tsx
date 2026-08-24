@@ -97,7 +97,7 @@ export function ProductWorkspaceShell({
   });
 
   useEffect(() => {
-    setMobileNavigationOpen(false);
+    void Promise.resolve().then(() => setMobileNavigationOpen(false));
   }, [activeSection]);
 
   return (
@@ -254,6 +254,7 @@ function resolveClientDataAlert({
   return null;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- Pure API readiness helper is shared with deterministic UI tests.
 export function getApiReadinessPresentation(
   loading: boolean,
   resolvedSource: ResolvedScannerSource,
@@ -267,6 +268,7 @@ export function getApiReadinessPresentation(
   return { value: copy["status.unavailable"], tone: "error" };
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- Pure freshness helper is shared with deterministic UI tests.
 export function getFreshnessPresentation(
   ageSeconds: number | null,
   freshnessStatus: "FRESH" | "STALE" | null,

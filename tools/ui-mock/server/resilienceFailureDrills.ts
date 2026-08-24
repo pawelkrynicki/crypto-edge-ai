@@ -741,7 +741,7 @@ async function runAIScenarios(
       provider,
       now: () => clock,
       workerId: "failure-drill-retry-worker",
-      limits: { maxAttempts: 2, retryBaseMs: 100 },
+      limits: { maxAttempts: 2, retryBaseMs: 100, retryJitterRatio: 0 },
     });
     const first = await worker.runCycle();
     const failedRecord = store.stats();

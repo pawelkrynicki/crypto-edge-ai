@@ -169,6 +169,7 @@ async function assertNodeSqliteAvailable(): Promise<void> {
     const detail = error instanceof Error ? error.message : String(error);
     throw new Error(
       `ERROR: node:sqlite jest niedostępny w tej wersji Node. Tryb SQLite smoke wymaga Node z wbudowanym node:sqlite. Szczegóły: ${detail}`,
+      { cause: error },
     );
   }
 }

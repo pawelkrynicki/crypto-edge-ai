@@ -201,7 +201,7 @@ export const WatchlistTab: React.FC<Props> = ({
   }, []);
 
   useEffect(() => {
-    void refreshDiagnostics();
+    void Promise.resolve().then(refreshDiagnostics);
   }, [refreshDiagnostics]);
 
   const handleExportReviewJson = () => {

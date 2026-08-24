@@ -8,7 +8,7 @@ import { createScannerApiServer } from "../server/scannerApiServer.js";
 describe("automation status API", () => {
   it("keeps a successful manual run disabled across 100 read-only requests without invoking a runner", async () => {
     let reads = 0;
-    let runnerCalls = 0;
+    const runnerCalls = 0;
     const state = {
       schema_version: "central_automation_state_v2",
       active_run_id: null,

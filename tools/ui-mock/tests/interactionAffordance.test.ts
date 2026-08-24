@@ -134,7 +134,7 @@ describe("UX.1 interaction affordance contracts", () => {
     assert.match(ownerRefresh, /status\.mode === "REVIEW_SAFE"/);
     assert.match(ownerRefresh, /id="owner-refresh-disabled-help"/);
     assert.match(promotion, /id="established-promotion-disabled-help"/);
-    assert.match(promotion, /disabled=\{!canAdd\}/);
+    assert.match(promotion, /disabled=\{!canAdd \|\| !decisionComplete\}/);
   });
 
   it("describes every missing feedback requirement without showing a waiting state", async () => {
@@ -172,7 +172,7 @@ describe("UX.1 interaction affordance contracts", () => {
       source("src/index.css"),
     ]);
     assert.doesNotMatch(detail, /candidate-detail-hero-back/);
-    assert.match(detail, /product-detail-actions[\s\S]{0,260}variant="secondary"/);
+    assert.match(detail, /product-detail-actions[\s\S]{0,260}variant="primary"/);
     assert.match(verification, /ExternalLinkAction variant="secondary" className="external-check-link"/);
     assert.match(verification, /CopyButton className="external-check-copy-button"/);
     assert.match(css, /\.external-check-copy-button > \.action-button--tertiary/);
@@ -230,7 +230,7 @@ describe("UX.1 interaction affordance contracts", () => {
     ];
     const joined = (await Promise.all(files.map(source))).join("\n");
     assert.doesNotMatch(joined, /dexscreenerClient|goplusClient|internalBetaCollector|ALLOW_LIVE_PROVIDER_CALLS/);
-    assert.match(joined, /onRefresh=\{\(\) => void loadData\(\)\}/);
+    assert.match(joined, /onRefresh=\{\(\) => void refreshView\(\)\}/);
     assert.doesNotMatch(joined, /onRefresh[\s\S]{0,120}(?:POST|PUT|PATCH|DELETE)/);
   });
 

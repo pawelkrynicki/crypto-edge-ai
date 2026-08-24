@@ -131,7 +131,7 @@ describe("Premium UI.2 presentation contracts", () => {
     }
     assert.match(i18n, /Market cap is between USD 300,000 and USD 10,000,000/);
     assert.match(i18n, /Pair age exceeds 7 days/);
-    for (const label of ["Nowe \/ obserwacja", "Dalsza obserwacja", "Kandydat do Established"]) {
+    for (const label of ["Nowe / obserwacja", "Dalsza obserwacja", "Kandydat do Established"]) {
       assert.match(i18n, new RegExp(label));
     }
     assert.match(methodology, /Cykl obserwacji/);

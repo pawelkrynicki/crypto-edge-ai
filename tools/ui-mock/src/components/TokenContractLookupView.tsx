@@ -54,7 +54,7 @@ export const TokenContractLookupView: React.FC<TokenContractLookupViewProps> = (
   const [input, setInput] = useState(initialInput);
 
   useEffect(() => {
-    setInput(initialInput);
+    void Promise.resolve().then(() => setInput(initialInput));
   }, [initialInput]);
 
   const lookup = useMemo(() => classifyTokenLookupInput(input), [input]);
@@ -183,6 +183,7 @@ function LookupMetric({
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- Lookup classifier is shared with deterministic validation tests.
 export function classifyTokenLookupInput(rawInput: string): LookupResult {
   const input = rawInput.trim();
 

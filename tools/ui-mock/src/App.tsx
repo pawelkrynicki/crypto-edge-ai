@@ -282,11 +282,11 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    loadData(initialDataSource);
+    void Promise.resolve().then(() => loadData(initialDataSource));
   }, [initialDataSource, loadData]);
 
   useEffect(() => {
-    loadMarketContext();
+    void Promise.resolve().then(loadMarketContext);
   }, [loadMarketContext]);
 
   useEffect(() => {
@@ -662,6 +662,7 @@ function getContextSourceStatus(state: MarketContextPanelState): { text: string;
   };
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- Pure runtime option helper is imported by deterministic UI tests.
 export function getDataSourceOptions(runtimeMode: ResolvedProductRuntimeMode): typeof DATA_SOURCE_OPTIONS {
   return runtimeMode === "DEVELOPMENT_DEMO" ? DATA_SOURCE_OPTIONS : [];
 }

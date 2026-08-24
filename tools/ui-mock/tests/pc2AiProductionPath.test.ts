@@ -250,32 +250,35 @@ describe("PC.2 shared production AI path", () => {
   it("uses the versioned public output, seven detail tabs and bilingual nontechnical states", async () => {
     await writeFixture(100_000);
     const store = await createAIAnalysisQueueStore({ databaseFilePath: resolve(root, "public-contract.sqlite") });
-    const service = createService(store);
-    let calls = 0;
-    await service.generate(request(), "camp-user");
-    const worker = createAIResearchWorker({ ...contextOptions(), store, now: () => NOW, provider: provider(async (context) => { calls += 1; return JSON.stringify(narrative(context)); }) });
-    await worker.runCycle();
-    const publicValue = presentAIProductionLookup(await service.getBrief("base", ADDRESS, "pl"));
-    assert.equal(publicValue.status, "READY");
-    assert.ok(publicValue.analysis);
-    assert.deepEqual(Object.keys(publicValue.analysis!).sort(), [
-      "analysis_summary", "analysis_version", "confirmed_findings", "data_snapshot_at", "evidence", "freshness", "generated_at", "holder_context",
-      "liquidity_context", "market_context", "missing_data", "next_research_steps", "reassessment_signals", "research_guidance", "risks", "schema_version", "security_context",
-    ]);
-    assert.doesNotMatch(JSON.stringify(publicValue), /openai|gpt-|analysis_id|cache_key|queue_status|token_usage|sqlite/i);
-    assert.equal(CANDIDATE_DETAIL_TAB_IDS.length, 7);
-    assert.equal(CANDIDATE_DETAIL_TAB_IDS.includes("ai"), true);
+    try {
+      const service = createService(store);
+      let calls = 0;
+      await service.generate(request(), "camp-user");
+      const worker = createAIResearchWorker({ ...contextOptions(), store, now: () => NOW, provider: provider(async (context) => { calls += 1; return JSON.stringify(narrative(context)); }) });
+      await worker.runCycle();
+      const publicValue = presentAIProductionLookup(await service.getBrief("base", ADDRESS, "pl"));
+      assert.equal(publicValue.status, "READY");
+      assert.ok(publicValue.analysis);
+      assert.deepEqual(Object.keys(publicValue.analysis!).sort(), [
+        "analysis_summary", "analysis_version", "confirmed_findings", "data_snapshot_at", "evidence", "freshness", "generated_at", "holder_context",
+        "liquidity_context", "market_context", "missing_data", "next_research_steps", "reassessment_signals", "research_guidance", "risks", "schema_version", "security_context",
+      ]);
+      assert.doesNotMatch(JSON.stringify(publicValue), /openai|gpt-|analysis_id|cache_key|queue_status|token_usage|sqlite/i);
+      assert.equal(CANDIDATE_DETAIL_TAB_IDS.length, 7);
+      assert.equal(CANDIDATE_DETAIL_TAB_IDS.includes("ai"), true);
 
-    const readyMarkup = renderToStaticMarkup(React.createElement(ProductLocaleProvider, { initialLocale: "pl" }, React.createElement(AIResearchSection, { chain: "base", contractAddress: ADDRESS, symbol: "T", name: "Token", initialLookup: publicValue, active: true })));
-    assert.match(readyMarkup, /Analiza gotowa/);
-    assert.equal(calls, 1, "opening Candidate Detail with READY data must be a cache read, not a provider call");
+      const readyMarkup = renderToStaticMarkup(React.createElement(ProductLocaleProvider, { initialLocale: "pl" }, React.createElement(AIResearchSection, { chain: "base", contractAddress: ADDRESS, symbol: "T", name: "Token", initialLookup: publicValue, active: true })));
+      assert.match(readyMarkup, /Analiza gotowa/);
+      assert.equal(calls, 1, "opening Candidate Detail with READY data must be a cache read, not a provider call");
 
-    const queued: typeof publicValue = { ...publicValue, status: "QUEUED", analysis: null, is_last_known_good: false };
-    const pl = renderToStaticMarkup(React.createElement(ProductLocaleProvider, { initialLocale: "pl" }, React.createElement(AIResearchSection, { chain: "base", contractAddress: ADDRESS, symbol: "T", name: "Token", initialLookup: queued })));
-    const en = renderToStaticMarkup(React.createElement(ProductLocaleProvider, { initialLocale: "en" }, React.createElement(AIResearchSection, { chain: "base", contractAddress: ADDRESS, symbol: "T", name: "Token", initialLookup: queued })));
-    assert.match(pl, /Przygotowanie analizy rozpocznie się, gdy będzie dostępna/);
-    assert.match(en, /The analysis will be prepared when it becomes available/);
-    store.close();
+      const queued: typeof publicValue = { ...publicValue, status: "QUEUED", analysis: null, is_last_known_good: false };
+      const pl = renderToStaticMarkup(React.createElement(ProductLocaleProvider, { initialLocale: "pl" }, React.createElement(AIResearchSection, { chain: "base", contractAddress: ADDRESS, symbol: "T", name: "Token", initialLookup: queued })));
+      const en = renderToStaticMarkup(React.createElement(ProductLocaleProvider, { initialLocale: "en" }, React.createElement(AIResearchSection, { chain: "base", contractAddress: ADDRESS, symbol: "T", name: "Token", initialLookup: queued })));
+      assert.match(pl, /Nie musisz nic robić\. Wynik pojawi się tutaj, gdy analiza będzie dostępna/);
+      assert.match(en, /You do not need to do anything\. The result will appear here when the analysis is available/);
+    } finally {
+      store.close();
+    }
   });
 
   it("keeps AI unable to mutate lifecycle or a private workspace", async () => {

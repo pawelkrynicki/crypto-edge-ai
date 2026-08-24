@@ -299,14 +299,17 @@ function nextAutomaticCheckLabel(model: TokenLifecycleViewModel, locale: Product
   return formatProductDateTime(model.next_checkpoint_at, locale);
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- Lifecycle label helper is shared with deterministic read-model tests.
 export function lifecycleStageLabel(stage: TokenLifecycleStage, locale: ProductLocale): string {
   return stageLabel(stage, locale);
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- Lifecycle label helper is shared with deterministic read-model tests.
 export function lifecycleActionLabel(action: TokenLifecycleNextActionType, locale: ProductLocale): string {
   return actionLabel(action, locale);
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- Lifecycle label helper is shared with deterministic read-model tests.
 export function lifecycleBlockingLabel(
   condition: TokenLifecycleBlockingCondition,
   locale: ProductLocale,
@@ -314,6 +317,7 @@ export function lifecycleBlockingLabel(
   return blockingLabel(condition, locale);
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- Lifecycle title helper is shared with deterministic read-model tests.
 export function lifecycleTrackingTitle(
   status: TokenLifecycleTrackingStatus,
   locale: ProductLocale,
@@ -340,6 +344,7 @@ function blockingLabel(condition: TokenLifecycleBlockingCondition, locale: Produ
   return FLOW_COPY[locale].blocking[condition];
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- Lifecycle completeness helper is shared with deterministic read-model tests.
 export function hasCompleteLifecycle(model: TokenLifecycleViewModel): boolean {
   return TOKEN_LIFECYCLE_STAGES.every((stage) => (
     stage === "established"

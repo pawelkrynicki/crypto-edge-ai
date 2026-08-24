@@ -25,6 +25,7 @@ interface ManualVerificationFallbackProps {
   compact?: boolean;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- Static verification contract is imported by non-component verification flows.
 export const FALLBACKS: Record<VerificationGapStatus, VerificationGap> = {
   "manual verification required": {
     status: "manual verification required",
@@ -118,6 +119,7 @@ export const ManualVerificationFallback: React.FC<ManualVerificationFallbackProp
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components -- Candidate gap builder is shared with deterministic verification tests.
 export function buildCandidateVerificationGaps(candidate: MockCandidate): VerificationGap[] {
   const gaps: VerificationGap[] = [...BASE_GAPS];
 
@@ -152,6 +154,7 @@ export function buildCandidateVerificationGaps(candidate: MockCandidate): Verifi
   return uniqueGaps(gaps);
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- Lookup gap builder is shared with deterministic verification tests.
 export function buildLookupVerificationGaps(hasContract: boolean): VerificationGap[] {
   const gaps = [
     ...BASE_GAPS,
@@ -169,6 +172,7 @@ export function buildLookupVerificationGaps(hasContract: boolean): VerificationG
   return uniqueGaps(gaps);
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- External lookup gap builder is shared with deterministic verification tests.
 export function buildExternalVerificationGaps(input: {
   hasContract: boolean;
   hasChain: boolean;

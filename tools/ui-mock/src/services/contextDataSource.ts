@@ -40,12 +40,7 @@ class ContextDataSourceHttpError extends Error {
 
 async function fetchJson(url: string): Promise<unknown> {
   const res = await fetch(url);
-  let body: unknown = null;
-  try {
-    body = await res.json() as unknown;
-  } catch {
-    body = null;
-  }
+  const body = await res.json().catch(() => null) as unknown;
 
   if (!res.ok) {
     const reasonCode = isRecord(body) && typeof body.reason_code === "string"
