@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useProductLocale } from "../productI18n";
 import { isAIResearchRenderPreviewMode } from "../runtimeMode";
+import { buildVerificationRouteHref } from "../candidateDetailRoute";
 import {
   AIResearchDataSourceError,
   loadAIResearchBrief,
@@ -152,6 +153,9 @@ export function AIResearchSection({
   const analysis = isProductionLookup(displayLookup) ? displayLookup.analysis : null;
   const effectiveError = errorCode ?? (isLegacyLookup(displayLookup) ? displayLookup.error_code : null);
   const effectiveRetryAfter = retryAfter ?? displayLookup?.retry_after_seconds ?? null;
+  const securityResearchHref = identity.status === "valid"
+    ? buildVerificationRouteHref({ chain: identity.chain, contract_address: identity.contract_address }, 3)
+    : "#external-checks";
   const waitingToRetry = availability === "COOLDOWN" || availability === "RATE_LIMITED";
   const canRequest = identity.status === "valid"
     && !["QUEUED", "PROCESSING", "READY", "PROVIDER_DISABLED", "INSUFFICIENT_DATA", "SUSPENDED", "COOLDOWN", "RATE_LIMITED"].includes(availability);
@@ -229,7 +233,7 @@ export function AIResearchSection({
       </div>
       <span className="sr-only" role="status" aria-live="polite">{requesting ? ui.requestingStatus : ""}</span>
       {brief && expanded && <AIResearchBriefCanvas brief={brief} symbol={symbol} name={name} reviewMetrics={reviewMetrics} />}
-      {analysis && expanded && <AIProductionAnalysisCanvas analysis={analysis} />}
+      {analysis && expanded && <AIProductionAnalysisCanvas analysis={analysis} securityResearchHref={securityResearchHref} />}
     </section>
   );
 }

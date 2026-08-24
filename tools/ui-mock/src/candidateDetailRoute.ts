@@ -40,6 +40,23 @@ export function writeVerificationRoute(identity: RouteTokenIdentity, researchSte
   writeTokenRoute(identity, "external-checks", null, researchStep);
 }
 
+/**
+ * Builds a normal browser route for a focused, read-only verification step.
+ * This is intentionally separate from `writeVerificationRoute`: links need a
+ * real href so normal browser back/forward behaviour is preserved.
+ */
+export function buildVerificationRouteHref(identity: RouteTokenIdentity, researchStep: ResearchStepNumber): string {
+  if (typeof window === "undefined" || !window.location?.href) return "#external-checks";
+  const url = new URL(window.location.href);
+  url.searchParams.set("chain", identity.chain);
+  url.searchParams.set("contract", identity.contract_address);
+  url.searchParams.delete("detail");
+  url.searchParams.set("research_step", String(researchStep));
+  url.searchParams.delete("research_playbook");
+  url.hash = "external-checks";
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+
 export function writeVerificationListRoute() {
   if (typeof window === "undefined") return;
   const url = new URL(window.location.href);

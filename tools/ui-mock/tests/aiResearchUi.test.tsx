@@ -8,6 +8,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { buildAIResearchContext, type AIResearchGuidanceInput } from "../server/aiResearchContext.js";
 import { buildDeterministicPreview } from "../server/aiResearchService.js";
 import { mapPersistableScannerOutputToUiCandidates } from "../src/adapters/scannerOutputAdapter.js";
+import { buildVerificationRouteHref } from "../src/candidateDetailRoute.js";
 import { AIResearchBriefCanvas } from "../src/components/AIResearchBriefCanvas.js";
 import { AIProductionAnalysisCanvas } from "../src/components/AIProductionAnalysisCanvas.js";
 import { AIResearchRadarStatus, AIResearchSection } from "../src/components/AIResearchSection.js";
@@ -46,6 +47,36 @@ const briefEn = buildDeterministicPreview(contextEn, new Date("2026-07-26T15:00:
 const semanticBriefPl = buildSemanticReviewBrief(briefPl, "pl");
 const semanticBriefEn = buildSemanticReviewBrief(briefEn, "en");
 const candidate = mapPersistableScannerOutputToUiCandidates(value)[0]!;
+const followUpOnlyCandidate = {
+  entry_id: "follow-up-ready-candidate",
+  chain: "base",
+  contract_address: ADDRESS,
+  display_name: "Pass Token",
+  symbol: "PASS",
+  pair_address: null,
+  lifecycle_status: "MATURING" as const,
+  pair_age: 10,
+  first_seen_at: "2026-07-01T10:00:00.000Z",
+  last_seen_at: "2026-07-26T15:00:00.000Z",
+  last_checked_at: "2026-07-26T15:00:00.000Z",
+  market_observed_at: "2026-07-26T15:00:00.000Z",
+  next_check_at: "2026-08-01T10:00:00.000Z",
+  completed_checkpoints: [1, 3, 7],
+  market_metrics: {
+    price_usd: 0.1,
+    market_cap_usd: 1_000_000,
+    fdv_usd: 1_000_000,
+    liquidity_usd: 100_000,
+    volume_24h_usd: 50_000,
+    volume_market_cap_ratio: 0.05,
+  },
+  filter_status: "passed_basic_filter" as const,
+  filter_reasons: [],
+  security_status: "PARTIAL_SECURITY_COVERAGE",
+  missing_data: ["honeypot_status"],
+  established_membership: false,
+  next_review_step: "WAIT_FOR_NEXT_CHECKPOINT" as const,
+};
 
 after(async () => { await rm(root, { recursive: true, force: true }); });
 
@@ -235,8 +266,10 @@ describe("PC.2 CAMP presentation polish", () => {
     assert.match(en, /Needs review/);
     assert.match(pl, /Kompletność źródła:/);
     assert.match(en, /Source completeness:/);
-    assert.match(pl, /Kontrola listy Established/);
-    assert.match(en, /Established-list check/);
+    assert.match(pl, /Kontrola etapu Radaru/);
+    assert.match(en, /Radar-stage check/);
+    assert.doesNotMatch(pl, /Established/);
+    assert.doesNotMatch(en, /Established/);
     assert.match(pl, /Brak dodatkowych danych w tej migawce/);
     assert.match(en, /No additional data in this snapshot/);
     assert.doesNotMatch(pl, /kolejk|provider|model|cache|dedup/i);
@@ -247,6 +280,69 @@ describe("PC.2 CAMP presentation polish", () => {
     assert.deepEqual(enAnalysis.confirmed_findings.map(({ title }) => title), ["Market cap", "Liquidity", "Basic filters"]);
     assert.match(en, /Fresh data becomes available/);
     assert.doesNotMatch(en, /Dostępność świeżych danych/);
+
+    const legacyEvidence = {
+      ...plAnalysis,
+      evidence: plAnalysis.evidence.map((item) => item.label === "Kontrola etapu Radaru"
+        ? { ...item, label: "Kontrola listy Established" }
+        : item),
+    };
+    const legacyMarkup = render("pl", <AIProductionAnalysisCanvas analysis={legacyEvidence} />);
+    assert.match(legacyMarkup, /Kontrola etapu Radaru/);
+    assert.doesNotMatch(legacyMarkup, /Established/);
+  });
+
+  it("routes the current security guidance action to its read-only research step", () => {
+    const analysis = presentAnalysis(briefPl, false, "pl", {
+      ...context.guidance,
+      freshness: "FRESH",
+      filters: { ...context.guidance.filters, status: "passed_basic_filter" },
+      security: { ...context.guidance.security, coverage: "partial" },
+      action_catalog: guidanceActions("pl", ["REVIEW_SECURITY", "OPEN_VERIFICATION"]),
+    });
+    const previousWindow = globalThis.window;
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: { location: { href: `http://127.0.0.1:5173/?chain=base&contract=${ADDRESS}&detail=ai#candidate-detail` } },
+    });
+    try {
+      const href = buildVerificationRouteHref({ chain: "base", contract_address: ADDRESS }, 3);
+      const markup = render("pl", <AIProductionAnalysisCanvas analysis={analysis} securityResearchHref={href} />);
+      assert.match(markup, new RegExp(`href="\\/?\\?chain=base&amp;contract=${ADDRESS}&amp;research_step=3#external-checks"`));
+      assert.match(markup, /href="#external-checks"/);
+
+      const english = presentAnalysis(briefEn, false, "en", {
+        ...contextEn.guidance,
+        freshness: "FRESH",
+        filters: { ...contextEn.guidance.filters, status: "passed_basic_filter" },
+        security: { ...contextEn.guidance.security, coverage: "partial" },
+        action_catalog: guidanceActions("en", ["REVIEW_SECURITY", "OPEN_VERIFICATION"]),
+      });
+      const englishMarkup = render("en", <AIProductionAnalysisCanvas analysis={english} />);
+      assert.match(englishMarkup, /Step 3\/7 — SECURITY \/ 3 CHECKS/);
+      assert.doesNotMatch(englishMarkup, /STAMPS/);
+
+      const legacyGuidance = {
+        ...english,
+        research_guidance: {
+          ...english.research_guidance,
+          current_step: { ...english.research_guidance.current_step, title: "SECURITY / 3 STAMPS" },
+        },
+      };
+      const legacyGuidanceMarkup = render("en", <AIProductionAnalysisCanvas analysis={legacyGuidance} />);
+      assert.match(legacyGuidanceMarkup, /Step 3\/7 — SECURITY \/ 3 CHECKS/);
+      assert.doesNotMatch(legacyGuidanceMarkup, /STAMPS/);
+    } finally {
+      Object.defineProperty(globalThis, "window", { configurable: true, value: previousWindow });
+    }
+  });
+
+  it("opens the focused checklist for a Follow-up-only candidate without manufacturing scanner data", () => {
+    const markup = render("pl", <ExternalVerificationLinksView followUp={followUpOnlyCandidate} focusedResearchStep={3} />);
+    assert.match(markup, /research-checklist-focus-3/);
+    assert.match(markup, /Krok 3\/7/);
+    assert.match(markup, /Bezpieczeństwo/);
+    assert.doesNotMatch(markup, /Źródła są opisane i linkowane/);
   });
 
   it("uses an explicit product URL locale before the stored preference", () => {

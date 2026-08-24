@@ -6,7 +6,14 @@ import { ActionLink, ExternalLinkAction, StatusBadge } from "./ProductUi";
 void React;
 
 /** CAMP-safe canvas backed by one stored bilingual PC.2 analysis, never a locale-triggered provider call. */
-export function AIProductionAnalysisCanvas({ analysis }: { analysis: AIProductionAnalysis }) {
+export function AIProductionAnalysisCanvas({
+  analysis,
+  securityResearchHref,
+}: {
+  analysis: AIProductionAnalysis;
+  /** A normal route to the current Security checklist step for the selected token. */
+  securityResearchHref?: string;
+}) {
   const { locale } = useProductLocale();
   const pl = locale === "pl";
   const headings = pl ? {
@@ -33,7 +40,7 @@ export function AIProductionAnalysisCanvas({ analysis }: { analysis: AIProductio
         </dl>
       </header>
 
-      <ResearchGuidancePanel guidance={analysis.research_guidance} locale={locale} headings={headings} />
+      <ResearchGuidancePanel guidance={analysis.research_guidance} locale={locale} headings={headings} securityResearchHref={securityResearchHref} />
 
       <details className="ai-production-details">
         <summary>{headings.details}</summary>
@@ -79,7 +86,7 @@ export function AIProductionAnalysisCanvas({ analysis }: { analysis: AIProductio
           <section className="ai-research-panel ai-sources-panel" aria-labelledby="ai-production-evidence">
             <h3 id="ai-production-evidence">{headings.evidence}</h3>
             <ul className="ai-source-list">{analysis.evidence.map((item, index) => (
-              <li key={`${item.label}-${index}`}><div><strong>{item.label}</strong><span>{item.observed_at ? formatProductDateTime(item.observed_at, locale) : headings.empty}</span></div>
+              <li key={`${item.label}-${index}`}><div><strong>{evidenceLabel(item.label, locale)}</strong><span>{item.observed_at ? formatProductDateTime(item.observed_at, locale) : headings.empty}</span></div>
                 <StatusBadge tone={item.completeness === "complete" ? "ready" : "warning"}>{completenessLabel(item.completeness, locale)}</StatusBadge>
                 {item.url && <ExternalLinkAction variant="tertiary" href={item.url}>{pl ? "Otwórz źródło" : "Open source"}</ExternalLinkAction>}
               </li>
@@ -127,18 +134,20 @@ function ResearchGuidancePanel({
   guidance,
   locale,
   headings,
+  securityResearchHref,
 }: {
   guidance: AIProductionResearchGuidance;
   locale: "pl" | "en";
   headings: {
     guidance: string; posture: string; blockers: string; actions: string; unlocks: string; why: string; resolves: string; filterFailures: string;
   };
+  securityResearchHref?: string;
 }) {
   const pl = locale === "pl";
   return <section className="ai-research-guidance" aria-labelledby="ai-research-guidance-title">
     <header>
       <span>{headings.guidance}</span>
-      <h4 id="ai-research-guidance-title">{pl ? "Krok" : "Step"} {guidance.current_step.number}/7 — {guidance.current_step.title}</h4>
+      <h4 id="ai-research-guidance-title">{pl ? "Krok" : "Step"} {guidance.current_step.number}/7 — {researchStageTitle(guidance.current_step.title, locale)}</h4>
       <dl><dt>{headings.posture}</dt><dd><span>{guidance.current_step.posture}</span><small>{guidance.current_step.posture_detail}</small></dd></dl>
     </header>
     <div className="ai-guidance-grid">
@@ -154,12 +163,17 @@ function ResearchGuidancePanel({
       </section>
       <section aria-labelledby="ai-research-guidance-actions">
         <h5 id="ai-research-guidance-actions">{headings.actions}</h5>
-        <ol className="ai-guidance-actions">{guidance.actions.map((item, index) => <li key={`${item.title}-${index}`}>
+          <ol className="ai-guidance-actions">{guidance.actions.map((item, index) => <li key={`${item.title}-${index}`}>
           <div className="ai-guidance-action-number" aria-hidden="true">{index + 1}</div>
           <div className="ai-guidance-action-copy"><strong>{item.title}</strong><p><b>{headings.why}:</b> {item.why}</p><p><b>{headings.resolves}:</b> {item.resolves}</p>
             {item.cta && (item.cta.external
               ? <ExternalLinkAction variant="secondary" href={item.cta.href}>{item.cta.label}</ExternalLinkAction>
-              : <ActionLink variant="secondary" href={item.cta.href}>{item.cta.label}</ActionLink>)}
+              : <ActionLink
+                variant="secondary"
+                href={securityResearchHref && index === 0 && (guidance.current_step.number === 2 || guidance.current_step.number === 3)
+                  ? securityResearchHref
+                  : item.cta.href}
+              >{item.cta.label}</ActionLink>)}
           </div>
         </li>)}</ol>
       </section>
@@ -179,4 +193,17 @@ function riskSeverityLabel(value: AIProductionAnalysis["risks"][number]["severit
 function completenessLabel(value: AIProductionAnalysis["evidence"][number]["completeness"], locale: "pl" | "en") {
   const labels = { complete: ["Kompletność źródła: pełna", "Source completeness: complete"], partial: ["Kompletność źródła: częściowa", "Source completeness: partial"], unavailable: ["Kompletność źródła: niedostępna", "Source completeness: unavailable"] } as const;
   return labels[value][locale === "pl" ? 0 : 1];
+}
+
+/** Keeps legacy stored evidence labels out of the CAMP surface without changing the immutable result. */
+function evidenceLabel(value: string, locale: "pl" | "en"): string {
+  if (value === "Kontrola listy Established" || value === "Established-list check") {
+    return locale === "pl" ? "Kontrola etapu Radaru" : "Radar-stage check";
+  }
+  return value;
+}
+
+/** Corrects a legacy English display typo in read-only public guidance. */
+function researchStageTitle(value: string, locale: "pl" | "en"): string {
+  return locale === "en" && value === "SECURITY / 3 STAMPS" ? "SECURITY / 3 CHECKS" : value;
 }

@@ -108,7 +108,7 @@ export function presentAIResearchGuidance(
         number: unavailable ? 2 : 3,
         title: unavailable
           ? (pl ? "BLOKERY — BEZPIECZEŃSTWO" : "DEAL BREAKERS — SECURITY")
-          : (pl ? "BEZPIECZEŃSTWO / 3 KONTROLE" : "SECURITY / 3 STAMPS"),
+          : (pl ? "BEZPIECZEŃSTWO / 3 KONTROLE" : "SECURITY / 3 CHECKS"),
         posture: pl ? "WYMAGA WERYFIKACJI BEZPIECZEŃSTWA" : "SECURITY VERIFICATION REQUIRED",
         posture_detail: pl ? "Kontrole bezpieczeństwa muszą zostać zakończone przed etapem danych on-chain." : "Security checks must be completed before the on-chain data stage.",
       },

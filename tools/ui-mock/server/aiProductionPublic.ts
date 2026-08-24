@@ -184,7 +184,7 @@ function conditionLabel(value: string, locale: AIResearchLocale): string {
 
 function sourceLabel(sourceType: string, fallback: string, locale: AIResearchLocale): string {
   const labels: Record<string, [string, string]> = {
-    scanner_snapshot: ["Migawka skanera", "Scanner snapshot"], follow_up_checkpoint: ["Punkty kontrolne obserwacji", "Observation checkpoints"], basic_filters: ["Podstawowe filtry", "Basic filters"], security_status: ["Status bezpieczeństwa", "Security status"], established_membership: ["Kontrola listy Established", "Established-list check"], methodology: ["Metodologia produktu", "Product methodology"], dexscreener: ["DexScreener", "DexScreener"], explorer: ["Eksplorator sieci", "Network explorer"], report: ["Aktualny raport", "Current report"],
+    scanner_snapshot: ["Migawka skanera", "Scanner snapshot"], follow_up_checkpoint: ["Punkty kontrolne obserwacji", "Observation checkpoints"], basic_filters: ["Podstawowe filtry", "Basic filters"], security_status: ["Status bezpieczeństwa", "Security status"], established_membership: ["Kontrola etapu Radaru", "Radar-stage check"], methodology: ["Metodologia produktu", "Product methodology"], dexscreener: ["DexScreener", "DexScreener"], explorer: ["Eksplorator sieci", "Network explorer"], report: ["Aktualny raport", "Current report"],
   };
   return labels[sourceType]?.[locale === "pl" ? 0 : 1] ?? fallback;
 }
