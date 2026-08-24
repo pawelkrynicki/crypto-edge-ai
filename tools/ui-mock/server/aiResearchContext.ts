@@ -10,6 +10,7 @@ import {
   AI_RESEARCH_DATA_CONTRACT_VERSION,
   AI_RESEARCH_PROMPT_VERSION,
   type AIResearchActionType,
+  type AIResearchBrief,
   type AIResearchCoverageItem,
   type AIResearchKnownFact,
   type AIResearchLocale,
@@ -207,10 +208,15 @@ export async function buildAIResearchContext(
       reasons: [...(candidate?.filterReasons ?? followUp?.filter_reasons ?? [])].sort(),
     },
     security: securityFingerprint(candidate, followUp),
-    source_health: sourceReferences.map(({ id, source_type, observed_at, completeness }) => ({
+    // Observation timestamps describe when a source was read, not a change to the
+    // candidate evidence. In particular, the fallback scanner timestamp changes
+    // for every global run even when this Follow-up candidate is not in that run.
+    // The fingerprint therefore keeps the source identity and completeness, while
+    // the actual candidate facts, lifecycle, security and report revision remain
+    // evidence-bearing inputs above and below.
+    source_health: sourceReferences.map(({ id, source_type, completeness }) => ({
       id,
       source_type,
-      observed_at,
       completeness,
     })),
     follow_up_checkpoint: followUp ? {
@@ -277,6 +283,47 @@ export async function buildAIResearchContext(
         })),
       },
     },
+  };
+}
+
+/**
+ * Checks whether a validated stored brief still represents the deterministic
+ * candidate evidence in the current context. It deliberately excludes global
+ * scanner observation timestamps: those timestamps are provenance for a run,
+ * not evidence about this candidate. This is read-only compatibility for valid
+ * historical rows; it never rewrites their cache key, fingerprint or result.
+ */
+export function isAIResearchBriefEvidenceCurrent(brief: AIResearchBrief, context: AIResearchContext): boolean {
+  return stableJson(briefEvidence(brief)) === stableJson(contextEvidence(context));
+}
+
+function contextEvidence(context: AIResearchContext) {
+  return {
+    identity: context.identity,
+    research_state: context.research_state,
+    known_facts: context.fact_candidates,
+    risk_factors: context.risk_candidates,
+    missing_information: context.missing_information,
+    next_actions: context.action_catalog,
+    status_change_conditions: context.status_change_conditions,
+    source_references: context.source_references.map(({ id, source_type, completeness, url }) => ({ id, source_type, completeness, url })),
+    coverage: context.coverage,
+    checkpoints: context.checkpoints.map(({ day, state }) => ({ day, state })),
+  };
+}
+
+function briefEvidence(brief: AIResearchBrief) {
+  return {
+    identity: brief.identity,
+    research_state: brief.research_state,
+    known_facts: brief.known_facts.map(({ key, label, value, source_reference_ids }) => ({ key, label, value, source_reference_ids })),
+    risk_factors: brief.risk_factors.map(({ severity, category, title, evidence_reference_ids }) => ({ severity, category, title, evidence_reference_ids })),
+    missing_information: brief.missing_information.map(({ key, label, source_reference_ids }) => ({ key, label, source_reference_ids })),
+    next_actions: brief.next_actions.map(({ action_type, label, priority, target_type, target_reference }) => ({ action_type, label, priority, target_type, target_reference })),
+    status_change_conditions: brief.status_change_conditions.map(({ key, label, source_reference_ids }) => ({ key, label, source_reference_ids })),
+    source_references: brief.source_references.map(({ id, source_type, completeness, url }) => ({ id, source_type, completeness, url })),
+    coverage: brief.coverage,
+    checkpoints: brief.checkpoints,
   };
 }
 

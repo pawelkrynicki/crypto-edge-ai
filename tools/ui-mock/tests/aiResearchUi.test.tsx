@@ -146,6 +146,10 @@ describe("AI.1 Visual Candidate Research Canvas", () => {
       assert.match(markup, label);
       assert.match(markup, /aria-live="polite"/);
       if (["ABSENT", "STALE"].includes(availability)) assert.match(markup, /Zleć analizę AI/);
+      if (availability === "STALE") {
+        assert.match(markup, /Dostępna jest poprzednia analiza\. Dane kandydata zmieniły się\. Możesz zlecić przygotowanie nowej analizy\./);
+        assert.doesNotMatch(markup, /aktualizacja jest przygotowywana/i);
+      }
       if (["ERROR", "FAILED"].includes(availability)) assert.match(markup, /Ponów zlecenie analizy/);
       assert.doesNotMatch(markup, /provider|model|OpenAI|kolejk/i);
     }
@@ -616,7 +620,8 @@ describe("AI.3 shared queue UI", () => {
     assert.equal(failure.brief, previous.brief);
     const markup = render("pl", <AIResearchSection chain="base" contractAddress={ADDRESS} symbol="SCOOBERT" name="Scoobert" initialLookup={failure} />);
     assert.match(markup, /Ostatnia analiza/);
-    assert.match(markup, /Poprzedni prawidłowy wynik pozostaje dostępny/);
+    assert.match(markup, /Dostępna jest poprzednia analiza\. Dane kandydata zmieniły się\. Możesz zlecić przygotowanie nowej analizy\./);
+    assert.doesNotMatch(markup, /aktualizacja jest przygotowywana/i);
     assert.match(markup, /Zamknij analizę AI/);
     assert.match(markup, /ai-research-canvas/);
   });

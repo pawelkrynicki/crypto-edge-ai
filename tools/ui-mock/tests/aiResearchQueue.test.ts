@@ -12,7 +12,7 @@ import {
   type AIAnalysisCacheIdentity,
   type AIAnalysisQueueStore,
 } from "../server/aiResearchQueueStore.js";
-import { createAIResearchService } from "../server/aiResearchService.js";
+import { createAIResearchService, hydrateAIResearchBrief } from "../server/aiResearchService.js";
 import { createAIResearchWorker, resolveAIResearchWorkerContextOptions } from "../server/aiResearchWorker.js";
 import { PERSISTABLE_SCANNER_SAMPLE } from "../src/fixtures/persistableScannerSample.js";
 
@@ -185,6 +185,51 @@ describe("AI.3 central worker, single-flight and last-known-good", () => {
     store.close();
   });
 
+  it("reuses a validated historical result when only cache metadata changed, but stales it for a Max evidence change", async () => {
+    await writeFixture(100_000, true);
+    const store = await createAIAnalysisQueueStore({ databaseFilePath: resolve(root, "evidence-compatible.sqlite") });
+    const service = createAIResearchService({ ...contextOptions(), queueStore: store, providerEnabled: false, modelId: "gpt-5-mini", now: () => NOW });
+    const current = await buildAIResearchContext("base", ADDRESS, "en", { ...contextOptions(), now: () => NOW });
+    const legacyContext = { ...current, snapshot_fingerprint: "c".repeat(64) };
+    const queued = enqueue(store, fromContext(legacyContext), "metadata-only-session");
+    const claimed = store.claimNext({ worker_id: "metadata-only-worker", now: NOW, lease_ms: 1_000 });
+    assert.equal(claimed?.analysis_id, queued.record?.analysis_id);
+    store.complete({
+      analysis_id: claimed!.analysis_id,
+      worker_id: "metadata-only-worker",
+      brief: hydrateAIResearchBrief(
+        legacyContext,
+        narrative(legacyContext),
+        "gpt-5-mini",
+        { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+        NOW,
+        false,
+      ),
+      validation_status: "VALID",
+      latency_ms: 0,
+      provider_response_id: null,
+      now: NOW,
+    });
+
+    const unchanged = await service.getBrief("base", ADDRESS, "pl");
+    assert.equal(unchanged.availability, "READY");
+    assert.equal(unchanged.brief?.snapshot_fingerprint, legacyContext.snapshot_fingerprint);
+    assert.equal(store.stats().records, 1, "read-time compatibility must not write a replacement cache row");
+
+    await writeFixture(100_000, true, 250_000);
+    const unrelatedCandidateChange = await service.getBrief("base", ADDRESS, "en");
+    assert.equal(unrelatedCandidateChange.availability, "READY");
+    assert.equal(unrelatedCandidateChange.brief?.analysis_id, unchanged.brief?.analysis_id);
+    assert.equal(store.stats().records, 1, "an unrelated candidate cannot create an analysis mutation");
+
+    await writeFixture(200_000, true);
+    const changed = await service.getBrief("base", ADDRESS, "en");
+    assert.equal(changed.availability, "STALE");
+    assert.equal(changed.brief?.analysis_id, unchanged.brief?.analysis_id);
+    assert.equal(store.stats().records, 1, "a stale read must not enqueue a new analysis");
+    store.close();
+  });
+
   it("keeps the worker available when a queued snapshot is superseded before claim", async () => {
     await writeFixture(100_000, true);
     const store = await createAIAnalysisQueueStore({ databaseFilePath: resolve(root, "superseded-snapshot.sqlite") });
@@ -328,7 +373,7 @@ function narrative(ctx: AIResearchContext) {
   };
 }
 
-async function writeFixture(liquidity: number, includeOther = false) {
+async function writeFixture(liquidity: number, includeOther = false, otherLiquidity = liquidity) {
   const value = structuredClone(PERSISTABLE_SCANNER_SAMPLE);
   const candidate = value.candidates[0]!;
   candidate.chain = "base";
@@ -336,6 +381,6 @@ async function writeFixture(liquidity: number, includeOther = false) {
   candidate.source_url = `https://dexscreener.com/base/${ADDRESS}`;
   candidate.liquidity_usd = liquidity;
   candidate.address_identity_verified = true;
-  if (includeOther) value.candidates.push({ ...candidate, contract_address: OTHER_ADDRESS, source_url: `https://dexscreener.com/base/${OTHER_ADDRESS}` });
+  if (includeOther) value.candidates.push({ ...candidate, contract_address: OTHER_ADDRESS, source_url: `https://dexscreener.com/base/${OTHER_ADDRESS}`, liquidity_usd: otherLiquidity });
   await writeFile(fixturePath, JSON.stringify(value), "utf8");
 }

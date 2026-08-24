@@ -236,6 +236,24 @@ export async function createAIAnalysisQueueStore(options: AIAnalysisQueueStoreOp
       return safeRecord(requireDb().prepare("SELECT * FROM crypto_ai_analysis_queue WHERE analysis_id = ? LIMIT 1").get(analysisId));
     },
 
+    findRecentValidResults(identity: AIAnalysisCacheIdentity): AIAnalysisQueueRecord[] {
+      return requireDb().prepare(`
+SELECT * FROM crypto_ai_analysis_queue
+WHERE chain = ? AND contract_address = ? AND prompt_version = ?
+  AND model_id = ? AND analysis_schema_version = ? AND result_json IS NOT NULL AND validation_status = 'VALID'
+ORDER BY completed_at DESC LIMIT 20
+`).all(
+        identity.chain,
+        identity.contract_address,
+        identity.prompt_version,
+        identity.model_id,
+        identity.analysis_schema_version,
+      ).flatMap((row) => {
+        const record = safeRecord(row);
+        return record ? [record] : [];
+      });
+    },
+
     enqueue(input: {
       identity: AIAnalysisCacheIdentity;
       session_scope_hash: string;

@@ -338,7 +338,7 @@ function stateDetail(
   if (value === "READY") return pl ? "Poniżej znajdziesz najważniejsze wnioski, ryzyka, braki danych i kolejne kroki researchu." : "Below you will find the key findings, risks, data gaps and next research steps.";
   if (value === "QUEUED") return pl ? "Nie musisz nic robić. Wynik pojawi się tutaj, gdy analiza będzie dostępna." : "You do not need to do anything. The result will appear here when the analysis is available.";
   if (value === "PROCESSING") return pl ? "Przygotowanie analizy trwa." : "The analysis is being prepared.";
-  if (value === "STALE") return pl ? "Dane zmieniły się, a aktualizacja jest przygotowywana. Poprzedni prawidłowy wynik pozostaje dostępny." : "Data changed and an update is being prepared. The previous valid result remains available.";
+  if (value === "STALE") return pl ? "Dostępna jest poprzednia analiza. Dane kandydata zmieniły się. Możesz zlecić przygotowanie nowej analizy." : "A previous analysis is available. Candidate data has changed. You can request a new analysis.";
   if (value === "FAILED" && hasBrief) return pl ? "Ostatni poprawny wynik pozostaje dostępny." : "The last valid result remains available.";
   if (value === "FAILED" || value === "SUSPENDED" || value === "COOLDOWN" || value === "RATE_LIMITED" || value === "PROVIDER_DISABLED" || value === "ERROR") {
     return pl ? "Nie musisz nic robić. Gdy analiza będzie dostępna, wynik pojawi się tutaj." : "You do not need to do anything. When the analysis is available, the result will appear here.";

@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { Readable } from "node:stream";
 import { after, describe, it } from "node:test";
-import { buildAIResearchContext, type AIResearchContext } from "../server/aiResearchContext.js";
+import { buildAIResearchContext, isAIResearchBriefEvidenceCurrent, type AIResearchContext } from "../server/aiResearchContext.js";
 import { parseAIResearchQuery, readAIResearchGenerateRequest } from "../server/aiResearchApi.js";
 import { OPENAI_RESEARCH_MAX_OUTPUT_TOKENS } from "../server/aiResearchProvider.js";
 import { buildAIAnalysisCacheIdentity } from "../server/aiResearchQueueStore.js";
@@ -66,6 +66,23 @@ describe("AI Research canonical identity, fingerprint and input boundary", () =>
     const changed = await context("base", ADDRESS, "pl", NOW);
     assert.notEqual(changed.snapshot_fingerprint, first.snapshot_fingerprint);
     await writeFixture(100_000);
+  });
+
+  it("keeps a valid result current across source observation metadata while rejecting a changed AI fact", async () => {
+    const recorded = await context("base", ADDRESS, "en");
+    const brief = buildDeterministicPreview(recorded, NOW);
+    const globalRunOnly = structuredClone(recorded);
+    globalRunOnly.data_generated_at = "2026-07-30T12:00:00.000Z";
+    globalRunOnly.source_references = globalRunOnly.source_references.map((source) => (
+      source.id === "scanner_snapshot" ? { ...source, observed_at: "2026-07-30T12:00:00.000Z" } : source
+    ));
+    assert.equal(isAIResearchBriefEvidenceCurrent(brief, globalRunOnly), true);
+
+    const changedCandidateEvidence = structuredClone(globalRunOnly);
+    const liquidity = changedCandidateEvidence.fact_candidates.find((fact) => fact.key === "liquidity_usd");
+    assert.ok(liquidity);
+    liquidity.value = Number(liquidity.value) + 1;
+    assert.equal(isAIResearchBriefEvidenceCurrent(brief, changedCandidateEvidence), false);
   });
 
   it("separates contract, fingerprint, prompt, model and schema in the cache key", () => {

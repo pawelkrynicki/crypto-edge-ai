@@ -9,7 +9,7 @@ import {
   type AIResearchProviderStatus,
   type AIResearchReviewMetricsLookup,
 } from "../src/types/aiResearchTypes.js";
-import { buildAIResearchContext, sha256, stableJson, type AIResearchContext, type AIResearchContextOptions } from "./aiResearchContext.js";
+import { buildAIResearchContext, isAIResearchBriefEvidenceCurrent, sha256, stableJson, type AIResearchContext, type AIResearchContextOptions } from "./aiResearchContext.js";
 import { AI_RESEARCH_NARRATIVE_VERSION, aiResearchNarrativeId } from "./aiResearchNarrativeContract.js";
 import {
   assertAIResearchSemanticQuality,
@@ -139,7 +139,7 @@ export function createAIResearchService(options: AIResearchServiceOptions = {}) 
       if (renderPreview) return lookup("READY", "DISABLED", buildDeterministicPreview(context, now()), null, null);
       let store: AIAnalysisQueueStore;
       try { store = await getStore(); } catch { return lookup("ERROR", providerMode(providerEnabled), null, null, "STORE_UNAVAILABLE"); }
-      const current = store.lookup(identity);
+      const current = lookupCurrentEvidence(store, identity, context);
       if (!current.record && !current.last_known_good && context.research_state === "INSUFFICIENT_DATA") {
         return lookup("INSUFFICIENT_DATA", providerMode(providerEnabled), null, null, "DATA_UNAVAILABLE", null, identity);
       }
@@ -153,7 +153,7 @@ export function createAIResearchService(options: AIResearchServiceOptions = {}) 
       const { context, identity } = await contextAndIdentity(request.chain, request.contract_address);
       if (renderPreview) return lookup("READY", "DISABLED", buildDeterministicPreview(context, now()), null, null);
       const store = await getStore();
-      const existing = store.lookup(identity);
+      const existing = lookupCurrentEvidence(store, identity, context);
       if (existing.record && existing.record.status !== "FAILED") {
         const status = publicLookup(existing, identity, providerEnabled, "ALREADY_EXISTS", null);
         if (existing.record?.status === "READY" || existing.record?.status === "STALE") status.request_outcome = "READY";
@@ -231,6 +231,19 @@ export function createAIResearchService(options: AIResearchServiceOptions = {}) 
       };
     },
   };
+}
+
+function lookupCurrentEvidence(
+  store: Awaited<ReturnType<typeof createAIAnalysisQueueStore>>,
+  identity: AIAnalysisCacheIdentity,
+  context: AIResearchContext,
+) {
+  const exact = store.lookup(identity);
+  if (exact.record) return exact;
+  const compatible = store.findRecentValidResults(identity).find((record) => (
+    record.result !== null && isAIResearchBriefEvidenceCurrent(record.result, context)
+  ));
+  return compatible ? { record: compatible, last_known_good: compatible.result } : exact;
 }
 
 export function hydrateAIResearchBrief(
