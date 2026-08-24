@@ -175,6 +175,33 @@ describe("AI.3 central worker, single-flight and last-known-good", () => {
     store.close();
   });
 
+  it("keeps the worker available when a queued snapshot is superseded before claim", async () => {
+    await writeFixture(100_000, true);
+    const store = await createAIAnalysisQueueStore({ databaseFilePath: resolve(root, "superseded-snapshot.sqlite") });
+    enqueue(store, fromContext(await context(ADDRESS)), "superseded-session");
+    await writeFixture(200_000, true);
+    let calls = 0;
+    const provider = mockProvider(async (value) => { calls += 1; return JSON.stringify(narrative(value)); });
+    const worker = createAIResearchWorker({
+      ...contextOptions(), store, provider, now: () => NOW, limits: { maxAttempts: 1 },
+    });
+
+    const staleCycle = await worker.runCycle();
+    assert.equal(staleCycle.provider_calls, 0);
+    assert.equal(calls, 0);
+    assert.equal(store.stats().suspended, 1);
+    assert.equal(store.workerState().suspended, false);
+
+    const service = createAIResearchService({ ...contextOptions(), queueStore: store, providerEnabled: true, modelId: "gpt-5-mini", now: () => NOW });
+    const replacement = await service.generate(request("superseded-request-0001"), "replacement-session");
+    assert.equal(replacement.availability, "QUEUED");
+    const currentCycle = await worker.runCycle();
+    assert.equal(currentCycle.provider_calls, 1);
+    assert.equal(calls, 1);
+    assert.equal(store.stats().ready, 1);
+    store.close();
+  });
+
   it("suspends immediately on a response contract failure", async () => {
     await writeFixture(100_000, true);
     const store = await createAIAnalysisQueueStore({ databaseFilePath: resolve(root, "contract-breaker.sqlite") });

@@ -393,7 +393,7 @@ async function processClaim(
     } else {
       cycleResult.suspended += 1;
       let cycleSafeErrorCode = failure.code;
-      if (!failure.transient) {
+      if (!failure.transient && failure.suspendWorker !== false) {
         try { store.suspendWorker(failure.code, now()); } catch { cycleSafeErrorCode = "AI_STORE_FAILURE"; }
       }
       cycleResult.safe_error_code = cycleSafeErrorCode;
@@ -450,7 +450,19 @@ class AIResearchWorkerCircuitError extends Error {
   constructor() { super("AI_CIRCUIT_FAILURE"); this.name = "AIResearchWorkerCircuitError"; }
 }
 
-function classifyFailure(error: unknown, stage: AIAnalysisFailureStage): { code: string; transient: boolean; stage: AIAnalysisFailureStage } {
+function classifyFailure(error: unknown, stage: AIAnalysisFailureStage): {
+  code: string;
+  transient: boolean;
+  stage: AIAnalysisFailureStage;
+  suspendWorker?: boolean;
+} {
+  // A changed canonical snapshot makes this one queued identity obsolete. It is
+  // terminal for that job, but it must not disable the shared worker: a new
+  // owner request can safely queue the current identity without any provider
+  // attempt having occurred for the superseded one.
+  if (error instanceof AIResearchWorkerContractError && error.code === "DATA_STALE") {
+    return { code: error.code, transient: false, stage, suspendWorker: false };
+  }
   if (error instanceof AIResearchWorkerContractError) return { code: error.code, transient: false, stage };
   if (error instanceof AIResearchContextError) return { code: "AI_CONTEXT_FAILURE", transient: false, stage: "CONTEXT_BUILD" };
   if (error instanceof AIResearchWorkerCircuitError) return { code: "AI_CIRCUIT_FAILURE", transient: false, stage: "CIRCUIT" };
