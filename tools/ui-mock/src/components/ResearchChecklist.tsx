@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useProductLocale } from "../productI18n";
 import { researchChecklistItemValue, researchEvidencePresentationText } from "../researchChecklistPresentation";
 import { resolveResearchChecklist } from "../researchChecklistResolver";
+import { researchPlaybookStageName as stepName } from "../researchPlaybookStages";
 import {
   type PersistedManualResearchState,
   type ResearchChecklistItem,
@@ -28,11 +29,6 @@ import type { UiTokenCandidate } from "../types/scannerTypes";
 import { ActionButton } from "./ProductUi";
 
 void React;
-
-const STEP_NAMES = {
-  pl: ["Szybki filtr", "Deal Breakers", "Bezpieczeństwo / 3 kontrole", "On-chain", "Social", "Scorecard", "Finalna checklista"],
-  en: ["Quick filter", "Deal breakers", "Security / 3 checks", "On-chain", "Social", "Scorecard", "Final research checklist"],
-} as const;
 
 const ITEM_NAMES: Record<string, [string, string]> = {
   market_cap: ["Kapitalizacja", "Market cap"], volume_24h: ["Wolumen 24 h", "24h volume"], liquidity: ["Płynność", "Liquidity"], pair_age: ["Wiek pary", "Pair age"], volume_market_cap_ratio: ["Wolumen / kapitalizacja", "Volume / market cap"], token_age: ["Wiek tokena", "Token age"],
@@ -1143,7 +1139,6 @@ function ResearchStateBadge({ state, compact = false, labelOverride }: { state: 
 }
 
 function itemName(key: string, locale: "pl" | "en"): string { return (ITEM_NAMES[key] ?? [key, key])[locale === "pl" ? 0 : 1]; }
-function stepName(step: number, locale: "pl" | "en"): string { return STEP_NAMES[locale][step - 1] ?? String(step); }
 function handleResearchStepKeyDown(event: React.KeyboardEvent<HTMLButtonElement>, step: ResearchStepNumber, onOpenStep?: (step: ResearchStepNumber) => void) {
   if (event.key !== "Enter" && event.key !== " ") return;
   event.preventDefault();

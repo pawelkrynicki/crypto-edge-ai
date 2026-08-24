@@ -2,6 +2,7 @@ import React from "react";
 import { formatProductDateTime, useProductLocale } from "../productI18n";
 import type { AIProductionAnalysis, AIProductionInsight, AIProductionResearchGuidance, AIProductionResearchStep } from "../types/aiProductionTypes";
 import { ActionLink, ExternalLinkAction, StatusBadge } from "./ProductUi";
+import { ResearchPlaybookProgressTracker } from "./ResearchPlaybookProgressTracker";
 
 void React;
 
@@ -20,12 +21,12 @@ export function AIProductionAnalysisCanvas({
     eyebrow: "ANALIZA AI", title: "Podsumowanie", summary: "CO Z TEGO WYNIKA TERAZ", findings: "NAJWAŻNIEJSZE POTWIERDZONE INFORMACJE", risks: "RYZYKA", missing: "NAJWAŻNIEJSZE BRAKI W DANYCH",
     context: "KONTEKST DANYCH", next: "NASTĘPNE KROKI RESEARCHU", futureNext: "JEŚLI TOKEN PRZEJDZIE KROK 1", futureNextSupport: "Po spełnieniu podstawowych filtrów kolejnym etapem będzie weryfikacja bezpieczeństwa.", futureNextPreview: "PODGLĄD KOLEJNEGO ETAPU", reassessment: "KIEDY WARTO WRÓCIĆ DO ANALIZY", evidence: "ŹRÓDŁA I DOWODY", market: "Rynek", security: "Bezpieczeństwo", liquidity: "Płynność", holders: "Holderzy",
     generated: "Przygotowano", snapshot: "Migawka danych", fresh: "Świeża", stale: "Wymaga odświeżenia", empty: "Brak dodatkowych danych w tej migawce.", boundary: "Analiza opiera się wyłącznie na zapisanych danych i służy do researchu, nie stanowi rekomendacji inwestycyjnej.",
-    guidance: "ETAP RESEARCHU", posture: "STAN RESEARCHU", blockers: "CO BLOKUJE DALSZY RESEARCH", actions: "CO ZROBIĆ TERAZ", unlocks: "CO ODBLOKUJE KOLEJNY ETAP", why: "Dlaczego", resolves: "Co to rozstrzygnie", filterFailures: "DOKŁADNE WYNIKI FILTRÓW", details: "SZCZEGÓŁY ANALIZY",
+    guidance: "ETAP RESEARCHU", posture: "STAN RESEARCHU", blockers: "CO BLOKUJE DALSZY RESEARCH", actions: "CO ZROBIĆ TERAZ", why: "Dlaczego", resolves: "Co to rozstrzygnie", filterFailures: "DOKŁADNE WYNIKI FILTRÓW", details: "SZCZEGÓŁY ANALIZY",
   } : {
     eyebrow: "AI ANALYSIS", title: "Summary", summary: "WHAT THIS MEANS NOW", findings: "KEY CONFIRMED FINDINGS", risks: "RISKS", missing: "HIGHEST-IMPACT DATA GAPS",
     context: "DATA CONTEXT", next: "NEXT RESEARCH STEPS", futureNext: "IF THE TOKEN PASSES STEP 1", futureNextSupport: "After the basic filters are met, the next stage will be security verification.", futureNextPreview: "NEXT-STAGE PREVIEW", reassessment: "WHEN TO REVISIT THE ANALYSIS", evidence: "SOURCES AND EVIDENCE", market: "Market", security: "Security", liquidity: "Liquidity", holders: "Holders",
     generated: "Generated", snapshot: "Data snapshot", fresh: "Fresh", stale: "Refreshing", empty: "No additional data in this snapshot.", boundary: "This analysis uses recorded data only and is for research, not investment advice.",
-    guidance: "RESEARCH STAGE", posture: "RESEARCH POSTURE", blockers: "WHAT BLOCKS FURTHER RESEARCH", actions: "WHAT TO DO NOW", unlocks: "WHAT UNLOCKS THE NEXT STAGE", why: "Why", resolves: "What this check should resolve", filterFailures: "EXACT FILTER RESULTS", details: "ANALYSIS DETAILS",
+    guidance: "RESEARCH STAGE", posture: "RESEARCH POSTURE", blockers: "WHAT BLOCKS FURTHER RESEARCH", actions: "WHAT TO DO NOW", why: "Why", resolves: "What this check should resolve", filterFailures: "EXACT FILTER RESULTS", details: "ANALYSIS DETAILS",
   };
   return (
     <article className="ai-research-canvas ai-production-analysis" aria-labelledby="ai-production-analysis-title">
@@ -139,7 +140,7 @@ function ResearchGuidancePanel({
   guidance: AIProductionResearchGuidance;
   locale: "pl" | "en";
   headings: {
-    guidance: string; posture: string; blockers: string; actions: string; unlocks: string; why: string; resolves: string; filterFailures: string;
+    guidance: string; posture: string; blockers: string; actions: string; why: string; resolves: string; filterFailures: string;
   };
   securityResearchHref?: string;
 }) {
@@ -150,6 +151,11 @@ function ResearchGuidancePanel({
       <h4 id="ai-research-guidance-title">{pl ? "Krok" : "Step"} {guidance.current_step.number}/7 — {researchStageTitle(guidance.current_step.title, locale)}</h4>
       <dl><dt>{headings.posture}</dt><dd><span>{guidance.current_step.posture}</span><small>{guidance.current_step.posture_detail}</small></dd></dl>
     </header>
+    <ResearchPlaybookProgressTracker
+      currentStep={guidance.current_step.number}
+      unlockConditions={guidance.unlock_conditions}
+      locale={locale}
+    />
     <div className="ai-guidance-grid">
       <section aria-labelledby="ai-research-guidance-blockers">
         <h5 id="ai-research-guidance-blockers">{headings.blockers}</h5>
@@ -178,10 +184,6 @@ function ResearchGuidancePanel({
         </li>)}</ol>
       </section>
     </div>
-    <section className="ai-guidance-unlocks" aria-labelledby="ai-research-guidance-unlocks">
-      <h5 id="ai-research-guidance-unlocks">{headings.unlocks}</h5>
-      <ul>{guidance.unlock_conditions.map((condition, index) => <li key={`${condition}-${index}`}>{condition}</li>)}</ul>
-    </section>
   </section>;
 }
 

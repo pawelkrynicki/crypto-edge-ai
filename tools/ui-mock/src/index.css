@@ -8739,12 +8739,38 @@ summary {
 .ai-research-guidance header dt { color: var(--text-helper); font-weight: 700; }
 .ai-research-guidance header dd { display: grid; gap: 3px; margin: 0; color: var(--warning); font-weight: 800; letter-spacing: 0.04em; }
 .ai-research-guidance header dd small { color: var(--text-secondary); font-size: 11px; font-weight: 500; letter-spacing: normal; line-height: 1.4; }
+.research-playbook-progress-tracker { display: grid; gap: 9px; min-width: 0; padding: 11px; border: 1px solid rgba(113, 139, 151, 0.3); border-radius: var(--radius-sm); background: rgba(7, 21, 27, 0.46); }
+.research-playbook-progress-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.research-playbook-progress-heading > span,
+.research-playbook-progress-unlock > strong { color: var(--accent); font-size: 10px; font-weight: 800; letter-spacing: 0.09em; text-transform: uppercase; }
+.research-playbook-progress-heading > strong { color: var(--text-secondary); font-size: 11px; }
+.research-playbook-progress-stages { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; min-width: 0; margin: 0; padding: 0; list-style: none; }
+.research-playbook-progress-tracker { overflow-x: auto; }
+.research-playbook-progress-stage { display: grid; grid-template-columns: 19px minmax(0, 1fr); grid-template-areas: "marker name" "state state"; gap: 2px 6px; min-width: 0; padding: 7px; border: 1px solid var(--border); border-radius: 7px; background: rgba(8, 12, 16, 0.28); }
+.research-playbook-progress-marker { grid-area: marker; display: grid; place-items: center; width: 19px; height: 19px; border: 1px solid var(--border); border-radius: 999px; color: var(--text-helper); font-size: 11px; font-weight: 900; }
+.research-playbook-progress-name { grid-area: name; min-width: 0; color: var(--text-secondary); font-size: 10px; font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
+.research-playbook-progress-name b { margin-right: 4px; color: var(--text-helper); }
+.research-playbook-progress-state-label { grid-area: state; min-width: 0; color: var(--text-helper); font-size: 8px; font-weight: 800; letter-spacing: 0; overflow-wrap: anywhere; text-transform: uppercase; }
+.research-playbook-progress-stage.completed { border-color: var(--accent-border); }
+.research-playbook-progress-stage.completed .research-playbook-progress-marker { color: var(--bg); background: var(--accent); border-color: var(--accent); }
+.research-playbook-progress-stage.completed .research-playbook-progress-state-label { color: var(--accent); }
+.research-playbook-progress-stage.current { border-color: var(--warning); background: rgba(123, 101, 44, 0.22); box-shadow: inset 0 0 0 1px rgba(238, 197, 87, 0.18); }
+.research-playbook-progress-stage.current .research-playbook-progress-marker { color: var(--bg); background: var(--warning); border-color: var(--warning); }
+.research-playbook-progress-stage.current .research-playbook-progress-name { color: var(--text-primary); }
+.research-playbook-progress-stage.current .research-playbook-progress-state-label { color: var(--warning); }
+.research-playbook-progress-stage.locked { border-style: dashed; opacity: 0.82; }
+.research-playbook-progress-unlock { display: grid; gap: 5px; padding-top: 2px; }
+.research-playbook-progress-unlock > p { margin: 0; color: var(--text-secondary); font-size: 11px; line-height: 1.45; }
+.research-playbook-progress-unlock ul { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 5px 12px; margin: 0; padding: 0; list-style: none; }
+.research-playbook-progress-unlock li { position: relative; padding-left: 15px; color: var(--text-secondary); font-size: 11px; line-height: 1.4; }
+.research-playbook-progress-unlock li::before { position: absolute; left: 0; color: var(--accent); content: "□"; font-weight: 800; }
+@media (max-width: 640px) {
+  .research-playbook-progress-stages { min-width: 570px; }
+}
 .ai-guidance-grid { display: grid; grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr); gap: 12px; }
-.ai-guidance-grid > section,
-.ai-guidance-unlocks { min-width: 0; padding: 12px; border: 1px solid rgba(113, 139, 151, 0.22); border-radius: var(--radius-sm); background: rgba(7, 21, 27, 0.46); }
+.ai-guidance-grid > section { min-width: 0; padding: 12px; border: 1px solid rgba(113, 139, 151, 0.22); border-radius: var(--radius-sm); background: rgba(7, 21, 27, 0.46); }
 .ai-guidance-blockers,
 .ai-guidance-filter-failures ul,
-.ai-guidance-unlocks ul,
 .ai-guidance-actions { display: grid; gap: 8px; margin: 10px 0 0; padding: 0; list-style: none; }
 .ai-guidance-blockers li { display: grid; gap: 3px; }
 .ai-guidance-blockers strong,
@@ -8763,9 +8789,6 @@ summary {
 .ai-guidance-action-number { display: grid; place-items: center; width: 25px; height: 25px; border-radius: 999px; color: var(--bg); background: var(--accent); font-size: 12px; font-weight: 900; }
 .ai-guidance-action-copy { display: grid; gap: 5px; min-width: 0; }
 .ai-guidance-action-copy .action-button { justify-self: start; min-height: 36px; margin-top: 2px; font-size: 11px; }
-.ai-guidance-unlocks ul { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
-.ai-guidance-unlocks li { position: relative; padding-left: 19px; color: var(--text-secondary); font-size: 11px; line-height: 1.4; }
-.ai-guidance-unlocks li::before { position: absolute; left: 0; color: var(--accent); content: "□"; font-weight: 800; }
 .ai-production-details { display: grid; gap: 12px; margin: 0; }
 .ai-production-details > summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 42px; padding: 11px 13px; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); cursor: pointer; font-size: 11px; font-weight: 800; letter-spacing: 0.07em; list-style: none; }
 .ai-production-details > summary::-webkit-details-marker { display: none; }
@@ -9394,7 +9417,6 @@ summary {
   .ai-production-header .ai-research-times { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .ai-research-guidance { padding: 12px; }
   .ai-research-guidance h4 { font-size: 17px; }
-  .ai-guidance-unlocks ul { grid-template-columns: 1fr; }
   .ai-guidance-filter-failures ul { grid-template-columns: 1fr; }
   .ai-research-panel { padding: 9px; }
   .ai-coverage-grid,

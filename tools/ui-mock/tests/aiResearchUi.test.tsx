@@ -12,11 +12,14 @@ import { buildVerificationRouteHref } from "../src/candidateDetailRoute.js";
 import { AIResearchBriefCanvas } from "../src/components/AIResearchBriefCanvas.js";
 import { AIProductionAnalysisCanvas } from "../src/components/AIProductionAnalysisCanvas.js";
 import { AIResearchRadarStatus, AIResearchSection } from "../src/components/AIResearchSection.js";
+import { ResearchPlaybookProgressTracker } from "../src/components/ResearchPlaybookProgressTracker.js";
 import { applyAIResearchGenerationFailure } from "../src/components/aiResearchState.js";
 import { CandidateDetailView } from "../src/components/CandidateDetailView.js";
 import { ExternalVerificationLinksView } from "../src/components/ExternalVerificationLinksView.js";
 import { PERSISTABLE_SCANNER_SAMPLE } from "../src/fixtures/persistableScannerSample.js";
 import { ProductLocaleProvider, readRequestedProductLocale, type ProductLocale } from "../src/productI18n.js";
+import { RESEARCH_PLAYBOOK_STAGES } from "../src/researchPlaybookStages.js";
+import { resolveResearchPlaybookProgressState } from "../src/researchPlaybookProgressState.js";
 import { AIResearchDataSourceError } from "../src/services/aiResearchDataSource.js";
 import type { AIResearchBrief, AIResearchBriefLookup, AIResearchReviewMetrics } from "../src/types/aiResearchTypes.js";
 import { presentAIProductionLookup, presentAnalysis, validateAIProductionLookup } from "../server/aiProductionPublic.js";
@@ -440,6 +443,65 @@ describe("PC.2 action-first research guidance", () => {
     assert.match(markup, /PODGLĄD KOLEJNEGO ETAPU/);
     assert.match(markup, /SZCZEGÓŁY ANALIZY/);
     assert.ok(markup.indexOf("ETAP RESEARCHU") < markup.indexOf("SZCZEGÓŁY ANALIZY"));
+  });
+
+  it("renders the canonical seven-stage Research Playbook path as a read-only, localized progress tracker", async () => {
+    const plInput = structuredClone(context.guidance);
+    plInput.freshness = "STALE";
+    plInput.filters = {
+      status: "rejected_basic_filter",
+      reasons: ["market_cap_below_300000"],
+      metrics: { market_cap_usd: 4_659, liquidity_usd: 120_000, volume_24h_usd: 100_000, volume_market_cap_ratio: 0.1, pair_age_days: 30 },
+    };
+    plInput.action_catalog = guidanceActions("pl", ["WAIT_FOR_CHECKPOINT"]);
+    const plAnalysis = presentAnalysis(briefPl, false, "pl", plInput);
+
+    const enInput = structuredClone(contextEn.guidance);
+    enInput.freshness = "STALE";
+    enInput.filters = {
+      status: "rejected_basic_filter",
+      reasons: ["market_cap_below_300000"],
+      metrics: { market_cap_usd: 4_659, liquidity_usd: 120_000, volume_24h_usd: 100_000, volume_market_cap_ratio: 0.1, pair_age_days: 30 },
+    };
+    enInput.action_catalog = guidanceActions("en", ["WAIT_FOR_CHECKPOINT"]);
+    const enAnalysis = presentAnalysis(briefEn, false, "en", enInput);
+
+    const plMarkup = render("pl", <AIProductionAnalysisCanvas analysis={plAnalysis} />);
+    const enMarkup = render("en", <AIProductionAnalysisCanvas analysis={enAnalysis} />);
+    const tracker = render("pl", <ResearchPlaybookProgressTracker currentStep={1} unlockConditions={plAnalysis.research_guidance.unlock_conditions} locale="pl" />);
+    const progressedTracker = render("pl", <ResearchPlaybookProgressTracker currentStep={3} unlockConditions={["Kontrole bezpieczeństwa są zakończone"]} locale="pl" />);
+    const css = await readFile(resolve(import.meta.dirname, "../src/index.css"), "utf8");
+
+    assert.equal((plMarkup.match(/data-research-playbook-progress-stage="[1-7]"/g) ?? []).length, 7);
+    assert.equal((enMarkup.match(/data-research-playbook-progress-stage="[1-7]"/g) ?? []).length, 7);
+    assert.equal((plMarkup.match(/data-research-playbook-progress-state="CURRENT"/g) ?? []).length, 1);
+    assert.match(plMarkup, /data-research-playbook-progress-stage="1"[^>]*data-research-playbook-progress-state="CURRENT"/);
+    assert.match(plMarkup, /data-research-playbook-progress-stage="2"[^>]*data-research-playbook-progress-state="LOCKED"/);
+    assert.match(plMarkup, /Co odblokuje kolejny etap/);
+    assert.match(plMarkup, /Świeża migawka danych/);
+    assert.match(enMarkup, /What unlocks the next stage/);
+    assert.match(enMarkup, /Fresh data snapshot/);
+    assert.match(plMarkup, /aria-label="Etap 1 z 7: Szybki filtr — Bieżący"/);
+    assert.match(enMarkup, /aria-label="Stage 1 of 7: Quick filter — Current"/);
+    assert.match(plMarkup, /Krok 1\/7 — SZYBKI FILTR/, "the existing current-stage detail remains visible");
+    assert.doesNotMatch(tracker, /<button\b/, "locked stages are informational, not controls");
+    assert.equal((progressedTracker.match(/data-research-playbook-progress-state="COMPLETED"/g) ?? []).length, 2);
+    assert.match(progressedTracker, /data-research-playbook-progress-stage="3"[^>]*data-research-playbook-progress-state="CURRENT"/);
+    assert.match(progressedTracker, /data-research-playbook-progress-stage="4"[^>]*data-research-playbook-progress-state="LOCKED"/);
+    assert.match(css, /\.research-playbook-progress-tracker \{[^}]*overflow-x: auto;/);
+    assert.match(css, /\.research-playbook-progress-stages \{[^}]*grid-template-columns: repeat\(7,/);
+    assert.match(css, /@media \(max-width: 640px\)\s*\{\s*\.research-playbook-progress-stages \{ min-width: 570px; \}/);
+
+    for (const locale of ["pl", "en"] as const) {
+      const markup = locale === "pl" ? plMarkup : enMarkup;
+      const positions = RESEARCH_PLAYBOOK_STAGES.map((stage) => markup.indexOf(stage.labels[locale]));
+      assert.equal(positions.every((position) => position >= 0), true, `${locale} exposes every canonical stage label`);
+      assert.equal(positions.every((position, index) => index === 0 || position > positions[index - 1]!), true, `${locale} keeps canonical stage order`);
+    }
+
+    assert.equal(resolveResearchPlaybookProgressState(1, 3), "COMPLETED");
+    assert.equal(resolveResearchPlaybookProgressState(3, 3), "CURRENT");
+    assert.equal(resolveResearchPlaybookProgressState(7, 3), "LOCKED");
   });
 
   it("keeps a freshness-specific Step 1 posture when filters passed and only the snapshot is stale", () => {
