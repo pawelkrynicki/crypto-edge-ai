@@ -13,7 +13,7 @@ import {
   type AIAnalysisQueueStore,
 } from "../server/aiResearchQueueStore.js";
 import { createAIResearchService } from "../server/aiResearchService.js";
-import { createAIResearchWorker } from "../server/aiResearchWorker.js";
+import { createAIResearchWorker, resolveAIResearchWorkerContextOptions } from "../server/aiResearchWorker.js";
 import { PERSISTABLE_SCANNER_SAMPLE } from "../src/fixtures/persistableScannerSample.js";
 
 const root = await mkdtemp(resolve(tmpdir(), "crypto-edge-ai3-queue-tests-"));
@@ -107,6 +107,16 @@ describe("AI.3 canonical cache identity and persistent queue", () => {
 });
 
 describe("AI.3 central worker, single-flight and last-known-good", () => {
+  it("uses the INTERNAL_BETA context sources by default for a standalone worker", () => {
+    const internalBeta = resolveAIResearchWorkerContextOptions({}, { CRYPTO_EDGE_RUNTIME_MODE: "INTERNAL_BETA" });
+    const defaultMode = resolveAIResearchWorkerContextOptions({}, {});
+    const explicit = resolveAIResearchWorkerContextOptions({ scanner: { runtimeMode: "DEVELOPMENT_DEMO", fixturePath } }, { CRYPTO_EDGE_RUNTIME_MODE: "INTERNAL_BETA" });
+
+    assert.equal(internalBeta.scanner?.runtimeMode, "INTERNAL_BETA");
+    assert.equal(defaultMode.scanner?.runtimeMode, "UNCONFIGURED");
+    assert.equal(explicit.scanner?.runtimeMode, "DEVELOPMENT_DEMO");
+  });
+
   it("lets two workers execute exactly one provider call for one cache key", async () => {
     await writeFixture(100_000, true);
     const databaseFilePath = resolve(root, "two-workers.sqlite");

@@ -3,6 +3,7 @@ import {
   AI_RESEARCH_TARGET_MODEL,
   type AIResearchBrief,
 } from "../src/types/aiResearchTypes.js";
+import { resolveProductRuntimeMode } from "../src/runtimeMode.js";
 import { AIResearchContextError, buildAIResearchContext, type AIResearchContextOptions } from "./aiResearchContext.js";
 import {
   createAIResearchProvider,
@@ -70,6 +71,25 @@ export type AIResearchWorkerCycleResult = {
   safe_error_code: string | null;
 };
 
+/**
+ * The standalone central worker does not sit behind scannerApiHandler, which
+ * normally supplies the active runtime mode to context reads.  Give the worker
+ * the same mode by default so an INTERNAL_BETA job is built from the same
+ * canonical sources as the public API that later reads it.  Explicit context
+ * sources remain available for isolated tests and controlled callers.
+ */
+export function resolveAIResearchWorkerContextOptions(
+  options: AIResearchContextOptions = {},
+  env: NodeJS.ProcessEnv = process.env,
+): AIResearchContextOptions {
+  return {
+    scanner: options.scanner ?? { runtimeMode: resolveProductRuntimeMode(env.CRYPTO_EDGE_RUNTIME_MODE) },
+    followUp: options.followUp,
+    reports: options.reports,
+    now: options.now,
+  };
+}
+
 export function resolveAIResearchWorkerLimits(
   input: Partial<AIResearchWorkerLimits> = {},
   env: NodeJS.ProcessEnv = process.env,
@@ -103,12 +123,12 @@ export function createAIResearchWorker(options: AIResearchWorkerOptions = {}) {
   const workerId = safeWorkerId(options.workerId) ?? `aiw_${randomUUID()}`;
   let storePromise: Promise<AIAnalysisQueueStore> | null = options.store ? Promise.resolve(options.store) : null;
   const getStore = async () => (storePromise ??= createAIAnalysisQueueStore(options.storeOptions));
-  const contextOptions: AIResearchContextOptions = {
+  const contextOptions = resolveAIResearchWorkerContextOptions({
     scanner: options.scanner,
     followUp: options.followUp,
     reports: options.reports,
     now,
-  };
+  });
 
   return {
     workerId,
