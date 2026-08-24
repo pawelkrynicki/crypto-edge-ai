@@ -50,21 +50,19 @@ export function presentAIResearchGuidance(
     const refreshAction = actionFromCatalog(source, "WAIT_FOR_CHECKPOINT");
     const actions: AIProductionGuidanceAction[] = filtersFailed && snapshotNeedsRefresh
       ? [guidanceAction(
-        pl ? "Poczekaj na świeżą migawkę" : "Wait for the next fresh snapshot",
-        pl ? "System automatycznie ponownie przeliczy podstawowe filtry." : "The system automatically recalculates the basic filters.",
+        pl ? "Poczekaj na aktualizację danych" : "Wait for the data update",
+        pl ? "Nowa migawka zostanie opublikowana przez centralny system danych." : "A new snapshot will be published by the central data system.",
         pl
-          ? "JEŻELI FILTRY NADAL NIE PRZEJDĄ: Token pozostaje w Kroku 1 — Szybki filtr. JEŻELI WSZYSTKIE WYMAGANE FILTRY PRZEJDĄ: Następny etap: Krok 2/7 — Deal Breakers / Security."
-          : "IF THE FILTERS STILL DO NOT PASS: The token remains at Step 1 — Quick Filter. IF EVERY REQUIRED FILTER PASSES: Next stage: Step 2/7 — Deal Breakers / Security.",
+          ? "Po pojawieniu się nowej migawki odśwież widok. Jeśli filtry nadal nie przejdą, token pozostanie w Kroku 1 — Szybki filtr."
+          : "Refresh the view after the new snapshot appears. If the filters still do not pass, the token remains at Step 1 — Quick Filter.",
         null,
       )]
       : [
         guidanceAction(
-          pl ? "Odśwież dane" : "Refresh the data",
-          snapshotNeedsRefresh
-            ? (pl ? "Migawka jest nieaktualna." : "The snapshot is stale.")
-            : (pl ? "Wynik filtrów wymaga ponownego sprawdzenia na zapisanych danych." : "The filter result needs re-checking against the recorded data."),
-          pl ? "Czy aktualna migawka nadal prowadzi do tego samego wyniku podstawowych filtrów." : "Whether the current snapshot still leads to the same basic-filter result.",
-          refreshAction,
+          pl ? "Poczekaj na aktualizację danych" : "Wait for the data update",
+          pl ? "Nowa migawka zostanie opublikowana przez centralny system danych." : "A new snapshot will be published by the central data system.",
+          pl ? "Po pojawieniu się nowej migawki odśwież widok." : "Refresh the view after the new snapshot appears.",
+          centralDataAction(refreshAction, locale),
         ),
         guidanceAction(
           pl ? "Sprawdź dokładne wyniki filtrów" : "Review the exact filter results",
@@ -84,7 +82,7 @@ export function presentAIResearchGuidance(
       current_step: {
         number: 1,
         title: pl ? "SZYBKI FILTR" : "QUICK FILTER",
-        posture: filtersFailed ? (pl ? "KROK 1 NIEZALICZONY" : "STEP 1 NOT PASSED") : snapshotNeedsRefresh ? (pl ? "ODŚWIEŻ DANE" : "REFRESH DATA") : (pl ? "NIE SPEŁNIA FILTRÓW RESEARCHU" : "RESEARCH FILTERS NOT MET"),
+        posture: filtersFailed ? (pl ? "KROK 1 NIEZALICZONY" : "STEP 1 NOT PASSED") : snapshotNeedsRefresh ? (pl ? "OCZEKUJE NA AKTUALIZACJĘ" : "AWAITING DATA UPDATE") : (pl ? "NIE SPEŁNIA FILTRÓW RESEARCHU" : "RESEARCH FILTERS NOT MET"),
         posture_detail: filtersFailed
           ? (pl ? "Dalszy research jest wstrzymany do kolejnej świeżej migawki." : "Further research is paused until the next fresh snapshot.")
           : snapshotNeedsRefresh
@@ -280,6 +278,17 @@ function guidanceAction(
 
 function actionFromCatalog(input: AIResearchGuidanceInput, actionType: string) {
   return input.action_catalog.find((action) => action.action_type === actionType) ?? null;
+}
+
+function centralDataAction(
+  action: AIResearchGuidanceInput["action_catalog"][number] | null,
+  locale: AIResearchLocale,
+) {
+  if (!action || action.action_type !== "WAIT_FOR_CHECKPOINT") return action;
+  return {
+    ...action,
+    label: locale === "pl" ? "Poczekaj na aktualizację danych" : "Wait for the data update",
+  };
 }
 
 function hasRecordedSecurityStatus(value: string | null): boolean {

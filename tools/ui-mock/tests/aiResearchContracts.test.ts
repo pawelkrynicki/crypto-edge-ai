@@ -156,6 +156,41 @@ describe("AI Research v2 brief and v6 bilingual prompt contract", () => {
     assert.throws(() => parseAIResearchProviderNarrative(JSON.stringify(generatedUrl), value), (error) => error instanceof AIResearchValidationError && error.code === "FORBIDDEN_CONTENT" && error.violations.includes("GENERATED_URL"));
   });
 
+  it("rejects the current sanitized Security-step wording at Quick Filter and uses localized slot fallbacks without replacing valid provider slots", async () => {
+    const current = structuredClone(await context("base", ADDRESS, "pl"));
+    current.research_state = "DATA_STALE";
+    current.narrative_contract.research_playbook.current_step = 1;
+    const marketCapIndex = current.fact_candidates.findIndex(({ key }) => key === "market_cap_usd");
+    const basicFiltersIndex = current.fact_candidates.findIndex(({ key }) => key === "basic_filters");
+    assert.ok(marketCapIndex >= 0 && basicFiltersIndex >= 0 && current.risk_candidates.length > 0);
+    current.fact_candidates[basicFiltersIndex]!.value = "passed_basic_filter";
+    current.risk_candidates[0]!.category = "freshness";
+
+    const provider = narrative(current);
+    provider.summary.pl = "Analiza przebiega według kroku badawczego skoncentrowanego na bezpieczeństwie.";
+    provider.summary.en = "The review is operating under the security-focused playbook step.";
+    provider.fact_narratives[marketCapIndex]!.pl = "market_cap_usd";
+    provider.fact_narratives[marketCapIndex]!.en = "market_cap_usd";
+    provider.fact_narratives[basicFiltersIndex]!.pl = "basic_filters";
+    provider.fact_narratives[basicFiltersIndex]!.en = "basic_filters";
+    provider.risk_narratives[0]!.pl = "DATA_STALE";
+    provider.risk_narratives[0]!.en = "DATA_STALE";
+    const untouched = provider.fact_narratives.find(({ id }) => id !== `fact:${current.fact_candidates[marketCapIndex]!.key}` && id !== `fact:${current.fact_candidates[basicFiltersIndex]!.key}`)!;
+
+    const parsed = parseAIResearchProviderNarrativeWithDiagnostics(JSON.stringify(provider), current);
+    assert.ok(parsed.slot_fallbacks.some(({ slot_id, violations }) => slot_id === "summary:overall" && violations.includes("CURRENT_STEP_BOUNDARY_VIOLATION")));
+    assert.ok(parsed.slot_fallbacks.some(({ slot_id }) => slot_id === `fact:${current.fact_candidates[marketCapIndex]!.key}`));
+    assert.ok(parsed.slot_fallbacks.some(({ slot_id }) => slot_id === `fact:${current.fact_candidates[basicFiltersIndex]!.key}`));
+    assert.ok(parsed.slot_fallbacks.some(({ slot_id }) => slot_id === "risk:0"));
+    assert.equal(parsed.narrative.fact_narratives[marketCapIndex]!.pl, "Ostatnia zapisana kapitalizacja pochodzi z dostępnej migawki danych. Wartość pozostaje częścią obecnego kontekstu, ale przed ponowną oceną wymaga aktualnej migawki.");
+    assert.equal(parsed.narrative.fact_narratives[marketCapIndex]!.en, "The last recorded market-cap value comes from the available data snapshot. It remains part of the current context, but a fresh snapshot is required before reassessment.");
+    assert.equal(parsed.narrative.fact_narratives[basicFiltersIndex]!.pl, "Podstawowe filtry zostały wcześniej zaliczone. Obecny blocker dotyczy świeżości danych, dlatego wynik filtrów powinien zostać potwierdzony na nowej migawce.");
+    assert.equal(parsed.narrative.fact_narratives[basicFiltersIndex]!.en, "The basic filters previously passed. The current blocker is data freshness, so the filter result should be confirmed against a new snapshot.");
+    assert.equal(parsed.narrative.risk_narratives[0]!.pl, "Obecna migawka jest zbyt stara do ponownej oceny. Do czasu publikacji świeższych danych aktualny stan należy traktować jako wymagający potwierdzenia.");
+    assert.equal(parsed.narrative.risk_narratives[0]!.en, "The current snapshot is too old for reassessment. Until fresher data is published, the current state should be treated as requiring confirmation.");
+    assert.deepEqual(parsed.narrative.fact_narratives.find(({ id }) => id === untouched.id), untouched);
+  });
+
   it("tightens the per-request structured-output schema to current counts and target-ID allowlists", async () => {
     const value = await context("base", ADDRESS, "pl");
     const schema = buildAIResearchProviderJsonSchema(value);

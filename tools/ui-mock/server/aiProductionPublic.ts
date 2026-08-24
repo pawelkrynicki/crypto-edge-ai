@@ -43,31 +43,33 @@ export function presentAnalysis(
   guidance?: AIResearchGuidanceInput,
 ): AIProductionAnalysis {
   const copy = (value: { en: string; pl: string }) => value[locale];
+  const researchGuidance = presentAIResearchGuidance(brief, locale, guidance);
+  const isStale = stale || brief.research_state === "DATA_STALE";
   const insight = (title: string, detail: string): AIProductionInsight => ({ title, detail });
   const factByKey = (...keys: string[]) => brief.known_facts.find((item) => keys.includes(item.key));
   const riskByCategory = (...keys: string[]) => brief.risk_factors.find((item) => keys.includes(item.category));
   const factInsight = (item: AIResearchBrief["known_facts"][number] | undefined, title: string, unavailable: string) => item
-    ? insight(factLabel(item.key, locale), copy(item.interpretation))
+    ? insight(factLabel(item.key, locale), presentFactNarrative(item, locale, isStale))
     : insight(title, unavailable);
   const valuedFactInsight = (keys: string[], title: string, unavailable: string) => {
     const item = factByKey(...keys);
-    return item ? insight(factValueTitle(item, locale), copy(item.interpretation)) : insight(title, unavailable);
+    return item ? insight(factValueTitle(item, locale), presentFactNarrative(item, locale, isStale)) : insight(title, unavailable);
   };
   const riskInsight = (item: AIResearchBrief["risk_factors"][number] | undefined, title: string, unavailable: string) => item
-    ? insight(riskLabel(item.category, locale), copy(item.explanation))
+    ? insight(riskLabel(item.category, locale), presentRiskNarrative(item, locale, isStale))
     : insight(title, unavailable);
 
   const analysis: AIProductionAnalysis = {
     schema_version: "ai_production_analysis_v3",
-    analysis_summary: copy(brief.summary),
+    analysis_summary: presentSummaryNarrative(brief.summary, locale, researchGuidance.current_step.number),
     confirmed_findings: [...brief.known_facts]
       .sort((left, right) => factPriority(left.key) - factPriority(right.key))
       .slice(0, 3)
-      .map((item) => insight(factLabel(item.key, locale), copy(item.interpretation))),
+      .map((item) => insight(factLabel(item.key, locale), presentFactNarrative(item, locale, isStale))),
     risks: [...brief.risk_factors]
       .sort((left, right) => riskPriority(left.severity) - riskPriority(right.severity))
       .slice(0, 3)
-      .map((risk) => ({ title: riskLabel(risk.category, locale), detail: copy(risk.explanation), severity: risk.severity })),
+      .map((risk) => ({ title: riskLabel(risk.category, locale), detail: presentRiskNarrative(risk, locale, isStale), severity: risk.severity })),
     missing_data: [...brief.missing_information]
       .sort((left, right) => missingPriority(left.key) - missingPriority(right.key))
       .slice(0, 3)
@@ -92,11 +94,11 @@ export function presentAnalysis(
       locale === "pl" ? "Holderzy" : "Holders",
       locale === "pl" ? "Brak danych o strukturze holderów. Nie można ocenić koncentracji podaży." : "Holder structure data is unavailable. Supply concentration cannot be assessed.",
     ),
-    research_guidance: presentAIResearchGuidance(brief, locale, guidance),
+    research_guidance: researchGuidance,
     next_research_steps: [...brief.next_actions]
       .sort((left, right) => actionPriority(left.priority) - actionPriority(right.priority))
       .slice(0, 3)
-      .map((item) => ({ title: actionLabel(item.action_type, locale), detail: copy(item.reason), priority: item.priority })),
+      .map((item) => ({ title: actionLabel(item.action_type, locale), detail: presentActionNarrative(item.action_type, copy(item.reason), locale), priority: item.priority })),
     reassessment_signals: brief.status_change_conditions.slice(0, 3)
       .map((item) => insight(conditionLabel(item.key, locale), copy(item.explanation))),
     evidence: brief.source_references.map((item) => ({
@@ -111,6 +113,124 @@ export function presentAnalysis(
     analysis_version: brief.schema_version,
   };
   return validateAIProductionAnalysis(analysis);
+}
+
+function presentSummaryNarrative(
+  summary: { en: string; pl: string },
+  locale: AIResearchLocale,
+  currentStep: number,
+): string {
+  const value = summary[locale];
+  if (currentStep !== 1 || !claimsSecurityAsCurrentStep(value)) return value;
+  return locale === "pl"
+    ? "Bieżący etap to Szybki filtr. Przed kolejną oceną potrzebna jest świeża migawka danych."
+    : "The current stage is Quick Filter. A fresh data snapshot is needed before reassessment.";
+}
+
+function presentFactNarrative(
+  item: AIResearchBrief["known_facts"][number],
+  locale: AIResearchLocale,
+  stale: boolean,
+): string {
+  const value = item.interpretation[locale];
+  if (item.key === "market_cap_usd" && isGenericFactFallback(value)) return stale
+    ? fallbackCopy("market_cap", locale)
+    : locale === "pl"
+      ? "Zapisana kapitalizacja pochodzi z dostępnej migawki danych i stanowi część obecnego kontekstu rynkowego."
+      : "The recorded market-cap value comes from the available data snapshot and forms part of the current market context.";
+  if (item.key === "basic_filters" && isGenericFactFallback(value)) {
+    if (item.value === "passed_basic_filter" && stale) return fallbackCopy("basic_filters", locale);
+    return locale === "pl"
+      ? "Wynik podstawowych filtrów powinien zostać potwierdzony na aktualnej migawce danych."
+      : "The basic-filter result should be confirmed against a current data snapshot.";
+  }
+  if (item.key === "liquidity_usd" && typeof item.value === "number" && liquidityProseContradictsValue(value)) {
+    return stale ? fallbackCopy("liquidity", locale) : locale === "pl"
+      ? "Zapisana wartość płynności pochodzi z migawki skanera i daje kontekst dla obecnej analizy."
+      : "The recorded liquidity value comes from the scanner snapshot and provides context for the current analysis.";
+  }
+  return value;
+}
+
+function presentRiskNarrative(
+  item: AIResearchBrief["risk_factors"][number],
+  locale: AIResearchLocale,
+  stale: boolean,
+): string {
+  const value = item.explanation[locale];
+  return item.category === "freshness" && stale && isGenericRiskFallback(value)
+    ? fallbackCopy("freshness", locale)
+    : value;
+}
+
+function presentActionNarrative(action: string, fallback: string, locale: AIResearchLocale): string {
+  const copy: Record<string, [string, string]> = {
+    REVIEW_SECURITY: [
+      "Brakuje pełnej weryfikacji bezpieczeństwa. Otwórz sekcję Bezpieczeństwo i sprawdź brakujące kontrole.",
+      "Full security verification is missing. Open the Security section and review the outstanding checks.",
+    ],
+    OPEN_VERIFICATION: [
+      "Nie wszystkie dane mają niezależne potwierdzenie. Otwórz Weryfikację, aby sprawdzić dostępne źródła.",
+      "Not all data has independent confirmation. Open Verification to review the available sources.",
+    ],
+    WAIT_FOR_CHECKPOINT: [
+      "Do kolejnej oceny wróć po pojawieniu się nowego punktu kontrolnego lub świeższych danych.",
+      "Return for reassessment when a new checkpoint or fresher data becomes available.",
+    ],
+    REVIEW_CHECKPOINTS: [
+      "Sprawdź zapisane punkty kontrolne, aby porównać kolejne obserwacje.",
+      "Review the recorded checkpoints to compare successive observations.",
+    ],
+  };
+  return (copy[action] ?? [fallback, fallback])[locale === "pl" ? 0 : 1];
+}
+
+function fallbackCopy(key: "market_cap" | "basic_filters" | "freshness" | "liquidity", locale: AIResearchLocale): string {
+  const copy: Record<typeof key, [string, string]> = {
+    market_cap: [
+      "Ostatnia zapisana kapitalizacja pochodzi z dostępnej migawki danych. Wartość pozostaje częścią obecnego kontekstu, ale przed ponowną oceną wymaga aktualnej migawki.",
+      "The last recorded market-cap value comes from the available data snapshot. It remains part of the current context, but a fresh snapshot is required before reassessment.",
+    ],
+    basic_filters: [
+      "Podstawowe filtry zostały wcześniej zaliczone. Obecny blocker dotyczy świeżości danych, dlatego wynik filtrów powinien zostać potwierdzony na nowej migawce.",
+      "The basic filters previously passed. The current blocker is data freshness, so the filter result should be confirmed against a new snapshot.",
+    ],
+    freshness: [
+      "Obecna migawka jest zbyt stara do ponownej oceny. Do czasu publikacji świeższych danych aktualny stan należy traktować jako wymagający potwierdzenia.",
+      "The current snapshot is too old for reassessment. Until fresher data is published, the current state should be treated as requiring confirmation.",
+    ],
+    liquidity: [
+      "Ostatnia zapisana wartość płynności pochodzi z migawki skanera. Wartość daje kontekst dla obecnej analizy, ale przed ponowną oceną wymaga potwierdzenia na świeższej migawce.",
+      "The last recorded liquidity value comes from the scanner snapshot. It provides context for the current analysis, but should be confirmed against a fresher snapshot before reassessment.",
+    ],
+  };
+  return copy[key][locale === "pl" ? 0 : 1];
+}
+
+function isGenericFactFallback(value: string): boolean {
+  return [
+    "This recorded fact adds context within the current evidence set.",
+    "Ten zapisany fakt uzupełnia obecny zestaw danych.",
+    "This recorded fact adds context to the research view.",
+    "Ten zapisany fakt uzupełnia obecną analizę.",
+  ].includes(value);
+}
+
+function isGenericRiskFallback(value: string): boolean {
+  return [
+    "This recorded risk remains part of the current evidence context.",
+    "To zapisane ryzyko pozostaje częścią obecnego kontekstu danych.",
+    "This recorded risk remains part of the listed evidence context.",
+    "To zapisane ryzyko pozostaje częścią wskazanego kontekstu danych.",
+  ].includes(value);
+}
+
+function liquidityProseContradictsValue(value: string): boolean {
+  return /(?:exact|numeric)(?:\s+(?:numeric|numerical|exact))?\s+(?:liquidity\s+)?(?:values?|details?).{0,80}(?:not\s+(?:present|available|included)|absent)|(?:dokładne\s+)?wartości\s+(?:liczbowe\s+)?(?:płynności\s+)?(?:nie\s+(?:są|znajdują)|brak)/iu.test(value);
+}
+
+function claimsSecurityAsCurrentStep(value: string): boolean {
+  return /(?:the\s+)?current(?:\s+(?:research|playbook))?\s+(?:step|stage)\s+(?:is|remains|focuses on)\s+(?:the\s+)?security|security[- ]focused\s+(?:(?:research|playbook)\s+)?(?:step|stage)|(?:bieżący|obecny)\s+(?:krok|etap)\s+(?:jest|pozostaje|dotyczy)\s+(?:skupiony\s+na\s+)?bezpieczeństw\w*|(?:krok|etap)\s+badawczy\s+skoncentrowan\w*\s+na\s+bezpieczeństw\w*|skoncentrowan\w*\s+na\s+bezpieczeństw\w*/iu.test(value);
 }
 
 function riskPriority(value: AIProductionRisk["severity"]): number {

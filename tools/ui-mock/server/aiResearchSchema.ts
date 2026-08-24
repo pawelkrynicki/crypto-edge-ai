@@ -250,8 +250,8 @@ function composeProviderNarrative(
       acceptedProviderSlotCount += 1;
       continue;
     }
-    binding.en = deterministicDescriptiveFallback(target, "en", binding.support_ids, context);
-    binding.pl = deterministicDescriptiveFallback(target, "pl", binding.support_ids, context);
+    binding.en = deterministicDescriptiveFallback(target, binding.id, "en", binding.support_ids, context);
+    binding.pl = deterministicDescriptiveFallback(target, binding.id, "pl", binding.support_ids, context);
     slotFallbacks.push({
       classification: "SLOT_SEMANTIC_FALLBACK",
       target,
@@ -270,6 +270,7 @@ function composeProviderNarrative(
 
 function deterministicDescriptiveFallback(
   target: AIResearchSlotFallback["target"],
+  slotId: string,
   locale: "en" | "pl",
   supportIds: string[],
   context: AIResearchContext,
@@ -278,7 +279,38 @@ function deterministicDescriptiveFallback(
   // retained only for ownership/audit; no provider wording or untrusted value
   // is copied into the replacement.
   void supportIds;
-  void context;
+  const stale = context.research_state === "DATA_STALE";
+  const factKey = target === "fact" ? slotId.slice("fact:".length) : null;
+  const riskIndex = target === "risk" ? Number(slotId.slice("risk:".length)) : -1;
+  const riskCategory = Number.isInteger(riskIndex) ? context.risk_candidates[riskIndex]?.category : null;
+  if (factKey === "market_cap_usd") {
+    if (stale) return locale === "pl"
+      ? "Ostatnia zapisana kapitalizacja pochodzi z dostępnej migawki danych. Wartość pozostaje częścią obecnego kontekstu, ale przed ponowną oceną wymaga aktualnej migawki."
+      : "The last recorded market-cap value comes from the available data snapshot. It remains part of the current context, but a fresh snapshot is required before reassessment.";
+    return locale === "pl"
+      ? "Zapisana kapitalizacja pochodzi z dostępnej migawki danych i stanowi część obecnego kontekstu rynkowego."
+      : "The recorded market-cap value comes from the available data snapshot and forms part of the current market context.";
+  }
+  if (factKey === "basic_filters") {
+    const passed = context.fact_candidates.find(({ key }) => key === "basic_filters")?.value === "passed_basic_filter";
+    if (passed && stale) return locale === "pl"
+      ? "Podstawowe filtry zostały wcześniej zaliczone. Obecny blocker dotyczy świeżości danych, dlatego wynik filtrów powinien zostać potwierdzony na nowej migawce."
+      : "The basic filters previously passed. The current blocker is data freshness, so the filter result should be confirmed against a new snapshot.";
+    return locale === "pl"
+      ? "Wynik podstawowych filtrów powinien zostać potwierdzony na aktualnej migawce danych."
+      : "The basic-filter result should be confirmed against a current data snapshot.";
+  }
+  if (factKey === "liquidity_usd") {
+    if (stale) return locale === "pl"
+      ? "Ostatnia zapisana wartość płynności pochodzi z migawki skanera. Wartość daje kontekst dla obecnej analizy, ale przed ponowną oceną wymaga potwierdzenia na świeższej migawce."
+      : "The last recorded liquidity value comes from the scanner snapshot. It provides context for the current analysis, but should be confirmed against a fresher snapshot before reassessment.";
+    return locale === "pl"
+      ? "Zapisana wartość płynności pochodzi z migawki skanera i daje kontekst dla obecnej analizy."
+      : "The recorded liquidity value comes from the scanner snapshot and provides context for the current analysis.";
+  }
+  if (riskCategory === "freshness") return locale === "pl"
+    ? "Obecna migawka jest zbyt stara do ponownej oceny. Do czasu publikacji świeższych danych aktualny stan należy traktować jako wymagający potwierdzenia."
+    : "The current snapshot is too old for reassessment. Until fresher data is published, the current state should be treated as requiring confirmation.";
   const text = {
     en: {
       summary: "The recorded evidence describes the current research context without resolving the remaining gaps.",
@@ -313,11 +345,17 @@ function narrativePresentationViolations(
   if (hasIncompleteNarrative([value])) violations.push("INCOMPLETE_NARRATIVE");
   if (hasTruncatedNarrative([value])) violations.push("TRUNCATED_NARRATIVE");
   if (hasInstructionalNarrative([value])) violations.push("INSTRUCTIONAL_NARRATIVE");
+  if (hasCurrentStepContradiction(value, context)) violations.push("CURRENT_STEP_BOUNDARY_VIOLATION");
   if (hasOutOfScopeDomain([value], context)) violations.push("CURRENT_STEP_BOUNDARY_VIOLATION");
   if (hasUnsupportedEntityOrCapability([value], context)) violations.push("UNSUPPORTED_ENTITY_OR_CAPABILITY");
   if (hasUnsupportedSource([value], context)) violations.push("UNSUPPORTED_SOURCE");
   if (hasUnsupportedInference([value])) violations.push("UNSUPPORTED_INFERENCE");
   return violations;
+}
+
+function hasCurrentStepContradiction(value: string, context: AIResearchContext): boolean {
+  if (context.narrative_contract.research_playbook.current_step !== 1) return false;
+  return /(?:the\s+)?current(?:\s+(?:research|playbook))?\s+(?:step|stage)\s+(?:is|remains|focuses on)\s+(?:the\s+)?security|security[- ]focused\s+(?:(?:research|playbook)\s+)?(?:step|stage)|(?:bieżący|obecny)\s+(?:krok|etap)\s+(?:jest|pozostaje|dotyczy)\s+(?:skupiony\s+na\s+)?bezpieczeństw\w*|(?:krok|etap)\s+badawczy\s+skoncentrowan\w*\s+na\s+bezpieczeństw\w*|skoncentrowan\w*\s+na\s+bezpieczeństw\w*/iu.test(value);
 }
 
 export function auditAIResearchSemanticQuality(value: unknown, context: AIResearchContext): AIResearchSemanticViolation[] {
@@ -667,10 +705,13 @@ function hasTruncatedNarrative(strings: string[]): boolean {
 
 /** Provider prose may explain server-issued actions, never issue an instruction. */
 function hasInstructionalNarrative(strings: string[]): boolean {
-  return strings.some((value) => splitSentences(value).some((sentence) => (
-    /^(?:review|check|inspect|investigate|perform|run|open|verify|wait|use|sprawdź|przejrzyj|zbadaj|uruchom|otwórz|zweryfikuj|poczekaj|użyj)\b/iu.test(sentence.trim())
-      || /\b(?:you|your|you should|you need(?: to)?|must\b|should\b|need(?:s| to)?\b|należy|powinien(?:eś|eś|naś)?|trzeba\b|musisz|potrzebujesz|twoj\w*)\b/iu.test(sentence)
-  )));
+  return strings.some((value) => splitSentences(value).some((sentence) => {
+    const deterministicPosture = /\b(?:should be (?:confirmed|treated)|należy traktować|powinien zostać potwierdzony)\b/iu.test(sentence);
+    return !deterministicPosture && (
+      /^(?:review|check|inspect|investigate|perform|run|open|verify|wait|use|sprawdź|przejrzyj|zbadaj|uruchom|otwórz|zweryfikuj|poczekaj|użyj)\b/iu.test(sentence.trim())
+        || /\b(?:you|your|you should|you need(?: to)?|must\b|should\b|need(?:s| to)?\b|należy|powinien(?:eś|eś|naś)?|trzeba\b|musisz|potrzebujesz|twoj\w*)\b/iu.test(sentence)
+    );
+  }));
 }
 
 type NarrativeDomain = "onchain" | "social" | "team" | "docs" | "narrative" | "unsupported";

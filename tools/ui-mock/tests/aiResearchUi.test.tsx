@@ -417,11 +417,11 @@ describe("PC.2 action-first research guidance", () => {
     assert.match(analysis.research_guidance.filter_failures[0]!.requirement, /300\s?000 USD/);
     assert.match(analysis.research_guidance.filter_failures[1]!.requirement, /30\s?000 USD/);
     assert.match(analysis.research_guidance.filter_failures[2]!.requirement, /30\s?000 USD/);
-    assert.deepEqual(analysis.research_guidance.actions.map(({ title }) => title), ["Poczekaj na świeżą migawkę"]);
+    assert.deepEqual(analysis.research_guidance.actions.map(({ title }) => title), ["Poczekaj na aktualizację danych"]);
     assert.equal(analysis.research_guidance.actions[0]!.cta, null);
-    assert.match(analysis.research_guidance.actions[0]!.why, /System automatycznie ponownie przeliczy podstawowe filtry/);
-    assert.match(analysis.research_guidance.actions[0]!.resolves, /JEŻELI FILTRY NADAL NIE PRZEJDĄ: Token pozostaje w Kroku 1/);
-    assert.match(analysis.research_guidance.actions[0]!.resolves, /JEŻELI WSZYSTKIE WYMAGANE FILTRY PRZEJDĄ: Następny etap: Krok 2\/7 — Deal Breakers \/ Security/);
+    assert.match(analysis.research_guidance.actions[0]!.why, /Nowa migawka zostanie opublikowana przez centralny system danych/);
+    assert.match(analysis.research_guidance.actions[0]!.resolves, /Po pojawieniu się nowej migawki odśwież widok/);
+    assert.match(analysis.research_guidance.actions[0]!.resolves, /Jeśli filtry nadal nie przejdą, token pozostanie w Kroku 1 — Szybki filtr/);
     assert.deepEqual(analysis.research_guidance.unlock_conditions, [
       "Świeża migawka danych",
       "Kapitalizacja: spełnia wymagany próg",
@@ -431,7 +431,8 @@ describe("PC.2 action-first research guidance", () => {
     assert.match(markup, /Krok 1\/7 — SZYBKI FILTR/);
     assert.match(markup, /KROK 1 NIEZALICZONY/);
     assert.match(markup, /Dalszy research jest wstrzymany do kolejnej świeżej migawki/);
-    assert.match(markup, /Poczekaj na świeżą migawkę/);
+    assert.match(markup, /Poczekaj na aktualizację danych/);
+    assert.doesNotMatch(markup, /Odśwież dane|Poczekaj na świeżą migawkę/);
     assert.doesNotMatch(markup, /Sprawdź dokładne wyniki filtrów/);
     assert.match(markup, /DOKŁADNE WYNIKI FILTRÓW/);
     assert.match(markup, /JEŚLI TOKEN PRZEJDZIE KROK 1/);
@@ -451,11 +452,91 @@ describe("PC.2 action-first research guidance", () => {
     assert.deepEqual(analysis.research_guidance.current_step, {
       number: 1,
       title: "QUICK FILTER",
-      posture: "REFRESH DATA",
+      posture: "AWAITING DATA UPDATE",
       posture_detail: "Basic filters remain passed; only data freshness is awaiting the next snapshot.",
     });
     assert.doesNotMatch(analysis.research_guidance.current_step.posture, /NOT PASSED/);
-    assert.deepEqual(analysis.research_guidance.actions.map(({ title }) => title), ["Refresh the data", "Review the exact filter results"]);
+    assert.deepEqual(analysis.research_guidance.actions.map(({ title }) => title), ["Wait for the data update", "Review the exact filter results"]);
+    assert.equal(analysis.research_guidance.actions[0]!.cta?.href, "#external-checks");
+    assert.match(analysis.research_guidance.actions[0]!.why, /central data system/);
+    assert.match(analysis.research_guidance.actions[0]!.resolves, /Refresh the view after the new snapshot appears/);
+  });
+
+  it("repairs legacy Quick Filter presentation at read time without changing accepted evidence, action targets, or cache-backed data", () => {
+    const stored = structuredClone(briefPl);
+    stored.research_state = "DATA_STALE";
+    stored.summary = {
+      en: "The review is operating under the security-focused playbook step.",
+      pl: "Analiza przebiega według kroku badawczego skoncentrowanego na bezpieczeństwie.",
+    };
+    const marketCap = stored.known_facts.find(({ key }) => key === "market_cap_usd");
+    const basicFilters = stored.known_facts.find(({ key }) => key === "basic_filters");
+    const liquidity = stored.known_facts.find(({ key }) => key === "liquidity_usd");
+    const freshnessRisk = stored.risk_factors[0];
+    assert.ok(marketCap && basicFilters && liquidity && freshnessRisk);
+    assert.equal(basicFilters.value, "passed_basic_filter");
+    assert.equal(typeof liquidity.value, "number");
+    marketCap.interpretation = bilingualText(
+      "This recorded fact adds context within the current evidence set.",
+      "Ten zapisany fakt uzupełnia obecny zestaw danych.",
+    );
+    basicFilters.interpretation = bilingualText(
+      "This recorded fact adds context within the current evidence set.",
+      "Ten zapisany fakt uzupełnia obecny zestaw danych.",
+    );
+    liquidity.interpretation = bilingualText(
+      "Liquidity entries appear in the scanner snapshot metadata while exact numeric details are not present in the provided evidence. The snapshot gives structural context for liquidity but lacks fresh numeric confirmation.",
+      "Dane dotyczące płynności pojawiają się w metadanych migawki skanera, podczas gdy dokładne wartości liczbowe nie znajdują się w dostarczonych dowodach. Migawka zapewnia kontekst strukturalny płynności, ale brak w niej świeżej numerycznej weryfikacji.",
+    );
+    freshnessRisk.category = "freshness";
+    freshnessRisk.explanation = bilingualText(
+      "This recorded risk remains part of the current evidence context.",
+      "To zapisane ryzyko pozostaje częścią obecnego kontekstu danych.",
+    );
+    const storedActionSkeleton = structuredClone(stored.next_actions);
+    const storedSources = structuredClone(stored.source_references);
+    const input = structuredClone(context.guidance);
+    input.freshness = "STALE";
+    input.filters = { ...input.filters, status: "passed_basic_filter", reasons: [] };
+    input.action_catalog = guidanceActions("pl", ["WAIT_FOR_CHECKPOINT", "REVIEW_SECURITY", "OPEN_VERIFICATION"]);
+
+    const pl = presentAnalysis(stored, true, "pl", input);
+    const en = presentAnalysis(stored, true, "en", {
+      ...input,
+      action_catalog: guidanceActions("en", ["WAIT_FOR_CHECKPOINT", "REVIEW_SECURITY", "OPEN_VERIFICATION"]),
+    });
+
+    assert.equal(pl.research_guidance.current_step.title, "SZYBKI FILTR");
+    assert.equal(en.research_guidance.current_step.title, "QUICK FILTER");
+    assert.doesNotMatch(pl.analysis_summary, /skoncentrowan\w* na bezpieczeństw/i);
+    assert.doesNotMatch(en.analysis_summary, /security-focused (?:research|playbook) step/i);
+    assert.equal(pl.analysis_summary, "Bieżący etap to Szybki filtr. Przed kolejną oceną potrzebna jest świeża migawka danych.");
+    assert.equal(en.analysis_summary, "The current stage is Quick Filter. A fresh data snapshot is needed before reassessment.");
+    assert.equal(pl.confirmed_findings.find(({ title }) => title === "Kapitalizacja")?.detail, "Ostatnia zapisana kapitalizacja pochodzi z dostępnej migawki danych. Wartość pozostaje częścią obecnego kontekstu, ale przed ponowną oceną wymaga aktualnej migawki.");
+    assert.equal(en.confirmed_findings.find(({ title }) => title === "Market cap")?.detail, "The last recorded market-cap value comes from the available data snapshot. It remains part of the current context, but a fresh snapshot is required before reassessment.");
+    assert.equal(pl.confirmed_findings.find(({ title }) => title === "Podstawowe filtry")?.detail, "Podstawowe filtry zostały wcześniej zaliczone. Obecny blocker dotyczy świeżości danych, dlatego wynik filtrów powinien zostać potwierdzony na nowej migawce.");
+    assert.equal(en.confirmed_findings.find(({ title }) => title === "Basic filters")?.detail, "The basic filters previously passed. The current blocker is data freshness, so the filter result should be confirmed against a new snapshot.");
+    assert.equal(pl.risks.find(({ title }) => title === "Świeżość danych")?.detail, "Obecna migawka jest zbyt stara do ponownej oceny. Do czasu publikacji świeższych danych aktualny stan należy traktować jako wymagający potwierdzenia.");
+    assert.equal(en.risks.find(({ title }) => title === "Data freshness")?.detail, "The current snapshot is too old for reassessment. Until fresher data is published, the current state should be treated as requiring confirmation.");
+    assert.match(pl.liquidity_context.title, /^Płynność: \d/);
+    assert.match(en.liquidity_context.title, /^Liquidity: \$?\d/);
+    assert.equal(pl.liquidity_context.detail, "Ostatnia zapisana wartość płynności pochodzi z migawki skanera. Wartość daje kontekst dla obecnej analizy, ale przed ponowną oceną wymaga potwierdzenia na świeższej migawce.");
+    assert.equal(en.liquidity_context.detail, "The last recorded liquidity value comes from the scanner snapshot. It provides context for the current analysis, but should be confirmed against a fresher snapshot before reassessment.");
+    assert.doesNotMatch(pl.liquidity_context.detail, /dokładne wartości liczbowe nie znajdują się/i);
+    assert.doesNotMatch(en.liquidity_context.detail, /exact numeric details are not present/i);
+    assert.deepEqual(pl.research_guidance.actions.map(({ title }) => title), ["Poczekaj na aktualizację danych", "Sprawdź dokładne wyniki filtrów"]);
+    assert.equal(pl.research_guidance.actions[0]!.cta?.href, "#external-checks");
+    assert.match(pl.research_guidance.actions[0]!.why, /centralny system danych/);
+    assert.match(pl.research_guidance.actions[0]!.resolves, /odśwież widok/);
+    assert.deepEqual(stored.next_actions, storedActionSkeleton);
+    assert.deepEqual(stored.source_references, storedSources);
+    const priority = { primary: 0, secondary: 1, tertiary: 2 } as const;
+    assert.deepEqual(
+      pl.next_research_steps.map(({ priority }) => priority),
+      [...storedActionSkeleton].sort((left, right) => priority[left.priority] - priority[right.priority]).slice(0, 3).map(({ priority }) => priority),
+    );
+    assert.match(pl.next_research_steps.map(({ detail }) => detail).join(" "), /Brakuje pełnej weryfikacji bezpieczeństwa|Nie wszystkie dane mają niezależne potwierdzenie|Do kolejnej oceny wróć/);
+    assert.match(en.next_research_steps.map(({ detail }) => detail).join(" "), /Full security verification is missing|Not all data has independent confirmation|Return for reassessment/);
   });
 
   it("selects Security before on-chain research when filters pass but security is incomplete", () => {
