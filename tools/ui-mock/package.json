@@ -29,7 +29,7 @@
     "test:premium-ui2": "node --import tsx --test tests/premiumUi2Pass.test.ts",
     "test:flow1": "node --import tsx --test tests/tokenFlow.test.ts tests/followUpBasket.test.ts tests/establishedPromotion.test.ts tests/establishedPromotionUi.test.tsx",
     "test:ux1": "node --import tsx --test tests/interactionAffordance.test.ts",
-    "test:ai1": "node --import tsx --test tests/aiResearchContracts.test.ts tests/aiResearchSemanticQuality.test.ts tests/aiResearchUi.test.tsx",
+    "test:ai1": "node --import tsx --test tests/aiResearchContracts.test.ts tests/aiResearchSemanticQuality.test.ts tests/aiResearchNarrativeV5.test.ts tests/aiResearchUi.test.tsx",
     "test:ai2": "node --import tsx --test tests/aiResearchLiveValidation.test.ts",
     "test:ai3": "node --import tsx --test tests/aiResearchQueue.test.ts tests/aiResearchApiQueue.test.ts",
     "test:ai3-launcher": "node --import tsx --test tests/aiResearchLauncherContract.test.ts",

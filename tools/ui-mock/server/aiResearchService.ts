@@ -114,6 +114,7 @@ export function createAIResearchService(options: AIResearchServiceOptions = {}) 
       locale: "en",
       snapshot_fingerprint: context.snapshot_fingerprint,
       prompt_version: context.prompt_version,
+      narrative_contract_version: AI_RESEARCH_NARRATIVE_VERSION,
       model_id: modelId,
       analysis_schema_version: AI_RESEARCH_SCHEMA_VERSION,
     });
@@ -259,6 +260,7 @@ export function hydrateAIResearchBrief(
     identity: context.identity,
     snapshot_fingerprint: context.snapshot_fingerprint,
     prompt_version: context.prompt_version,
+    narrative_contract_version: AI_RESEARCH_NARRATIVE_VERSION,
     model,
   }));
   const base = {
@@ -272,7 +274,7 @@ export function hydrateAIResearchBrief(
     generated_at: generatedAt.toISOString(),
     data_generated_at: context.data_generated_at,
     research_state: context.research_state,
-    summary: narrative.summary,
+    summary: { en: narrative.summary.en, pl: narrative.summary.pl },
     known_facts: context.fact_candidates.map((fact, index) => ({
       ...fact,
       interpretation: { en: narrative.fact_narratives[index]!.en, pl: narrative.fact_narratives[index]!.pl },
@@ -429,28 +431,37 @@ export function buildDeterministicPreview(context: AIResearchContext, generatedA
   };
   const narrative: AIResearchProviderNarrative = {
     narrative_version: AI_RESEARCH_NARRATIVE_VERSION,
-    summary: bilingual(
-      "The snapshot provides market and liquidity context, but the most important research blockers remain the missing security and supporting verification evidence. Use the recorded facts to guide the next check, not as a conclusion about the project.",
-      "Migawka zawiera kontekst rynkowy i płynnościowy, ale najważniejszymi blokadami analizy pozostają brak danych bezpieczeństwa i dodatkowej weryfikacji. Zapisane fakty pomagają wybrać kolejny krok, ale nie są oceną projektu.",
-    ),
+    summary: {
+      id: context.narrative_contract.slots.summary.id,
+      support_ids: [context.narrative_contract.slots.summary.allowed_support_ids[0]!],
+      ...bilingual(
+        "The snapshot provides market and liquidity context, but the most important research blockers remain the missing security and supporting verification evidence. The recorded facts guide the current review without concluding anything about the project.",
+        "Migawka zawiera kontekst rynkowy i płynnościowy, ale najważniejszymi blokadami analizy pozostają brak danych bezpieczeństwa i dodatkowej weryfikacji. Zapisane fakty prowadzą bieżącą analizę, ale nie są oceną projektu.",
+      ),
+    },
     fact_narratives: context.fact_candidates.map((fact) => ({
       id: aiResearchNarrativeId("fact", fact.key),
+      support_ids: [context.narrative_contract.slots.facts.find(({ id }) => id === aiResearchNarrativeId("fact", fact.key))!.allowed_support_ids[0]!],
       ...factNarrative(fact),
     })),
     risk_narratives: context.risk_candidates.map((risk, index) => ({
       id: aiResearchNarrativeId("risk", index),
+      support_ids: [context.narrative_contract.slots.risks[index]!.allowed_support_ids[0]!],
       ...riskNarrative(risk.category),
     })),
     missing_narratives: context.missing_information.map((item) => ({
       id: aiResearchNarrativeId("missing", item.key),
+      support_ids: [context.narrative_contract.slots.missing_information.find(({ id }) => id === aiResearchNarrativeId("missing", item.key))!.allowed_support_ids[0]!],
       ...missingNarrative(item.key),
     })),
     action_narratives: context.action_catalog.map((action, index) => ({
       id: aiResearchNarrativeId("action", index),
+      support_ids: [context.narrative_contract.slots.actions[index]!.allowed_support_ids[0]!],
       ...actionNarrative(action.action_type),
     })),
     status_change_narratives: context.status_change_conditions.map((condition) => ({
       id: aiResearchNarrativeId("condition", condition.key),
+      support_ids: [context.narrative_contract.slots.status_change_conditions.find(({ id }) => id === aiResearchNarrativeId("condition", condition.key))!.allowed_support_ids[0]!],
       ...statusConditionNarrative(condition.key),
     })),
   };

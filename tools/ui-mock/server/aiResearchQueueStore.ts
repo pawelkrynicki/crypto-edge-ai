@@ -14,6 +14,7 @@ import {
 } from "../src/types/aiResearchTypes.js";
 import { resolveTokenIdentity } from "../src/tokenLifecycle.js";
 import { sha256, stableJson } from "./aiResearchContext.js";
+import { AI_RESEARCH_NARRATIVE_VERSION } from "./aiResearchNarrativeContract.js";
 import { validateStoredAIResearchBrief } from "./aiResearchSchema.js";
 
 type SqliteRunResult = { changes?: number | bigint };
@@ -53,6 +54,7 @@ export type AIAnalysisCacheIdentity = {
   contract_address: string;
   snapshot_fingerprint: string;
   prompt_version: string;
+  narrative_contract_version: string | null;
   model_id: string;
   analysis_schema_version: string;
   locale: AIResearchLocale;
@@ -171,6 +173,7 @@ export function buildAIAnalysisCacheIdentity(input: {
   contract_address: string;
   snapshot_fingerprint: string;
   prompt_version?: string;
+  narrative_contract_version?: string;
   model_id: string;
   analysis_schema_version?: string;
   locale: AIResearchLocale;
@@ -179,6 +182,7 @@ export function buildAIAnalysisCacheIdentity(input: {
   if (identity.status !== "valid"
     || !/^[0-9a-f]{64}$/.test(input.snapshot_fingerprint)
     || !safeVersion(input.prompt_version ?? AI_RESEARCH_PROMPT_VERSION)
+    || !safeVersion(input.narrative_contract_version ?? AI_RESEARCH_NARRATIVE_VERSION)
     || !safeVersion(input.model_id)
     || !safeVersion(input.analysis_schema_version ?? AI_RESEARCH_SCHEMA_VERSION)) {
     throw new AIAnalysisQueueStoreError("STORE_SCHEMA_INVALID");
@@ -189,6 +193,7 @@ export function buildAIAnalysisCacheIdentity(input: {
     contract_address: identity.contract_address,
     model_id: input.model_id,
     prompt_version: input.prompt_version ?? AI_RESEARCH_PROMPT_VERSION,
+    narrative_contract_version: input.narrative_contract_version ?? AI_RESEARCH_NARRATIVE_VERSION,
     snapshot_fingerprint: input.snapshot_fingerprint,
   };
   // The legacy database column is retained for compatibility. Production writes use
@@ -240,12 +245,13 @@ export async function createAIAnalysisQueueStore(options: AIAnalysisQueueStoreOp
       return requireDb().prepare(`
 SELECT * FROM crypto_ai_analysis_queue
 WHERE chain = ? AND contract_address = ? AND prompt_version = ?
-  AND model_id = ? AND analysis_schema_version = ? AND result_json IS NOT NULL AND validation_status = 'VALID'
+  AND narrative_contract_version = ? AND model_id = ? AND analysis_schema_version = ? AND result_json IS NOT NULL AND validation_status = 'VALID'
 ORDER BY completed_at DESC LIMIT 20
 `).all(
         identity.chain,
         identity.contract_address,
         identity.prompt_version,
+        identity.narrative_contract_version,
         identity.model_id,
         identity.analysis_schema_version,
       ).flatMap((row) => {
@@ -306,12 +312,12 @@ WHERE cache_key = ?
         } else {
           db.prepare(`
 INSERT INTO crypto_ai_analysis_queue (
-  analysis_id, cache_key, chain, contract_address, snapshot_fingerprint, prompt_version, model_id,
+  analysis_id, cache_key, chain, contract_address, snapshot_fingerprint, prompt_version, narrative_contract_version, model_id,
   analysis_schema_version, locale, status, requested_at, queued_at, attempt_count, result_json,
   validation_status, safe_error_code, prompt_tokens, completion_tokens, total_tokens, latency_ms,
   provider_response_id, provider_attempt_count, provider_attempt_started_at, provider_attempt_completed_at,
   provider_attempt_status, provider_attempt_safe_error_code, failure_stage, lease_owner, lease_expires_at, created_at, updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'QUEUED', ?, ?, 0, NULL, 'PENDING', NULL, 0, 0, 0, NULL, NULL, 0, NULL, NULL, 'NOT_ATTEMPTED', NULL, NULL, NULL, NULL, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'QUEUED', ?, ?, 0, NULL, 'PENDING', NULL, 0, 0, 0, NULL, NULL, 0, NULL, NULL, 'NOT_ATTEMPTED', NULL, NULL, NULL, NULL, ?, ?)
 `).run(
             `air_${randomUUID()}`,
             input.identity.cache_key,
@@ -319,6 +325,7 @@ INSERT INTO crypto_ai_analysis_queue (
             input.identity.contract_address,
             input.identity.snapshot_fingerprint,
             input.identity.prompt_version,
+            input.identity.narrative_contract_version,
             input.identity.model_id,
             input.identity.analysis_schema_version,
             input.identity.locale,
@@ -521,6 +528,7 @@ SELECT * FROM crypto_ai_analysis_queue WHERE analysis_id = ? AND status = 'PROCE
           contract_address: brief.identity.contract_address,
           snapshot_fingerprint: brief.snapshot_fingerprint,
           prompt_version: brief.prompt_version,
+          narrative_contract_version: owned.narrative_contract_version ?? "legacy",
           model_id: brief.model,
           analysis_schema_version: brief.schema_version,
           locale: "en",
@@ -765,6 +773,7 @@ CREATE TABLE IF NOT EXISTS crypto_ai_analysis_queue (
   contract_address TEXT NOT NULL,
   snapshot_fingerprint TEXT NOT NULL,
   prompt_version TEXT NOT NULL,
+  narrative_contract_version TEXT,
   model_id TEXT NOT NULL,
   analysis_schema_version TEXT NOT NULL,
   locale TEXT NOT NULL CHECK (locale IN ('pl','en')),
@@ -837,6 +846,7 @@ VALUES (1, 'CLOSED', 0, NULL, 0, '1970-01-01T00:00:00.000Z');
 PRAGMA user_version = 1;
 `);
   ensureQueueColumn(database, "provider_attempt_count", "INTEGER NOT NULL DEFAULT 0 CHECK (provider_attempt_count >= 0)");
+  ensureQueueColumn(database, "narrative_contract_version", "TEXT");
   ensureQueueColumn(database, "provider_attempt_started_at", "TEXT");
   ensureQueueColumn(database, "provider_attempt_completed_at", "TEXT");
   ensureQueueColumn(database, "provider_attempt_status", "TEXT NOT NULL DEFAULT 'NOT_ATTEMPTED' CHECK (provider_attempt_status IN ('NOT_ATTEMPTED','STARTED','RESPONSE_RECEIVED','FAILED'))");
@@ -848,7 +858,7 @@ PRAGMA user_version = 1;
   ensureQueueColumn(database, "internal_provider_output_tokens", "INTEGER CHECK (internal_provider_output_tokens IS NULL OR internal_provider_output_tokens >= 0)");
   ensureQueueColumn(database, "internal_provider_reasoning_tokens", "INTEGER CHECK (internal_provider_reasoning_tokens IS NULL OR internal_provider_reasoning_tokens >= 0)");
   ensureQueueColumn(database, "failure_stage", "TEXT CHECK (failure_stage IN ('CONTEXT_BUILD','IDENTITY_CHECK','CIRCUIT','PROVIDER_CALL','PROVIDER_RESPONSE','PROVIDER_PARSE','HYDRATE','STORE_COMPLETE','USAGE_RECORD','UNKNOWN'))");
-  database.exec("PRAGMA user_version = 4");
+  database.exec("PRAGMA user_version = 5");
 }
 
 function ensureQueueColumn(database: SqliteDatabase, name: string, definition: string): void {
@@ -860,7 +870,7 @@ function assertSchema(database: SqliteDatabase): void {
   const columns = database.prepare("PRAGMA table_info(crypto_ai_analysis_queue)").all();
   const names = new Set(columns.map((row) => isRecord(row) ? row.name : null));
   const required = [
-    "analysis_id", "cache_key", "chain", "contract_address", "snapshot_fingerprint", "prompt_version",
+    "analysis_id", "cache_key", "chain", "contract_address", "snapshot_fingerprint", "prompt_version", "narrative_contract_version",
     "model_id", "analysis_schema_version", "status", "requested_at", "queued_at", "started_at", "completed_at",
     "failed_at", "next_retry_at", "attempt_count", "result_json", "validation_status", "safe_error_code",
     "prompt_tokens", "completion_tokens", "total_tokens", "latency_ms", "provider_response_id",
@@ -880,6 +890,7 @@ function safeRecord(value: unknown): AIAnalysisQueueRecord | null {
     || typeof value.contract_address !== "string"
     || typeof value.snapshot_fingerprint !== "string"
     || typeof value.prompt_version !== "string"
+    || (value.narrative_contract_version !== null && typeof value.narrative_contract_version !== "string")
     || typeof value.model_id !== "string"
     || typeof value.analysis_schema_version !== "string"
     || (value.locale !== "pl" && value.locale !== "en")
@@ -893,6 +904,7 @@ function safeRecord(value: unknown): AIAnalysisQueueRecord | null {
     contract_address: value.contract_address,
     snapshot_fingerprint: value.snapshot_fingerprint,
     prompt_version: value.prompt_version,
+    narrative_contract_version: stringField(value.narrative_contract_version),
     model_id: value.model_id,
     analysis_schema_version: value.analysis_schema_version,
     locale: value.locale,
@@ -944,12 +956,13 @@ function findLastKnownGood(
   const rows = database.prepare(`
 SELECT * FROM crypto_ai_analysis_queue
 WHERE chain = ? AND contract_address = ? AND prompt_version = ?
-  AND model_id = ? AND analysis_schema_version = ? AND result_json IS NOT NULL AND validation_status = 'VALID'
+  AND narrative_contract_version = ? AND model_id = ? AND analysis_schema_version = ? AND result_json IS NOT NULL AND validation_status = 'VALID'
 ORDER BY completed_at DESC LIMIT 20
 `).all(
     identity.chain,
     identity.contract_address,
     identity.prompt_version,
+    identity.narrative_contract_version,
     identity.model_id,
     identity.analysis_schema_version,
   );

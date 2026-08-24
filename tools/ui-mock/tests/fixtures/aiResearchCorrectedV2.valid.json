@@ -8,6 +8,6 @@
   },
   "risk_explanation": "Zapisany stan wymaga dalszego sprawdzenia w granicach produktu.",
   "missing_explanation": "Produkt jednoznacznie wskazuje brak danych w obsługiwanym obszarze.",
-  "action_reason": "Wykonaj ten krok zgodnie z kolejnością ustaloną przez produkt.",
+  "action_reason": "Ten stały krok odpowiada kolejności ustalonej przez produkt.",
   "condition_explanation": "Ponowna ocena nastąpi po zmianie danych zapisanych przez produkt."
 }

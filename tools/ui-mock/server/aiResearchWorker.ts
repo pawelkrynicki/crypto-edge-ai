@@ -5,6 +5,7 @@ import {
 } from "../src/types/aiResearchTypes.js";
 import { resolveProductRuntimeMode } from "../src/runtimeMode.js";
 import { AIResearchContextError, buildAIResearchContext, type AIResearchContextOptions } from "./aiResearchContext.js";
+import { AI_RESEARCH_NARRATIVE_VERSION } from "./aiResearchNarrativeContract.js";
 import {
   createAIResearchProvider,
   NOOP_AI_RESEARCH_USAGE_RECORDER,
@@ -225,6 +226,7 @@ async function processClaim(
       locale: "en",
       snapshot_fingerprint: context.snapshot_fingerprint,
       prompt_version: context.prompt_version,
+      narrative_contract_version: AI_RESEARCH_NARRATIVE_VERSION,
       model_id: claimed.model_id,
       analysis_schema_version: claimed.analysis_schema_version,
     });

@@ -1,0 +1,9 @@
+{
+  "fixture_version": "ai_research_v5_corrected_pl_v1",
+  "summary": "Zapisane dane wskazują, że bieżący etap dotyczy bezpieczeństwa i wymaga uzupełnienia trzech kontroli.",
+  "fact": "Ten zapisany fakt daje kontekst dla bieżącej analizy.",
+  "risk": "To zapisane ryzyko pozostaje nierozstrzygnięte na podstawie dostępnych danych.",
+  "missing": "Ta luka w danych ogranicza obecne wnioski.",
+  "action": "To stałe działanie odnosi się do bieżącej luki w danych.",
+  "condition": "Ten warunek uzasadnia ponowne sprawdzenie analizy po zapisaniu nowych danych."
+}

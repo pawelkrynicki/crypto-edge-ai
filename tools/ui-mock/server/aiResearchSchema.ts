@@ -14,14 +14,21 @@ import {
 } from "../src/types/aiResearchTypes.js";
 import { getAIResearchCapability, isCapabilitySourceSupported } from "./aiResearchCapabilities.js";
 import { sha256, stableJson, type AIResearchContext } from "./aiResearchContext.js";
-import { AI_RESEARCH_NARRATIVE_VERSION, aiResearchNarrativeId } from "./aiResearchNarrativeContract.js";
+import { AI_RESEARCH_NARRATIVE_VERSION } from "./aiResearchNarrativeContract.js";
 
 const narrativeBindingSchema = (maxLength: number) => ({
   type: "object",
   additionalProperties: false,
-  required: ["id", "en", "pl"],
+  required: ["id", "support_ids", "en", "pl"],
   properties: {
     id: { type: "string", maxLength: 120 },
+    support_ids: {
+      type: "array",
+      minItems: 1,
+      maxItems: 16,
+      uniqueItems: true,
+      items: { type: "string", maxLength: 120 },
+    },
     en: { type: "string", maxLength },
     pl: { type: "string", maxLength },
   },
@@ -41,12 +48,7 @@ export const AI_RESEARCH_PROVIDER_JSON_SCHEMA = {
   ],
   properties: {
     narrative_version: { type: "string", enum: [AI_RESEARCH_NARRATIVE_VERSION] },
-    summary: {
-      type: "object",
-      additionalProperties: false,
-      required: ["en", "pl"],
-      properties: { en: { type: "string", maxLength: 600 }, pl: { type: "string", maxLength: 600 } },
-    },
+    summary: narrativeBindingSchema(600),
     fact_narratives: {
       type: "array",
       minItems: 3,
@@ -86,6 +88,7 @@ export const AI_RESEARCH_PROVIDER_JSON_SCHEMA = {
 export function buildAIResearchProviderJsonSchema(context: AIResearchContext): Record<string, unknown> {
   const schema = JSON.parse(JSON.stringify(AI_RESEARCH_PROVIDER_JSON_SCHEMA)) as Record<string, unknown>;
   const properties = schema.properties as Record<string, Record<string, unknown>>;
+  const supportIds = context.narrative_contract.support_catalog.map(({ id }) => id);
   const configure = (field: string, ids: string[]) => {
     const list = properties[field]!;
     list.minItems = ids.length;
@@ -93,20 +96,37 @@ export function buildAIResearchProviderJsonSchema(context: AIResearchContext): R
     const item = list.items as Record<string, unknown>;
     const itemProperties = item.properties as Record<string, unknown>;
     itemProperties.id = { type: "string", enum: ids };
+    itemProperties.support_ids = {
+      type: "array",
+      minItems: 1,
+      maxItems: 16,
+      uniqueItems: true,
+      items: { type: "string", enum: supportIds },
+    };
   };
-  configure("fact_narratives", context.fact_candidates.map((fact) => aiResearchNarrativeId("fact", fact.key)));
-  configure("risk_narratives", context.risk_candidates.map((_risk, index) => aiResearchNarrativeId("risk", index)));
-  configure("missing_narratives", context.missing_information.map((item) => aiResearchNarrativeId("missing", item.key)));
-  configure("action_narratives", context.action_catalog.map((_action, index) => aiResearchNarrativeId("action", index)));
-  configure("status_change_narratives", context.status_change_conditions.map((condition) => aiResearchNarrativeId("condition", condition.key)));
+  const summary = properties.summary!;
+  const summaryProperties = summary.properties as Record<string, unknown>;
+  summaryProperties.id = { type: "string", enum: [context.narrative_contract.slots.summary.id] };
+  summaryProperties.support_ids = {
+    type: "array",
+    minItems: 1,
+    maxItems: 16,
+    uniqueItems: true,
+    items: { type: "string", enum: supportIds },
+  };
+  configure("fact_narratives", context.narrative_contract.slots.facts.map(({ id }) => id));
+  configure("risk_narratives", context.narrative_contract.slots.risks.map(({ id }) => id));
+  configure("missing_narratives", context.narrative_contract.slots.missing_information.map(({ id }) => id));
+  configure("action_narratives", context.narrative_contract.slots.actions.map(({ id }) => id));
+  configure("status_change_narratives", context.narrative_contract.slots.status_change_conditions.map(({ id }) => id));
   return schema;
 }
 
-export type AIResearchNarrativeBinding = { id: string; en: string; pl: string };
+export type AIResearchNarrativeBinding = { id: string; support_ids: string[]; en: string; pl: string };
 
 export type AIResearchProviderNarrative = {
   narrative_version: typeof AI_RESEARCH_NARRATIVE_VERSION;
-  summary: AIResearchBilingualText;
+  summary: AIResearchNarrativeBinding;
   fact_narratives: AIResearchNarrativeBinding[];
   risk_narratives: AIResearchNarrativeBinding[];
   missing_narratives: AIResearchNarrativeBinding[];
@@ -136,12 +156,20 @@ export type AIResearchSemanticViolation =
   | "MISSING_SKELETON_MISMATCH"
   | "ACTION_SKELETON_MISMATCH"
   | "STATUS_CONDITION_MISMATCH"
+  | "SOURCE_SKELETON_MISMATCH"
   | "RAW_ENUM_IN_NARRATIVE"
   | "MACHINE_VALUE_IN_NARRATIVE"
   | "LANGUAGE_MISMATCH"
   | "FORBIDDEN_CONTENT"
   | "GENERATED_URL"
-  | "INVENTED_NUMBER";
+  | "INVENTED_NUMBER"
+  | "UNSUPPORTED_SUPPORT_REFERENCE"
+  | "MISSING_SUPPORT_REFERENCE"
+  | "CURRENT_STEP_BOUNDARY_VIOLATION"
+  | "UNSUPPORTED_ENTITY_OR_CAPABILITY"
+  | "FOREIGN_SCRIPT_CONTAMINATION"
+  | "INCOMPLETE_NARRATIVE"
+  | "INSTRUCTIONAL_NARRATIVE";
 
 export class AIResearchValidationError extends Error {
   readonly code:
@@ -183,108 +211,84 @@ export function parseAIResearchProviderNarrativeWithDiagnostics(raw: string, con
 
   const result: AIResearchProviderNarrative = {
     narrative_version: AI_RESEARCH_NARRATIVE_VERSION,
-    summary: bilingualText(value.summary, 1, 600),
+    summary: parseBinding(value.summary, context.narrative_contract.slots.summary, 600),
     fact_narratives: parseBindings(
       value.fact_narratives,
-      context.fact_candidates.map((fact) => aiResearchNarrativeId("fact", fact.key)),
+      context.narrative_contract.slots.facts,
       280,
     ),
     risk_narratives: parseBindings(
       value.risk_narratives,
-      context.risk_candidates.map((_risk, index) => aiResearchNarrativeId("risk", index)),
+      context.narrative_contract.slots.risks,
       360,
     ),
     missing_narratives: parseBindings(
       value.missing_narratives,
-      context.missing_information.map((item) => aiResearchNarrativeId("missing", item.key)),
+      context.narrative_contract.slots.missing_information,
       280,
     ),
     action_narratives: parseBindings(
       value.action_narratives,
-      context.action_catalog.map((_action, index) => aiResearchNarrativeId("action", index)),
+      context.narrative_contract.slots.actions,
       280,
     ),
     status_change_narratives: parseBindings(
       value.status_change_narratives,
-      context.status_change_conditions.map((condition) => aiResearchNarrativeId("condition", condition.key)),
+      context.narrative_contract.slots.status_change_conditions,
       280,
     ),
   };
-  const presentation_fallbacks = applyPresentationFallbacks(result, context);
-  return { narrative: result, presentation_fallbacks };
+  const violations = auditProviderNarrative(result, context);
+  if (violations.length > 0) {
+    const code = violations.includes("FORBIDDEN_CONTENT") || violations.includes("GENERATED_URL")
+      ? "FORBIDDEN_CONTENT"
+      : violations.includes("INVENTED_NUMBER")
+        ? "UNKNOWN_FACT"
+        : "SEMANTIC_MISMATCH";
+    throw new AIResearchValidationError(code, violations);
+  }
+  return { narrative: result, presentation_fallbacks: [] };
 }
 
-function applyPresentationFallbacks(
+function auditProviderNarrative(
   narrative: AIResearchProviderNarrative,
   context: AIResearchContext,
-): AIResearchPresentationFallback[] {
-  const fallbacks: AIResearchPresentationFallback[] = [];
-  const inspect = (target: string, copy: AIResearchBilingualText, fallback: AIResearchBilingualText) => {
+): AIResearchSemanticViolation[] {
+  const result = new Set<AIResearchSemanticViolation>();
+  const bindings = [
+    narrative.summary,
+    ...narrative.fact_narratives,
+    ...narrative.risk_narratives,
+    ...narrative.missing_narratives,
+    ...narrative.action_narratives,
+    ...narrative.status_change_narratives,
+  ];
+  for (const binding of bindings) {
     for (const locale of ["en", "pl"] as const) {
-      const presentationViolations = narrativePresentationViolations(copy[locale], locale, context);
-      if (presentationViolations.length === 0) continue;
-      copy[locale] = fallback[locale];
-      fallbacks.push({ target, locale, violations: presentationViolations });
-    }
-  };
-  inspect("summary", narrative.summary, deterministicNarrativeFallback("summary"));
-  for (const [field, items] of [
-    ["fact_narratives", narrative.fact_narratives],
-    ["risk_narratives", narrative.risk_narratives],
-    ["missing_narratives", narrative.missing_narratives],
-    ["action_narratives", narrative.action_narratives],
-    ["status_change_narratives", narrative.status_change_narratives],
-  ] as const) {
-    for (let index = 0; index < items.length; index += 1) {
-      inspect(`${field}[${index}]`, items[index]!, deterministicNarrativeFallback(field));
+      for (const violation of narrativePresentationViolations(binding[locale], locale, context)) result.add(violation);
     }
   }
-  return fallbacks;
+  return [...result];
 }
 
 function narrativePresentationViolations(
   value: string,
   locale: "en" | "pl",
   context: AIResearchContext,
-): Array<"RAW_ENUM_IN_NARRATIVE" | "MACHINE_VALUE_IN_NARRATIVE" | "LANGUAGE_MISMATCH"> {
-  if (hasForbiddenContent([value])) throw new AIResearchValidationError("FORBIDDEN_CONTENT", ["FORBIDDEN_CONTENT"]);
-  if (hasGeneratedUrl([value])) throw new AIResearchValidationError("FORBIDDEN_CONTENT", ["GENERATED_URL"]);
-  if (hasInventedNumber([value], context)) throw new AIResearchValidationError("UNKNOWN_FACT", ["INVENTED_NUMBER"]);
-  const violations: Array<"RAW_ENUM_IN_NARRATIVE" | "MACHINE_VALUE_IN_NARRATIVE" | "LANGUAGE_MISMATCH"> = [];
+): AIResearchSemanticViolation[] {
+  const violations: AIResearchSemanticViolation[] = [];
+  if (hasForbiddenContent([value])) violations.push("FORBIDDEN_CONTENT");
+  if (hasGeneratedUrl([value])) violations.push("GENERATED_URL");
+  if (hasInventedNumber([value], context)) violations.push("INVENTED_NUMBER");
   if (hasRawEnum([value])) violations.push("RAW_ENUM_IN_NARRATIVE");
   if (hasMachineValue([value], locale)) violations.push("MACHINE_VALUE_IN_NARRATIVE");
   if (hasLanguageMismatch([value], locale)) violations.push("LANGUAGE_MISMATCH");
+  if (hasForeignScript([value])) violations.push("FOREIGN_SCRIPT_CONTAMINATION");
+  if (hasIncompleteNarrative([value])) violations.push("INCOMPLETE_NARRATIVE");
+  if (hasInstructionalNarrative([value])) violations.push("INSTRUCTIONAL_NARRATIVE");
+  if (hasOutOfScopeDomain([value], context)) violations.push("CURRENT_STEP_BOUNDARY_VIOLATION");
+  if (hasUnsupportedEntityOrCapability([value], context)) violations.push("UNSUPPORTED_ENTITY_OR_CAPABILITY");
   return violations;
-}
-
-function deterministicNarrativeFallback(field: string): AIResearchBilingualText {
-  const copy: Record<string, AIResearchBilingualText> = {
-    summary: {
-      en: "The recorded evidence provides research context, while the remaining gaps need verification before a stronger conclusion.",
-      pl: "Zapisane dane dają kontekst do analizy, ale pozostałe braki wymagają sprawdzenia przed mocniejszym wnioskiem.",
-    },
-    fact_narratives: {
-      en: "This recorded fact adds context to the current research view.",
-      pl: "Ten zapisany fakt uzupełnia obecny obraz analizy.",
-    },
-    risk_narratives: {
-      en: "This recorded risk needs verification against the listed evidence.",
-      pl: "To zapisane ryzyko wymaga sprawdzenia względem wskazanych danych.",
-    },
-    missing_narratives: {
-      en: "This evidence gap limits what can be concluded from the supplied record.",
-      pl: "Ta luka w danych ogranicza wnioski możliwe na podstawie zapisanego materiału.",
-    },
-    action_narratives: {
-      en: "Use this permitted research step to verify the listed evidence gap.",
-      pl: "Wykorzystaj ten dozwolony krok analizy, aby sprawdzić wskazaną lukę w danych.",
-    },
-    status_change_narratives: {
-      en: "This condition would justify reviewing the research view against new evidence.",
-      pl: "Ten warunek uzasadnia ponowne sprawdzenie analizy względem nowych danych.",
-    },
-  };
-  return copy[field] ?? copy.summary!;
 }
 
 export function auditAIResearchSemanticQuality(value: unknown, context: AIResearchContext): AIResearchSemanticViolation[] {
@@ -355,6 +359,18 @@ export function auditAIResearchSemanticQuality(value: unknown, context: AIResear
       || !sameStringArray(item.source_reference_ids, expected.source_reference_ids);
   })) violations.add("STATUS_CONDITION_MISMATCH");
 
+  const sources = Array.isArray(value.source_references) ? value.source_references : [];
+  if (sources.length !== context.source_references.length || sources.some((item, index) => {
+    const expected = context.source_references[index];
+    return !isRecord(item) || !expected
+      || item.id !== expected.id
+      || item.source_type !== expected.source_type
+      || item.label !== expected.label
+      || item.observed_at !== expected.observed_at
+      || item.completeness !== expected.completeness
+      || item.url !== expected.url;
+  })) violations.add("SOURCE_SKELETON_MISMATCH");
+
   for (const locale of ["en", "pl"] as const) {
     const narratives = narrativeStringsFromSemantic(value, locale);
     if (hasRawEnum(narratives)) violations.add("RAW_ENUM_IN_NARRATIVE");
@@ -363,6 +379,16 @@ export function auditAIResearchSemanticQuality(value: unknown, context: AIResear
     if (hasForbiddenContent(narratives)) violations.add("FORBIDDEN_CONTENT");
     if (hasGeneratedUrl(narratives)) violations.add("GENERATED_URL");
     if (hasInventedNumber(narratives, context)) violations.add("INVENTED_NUMBER");
+    // Render preview is an explicit local deterministic mode, never provider
+    // output or canonical READY evidence. Provider and persisted v5 paths use
+    // the full contract below.
+    if (value.render_preview !== true) {
+      if (hasForeignScript(narratives)) violations.add("FOREIGN_SCRIPT_CONTAMINATION");
+      if (hasIncompleteNarrative(narratives)) violations.add("INCOMPLETE_NARRATIVE");
+      if (hasInstructionalNarrative(narratives)) violations.add("INSTRUCTIONAL_NARRATIVE");
+      if (hasOutOfScopeDomain(narratives, context)) violations.add("CURRENT_STEP_BOUNDARY_VIOLATION");
+      if (hasUnsupportedEntityOrCapability(narratives, context)) violations.add("UNSUPPORTED_ENTITY_OR_CAPABILITY");
+    }
   }
   return [...violations];
 }
@@ -372,6 +398,10 @@ export function assertAIResearchSemanticQuality(value: unknown, context: AIResea
   if (violations.length > 0) throw new AIResearchValidationError("SEMANTIC_MISMATCH", violations);
 }
 
+/**
+ * Historical v4 records are parsed only so they remain auditable.  Eligibility
+ * for a current lookup is enforced by the queue's full v5 cache identity.
+ */
 export function validateStoredAIResearchBrief(value: unknown): AIResearchBrief {
   if (!isRecord(value) || !hasExactKeys(value, [
     "schema_version", "analysis_id", "identity", "analysis_language", "snapshot_fingerprint",
@@ -379,7 +409,9 @@ export function validateStoredAIResearchBrief(value: unknown): AIResearchBrief {
     "known_facts", "risk_factors", "missing_information", "next_actions", "status_change_conditions",
     "source_references", "coverage", "checkpoints", "token_usage", "input_hash", "output_hash", "render_preview",
   ])) fail();
-  if (value.schema_version !== AI_RESEARCH_SCHEMA_VERSION || value.prompt_version !== AI_RESEARCH_PROMPT_VERSION) fail();
+  if (value.schema_version !== AI_RESEARCH_SCHEMA_VERSION
+    || (value.prompt_version !== AI_RESEARCH_PROMPT_VERSION && value.prompt_version !== "ai_research_prompt_v4")) fail();
+  const historicalV4 = value.prompt_version === "ai_research_prompt_v4";
   const analysisId = text(value.analysis_id, 40, 40);
   if (!/^air_[0-9a-f-]{36}$/.test(analysisId)) fail();
   if (!isRecord(value.identity) || !hasExactKeys(value.identity, ["chain", "contract_address"])) fail();
@@ -451,7 +483,7 @@ export function validateStoredAIResearchBrief(value: unknown): AIResearchBrief {
     identity,
     analysis_language: value.analysis_language,
     snapshot_fingerprint: value.snapshot_fingerprint,
-    prompt_version: AI_RESEARCH_PROMPT_VERSION,
+    prompt_version: value.prompt_version,
     model: text(value.model, 1, 128),
     generated_at: utc(value.generated_at),
     data_generated_at: utc(value.data_generated_at),
@@ -472,23 +504,37 @@ export function validateStoredAIResearchBrief(value: unknown): AIResearchBrief {
   };
   const expectedOutputHash = sha256(stableJson({ ...result, output_hash: "0".repeat(64) }));
   if (result.output_hash !== expectedOutputHash) fail();
-  assertNarrativePolicy(narrativeStringsFromSemantic(result, "en"), "en");
-  assertNarrativePolicy(narrativeStringsFromSemantic(result, "pl"), "pl");
+  // The older record can be viewed in audit history but is not rewritten nor
+  // reclassified under v5's stricter closed-world semantic policy.
+  if (!historicalV4 && value.render_preview !== true) {
+    assertNarrativePolicy(narrativeStringsFromSemantic(result, "en"), "en");
+    assertNarrativePolicy(narrativeStringsFromSemantic(result, "pl"), "pl");
+  }
   return result;
 }
 
 function parseBindings(
   value: unknown,
-  expectedIds: string[],
+  expectedSlots: AIResearchContext["narrative_contract"]["slots"]["facts"],
   maxLength: number,
 ): AIResearchNarrativeBinding[] {
-  const items = array(value, expectedIds.length, expectedIds.length);
-  return items.map((item, index) => {
-    if (!isRecord(item) || !hasExactKeys(item, ["id", "en", "pl"])) fail();
-    const id = text(item.id, 1, 120);
-    if (id !== expectedIds[index]) throw new AIResearchValidationError("SKELETON_MISMATCH");
-    return { id, en: text(item.en, 1, maxLength), pl: text(item.pl, 1, maxLength) };
-  });
+  const items = array(value, expectedSlots.length, expectedSlots.length);
+  return items.map((item, index) => parseBinding(item, expectedSlots[index]!, maxLength));
+}
+
+function parseBinding(
+  value: unknown,
+  expectedSlot: { id: string; allowed_support_ids: string[] },
+  maxLength: number,
+): AIResearchNarrativeBinding {
+  if (!isRecord(value) || !hasExactKeys(value, ["id", "support_ids", "en", "pl"])) fail();
+  const id = text(value.id, 1, 120);
+  if (id !== expectedSlot.id) throw new AIResearchValidationError("SKELETON_MISMATCH");
+  const supportIds = stringArray(value.support_ids, 1, Math.min(16, expectedSlot.allowed_support_ids.length), 120);
+  if (new Set(supportIds).size !== supportIds.length || supportIds.some((supportId) => !expectedSlot.allowed_support_ids.includes(supportId))) {
+    throw new AIResearchValidationError("SEMANTIC_MISMATCH", ["UNSUPPORTED_SUPPORT_REFERENCE"]);
+  }
+  return { id, support_ids: supportIds, en: text(value.en, 1, maxLength), pl: text(value.pl, 1, maxLength) };
 }
 
 function parseStoredFact(value: unknown): AIResearchKnownFact {
@@ -530,6 +576,9 @@ function assertNarrativePolicy(strings: string[], locale: "pl" | "en", context?:
   if (hasForbiddenContent(strings) || hasGeneratedUrl(strings)) throw new AIResearchValidationError("FORBIDDEN_CONTENT");
   if (hasRawEnum(strings) || hasMachineValue(strings, locale)) throw new AIResearchValidationError("RAW_MACHINE_VALUE");
   if (hasLanguageMismatch(strings, locale)) throw new AIResearchValidationError("LANGUAGE_MISMATCH");
+  if (hasForeignScript(strings)) throw new AIResearchValidationError("SEMANTIC_MISMATCH", ["FOREIGN_SCRIPT_CONTAMINATION"]);
+  if (hasIncompleteNarrative(strings)) throw new AIResearchValidationError("SEMANTIC_MISMATCH", ["INCOMPLETE_NARRATIVE"]);
+  if (hasInstructionalNarrative(strings)) throw new AIResearchValidationError("SEMANTIC_MISMATCH", ["INSTRUCTIONAL_NARRATIVE"]);
   if (context && hasInventedNumber(strings, context)) throw new AIResearchValidationError("UNKNOWN_FACT");
 }
 
@@ -564,6 +613,74 @@ function hasLanguageMismatch(strings: string[], locale: "pl" | "en"): boolean {
   const content = strings.join("\n");
   if (locale === "en") return /[\u0105\u0107\u0119\u0142\u0144\u00f3\u015b\u017a\u017c]/u.test(content);
   return /\b(?:lifecycle|security|the\s+data|the\s+product|filters?\s+(?:are|is)|wait\s+for)\b/iu.test(content);
+}
+
+/** Rejects script families that cannot occur in a normal English or Polish fragment. */
+function hasForeignScript(strings: string[]): boolean {
+  return /[\p{Script=Greek}\p{Script=Cyrillic}\p{Script=Arabic}\p{Script=Devanagari}\p{Script=Hangul}\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(strings.join("\n"));
+}
+
+/** Every provider fragment is prose, not a title or an unfinished continuation. */
+function hasIncompleteNarrative(strings: string[]): boolean {
+  return strings.some((value) => {
+    const text = value.trim();
+    if (text.length < 12 || !/[.!?…]$/u.test(text)) return true;
+    return /(?:\b(?:and|or|to|with|for|the|a|an|oraz|lub|i|z|do|na|w|od|bez)|[,;:–—(]|\[)[.!?…]$/iu.test(text);
+  });
+}
+
+/** Provider prose may explain server-issued actions, never issue an instruction. */
+function hasInstructionalNarrative(strings: string[]): boolean {
+  return strings.some((value) => splitSentences(value).some((sentence) => (
+    /^(?:review|check|inspect|investigate|perform|run|open|verify|wait|use|sprawdź|przejrzyj|zbadaj|uruchom|otwórz|zweryfikuj|poczekaj|użyj)\b/iu.test(sentence.trim())
+      || /\b(?:you should|you need to|must (?:review|check|inspect|investigate|run|verify)|należy|powinien(?:eś|eś|naś)?|trzeba (?:sprawdzić|zbadać|uruchomić|zweryfikować))\b/iu.test(sentence)
+  )));
+}
+
+type NarrativeDomain = "onchain" | "social" | "team" | "docs" | "narrative" | "unsupported";
+
+/**
+ * Registry of product research capabilities and their earliest allowed stage.
+ * This is the positive playbook boundary, not a list of phrases from one bad
+ * answer.
+ */
+const NARRATIVE_DOMAIN_REGISTRY: Array<{ domain: NarrativeDomain; earliest_step: number; terms: RegExp }> = [
+  { domain: "onchain", earliest_step: 4, terms: /\b(?:on[- ]?chain|wallet(?:s)?|holder(?:s)?|concentration|bytecode|liquidity[ -]?pool|pool(?:s)?|order[ -]?book|oracle|price[ -]?feed|exchange)\b/iu },
+  { domain: "social", earliest_step: 5, terms: /\b(?:social|twitter|telegram|discord|community)\b/iu },
+  { domain: "team", earliest_step: 5, terms: /\b(?:team|founder|developer|partner|ownership history)\b/iu },
+  { domain: "docs", earliest_step: 5, terms: /\b(?:repository|repo|source[ -]?code|whitepaper|roadmap|documentation|static analysis)\b/iu },
+  { domain: "narrative", earliest_step: 5, terms: /\b(?:narrative|marketing claim|project claim)\b/iu },
+  { domain: "unsupported", earliest_step: 99, terms: /\b(?:audit(?:s|ing)?|code review|technical investigation)\b/iu },
+];
+
+function hasOutOfScopeDomain(strings: string[], context: AIResearchContext): boolean {
+  const boundary = context.narrative_contract.research_playbook;
+  return strings.some((value) => splitSentences(value).some((sentence) => NARRATIVE_DOMAIN_REGISTRY.some((entry) => (
+    entry.earliest_step > boundary.current_step
+      && entry.terms.test(sentence)
+      && (entry.domain === "unsupported" || !isExplicitlyBlockedOrFuture(sentence))
+  ))));
+}
+
+function hasUnsupportedEntityOrCapability(strings: string[], context: AIResearchContext): boolean {
+  const available = new Set(context.narrative_contract.support_catalog.map(({ label }) => normalizeNarrativeTerm(label)));
+  return strings.some((value) => splitSentences(value).some((sentence) => NARRATIVE_DOMAIN_REGISTRY.some((entry) => {
+    if (!entry.terms.test(sentence) || (entry.domain !== "unsupported" && isExplicitlyBlockedOrFuture(sentence))) return false;
+    const matched = sentence.match(entry.terms)?.[0] ?? "";
+    return !available.has(normalizeNarrativeTerm(matched)) && entry.earliest_step > context.narrative_contract.research_playbook.current_step;
+  })));
+}
+
+function isExplicitlyBlockedOrFuture(sentence: string): boolean {
+  return /\b(?:blocked|pending|unavailable|not available|after (?:security|the current step)|once security|before (?:the )?on[- ]?chain|zablokowan\w*|wstrzyman\w*|niedostępn\w*|po zakończeniu (?:kontroli )?bezpieczeństwa|dopiero po|przed etapem on[- ]?chain)\b/iu.test(sentence);
+}
+
+function splitSentences(value: string): string[] {
+  return value.split(/(?<=[.!?…])\s+/u).filter(Boolean);
+}
+
+function normalizeNarrativeTerm(value: string): string {
+  return value.normalize("NFKC").trim().toLocaleLowerCase("en-US");
 }
 
 function hasInventedNumber(strings: string[], context: AIResearchContext): boolean {

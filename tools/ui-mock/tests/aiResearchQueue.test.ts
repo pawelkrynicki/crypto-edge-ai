@@ -296,7 +296,7 @@ describe("AI.3 central worker, single-flight and last-known-good", () => {
   });
 });
 
-function cacheIdentity(chain: string, address: string, fingerprint: string, promptVersion = "ai_research_prompt_v4") {
+function cacheIdentity(chain: string, address: string, fingerprint: string, promptVersion = "ai_research_prompt_v5") {
   return buildAIAnalysisCacheIdentity({
     chain,
     contract_address: address,
@@ -313,6 +313,7 @@ function fromContext(value: AIResearchContext): AIAnalysisCacheIdentity {
     ...value.identity,
     snapshot_fingerprint: value.snapshot_fingerprint,
     prompt_version: value.prompt_version,
+    narrative_contract_version: "ai_research_narrative_v4",
     model_id: "gpt-5-mini",
     analysis_schema_version: "ai_research_brief_v2",
     locale: "en",
@@ -362,14 +363,15 @@ function mockProvider(generateJson: (context: AIResearchContext) => Promise<stri
 }
 
 function narrative(ctx: AIResearchContext) {
+  const slot = (entry: { id: string; allowed_support_ids: string[] }, en: string, pl: string) => ({ id: entry.id, support_ids: [entry.allowed_support_ids[0]!], en, pl });
   return {
-    narrative_version: "ai_research_narrative_v3",
-    summary: { en: "The recorded snapshot gives market context while evidence gaps still need verification.", pl: "Zapisana migawka daje kontekst rynkowy, ale luki w danych nadal wymagają sprawdzenia." },
-    fact_narratives: ctx.fact_candidates.map((item) => ({ id: `fact:${item.key}`, en: "This recorded fact adds context to the research view.", pl: "Ten zapisany fakt uzupełnia obecną analizę." })),
-    risk_narratives: ctx.risk_candidates.map((_item, index) => ({ id: `risk:${index}`, en: "This recorded risk needs verification against the listed evidence.", pl: "To zapisane ryzyko wymaga sprawdzenia względem wskazanych danych." })),
-    missing_narratives: ctx.missing_information.map((item) => ({ id: `missing:${item.key}`, en: "This evidence gap limits the current research view.", pl: "Ta luka w danych ogranicza obecną analizę." })),
-    action_narratives: ctx.action_catalog.map((_item, index) => ({ id: `action:${index}`, en: "Use this permitted research step to verify the evidence.", pl: "Wykorzystaj ten dozwolony krok analizy, aby sprawdzić dane." })),
-    status_change_narratives: ctx.status_change_conditions.map((item) => ({ id: `condition:${item.key}`, en: "This condition would justify reviewing the research view.", pl: "Ten warunek uzasadnia ponowne sprawdzenie analizy." })),
+    narrative_version: "ai_research_narrative_v4",
+    summary: slot(ctx.narrative_contract.slots.summary, "The recorded snapshot gives market context while evidence gaps still need verification.", "Zapisana migawka daje kontekst rynkowy, ale luki w danych nadal wymagają sprawdzenia."),
+    fact_narratives: ctx.narrative_contract.slots.facts.map((entry) => slot(entry, "This recorded fact adds context to the research view.", "Ten zapisany fakt uzupełnia obecną analizę.")),
+    risk_narratives: ctx.narrative_contract.slots.risks.map((entry) => slot(entry, "This recorded risk needs verification against the listed evidence.", "To zapisane ryzyko wymaga sprawdzenia względem wskazanych danych.")),
+    missing_narratives: ctx.narrative_contract.slots.missing_information.map((entry) => slot(entry, "This evidence gap limits the current research view.", "Ta luka w danych ogranicza obecną analizę.")),
+    action_narratives: ctx.narrative_contract.slots.actions.map((entry) => slot(entry, "The fixed action addresses the current evidence gap.", "Stałe działanie dotyczy bieżącej luki w danych.")),
+    status_change_narratives: ctx.narrative_contract.slots.status_change_conditions.map((entry) => slot(entry, "This condition would justify reviewing the research view.", "Ten warunek uzasadnia ponowne sprawdzenie analizy.")),
   };
 }
 

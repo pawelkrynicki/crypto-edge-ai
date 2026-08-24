@@ -167,7 +167,7 @@ describe("PC.2 provider attempt and failure-stage audit", () => {
     store.close();
   });
 
-  it("C3: retains a valid shared result with a field-level presentation fallback", async () => {
+  it("C3: rejects presentation-invalid provider prose without a canonical READY fallback", async () => {
     const store = await storeFor("presentation-fallback.sqlite");
     const queued = await enqueueReal(store, "presentation-fallback");
     const worker = createAIResearchWorker({
@@ -184,10 +184,13 @@ describe("PC.2 provider attempt and failure-stage audit", () => {
 
     await worker.runCycle();
     const record = required(store, queued);
-    assert.equal(record.status, "READY");
-    assert.equal(record.internal_validation_code, "PRESENTATION_FALLBACK");
+    assert.equal(record.status, "SUSPENDED");
+    assert.equal(record.safe_error_code, "PROVIDER_CONTRACT_INVALID");
+    assert.equal(record.internal_validation_code, "SEMANTIC_MISMATCH");
     assert.deepEqual(record.internal_validation_violations, ["MACHINE_VALUE_IN_NARRATIVE", "LANGUAGE_MISMATCH"]);
-    assert.equal(record.result?.known_facts[0]?.interpretation.pl.includes("security"), false);
+    assert.equal(record.provider_attempt_count, 1);
+    assert.equal(record.attempt_count, 1);
+    assert.equal(record.result, null);
     store.close();
   });
 
@@ -364,14 +367,15 @@ function provider(generateJson: (context: AIResearchContext) => Promise<string>)
 }
 
 function narrative(context: AIResearchContext) {
+  const slot = (entry: { id: string; allowed_support_ids: string[] }, en: string, pl: string) => ({ id: entry.id, support_ids: [entry.allowed_support_ids[0]!], en, pl });
   return {
-    narrative_version: "ai_research_narrative_v3",
-    summary: { en: "The recorded snapshot gives market context while evidence gaps still need verification.", pl: "Zapisana migawka daje kontekst rynkowy, ale luki w danych nadal wymagają sprawdzenia." },
-    fact_narratives: context.fact_candidates.map((item) => ({ id: `fact:${item.key}`, en: "This recorded fact adds context to the research view.", pl: "Ten zapisany fakt uzupełnia obecną analizę." })),
-    risk_narratives: context.risk_candidates.map((_item, index) => ({ id: `risk:${index}`, en: "This recorded risk needs verification against the listed evidence.", pl: "To zapisane ryzyko wymaga sprawdzenia względem wskazanych danych." })),
-    missing_narratives: context.missing_information.map((item) => ({ id: `missing:${item.key}`, en: "This evidence gap limits the current research view.", pl: "Ta luka w danych ogranicza obecną analizę." })),
-    action_narratives: context.action_catalog.map((_item, index) => ({ id: `action:${index}`, en: "Use this permitted research step to verify the evidence.", pl: "Wykorzystaj ten dozwolony krok analizy, aby sprawdzić dane." })),
-    status_change_narratives: context.status_change_conditions.map((item) => ({ id: `condition:${item.key}`, en: "This condition would justify reviewing the research view.", pl: "Ten warunek uzasadnia ponowne sprawdzenie analizy." })),
+    narrative_version: "ai_research_narrative_v4",
+    summary: slot(context.narrative_contract.slots.summary, "The recorded snapshot gives market context while evidence gaps still need verification.", "Zapisana migawka daje kontekst rynkowy, ale luki w danych nadal wymagają sprawdzenia."),
+    fact_narratives: context.narrative_contract.slots.facts.map((entry) => slot(entry, "This recorded fact adds context to the research view.", "Ten zapisany fakt uzupełnia obecną analizę.")),
+    risk_narratives: context.narrative_contract.slots.risks.map((entry) => slot(entry, "This recorded risk needs verification against the listed evidence.", "To zapisane ryzyko wymaga sprawdzenia względem wskazanych danych.")),
+    missing_narratives: context.narrative_contract.slots.missing_information.map((entry) => slot(entry, "This evidence gap limits the current research view.", "Ta luka w danych ogranicza obecną analizę.")),
+    action_narratives: context.narrative_contract.slots.actions.map((entry) => slot(entry, "The fixed action addresses the current evidence gap.", "Stałe działanie dotyczy bieżącej luki w danych.")),
+    status_change_narratives: context.narrative_contract.slots.status_change_conditions.map((entry) => slot(entry, "This condition would justify reviewing the research view.", "Ten warunek uzasadnia ponowne sprawdzenie analizy.")),
   };
 }
 

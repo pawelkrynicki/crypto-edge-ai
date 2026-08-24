@@ -24,7 +24,12 @@ import {
 import type { FollowUpPublicEntry } from "../src/types/followUpTypes.js";
 import type { ScannerApiOutput, UiTokenCandidate } from "../src/types/scannerTypes.js";
 import { getAIResearchCapability } from "./aiResearchCapabilities.js";
-import { AI_RESEARCH_NARRATIVE_VERSION, aiResearchNarrativeId } from "./aiResearchNarrativeContract.js";
+import {
+  AI_RESEARCH_NARRATIVE_VERSION,
+  aiResearchNarrativeId,
+  buildAIResearchNarrativeContract,
+  type AIResearchNarrativeContract,
+} from "./aiResearchNarrativeContract.js";
 import { readFollowUpList, readFollowUpStatus, type FollowUpApiOptions } from "./followUpApi.js";
 import { readLatestScannerOutput, type LatestScannerOutputOptions } from "./latestScannerOutput.js";
 import { readReportsList, type ReportsLibraryOptions } from "./reportsLibrary.js";
@@ -89,6 +94,7 @@ export type AIResearchContext = {
   coverage: AIResearchCoverageItem[];
   checkpoints: TokenLifecycleViewModel["checkpoints"];
   guidance: AIResearchGuidanceInput;
+  narrative_contract: AIResearchNarrativeContract;
   provider_context: Record<string, unknown>;
 };
 
@@ -190,6 +196,16 @@ export async function buildAIResearchContext(
   };
   const symbol = boundedUntrustedText(candidate?.symbol ?? followUp?.symbol ?? "", 32);
   const name = boundedUntrustedText(candidate?.name ?? followUp?.display_name ?? symbol, 120);
+  const narrativeContract = buildAIResearchNarrativeContract({
+    fact_candidates: factCandidates,
+    risk_candidates: riskCandidates,
+    missing_information: missingInformation,
+    action_catalog: actionCatalog,
+    status_change_conditions: statusChangeConditions,
+    source_references: sourceReferences,
+    security_coverage: securityCoverage,
+    research_state: researchState,
+  });
   const canonicalInput = {
     data_contract_version: AI_RESEARCH_DATA_CONTRACT_VERSION,
     identity: { chain: identity.chain, contract_address: identity.contract_address },
@@ -253,11 +269,15 @@ export async function buildAIResearchContext(
     coverage,
     checkpoints: lifecycle.checkpoints,
     guidance,
+    narrative_contract: narrativeContract,
     provider_context: {
       contract_version: AI_RESEARCH_NARRATIVE_VERSION,
       locale,
       project_fields_are_untrusted_data: { symbol, name },
       deterministic_state_label: presentResearchState(researchState, locale),
+      research_playbook: narrativeContract.research_playbook,
+      support_catalog: narrativeContract.support_catalog,
+      narrative_slots: narrativeContract.slots,
       narrative_targets: {
         facts: factCandidates.map((fact) => ({
           id: aiResearchNarrativeId("fact", fact.key),

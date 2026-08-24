@@ -96,26 +96,24 @@ describe("AI.2C deterministic actions and PL/EN narrative boundary", () => {
     assert.ok(context.action_catalog.some(({ action_type }) => action_type === "WAIT_FOR_CHECKPOINT"));
   });
 
-  it("accepts natural PL/EN narrative and field-falls back raw enums, machine values and mixed language", async () => {
+  it("accepts natural PL/EN narrative and rejects raw enums, machine values and mixed language", async () => {
     const pl = await researchContext("pl");
     const en = await researchContext("en");
-    assert.equal(parseAIResearchProviderNarrative(JSON.stringify(providerNarrative(pl)), pl).narrative_version, "ai_research_narrative_v3");
-    assert.equal(parseAIResearchProviderNarrative(JSON.stringify(providerNarrative(en)), en).narrative_version, "ai_research_narrative_v3");
+    assert.equal(parseAIResearchProviderNarrative(JSON.stringify(providerNarrative(pl)), pl).narrative_version, "ai_research_narrative_v4");
+    assert.equal(parseAIResearchProviderNarrative(JSON.stringify(providerNarrative(en)), en).narrative_version, "ai_research_narrative_v4");
 
     const rawEnum = providerNarrative(pl);
     rawEnum.summary.pl = "Stan DATA_STALE wymaga sprawdzenia.";
-    const rawEnumResult = parseAIResearchProviderNarrativeWithDiagnostics(JSON.stringify(rawEnum), pl);
-    assert.equal(rawEnumResult.narrative.summary.pl.includes("DATA_STALE"), false);
-    assert.ok(rawEnumResult.presentation_fallbacks[0]?.violations.includes("RAW_ENUM_IN_NARRATIVE"));
+    assert.throws(() => parseAIResearchProviderNarrativeWithDiagnostics(JSON.stringify(rawEnum), pl),
+      (error) => error instanceof AIResearchValidationError && error.violations.includes("RAW_ENUM_IN_NARRATIVE"));
     const machineValue = providerNarrative(pl);
     machineValue.fact_narratives[0]!.pl = "Etap lifecycle ma wartość new.";
-    const machineResult = parseAIResearchProviderNarrativeWithDiagnostics(JSON.stringify(machineValue), pl);
-    assert.equal(machineResult.narrative.fact_narratives[0]!.pl.includes("lifecycle"), false);
-    assert.ok(machineResult.presentation_fallbacks[0]?.violations.includes("MACHINE_VALUE_IN_NARRATIVE"));
+    assert.throws(() => parseAIResearchProviderNarrativeWithDiagnostics(JSON.stringify(machineValue), pl),
+      (error) => error instanceof AIResearchValidationError && error.violations.includes("MACHINE_VALUE_IN_NARRATIVE"));
     const mixed = providerNarrative(en);
     mixed.summary.en = "Dane wymagają świeżej migawki.";
-    const mixedResult = parseAIResearchProviderNarrativeWithDiagnostics(JSON.stringify(mixed), en);
-    assert.ok(mixedResult.presentation_fallbacks[0]?.violations.includes("LANGUAGE_MISMATCH"));
+    assert.throws(() => parseAIResearchProviderNarrativeWithDiagnostics(JSON.stringify(mixed), en),
+      (error) => error instanceof AIResearchValidationError && error.violations.includes("LANGUAGE_MISMATCH"));
   });
 });
 
@@ -133,7 +131,7 @@ function semanticCandidate(context: AIResearchContext, fixture: CapturedFixture 
   const actions = context.action_catalog.map((action) => ({
     ...action,
     reason: bilingual(
-      "Use this permitted research step to verify the evidence.",
+      "This fixed research step addresses the listed evidence.",
       "action_reason" in fixture ? fixture.action_reason : "Wykorzystaj ten dozwolony krok analizy, aby sprawdzić dane.",
     ),
   }));
@@ -172,33 +170,20 @@ function semanticCandidate(context: AIResearchContext, fixture: CapturedFixture 
       ...condition,
       explanation: bilingual("This condition would justify reviewing the research view.", "condition_explanation" in fixture ? fixture.condition_explanation : "Ten warunek uzasadnia ponowne sprawdzenie analizy."),
     })),
+    source_references: context.source_references,
   };
 }
 
 function providerNarrative(context: AIResearchContext) {
+  const slot = (entry: { id: string; allowed_support_ids: string[] }, en: string, pl: string) => ({ id: entry.id, support_ids: [entry.allowed_support_ids[0]!], en, pl });
   return {
-    narrative_version: "ai_research_narrative_v3" as const,
-    summary: bilingual("The recorded data needs further review before the next research step.", "Zapisane dane wymagają dalszego sprawdzenia przed kolejnym krokiem analizy."),
-    fact_narratives: context.fact_candidates.map((fact) => ({
-      id: `fact:${fact.key}`,
-      ...bilingual("This recorded fact adds context to the research view.", "Ten zapisany fakt uzupełnia obecną analizę."),
-    })),
-    risk_narratives: context.risk_candidates.map((_risk, index) => ({
-      id: `risk:${index}`,
-      ...bilingual("This recorded risk needs verification against the listed evidence.", "To zapisane ryzyko wymaga sprawdzenia względem wskazanych danych."),
-    })),
-    missing_narratives: context.missing_information.map((item) => ({
-      id: `missing:${item.key}`,
-      ...bilingual("This evidence gap limits the current research view.", "Ta luka w danych ogranicza obecną analizę."),
-    })),
-    action_narratives: context.action_catalog.map((_action, index) => ({
-      id: `action:${index}`,
-      ...bilingual("Use this permitted research step to verify the evidence.", "Wykorzystaj ten dozwolony krok analizy, aby sprawdzić dane."),
-    })),
-    status_change_narratives: context.status_change_conditions.map((condition) => ({
-      id: `condition:${condition.key}`,
-      ...bilingual("This condition would justify reviewing the research view.", "Ten warunek uzasadnia ponowne sprawdzenie analizy."),
-    })),
+    narrative_version: "ai_research_narrative_v4" as const,
+    summary: slot(context.narrative_contract.slots.summary, "The recorded data needs further review within the current research boundary.", "Zapisane dane wymagają dalszego sprawdzenia w granicach bieżącej analizy."),
+    fact_narratives: context.narrative_contract.slots.facts.map((entry) => slot(entry, "This recorded fact adds context to the research view.", "Ten zapisany fakt uzupełnia obecną analizę.")),
+    risk_narratives: context.narrative_contract.slots.risks.map((entry) => slot(entry, "This recorded risk needs verification against the listed evidence.", "To zapisane ryzyko wymaga sprawdzenia względem wskazanych danych.")),
+    missing_narratives: context.narrative_contract.slots.missing_information.map((entry) => slot(entry, "This evidence gap limits the current research view.", "Ta luka w danych ogranicza obecną analizę.")),
+    action_narratives: context.narrative_contract.slots.actions.map((entry) => slot(entry, "The fixed action addresses the current evidence gap.", "Stałe działanie dotyczy bieżącej luki w danych.")),
+    status_change_narratives: context.narrative_contract.slots.status_change_conditions.map((entry) => slot(entry, "This condition would justify reviewing the research view.", "Ten warunek uzasadnia ponowne sprawdzenie analizy.")),
   };
 }
 

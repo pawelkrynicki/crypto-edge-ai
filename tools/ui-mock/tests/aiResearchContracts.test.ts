@@ -90,16 +90,17 @@ describe("AI Research canonical identity, fingerprint and input boundary", () =>
     assert.notEqual(cacheIdentity(OTHER_ADDRESS, "a".repeat(64)).cache_key, base.cache_key);
     assert.notEqual(cacheIdentity(ADDRESS, "b".repeat(64)).cache_key, base.cache_key);
     assert.notEqual(cacheIdentity(ADDRESS, "a".repeat(64), { prompt_version: "ai_research_prompt_v3" }).cache_key, base.cache_key);
+    assert.notEqual(cacheIdentity(ADDRESS, "a".repeat(64), { narrative_contract_version: "ai_research_narrative_v3" }).cache_key, base.cache_key);
     assert.notEqual(cacheIdentity(ADDRESS, "a".repeat(64), { model_id: "different-model" }).cache_key, base.cache_key);
     assert.notEqual(cacheIdentity(ADDRESS, "a".repeat(64), { analysis_schema_version: "ai_research_brief_v1" }).cache_key, base.cache_key);
   });
 });
 
-describe("AI Research v2 brief and v4 bilingual prompt contract", () => {
+describe("AI Research v2 brief and v5 bilingual prompt contract", () => {
   it("accepts bounded narrative only and rejects skeleton changes, invented facts and unsafe advice", async () => {
     const value = await context("base", ADDRESS, "pl");
     const valid = narrative(value);
-    assert.equal(parseAIResearchProviderNarrative(JSON.stringify(valid), value).narrative_version, "ai_research_narrative_v3");
+    assert.equal(parseAIResearchProviderNarrative(JSON.stringify(valid), value).narrative_version, "ai_research_narrative_v4");
     assert.throws(() => parseAIResearchProviderNarrative("not-json", value), (error) => error instanceof AIResearchValidationError && error.code === "INVALID_JSON");
     const advice = structuredClone(valid);
     advice.summary.pl = "Kup token teraz.";
@@ -133,18 +134,12 @@ describe("AI Research v2 brief and v4 bilingual prompt contract", () => {
     }
   });
 
-  it("falls back only the presentation-defective field and keeps safety or skeleton failures closed", async () => {
+  it("rejects presentation-defective prose and keeps safety or skeleton failures closed", async () => {
     const value = await context("base", ADDRESS, "pl");
     const contaminated = narrative(value);
     contaminated.fact_narratives[0]!.pl = "Dane security wymagają dalszej weryfikacji.";
-    const parsed = parseAIResearchProviderNarrativeWithDiagnostics(JSON.stringify(contaminated), value);
-    assert.deepEqual(parsed.presentation_fallbacks, [{
-      target: "fact_narratives[0]",
-      locale: "pl",
-      violations: ["MACHINE_VALUE_IN_NARRATIVE", "LANGUAGE_MISMATCH"],
-    }]);
-    assert.equal(parsed.narrative.fact_narratives[0]!.en, contaminated.fact_narratives[0]!.en);
-    assert.equal(parsed.narrative.fact_narratives[0]!.pl.includes("security"), false);
+    assert.throws(() => parseAIResearchProviderNarrativeWithDiagnostics(JSON.stringify(contaminated), value),
+      (error) => error instanceof AIResearchValidationError && error.violations.includes("MACHINE_VALUE_IN_NARRATIVE"));
 
     const wrongTarget = structuredClone(contaminated);
     wrongTarget.fact_narratives[0]!.id = "fact:wrong";
@@ -182,7 +177,7 @@ describe("AI Research v2 brief and v4 bilingual prompt contract", () => {
     const value = await context("base", ADDRESS, "pl");
     const brief = buildDeterministicPreview(value, NOW);
     assert.equal(brief.schema_version, "ai_research_brief_v2");
-    assert.equal(brief.prompt_version, "ai_research_prompt_v4");
+    assert.equal(brief.prompt_version, "ai_research_prompt_v5");
     assert.equal(brief.research_state, value.research_state);
     assert.deepEqual(brief.risk_factors.map(({ severity }) => severity), value.risk_candidates.map(({ severity }) => severity));
     assert.equal(brief.next_actions.some(({ action_type }) => action_type === "OWNER_REVIEW"), value.action_catalog.some(({ action_type }) => action_type === "OWNER_REVIEW"));
@@ -215,13 +210,14 @@ describe("AI Research v2 brief and v4 bilingual prompt contract", () => {
 function cacheIdentity(
   address: string,
   fingerprint: string,
-  overrides: Partial<{ prompt_version: string; model_id: string; analysis_schema_version: string }> = {},
+  overrides: Partial<{ prompt_version: string; narrative_contract_version: string; model_id: string; analysis_schema_version: string }> = {},
 ) {
   return buildAIAnalysisCacheIdentity({
     chain: "base",
     contract_address: address,
     snapshot_fingerprint: fingerprint,
-    prompt_version: overrides.prompt_version ?? "ai_research_prompt_v4",
+    prompt_version: overrides.prompt_version ?? "ai_research_prompt_v5",
+    narrative_contract_version: overrides.narrative_contract_version ?? "ai_research_narrative_v4",
     model_id: overrides.model_id ?? "gpt-5-mini",
     analysis_schema_version: overrides.analysis_schema_version ?? "ai_research_brief_v2",
     locale: "pl",
@@ -241,14 +237,15 @@ function contextOptions() {
 }
 
 function narrative(ctx: AIResearchContext) {
+  const slot = (entry: { id: string; allowed_support_ids: string[] }, en: string, pl: string) => ({ id: entry.id, support_ids: [entry.allowed_support_ids[0]!], en, pl });
   return {
-    narrative_version: "ai_research_narrative_v3" as const,
-    summary: { en: "Recorded evidence identifies the current research focus and the next verification step.", pl: "Zapisane dane wskazują obecny cel analizy i kolejny krok weryfikacji." },
-    fact_narratives: ctx.fact_candidates.map((fact) => ({ id: `fact:${fact.key}`, en: "This recorded fact adds context to the research view.", pl: "Ten zapisany fakt uzupełnia obecną analizę." })),
-    risk_narratives: ctx.risk_candidates.map((_risk, index) => ({ id: `risk:${index}`, en: "This recorded risk needs verification against the listed evidence.", pl: "To zapisane ryzyko wymaga sprawdzenia względem wskazanych danych." })),
-    missing_narratives: ctx.missing_information.map((item) => ({ id: `missing:${item.key}`, en: "This evidence gap limits the current research view.", pl: "Ta luka w danych ogranicza obecną analizę." })),
-    action_narratives: ctx.action_catalog.map((_action, index) => ({ id: `action:${index}`, en: "Use this permitted research step to verify the evidence.", pl: "Wykorzystaj ten dozwolony krok analizy, aby sprawdzić dane." })),
-    status_change_narratives: ctx.status_change_conditions.map((condition) => ({ id: `condition:${condition.key}`, en: "This condition would justify reviewing the research view.", pl: "Ten warunek uzasadnia ponowne sprawdzenie analizy." })),
+    narrative_version: "ai_research_narrative_v4" as const,
+    summary: slot(ctx.narrative_contract.slots.summary, "Recorded evidence identifies the current research focus and the current verification boundary.", "Zapisane dane wskazują obecny cel analizy i granicę bieżącej weryfikacji."),
+    fact_narratives: ctx.narrative_contract.slots.facts.map((entry) => slot(entry, "This recorded fact adds context to the research view.", "Ten zapisany fakt uzupełnia obecną analizę.")),
+    risk_narratives: ctx.narrative_contract.slots.risks.map((entry) => slot(entry, "This recorded risk needs verification against the listed evidence.", "To zapisane ryzyko wymaga sprawdzenia względem wskazanych danych.")),
+    missing_narratives: ctx.narrative_contract.slots.missing_information.map((entry) => slot(entry, "This evidence gap limits the current research view.", "Ta luka w danych ogranicza obecną analizę.")),
+    action_narratives: ctx.narrative_contract.slots.actions.map((entry) => slot(entry, "The fixed action addresses the current evidence gap.", "Stałe działanie dotyczy bieżącej luki w danych.")),
+    status_change_narratives: ctx.narrative_contract.slots.status_change_conditions.map((entry) => slot(entry, "This condition would justify reviewing the research view.", "Ten warunek uzasadnia ponowne sprawdzenie analizy.")),
   };
 }
 
@@ -258,14 +255,15 @@ function maximumLengthNarrative(ctx: AIResearchContext) {
   const plSummary = text("Zapisane dane nadal wymagają weryfikacji. ", 600);
   const enItem = text("Recorded evidence requires careful verification. ", 280);
   const plItem = text("Zapisane dane wymagają dokładnej weryfikacji. ", 280);
+  const slot = (entry: { id: string; allowed_support_ids: string[] }, en: string, pl: string) => ({ id: entry.id, support_ids: [entry.allowed_support_ids[0]!], en: `${en.slice(0, -1)}.`, pl: `${pl.slice(0, -1)}.` });
   return {
-    narrative_version: "ai_research_narrative_v3" as const,
-    summary: { en: enSummary, pl: plSummary },
-    fact_narratives: ctx.fact_candidates.map((fact) => ({ id: `fact:${fact.key}`, en: enItem, pl: plItem })),
-    risk_narratives: ctx.risk_candidates.map((_risk, index) => ({ id: `risk:${index}`, en: enItem, pl: plItem })),
-    missing_narratives: ctx.missing_information.map((item) => ({ id: `missing:${item.key}`, en: enItem, pl: plItem })),
-    action_narratives: ctx.action_catalog.map((_action, index) => ({ id: `action:${index}`, en: enItem, pl: plItem })),
-    status_change_narratives: ctx.status_change_conditions.map((condition) => ({ id: `condition:${condition.key}`, en: enItem, pl: plItem })),
+    narrative_version: "ai_research_narrative_v4" as const,
+    summary: slot(ctx.narrative_contract.slots.summary, enSummary, plSummary),
+    fact_narratives: ctx.narrative_contract.slots.facts.map((entry) => slot(entry, enItem, plItem)),
+    risk_narratives: ctx.narrative_contract.slots.risks.map((entry) => slot(entry, enItem, plItem)),
+    missing_narratives: ctx.narrative_contract.slots.missing_information.map((entry) => slot(entry, enItem, plItem)),
+    action_narratives: ctx.narrative_contract.slots.actions.map((entry) => slot(entry, enItem, plItem)),
+    status_change_narratives: ctx.narrative_contract.slots.status_change_conditions.map((entry) => slot(entry, enItem, plItem)),
   };
 }
 

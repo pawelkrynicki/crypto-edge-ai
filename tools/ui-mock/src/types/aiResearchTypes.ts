@@ -1,7 +1,7 @@
 export const AI_RESEARCH_SCHEMA_VERSION = "ai_research_brief_v2" as const;
 // One shared heavy generation carries evidence-bound English and Polish wording.
 // Request locale never owns the cache key or triggers a second provider call.
-export const AI_RESEARCH_PROMPT_VERSION = "ai_research_prompt_v4" as const;
+export const AI_RESEARCH_PROMPT_VERSION = "ai_research_prompt_v5" as const;
 export const AI_ANALYSIS_QUEUE_SCHEMA_VERSION = "ai_analysis_queue_v1" as const;
 export const AI_RESEARCH_DATA_CONTRACT_VERSION = "ai_research_data_contract_v2" as const;
 export const AI_RESEARCH_TARGET_MODEL = "gpt-5-mini" as const;
@@ -149,13 +149,18 @@ export type AIResearchCoverageItem = {
   explanation: string;
 };
 
+/**
+ * The public result shape remains v2.  Historical v4 rows are intentionally
+ * readable for audit, while only the current prompt is eligible for a current
+ * lookup.
+ */
 export type AIResearchBrief = {
   schema_version: typeof AI_RESEARCH_SCHEMA_VERSION;
   analysis_id: string;
   identity: { chain: string; contract_address: string };
   analysis_language: "bilingual";
   snapshot_fingerprint: string;
-  prompt_version: typeof AI_RESEARCH_PROMPT_VERSION;
+  prompt_version: typeof AI_RESEARCH_PROMPT_VERSION | "ai_research_prompt_v4";
   model: string;
   generated_at: string;
   data_generated_at: string;
@@ -196,7 +201,7 @@ export type AIResearchReviewMetrics = {
   schema_version: "ai_research_review_metrics_v1";
   analysis_id: string;
   model: string;
-  prompt_version: typeof AI_RESEARCH_PROMPT_VERSION;
+  prompt_version: AIResearchBrief["prompt_version"];
   snapshot_fingerprint: string;
   generated_at: string;
   data_generated_at: string;

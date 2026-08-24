@@ -1,0 +1,9 @@
+{
+  "fixture_version": "ai_research_v5_corrected_en_v1",
+  "summary": "Recorded evidence shows that the current stage concerns security and still requires the three unresolved checks.",
+  "fact": "This recorded fact provides context for the current research view.",
+  "risk": "This recorded risk remains unresolved on the available evidence.",
+  "missing": "This evidence gap limits the current conclusion.",
+  "action": "This fixed action addresses the current evidence gap.",
+  "condition": "This condition justifies reviewing the analysis after new evidence is recorded."
+}
