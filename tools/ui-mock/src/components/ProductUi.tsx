@@ -132,18 +132,23 @@ export function StatusBadge({
   tone = "neutral",
   className = "",
   "aria-label": ariaLabel,
+  activeState = false,
 }: {
   children: ReactNode;
   tone?: ProductStatusTone;
   className?: string;
   "aria-label"?: string;
+  /** Marks a currently effective product state; text remains the primary cue. */
+  activeState?: boolean;
 }) {
   return (
     <span
       className={`product-status-badge ${tone} ${className}`.trim()}
       data-status-tone={tone}
+      data-status-active={activeState ? "true" : "false"}
       data-interaction="status"
       aria-label={ariaLabel}
+      role={activeState ? "status" : undefined}
     >
       <span className="product-status-indicator" aria-hidden="true" />
       <span>{children}</span>

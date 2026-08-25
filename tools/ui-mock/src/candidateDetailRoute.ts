@@ -14,9 +14,16 @@ export type RouteTokenIdentity = {
 export function resolveRouteTokenIdentity(): RouteTokenIdentity | null {
   if (typeof window === "undefined") return null;
   const params = new URLSearchParams(window.location.search);
-  const identity = resolveTokenIdentity(params.get("chain") ?? "", params.get("contract") ?? "");
-  if (identity.status !== "valid") return null;
-  return { chain: identity.chain, contract_address: identity.contract_address };
+  const rawChain = (params.get("chain") ?? "").trim();
+  const rawContract = (params.get("contract") ?? "").trim();
+  if (!rawChain || !rawContract) return null;
+  const identity = resolveTokenIdentity(rawChain, rawContract);
+  // A route is also the hand-off contract between Product Detail and
+  // Verification. Unsupported or malformed records must remain selectable so
+  // the product can explain the block; only lifecycle/AI eligibility uses the
+  // stricter identity resolver.
+  if (identity.status === "valid") return { chain: identity.chain, contract_address: identity.contract_address };
+  return { chain: rawChain.toLowerCase(), contract_address: rawContract };
 }
 
 export function resolveDetailTab(): CandidateDetailTabId {
@@ -89,7 +96,7 @@ export function writeVerificationDecisionTargetRoute(identity: RouteTokenIdentit
   url.searchParams.delete("research_check");
   url.searchParams.delete("research_playbook");
   url.hash = "external-checks";
-  window.history.pushState(null, "", url);
+  commitTokenRoute(url);
 }
 
 export function writeVerificationDecisionRoute(identity: RouteTokenIdentity) {
@@ -105,7 +112,7 @@ export function writeVerificationDecisionRoute(identity: RouteTokenIdentity) {
   url.searchParams.delete("research_check");
   url.searchParams.delete("research_playbook");
   url.hash = "external-checks";
-  window.history.pushState(null, "", url);
+  commitTokenRoute(url);
 }
 
 export function resolveVerificationTab(): "decision" | null {
@@ -152,7 +159,7 @@ export function writeVerificationListRoute() {
   url.searchParams.delete("verification_origin");
   url.searchParams.delete("verification_tab");
   url.hash = "external-checks";
-  window.history.pushState(null, "", url);
+  commitTokenRoute(url);
 }
 
 function writeTokenRoute(
@@ -179,5 +186,19 @@ function writeTokenRoute(
   url.searchParams.delete("verification_origin");
   url.searchParams.delete("verification_tab");
   url.hash = section;
+  commitTokenRoute(url);
+}
+
+/**
+ * `history.pushState` intentionally does not emit popstate/hashchange. Product
+ * Detail owns a rendered-tab state in addition to the URL, so notify that
+ * state explicitly after every canonical token-route write.
+ */
+function commitTokenRoute(url: URL) {
   window.history.pushState(null, "", url);
+  // Lightweight test/window shims may support history without an event
+  // target. Real browsers always receive the synchronous route notification.
+  if (typeof window.dispatchEvent === "function") {
+    window.dispatchEvent(new Event("crypto-edge-token-route-change"));
+  }
 }

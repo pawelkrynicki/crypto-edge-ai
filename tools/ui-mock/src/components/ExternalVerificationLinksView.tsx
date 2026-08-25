@@ -22,6 +22,7 @@ import type { UiTokenCandidate } from "../types/scannerTypes";
 import type { FollowUpPublicEntry } from "../types/followUpTypes";
 import type { ResearchStepNumber } from "../researchChecklistTypes";
 import { followUpToResearchCandidate } from "../followUpResearchCandidate";
+import { resolveTokenIdentity } from "../tokenLifecycle";
 import {
   loadManualVerification,
   saveManualVerificationDecision,
@@ -31,7 +32,7 @@ import {
 import { ActionButton, CopyButton, ExternalLinkAction } from "./ProductUi";
 import { TokenDetailDrawer } from "./TokenDetailDrawer";
 import { TokenDetailTabPanel, TokenDetailTabs } from "./TokenDetailTabs";
-import { ManualSourceGuidance, ResearchManualEvidencePanel, ResearchPlaybookContext, type ManualSourceGuidanceTopic } from "./ResearchChecklist";
+import { ManualSourceGuidance, ResearchPlaybookContext, type ManualSourceGuidanceTopic } from "./ResearchChecklist";
 import { getVerificationMissingTargetPresentation, resolveVerificationMissingTarget, type VerificationMissingTarget } from "../verificationMissingItemTargets";
 
 const VERIFICATION_DRAWER_TAB_IDS = ["identity", "market", "filters", "security", "data", "decision"] as const;
@@ -83,7 +84,6 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
   // not present in the current scanner batch.
   const researchCandidate = candidate ?? (followUp ? followUpToResearchCandidate(followUp) : null);
   const focusedMissingMapping = focusedMissingTarget ? getVerificationMissingTargetPresentation(focusedMissingTarget) : null;
-  const focusedMissingTab = focusedMissingMapping?.tab ?? null;
   const [activeTab, setActiveTab] = useState<VerificationDrawerTabId>(focusedMissingMapping?.tab ?? (focusedResearchStep === 3 ? "security" : initialActiveTab));
   const [verdict, setVerdict] = useState<ManualVerificationVerdict | null>(null);
   const [note, setNote] = useState("");
@@ -105,12 +105,6 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
     });
     return () => { cancelled = true; };
   }, [chain, contractAddress]);
-
-  useEffect(() => {
-    if (!focusedMissingTab || typeof window === "undefined") return;
-    const frame = window.requestAnimationFrame(() => setActiveTab(focusedMissingTab));
-    return () => window.cancelAnimationFrame(frame);
-  }, [focusedMissingTab]);
 
   useEffect(() => {
     if (!focusedMissingTarget || typeof document === "undefined") return;
@@ -135,6 +129,7 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
 
   const input = buildInput(candidate, followUp);
   const normalizedInput = normalizeExternalVerificationInput(input);
+  const tokenIdentity = resolveTokenIdentity(chain, contractAddress);
   const targets = buildExternalVerificationTargets(input);
   const securityResolution = candidate ? resolveProductSecurityState(candidate) : null;
   const missingData = fallbackMissing;
@@ -148,7 +143,11 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
     volumeMarketCapRatio: candidate?.volumeMarketCapRatio ?? followUp?.market_metrics.volume_market_cap_ratio ?? null,
     pairAge: candidate?.pairAgeDays ?? followUp?.pair_age ?? null,
   };
-  const marketObservedAt = followUp?.market_observed_at ?? candidate?.lastCheckedAt ?? null;
+  // A record-check time proves when the record was handled; it is not market
+  // snapshot provenance. Only the retained Follow-up observation carries a
+  // per-token market snapshot timestamp today.
+  const marketObservedAt = followUp?.market_observed_at ?? null;
+  const recordCheckedAt = followUp?.last_checked_at ?? candidate?.lastCheckedAt ?? null;
   const filterResolution = resolveProductFilterConditions({
     basicFilterStatus: candidate?.basicFilterStatus ?? followUp?.filter_status ?? "not_checked",
     filterReasons: candidate?.filterReasons ?? followUp?.filter_reasons ?? [],
@@ -206,7 +205,8 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
           <VerificationMetric label={locale === "pl" ? "Wiek pary" : "Pair age"} value={formatProductPairAge(market.pairAge, locale, missingText, { pairCreatedAt: candidate?.pairCreatedAt ?? null })} />
           <VerificationMetric label={locale === "pl" ? "Cena" : "Price"} value={formatVerificationPrice(candidate?.priceUsd ?? followUp?.market_metrics.price_usd ?? null, locale, missingText)} />
           <VerificationMetric label={locale === "pl" ? "Zmiana ceny" : "Price change"} value={locale === "pl" ? "Brak danych o zmianie ceny" : "No price-change data"} />
-          <VerificationMetric label={locale === "pl" ? "Dane aktualne na" : "Market data as of"} value={marketObservedAt ? formatProductDateTime(marketObservedAt, locale) : missingText} />
+          <VerificationMetric label={locale === "pl" ? "Czas migawki rynkowej" : "Market snapshot time"} value={marketSnapshotTimeLabel(marketObservedAt, locale)} />
+          <VerificationMetric label={locale === "pl" ? "Rekord sprawdzono" : "Record checked"} value={recordCheckedAt ? formatProductDateTime(recordCheckedAt, locale) : missingText} />
         </div>
       </VerificationSection>
     );
@@ -258,7 +258,8 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
         {focusedMissingTarget && <VerificationMissingTargetFocus target={focusedMissingTarget} chain={chain} contractAddress={contractAddress} locale={locale} onReturnToDecision={decisionOrigin ? onReturnToDecision : undefined} />}
         <div className="product-detail-grid data">
           <VerificationMetric label={locale === "pl" ? "Źródło danych rynkowych i filtrów" : "Market and filter source"} value={candidate ? formatProductSourceLabel(candidate.source) : formatFollowUpMarketSource(locale)} />
-          <VerificationMetric label={locale === "pl" ? "Timestamp danych" : "Data timestamp"} value={marketObservedAt ? formatProductDateTime(marketObservedAt, locale) : missingText} />
+          <VerificationMetric label={locale === "pl" ? "Czas migawki rynkowej" : "Market snapshot time"} value={marketSnapshotTimeLabel(marketObservedAt, locale)} />
+          <VerificationMetric label={locale === "pl" ? "Rekord sprawdzono" : "Record checked"} value={recordCheckedAt ? formatProductDateTime(recordCheckedAt, locale) : missingText} />
           <VerificationMetric label={locale === "pl" ? "Status źródła" : "Source status"} value={locale === "pl" ? "Migawka dostępna do ręcznej kontroli" : "Snapshot available for manual review"} />
           <VerificationMetric label={locale === "pl" ? "Źródła kontroli bezpieczeństwa" : "Security check sources"} value={securityResolution?.sources.map(formatProductSourceLabel).join(", ") || missingText} />
         </div>
@@ -273,7 +274,6 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
   if (activeTab === "decision") {
     activeContent = (
       <VerificationDecision
-        candidate={candidate}
         locale={locale}
         lastDecision={lastDecision}
         verdict={verdict}
@@ -306,6 +306,7 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
       className="verification-token-drawer"
     >
       <TokenDetailTabPanel activeTab={activeTab} idPrefix="verification"><div className="external-checks-view product-verification verification-tab-content">
+        {tokenIdentity.status === "invalid" && <VerificationEligibilityNotice reason={tokenIdentity.reason} locale={locale} />}
         {focusedResearchStep && researchCandidate && <ResearchPlaybookContext candidate={researchCandidate} focusedStep={focusedResearchStep} verificationCheck={focusedResearchCheck} surface="verification" onOpenPlaybook={onBackToResearchPlaybook} />}
         {activeContent}
       </div></TokenDetailTabPanel>
@@ -314,7 +315,6 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
 };
 
 function VerificationDecision({
-  candidate,
   locale,
   lastDecision,
   verdict,
@@ -330,7 +330,6 @@ function VerificationDecision({
   onReturnToDetail,
   onOpenMissingTarget,
 }: {
-  candidate: UiTokenCandidate | null | undefined;
   locale: ProductLocale;
   lastDecision: PrivateVerificationRecord | null;
   verdict: ManualVerificationVerdict | null;
@@ -349,29 +348,29 @@ function VerificationDecision({
   const pl = locale === "pl";
   return (
     <VerificationSection heading={pl ? "Decyzja weryfikacyjna" : "Verification decision"} detail={pl ? "Zapisujesz swój wynik weryfikacji. Nie zmienia on wspólnego Radaru ani lifecycle." : "You save your own verification result. It does not change the shared Radar or lifecycle."}>
-      <section className="verification-decision-current" aria-label={pl ? "Twój wynik weryfikacji" : "Your verification result"}>
-        <span>{pl ? "Twój wynik weryfikacji" : "Your verification result"}</span>
+      <section className="verification-decision-current" aria-label={pl ? "Aktualny wynik weryfikacji" : "Current verification result"}>
+        <span>{pl ? "Aktualny wynik" : "Current result"}</span>
         <strong data-verification-verdict={lastDecision?.verdict}>{lastDecision ? manualVerificationVerdictLabel(lastDecision.verdict, locale) : (pl ? "Brak zapisanej decyzji" : "No saved decision")}</strong>
         {lastDecision && <p>{pl ? `Twój zapis: ${formatProductDateTime(lastDecision.checked_at, locale)}` : `Your saved result: ${formatProductDateTime(lastDecision.checked_at, locale)}`}</p>}
       </section>
 
+      <section className="verification-decision-coverage" aria-label={pl ? "Dostępny i brakujący kontekst decyzji" : "Available and missing decision context"}><div className="condition-list ready"><strong>{pl ? "Dostępne / potwierdzone" : "Available / confirmed"}</strong><ul>{availableData.map((item) => <li key={item}>{formatCoverageItem(item, locale)}</li>)}</ul></div><div className="condition-list warning"><strong>{pl ? "Braki dla tej decyzji" : "Missing for this decision"}</strong>{missingData.length > 0 ? <ul>{missingData.map((item) => <MissingDecisionItem key={item} value={item} locale={locale} onOpenMissingTarget={onOpenMissingTarget} />)}</ul> : <p>{pl ? "Brak" : "None"}</p>}</div></section>
+
+      <section className="verification-decision-choice-section" aria-labelledby="verification-decision-choice-heading">
+        <h4 id="verification-decision-choice-heading">{pl ? "Twoja decyzja" : "Your decision"}</h4>
       <div className="verification-decision-options" role="radiogroup" aria-label={pl ? "Wybierz decyzję weryfikacyjną" : "Choose verification decision"}>
         {(["VERIFIED", "NEEDS_MORE_DATA", "CRITICAL_RISK", "REJECT"] as const).map((option) => (
-          <button key={option} type="button" role="radio" aria-checked={verdict === option} className={verdict === option ? "selected" : ""} onClick={() => onVerdictChange(option)}>
+          <button key={option} type="button" role="radio" aria-checked={verdict === option} tabIndex={verdict === option || verdict === null && option === "VERIFIED" ? 0 : -1} className={verdict === option ? "selected" : ""} onClick={() => onVerdictChange(option)} onKeyDown={(event) => selectDecisionWithKeyboard(event, option, onVerdictChange)}>
             {manualVerificationVerdictLabel(option, locale)}
           </button>
         ))}
       </div>
+      </section>
 
-      <label className="verification-decision-note"><span>{pl ? "Twoja notatka" : "Your note"}</span><textarea value={note} onChange={(event) => onNoteChange(event.target.value)} minLength={3} maxLength={500} rows={4} /></label>
-
-      <section className="verification-decision-impact"><strong>{pl ? "Podsumowanie skutków decyzji" : "Decision impact summary"}</strong><p>{verdict ? decisionImpactCopy(verdict, locale) : (pl ? "Wybierz decyzję, aby zobaczyć jej skutki." : "Choose a decision to see its impact.")}</p></section>
-
-      <section className="verification-decision-coverage"><div className="condition-list ready"><strong>{pl ? "Dostępne" : "Available"}</strong><ul>{availableData.map((item) => <li key={item}>{formatCoverageItem(item, locale)}</li>)}</ul></div><div className="condition-list warning"><strong>{pl ? "Brakujące" : "Missing"}</strong>{missingData.length > 0 ? <ul>{missingData.map((item) => <MissingDecisionItem key={item} value={item} locale={locale} onOpenMissingTarget={onOpenMissingTarget} />)}</ul> : <p>{pl ? "Brak" : "None"}</p>}</div></section>
-
-      {candidate && <ResearchManualEvidencePanel candidate={candidate} />}
+      <label className="verification-decision-note"><span>{pl ? "Krótka notatka" : "Short note"}</span><textarea value={note} onChange={(event) => onNoteChange(event.target.value)} minLength={3} maxLength={500} rows={4} /></label>
 
       <section className="verification-save-section" aria-label={pl ? "Zapis wyniku weryfikacji" : "Save verification result"}>
+        {(!verdict || note.trim().length < 3) && <p className="verification-save-requirements" role="status">{pl ? "Aby zapisać, wybierz decyzję i wpisz krótką notatkę (co najmniej 3 znaki)." : "To save, choose a decision and enter a short note (at least 3 characters)."}</p>}
         <ActionButton variant="primary" onClick={() => void onSave()} loading={saving} disabled={!verdict || note.trim().length < 3 || saving}>{pl ? "Zapisz wynik weryfikacji" : "Save verification result"}</ActionButton>
         {saveError && <p role="alert">{pl ? "Nie zapisano wyniku. Wprowadzone dane pozostają na ekranie — spróbuj ponownie." : "The result was not saved. Your entered data remains on screen — try again."}</p>}
       </section>
@@ -389,12 +388,42 @@ function VerificationSection({ heading, detail, children }: { heading: string; d
   return <section className={`verification-research-section ${isIdentity ? "verification-identity-panel" : ""} ${isDecision ? "verification-decision-panel" : ""}`.trim()}><header><div><h3>{heading}</h3><p>{detail}</p></div></header>{children}</section>;
 }
 
-function decisionImpactCopy(verdict: ManualVerificationVerdict, locale: ProductLocale): string {
+function selectDecisionWithKeyboard(
+  event: React.KeyboardEvent<HTMLButtonElement>,
+  current: ManualVerificationVerdict,
+  onChange: (value: ManualVerificationVerdict) => void,
+) {
+  const options: ManualVerificationVerdict[] = ["VERIFIED", "NEEDS_MORE_DATA", "CRITICAL_RISK", "REJECT"];
+  const index = options.indexOf(current);
+  const nextIndex = event.key === "ArrowRight" || event.key === "ArrowDown"
+    ? (index + 1) % options.length
+    : event.key === "ArrowLeft" || event.key === "ArrowUp"
+      ? (index - 1 + options.length) % options.length
+      : event.key === "Home" ? 0
+        : event.key === "End" ? options.length - 1
+          : null;
+  if (nextIndex === null) return;
+  event.preventDefault();
+  const next = options[nextIndex]!;
+  onChange(next);
+  event.currentTarget.parentElement?.querySelector<HTMLButtonElement>(`[role="radio"]:nth-child(${nextIndex + 1})`)?.focus();
+}
+
+function VerificationEligibilityNotice({ reason, locale }: { reason: "INCOMPLETE_IDENTITY" | "INVALID_CONTRACT_ADDRESS" | "UNSUPPORTED_CHAIN"; locale: ProductLocale }) {
   const pl = locale === "pl";
-  if (verdict === "VERIFIED") return pl ? "Werdykt zostanie zapisany jako ręcznie zweryfikowany dla tej tożsamości tokena." : "The verdict will be saved as manually verified for this token identity.";
-  if (verdict === "CRITICAL_RISK") return pl ? "Werdykt wskaże krytyczne ryzyko do dalszej ręcznej oceny." : "The verdict will mark critical risk for further manual assessment.";
-  if (verdict === "REJECT") return pl ? "Werdykt wskaże odrzucenie tej tożsamości w historii ręcznej weryfikacji." : "The verdict will mark this identity as rejected in manual-verification history.";
-  return pl ? "Werdykt wskaże, że przed decyzją potrzebne są dodatkowe dane." : "The verdict will mark that more data is needed before a decision.";
+  const presentationState = reason === "UNSUPPORTED_CHAIN"
+    ? "unsupported-network"
+    : reason === "INVALID_CONTRACT_ADDRESS" ? "invalid-contract" : "identity-missing";
+  const copy = reason === "UNSUPPORTED_CHAIN"
+    ? { title: pl ? "Nieobsługiwana sieć" : "Unsupported network", detail: pl ? "Ten token pozostaje widoczny do obserwacji, ale pełna weryfikacja nie jest obecnie dostępna dla tej sieci." : "This token remains visible for observation, but full verification is not currently available for this network." }
+    : reason === "INVALID_CONTRACT_ADDRESS"
+      ? { title: pl ? "Nieprawidłowy adres kontraktu" : "Invalid contract address", detail: pl ? "Nie udało się potwierdzić tożsamości tokena, dlatego funkcje wymagające potwierdzonej tożsamości są zablokowane." : "The token identity could not be confirmed, so functions requiring a confirmed identity are unavailable." }
+      : { title: pl ? "Brakuje danych identyfikujących token" : "Token identity data is missing", detail: pl ? "Uzupełnij dane tożsamości, aby otworzyć pełną weryfikację." : "Complete the identity data to open full verification." };
+  return <section className="verification-eligibility-notice" role="status" data-verification-eligibility={presentationState}><strong>{copy.title}</strong><p>{copy.detail}</p></section>;
+}
+
+function marketSnapshotTimeLabel(value: string | null, locale: ProductLocale): string {
+  return value ? formatProductDateTime(value, locale) : locale === "pl" ? "Brak dokładnego czasu migawki" : "Exact snapshot time unavailable";
 }
 
 function VerificationFilterRow({ category, state, value, reasons, advisory, locale }: { category: BasicFilterCategory; state: BasicFilterConditionState; value: string; reasons: string[]; advisory: string | null; locale: ProductLocale }) {

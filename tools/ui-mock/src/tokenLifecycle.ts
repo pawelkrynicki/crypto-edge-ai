@@ -134,7 +134,7 @@ const NEXT_ACTION_LABELS: Record<TokenLifecycleNextActionType, string> = {
   automatic_checkpoint: "Data reassessment at the checkpoint",
   owner_decision: "Product decision",
   main_radar_monitoring: "Main Radar monitoring",
-  resolve_identity: "Complete chain and contract address",
+  resolve_identity: "Complete the token identity details",
   restore_follow_up_data: "Restore read-only Follow-up data",
   observation_complete: "Keep the completed Follow-up history",
 };
@@ -370,6 +370,23 @@ function resolveCheckpointViews(
     if (day === nextDay && nextIsDue) return { day, state: "current", scheduled_at: nextCheckpointAt };
     return { day, state: "future", scheduled_at: day === nextDay ? nextCheckpointAt : null };
   });
+}
+
+/**
+ * Product routes must also be able to carry a raw source identity for a token
+ * on an unsupported network. This is deliberately separate from
+ * `isSameTokenIdentity`: lifecycle, persistence and AI eligibility remain
+ * limited to supported, validated identities.
+ */
+export function isSameRoutedTokenIdentity(
+  left: { chain: string; contract_address: string },
+  right: { chain: string; contract_address: string },
+): boolean {
+  const leftIdentity = resolveTokenIdentity(left.chain, left.contract_address);
+  const rightIdentity = resolveTokenIdentity(right.chain, right.contract_address);
+  if (leftIdentity.status === "valid" && rightIdentity.status === "valid") return leftIdentity.key === rightIdentity.key;
+  return left.chain.trim().toLowerCase() === right.chain.trim().toLowerCase()
+    && left.contract_address.trim().toLowerCase() === right.contract_address.trim().toLowerCase();
 }
 
 function isValidSolanaAddress(value: string): boolean {

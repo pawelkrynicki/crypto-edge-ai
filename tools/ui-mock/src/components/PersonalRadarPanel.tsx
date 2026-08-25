@@ -47,6 +47,7 @@ export function PersonalRadarPanel({
   const canWrite = resolvedView.actor.capabilities.includes("CAMP_USER_WORKSPACE_WRITE");
   const target = nextPrivateStatus(resolvedView.user_status);
   const actionLabel = target === "MAIN_RADAR" ? copy.nextMain : copy.nextFollowUp;
+  const privateStatus = resolvedView.user_status_is_override ? resolvedView.user_status : null;
 
   const publish = async (next: LifecycleTokenView | null) => {
     if (!next) { setError(copy.saveFailed); return; }
@@ -67,8 +68,8 @@ export function PersonalRadarPanel({
 
   return <div className={`personal-radar-inline ${placement}`} data-personal-radar="inline">
     <div className="personal-radar-statuses" aria-label={locale === "pl" ? "Status Radaru produktu i Twojego Radaru" : "Product Radar and Your Radar status"}>
-      <StatusBadge tone={radarTone(resolvedView.system_status)} className="personal-radar-active" aria-label={`${copy.system}: ${lifecycleStatusLabel(resolvedView.system_status, locale)}; ${locale === "pl" ? "aktywny status" : "active status"}`}>{copy.system}: {lifecycleStatusLabel(resolvedView.system_status, locale)}</StatusBadge>
-      <StatusBadge tone={radarTone(resolvedView.user_status)} className="personal-radar-active" aria-label={`${copy.yours}: ${lifecycleStatusLabel(resolvedView.user_status, locale)}; ${locale === "pl" ? "aktywny status" : "active status"}`}>{copy.yours}: {lifecycleStatusLabel(resolvedView.user_status, locale)}</StatusBadge>
+      <StatusBadge tone={radarTone(resolvedView.system_status)} className="personal-radar-active" activeState aria-label={`${copy.system}: ${lifecycleStatusLabel(resolvedView.system_status, locale)}; ${locale === "pl" ? "aktywny status" : "active status"}`}>{copy.system}: {lifecycleStatusLabel(resolvedView.system_status, locale)}</StatusBadge>
+      <StatusBadge tone={privateStatus ? radarTone(privateStatus) : "manual"} className="personal-radar-active" activeState aria-label={`${copy.yours}: ${privateStatus ? lifecycleStatusLabel(privateStatus, locale) : copy.unassigned}; ${locale === "pl" ? "aktualny status prywatny" : "current private status"}`}>{copy.yours}: {privateStatus ? lifecycleStatusLabel(privateStatus, locale) : copy.unassigned}</StatusBadge>
       {resolvedView.user_status_is_override && <small className="personal-radar-private-note">{locale === "pl" ? "To jest prywatna organizacja. Radar produktu pozostaje bez zmian." : "This is private organization. Product Radar stays unchanged."}</small>}
     </div>
     {canWrite && !confirming && <div className="personal-radar-actions">
@@ -90,6 +91,5 @@ function nextPrivateStatus(value: SystemLifecycleStatus): Exclude<SystemLifecycl
 
 function radarTone(status: SystemLifecycleStatus): "accent" | "ready" | "neutral" {
   if (status === "MAIN_RADAR") return "ready";
-  if (status === "FOLLOW_UP") return "accent";
-  return "neutral";
+  return "accent";
 }

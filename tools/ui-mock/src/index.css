@@ -5846,6 +5846,33 @@ button:disabled,
   gap: var(--space-3);
 }
 
+.private-radar-section {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.private-radar-switcher-heading {
+  display: grid;
+  gap: 4px;
+  max-width: 760px;
+}
+
+.private-radar-switcher-heading > span {
+  color: var(--color-text-helper);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.private-radar-switcher-heading > p { margin: 0; }
+
+/* The section heading belongs to the section, never to a basket cell. Keep
+   the cards compact on tablets while preserving the three equal columns on
+   a desktop. */
+@media (min-width: 761px) and (max-width: 960px) {
+  .private-radar-section > .basket-switcher { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 .basket-switcher::before {
   position: absolute;
   z-index: 0;
@@ -7168,6 +7195,13 @@ button:disabled,
   height: 8px;
   flex-basis: 8px;
   box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 17%, transparent);
+}
+
+.personal-radar-active[data-status-active="true"] .product-status-indicator {
+  width: 9px;
+  height: 9px;
+  flex-basis: 9px;
+  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 20%, transparent);
 }
 
 .personal-radar-confirmation {
@@ -9607,6 +9641,45 @@ summary {
 .verification-decision-options > button:hover,
 .verification-decision-options > button.selected { border-color: var(--color-border-active); background: var(--color-accent-soft); }
 .verification-decision-options > button.selected { box-shadow: inset 3px 0 0 var(--color-accent); }
+.verification-decision-options > button:focus-visible {
+  outline: 2px solid var(--color-border-active);
+  outline-offset: 2px;
+}
+
+.verification-decision-choice-section {
+  display: grid;
+  width: 100%;
+  gap: var(--space-2);
+}
+
+.verification-decision-choice-section > h4 {
+  margin: 0;
+  color: var(--color-text-helper);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.verification-save-requirements {
+  margin: 0 0 var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.verification-eligibility-notice {
+  display: grid;
+  gap: 5px;
+  width: 100%;
+  margin-bottom: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-status-partial);
+  border-radius: var(--radius-sm);
+  background: var(--color-status-partial-bg);
+}
+
+.verification-eligibility-notice strong { color: var(--color-status-partial); }
+.verification-eligibility-notice p { margin: 0; color: var(--color-text-primary); font-size: 12px; line-height: 1.5; }
 
 .verification-missing-link {
   display: inline-flex;

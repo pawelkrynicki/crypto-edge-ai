@@ -104,7 +104,7 @@ describe("Premium UI.2 presentation contracts", () => {
       source("src/externalVerificationTargets.ts"),
       source("src/productI18n.tsx"),
     ]);
-    for (const section of ["verification.identity", "Dane rynkowe", "Kontrakt i eksplorator", "Status bezpieczeństwa", "Źródła zewnętrzne", "Lista ręcznej weryfikacji"]) {
+    for (const section of ["tabCopy.identity", "tabCopy.market", "verification-contract-panel", "Status bezpieczeństwa", "external-checks-list", "verification-decision-options"]) {
       assert.match(verification, new RegExp(section));
     }
     assert.doesNotMatch(verification, /fetch\(|axios|XMLHttpRequest|submit/i);
@@ -147,16 +147,17 @@ describe("Premium UI.2 presentation contracts", () => {
     }
   });
 
-  it("keeps Run ID in Candidate Detail technical details and renders readable failed-condition rows", async () => {
+  it("keeps Run ID in Data and sources technical details and renders readable failed-condition rows", async () => {
     const detail = await source("src/components/CandidateDetailView.tsx");
     const freshnessSection = detail.slice(detail.indexOf('aria-labelledby="freshness-heading"'), detail.indexOf('aria-labelledby="sources-heading"'));
+    const sourcesSection = detail.slice(detail.indexOf('aria-labelledby="sources-heading"'));
     assert.doesNotMatch(freshnessSection, /DetailField label=\{t\("detail\.runId"\)\}/);
-    assert.match(freshnessSection, /TechnicalDetails label=\{t\("app\.technicalDetails"\)\}/);
-    assert.match(freshnessSection, /<dt>\{t\("detail\.runId"\)\}<\/dt>/);
-    assert.match(detail, /failed-condition-row/);
-    assert.match(detail, /actual/);
-    assert.match(detail, /required/);
-    assert.match(detail, /buildFailedFilterRow/);
+    assert.match(sourcesSection, /TechnicalDetails label=\{t\("app\.technicalDetails"\)\}/);
+    assert.match(sourcesSection, /<dt>\{t\("detail\.runId"\)\}<\/dt>/);
+    assert.match(detail, /function FilterFacts/);
+    assert.match(detail, /getProductFilterRequirement\(category\)/);
+    assert.match(detail, /filter-facts-grid/);
+    assert.match(detail, /Wymaganie/);
   });
 
   it("keeps complete PL/EN tagline, routes, focus, mobile overflow and reduced motion", async () => {

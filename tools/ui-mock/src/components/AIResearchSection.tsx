@@ -69,6 +69,7 @@ export function AIResearchSection({
   const { locale } = useProductLocale();
   const ui = COPY[locale];
   const identity = useMemo(() => resolveTokenIdentity(chain, contractAddress), [chain, contractAddress]);
+  const ineligibilityReason = identity.status === "invalid" ? identity.reason : null;
   const renderPreviewMode = isAIResearchRenderPreviewMode();
   const initialNeedsPreview = renderPreviewMode && (!isLegacyLookup(initialLookup) || initialLookup.brief?.render_preview !== true);
   const [lookup, setLookup] = useState<Lookup | null>(initialLookup ?? null);
@@ -155,7 +156,7 @@ export function AIResearchSection({
   const waitingToRetry = availability === "COOLDOWN" || availability === "RATE_LIMITED";
   const canRequest = identity.status === "valid"
     && !["QUEUED", "PROCESSING", "READY", "PROVIDER_DISABLED", "INSUFFICIENT_DATA", "SUSPENDED", "COOLDOWN", "RATE_LIMITED"].includes(availability);
-  const showRequest = ["ABSENT", "STALE", "FAILED", "ERROR"].includes(availability);
+  const showRequest = ineligibilityReason === null && ["ABSENT", "STALE", "FAILED", "ERROR"].includes(availability);
 
   useEffect(() => {
     if (typeof window === "undefined" || typeof window.setInterval !== "function" || typeof window.clearInterval !== "function"
@@ -182,10 +183,10 @@ export function AIResearchSection({
         onClick={onOpen}
       >
         <span>{ui.title}</span>
-        <StatusBadge tone={availabilityTone(availability)}>{availabilityLabel(availability, locale)}</StatusBadge>
-        <strong>{stateTitle(availability, locale)}</strong>
-        <p>{stateDetail(availability, effectiveError, effectiveRetryAfter, locale, Boolean(brief))}</p>
-        {availability !== "PROVIDER_DISABLED" && <small>{ui.summaryNextStep}</small>}
+        <StatusBadge tone={ineligibilityReason ? "partial" : availabilityTone(availability)}>{ineligibilityReason ? ui.ineligible : availabilityLabel(availability, locale)}</StatusBadge>
+        <strong>{stateTitle(availability, locale, ineligibilityReason)}</strong>
+        <p>{stateDetail(availability, effectiveError, effectiveRetryAfter, locale, Boolean(brief), ineligibilityReason)}</p>
+        {!ineligibilityReason && availability !== "PROVIDER_DISABLED" && <small>{ui.summaryNextStep}</small>}
         <i aria-hidden="true">→</i>
       </button>
     );
@@ -195,12 +196,12 @@ export function AIResearchSection({
     <section className="product-detail-section ai-research-section" aria-labelledby="ai-research-section-heading" aria-live="polite">
       <header className="ai-research-section-heading">
         <div><span className="candidate-detail-section-index">AI</span><div><h3 id="ai-research-section-heading">{ui.title}</h3><p>{ui.intro}</p></div></div>
-        <StatusBadge tone={availabilityTone(availability)}>{availabilityLabel(availability, locale)}</StatusBadge>
+        <StatusBadge tone={ineligibilityReason ? "partial" : availabilityTone(availability)}>{ineligibilityReason ? ui.ineligible : availabilityLabel(availability, locale)}</StatusBadge>
       </header>
       <div className="ai-research-section-summary">
         <div>
-          <strong>{stateTitle(availability, locale)}</strong>
-          <p>{stateDetail(availability, effectiveError, effectiveRetryAfter, locale, Boolean(brief))}</p>
+          <strong>{stateTitle(availability, locale, ineligibilityReason)}</strong>
+          <p>{stateDetail(availability, effectiveError, effectiveRetryAfter, locale, Boolean(brief), ineligibilityReason)}</p>
           {(brief || analysis) && (!brief || !brief.render_preview) && <span className="ai-prepared-status">{ui.analysisPrepared}</span>}
         </div>
         <div className="ai-research-section-actions">
@@ -311,8 +312,11 @@ function availabilityTone(value: AIResearchBriefLookup["availability"]): "neutra
   return "neutral";
 }
 
-function stateTitle(value: AIResearchBriefLookup["availability"], locale: "pl" | "en") {
+function stateTitle(value: AIResearchBriefLookup["availability"], locale: "pl" | "en", ineligibilityReason: "INCOMPLETE_IDENTITY" | "INVALID_CONTRACT_ADDRESS" | "UNSUPPORTED_CHAIN" | null = null) {
   const pl = locale === "pl";
+  if (ineligibilityReason === "UNSUPPORTED_CHAIN") return pl ? "Analiza AI nie jest dostępna dla tego tokena, ponieważ jego sieć nie jest obecnie obsługiwana." : "AI analysis is unavailable for this token because its network is not currently supported.";
+  if (ineligibilityReason === "INVALID_CONTRACT_ADDRESS") return pl ? "Analiza AI nie jest dostępna, ponieważ adres kontraktu jest nieprawidłowy." : "AI analysis is unavailable because the contract address is invalid.";
+  if (ineligibilityReason === "INCOMPLETE_IDENTITY") return pl ? "Analiza AI nie jest dostępna, ponieważ brakuje danych identyfikujących token." : "AI analysis is unavailable because token identity data is missing.";
   if (value === "READY") return pl ? "Analiza gotowa" : "Analysis ready";
   if (value === "QUEUED") return pl ? "Analiza oczekuje na przygotowanie" : "Analysis is waiting to be prepared";
   if (value === "PROCESSING") return pl ? "Analiza jest przygotowywana" : "Analysis is being prepared";
@@ -333,8 +337,12 @@ function stateDetail(
   _retry: number | null,
   locale: "pl" | "en",
   hasBrief: boolean,
+  ineligibilityReason: "INCOMPLETE_IDENTITY" | "INVALID_CONTRACT_ADDRESS" | "UNSUPPORTED_CHAIN" | null = null,
 ) {
   const pl = locale === "pl";
+  if (ineligibilityReason === "UNSUPPORTED_CHAIN") return pl ? "Nie można zlecić ani ponowić analizy, dopóki ta sieć nie będzie obsługiwana przez produkt." : "An analysis cannot be requested or retried until this network is supported by the product.";
+  if (ineligibilityReason === "INVALID_CONTRACT_ADDRESS") return pl ? "Nie można zlecić ani ponowić analizy, dopóki nie uda się potwierdzić adresu kontraktu." : "An analysis cannot be requested or retried until the contract address can be confirmed.";
+  if (ineligibilityReason === "INCOMPLETE_IDENTITY") return pl ? "Nie można zlecić ani ponowić analizy, dopóki nie będzie pełnych danych identyfikujących token." : "An analysis cannot be requested or retried until the token identity is complete.";
   if (value === "READY") return pl ? "Poniżej znajdziesz najważniejsze wnioski, ryzyka, braki danych i kolejne kroki researchu." : "Below you will find the key findings, risks, data gaps and next research steps.";
   if (value === "QUEUED") return pl ? "Nie musisz nic robić. Wynik pojawi się tutaj, gdy analiza będzie dostępna." : "You do not need to do anything. The result will appear here when the analysis is available.";
   if (value === "PROCESSING") return pl ? "Przygotowanie analizy trwa." : "The analysis is being prepared.";
@@ -364,6 +372,7 @@ const COPY = {
     radarDetails: "Przejdź do szczegółów analizy",
     analysisPrepared: "Analiza została przygotowana na podstawie zweryfikowanych danych dostępnych w tej migawce.",
     summaryNextStep: "Otwórz zakładkę Analiza AI, aby zobaczyć pełne podsumowanie.",
+    ineligible: "Niedostępna dla tego tokena",
   },
   en: {
     title: "AI analysis",
@@ -381,5 +390,6 @@ const COPY = {
     radarDetails: "Open analysis details",
     analysisPrepared: "The analysis was prepared from verified data available in this snapshot.",
     summaryNextStep: "Open the AI analysis tab to see the full summary.",
+    ineligible: "Unavailable for this token",
   },
 } as const;

@@ -227,6 +227,34 @@ candidate, locale and Decision origin. A focused check offers a return to the
 same Verification Decision context; an unmapped item gives truthful inline
 guidance instead of a dead link.
 
+## Final owner-review interaction rules
+
+1. Every Candidate Detail tab renders its selected content on a single click.
+2. The selected Candidate Detail tab, its rendered panel and its canonical
+   route state are atomic: they must never diverge.
+3. Candidate Detail → Verification carries the same token identity into the
+   Verification drawer automatically.
+4. An unsupported or otherwise ineligible candidate still opens in
+   Verification; the drawer states the exact product blocking reason instead
+   of clearing selection.
+5. Verification Decision records a verification opinion. It is not a private
+   Research Playbook evidence editor.
+6. Private evidence editing belongs only in the relevant focused Research
+   Playbook stages.
+7. Verification Decision contains only current result, concise available and
+   missing context, the decision, a short note, save and return controls.
+8. Known missing Verification items use the canonical direct-target mapping;
+   unmapped items use truthful inline guidance.
+9. Effective Product Radar and Your Radar states have text, accessible state
+   semantics and a visibly active marker; color is supplementary only.
+10. The Your Radar heading and explanation sit outside its basket-card grid.
+11. Raw persistence field names such as `chain` and `contract_address` are
+    forbidden in normal user-facing copy.
+12. Market snapshot time and record-check time are distinct concepts and are
+    never substituted for each other.
+13. AI ineligibility is distinct from a provider or system failure and gives
+    the deterministic eligibility reason without a request/retry action.
+
 ## Reports
 
 Reports remain a backend/history and audit capability. They are not a CAMP

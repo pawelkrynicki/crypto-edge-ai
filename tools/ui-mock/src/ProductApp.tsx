@@ -67,7 +67,7 @@ import type { LifecycleRadarCard, LifecycleRadarView, LifecycleSummary, Lifecycl
 import type { FollowUpPublicEntry, FollowUpPublicStatus } from "./types/followUpTypes";
 import {
   findFollowUpByIdentity,
-  isSameTokenIdentity,
+  isSameRoutedTokenIdentity,
   resolveTokenIdentity,
 } from "./tokenLifecycle";
 import type { FeedbackScreenContext, FeedbackSubjectRef } from "./services/feedbackDataSource";
@@ -302,12 +302,12 @@ export function ProductAppContent({
   }), [t]);
 
   const routedFollowUp = routeTokenIdentity
-    ? followUpEntries.find((entry) => isSameTokenIdentity(entry, routeTokenIdentity)) ?? null
+    ? followUpEntries.find((entry) => isSameRoutedTokenIdentity(entry, routeTokenIdentity)) ?? null
     : null;
   const explicitlySelectedFollowUp = followUpEntries.find((entry) => entry.entry_id === selectedFollowUpEntryId) ?? routedFollowUp;
   const reviewPreviewCandidate = selectAIResearchReviewCandidate(candidates);
   const routedCandidate = routeTokenIdentity
-    ? candidates.find((candidate) => isSameTokenIdentity(
+    ? candidates.find((candidate) => isSameRoutedTokenIdentity(
       { chain: candidate.chain, contract_address: candidate.contractAddress },
       routeTokenIdentity,
     )) ?? null
@@ -315,7 +315,7 @@ export function ProductAppContent({
   const routedLifecycleCard = findLifecycleRadarCard(lifecycleRadar, routeTokenIdentity);
   const routedLifecycleCandidate = routedLifecycleCard ? lifecycleCardToCandidate(routedLifecycleCard) : null;
   const selectedCandidate = explicitlySelectedFollowUp
-    ? candidates.find((candidate) => isSameTokenIdentity(
+    ? candidates.find((candidate) => isSameRoutedTokenIdentity(
       explicitlySelectedFollowUp,
       { chain: candidate.chain, contract_address: candidate.contractAddress },
     )) ?? null
@@ -330,16 +330,13 @@ export function ProductAppContent({
   const selectedFollowUp = explicitlySelectedFollowUp
     ?? (selectedCandidate ? findFollowUpByIdentity(followUpEntries, selectedCandidate) : null);
   const verificationCandidate = routeTokenIdentity
-    ? candidates.find((candidate) => isSameTokenIdentity(
+    ? candidates.find((candidate) => isSameRoutedTokenIdentity(
       { chain: candidate.chain, contract_address: candidate.contractAddress },
       routeTokenIdentity,
     )) ?? null
     : null;
   const verificationFollowUp = routeTokenIdentity
-    ? findFollowUpByIdentity(followUpEntries, {
-      chain: routeTokenIdentity.chain,
-      contractAddress: routeTokenIdentity.contract_address,
-    })
+    ? followUpEntries.find((entry) => isSameRoutedTokenIdentity(entry, routeTokenIdentity)) ?? null
     : null;
   const sourceHealth = useMemo(
     () => resolveProductSourceHealth({ metadata, readiness, sourceIds }),
@@ -587,8 +584,16 @@ export function ProductAppContent({
       }
       setActiveSection(section);
       const identity = resolveRouteTokenIdentity();
-      routeTokenIdentityRef.current = identity;
-      setRouteTokenIdentity(identity);
+      const currentIdentity = routeTokenIdentityRef.current;
+      const sameIdentity = currentIdentity !== null && identity !== null
+        && isSameRoutedTokenIdentity(currentIdentity, identity);
+      // A Detail-tab route write emits a synchronous event so the visible
+      // panel updates immediately. Reuse the existing identity object when
+      // only its tab changed: Follow-up loading is identity-scoped, not
+      // tab-scoped, and must not reread the same token for every tab click.
+      const nextIdentity = sameIdentity ? currentIdentity : identity;
+      routeTokenIdentityRef.current = nextIdentity;
+      if (!sameIdentity) setRouteTokenIdentity(nextIdentity);
       setActiveDetailTab(resolveDetailTab());
       setFocusedResearchStep((section === "candidate-detail" || section === "external-checks") ? resolveResearchChecklistStep() : null);
       setFocusedResearchCheck(section === "external-checks" ? resolveResearchVerificationCheck() : null);
@@ -601,9 +606,11 @@ export function ProductAppContent({
     const handlePopState = () => handleRouteChange();
     window.addEventListener("hashchange", handleHashChange);
     window.addEventListener("popstate", handlePopState);
+    window.addEventListener("crypto-edge-token-route-change", handleRouteChange);
     return () => {
       window.removeEventListener("hashchange", handleHashChange);
       window.removeEventListener("popstate", handlePopState);
+      window.removeEventListener("crypto-edge-token-route-change", handleRouteChange);
     };
   }, []);
 
@@ -672,7 +679,7 @@ export function ProductAppContent({
   const openFollowUp = useCallback((entryId: string) => {
     const entry = followUpEntries.find((candidate) => candidate.entry_id === entryId);
     const matchingCandidate = entry
-      ? candidates.find((candidate) => isSameTokenIdentity(
+      ? candidates.find((candidate) => isSameRoutedTokenIdentity(
         entry,
         { chain: candidate.chain, contract_address: candidate.contractAddress },
       ))
@@ -696,22 +703,25 @@ export function ProductAppContent({
   }, [candidates, followUpEntries, navigate]);
 
   const changeDetailTab = useCallback((tab: CandidateDetailTabId) => {
+    // The route identity is the source of truth while a detail workspace is
+    // open. It may describe a visible but unsupported token, so do not derive
+    // it only from a currently loaded supported candidate.
+    const identity = routeTokenIdentityRef.current
+      ?? (selectedCandidate
+        ? { chain: selectedCandidate.chain, contract_address: selectedCandidate.contractAddress }
+        : selectedFollowUp
+          ? { chain: selectedFollowUp.chain, contract_address: selectedFollowUp.contract_address }
+          : null);
+    if (!identity) return;
     setActiveDetailTab(tab);
     setFocusedResearchStep(null);
     setFocusedResearchCheck(null);
     setFocusResearchPlaybook(false);
-    const identity = selectedCandidate
-      ? { chain: selectedCandidate.chain, contract_address: selectedCandidate.contractAddress }
-      : selectedFollowUp
-        ? { chain: selectedFollowUp.chain, contract_address: selectedFollowUp.contract_address }
-        : routeTokenIdentity;
-    if (identity) {
-      routeTokenIdentityRef.current = identity;
-      setRouteTokenIdentity(identity);
-      writeCandidateDetailRoute(identity, tab);
-      setActiveSection("candidate-detail");
-    }
-  }, [routeTokenIdentity, selectedCandidate, selectedFollowUp]);
+    routeTokenIdentityRef.current = identity;
+    setRouteTokenIdentity(identity);
+    writeCandidateDetailRoute(identity, tab);
+    setActiveSection("candidate-detail");
+  }, [selectedCandidate, selectedFollowUp]);
 
   const openResearchPlaybook = useCallback((token: UiTokenCandidate | FollowUpPublicEntry, researchStep: ResearchStepNumber | null = null) => {
     const isFollowUp = "entry_id" in token;
@@ -1137,7 +1147,7 @@ export function findLifecycleRadarCard(
     ...radar.private_baskets.new.cards,
     ...radar.private_baskets.follow_up.cards,
     ...radar.private_baskets.main_radar.cards,
-  ].find((card) => isSameTokenIdentity(card, identity)) ?? null;
+  ].find((card) => isSameRoutedTokenIdentity(card, identity)) ?? null;
 }
 
 export function lifecycleStatusToBasket(status: LifecycleTokenView["user_status"]): RadarBasketId {

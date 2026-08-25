@@ -214,8 +214,9 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
         </section>
       </TechnicalDetails>
 
-      <section className="basket-switcher" aria-label={t("radar.basketSelection")}>
+      <section className="private-radar-section" aria-label={t("radar.basketSelection")}>
         {lifecycleRadar && <header className="private-radar-switcher-heading"><span>{locale === "pl" ? "TWÓJ RADAR" : "YOUR RADAR"}</span><p>{locale === "pl" ? "Prywatny widok organizacyjny; nie zmienia Radaru produktu." : "Private organizational view; it does not change Product Radar."}</p></header>}
+        <div className="basket-switcher">
         <button
           type="button"
           className={activeBasket === "new_emerging" ? "active" : ""}
@@ -249,6 +250,7 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
           <strong>{lifecycleRadar?.private_main_radar_total ?? establishedEntries}</strong>
           <small>{lifecycleRadar ? privateViewCopy : getEstablishedTabStatus(metadata, readiness, locale, establishedUniverseStatus)}</small>
         </button>
+        </div>
       </section>
 
       {lifecycleRadar && scannerUnavailableReasonCode && <section className="product-partial-data lifecycle-scanner-warning" role="status"><strong>{t("status.delayed")}</strong><span>{t("lifecycle.scannerUnavailable")}</span></section>}

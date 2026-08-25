@@ -11,6 +11,7 @@ import { resolveDetailTab, resolveRouteTokenIdentity } from "../src/candidateDet
 import { CandidateDetailView } from "../src/components/CandidateDetailView.js";
 import { AIResearchSection } from "../src/components/AIResearchSection.js";
 import { ExternalVerificationLinksView } from "../src/components/ExternalVerificationLinksView.js";
+import { PersonalRadarPanel } from "../src/components/PersonalRadarPanel.js";
 import { VerificationTokenBrowser } from "../src/components/VerificationTokenBrowser.js";
 import { CandidateResultsView } from "../src/components/CandidateResultsView.js";
 import { ProductWorkspaceShell } from "../src/components/ProductWorkspaceShell.js";
@@ -19,6 +20,7 @@ import { mapPersistableScannerOutputToUiCandidates } from "../src/adapters/scann
 import { formatProductDateTime, ProductLocaleProvider } from "../src/productI18n.js";
 import type { ScannerDataSourceLoadResult } from "../src/services/scannerDataSource.js";
 import type { FollowUpPublicEntry, FollowUpPublicStatus } from "../src/types/followUpTypes.js";
+import type { LifecycleTokenView } from "../src/types/lifecycleTypes.js";
 import type { ProductReadinessOutput } from "../src/types/scannerTypes.js";
 import { resolveGlobalProductTimestamp } from "../src/productRefreshState.js";
 
@@ -85,7 +87,7 @@ describe("P1.1 Radar operational usability", () => {
     assert.equal(resolveGlobalProductTimestamp("invalid", "also-invalid", null), null);
   });
 
-  it("shows explicit disabled AI guidance and an actionable manual verification workspace", () => {
+  it("shows a deterministic ineligibility reason and an actionable manual verification workspace", () => {
     const candidate = mapPersistableScannerOutputToUiCandidates(PERSISTABLE_SCANNER_SAMPLE)[0]!;
     const aiMarkup = renderToStaticMarkup(
       <ProductLocaleProvider initialLocale="pl">
@@ -106,9 +108,9 @@ describe("P1.1 Radar operational usability", () => {
         />
       </ProductLocaleProvider>,
     );
-    assert.match(aiMarkup, /Niedostępna/);
-    assert.match(aiMarkup, /Analiza AI jest chwilowo niedostępna\./);
-    assert.match(aiMarkup, /Nie musisz nic robić\. Gdy analiza będzie dostępna, wynik pojawi się tutaj\./);
+    assert.match(aiMarkup, /Niedostępna dla tego tokena/);
+    assert.match(aiMarkup, /adres kontraktu jest nieprawidłowy/);
+    assert.match(aiMarkup, /Nie można zlecić ani ponowić analizy/);
     assert.doesNotMatch(aiMarkup, /provider|model|api[_ -]?key|Centrum sterowania|Aktywuj/i);
 
     const verificationMarkup = renderToStaticMarkup(
@@ -122,6 +124,38 @@ describe("P1.1 Radar operational usability", () => {
     assert.match(verificationMarkup, /Dane i źródła/);
     assert.match(verificationMarkup, /Decyzja weryfikacyjna/);
     assert.match(verificationMarkup, /verification-panel-identity/);
+  });
+
+  it("marks every effective Product and Private Radar state as active, including no private assignment", () => {
+    const mainMarkup = renderToStaticMarkup(
+      <ProductLocaleProvider initialLocale="pl">
+        <PersonalRadarPanel chain="bsc" contractAddress="0x1111111111111111111111111111111111111111" initialView={lifecycleTokenView("FOLLOW_UP", "MAIN_RADAR", true)} />
+      </ProductLocaleProvider>,
+    );
+    assert.equal((mainMarkup.match(/data-status-active="true"/g) ?? []).length, 2);
+    assert.equal((mainMarkup.match(/role="status"/g) ?? []).length, 2);
+    assert.match(mainMarkup, /Radar produktu: Dalsza obserwacja/);
+    assert.match(mainMarkup, /Twój Radar: Główny Radar/);
+
+    const unassignedMarkup = renderToStaticMarkup(
+      <ProductLocaleProvider initialLocale="pl">
+        <PersonalRadarPanel chain="bsc" contractAddress="0x2222222222222222222222222222222222222222" initialView={lifecycleTokenView("FOLLOW_UP", "FOLLOW_UP", false)} />
+      </ProductLocaleProvider>,
+    );
+    assert.match(unassignedMarkup, /Radar produktu: Dalsza obserwacja/);
+    assert.match(unassignedMarkup, /Twój Radar: Brak prywatnego przypisania/);
+    assert.equal((unassignedMarkup.match(/data-status-active="true"/g) ?? []).length, 2);
+  });
+
+  it("keeps the Your Radar heading outside a three-card desktop grid and uses two columns on tablets", async () => {
+    const [component, css] = await Promise.all([
+      readFile(resolve(process.cwd(), "src", "components", "CandidateResultsView.tsx"), "utf8"),
+      readFile(resolve(process.cwd(), "src", "index.css"), "utf8"),
+    ]);
+    assert.match(component, /<section className="private-radar-section"[\s\S]*?<header className="private-radar-switcher-heading"[\s\S]*?<div className="basket-switcher">/);
+    assert.match(css, /\.basket-switcher\s*\{[\s\S]*?grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\)/);
+    assert.match(css, /@media \(min-width: 761px\) and \(max-width: 960px\)[\s\S]*?\.private-radar-section > \.basket-switcher \{ grid-template-columns: repeat\(2, minmax\(0, 1fr\)\); \}/);
+    assert.match(css, /@media \(max-width: 760px\)[\s\S]*?\.basket-switcher[\s\S]*?grid-template-columns: 1fr/);
   });
 
   it("keeps the Verification list visible and reuses the Details token drawer for a selected token", async () => {
@@ -252,14 +286,25 @@ describe("P1.1 Radar operational usability", () => {
       assert.equal(resolveRouteTokenIdentity()?.contract_address, entry.contract_address);
       assert.equal(renderer!.root.findAll((node) => node.props.role === "tab").length, 7);
 
-      await act(async () => { detail.props.onActiveTabChange("market"); });
-      assert.equal(resolveDetailTab(), "market");
+      for (const tab of ["summary", "observation", "market", "filters", "security", "ai", "data"] as const) {
+        await act(async () => { detail.props.onActiveTabChange(tab); });
+        assert.equal(resolveDetailTab(), tab);
+        assert.deepEqual(resolveRouteTokenIdentity(), { chain: entry.chain, contract_address: entry.contract_address });
+        detail = renderer!.root.findByType(CandidateDetailView);
+        assert.equal(detail.props.activeTab, tab);
+      }
+      await act(async () => { browser.back(); });
+      detail = renderer!.root.findByType(CandidateDetailView);
+      assert.equal(detail.props.activeTab, "ai");
+      await act(async () => { browser.forward(); });
+      detail = renderer!.root.findByType(CandidateDetailView);
+      assert.equal(detail.props.activeTab, "data");
       const shell = renderer!.root.findByType(ProductWorkspaceShell);
       await act(async () => { shell.props.onRefresh(); await flushPromises(); });
       detail = renderer!.root.findByType(CandidateDetailView);
       assert.equal(detail.props.followUp.contract_address, entry.contract_address);
-      assert.equal(detail.props.activeTab, "market");
-      assert.deepEqual(calls, { scanner: 2, readiness: 2, automation: 2, universe: 2, control: 0, status: 2, list: 2 });
+      assert.equal(detail.props.activeTab, "data");
+      assert.deepEqual(calls, { scanner: 2, readiness: 2, automation: 2, universe: 2, control: 0, status: 1, list: 1 });
       assert.ok(localRequests.every((request) => request.method === "GET"));
       assert.ok(localRequests.every((request) => request.url.startsWith("/api/")));
       assert.ok(localRequests.every((request) => !/provider|openai|collect|automation\/(?:run|enable|activate)|central/i.test(request.url)));
@@ -310,6 +355,17 @@ function followUpEntry(index: number): FollowUpPublicEntry {
     missing_data: ["security_not_checked"],
     established_membership: false,
     next_review_step: "WAIT_FOR_NEXT_CHECKPOINT",
+  };
+}
+
+function lifecycleTokenView(system: LifecycleTokenView["system_status"], user: LifecycleTokenView["user_status"], override: boolean): LifecycleTokenView {
+  return {
+    identity: `bsc:0x${"1".repeat(40)}`,
+    system_status: system,
+    user_status: user,
+    user_status_is_override: override,
+    conditions: { conditions_met: [], conditions_unmet: [], missing_data: [], risks: [], readiness: "CONDITIONS_UNMET", security_state: "PARTIAL", verification_state: "PENDING" },
+    actor: { role: "CAMP_USER", capabilities: ["CAMP_USER_WORKSPACE_WRITE"] },
   };
 }
 
@@ -392,6 +448,9 @@ function scannerUnavailable(): ScannerDataSourceLoadResult {
 
 function installBrowser(initialHref: string) {
   const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+  const entries = [initialHref];
+  let index = 0;
+  const listeners = new Map<string, Set<(event: Event) => void>>();
   const location = { href: "", search: "", hash: "" };
   const apply = (href: string) => {
     const url = new URL(href);
@@ -400,19 +459,47 @@ function installBrowser(initialHref: string) {
     location.hash = url.hash;
   };
   apply(initialHref);
+  const dispatch = (event: Event) => {
+    for (const listener of listeners.get(event.type) ?? []) listener(event);
+    return true;
+  };
   Object.defineProperty(globalThis, "window", {
     configurable: true,
     value: {
       location,
-      history: { pushState: (_data: unknown, _unused: string, url: URL | string) => apply(String(url)) },
+      history: {
+        pushState: (_data: unknown, _unused: string, url: URL | string) => {
+          entries.splice(index + 1);
+          entries.push(String(url));
+          index = entries.length - 1;
+          apply(entries[index]!);
+        },
+      },
       localStorage: { getItem: () => null, setItem: () => undefined },
-      addEventListener: () => undefined,
-      removeEventListener: () => undefined,
+      addEventListener: (type: string, listener: (event: Event) => void) => {
+        const registered = listeners.get(type) ?? new Set<(event: Event) => void>();
+        registered.add(listener);
+        listeners.set(type, registered);
+      },
+      removeEventListener: (type: string, listener: (event: Event) => void) => listeners.get(type)?.delete(listener),
+      dispatchEvent: dispatch,
       setTimeout,
       clearTimeout,
     },
   });
   return {
+    back: () => {
+      if (index === 0) return;
+      index -= 1;
+      apply(entries[index]!);
+      dispatch(new Event("popstate"));
+    },
+    forward: () => {
+      if (index >= entries.length - 1) return;
+      index += 1;
+      apply(entries[index]!);
+      dispatch(new Event("popstate"));
+    },
     restore: () => {
       if (originalWindow) Object.defineProperty(globalThis, "window", originalWindow);
       else Reflect.deleteProperty(globalThis, "window");

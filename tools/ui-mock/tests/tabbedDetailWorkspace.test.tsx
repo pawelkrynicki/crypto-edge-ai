@@ -9,6 +9,7 @@ import { mapPersistableScannerOutputToUiCandidates } from "../src/adapters/scann
 import { resolveDetailTab, resolveRouteTokenIdentity, writeCandidateDetailRoute } from "../src/candidateDetailRoute.js";
 import { AIResearchSection } from "../src/components/AIResearchSection.js";
 import { CandidateDetailView } from "../src/components/CandidateDetailView.js";
+import { ExternalVerificationLinksView } from "../src/components/ExternalVerificationLinksView.js";
 import { ProductWorkspaceShell } from "../src/components/ProductWorkspaceShell.js";
 import { PERSISTABLE_SCANNER_SAMPLE } from "../src/fixtures/persistableScannerSample.js";
 import { ProductLocaleProvider, type ProductLocale } from "../src/productI18n.js";
@@ -24,6 +25,17 @@ const ADDRESS_B = "0x2222222222222222222222222222222222222222";
 const baseCandidate = mapPersistableScannerOutputToUiCandidates(PERSISTABLE_SCANNER_SAMPLE)[0]!;
 const candidateA = { ...baseCandidate, id: "base:a", chain: "base", contractAddress: ADDRESS_A, pairAddress: ADDRESS_B, addressIdentityVerified: true };
 const candidateB = { ...candidateA, id: "base:b", symbol: "NEXT", name: "Next Token", contractAddress: ADDRESS_B };
+const unsupportedArrowCandidate = {
+  ...candidateA,
+  id: "robinhood:arrow",
+  chain: "robinhood",
+  contractAddress: "0x498892aaD2c9fFAF91747241fC0690f6B614E0AA",
+  pairAddress: "0xb33c00000000000000000000000000000000ef89fcf0",
+  symbol: "ARROW",
+  name: "ARROW",
+  dex: "uniswap",
+  addressIdentityVerified: false,
+};
 const followUpCandidate: FollowUpPublicEntry = {
   entry_id: "follow-up:max",
   chain: "bsc",
@@ -83,6 +95,25 @@ describe("UX.2 Tabbed Token Detail Workspace", () => {
     assert.match(markup, /Następny krok[\s\S]*Dokończ weryfikację/);
     assert.match(markup, /Max[\s\S]*Giggle Mascot/);
     assert.doesNotMatch(markup, /Established|established universe|candidate_for_established|owner|właściciela/i);
+  });
+
+  it("keeps an unsupported network routable while giving ARROW a truthful, non-technical blocker", () => {
+    const detail = render("pl", <CandidateDetailView candidate={unsupportedArrowCandidate} initialOwnerPromotionStatus={null} />);
+    const verification = render("pl", <ExternalVerificationLinksView candidate={unsupportedArrowCandidate} />);
+    const ai = render("pl", <AIResearchSection
+      chain={unsupportedArrowCandidate.chain}
+      contractAddress={unsupportedArrowCandidate.contractAddress}
+      symbol="ARROW"
+      name="ARROW"
+      mode="detail"
+      initialLookup={{ schema_version: "ai_research_lookup_v1", availability: "PROVIDER_DISABLED", provider_mode: "DISABLED", brief: null, retry_after_seconds: null, error_code: "PROVIDER_DISABLED" }}
+    />);
+
+    assert.match(detail, /Nieobsługiwana sieć/);
+    assert.match(detail, /pełna weryfikacja w tej sieci nie jest obecnie dostępna/);
+    assert.match(verification, /Ten token pozostaje widoczny do obserwacji, ale pełna weryfikacja nie jest obecnie dostępna dla tej sieci/);
+    assert.match(ai, /Analiza AI nie jest dostępna dla tego tokena, ponieważ jego sieć nie jest obecnie obsługiwana/);
+    for (const markup of [detail, verification, ai]) assert.doesNotMatch(markup, />\s*chain\s*<|contract_address|UNSUPPORTED_CHAIN/i);
   });
 
   it("keeps a Follow-up advisory separate from missing data and raw filter keys", () => {
@@ -177,7 +208,7 @@ describe("UX.2 Tabbed Token Detail Workspace", () => {
 
     assert.match(markup, /Dane rynkowe/);
     assert.match(markup, /\$0\.002002/);
-    assert.match(markup, /Dane aktualne na[\s\S]*17\.08\.2026, 15:32/);
+    assert.match(markup, /Czas migawki rynkowej[\s\S]*17\.08\.2026, 15:32/);
     assert.doesNotMatch(markup, /20\.08\.2026/);
   });
 
@@ -192,11 +223,11 @@ describe("UX.2 Tabbed Token Detail Workspace", () => {
       />,
     );
 
-    assert.match(markup, /Dane aktualne na[\s\S]*Brak/);
-    assert.doesNotMatch(markup, /20\.08\.2026/);
+    assert.match(markup, /Czas migawki rynkowej[\s\S]*Brak dokładnego czasu migawki/);
+    assert.match(markup, /Rekord sprawdzono: 20\.08\.2026, 12:00/);
   });
 
-  it("switches Market and AI inside the same single panel and removes prior full content", async () => {
+  it("renders every Detail tab immediately in its single active panel", async () => {
     const originalFetch = globalThis.fetch;
     const originalActEnvironment = globalThis.IS_REACT_ACT_ENVIRONMENT;
     globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -211,21 +242,23 @@ describe("UX.2 Tabbed Token Detail Workspace", () => {
         renderer = create(<ProductLocaleProvider initialLocale="en"><CandidateDetailView candidate={candidateA} initialOwnerPromotionStatus={null} /></ProductLocaleProvider>);
       });
       const getTab = (id: string) => renderer!.root.find((node) => node.props.id === `candidate-tab-${id}`);
+      const expectedContent: Record<string, RegExp> = {
+        summary: /The essential answers about the token/,
+        observation: /Observation flow/,
+        market: /Market data/,
+        filters: /Filters/,
+        security: /Security/,
+        ai: /AI analysis/,
+        data: /Data and freshness/,
+      };
       assert.equal(getTab("summary").props["aria-selected"], true);
-
-      await act(async () => { getTab("market").props.onClick(); });
-      assert.equal(renderer!.root.findAll((node) => node.props.role === "tabpanel").length, 1);
-      assert.equal(renderer!.root.find((node) => node.props["data-active-detail-tab"] !== undefined).props["data-active-detail-tab"], "market");
-      assert.equal(getTab("market").props["aria-selected"], true);
-      assert.match(renderedText(renderer!), /Market data/);
-      assert.doesNotMatch(renderedText(renderer!), /The essential answers about the token/);
-
-      await act(async () => { getTab("ai").props.onClick(); });
-      assert.equal(renderer!.root.findAll((node) => node.props.role === "tabpanel").length, 1);
-      assert.equal(renderer!.root.find((node) => node.props["data-active-detail-tab"] !== undefined).props["data-active-detail-tab"], "ai");
-      assert.equal(getTab("ai").props["aria-selected"], true);
-      assert.match(renderedText(renderer!), /AI analysis/);
-      assert.doesNotMatch(activePanelText(renderer!), /Market data/);
+      for (const tab of ["summary", "observation", "market", "filters", "security", "ai", "data"]) {
+        await act(async () => { getTab(tab).props.onClick(); });
+        assert.equal(renderer!.root.findAll((node) => node.props.role === "tabpanel").length, 1);
+        assert.equal(renderer!.root.find((node) => node.props["data-active-detail-tab"] !== undefined).props["data-active-detail-tab"], tab);
+        assert.equal(getTab(tab).props["aria-selected"], true);
+        assert.match(activePanelText(renderer!), expectedContent[tab]!);
+      }
       assert.ok(localApiRequests >= 1, "AI UI may read only its local API state");
     } finally {
       if (renderer) await act(async () => { renderer!.unmount(); });
@@ -275,9 +308,12 @@ describe("UX.2 Tabbed Token Detail Workspace", () => {
       assert.equal(resolveDetailTab(), "ai");
       history.replace(`http://127.0.0.1:5173/?chain=base&contract=${ADDRESS_A}&detail=unsupported#candidate-detail`);
       assert.equal(resolveDetailTab(), "summary");
+      history.replace(`http://127.0.0.1:5173/?chain=robinhood&contract=${unsupportedArrowCandidate.contractAddress}#external-checks`);
+      assert.deepEqual(resolveRouteTokenIdentity(), { chain: "robinhood", contract_address: unsupportedArrowCandidate.contractAddress });
 
       const app = await source("src/ProductApp.tsx");
       assert.match(app, /addEventListener\("popstate", handlePopState\)/);
+      assert.match(app, /addEventListener\("crypto-edge-token-route-change", handleRouteChange\)/);
       assert.match(app, /setActiveDetailTab\(resolveDetailTab\(\)\)/);
       assert.match(app, /writeCandidateDetailRoute\(identity, "summary"\)/);
     } finally {

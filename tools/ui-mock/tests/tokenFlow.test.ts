@@ -274,7 +274,7 @@ describe("FLOW.1 visible token lifecycle contracts", () => {
       followUpStatus: followUpStatus({ entries_total: 0 }),
       initialActiveTab: "summary",
     }));
-    assert.match(valid, /Tożsamość techniczna[\s\S]*Poprawna/);
+    assert.match(valid, /Tożsamość techniczna[\s\S]*Potwierdzona technicznie/);
     assert.match(valid, /Weryfikacja źródłowa[\s\S]*Wymagana/);
     assert.doesNotMatch(valid, /OBSERWACJA — NOWY PROJEKT/);
     assert.doesNotMatch(valid, /Tożsamość adresu[\s\S]*Niezweryfikowana/);
@@ -285,8 +285,8 @@ describe("FLOW.1 visible token lifecycle contracts", () => {
       followUpStatus: followUpStatus({ entries_total: 0 }),
       initialActiveTab: "summary",
     }));
-    assert.match(invalid, /Tożsamość techniczna[\s\S]*Niepoprawna/);
-    assert.match(invalid, /Brak poprawnego adresu kontraktu/);
+    assert.match(invalid, /Tożsamość techniczna[\s\S]*Nieprawidłowy adres kontraktu/);
+    assert.match(invalid, /Nie udało się potwierdzić tożsamości tokena/);
     assert.doesNotMatch(invalid, /Oczekuje na ocenę w przyszłym centralnym cyklu danych/);
   });
 

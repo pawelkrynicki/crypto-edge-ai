@@ -26,9 +26,9 @@ import {
   createInitialAutomationState,
 } from "../../data-poc/src/automation/automationState.js";
 import {
-  MAX_CONSECUTIVE_TRANSIENT_FAILURES,
   runCentralAutomation,
 } from "../../data-poc/src/automation/centralAutomationCoordinator.js";
+import { decideCentralSchedule } from "../../data-poc/src/automation/schedulerDecision.js";
 import { mapPersistableScannerOutputToUiCandidates } from "../src/adapters/scannerOutputAdapter.js";
 import { PERSISTABLE_SCANNER_SAMPLE } from "../src/fixtures/persistableScannerSample.js";
 import {
@@ -477,32 +477,28 @@ async function runCentralCycleScenarios(
     });
   });
 
-  await runScenario(scenarios, "central-circuit-breaker", "Three consecutive transient failures open the breaker and block another collector until owner recovery.", async () => {
+  await runScenario(scenarios, "central-circuit-breaker", "A transient failure sets a bounded retry deadline and the scheduler skips the collector until that deadline.", async () => {
     const directory = resolve(automationRoot, "circuit-breaker");
     let runnerCalls = 0;
-    for (let index = 0; index < MAX_CONSECUTIVE_TRANSIENT_FAILURES; index += 1) {
-      const result = await runCentralAutomation({
-        automationDirectoryPath: directory,
-        runIdFactory: () => `failure_drill_breaker_${index}`,
-        runner: async () => { runnerCalls += 1; throw new Error("NETWORK_ERROR"); },
-      });
-      assert(result.status === "FAILED", "BREAKER_FAILURE_NOT_RECORDED");
-    }
-    const blocked = await runCentralAutomation({
+    const failureAt = new Date("2026-07-30T12:00:00.000Z");
+    const result = await runCentralAutomation({
       automationDirectoryPath: directory,
-      runIdFactory: () => "failure_drill_breaker_blocked",
-      runner: async () => { runnerCalls += 1; return {}; },
+      runIdFactory: () => "failure_drill_retry_gate",
+      now: () => failureAt,
+      runner: async () => { runnerCalls += 1; throw new Error("NETWORK_ERROR"); },
     });
     const state = await createAutomationStateStore(directory).read();
-    assert(state.automation_suspended && blocked.status === "AUTOMATION_SUSPENDED", "CIRCUIT_BREAKER_NOT_OPEN");
-    assert(runnerCalls === MAX_CONSECUTIVE_TRANSIENT_FAILURES, "OPEN_BREAKER_RAN_COLLECTOR");
-    return evidence("The breaker opened after the bounded threshold and the next call skipped the runner.", "An owner-only bounded probe is required before returning to closed.", {
-      threshold: MAX_CONSECUTIVE_TRANSIENT_FAILURES,
+    const blocked = decideCentralSchedule({ now: failureAt, enabled: true, state });
+    assert(result.status === "FAILED", "TRANSIENT_FAILURE_NOT_RECORDED");
+    assert(state.retry_not_before !== null && Date.parse(state.retry_not_before) > failureAt.getTime(), "TRANSIENT_RETRY_DEADLINE_NOT_SET");
+    assert(!state.automation_suspended && blocked.decision === "NOTHING_DUE", "TRANSIENT_RETRY_GATE_NOT_APPLIED");
+    assert(runnerCalls === 1, "RETRY_GATE_RAN_COLLECTOR");
+    return evidence("The transient failure set a retry deadline; the scheduler skipped the collector before that deadline.", "A later normal scheduled attempt may recover without changing the persistent automation mode.", {
       runner_calls: runnerCalls,
-      breaker_open: state.automation_suspended,
-      blocked_status: blocked.status,
-      ordinary_user_resume: false,
-    }, ["NETWORK_ERROR", "AUTOMATION_SUSPENDED"]);
+      retry_not_before: state.retry_not_before,
+      automation_suspended: state.automation_suspended,
+      scheduler_decision: blocked.decision,
+    }, ["NETWORK_ERROR", "NOTHING_DUE"]);
   });
 }
 

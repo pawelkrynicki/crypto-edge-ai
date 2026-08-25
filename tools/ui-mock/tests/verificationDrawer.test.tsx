@@ -18,6 +18,16 @@ void React;
 const { act, create } = TestRenderer;
 const candidate = mapPersistableScannerOutputToUiCandidates(PERSISTABLE_SCANNER_SAMPLE)[0]!;
 const identity = `${candidate.chain}:${candidate.contractAddress}`;
+const unsupportedArrow = {
+  ...candidate,
+  id: "robinhood:arrow",
+  chain: "robinhood",
+  contractAddress: "0x498892aaD2c9fFAF91747241fC0690f6B614E0AA",
+  pairAddress: "0xb33c00000000000000000000000000000000ef89fcf0",
+  symbol: "ARROW",
+  name: "ARROW",
+  addressIdentityVerified: false,
+};
 const followUpCandidate = {
   entry_id: "fup_efec70c089b1dfe9",
   chain: "bsc",
@@ -100,6 +110,22 @@ describe("Verification drawer tabs", () => {
     }
   });
 
+  it("keeps an unsupported routed token selected and explains its verification block", async () => {
+    const renderer = await render(<ProductLocaleProvider initialLocale="pl"><VerificationTokenBrowser
+      candidates={[unsupportedArrow]}
+      followUpEntries={[]}
+      selectedCandidate={unsupportedArrow}
+      onSelectToken={() => undefined}
+      onCloseToken={() => undefined}
+    /></ProductLocaleProvider>);
+    const arrowIdentity = `${unsupportedArrow.chain}:${unsupportedArrow.contractAddress}`;
+    assert.equal(renderer.root.findByProps({ "data-verification-token": arrowIdentity }).props["aria-pressed"], true);
+    assert.equal(renderer.root.findAllByProps({ "data-token-detail-drawer": "true" }).length, 1);
+    assert.match(visibleText(renderer.toJSON()), /Nieobsługiwana sieć/);
+    assert.match(visibleText(renderer.toJSON()), /pełna weryfikacja nie jest obecnie dostępna dla tej sieci/);
+    await act(async () => { renderer.unmount(); });
+  });
+
   it("keeps Follow-up verification data tied to its LKG snapshot and exposes only approved manual links", () => {
     const market = followUpMarkup("market");
     const data = followUpMarkup("data");
@@ -110,7 +136,7 @@ describe("Verification drawer tabs", () => {
       assert.match(markup, /17\.08\.2026, 15:32/);
       assert.doesNotMatch(markup, /17\.08\.2026, 14:40|20\.08\.2026/);
     }
-    assert.match(market, /Dane aktualne na/);
+    assert.match(market, /Czas migawki rynkowej/);
     assert.match(data, /Źródło zachowanej obserwacji nie zostało zapisane/);
     assert.doesNotMatch(data, />Follow-up</);
     assert.match(data, /https:\/\/dexscreener\.com\/bsc\/0xa2b1926Cb477e92445Cf70602f1A7200361F761D/);
@@ -141,7 +167,10 @@ describe("Verification drawer tabs", () => {
     const decision = followUpMarkup("decision");
 
     assert.match(decision, /Brak zapisanej decyzji/);
-    assert.match(decision, /Twoja notatka/);
+    assert.match(decision, /Krótka notatka/);
+    assert.match(decision, /Dostępne \/ potwierdzone/);
+    assert.match(decision, /Braki dla tej decyzji/);
+    assert.doesNotMatch(decision, /Prywatne dowody researchu|Twoje ręczne ustalenia|Dodaj wpis/);
     assert.match(decision, /Szczegółów tokena/);
     assert.doesNotMatch(decision, /aria-checked="true"|owner|Candidate Detail|Krótka notatka ownera/);
   });
@@ -158,6 +187,7 @@ describe("Verification drawer tabs", () => {
     await act(async () => { button(renderer, "Blokada płynności").props.onClick(); });
     await act(async () => { button(renderer, "Udział Top 10 portfeli").props.onClick(); });
     assert.deepEqual(opened, ["honeypot", "liquidity_lock", "top10_wallets"]);
+    assert.equal(renderer.root.findAll((node) => node.type === "button" && node.props.className === "verification-missing-link").length, 3);
     assert.equal(resolveVerificationMissingTarget("tokensniffer")?.target, "tokensniffer");
     assert.equal(resolveVerificationMissingTarget("bubblemaps")?.target, "bubblemaps");
     assert.equal(resolveVerificationMissingTarget("unknown_gap"), null);
@@ -175,6 +205,14 @@ describe("Verification drawer tabs", () => {
     assert.equal(focused.root.findByProps({ id: "verification-tab-security" }).props["aria-selected"], true);
     await act(async () => { button(focused, "Wróć do decyzji weryfikacyjnej").props.onClick(); });
     assert.equal(returned, 1);
+    await act(async () => {
+      focused.update(<ProductLocaleProvider initialLocale="pl"><ExternalVerificationLinksView key="decision-return"
+        followUp={followUpCandidate}
+        initialActiveTab="decision"
+      /></ProductLocaleProvider>);
+      await flushPromises();
+    });
+    assert.equal(focused.root.findByProps({ id: "verification-tab-decision" }).props["aria-selected"], true);
     await act(async () => { focused.unmount(); });
   });
 
@@ -232,8 +270,15 @@ describe("Verification drawer tabs", () => {
       assert.equal(renderer.root.findAll((node) => node.props.role === "radio").length, 4);
       const saveButton = button(renderer, "Zapisz wynik weryfikacji");
       assert.equal(saveButton.props.disabled, true, "no verdict keeps Save disabled");
-      await act(async () => { button(renderer, "Potrzebne dodatkowe dane").props.onClick(); });
-      assert.match(visibleText(renderer.toJSON()), /Werdykt wskaże, że przed decyzją potrzebne są dodatkowe dane\./);
+      assert.match(visibleText(renderer.toJSON()), /Aby zapisać, wybierz decyzję i wpisz krótką notatkę/);
+      await act(async () => {
+        button(renderer, "Zweryfikowany").props.onKeyDown({
+          key: "ArrowRight",
+          preventDefault: () => undefined,
+          currentTarget: { parentElement: { querySelector: () => ({ focus: () => undefined }) } },
+        });
+      });
+      assert.equal(button(renderer, "Potrzebne dodatkowe dane").props["aria-checked"], true);
       assert.deepEqual(writes, [], "selecting a draft never writes");
       assert.equal(button(renderer, "Zapisz wynik weryfikacji").props.disabled, false);
       await act(async () => { button(renderer, "Zapisz wynik weryfikacji").props.onClick(); await flushPromises(); });

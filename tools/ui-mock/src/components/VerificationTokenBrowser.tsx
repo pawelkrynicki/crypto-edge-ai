@@ -3,7 +3,7 @@ import React, { useMemo } from "react";
 void React;
 
 import { useProductLocale } from "../productI18n";
-import { isSameTokenIdentity } from "../tokenLifecycle";
+import { isSameRoutedTokenIdentity } from "../tokenLifecycle";
 import type { UiTokenCandidate } from "../types/scannerTypes";
 import type { FollowUpPublicEntry } from "../types/followUpTypes";
 import type { PrivateVerificationRecord } from "../services/manualOwnerActionsDataSource";
@@ -63,7 +63,7 @@ export function VerificationTokenBrowser({
   const tokens = useMemo<VerificationListToken[]>(() => {
     const currentCandidates: VerificationListToken[] = candidates.map((token) => ({ kind: "candidate", token }));
     const followUpOnly = followUpEntries
-      .filter((entry) => !candidates.some((candidate) => isSameTokenIdentity(
+      .filter((entry) => !candidates.some((candidate) => isSameRoutedTokenIdentity(
         entry,
         { chain: candidate.chain, contract_address: candidate.contractAddress },
       )))
@@ -94,7 +94,7 @@ export function VerificationTokenBrowser({
                 : item.token.contract_address;
               const name = item.kind === "candidate" ? item.token.name : item.token.display_name;
               const symbol = item.token.symbol;
-              const selected = Boolean(selectedIdentity && isSameTokenIdentity(
+              const selected = Boolean(selectedIdentity && isSameRoutedTokenIdentity(
                 { chain, contract_address: contractAddress },
                 selectedIdentity,
               ));
@@ -122,7 +122,7 @@ export function VerificationTokenBrowser({
       <div className="verification-token-drawer-region" aria-live="polite">
         {selectedCandidate || selectedFollowUp ? (
           <ExternalVerificationLinksView
-            key={`${selectedCandidate?.chain ?? selectedFollowUp?.chain}:${selectedCandidate?.contractAddress ?? selectedFollowUp?.contract_address}:${focusedResearchStep ?? "none"}`}
+            key={`${selectedCandidate?.chain ?? selectedFollowUp?.chain}:${selectedCandidate?.contractAddress ?? selectedFollowUp?.contract_address}:${focusedResearchStep ?? "none"}:${focusedMissingTarget ?? "none"}:${initialDecisionTab ? "decision" : "identity"}`}
             candidate={selectedCandidate}
             followUp={selectedFollowUp}
             onClose={onCloseToken}

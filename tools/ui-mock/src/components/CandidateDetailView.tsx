@@ -23,6 +23,7 @@ import {
 import {
   resolveTokenIdentity,
   resolveTokenLifecycle,
+  type TokenIdentityResolution,
   type TokenLifecycleViewModel,
 } from "../tokenLifecycle";
 import type { UiTokenCandidate } from "../types/scannerTypes";
@@ -163,6 +164,7 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
     : locale === "pl" ? "Nowe" : "New / Emerging";
   const status = getCandidateStatus(candidate, locale);
   const technicalIdentity = resolveTokenIdentity(candidate.chain, candidate.contractAddress);
+  const identityPresentation = presentCandidateIdentity(technicalIdentity, locale);
   const filterResolution = resolveProductFilterConditions({
     basicFilterStatus: candidate.basicFilterStatus,
     filterReasons: candidate.filterReasons,
@@ -223,7 +225,7 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
             <div className="product-detail-grid">
               <DetailField label={t("detail.contract")} value={candidate.contractAddress || t("radar.missingData")} copyValue={candidate.contractAddress} copyLabel={t("verification.copyContract")} mono />
               <DetailField label={t("detail.chain")} value={candidate.chain || t("radar.missingData")} />
-              <DetailField label={t("detail.technicalIdentity")} value={technicalIdentity.status === "valid" ? t("detail.technicalIdentityValid") : t("detail.technicalIdentityInvalid")} tone={technicalIdentity.status === "valid" ? "ready" : "warning"} />
+              <DetailField label={t("detail.technicalIdentity")} value={identityPresentation.value} detail={identityPresentation.detail} tone={technicalIdentity.status === "valid" ? "ready" : "warning"} />
               <DetailField label={t("detail.sourceVerification")} value={candidate.addressIdentityVerified ? t("detail.sourceVerificationConfirmed") : t("detail.sourceVerificationRequired")} tone={candidate.addressIdentityVerified ? "ready" : "warning"} />
             </div>
           </section>
@@ -268,7 +270,7 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
           <DetailField label={t("radar.volume24h")} value={formatProductUsd(market?.volume_24h_usd ?? candidate.volume24h, locale, t("radar.missingData"))} />
           <DetailField label={t("radar.ratio")} value={(market?.volume_market_cap_ratio ?? candidate.volumeMarketCapRatio) == null ? t("radar.missingData") : (market?.volume_market_cap_ratio ?? candidate.volumeMarketCapRatio)!.toFixed(4)} />
           <DetailField label={t("radar.pairAge")} value={formatProductPairAge(followUp?.pair_age ?? candidate.pairAgeDays, locale, t("radar.missingData"), { pairCreatedAt: candidate.pairCreatedAt })} />
-          <DetailField label={locale === "pl" ? "Dane aktualne na" : "Market data as of"} value={marketObservedAt ? formatProductDateTime(marketObservedAt, locale) : t("app.noData")} />
+          <DetailField label={locale === "pl" ? "Czas migawki rynkowej" : "Market snapshot time"} value={marketSnapshotTimeLabel(marketObservedAt, locale)} detail={marketObservedAt ? undefined : recordCheckedDetail(candidate.lastCheckedAt, locale)} />
         </div>
       </section>
     );
@@ -353,6 +355,7 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
         <section className="product-detail-section data-freshness" aria-labelledby="freshness-heading">
           <SectionHeader id="freshness-heading" title={t("detail.dataFreshness")} />
           <div className="product-detail-grid data">
+            <DetailField label={locale === "pl" ? "Czas migawki rynkowej" : "Market snapshot time"} value={marketSnapshotTimeLabel(marketObservedAt, locale)} detail={marketObservedAt ? undefined : recordCheckedDetail(candidate.lastCheckedAt, locale)} />
             <DetailField label={t("followUp.lastChecked")} value={formatProductDateTime(candidate.lastCheckedAt, locale)} />
             <DetailField label={t("detail.pairCreated")} value={candidate.pairCreatedAt ? formatProductDateTime(candidate.pairCreatedAt, locale) : t("radar.missingData")} />
             <DetailField label={t("detail.universeVersion")} value={candidate.discoveryBasket === "established" ? candidate.universeVersion ?? t("radar.missingData") : t("detail.notApplicable")} />
@@ -630,7 +633,7 @@ function FollowUpOnlyDetail({
           <DetailField label={t("radar.marketCap")} value={formatProductUsd(followUp.market_metrics.market_cap_usd, locale, t("radar.missingData"))} />
           <DetailField label={t("radar.liquidity")} value={formatProductUsd(followUp.market_metrics.liquidity_usd, locale, t("radar.missingData"))} />
           <DetailField label={t("radar.volume24h")} value={formatProductUsd(followUp.market_metrics.volume_24h_usd, locale, t("radar.missingData"))} />
-          <DetailField label={locale === "pl" ? "Dane aktualne na" : "Market data as of"} value={followUp.market_observed_at ? formatProductDateTime(followUp.market_observed_at, locale) : t("app.noData")} />
+          <DetailField label={locale === "pl" ? "Czas migawki rynkowej" : "Market snapshot time"} value={marketSnapshotTimeLabel(followUp.market_observed_at ?? null, locale)} detail={followUp.market_observed_at ? undefined : recordCheckedDetail(followUp.last_checked_at, locale)} />
         </div>
       </section>
     );
@@ -701,7 +704,7 @@ function FollowUpOnlyDetail({
             <DetailField label={t("detail.contract")} value={followUp.contract_address} copyValue={followUp.contract_address} copyLabel={t("verification.copyContract")} mono />
             <DetailField label={t("detail.chain")} value={followUp.chain} />
             <DetailField label={locale === "pl" ? "Pochodzenie danych rynkowych" : "Market-data provenance"} value={locale === "pl" ? "Źródło tej zachowanej obserwacji nie zostało zapisane." : "The source of this retained observation was not stored."} tone="warning" />
-            <DetailField label={locale === "pl" ? "Dane rynkowe z" : "Market data captured"} value={followUp.market_observed_at ? formatProductDateTime(followUp.market_observed_at, locale) : t("app.noData")} />
+            <DetailField label={locale === "pl" ? "Czas migawki rynkowej" : "Market snapshot time"} value={marketSnapshotTimeLabel(followUp.market_observed_at ?? null, locale)} detail={followUp.market_observed_at ? undefined : recordCheckedDetail(followUp.last_checked_at, locale)} />
           </div>
           <p>{locale === "pl" ? "Widoczne wartości pochodzą z ostatniej prawidłowej, zachowanej obserwacji Follow-up. Ręczne linki weryfikacyjne są miejscem sprawdzenia danych, a nie automatycznym źródłem tych wartości." : "The displayed values come from the latest valid retained Follow-up observation. Manual verification links are places to check data, not an automatic source of these values."}</p>
         </section>
@@ -746,7 +749,50 @@ function candidateDetailSystemStatusLabel(model: TokenLifecycleViewModel, locale
   return lifecycleStageLabel(model.current_stage, locale);
 }
 
+function presentCandidateIdentity(identity: TokenIdentityResolution, locale: ProductLocale): { value: string; detail?: string } {
+  if (identity.status === "valid") return { value: locale === "pl" ? "Potwierdzona technicznie" : "Technically confirmed" };
+  if (identity.reason === "UNSUPPORTED_CHAIN") {
+    return {
+      value: locale === "pl" ? "Nieobsługiwana sieć" : "Unsupported network",
+      detail: locale === "pl"
+        ? "Token można obserwować, ale pełna weryfikacja w tej sieci nie jest obecnie dostępna."
+        : "The token can be observed, but full verification is not currently available on this network.",
+    };
+  }
+  if (identity.reason === "INVALID_CONTRACT_ADDRESS") {
+    return {
+      value: locale === "pl" ? "Nieprawidłowy adres kontraktu" : "Invalid contract address",
+      detail: locale === "pl" ? "Nie udało się potwierdzić tożsamości tokena." : "The token identity could not be confirmed.",
+    };
+  }
+  return {
+    value: locale === "pl" ? "Brakuje danych identyfikujących" : "Identity data is missing",
+    detail: locale === "pl" ? "Nie udało się potwierdzić tożsamości tokena." : "The token identity could not be confirmed.",
+  };
+}
+
+function marketSnapshotTimeLabel(value: string | null, locale: ProductLocale): string {
+  if (value) return formatProductDateTime(value, locale);
+  return locale === "pl" ? "Brak dokładnego czasu migawki" : "Exact snapshot time unavailable";
+}
+
+function recordCheckedDetail(value: string | null | undefined, locale: ProductLocale): string | undefined {
+  if (!value) return undefined;
+  return locale === "pl"
+    ? `Rekord sprawdzono: ${formatProductDateTime(value, locale)}`
+    : `Record checked: ${formatProductDateTime(value, locale)}`;
+}
+
 function candidateDetailNextStep(model: TokenLifecycleViewModel, followUp: FollowUpPublicEntry | null, locale: ProductLocale): string {
+  if (model.blocking_conditions.includes("UNSUPPORTED_CHAIN")) {
+    return locale === "pl" ? "Pełna weryfikacja nie jest dostępna dla tej sieci" : "Full verification is unavailable for this network";
+  }
+  if (model.blocking_conditions.includes("INVALID_CONTRACT_ADDRESS")) {
+    return locale === "pl" ? "Potwierdź adres kontraktu" : "Confirm the contract address";
+  }
+  if (model.blocking_conditions.includes("INCOMPLETE_IDENTITY")) {
+    return locale === "pl" ? "Uzupełnij dane identyfikujące token" : "Complete the token identity details";
+  }
   if (requiresCampUserVerification(followUp)) {
     return locale === "pl" ? "Dokończ weryfikację" : "Complete verification";
   }
