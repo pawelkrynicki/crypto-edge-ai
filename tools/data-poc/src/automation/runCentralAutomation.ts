@@ -46,6 +46,13 @@ export function assertExplicitLiveAutomationOptIn(env: NodeJS.ProcessEnv): void 
   }
 }
 
+/** Owner smoke authorization is intentionally separate from persistent scheduling. */
+export function assertExplicitOwnerOneShotOptIn(env: NodeJS.ProcessEnv): void {
+  if (env.CRYPTO_EDGE_OWNER_ONE_SHOT !== "1" || env.ALLOW_LIVE_PROVIDER_CALLS !== "1") {
+    throw new Error("OWNER_ONE_SHOT_OPT_IN_REQUIRED");
+  }
+}
+
 export async function runCentralSchedulerOnce(
   options: RunCentralSchedulerOnceOptions,
 ): Promise<RunCentralSchedulerOnceResult> {
@@ -162,6 +169,7 @@ export async function runCentralLiveCycleOnce(options: {
     now: options.now,
     automationDirectoryPath: options.automationDirectoryPath,
     stateStore: options.stateStore,
+    executionKind: "OWNER_ONE_SHOT",
     beforeRun: options.beforeRun,
   });
   if (coordinated.status === "RUN_ALREADY_IN_PROGRESS") {

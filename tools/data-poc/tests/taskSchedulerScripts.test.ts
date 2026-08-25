@@ -118,8 +118,11 @@ describe("Windows Task Scheduler scripts", () => {
     assert.match(launcher, /--rollback/);
     assert.match(launcher, /CRYPTO_EDGE_AI_RESEARCH_PROVIDER=DISABLED/);
     assert.match(launcher, /OPENAI_API_KEY=/);
+    assert.match(launcher, /CRYPTO_EDGE_OWNER_ONE_SHOT=1/);
+    assert.match(launcher, /CRYPTO_EDGE_AUTOMATION_ENABLED=0/);
     const operationSource = await readFile(resolve(repoRoot, "tools", "data-poc", "src", "automation", "runDataCycleOperations.ts"), "utf8");
     assert.match(operationSource, /rawArgs\[0\] === "--"/);
+    assert.match(operationSource, /assertExplicitOwnerOneShotOptIn/);
     assert.doesNotMatch(launcher, /--apply|cloudflared|schtasks|Register-ScheduledTask/i);
   });
 });

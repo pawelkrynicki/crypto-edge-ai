@@ -15,6 +15,7 @@ import {
 import { nextRunAt, SOURCE_CADENCE_MS } from "./sourceCadence.js";
 
 export type CentralAutomationRunMode = "scanner_and_context" | "context_only";
+export type CentralAutomationExecutionKind = "SCHEDULED" | "OWNER_ONE_SHOT";
 
 export type CentralAutomationRunnerResult = {
   request_counts?: AutomationRequestCounts;
@@ -40,6 +41,8 @@ export type CentralAutomationOptions<T extends CentralAutomationRunnerResult> = 
   now?: () => Date;
   heartbeatIntervalMs?: number;
   mode?: CentralAutomationRunMode;
+  /** A bounded owner smoke must neither resume nor reconfigure persistent scheduling. */
+  executionKind?: CentralAutomationExecutionKind;
   beforeRun?: (runId: string) => Promise<void>;
 };
 
@@ -50,7 +53,8 @@ export type CentralAutomationResult<T extends CentralAutomationRunnerResult> =
   | { status: "AUTOMATION_SUSPENDED"; reason: string }
   | { status: "RUN_ALREADY_IN_PROGRESS"; active_run_id: string };
 
-export const MAX_CONSECUTIVE_TRANSIENT_FAILURES = 3;
+export const MAX_TRANSIENT_RETRY_BACKOFF_MULTIPLIER = 4;
+const TRANSIENT_RETRY_BASE_MS = SOURCE_CADENCE_MS.dexscreener;
 
 export class CentralAutomationError extends Error {
   readonly code: string;
@@ -77,6 +81,7 @@ export async function runCentralAutomation<T extends CentralAutomationRunnerResu
   }
 
   const stateStore = options.stateStore ?? createAutomationStateStore(options.automationDirectoryPath);
+  const isOwnerOneShot = options.executionKind === "OWNER_ONE_SHOT";
   const ttlMs = options.lockOptions?.ttlMs ?? DEFAULT_COLLECTOR_LOCK_TTL_MS;
   const heartbeatIntervalMs = options.heartbeatIntervalMs ?? Math.max(50, Math.floor(ttlMs / 3));
   let heartbeatError: unknown = null;
@@ -85,23 +90,25 @@ export async function runCentralAutomation<T extends CentralAutomationRunnerResu
 
   try {
     const previous = await readStateFailClosed(stateStore);
-    if (previous.automation_suspended) {
+    if (!isOwnerOneShot && previous.automation_suspended) {
       return { status: "AUTOMATION_SUSPENDED", reason: previous.suspended_reason ?? "OWNER_RESUME_REQUIRED" };
     }
     await options.beforeRun?.(runId);
     const attemptAt = now().toISOString();
-    await writeStateFailClosed(stateStore, {
-      ...previous,
-      last_attempt_at: attemptAt,
-      last_run_id: runId,
-      active_run_id: runId,
-      last_error_code: null,
-      cycle_id: runId,
-      cycle_status: "IN_PROGRESS",
-      cycle_duration_ms: null,
-      failure_code: null,
-      safe_error: null,
-    });
+    if (!isOwnerOneShot) {
+      await writeStateFailClosed(stateStore, {
+        ...previous,
+        last_attempt_at: attemptAt,
+        last_run_id: runId,
+        active_run_id: runId,
+        last_error_code: null,
+        cycle_id: runId,
+        cycle_status: "IN_PROGRESS",
+        cycle_duration_ms: null,
+        failure_code: null,
+        safe_error: null,
+      });
+    }
 
     heartbeatTimer = setInterval(() => {
       if (heartbeatInFlight || heartbeatError) return;
@@ -120,38 +127,40 @@ export async function runCentralAutomation<T extends CentralAutomationRunnerResu
       const errorCode = safeErrorCode(error);
       const failureRequestCounts = requestCountsFromError(error);
       const failureClass = classifyAutomationFailure(errorCode);
-      const consecutiveFailureCount = previous.consecutive_failure_count + 1;
-      const shouldSuspend = failureClass === "DETERMINISTIC"
-        || consecutiveFailureCount >= MAX_CONSECUTIVE_TRANSIENT_FAILURES;
       const failureAt = now().toISOString();
-      await writeStateFailClosed(stateStore, {
-        ...previous,
-        last_attempt_at: attemptAt,
-        last_failure_at: failureAt,
-        last_run_id: runId,
-        active_run_id: null,
-        last_result: "FAILED",
-        last_error_code: errorCode,
-        cycle_id: runId,
-        cycle_status: "FAILED",
-        cycle_duration_ms: elapsedMs(attemptAt, now()),
-        records_received: 0,
-        records_valid: 0,
-        records_rejected: 0,
-        new_records: 0,
-        follow_up_ingested: 0,
-        checkpoints_processed: 0,
-        source_statuses: {},
-        failure_code: errorCode,
-        safe_error: safeErrorDescription(errorCode),
-        request_counts: failureRequestCounts ?? previous.request_counts,
-        consecutive_failure_count: consecutiveFailureCount,
-        automation_suspended: shouldSuspend,
-        suspended_at: shouldSuspend ? failureAt : null,
-        suspended_reason: shouldSuspend ? errorCode : null,
-        last_failure_class: failureClass,
-        resume_required: shouldSuspend,
-      });
+      if (!isOwnerOneShot) {
+        const consecutiveFailureCount = previous.consecutive_failure_count + 1;
+        const shouldSuspend = failureClass === "DETERMINISTIC";
+        await writeStateFailClosed(stateStore, {
+          ...previous,
+          last_attempt_at: attemptAt,
+          last_failure_at: failureAt,
+          last_run_id: runId,
+          active_run_id: null,
+          last_result: "FAILED",
+          last_error_code: errorCode,
+          cycle_id: runId,
+          cycle_status: "FAILED",
+          cycle_duration_ms: elapsedMs(attemptAt, now()),
+          records_received: 0,
+          records_valid: 0,
+          records_rejected: 0,
+          new_records: 0,
+          follow_up_ingested: 0,
+          checkpoints_processed: 0,
+          source_statuses: {},
+          failure_code: errorCode,
+          safe_error: safeErrorDescription(errorCode),
+          request_counts: failureRequestCounts ?? previous.request_counts,
+          consecutive_failure_count: consecutiveFailureCount,
+          retry_not_before: shouldSuspend ? null : transientRetryNotBefore(failureAt, consecutiveFailureCount),
+          automation_suspended: shouldSuspend,
+          suspended_at: shouldSuspend ? failureAt : null,
+          suspended_reason: shouldSuspend ? errorCode : null,
+          last_failure_class: failureClass,
+          resume_required: shouldSuspend,
+        });
+      }
       return {
         status: "FAILED",
         run_id: runId,
@@ -161,15 +170,17 @@ export async function runCentralAutomation<T extends CentralAutomationRunnerResu
     }
 
     const cycleStatus = resolveCycleStatus(result);
-    await writeStateFailClosed(stateStore, buildCompletedState(
-      previous,
-      runId,
-      attemptAt,
-      now(),
-      result,
-      options.mode ?? "scanner_and_context",
-      cycleStatus,
-    ));
+    if (!isOwnerOneShot) {
+      await writeStateFailClosed(stateStore, buildCompletedState(
+        previous,
+        runId,
+        attemptAt,
+        now(),
+        result,
+        options.mode ?? "scanner_and_context",
+        cycleStatus,
+      ));
+    }
     return { status: cycleStatus, run_id: runId, result };
   } finally {
     if (heartbeatTimer) clearInterval(heartbeatTimer);
@@ -229,7 +240,16 @@ function buildCompletedState<T extends CentralAutomationRunnerResult>(
       ? nextRunAt(successAt, SOURCE_CADENCE_MS.defillama_api)
       : previous.next_defillama_run_at,
     consecutive_failure_count: 0,
+    retry_not_before: null,
   };
+}
+
+function transientRetryNotBefore(failureAt: string, consecutiveFailures: number): string {
+  const exponent = Math.min(
+    Math.max(0, consecutiveFailures - 1),
+    Math.log2(MAX_TRANSIENT_RETRY_BACKOFF_MULTIPLIER),
+  );
+  return new Date(Date.parse(failureAt) + TRANSIENT_RETRY_BASE_MS * 2 ** exponent).toISOString();
 }
 
 function resolveCycleStatus(result: CentralAutomationRunnerResult): "SUCCESS" | "PARTIAL" {

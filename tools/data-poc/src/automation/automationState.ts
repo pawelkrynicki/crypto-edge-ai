@@ -59,6 +59,8 @@ export type AutomationState = {
   last_context_run_id: string | null;
   missed_schedule_count: number;
   consecutive_failure_count: number;
+  /** Earliest cadence-safe retry after a transient central source failure. */
+  retry_not_before: string | null;
   automation_suspended: boolean;
   suspended_at: string | null;
   suspended_reason: string | null;
@@ -119,6 +121,7 @@ export function createInitialAutomationState(): AutomationState {
     last_context_run_id: null,
     missed_schedule_count: 0,
     consecutive_failure_count: 0,
+    retry_not_before: null,
     automation_suspended: false,
     suspended_at: null,
     suspended_reason: null,
@@ -226,6 +229,7 @@ export function normalizeAutomationState(value: unknown): AutomationState {
     last_context_run_id: optionalNullableSafeText(record.last_context_run_id),
     missed_schedule_count: optionalNonNegativeInteger(record.missed_schedule_count),
     consecutive_failure_count: optionalNonNegativeInteger(record.consecutive_failure_count),
+    retry_not_before: optionalNullableIso(record.retry_not_before),
     automation_suspended: automationSuspended,
     suspended_at: suspendedAt,
     suspended_reason: suspendedReason,

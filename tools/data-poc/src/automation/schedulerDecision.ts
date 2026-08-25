@@ -64,6 +64,7 @@ export function decideCentralSchedule(input: SchedulerDecisionInput): SchedulerD
   if (!input.enabled) decision = "AUTOMATION_DISABLED";
   else if (input.state_available === false || state === null) decision = "STATE_UNAVAILABLE";
   else if (state.automation_suspended) decision = "AUTOMATION_SUSPENDED";
+  else if (state.retry_not_before !== null && Date.parse(state.retry_not_before) > input.now.getTime()) decision = "NOTHING_DUE";
   else if (activeRunId) decision = "RUN_ALREADY_IN_PROGRESS";
   else if (cadence.requires_scanner_and_context) decision = "RUN_SCANNER_AND_CONTEXT";
   else if (cadence.requires_context_only) decision = "RUN_CONTEXT_ONLY";

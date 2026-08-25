@@ -156,6 +156,32 @@ scheduler wakes independently, one coordinator acquires the single-flight
 lock, publishes atomically and advances the product-version pointer for all
 readers.
 
+### Central automation operational contract
+
+A real central product cycle may perform only canonical **system** lifecycle
+transitions defined by the lifecycle contract. It never writes private user
+Radar state, private research evidence, scorecards or an automatic Established
+promotion. In contrast, browser refresh, product-version polling, read-only
+user fan-out and offline regression run with zero lifecycle mutations.
+
+An explicit owner one-shot data smoke is a bounded coordinator execution, not
+a scheduler resume. It acquires the same global single-flight lock, preserves
+provider budgets, retries and atomic/LKG protections, then exits. It does not
+enable or resume persistent scheduling, alter the prior enabled/suspended
+operator configuration, install a task, create a timer or schedule a follow-up
+run. This allows a suspended local owner preview to validate one bounded cycle
+without changing how its normal scheduler is configured.
+
+Invalid or insufficient source coverage is never published merely to advance a
+timestamp. A transient source/data-quality failure preserves the accepted
+last-known-good snapshot, records a safe failure state and applies bounded
+cadence-safe backoff before the next scheduled opportunity. It does not become
+a hidden permanent stale-data dead state. Deterministic contract/provenance
+failures remain separately suspendable for operator intervention. VPS central
+automation continues to run independently of browser presence; local owner
+preview automation may remain disabled or suspended until an operator changes
+that configuration deliberately.
+
 ## Radar and private organization
 
 **Product Radar** is shared server-owned product state and answers which token

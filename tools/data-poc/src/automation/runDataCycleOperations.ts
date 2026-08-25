@@ -10,7 +10,7 @@ import {
 } from "./dataCycleOperations.js";
 import { acquireGlobalCollectorLock } from "./globalCollectorLock.js";
 import {
-  assertExplicitLiveAutomationOptIn,
+  assertExplicitOwnerOneShotOptIn,
   runCentralLiveCycleOnce,
 } from "./runCentralAutomation.js";
 
@@ -63,7 +63,7 @@ async function preview(): Promise<Record<string, unknown>> {
 }
 
 async function runOnceLive(): Promise<void> {
-  assertExplicitLiveAutomationOptIn(process.env);
+  assertExplicitOwnerOneShotOptIn(process.env);
   if (process.env.CRYPTO_EDGE_AI_RESEARCH_PROVIDER !== "DISABLED") {
     throw new Error("OPENAI_PROVIDER_MUST_BE_DISABLED");
   }

@@ -75,7 +75,7 @@ describe("central automation circuit breaker", () => {
     await assertCanonicalSentinelsUnchanged(sentinels);
   });
 
-  it("suspends after three consecutive transient failures", async () => {
+  it("keeps transient failures operational with bounded cadence backoff", async () => {
     const root = await tempRoot();
     const automationDirectoryPath = resolve(root, "automation");
     let runnerCalls = 0;
@@ -91,20 +91,89 @@ describe("central automation circuit breaker", () => {
       assert.equal(result.status, "FAILED");
       const state = await createAutomationStateStore(automationDirectoryPath).read();
       assert.equal(state.consecutive_failure_count, attempt);
-      assert.equal(state.automation_suspended, attempt === 3);
+      assert.equal(state.automation_suspended, false);
+      assert.equal(state.resume_required, false);
+      assert.equal(state.retry_not_before, new Date(Date.parse(state.last_failure_at!) + 15 * 60_000 * Math.min(2 ** (attempt - 1), 4)).toISOString());
       assert.equal(state.last_failure_class, "TRANSIENT");
     }
     assert.equal(runnerCalls, 3);
 
-    const blocked = await runCentralAutomation({
+    const state = await createAutomationStateStore(automationDirectoryPath).read();
+    const blocked = await runCentralSchedulerOnce({
+      enabled: true,
+      now: () => new Date(Date.parse(state.retry_not_before!) - 1),
       automationDirectoryPath,
-      runner: async () => {
+      scannerAndContextRunner: async () => {
         runnerCalls += 1;
         return {};
       },
     });
-    assert.equal(blocked.status, "AUTOMATION_SUSPENDED");
+    assert.equal(blocked.decision, "NOTHING_DUE");
     assert.equal(runnerCalls, 3);
+  });
+
+  it("preserves LKG after insufficient coverage and retries only at the next bounded opportunity", async () => {
+    const root = await tempRoot();
+    const automationDirectoryPath = resolve(root, "automation");
+    const sentinels = await createCanonicalSentinels(root);
+    const store = createAutomationStateStore(automationDirectoryPath);
+    const baseline: AutomationState = {
+      ...createInitialAutomationState(),
+      last_scanner_success_at: "2026-08-25T10:00:00.000Z",
+      last_context_success_at: "2026-08-25T10:00:00.000Z",
+      last_published_scanner_run_id: "scan_lkg",
+      last_published_context_run_id: "context_lkg",
+    };
+    await store.write(baseline);
+
+    const failed = await runCentralAutomation({
+      automationDirectoryPath,
+      stateStore: store,
+      now: () => new Date("2026-08-25T10:15:00.000Z"),
+      runner: async () => {
+        throw Object.assign(new Error("coverage too low"), { code: "DEXSCREENER_DISCOVERY_INSUFFICIENT_COVERAGE" });
+      },
+    });
+    assert.equal(failed.status, "FAILED");
+    const afterFailure = await store.read();
+    assert.equal(afterFailure.automation_suspended, false);
+    assert.equal(afterFailure.retry_not_before, "2026-08-25T10:30:00.000Z");
+    assert.equal(afterFailure.last_published_scanner_run_id, "scan_lkg");
+    assert.equal(afterFailure.last_published_context_run_id, "context_lkg");
+    await assertCanonicalSentinelsUnchanged(sentinels);
+
+    let attempts = 0;
+    const tooEarly = await runCentralSchedulerOnce({
+      enabled: true,
+      now: () => new Date("2026-08-25T10:29:59.000Z"),
+      automationDirectoryPath,
+      stateStore: store,
+      activeLockRunId: null,
+      scannerAndContextRunner: async () => {
+        attempts += 1;
+        return {};
+      },
+    });
+    assert.equal(tooEarly.decision, "NOTHING_DUE");
+    assert.equal(attempts, 0);
+
+    const recovered = await runCentralSchedulerOnce({
+      enabled: true,
+      now: () => new Date("2026-08-25T10:30:00.000Z"),
+      automationDirectoryPath,
+      stateStore: store,
+      activeLockRunId: null,
+      scannerAndContextRunner: async () => {
+        attempts += 1;
+        return { scanner_run_id: "scan_recovered", context_run_id: "context_recovered" };
+      },
+    });
+    assert.equal(recovered.run_status, "SUCCESS");
+    assert.equal(attempts, 1);
+    const afterRecovery = await store.read();
+    assert.equal(afterRecovery.retry_not_before, null);
+    assert.equal(afterRecovery.consecutive_failure_count, 0);
+    assert.equal(afterRecovery.last_published_scanner_run_id, "scan_recovered");
   });
 
   it("resets the failure counter only after SUCCESS or PARTIAL", async () => {
@@ -171,6 +240,7 @@ describe("central automation circuit breaker", () => {
       "SCANNER_CONTEXT_PROVENANCE_INVALID",
     ]) assert.equal(classifyAutomationFailure(code), "DETERMINISTIC");
     assert.equal(classifyAutomationFailure("PROVIDER_TIMEOUT"), "TRANSIENT");
+    assert.equal(classifyAutomationFailure("DEXSCREENER_DISCOVERY_INSUFFICIENT_COVERAGE"), "TRANSIENT");
   });
 });
 
