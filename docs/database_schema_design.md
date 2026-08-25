@@ -1,5 +1,7 @@
 # Database Schema Design
 
+> **HISTORICAL / SUPERSEDED.** The canonical product and deployment direction is [canonical_product_information_architecture.md](canonical_product_information_architecture.md).
+
 ## Purpose
 
 This document defines the database design for Crypto Edge AI.

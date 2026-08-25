@@ -314,6 +314,7 @@ describe("Feedback HTTP and owner boundary", () => {
       ownerOperations: { mode: "REVIEW_SAFE", sessionSecret: "x".repeat(32) },
       feedback: { store, sessionLimit: 20, globalLimit: 20 },
       health: { buildSha: "abcdef1234567" },
+      lifecycle: { defaultSessionRole: "OWNER" },
     }));
     await listen(owner);
     const origin = serverUrl(owner);

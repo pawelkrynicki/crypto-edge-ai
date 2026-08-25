@@ -1066,6 +1066,8 @@ button.research-key-tool-heading:hover strong { color: var(--accent); }
 }
 @media (max-width: 720px) {
   .research-checklist-summary ol { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .research-playbook-context { align-items: stretch; flex-direction: column; }
+  .research-playbook-context .action-button { width: 100%; }
   .research-checklist-heading, .research-checklist-step > header, .research-manual-evidence > header { align-items: start; flex-direction: column; }
   .research-focus-navigation { align-items: start; flex-direction: column; }
   .research-focus-navigation > strong { text-align: left; }
@@ -8741,16 +8743,16 @@ summary {
 .ai-research-guidance header dd small { color: var(--text-secondary); font-size: 11px; font-weight: 500; letter-spacing: normal; line-height: 1.4; }
 .research-playbook-progress-tracker { display: grid; gap: 9px; min-width: 0; padding: 11px; border: 1px solid rgba(113, 139, 151, 0.3); border-radius: var(--radius-sm); background: rgba(7, 21, 27, 0.46); }
 .research-playbook-progress-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
-.research-playbook-progress-heading > span,
-.research-playbook-progress-unlock > strong { color: var(--accent); font-size: 10px; font-weight: 800; letter-spacing: 0.09em; text-transform: uppercase; }
+.research-playbook-progress-heading > span { color: var(--accent); font-size: 10px; font-weight: 800; letter-spacing: 0.09em; text-transform: uppercase; }
 .research-playbook-progress-heading > strong { color: var(--text-secondary); font-size: 11px; }
 .research-playbook-progress-stages { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; min-width: 0; margin: 0; padding: 0; list-style: none; }
 .research-playbook-progress-tracker { overflow-x: auto; }
-.research-playbook-progress-stage { display: grid; grid-template-columns: 19px minmax(0, 1fr); grid-template-areas: "marker name" "state state"; gap: 2px 6px; min-width: 0; padding: 7px; border: 1px solid var(--border); border-radius: 7px; background: rgba(8, 12, 16, 0.28); }
+.research-playbook-progress-stage { display: grid; grid-template-columns: 19px minmax(0, 1fr); grid-template-areas: "marker name" "state state" "evidence evidence"; gap: 2px 6px; min-width: 0; padding: 7px; border: 1px solid var(--border); border-radius: 7px; background: rgba(8, 12, 16, 0.28); }
 .research-playbook-progress-marker { grid-area: marker; display: grid; place-items: center; width: 19px; height: 19px; border: 1px solid var(--border); border-radius: 999px; color: var(--text-helper); font-size: 11px; font-weight: 900; }
 .research-playbook-progress-name { grid-area: name; min-width: 0; color: var(--text-secondary); font-size: 10px; font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
 .research-playbook-progress-name b { margin-right: 4px; color: var(--text-helper); }
 .research-playbook-progress-state-label { grid-area: state; min-width: 0; color: var(--text-helper); font-size: 8px; font-weight: 800; letter-spacing: 0; overflow-wrap: anywhere; text-transform: uppercase; }
+.research-playbook-progress-evidence { grid-area: evidence; min-width: 0; color: var(--text-secondary); font-size: 8px; line-height: 1.25; overflow-wrap: anywhere; }
 .research-playbook-progress-stage.completed { border-color: var(--accent-border); }
 .research-playbook-progress-stage.completed .research-playbook-progress-marker { color: var(--bg); background: var(--accent); border-color: var(--accent); }
 .research-playbook-progress-stage.completed .research-playbook-progress-state-label { color: var(--accent); }
@@ -8758,12 +8760,17 @@ summary {
 .research-playbook-progress-stage.current .research-playbook-progress-marker { color: var(--bg); background: var(--warning); border-color: var(--warning); }
 .research-playbook-progress-stage.current .research-playbook-progress-name { color: var(--text-primary); }
 .research-playbook-progress-stage.current .research-playbook-progress-state-label { color: var(--warning); }
-.research-playbook-progress-stage.locked { border-style: dashed; opacity: 0.82; }
-.research-playbook-progress-unlock { display: grid; gap: 5px; padding-top: 2px; }
-.research-playbook-progress-unlock > p { margin: 0; color: var(--text-secondary); font-size: 11px; line-height: 1.45; }
-.research-playbook-progress-unlock ul { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 5px 12px; margin: 0; padding: 0; list-style: none; }
-.research-playbook-progress-unlock li { position: relative; padding-left: 15px; color: var(--text-secondary); font-size: 11px; line-height: 1.4; }
-.research-playbook-progress-unlock li::before { position: absolute; left: 0; color: var(--accent); content: "□"; font-weight: 800; }
+.research-playbook-progress-stage.pending { border-style: dashed; opacity: 0.88; }
+.research-playbook-progress-unlock { margin: 0; padding-top: 2px; color: var(--text-secondary); font-size: 11px; line-height: 1.45; }
+.research-playbook-context { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 12px; padding: 11px; border: 1px solid color-mix(in srgb, var(--accent) 46%, var(--border)); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--surface) 90%, var(--accent) 10%); }
+.research-playbook-context > div { display: grid; gap: 3px; min-width: 0; }
+.research-playbook-context span { color: var(--accent); font-size: 10px; font-weight: 800; letter-spacing: 0.08em; }
+.research-playbook-context strong { color: var(--text-primary); font-size: 13px; }
+.research-playbook-context p { margin: 0; color: var(--text-secondary); font-size: 11px; line-height: 1.4; }
+.research-playbook-context .action-button { flex: 0 0 auto; }
+.research-verification-action { display: grid; gap: 6px; margin-top: 10px; padding: 10px; border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--border)); border-radius: 8px; background: color-mix(in srgb, var(--surface) 90%, var(--accent) 10%); }
+.research-verification-action strong { color: var(--text-primary); font-size: 12px; }
+.research-verification-action p { margin: 0; color: var(--text-secondary); font-size: 11px; line-height: 1.4; }
 @media (max-width: 640px) {
   .research-playbook-progress-stages { min-width: 570px; }
 }
@@ -9679,26 +9686,6 @@ summary {
 }
 
 .verification-token-drawer > .detail-tab-bar > .token-detail-tabs { position: static; }
-
-/* Research focus owns page scrolling; the normal Verification drawer remains bounded. */
-.verification-token-drawer.research-focus-drawer {
-  max-height: none;
-  min-height: 0;
-  overflow: visible;
-}
-
-.research-focus-drawer .token-detail-drawer-body--tabbed {
-  flex: 0 0 auto;
-  overflow: visible;
-}
-
-.research-focus-drawer .token-detail-tabpanel {
-  flex: 0 0 auto;
-  min-height: 0;
-  overflow-x: visible;
-  overflow-y: visible;
-  scrollbar-gutter: auto;
-}
 
 @keyframes verification-drawer-enter {
   from { opacity: 0; transform: translateX(10px); }

@@ -1,5 +1,9 @@
 # Local MVP Release Candidate
 
+> **HISTORICAL / SUPERSEDED.** The canonical product, Research Playbook and
+> standalone deployment direction is
+> [canonical_product_information_architecture.md](canonical_product_information_architecture.md).
+
 ## Status
 
 - Local MVP Release Candidate Stabilization v1.

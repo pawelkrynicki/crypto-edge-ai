@@ -200,7 +200,11 @@ describe("read-only Reports Library API", () => {
     await withReportsRoot(async (root) => {
       await writeReport(root, "analyst-report-control.json", validReport());
       await writeFile(resolve(root, "analyst-report-invalid.json"), "{}", "utf8");
-      const server = createScannerApiServer({ runtimeMode: "INTERNAL_BETA", reports: { reportsRootPath: root } });
+      const server = createScannerApiServer({
+        runtimeMode: "INTERNAL_BETA",
+        reports: { reportsRootPath: root },
+        lifecycle: { defaultSessionRole: "OWNER" },
+      });
       await listen(server);
       try {
         const [libraryResponse, controlResponse] = await Promise.all([

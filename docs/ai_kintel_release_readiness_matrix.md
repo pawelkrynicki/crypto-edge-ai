@@ -1,5 +1,7 @@
 # AI KINTEL Release Readiness Matrix
 
+> **HISTORICAL / SUPERSEDED.** The canonical product and deployment direction is [canonical_product_information_architecture.md](canonical_product_information_architecture.md).
+
 ## Status
 
 - Stage: 11G - release readiness matrix.

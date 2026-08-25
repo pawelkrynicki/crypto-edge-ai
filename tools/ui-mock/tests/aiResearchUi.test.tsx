@@ -8,17 +8,14 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { buildAIResearchContext, type AIResearchGuidanceInput } from "../server/aiResearchContext.js";
 import { buildDeterministicPreview } from "../server/aiResearchService.js";
 import { mapPersistableScannerOutputToUiCandidates } from "../src/adapters/scannerOutputAdapter.js";
-import { buildVerificationRouteHref } from "../src/candidateDetailRoute.js";
 import { AIResearchBriefCanvas } from "../src/components/AIResearchBriefCanvas.js";
 import { AIProductionAnalysisCanvas } from "../src/components/AIProductionAnalysisCanvas.js";
 import { AIResearchRadarStatus, AIResearchSection } from "../src/components/AIResearchSection.js";
-import { ResearchPlaybookProgressTracker } from "../src/components/ResearchPlaybookProgressTracker.js";
 import { applyAIResearchGenerationFailure } from "../src/components/aiResearchState.js";
 import { CandidateDetailView } from "../src/components/CandidateDetailView.js";
 import { ExternalVerificationLinksView } from "../src/components/ExternalVerificationLinksView.js";
 import { PERSISTABLE_SCANNER_SAMPLE } from "../src/fixtures/persistableScannerSample.js";
 import { ProductLocaleProvider, readRequestedProductLocale, type ProductLocale } from "../src/productI18n.js";
-import { RESEARCH_PLAYBOOK_STAGES } from "../src/researchPlaybookStages.js";
 import { resolveResearchPlaybookProgressState } from "../src/researchPlaybookProgressState.js";
 import { AIResearchDataSourceError } from "../src/services/aiResearchDataSource.js";
 import type { AIResearchBrief, AIResearchBriefLookup, AIResearchReviewMetrics } from "../src/types/aiResearchTypes.js";
@@ -295,7 +292,7 @@ describe("PC.2 CAMP presentation polish", () => {
     assert.doesNotMatch(legacyMarkup, /Established/);
   });
 
-  it("routes the current security guidance action to its read-only research step", () => {
+  it("keeps stored AI guidance separate from the Research Playbook authority", () => {
     const analysis = presentAnalysis(briefPl, false, "pl", {
       ...context.guidance,
       freshness: "FRESH",
@@ -303,49 +300,39 @@ describe("PC.2 CAMP presentation polish", () => {
       security: { ...context.guidance.security, coverage: "partial" },
       action_catalog: guidanceActions("pl", ["REVIEW_SECURITY", "OPEN_VERIFICATION"]),
     });
-    const previousWindow = globalThis.window;
-    Object.defineProperty(globalThis, "window", {
-      configurable: true,
-      value: { location: { href: `http://127.0.0.1:5173/?chain=base&contract=${ADDRESS}&detail=ai#candidate-detail` } },
+    const markup = render("pl", <AIProductionAnalysisCanvas analysis={analysis} />);
+    assert.match(markup, /href="#external-checks"/);
+    assert.doesNotMatch(markup, /research-playbook-progress-tracker/);
+    assert.doesNotMatch(markup, /Krok 3\/7/);
+
+    const english = presentAnalysis(briefEn, false, "en", {
+      ...contextEn.guidance,
+      freshness: "FRESH",
+      filters: { ...contextEn.guidance.filters, status: "passed_basic_filter" },
+      security: { ...contextEn.guidance.security, coverage: "partial" },
+      action_catalog: guidanceActions("en", ["REVIEW_SECURITY", "OPEN_VERIFICATION"]),
     });
-    try {
-      const href = buildVerificationRouteHref({ chain: "base", contract_address: ADDRESS }, 3);
-      const markup = render("pl", <AIProductionAnalysisCanvas analysis={analysis} securityResearchHref={href} />);
-      assert.match(markup, new RegExp(`href="\\/?\\?chain=base&amp;contract=${ADDRESS}&amp;research_step=3#external-checks"`));
-      assert.match(markup, /href="#external-checks"/);
+    const englishMarkup = render("en", <AIProductionAnalysisCanvas analysis={english} />);
+    assert.match(englishMarkup, /AI guidance based on the current snapshot/);
+    assert.doesNotMatch(englishMarkup, /Step 3\/7/);
 
-      const english = presentAnalysis(briefEn, false, "en", {
-        ...contextEn.guidance,
-        freshness: "FRESH",
-        filters: { ...contextEn.guidance.filters, status: "passed_basic_filter" },
-        security: { ...contextEn.guidance.security, coverage: "partial" },
-        action_catalog: guidanceActions("en", ["REVIEW_SECURITY", "OPEN_VERIFICATION"]),
-      });
-      const englishMarkup = render("en", <AIProductionAnalysisCanvas analysis={english} />);
-      assert.match(englishMarkup, /Step 3\/7 — SECURITY \/ 3 CHECKS/);
-      assert.doesNotMatch(englishMarkup, /STAMPS/);
-
-      const legacyGuidance = {
-        ...english,
-        research_guidance: {
-          ...english.research_guidance,
-          current_step: { ...english.research_guidance.current_step, title: "SECURITY / 3 STAMPS" },
-        },
-      };
-      const legacyGuidanceMarkup = render("en", <AIProductionAnalysisCanvas analysis={legacyGuidance} />);
-      assert.match(legacyGuidanceMarkup, /Step 3\/7 — SECURITY \/ 3 CHECKS/);
-      assert.doesNotMatch(legacyGuidanceMarkup, /STAMPS/);
-    } finally {
-      Object.defineProperty(globalThis, "window", { configurable: true, value: previousWindow });
-    }
+    const legacyGuidance = {
+      ...english,
+      research_guidance: {
+        ...english.research_guidance,
+        current_step: { ...english.research_guidance.current_step, title: "SECURITY / 3 STAMPS" },
+      },
+    };
+    const legacyGuidanceMarkup = render("en", <AIProductionAnalysisCanvas analysis={legacyGuidance} />);
+    assert.doesNotMatch(legacyGuidanceMarkup, /STAMPS/);
   });
 
-  it("opens the focused checklist for a Follow-up-only candidate without manufacturing scanner data", () => {
+  it("keeps a Follow-up-only Verification drawer as an evidence workspace", () => {
     const markup = render("pl", <ExternalVerificationLinksView followUp={followUpOnlyCandidate} focusedResearchStep={3} />);
-    assert.match(markup, /research-checklist-focus-3/);
-    assert.match(markup, /Krok 3\/7/);
+    assert.equal((markup.match(/role="tab"/g) ?? []).length, 6);
     assert.match(markup, /Bezpieczeństwo/);
-    assert.doesNotMatch(markup, /Źródła są opisane i linkowane/);
+    assert.doesNotMatch(markup, /research-checklist-focus-3/);
+    assert.doesNotMatch(markup, /7-stopniowa checklista researchu/);
   });
 
   it("uses an explicit product URL locale before the stored preference", () => {
@@ -431,7 +418,7 @@ describe("PC.2 action-first research guidance", () => {
       "Wolumen 24 h: spełnia wymagany próg",
       "Płynność: spełnia wymagany próg",
     ]);
-    assert.match(markup, /Krok 1\/7 — SZYBKI FILTR/);
+    assert.doesNotMatch(markup, /Krok 1\/7 — SZYBKI FILTR/, "AI does not render a second Playbook current-step authority");
     assert.match(markup, /KROK 1 NIEZALICZONY/);
     assert.match(markup, /Dalszy research jest wstrzymany do kolejnej świeżej migawki/);
     assert.match(markup, /Poczekaj na aktualizację danych/);
@@ -445,7 +432,7 @@ describe("PC.2 action-first research guidance", () => {
     assert.ok(markup.indexOf("ETAP RESEARCHU") < markup.indexOf("SZCZEGÓŁY ANALIZY"));
   });
 
-  it("renders the canonical seven-stage Research Playbook path as a read-only, localized progress tracker", async () => {
+  it("does not render a duplicate seven-stage Research Playbook tracker inside AI", async () => {
     const plInput = structuredClone(context.guidance);
     plInput.freshness = "STALE";
     plInput.filters = {
@@ -468,40 +455,16 @@ describe("PC.2 action-first research guidance", () => {
 
     const plMarkup = render("pl", <AIProductionAnalysisCanvas analysis={plAnalysis} />);
     const enMarkup = render("en", <AIProductionAnalysisCanvas analysis={enAnalysis} />);
-    const tracker = render("pl", <ResearchPlaybookProgressTracker currentStep={1} unlockConditions={plAnalysis.research_guidance.unlock_conditions} locale="pl" />);
-    const progressedTracker = render("pl", <ResearchPlaybookProgressTracker currentStep={3} unlockConditions={["Kontrole bezpieczeństwa są zakończone"]} locale="pl" />);
-    const css = await readFile(resolve(import.meta.dirname, "../src/index.css"), "utf8");
-
-    assert.equal((plMarkup.match(/data-research-playbook-progress-stage="[1-7]"/g) ?? []).length, 7);
-    assert.equal((enMarkup.match(/data-research-playbook-progress-stage="[1-7]"/g) ?? []).length, 7);
-    assert.equal((plMarkup.match(/data-research-playbook-progress-state="CURRENT"/g) ?? []).length, 1);
-    assert.match(plMarkup, /data-research-playbook-progress-stage="1"[^>]*data-research-playbook-progress-state="CURRENT"/);
-    assert.match(plMarkup, /data-research-playbook-progress-stage="2"[^>]*data-research-playbook-progress-state="LOCKED"/);
-    assert.match(plMarkup, /Co odblokuje kolejny etap/);
-    assert.match(plMarkup, /Świeża migawka danych/);
-    assert.match(enMarkup, /What unlocks the next stage/);
-    assert.match(enMarkup, /Fresh data snapshot/);
-    assert.match(plMarkup, /aria-label="Etap 1 z 7: Szybki filtr — Bieżący"/);
-    assert.match(enMarkup, /aria-label="Stage 1 of 7: Quick filter — Current"/);
-    assert.match(plMarkup, /Krok 1\/7 — SZYBKI FILTR/, "the existing current-stage detail remains visible");
-    assert.doesNotMatch(tracker, /<button\b/, "locked stages are informational, not controls");
-    assert.equal((progressedTracker.match(/data-research-playbook-progress-state="COMPLETED"/g) ?? []).length, 2);
-    assert.match(progressedTracker, /data-research-playbook-progress-stage="3"[^>]*data-research-playbook-progress-state="CURRENT"/);
-    assert.match(progressedTracker, /data-research-playbook-progress-stage="4"[^>]*data-research-playbook-progress-state="LOCKED"/);
-    assert.match(css, /\.research-playbook-progress-tracker \{[^}]*overflow-x: auto;/);
-    assert.match(css, /\.research-playbook-progress-stages \{[^}]*grid-template-columns: repeat\(7,/);
-    assert.match(css, /@media \(max-width: 640px\)\s*\{\s*\.research-playbook-progress-stages \{ min-width: 570px; \}/);
-
-    for (const locale of ["pl", "en"] as const) {
-      const markup = locale === "pl" ? plMarkup : enMarkup;
-      const positions = RESEARCH_PLAYBOOK_STAGES.map((stage) => markup.indexOf(stage.labels[locale]));
-      assert.equal(positions.every((position) => position >= 0), true, `${locale} exposes every canonical stage label`);
-      assert.equal(positions.every((position, index) => index === 0 || position > positions[index - 1]!), true, `${locale} keeps canonical stage order`);
-    }
+    assert.doesNotMatch(plMarkup, /data-research-playbook-progress-stage=/);
+    assert.doesNotMatch(enMarkup, /data-research-playbook-progress-stage=/);
+    assert.doesNotMatch(plMarkup, /Krok 1\/7/);
+    assert.doesNotMatch(enMarkup, /Step 1\/7/);
+    assert.match(plMarkup, /ETAP RESEARCHU/);
+    assert.match(enMarkup, /RESEARCH STAGE/);
 
     assert.equal(resolveResearchPlaybookProgressState(1, 3), "COMPLETED");
     assert.equal(resolveResearchPlaybookProgressState(3, 3), "CURRENT");
-    assert.equal(resolveResearchPlaybookProgressState(7, 3), "LOCKED");
+    assert.equal(resolveResearchPlaybookProgressState(7, 3), "PENDING");
   });
 
   it("keeps a freshness-specific Step 1 posture when filters passed and only the snapshot is stale", () => {

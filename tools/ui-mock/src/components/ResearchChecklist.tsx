@@ -27,6 +27,7 @@ import {
 import { normalizeSafePublicHttpsUrl, normalizeSafeSocialLinkUrl, type SocialLinkCategory } from "../socialLinks";
 import type { UiTokenCandidate } from "../types/scannerTypes";
 import { ActionButton } from "./ProductUi";
+import { ResearchPlaybookProgressTracker } from "./ResearchPlaybookProgressTracker";
 
 void React;
 
@@ -154,8 +155,40 @@ export function ResearchChecklistSummary({
   return <section id="research-playbook-summary" tabIndex={focusOnMount ? -1 : undefined} data-research-playbook-focused={focusOnMount ? "true" : undefined} className="research-checklist-summary" aria-label={pl ? "Research playbook" : "Research playbook"}>
     <header><span>{pl ? "RESEARCH PLAYBOOK" : "RESEARCH PLAYBOOK"}</span><button type="button" className="research-current-step-cta" data-research-current-step-cta={view.current_step} onClick={() => onOpenStep?.(view.current_step)} onKeyDown={(event) => handleResearchStepKeyDown(event, view.current_step, onOpenStep)} aria-label={openStepLabel(view.current_step, locale)}>{pl ? `Krok ${view.current_step}/7 — ${stepName(view.current_step, locale)}` : `Step ${view.current_step}/7 — ${stepName(view.current_step, locale)}`}</button></header>
     <p>{pl ? "KOMPLETNOŚĆ RESEARCHU" : "RESEARCH COMPLETENESS"}: <b>{view.completeness.resolved_checks} / {view.completeness.total_checks}</b> ({view.completeness.percentage}%)</p>
+    <ResearchPlaybookProgressTracker currentStep={view.current_step} stageStates={new Map(view.steps.map((step) => [step.number, step.state] as const))} locale={locale} />
     <ResearchKeyToolsOverview view={view} candidate={candidate} locale={locale} onOpenStep={onOpenStep} />
     <ol>{view.steps.map((step) => <li key={step.number} className={step.number === view.current_step ? "current" : ""}><button type="button" className="research-step-nav" data-research-step-nav={step.number} onClick={() => onOpenStep?.(step.number)} onKeyDown={(event) => handleResearchStepKeyDown(event, step.number, onOpenStep)} aria-label={openStepLabel(step.number, locale)}><span>{step.number}. {stepName(step.number, locale)}</span><ResearchStateBadge state={step.state} compact labelOverride={isIncompleteFinalStep(step) ? researchIncompleteName(locale) : undefined} /></button></li>)}</ol>
+  </section>;
+}
+
+/**
+ * A small presentation-only overlay for surfaces that assist research without
+ * owning it. The current step always comes from the same actor-private
+ * Checklist read model as the Summary master.
+ */
+export function ResearchPlaybookContext({
+  candidate,
+  onOpenPlaybook,
+  focusedStep = null,
+  verificationCheck,
+  surface,
+}: {
+  candidate: UiTokenCandidate;
+  onOpenPlaybook?: () => void;
+  focusedStep?: ResearchStepNumber | null;
+  verificationCheck?: "honeypot" | null;
+  surface: "ai" | "verification";
+}) {
+  const view = useResearchChecklist(candidate);
+  const { locale } = useProductLocale();
+  const pl = locale === "pl";
+  return <section className={`research-playbook-context research-playbook-context--${surface}`} data-research-playbook-context={surface} data-research-playbook-current-step={view.current_step}>
+    <div>
+      <span>{pl ? "RESEARCH PLAYBOOK" : "RESEARCH PLAYBOOK"}</span>
+      <strong>{pl ? `Aktualny etap: ${view.current_step}/7 — ${stepName(view.current_step, locale)}` : `Current stage: ${view.current_step}/7 — ${stepName(view.current_step, locale)}`}</strong>
+      {focusedStep && <p>{pl ? `Narzędzie dla kroku ${focusedStep}/7: ${stepName(focusedStep, locale)}` : `Tool for step ${focusedStep}/7: ${stepName(focusedStep, locale)}`}{verificationCheck === "honeypot" ? (pl ? " · sprawdzany punkt: Honeypot." : " · check: Honeypot.") : ""}</p>}
+    </div>
+    {onOpenPlaybook && <ActionButton variant="secondary" onClick={onOpenPlaybook}>{surface === "verification" ? (pl ? "Wróć do Research Playbook" : "Return to Research Playbook") : (pl ? "Otwórz Research Playbook" : "Open Research Playbook")}</ActionButton>}
   </section>;
 }
 
@@ -164,11 +197,13 @@ export function ResearchChecklistDetail({
   focusedStep = null,
   onBackToResearchPlaybook,
   onOpenStep,
+  onOpenVerificationForStep,
 }: {
   candidate: UiTokenCandidate;
   focusedStep?: ResearchStepNumber | null;
   onBackToResearchPlaybook?: () => void;
   onOpenStep?: (step: ResearchStepNumber) => void;
+  onOpenVerificationForStep?: (step: ResearchStepNumber) => void;
 }) {
   const { view, reload } = useResearchChecklistWithReload(candidate);
   const { locale } = useProductLocale();
@@ -191,7 +226,7 @@ export function ResearchChecklistDetail({
         <button type="button" className="research-focus-back" data-research-playbook-back onClick={() => onBackToResearchPlaybook?.()}>{pl ? "← Wróć do Research Playbook" : "← Back to Research Playbook"}</button>
         <strong>{pl ? `Krok ${selectedStep.number}/7` : `Step ${selectedStep.number}/7`}</strong>
       </header>
-      <FocusedResearchStep step={selectedStep} view={view} candidate={candidate} locale={locale} writable={view.manual_evidence_writable} onSaved={reload} onOpenStep={onOpenStep} />
+      <FocusedResearchStep step={selectedStep} view={view} candidate={candidate} locale={locale} writable={view.manual_evidence_writable} onSaved={reload} onOpenStep={onOpenStep} onOpenVerificationForStep={onOpenVerificationForStep} />
     </section>;
   }
   return <section className="research-checklist-detail" aria-label={pl ? "7-stopniowa checklista researchu" : "7-step research checklist"}>
@@ -228,7 +263,7 @@ function ResearchStepCard({
   </section>;
 }
 
-function FocusedResearchStep({ step, view, candidate, locale, writable, onSaved, onOpenStep }: {
+function FocusedResearchStep({ step, view, candidate, locale, writable, onSaved, onOpenStep, onOpenVerificationForStep }: {
   step: ResearchChecklistStep;
   view: ResearchChecklistView;
   candidate: UiTokenCandidate;
@@ -236,6 +271,7 @@ function FocusedResearchStep({ step, view, candidate, locale, writable, onSaved,
   writable: boolean;
   onSaved: () => Promise<void>;
   onOpenStep?: (step: ResearchStepNumber) => void;
+  onOpenVerificationForStep?: (step: ResearchStepNumber) => void;
 }) {
   const [technicalExpanded, setTechnicalExpanded] = useState(false);
   if (step.number === 6) {
@@ -271,6 +307,11 @@ function FocusedResearchStep({ step, view, candidate, locale, writable, onSaved,
         <span><b>{pl ? "Do sprawdzenia" : "To check"}</b>{toCheck.length}</span>
       </div>
     </section>
+    {step.number === 3 && onOpenVerificationForStep && <section className="research-verification-action" data-research-verification-action="honeypot">
+      <strong>{pl ? "Honeypot wymaga kontroli źródłowej" : "Honeypot needs source verification"}</strong>
+      <p>{pl ? "Otwórz Weryfikację wyłącznie dla tego konkretnego punktu." : "Open Verification only for this specific check."}</p>
+      <ActionButton variant="secondary" onClick={() => onOpenVerificationForStep(step.number)}>{pl ? "Otwórz weryfikację: Honeypot" : "Open verification: Honeypot"}</ActionButton>
+    </section>}
     <ContextualResearchTools items={contextualTools} step={step.number} candidate={candidate} locale={locale} writable={writable} onSaved={onSaved} />
     {technicalItems.length > 0 && <details className="research-technical-details" data-research-technical-details={step.number} open={technicalExpanded} onToggle={(event) => setTechnicalExpanded(event.currentTarget.open)}>
       <summary><span>{pl ? `Pokaż szczegóły techniczne (${technicalItems.length})` : `Show technical details (${technicalItems.length})`}</span><b>{technicalExpanded ? (pl ? "Ukryj" : "Hide") : (pl ? "Pokaż" : "Show")}</b></summary>

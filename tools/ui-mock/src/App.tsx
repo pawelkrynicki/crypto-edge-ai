@@ -482,7 +482,10 @@ export default function App() {
               candidate={selectedDetailCandidate}
               onBackToResults={() => handleWorkspaceSectionChange("candidate-results")}
               onOpenExternalChecks={handleOpenExternalChecks}
-              onOpenResearchChecklistStep={(candidate, step) => handleOpenExternalChecks(candidate, undefined, step)}
+              onOpenResearchChecklistStep={(_candidate, step) => setFocusedResearchStep(step)}
+              onOpenVerificationForResearchStep={(candidate, step) => handleOpenExternalChecks("entry_id" in candidate ? null : candidate, undefined, step)}
+              onBackToResearchPlaybook={() => setFocusedResearchStep(null)}
+              focusedResearchStep={focusedResearchStep}
             />
           </WorkspaceSection>
         );
@@ -501,9 +504,6 @@ export default function App() {
             <ExternalVerificationLinksView
               candidate={externalChecksCandidate}
               focusedResearchStep={focusedResearchStep}
-              onOpenResearchChecklistStep={(step) => {
-                if (externalChecksCandidate) handleOpenExternalChecks(externalChecksCandidate, undefined, step);
-              }}
               onBackToResearchPlaybook={() => {
                 setFocusedResearchStep(null);
                 handleWorkspaceSectionChange("candidate-detail");

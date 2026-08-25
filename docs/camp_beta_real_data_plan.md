@@ -1,5 +1,7 @@
 # Camp BETA Real Data Plan
 
+> **HISTORICAL / SUPERSEDED.** The canonical product and deployment direction is [canonical_product_information_architecture.md](canonical_product_information_architecture.md).
+
 ## Product Radar owner acceptance gate
 
 Discovery jest zamknięte. Aktualny product path `INTERNAL_BETA` czyta `UiTokenCandidate` bez konwersji do `MockCandidate`, pokazuje dwa odrębne koszyki i respektuje address-backed identity Established. Commitowany universe z `0` aktywnych wpisów daje dedykowany `ESTABLISHED_UNIVERSE_EMPTY`; nie uruchamia fixture ani ogólnego „No Candidates Found”.

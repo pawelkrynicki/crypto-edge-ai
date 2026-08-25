@@ -1,5 +1,7 @@
 # AIKINTEL Integration Plan
 
+> **HISTORICAL / SUPERSEDED.** The canonical product and deployment direction is [canonical_product_information_architecture.md](canonical_product_information_architecture.md).
+
 ## Goal
 
 Develop Crypto Edge AI in this standalone working repository first, while keeping a clear and practical path for later AIKINTEL integration.

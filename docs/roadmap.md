@@ -1,5 +1,9 @@
 # Roadmap
 
+> **Canonical product navigation, Research Playbook ownership, AI/Verification
+> boundaries and deployment direction:** see
+> [canonical_product_information_architecture.md](canonical_product_information_architecture.md).
+
 ## Current stage: PC.1 — System Lifecycle, Private Radar and Operational Data Flow
 
 The accepted Final Local Regression and Freeze remains the technical base, not a
@@ -956,6 +960,9 @@ Prepare a controlled flow for real users:
 - Safe setup review.
 
 ## Stage 9: Integration Decision With Main AIKINTEL Repo
+
+> **HISTORICAL / SUPERSEDED.** See
+> [canonical_product_information_architecture.md](canonical_product_information_architecture.md).
 
 Decide when and how to move from this standalone working repo into the main AIKINTEL repo.
 

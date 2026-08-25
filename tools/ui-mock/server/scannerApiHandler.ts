@@ -100,6 +100,7 @@ import {
   type ManualOwnerActionsOptions,
 } from "./manualOwnerActions.js";
 import type { ManualVerificationVerdict } from "../../data-poc/src/followUpBasket.js";
+import { followUpToResearchCandidate } from "../src/followUpResearchCandidate.js";
 import type { LifecycleCycleReceipt } from "../../data-poc/src/systemLifecycle.js";
 import { createLifecycleService, LifecycleServiceError, parseRadarCursor } from "./lifecycleService.js";
 import { createPc1SessionContextService, type Pc1ActorRole } from "./lifecycleSession.js";
@@ -316,7 +317,7 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
         const session = pc1Sessions.resolve(req);
         if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
         const query = validateResearchChecklistQuery(req.url);
-        const candidate = await resolveResearchChecklistCandidate(query.chain, query.contract_address, scannerOptions);
+        const candidate = await resolveResearchChecklistCandidate(query.chain, query.contract_address, scannerOptions, options.followUp);
         const evidence = (await researchEvidenceRepository).list(session.context.actor_id, query.chain, query.contract_address);
         sendJson(req, res, 200, {
           ...resolveResearchChecklist(candidate, evidence),
@@ -335,7 +336,7 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
         if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
         if (!session.context.capabilities.includes("CAMP_USER_WORKSPACE_WRITE")) throw new ResearchChecklistRequestError("FORBIDDEN", 403);
         const body = validateResearchEvidenceWriteBody(await readResearchEvidenceJsonBody(req));
-        await resolveResearchChecklistCandidate(body.chain, body.contract_address, scannerOptions);
+        await resolveResearchChecklistCandidate(body.chain, body.contract_address, scannerOptions, options.followUp);
         const evidence = (await researchEvidenceRepository).upsert({
           actorId: session.context.actor_id,
           chain: body.chain,
@@ -1647,16 +1648,19 @@ async function resolveResearchChecklistCandidate(
   chain: string,
   contractAddress: string,
   scannerOptions: LatestScannerOutputOptions,
+  followUpOptions?: FollowUpApiOptions,
 ): Promise<UiTokenCandidate> {
   const identity = resolveTokenIdentity(chain, contractAddress);
   if (identity.status !== "valid") throw new ResearchChecklistRequestError("REQUEST_INVALID", 400);
-  const scanner = await readLatestScannerOutput(scannerOptions);
-  const candidate = mapPersistableScannerOutputToUiCandidates(scanner as unknown as PersistableScannerOutput).find((entry) => {
+  const scanner = await readLatestScannerOutput(scannerOptions).catch(() => null);
+  const candidate = scanner && mapPersistableScannerOutputToUiCandidates(scanner as unknown as PersistableScannerOutput).find((entry) => {
     const entryIdentity = resolveTokenIdentity(entry.chain, entry.contractAddress);
     return entryIdentity.status === "valid" && entryIdentity.key === identity.key;
   });
-  if (!candidate) throw new ResearchChecklistRequestError("NOT_FOUND", 404);
-  return candidate;
+  if (candidate) return candidate;
+  const followUp = await readFollowUpByIdentity(chain, contractAddress, followUpOptions);
+  if (followUp) return followUpToResearchCandidate(followUp);
+  throw new ResearchChecklistRequestError("NOT_FOUND", 404);
 }
 
 function isCorsOriginDenied(req: IncomingMessage, runtimeMode: ResolvedProductRuntimeMode): boolean {
@@ -2223,7 +2227,7 @@ async function ensurePrivateVerificationSubject(
   followUpOptions: FollowUpApiOptions | undefined,
 ): Promise<void> {
   try {
-    await resolveResearchChecklistCandidate(chain, contractAddress, scannerOptions);
+    await resolveResearchChecklistCandidate(chain, contractAddress, scannerOptions, followUpOptions);
     return;
   } catch (error) {
     if (!(error instanceof ResearchChecklistRequestError) || error.code !== "NOT_FOUND") throw error;

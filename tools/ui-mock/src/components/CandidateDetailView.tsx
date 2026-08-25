@@ -24,6 +24,7 @@ import {
 import type { UiTokenCandidate } from "../types/scannerTypes";
 import type { FollowUpPublicEntry, FollowUpPublicStatus } from "../types/followUpTypes";
 import type { ResearchStepNumber } from "../researchChecklistTypes";
+import { followUpToResearchCandidate } from "../followUpResearchCandidate";
 import { CANDIDATE_DETAIL_TAB_IDS, type CandidateDetailTabId } from "../candidateDetailTabs";
 import { TokenDetailTabPanel, TokenDetailTabs } from "./TokenDetailTabs";
 import {
@@ -37,7 +38,7 @@ import { OwnerFollowUpActionPanel } from "./OwnerFollowUpActionPanel";
 import { PersonalRadarPanel } from "./PersonalRadarPanel";
 import type { PrivateVerificationRecord } from "../services/manualOwnerActionsDataSource";
 import { ActionButton, CopyButton, CopyableAddress, StatusBadge, TechnicalDetails } from "./ProductUi";
-import { ResearchChecklistSummary } from "./ResearchChecklist";
+import { ResearchChecklistDetail, ResearchChecklistSummary, ResearchPlaybookContext } from "./ResearchChecklist";
 import {
   lifecycleActionLabel,
   lifecycleBlockingLabel,
@@ -51,7 +52,9 @@ interface CandidateDetailViewProps {
   followUpStatus?: FollowUpPublicStatus | null;
   onBackToResults?: () => void;
   onOpenExternalChecks?: (candidate: UiTokenCandidate) => void;
-  onOpenResearchChecklistStep?: (candidate: UiTokenCandidate, step: ResearchStepNumber) => void;
+  onOpenResearchChecklistStep?: (candidate: UiTokenCandidate | FollowUpPublicEntry, step: ResearchStepNumber) => void;
+  onOpenVerificationForResearchStep?: (candidate: UiTokenCandidate | FollowUpPublicEntry, step: ResearchStepNumber) => void;
+  onBackToResearchPlaybook?: () => void;
   onOpenFollowUpExternalChecks?: (followUp: FollowUpPublicEntry) => void;
   initialManualVerification?: PrivateVerificationRecord | null;
   onLifecycleChanged?: () => void | Promise<void>;
@@ -60,6 +63,7 @@ interface CandidateDetailViewProps {
   initialActiveTab?: CandidateDetailTabId;
   onActiveTabChange?: (tab: CandidateDetailTabId) => void;
   focusResearchPlaybook?: boolean;
+  focusedResearchStep?: ResearchStepNumber | null;
 }
 
 export const CandidateDetailView: React.FC<CandidateDetailViewProps> = (props) => {
@@ -74,6 +78,8 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
   onBackToResults,
   onOpenExternalChecks,
   onOpenResearchChecklistStep,
+  onOpenVerificationForResearchStep,
+  onBackToResearchPlaybook,
   onOpenFollowUpExternalChecks,
   initialManualVerification,
   onLifecycleChanged,
@@ -82,6 +88,7 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
   initialActiveTab = "summary",
   onActiveTabChange,
   focusResearchPlaybook = false,
+  focusedResearchStep = null,
 }) => {
   const { locale, t } = useProductLocale();
   const [internalActiveTab, setInternalActiveTab] = useState<CandidateDetailTabId>(initialActiveTab);
@@ -133,10 +140,15 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
         onOwnerPromotionStatusChange={setOwnerPromotionStatus}
         onBackToResults={onBackToResults}
         onOpenFollowUpExternalChecks={onOpenFollowUpExternalChecks}
+        onOpenResearchChecklistStep={onOpenResearchChecklistStep}
+        onOpenVerificationForResearchStep={onOpenVerificationForResearchStep}
+        onBackToResearchPlaybook={onBackToResearchPlaybook}
         initialManualVerification={initialManualVerification}
         onLifecycleChanged={onLifecycleChanged}
         activeTab={activeTab}
         onActiveTabChange={setActiveTab}
+        focusResearchPlaybook={focusResearchPlaybook}
+        focusedResearchStep={focusedResearchStep}
       />
     );
   }
@@ -222,14 +234,22 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
           </section>
           <AIResearchSection chain={candidate.chain} contractAddress={candidate.contractAddress} symbol={candidate.symbol} name={candidate.name} mode="summary" onOpen={() => setActiveTab("ai")} />
         </div>
-        <ResearchChecklistSummary
-          candidate={candidate}
-          focusOnMount={focusResearchPlaybook}
-          onOpenStep={(step) => {
-            if (onOpenResearchChecklistStep) onOpenResearchChecklistStep(candidate, step);
-            else onOpenExternalChecks?.(candidate);
-          }}
-        />
+        {focusedResearchStep ? (
+          <ResearchChecklistDetail
+            candidate={candidate}
+            focusedStep={focusedResearchStep}
+            onBackToResearchPlaybook={onBackToResearchPlaybook}
+            onOpenVerificationForStep={(step) => onOpenVerificationForResearchStep?.(candidate, step)}
+          />
+        ) : (
+          <ResearchChecklistSummary
+            candidate={candidate}
+            focusOnMount={focusResearchPlaybook}
+            onOpenStep={(step) => {
+              if (onOpenResearchChecklistStep) onOpenResearchChecklistStep(candidate, step);
+            }}
+          />
+        )}
         {onOpenExternalChecks && <div className="candidate-summary-actions"><ActionButton variant="secondary" onClick={() => onOpenExternalChecks(candidate)}>{t("detail.openVerification")}</ActionButton></div>}
       </section>
     );
@@ -327,7 +347,15 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
       </>
     );
   } else if (activeTab === "ai") {
-    activeTabContent = <AIResearchSection chain={candidate.chain} contractAddress={candidate.contractAddress} symbol={candidate.symbol} name={candidate.name} mode="detail" active />;
+    activeTabContent = <AIResearchSection
+      chain={candidate.chain}
+      contractAddress={candidate.contractAddress}
+      symbol={candidate.symbol}
+      name={candidate.name}
+      mode="detail"
+      active
+      playbookContext={<ResearchPlaybookContext candidate={candidate} surface="ai" onOpenPlaybook={onBackToResearchPlaybook} />}
+    />;
   } else if (activeTab === "data") {
     activeTabContent = (
       <div className="candidate-data-sources-tab">
@@ -516,10 +544,15 @@ function FollowUpOnlyDetail({
   onOwnerPromotionStatusChange,
   onBackToResults,
   onOpenFollowUpExternalChecks,
+  onOpenResearchChecklistStep,
+  onOpenVerificationForResearchStep,
+  onBackToResearchPlaybook,
   initialManualVerification,
   onLifecycleChanged,
   activeTab,
   onActiveTabChange,
+  focusResearchPlaybook,
+  focusedResearchStep,
 }: {
   followUp: FollowUpPublicEntry;
   lifecycle: TokenLifecycleViewModel;
@@ -527,10 +560,15 @@ function FollowUpOnlyDetail({
   onOwnerPromotionStatusChange: (status: EstablishedPromotionStatus) => void;
   onBackToResults?: () => void;
   onOpenFollowUpExternalChecks?: (followUp: FollowUpPublicEntry) => void;
+  onOpenResearchChecklistStep?: (candidate: UiTokenCandidate | FollowUpPublicEntry, step: ResearchStepNumber) => void;
+  onOpenVerificationForResearchStep?: (candidate: UiTokenCandidate | FollowUpPublicEntry, step: ResearchStepNumber) => void;
+  onBackToResearchPlaybook?: () => void;
   initialManualVerification?: PrivateVerificationRecord | null;
   onLifecycleChanged?: () => void | Promise<void>;
   activeTab: CandidateDetailTabId;
   onActiveTabChange: (tab: CandidateDetailTabId) => void;
+  focusResearchPlaybook: boolean;
+  focusedResearchStep: ResearchStepNumber | null;
 }) {
   const { locale, t } = useProductLocale();
   const copy = getTabbedWorkspaceCopy(locale);
@@ -548,6 +586,7 @@ function FollowUpOnlyDetail({
   const missingSecurityItems = formatSecurityMissingData(followUp.missing_data, locale);
   const marketMissing = Object.values(followUp.market_metrics).filter((value) => value == null).length;
   const completeness = followUp.missing_data.length === 0 && marketMissing === 0 ? copy.complete : copy.partial;
+  const researchCandidate = followUpToResearchCandidate(followUp);
   let content: React.ReactNode = null;
   if (activeTab === "summary") {
     content = (
@@ -573,6 +612,20 @@ function FollowUpOnlyDetail({
           </section>
           <AIResearchSection chain={followUp.chain} contractAddress={followUp.contract_address} symbol={followUp.symbol ?? ""} name={followUp.display_name ?? followUp.symbol ?? ""} mode="summary" onOpen={() => onActiveTabChange("ai")} />
         </div>
+        {focusedResearchStep ? (
+          <ResearchChecklistDetail
+            candidate={researchCandidate}
+            focusedStep={focusedResearchStep}
+            onBackToResearchPlaybook={onBackToResearchPlaybook}
+            onOpenVerificationForStep={(step) => onOpenVerificationForResearchStep?.(followUp, step)}
+          />
+        ) : (
+          <ResearchChecklistSummary
+            candidate={researchCandidate}
+            focusOnMount={focusResearchPlaybook}
+            onOpenStep={(step) => onOpenResearchChecklistStep?.(followUp, step)}
+          />
+        )}
       </section>
     );
   } else if (activeTab === "observation") {
@@ -633,6 +686,7 @@ function FollowUpOnlyDetail({
         name={followUp.display_name ?? followUp.symbol ?? ""}
         mode="detail"
         active
+        playbookContext={<ResearchPlaybookContext candidate={researchCandidate} surface="ai" onOpenPlaybook={onBackToResearchPlaybook} />}
       />
     );
   } else if (activeTab === "data") {

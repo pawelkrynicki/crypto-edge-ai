@@ -1,5 +1,7 @@
 # AI KINTEL Database Migration Blueprint
 
+> **HISTORICAL / SUPERSEDED.** The canonical product and deployment direction is [canonical_product_information_architecture.md](canonical_product_information_architecture.md).
+
 ## Status
 
 - Stage: 11B - Database Migration Blueprint.

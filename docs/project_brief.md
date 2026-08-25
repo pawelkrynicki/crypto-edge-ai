@@ -1,5 +1,7 @@
 # Project Brief: Crypto Edge AI
 
+> **HISTORICAL / SUPERSEDED.** The canonical product and deployment direction is [canonical_product_information_architecture.md](canonical_product_information_architecture.md).
+
 ## Overview
 
 Crypto Edge AI is a crypto trading intelligence module designed first in this standalone working repository, with a clear path for later integration into AIKINTEL.

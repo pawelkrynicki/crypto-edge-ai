@@ -1,6 +1,6 @@
 import type { ResearchStepNumber } from "./researchChecklistTypes";
 
-export type ResearchPlaybookProgressState = "COMPLETED" | "CURRENT" | "LOCKED";
+export type ResearchPlaybookProgressState = "COMPLETED" | "CURRENT" | "PENDING";
 
 /** Maps the server-owned current step into a display-only playbook state. */
 export function resolveResearchPlaybookProgressState(
@@ -8,5 +8,5 @@ export function resolveResearchPlaybookProgressState(
   currentStep: ResearchStepNumber,
 ): ResearchPlaybookProgressState {
   if (step === currentStep) return "CURRENT";
-  return step < currentStep ? "COMPLETED" : "LOCKED";
+  return step < currentStep ? "COMPLETED" : "PENDING";
 }

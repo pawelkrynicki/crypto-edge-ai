@@ -83,7 +83,7 @@ test("PC.3A compact playbook uses native buttons to target every detailed step, 
   }
 });
 
-test("PC.3A focus mode keeps navigation in normal flow, avoids title duplication and returns to the compact playbook", async () => {
+test("PC.3A focus mode stays in Candidate Detail and Verification remains a bounded evidence workspace", async () => {
   const detail = renderToStaticMarkup(<ProductLocaleProvider initialLocale="en"><ResearchChecklistDetail candidate={candidate} focusedStep={3} /></ProductLocaleProvider>);
   const polishDetail = renderToStaticMarkup(<ProductLocaleProvider initialLocale="pl"><ResearchChecklistDetail candidate={candidate} focusedStep={3} /></ProductLocaleProvider>);
   const drawer = renderToStaticMarkup(<ProductLocaleProvider initialLocale="en"><ExternalVerificationLinksView candidate={candidate} focusedResearchStep={3} /></ProductLocaleProvider>);
@@ -110,12 +110,12 @@ test("PC.3A focus mode keeps navigation in normal flow, avoids title duplication
   assert.doesNotMatch(polishDetail, /data-research-technical-details="3"[^>]*\sopen=/, "technical details start collapsed");
   assert.match(detail, /Key checks/);
   assert.equal((drawer.match(/role="tab"/g) ?? []).length, 6);
-  assert.match(drawer, /id="verification-tab-data"[^>]*aria-selected="true"/);
-  assert.match(drawer, /id="research-checklist-step-3"/);
-  assert.match(drawer, /class="[^"]*verification-token-drawer research-focus-drawer[^"]*"/);
-  assert.doesNotMatch(normalDrawer, /research-focus-drawer/, "normal Verification drawers stay bounded");
-  assert.doesNotMatch(drawer, /external-checks-list/, "focused research does not show the generic external-card wall");
-  assert.doesNotMatch(drawer, /AI Research Brief/, "focused research does not show the generic AI action");
+  assert.match(drawer, /id="verification-tab-security"[^>]*aria-selected="true"/);
+  assert.match(drawer, /data-research-playbook-context="verification"/);
+  assert.match(drawer, /Current stage: 2\/7 — Deal breakers/);
+  assert.match(drawer, /Tool for step 3\/7: Security \/ 3 checks/);
+  assert.doesNotMatch(drawer, /id="research-checklist-step-3"/);
+  assert.doesNotMatch(drawer, /research-focus-drawer/);
   assert.match(normalDrawer, /external-checks-list/, "normal Data and sources keeps the external-card wall");
   assert.match(normalDrawer, /AI Research Brief/, "normal Data and sources keeps the generic AI action");
 
@@ -129,9 +129,7 @@ test("PC.3A focus mode keeps navigation in normal flow, avoids title duplication
   assert.match(navigationCss, /top:\s*auto/);
   assert.match(navigationCss, /z-index:\s*auto/);
   assert.doesNotMatch(navigationCss, /sticky|fixed/);
-  assert.match(css, /\.verification-token-drawer\.research-focus-drawer\s*\{[^}]*max-height:\s*none;[^}]*min-height:\s*0;[^}]*overflow:\s*visible;/);
-  assert.match(css, /\.research-focus-drawer \.token-detail-drawer-body--tabbed\s*\{[^}]*flex:\s*0 0 auto;[^}]*overflow:\s*visible;/);
-  assert.match(css, /\.research-focus-drawer \.token-detail-tabpanel\s*\{[^}]*overflow-x:\s*visible;[^}]*overflow-y:\s*visible;/);
+  assert.doesNotMatch(css, /research-focus-drawer/, "Verification never becomes a full Playbook focus surface");
   assert.match(css, /\.detail-panel\s*\{[\s\S]*?max-height:\s*calc\(100vh - 170px\);/, "normal drawers retain their accepted height");
   assert.match(css, /\.token-detail-tabpanel\s*\{[\s\S]*?overflow-y:\s*auto;/, "normal drawers retain their internal tab scrolling");
 

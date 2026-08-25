@@ -1,5 +1,7 @@
 # Security and Disclaimer
 
+> **HISTORICAL / SUPERSEDED.** The canonical product and deployment direction is [canonical_product_information_architecture.md](canonical_product_information_architecture.md).
+
 ## Core Principle
 
 Crypto Edge AI supports research and decision preparation for crypto traders. It can later integrate into AIKINTEL, but it must not make trading decisions for users.

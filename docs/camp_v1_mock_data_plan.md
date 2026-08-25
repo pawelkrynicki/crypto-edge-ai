@@ -1,5 +1,7 @@
 # Camp v1 Mock Data Plan
 
+> **HISTORICAL / SUPERSEDED.** The canonical product and deployment direction is [canonical_product_information_architecture.md](canonical_product_information_architecture.md).
+
 ## Purpose
 
 Define safe mock/seed data for Camp BETA demonstrations of the Crypto Edge AI module.

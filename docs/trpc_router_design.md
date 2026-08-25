@@ -1,5 +1,7 @@
 # tRPC Router Design: `cryptoMarket`
 
+> **HISTORICAL / SUPERSEDED.** The canonical product and deployment direction is [canonical_product_information_architecture.md](canonical_product_information_architecture.md).
+
 ## Purpose
 
 This document designs the `cryptoMarket` tRPC router that can power the Crypto Edge AI module.

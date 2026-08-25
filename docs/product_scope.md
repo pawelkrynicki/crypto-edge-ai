@@ -1,5 +1,9 @@
 # Product Scope
 
+> **HISTORICAL / SUPERSEDED.** The canonical product, Research Playbook and
+> standalone deployment direction is
+> [canonical_product_information_architecture.md](canonical_product_information_architecture.md).
+
 ## Product Direction
 
 Crypto Edge AI is the main module direction.

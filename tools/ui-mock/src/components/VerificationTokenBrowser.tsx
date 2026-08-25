@@ -8,6 +8,7 @@ import type { UiTokenCandidate } from "../types/scannerTypes";
 import type { FollowUpPublicEntry } from "../types/followUpTypes";
 import type { PrivateVerificationRecord } from "../services/manualOwnerActionsDataSource";
 import type { ResearchStepNumber } from "../researchChecklistTypes";
+import type { ResearchVerificationCheck } from "../candidateDetailRoute";
 import { ExternalVerificationLinksView } from "./ExternalVerificationLinksView";
 
 type VerificationTokenBrowserProps = {
@@ -21,8 +22,8 @@ type VerificationTokenBrowserProps = {
   onVerificationSaved?: (record: PrivateVerificationRecord) => void;
   onReturnToDetail?: () => void;
   onBackToResearchPlaybook?: () => void;
-  onOpenResearchChecklistStep?: (candidate: UiTokenCandidate, step: ResearchStepNumber) => void;
   focusedResearchStep?: ResearchStepNumber | null;
+  focusedResearchCheck?: ResearchVerificationCheck | null;
 };
 
 type VerificationListToken =
@@ -44,8 +45,8 @@ export function VerificationTokenBrowser({
   onVerificationSaved,
   onReturnToDetail,
   onBackToResearchPlaybook,
-  onOpenResearchChecklistStep,
   focusedResearchStep = null,
+  focusedResearchCheck = null,
 }: VerificationTokenBrowserProps) {
   const { locale } = useProductLocale();
   const tokens = useMemo<VerificationListToken[]>(() => {
@@ -118,8 +119,8 @@ export function VerificationTokenBrowser({
             onVerificationSaved={onVerificationSaved}
             onReturnToDetail={onReturnToDetail}
             onBackToResearchPlaybook={onBackToResearchPlaybook}
-            onOpenResearchChecklistStep={selectedCandidate ? (step) => onOpenResearchChecklistStep?.(selectedCandidate, step) : undefined}
             focusedResearchStep={focusedResearchStep}
+            focusedResearchCheck={focusedResearchCheck}
           />
         ) : (
           <section className="verification-token-drawer-placeholder" aria-label={locale === "pl" ? "Wybór tokena do weryfikacji" : "Verification token selection"}>

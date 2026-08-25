@@ -1,29 +1,25 @@
 import React from "react";
 import { RESEARCH_PLAYBOOK_STAGE_COUNT, RESEARCH_PLAYBOOK_STAGES, type ResearchPlaybookLocale } from "../researchPlaybookStages";
-import type { ResearchStepNumber } from "../researchChecklistTypes";
+import type { ResearchChecklistState, ResearchStepNumber } from "../researchChecklistTypes";
 import { resolveResearchPlaybookProgressState, type ResearchPlaybookProgressState } from "../researchPlaybookProgressState";
 
 void React;
 
 /**
- * Read-only presentation of the server-owned guidance. It deliberately has no
- * controls: seeing a later stage cannot change the current step or write data.
+ * Read-only presentation of the canonical Checklist view. It deliberately has
+ * no controls: seeing a later stage cannot change the current step or write data.
  */
 export function ResearchPlaybookProgressTracker({
   currentStep,
-  unlockConditions,
+  stageStates,
   locale,
 }: {
   currentStep: ResearchStepNumber;
-  unlockConditions: readonly string[];
+  stageStates?: ReadonlyMap<ResearchStepNumber, ResearchChecklistState>;
   locale: ResearchPlaybookLocale;
 }) {
   const pl = locale === "pl";
   const hasNextStep = currentStep < RESEARCH_PLAYBOOK_STAGE_COUNT;
-  const unlockHeading = pl ? "Co odblokuje kolejny etap" : "What unlocks the next stage";
-  const fallback = pl
-    ? "Ukończ bieżący krok zgodnie z widocznymi wymaganiami."
-    : "Complete the current step using the requirements shown here.";
   return <section className="research-playbook-progress-tracker" data-research-playbook-progress-tracker aria-label={pl ? "Ścieżka siedmiu etapów Research Playbook" : "Seven-stage Research Playbook path"}>
     <div className="research-playbook-progress-heading">
       <span>{pl ? "ŚCIEŻKA RESEARCHU" : "RESEARCH PATH"}</span>
@@ -33,6 +29,7 @@ export function ResearchPlaybookProgressTracker({
       {RESEARCH_PLAYBOOK_STAGES.map((stage) => {
         const state = resolveResearchPlaybookProgressState(stage.number, currentStep);
         const stateLabel = progressStateLabel(state, locale);
+        const canonicalItemState = stageStates?.get(stage.number);
         return <li
           key={stage.number}
           className={`research-playbook-progress-stage ${state.toLowerCase()}`}
@@ -46,17 +43,15 @@ export function ResearchPlaybookProgressTracker({
           <span className="research-playbook-progress-marker" aria-hidden="true">{progressStateMarker(state)}</span>
           <span className="research-playbook-progress-name"><b>{stage.number}</b>{stage.labels[locale]}</span>
           <span className="research-playbook-progress-state-label">{stateLabel}</span>
+          {canonicalItemState && <span className="research-playbook-progress-evidence" data-research-playbook-stage-evidence={stage.number}>{canonicalStateLabel(canonicalItemState, locale)}</span>}
         </li>;
       })}
     </ol>
-    <div className="research-playbook-progress-unlock" data-research-playbook-progress-unlock>
-      <strong>{hasNextStep ? unlockHeading : (pl ? "Ostatni etap" : "Final stage")}</strong>
+    <p className="research-playbook-progress-unlock" data-research-playbook-progress-unlock>
       {hasNextStep
-        ? <ul>{unlockConditions.length > 0
-          ? unlockConditions.map((condition, index) => <li key={`${condition}-${index}`}>{condition}</li>)
-          : <li>{fallback}</li>}</ul>
-        : <p>{pl ? "Nie ma kolejnego etapu do odblokowania." : "There is no later stage to unlock."}</p>}
-    </div>
+        ? (pl ? "Otwórz dowolny etap, aby zobaczyć dostępne fakty i wymagania." : "Open any stage to see its available facts and requirements.")
+        : (pl ? "Ostatni etap pozostaje dostępny do przeglądu." : "The final stage remains available for review.")}
+    </p>
   </section>;
 }
 
@@ -64,7 +59,7 @@ function progressStateLabel(state: ResearchPlaybookProgressState, locale: Resear
   const labels: Record<ResearchPlaybookProgressState, Record<ResearchPlaybookLocale, string>> = {
     COMPLETED: { pl: "Ukończony", en: "Completed" },
     CURRENT: { pl: "Bieżący", en: "Current" },
-    LOCKED: { pl: "Zablokowany", en: "Locked" },
+    PENDING: { pl: "Kolejny etap", en: "Later stage" },
   };
   return labels[state][locale];
 }
@@ -72,5 +67,17 @@ function progressStateLabel(state: ResearchPlaybookProgressState, locale: Resear
 function progressStateMarker(state: ResearchPlaybookProgressState): string {
   if (state === "COMPLETED") return "✓";
   if (state === "CURRENT") return "●";
-  return "⌁";
+  return "○";
+}
+
+function canonicalStateLabel(state: ResearchChecklistState, locale: ResearchPlaybookLocale): string {
+  const labels: Record<ResearchChecklistState, Record<ResearchPlaybookLocale, string>> = {
+    AUTO_VERIFIED: { pl: "Sprawdzone automatycznie", en: "Automatically checked" },
+    MANUAL_VERIFIED: { pl: "Sprawdzone ręcznie", en: "Manually checked" },
+    MISSING_DATA: { pl: "Brak danych", en: "Missing data" },
+    RED_FLAG: { pl: "Czerwona flaga", en: "Red flag" },
+    NOT_APPLICABLE: { pl: "Nie dotyczy", en: "Not applicable" },
+    OPEN_EXTERNAL_TOOL: { pl: "Wymaga kontroli", en: "Needs review" },
+  };
+  return labels[state][locale];
 }

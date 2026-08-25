@@ -1,5 +1,7 @@
 # Open Questions for AIKINTEL Owner
 
+> **HISTORICAL / SUPERSEDED.** The canonical product and deployment direction is [canonical_product_information_architecture.md](canonical_product_information_architecture.md).
+
 ## Answered Decisions
 
 1. Answered: Working repo remains separate for now.

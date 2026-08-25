@@ -2,6 +2,9 @@ import { isCandidateDetailTabId, type CandidateDetailTabId } from "./candidateDe
 import type { ResearchStepNumber } from "./researchChecklistTypes";
 import { resolveTokenIdentity } from "./tokenLifecycle";
 
+export const RESEARCH_VERIFICATION_CHECKS = ["honeypot"] as const;
+export type ResearchVerificationCheck = (typeof RESEARCH_VERIFICATION_CHECKS)[number];
+
 export type RouteTokenIdentity = {
   chain: string;
   contract_address: string;
@@ -32,12 +35,34 @@ export function resolveResearchPlaybookFocus(): boolean {
   return new URLSearchParams(window.location.search).get("research_playbook") === "1";
 }
 
-export function writeCandidateDetailRoute(identity: RouteTokenIdentity, tab: CandidateDetailTabId, focusResearchPlaybook = false) {
-  writeTokenRoute(identity, "candidate-detail", tab, null, focusResearchPlaybook);
+export function resolveResearchVerificationCheck(): ResearchVerificationCheck | null {
+  if (typeof window === "undefined") return null;
+  const value = new URLSearchParams(window.location.search).get("research_check");
+  return RESEARCH_VERIFICATION_CHECKS.includes(value as ResearchVerificationCheck)
+    ? value as ResearchVerificationCheck
+    : null;
 }
 
-export function writeVerificationRoute(identity: RouteTokenIdentity, researchStep: ResearchStepNumber | null = null) {
-  writeTokenRoute(identity, "external-checks", null, researchStep);
+export function writeCandidateDetailRoute(
+  identity: RouteTokenIdentity,
+  tab: CandidateDetailTabId,
+  focusResearchPlaybook = false,
+  researchStep: ResearchStepNumber | null = null,
+) {
+  writeTokenRoute(identity, "candidate-detail", tab, researchStep, focusResearchPlaybook);
+}
+
+/** The only candidate-detail route shape for either the master or a focused Playbook stage. */
+export function writeResearchPlaybookRoute(identity: RouteTokenIdentity, researchStep: ResearchStepNumber | null = null) {
+  writeCandidateDetailRoute(identity, "summary", true, researchStep);
+}
+
+export function writeVerificationRoute(
+  identity: RouteTokenIdentity,
+  researchStep: ResearchStepNumber | null = null,
+  researchCheck: ResearchVerificationCheck | null = null,
+) {
+  writeTokenRoute(identity, "external-checks", null, researchStep, false, researchCheck);
 }
 
 /**
@@ -45,13 +70,19 @@ export function writeVerificationRoute(identity: RouteTokenIdentity, researchSte
  * This is intentionally separate from `writeVerificationRoute`: links need a
  * real href so normal browser back/forward behaviour is preserved.
  */
-export function buildVerificationRouteHref(identity: RouteTokenIdentity, researchStep: ResearchStepNumber): string {
+export function buildVerificationRouteHref(
+  identity: RouteTokenIdentity,
+  researchStep: ResearchStepNumber,
+  researchCheck: ResearchVerificationCheck | null = null,
+): string {
   if (typeof window === "undefined" || !window.location?.href) return "#external-checks";
   const url = new URL(window.location.href);
   url.searchParams.set("chain", identity.chain);
   url.searchParams.set("contract", identity.contract_address);
   url.searchParams.delete("detail");
   url.searchParams.set("research_step", String(researchStep));
+  if (researchCheck) url.searchParams.set("research_check", researchCheck);
+  else url.searchParams.delete("research_check");
   url.searchParams.delete("research_playbook");
   url.hash = "external-checks";
   return `${url.pathname}${url.search}${url.hash}`;
@@ -64,6 +95,7 @@ export function writeVerificationListRoute() {
   url.searchParams.delete("contract");
   url.searchParams.delete("detail");
   url.searchParams.delete("research_step");
+  url.searchParams.delete("research_check");
   url.searchParams.delete("research_playbook");
   url.hash = "external-checks";
   window.history.pushState(null, "", url);
@@ -75,6 +107,7 @@ function writeTokenRoute(
   tab: CandidateDetailTabId | null,
   researchStep: ResearchStepNumber | null = null,
   focusResearchPlaybook = false,
+  researchCheck: ResearchVerificationCheck | null = null,
 ) {
   if (typeof window === "undefined") return;
   const url = new URL(window.location.href);
@@ -84,6 +117,8 @@ function writeTokenRoute(
   else url.searchParams.delete("detail");
   if (researchStep) url.searchParams.set("research_step", String(researchStep));
   else url.searchParams.delete("research_step");
+  if (researchCheck) url.searchParams.set("research_check", researchCheck);
+  else url.searchParams.delete("research_check");
   if (focusResearchPlaybook) url.searchParams.set("research_playbook", "1");
   else url.searchParams.delete("research_playbook");
   url.hash = section;

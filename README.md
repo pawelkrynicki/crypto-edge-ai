@@ -2,7 +2,13 @@
 
 Crypto Edge AI is a web tool for crypto traders. It helps with research, market-topic selection, risk review, scam filtering, and decision process structure.
 
-It uses AIKINTEL-style market intelligence concepts and should use existing AIKINTEL auth/users if integrated into the main platform. The module focuses on trader-facing decision support: bias, risk, opportunity, confidence, narratives, scam alerts, setup review, and pre-trade checklist.
+**Canonical product navigation, Research Playbook ownership, AI/Verification
+boundaries and deployment direction are defined in
+[docs/canonical_product_information_architecture.md](docs/canonical_product_information_architecture.md).**
+
+It uses AIKINTEL-style market intelligence concepts. The standalone product
+focuses on trader-facing decision support: bias, risk, opportunity, confidence,
+narratives, scam alerts, setup review, and pre-trade checklist.
 
 The product combines five major components:
 
@@ -20,13 +26,11 @@ Crypto Edge AI is the module name and the intended menu name. The project should
 
 Current direction:
 
-- Develop conceptually and technically in this working repo: `pawelkrynicki/crypto-edge-ai`.
-- Keep the architecture compatible with AIKINTEL.
-- Integrate into AIKINTEL later if the module works and the main repo integration is approved.
-- Use existing AIKINTEL auth/users when integrated.
-- Reuse or map to existing AIKINTEL Market News / Crypto data where possible.
-
-This repo is not a second platform beside AIKINTEL. It is a working space for the Crypto Edge AI module before integration.
+- Finalize and operate the standalone product from this repository.
+- Package the local RC, validate it on the owner's VPS, then configure
+  tunnel/domain.
+- AIKINTEL may provide an entry/redirect/access path after that deployment; it
+  is not the implementation target or runtime host.
 
 The current client UX uses a wide Tabbed Detail Workspace, a compact nontechnical header and provider-neutral AI presentation. Product and owner boundaries, responsive behavior and the safe review command are documented in [`docs/tabbed_detail_workspace.md`](docs/tabbed_detail_workspace.md).
 

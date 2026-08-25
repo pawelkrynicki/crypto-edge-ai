@@ -1,5 +1,7 @@
 # Owner Decisions: 2026-06-18
 
+> **HISTORICAL / SUPERSEDED.** The canonical product and deployment direction is [canonical_product_information_architecture.md](canonical_product_information_architecture.md).
+
 ## Summary
 
 This document records owner-side decisions for the Crypto Edge AI project after the AIKINTEL integration discussion.

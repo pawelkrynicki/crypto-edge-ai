@@ -20,6 +20,7 @@ import { manualVerificationVerdictLabel } from "../manualVerificationVerdictLabe
 import type { UiTokenCandidate } from "../types/scannerTypes";
 import type { FollowUpPublicEntry } from "../types/followUpTypes";
 import type { ResearchStepNumber } from "../researchChecklistTypes";
+import { followUpToResearchCandidate } from "../followUpResearchCandidate";
 import {
   loadManualVerification,
   saveManualVerificationDecision,
@@ -29,7 +30,7 @@ import {
 import { ActionButton, CopyButton, ExternalLinkAction } from "./ProductUi";
 import { TokenDetailDrawer } from "./TokenDetailDrawer";
 import { TokenDetailTabPanel, TokenDetailTabs } from "./TokenDetailTabs";
-import { ManualSourceGuidance, ResearchChecklistDetail, ResearchManualEvidencePanel, type ManualSourceGuidanceTopic } from "./ResearchChecklist";
+import { ManualSourceGuidance, ResearchManualEvidencePanel, ResearchPlaybookContext, type ManualSourceGuidanceTopic } from "./ResearchChecklist";
 
 const VERIFICATION_DRAWER_TAB_IDS = ["identity", "market", "filters", "security", "data", "decision"] as const;
 export type VerificationDrawerTabId = (typeof VERIFICATION_DRAWER_TAB_IDS)[number];
@@ -43,12 +44,11 @@ interface ExternalVerificationLinksViewProps {
   onClose?: () => void;
   /** Supports focused UI tests. A selected token always uses the identity tab. */
   initialActiveTab?: VerificationDrawerTabId;
-  /** A compact playbook navigation target in the existing Data and sources tab. */
+  /** A specific Playbook task that opened this evidence workspace. */
   focusedResearchStep?: ResearchStepNumber | null;
+  focusedResearchCheck?: "honeypot" | null;
   /** Returns from the focused checklist step to Candidate Detail > Summary. */
   onBackToResearchPlaybook?: () => void;
-  /** Opens another existing focused Research Playbook step for this candidate. */
-  onOpenResearchChecklistStep?: (step: ResearchStepNumber) => void;
 }
 
 export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksViewProps> = ({
@@ -60,15 +60,19 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
   onClose,
   initialActiveTab = "identity",
   focusedResearchStep = null,
+  focusedResearchCheck = null,
   onBackToResearchPlaybook,
-  onOpenResearchChecklistStep,
 }) => {
   const { locale, t } = useProductLocale();
   const chain = candidate?.chain ?? followUp?.chain ?? "";
   const contractAddress = candidate?.contractAddress ?? followUp?.contract_address ?? "";
   const symbol = candidate?.symbol ?? followUp?.symbol ?? "";
   const displayName = candidate?.name ?? followUp?.display_name ?? "";
-  const [activeTab, setActiveTab] = useState<VerificationDrawerTabId>(focusedResearchStep ? "data" : initialActiveTab);
+  // Follow-up entries are canonical Radar records too. Project them once for
+  // the shared Playbook resolver instead of hiding context when the token is
+  // not present in the current scanner batch.
+  const researchCandidate = candidate ?? (followUp ? followUpToResearchCandidate(followUp) : null);
+  const [activeTab, setActiveTab] = useState<VerificationDrawerTabId>(focusedResearchStep === 3 ? "security" : initialActiveTab);
   const [verdict, setVerdict] = useState<ManualVerificationVerdict | null>(null);
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
@@ -106,11 +110,6 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
   }
 
   const input = buildInput(candidate, followUp);
-  // Follow-up entries are canonical candidates even after they leave the
-  // current scanner snapshot.  The Research Playbook read model is keyed by
-  // chain + contract, so keep this presentation-only projection local and
-  // never manufacture or persist scanner data for a focused step.
-  const researchCandidate = candidate ?? (followUp ? followUpToResearchCandidate(followUp) : null);
   const normalizedInput = normalizeExternalVerificationInput(input);
   const targets = buildExternalVerificationTargets(input);
   const securityResolution = candidate ? resolveProductSecurityState(candidate) : null;
@@ -228,9 +227,7 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
       </VerificationSection>
     );
   } else if (activeTab === "data") {
-    activeContent = focusedResearchStep && researchCandidate ? (
-      <ResearchChecklistDetail candidate={researchCandidate} focusedStep={focusedResearchStep} onBackToResearchPlaybook={onBackToResearchPlaybook} onOpenStep={onOpenResearchChecklistStep} />
-    ) : (
+    activeContent = (
       <VerificationSection heading={tabCopy.data} detail={locale === "pl" ? "Źródła są opisane i linkowane; otwarcie oraz zmiana zakładki nie wykonują połączeń do dostawców." : "Sources are described and linked; opening and switching tabs do not call providers."}>
         <div className="product-detail-grid data">
           <VerificationMetric label={locale === "pl" ? "Źródło danych rynkowych i filtrów" : "Market and filter source"} value={candidate ? formatProductSourceLabel(candidate.source) : formatFollowUpMarketSource(locale)} />
@@ -238,7 +235,6 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
           <VerificationMetric label={locale === "pl" ? "Status źródła" : "Source status"} value={locale === "pl" ? "Migawka dostępna do ręcznej kontroli" : "Snapshot available for manual review"} />
           <VerificationMetric label={locale === "pl" ? "Źródła kontroli bezpieczeństwa" : "Security check sources"} value={securityResolution?.sources.map(formatProductSourceLabel).join(", ") || missingText} />
         </div>
-        {researchCandidate && <ResearchChecklistDetail candidate={researchCandidate} focusedStep={focusedResearchStep} onBackToResearchPlaybook={onBackToResearchPlaybook} onOpenStep={onOpenResearchChecklistStep} />}
         <div className="external-checks-list">{targets.map((target) => <ExternalCheckCard key={target.id} target={target} />)}</div>
         {onOpenResearchBrief && <section className="verification-ai-research-action" aria-label={locale === "pl" ? "Analiza badawcza AI" : "AI Research Brief"}><div><strong>{locale === "pl" ? "Analiza badawcza AI" : "AI Research Brief"}</strong><p>{locale === "pl" ? "Analiza AI uzupełnia, ale nie zastępuje ręcznej weryfikacji." : "AI analysis complements but does not replace manual verification."}</p></div><ActionButton variant="secondary" icon="arrow" iconPosition="end" onClick={onOpenResearchBrief}>{locale === "pl" ? "Otwórz analizę AI" : "Open AI analysis"}</ActionButton></section>}
       </VerificationSection>
@@ -279,9 +275,12 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
       meta={<><span className="research-context-chip"><span>{t("verification.network")}</span><strong>{chain || missingText}</strong></span><span className="research-context-chip"><span>{t("verification.contractAddress")}</span><code>{contractAddress || missingText}</code></span></>}
       tabBar={<TokenDetailTabs tabs={VERIFICATION_DRAWER_TAB_IDS.map((id) => ({ id, label: tabCopy[id] }))} activeTab={activeTab} onChange={setActiveTab} idPrefix="verification" ariaLabel={locale === "pl" ? "Zakładki karty Weryfikacji" : "Verification drawer tabs"} />}
       bodyClassName="token-detail-drawer-body--tabbed"
-      className={`verification-token-drawer${focusedResearchStep ? " research-focus-drawer" : ""}`}
+      className="verification-token-drawer"
     >
-      <TokenDetailTabPanel activeTab={activeTab} idPrefix="verification"><div className="external-checks-view product-verification verification-tab-content">{activeContent}</div></TokenDetailTabPanel>
+      <TokenDetailTabPanel activeTab={activeTab} idPrefix="verification"><div className="external-checks-view product-verification verification-tab-content">
+        {focusedResearchStep && researchCandidate && <ResearchPlaybookContext candidate={researchCandidate} focusedStep={focusedResearchStep} verificationCheck={focusedResearchCheck} surface="verification" onOpenPlaybook={onBackToResearchPlaybook} />}
+        {activeContent}
+      </div></TokenDetailTabPanel>
     </TokenDetailDrawer>
   );
 };
@@ -546,61 +545,6 @@ function presentVerificationSecurityState(state: ProductSecurityState, t: Return
 
 function buildInput(candidate?: UiTokenCandidate | null, followUp?: FollowUpPublicEntry | null): ExternalVerificationInput {
   return { symbol: candidate?.symbol ?? followUp?.symbol ?? "", projectName: candidate?.name ?? followUp?.display_name ?? "", chain: candidate?.chain ?? followUp?.chain ?? "", contractAddress: candidate?.contractAddress ?? followUp?.contract_address ?? "", pairAddress: candidate?.pairAddress ?? followUp?.pair_address ?? "", sourceUrl: candidate?.sourceUrl ?? "", tokenInput: candidate?.contractAddress ?? followUp?.contract_address ?? "" };
-}
-
-/**
- * Adapts a canonical Follow-up read-model entry for the existing read-only
- * Research Checklist. The checklist reloads its own canonical state by this
- * identity; these fallback fields only keep the focused view truthful while
- * the record is no longer in the current scanner list.
- */
-function followUpToResearchCandidate(entry: FollowUpPublicEntry): UiTokenCandidate {
-  const basicFilterStatus = entry.filter_status === "passed_basic_filter"
-    ? "passed_basic_filter"
-    : entry.filter_status === "rejected_basic_filter"
-      ? "rejected_basic_filter"
-      : "not_evaluated";
-  return {
-    id: `follow-up:${entry.entry_id}`,
-    runId: "follow-up-read-model",
-    symbol: entry.symbol ?? entry.display_name ?? entry.contract_address,
-    name: entry.display_name ?? entry.symbol ?? entry.contract_address,
-    chain: entry.chain,
-    dex: "",
-    source: "follow_up",
-    contractAddress: entry.contract_address,
-    pairAddress: entry.pair_address ?? "",
-    sourceUrl: "",
-    discoveryBasket: "new_emerging",
-    discoveryMethod: "dexscreener_latest_token_profiles",
-    observationOnly: true,
-    establishedEligible: false,
-    universeVersion: null,
-    universeEntryIndex: null,
-    // A syntactically valid identity is not a completed source verification.
-    addressIdentityVerified: false,
-    priceUsd: entry.market_metrics.price_usd,
-    marketCap: entry.market_metrics.market_cap_usd,
-    fdvUsd: entry.market_metrics.fdv_usd,
-    liquidity: entry.market_metrics.liquidity_usd,
-    volume24h: entry.market_metrics.volume_24h_usd,
-    volumeMarketCapRatio: entry.market_metrics.volume_market_cap_ratio,
-    pairCreatedAt: entry.first_seen_at,
-    pairAgeDays: entry.pair_age,
-    basicFilterStatus,
-    securityLabel: entry.security_status,
-    finalLabel: "NEEDS_MANUAL_VERIFICATION",
-    mainReason: entry.filter_reasons[0] ?? entry.missing_data[0] ?? "FOLLOW_UP",
-    filterReasons: entry.filter_reasons,
-    criticalReasons: [],
-    warningReasons: entry.missing_data,
-    finalReasons: [...entry.filter_reasons, ...entry.missing_data],
-    missingData: entry.missing_data,
-    riskFlags: [],
-    security: null,
-    scorecard: null,
-    lastCheckedAt: entry.last_checked_at ?? entry.last_seen_at,
-  };
 }
 
 function formatCoverageItem(value: string, locale: ProductLocale): string {

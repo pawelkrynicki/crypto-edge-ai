@@ -1,5 +1,7 @@
 # Technical Architecture
 
+> **HISTORICAL / SUPERSEDED.** The canonical product and deployment direction is [canonical_product_information_architecture.md](canonical_product_information_architecture.md).
+
 ## Architecture Direction
 
 Crypto Edge AI is developed in this standalone working repository first, with a clear path for later AIKINTEL integration.

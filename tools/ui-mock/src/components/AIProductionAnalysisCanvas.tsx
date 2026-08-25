@@ -2,18 +2,14 @@ import React from "react";
 import { formatProductDateTime, useProductLocale } from "../productI18n";
 import type { AIProductionAnalysis, AIProductionInsight, AIProductionResearchGuidance, AIProductionResearchStep } from "../types/aiProductionTypes";
 import { ActionLink, ExternalLinkAction, StatusBadge } from "./ProductUi";
-import { ResearchPlaybookProgressTracker } from "./ResearchPlaybookProgressTracker";
 
 void React;
 
 /** CAMP-safe canvas backed by one stored bilingual PC.2 analysis, never a locale-triggered provider call. */
 export function AIProductionAnalysisCanvas({
   analysis,
-  securityResearchHref,
 }: {
   analysis: AIProductionAnalysis;
-  /** A normal route to the current Security checklist step for the selected token. */
-  securityResearchHref?: string;
 }) {
   const { locale } = useProductLocale();
   const pl = locale === "pl";
@@ -41,7 +37,7 @@ export function AIProductionAnalysisCanvas({
         </dl>
       </header>
 
-      <ResearchGuidancePanel guidance={analysis.research_guidance} locale={locale} headings={headings} securityResearchHref={securityResearchHref} />
+      <ResearchGuidancePanel guidance={analysis.research_guidance} locale={locale} headings={headings} />
 
       <details className="ai-production-details">
         <summary>{headings.details}</summary>
@@ -135,27 +131,20 @@ function ResearchGuidancePanel({
   guidance,
   locale,
   headings,
-  securityResearchHref,
 }: {
   guidance: AIProductionResearchGuidance;
   locale: "pl" | "en";
   headings: {
     guidance: string; posture: string; blockers: string; actions: string; why: string; resolves: string; filterFailures: string;
   };
-  securityResearchHref?: string;
 }) {
   const pl = locale === "pl";
   return <section className="ai-research-guidance" aria-labelledby="ai-research-guidance-title">
     <header>
       <span>{headings.guidance}</span>
-      <h4 id="ai-research-guidance-title">{pl ? "Krok" : "Step"} {guidance.current_step.number}/7 — {researchStageTitle(guidance.current_step.title, locale)}</h4>
+      <h4 id="ai-research-guidance-title">{pl ? "Wskazówki AI na podstawie bieżącej migawki" : "AI guidance based on the current snapshot"}</h4>
       <dl><dt>{headings.posture}</dt><dd><span>{guidance.current_step.posture}</span><small>{guidance.current_step.posture_detail}</small></dd></dl>
     </header>
-    <ResearchPlaybookProgressTracker
-      currentStep={guidance.current_step.number}
-      unlockConditions={guidance.unlock_conditions}
-      locale={locale}
-    />
     <div className="ai-guidance-grid">
       <section aria-labelledby="ai-research-guidance-blockers">
         <h5 id="ai-research-guidance-blockers">{headings.blockers}</h5>
@@ -174,12 +163,7 @@ function ResearchGuidancePanel({
           <div className="ai-guidance-action-copy"><strong>{item.title}</strong><p><b>{headings.why}:</b> {item.why}</p><p><b>{headings.resolves}:</b> {item.resolves}</p>
             {item.cta && (item.cta.external
               ? <ExternalLinkAction variant="secondary" href={item.cta.href}>{item.cta.label}</ExternalLinkAction>
-              : <ActionLink
-                variant="secondary"
-                href={securityResearchHref && index === 0 && (guidance.current_step.number === 2 || guidance.current_step.number === 3)
-                  ? securityResearchHref
-                  : item.cta.href}
-              >{item.cta.label}</ActionLink>)}
+              : <ActionLink variant="secondary" href={item.cta.href}>{item.cta.label}</ActionLink>)}
           </div>
         </li>)}</ol>
       </section>
@@ -203,9 +187,4 @@ function evidenceLabel(value: string, locale: "pl" | "en"): string {
     return locale === "pl" ? "Kontrola etapu Radaru" : "Radar-stage check";
   }
   return value;
-}
-
-/** Corrects a legacy English display typo in read-only public guidance. */
-function researchStageTitle(value: string, locale: "pl" | "en"): string {
-  return locale === "en" && value === "SECURITY / 3 STAMPS" ? "SECURITY / 3 CHECKS" : value;
 }

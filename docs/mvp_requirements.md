@@ -1,5 +1,7 @@
 # MVP Requirements
 
+> **HISTORICAL / SUPERSEDED.** The canonical product and deployment direction is [canonical_product_information_architecture.md](canonical_product_information_architecture.md).
+
 ## MVP Goal
 
 Build a controlled camp v1 module that fits AIKINTEL, rather than a standalone app.
