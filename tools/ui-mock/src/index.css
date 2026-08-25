@@ -7157,6 +7157,19 @@ button:disabled,
 
 .personal-radar-inline .action-button { flex: 0 0 auto; }
 
+/* A Radar status is both named and visibly marked as the current state; the
+   dot supplements the text rather than being the only state signal. */
+.personal-radar-active {
+  font-weight: 700;
+}
+
+.personal-radar-active .product-status-indicator {
+  width: 8px;
+  height: 8px;
+  flex-basis: 8px;
+  box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 17%, transparent);
+}
+
 .personal-radar-confirmation {
   width: 100%;
   flex: 1 1 100%;
@@ -9594,6 +9607,41 @@ summary {
 .verification-decision-options > button:hover,
 .verification-decision-options > button.selected { border-color: var(--color-border-active); background: var(--color-accent-soft); }
 .verification-decision-options > button.selected { box-shadow: inset 3px 0 0 var(--color-accent); }
+
+.verification-missing-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 2px 0;
+  border: 0;
+  border-bottom: 1px solid currentColor;
+  color: var(--color-accent-strong);
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+  background: transparent;
+}
+
+.verification-missing-link:hover {
+  color: var(--color-text-primary);
+  border-bottom-width: 2px;
+}
+
+.verification-missing-link:focus-visible,
+.verification-target-focus:focus-visible {
+  outline: 2px solid var(--color-border-active);
+  outline-offset: 3px;
+}
+
+.verification-target-focus {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border-active);
+  border-radius: var(--radius-md);
+  background: var(--color-accent-soft);
+}
 
 .verification-decision-note {
   display: grid;

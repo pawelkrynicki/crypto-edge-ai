@@ -19,5 +19,5 @@ if not "%~2"=="" exit /b 64
 
 echo Mode: OWNER_CONFIRMED
 echo Task Scheduler will not be enabled or changed.
-call pnpm --dir tools\data-poc run automation:resume -- --confirm-owner-resume
+call pnpm --dir tools\data-poc run automation:resume --confirm-owner-resume
 exit /b %ERRORLEVEL%

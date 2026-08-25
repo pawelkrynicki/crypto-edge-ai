@@ -44,13 +44,18 @@ describe("PC.1 private workspace repository", () => {
     repository.close();
   });
 
-  it("requires an override reason only when conditions are unmet and rejects invalid, duplicate, and backward writes", async () => {
+  it("allows private Main and Follow-up organization without product eligibility gates, while rejecting invalid and duplicate writes", async () => {
     const repository = await workspace();
     const base = { actorId: "camp-user-one", identity: IDENTITY, previousPrivateStatus: "NEW" as const, newPrivateStatus: "FOLLOW_UP" as const, systemStatus: "NEW" as const, sessionReference: "session-one" };
-    assert.throws(() => repository.transition({ ...base, conditions: UNMET, overrideReason: null }), (error: unknown) => error instanceof UserWorkspaceError && error.code === "WORKSPACE_OVERRIDE_REASON_REQUIRED");
+    assert.doesNotThrow(() => repository.transition({ ...base, conditions: UNMET, overrideReason: null }));
     assert.throws(() => repository.transition({ ...base, identity: "base:not-an-address", conditions: MET, overrideReason: null }), UserWorkspaceError);
-    repository.transition({ ...base, conditions: MET, overrideReason: null });
     assert.throws(() => repository.transition({ ...base, conditions: MET, overrideReason: null }), (error: unknown) => error instanceof UserWorkspaceError && error.code === "WORKSPACE_DUPLICATE");
+    const main = repository.transition({ ...base, previousPrivateStatus: "FOLLOW_UP", newPrivateStatus: "MAIN_RADAR", systemStatus: "NEW", conditions: UNMET, overrideReason: null });
+    assert.equal(main.new_private_status, "MAIN_RADAR");
+    const backToFollowUp = repository.transition({ ...base, previousPrivateStatus: "MAIN_RADAR", newPrivateStatus: "FOLLOW_UP", systemStatus: "NEW", conditions: UNMET, overrideReason: null });
+    assert.equal(backToFollowUp.new_private_status, "FOLLOW_UP");
+    assert.equal(repository.remove({ actorId: "camp-user-one", identity: IDENTITY }), true);
+    assert.equal(repository.get("camp-user-one", IDENTITY), null);
     repository.close();
   });
 });
@@ -402,7 +407,7 @@ describe("PC.1 bounded lifecycle Radar API", () => {
     assert.doesNotMatch(component, /conditions_met\.join/);
   });
 
-  it("opens private manual moves immediately and advances only the CAMP user's status", async () => {
+  it("moves private Main and Follow-up both ways, removes the private assignment, and leaves Product Radar unchanged", async () => {
     const originalFetch = globalThis.fetch;
     const submitted: Array<{ target_status: string; override_reason: string | null }> = [];
     const initial: LifecycleTokenView = {
@@ -415,9 +420,12 @@ describe("PC.1 bounded lifecycle Radar API", () => {
     };
     const afterFollowUp: LifecycleTokenView = { ...initial, user_status: "FOLLOW_UP", user_status_is_override: true, conditions: MET };
     const afterMainRadar: LifecycleTokenView = { ...afterFollowUp, user_status: "MAIN_RADAR" };
+    const backToFollowUp: LifecycleTokenView = { ...afterMainRadar, user_status: "FOLLOW_UP" };
+    const cleared: LifecycleTokenView = { ...initial, user_status: "NEW", user_status_is_override: false };
     globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
-      submitted.push(JSON.parse(String(init?.body)) as { target_status: string; override_reason: string | null });
-      const next = submitted.length === 1 ? afterFollowUp : afterMainRadar;
+      const body = JSON.parse(String(init?.body)) as { target_status: string; override_reason: string | null };
+      submitted.push(body);
+      const next = init?.method === "DELETE" ? cleared : submitted.length === 1 ? afterFollowUp : submitted.length === 2 ? afterMainRadar : backToFollowUp;
       return new Response(JSON.stringify(next), { status: 200, headers: { "content-type": "application/json" } });
     }) as typeof fetch;
     let renderer: ReturnType<typeof create> | undefined;
@@ -427,48 +435,37 @@ describe("PC.1 bounded lifecycle Radar API", () => {
       });
       const action = () => renderer!.root.findAllByType("button").find((node) => node.props["aria-expanded"] === false)!;
       await act(async () => { action().props.onClick(); });
-      const confirmation = renderer!.root.findByType("details");
-      assert.equal(confirmation.props.open, true);
-      assert.equal(confirmation.findByType("summary").props["aria-expanded"], true);
       const confirmationMarkup = JSON.stringify(renderer!.toJSON());
-      assert.match(confirmationMarkup, /Conditions met/);
-      assert.match(confirmationMarkup, /Unmet conditions/);
-      assert.match(confirmationMarkup, /Missing data/);
-      assert.match(confirmationMarkup, /Risks/);
-      assert.equal(renderer!.root.findAllByType("textarea").length, 1);
+      assert.match(confirmationMarkup, /This changes only your private Radar/);
+      assert.doesNotMatch(confirmationMarkup, /Conditions met|Unmet conditions|Missing data|Risks/);
       let saveButton = renderer!.root.findAllByType("button").find((node) => node.props["data-action-variant"] === "primary")!;
-      assert.equal(saveButton.props.disabled, true);
-      await act(async () => {
-        renderer!.root.findByType("textarea").props.onChange({ target: { value: "Early private review" } });
-        renderer!.root.findByType("input").props.onChange({ target: { checked: true } });
-      });
-      saveButton = renderer!.root.findAllByType("button").find((node) => node.props["data-action-variant"] === "primary")!;
-      assert.equal(saveButton.props.disabled, false);
       await act(async () => { saveButton.props.onClick(); await flush(); });
       let markup = JSON.stringify(renderer!.toJSON());
       assert.match(markup, /Product Radar[\s\S]*New/);
       assert.match(markup, /Your Radar[\s\S]*Follow-up/);
       assert.match(markup, /Move to my Main Radar/);
-      assert.equal(renderer!.root.findAllByType("details").every((detail) => detail.props.open !== true), true);
       await act(async () => { action().props.onClick(); });
-      assert.equal(renderer!.root.findByType("details").props.open, true);
-      assert.equal(renderer!.root.findAllByType("textarea").length, 0);
-      const followUpConfirmationMarkup = JSON.stringify(renderer!.toJSON());
-      assert.match(followUpConfirmationMarkup, /Conditions met/);
-      assert.match(followUpConfirmationMarkup, /Unmet conditions/);
-      assert.match(followUpConfirmationMarkup, /Missing data/);
-      assert.match(followUpConfirmationMarkup, /Risks/);
-      await act(async () => { renderer!.root.findByType("input").props.onChange({ target: { checked: true } }); });
       saveButton = renderer!.root.findAllByType("button").find((node) => node.props["data-action-variant"] === "primary")!;
-      assert.equal(saveButton.props.disabled, false);
       await act(async () => { saveButton.props.onClick(); await flush(); });
       markup = JSON.stringify(renderer!.toJSON());
       assert.match(markup, /Product Radar[\s\S]*New/);
       assert.match(markup, /Your Radar[\s\S]*Main Radar/);
-      assert.equal(renderer!.root.findAllByType("details").length, 0);
+      await act(async () => { action().props.onClick(); });
+      saveButton = renderer!.root.findAllByType("button").find((node) => node.props["data-action-variant"] === "primary")!;
+      await act(async () => { saveButton.props.onClick(); await flush(); });
+      markup = JSON.stringify(renderer!.toJSON());
+      assert.match(markup, /Your Radar[\s\S]*Follow-up/);
+      const remove = renderer!.root.findAllByType("button").find((node) => String(node.children?.join("")) === "Remove from my Radar")!;
+      await act(async () => { remove.props.onClick(); });
+      const removeConfirmation = renderer!.root.findAllByType("button").find((node) => node.props["data-action-variant"] === "tertiary" && String(node.children?.join("")) === "Remove from my Radar")!;
+      await act(async () => { removeConfirmation.props.onClick(); await flush(); });
+      markup = JSON.stringify(renderer!.toJSON());
+      assert.match(markup, /Your Radar[\s\S]*New/);
       assert.deepEqual(submitted.map(({ target_status, override_reason }) => ({ target_status, override_reason })), [
-        { target_status: "FOLLOW_UP", override_reason: "Early private review" },
+        { target_status: "FOLLOW_UP", override_reason: null },
         { target_status: "MAIN_RADAR", override_reason: null },
+        { target_status: "FOLLOW_UP", override_reason: null },
+        { target_status: undefined, override_reason: undefined },
       ]);
     } finally {
       if (renderer) await act(async () => { renderer!.unmount(); });
@@ -570,7 +567,7 @@ describe("PC.1 bounded lifecycle Radar API", () => {
         await flush();
       });
       const markup = JSON.stringify(renderer!.toJSON());
-      assert.match(markup, /Add to Follow-up/);
+      assert.match(markup, /Move to Follow-up/);
       assert.match(markup, /Open details/);
       const footer = renderer!.root.find((node) => typeof node.props.className === "string" && node.props.className.includes("lifecycle-radar-card-footer"));
       assert.equal(footer.findAllByType("button").length, 2);
@@ -786,7 +783,8 @@ describe("PC.1 bounded lifecycle Radar API", () => {
     assert.doesNotMatch(radar, /personal-radar-review-switch/);
     assert.match(personalRadar, /data-personal-radar="inline"/);
     assert.doesNotMatch(personalRadar, /personal-radar-panel/);
-    assert.match(personalRadar, /TechnicalDetails label=\{copy\.confirmAction\}/);
+    assert.match(personalRadar, /copy\.privateOnly/);
+    assert.match(personalRadar, /clearPrivateLifecycleStatus/);
     assert.match(productApp, /isReviewMode\(\).*LifecycleReviewSwitch/);
     assert.match(productApp, /data-pc1-review-switch="global"/);
     assert.match(productApp, /Auto-update test: oczekiwanie/);

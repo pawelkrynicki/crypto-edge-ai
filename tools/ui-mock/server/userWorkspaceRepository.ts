@@ -95,11 +95,8 @@ export async function createUserWorkspaceRepository(options: { databaseFilePath?
       assertStatus(input.previousPrivateStatus);
       assertStatus(input.newPrivateStatus);
       assertStatus(input.systemStatus);
-      if (!isForwardTransition(input.previousPrivateStatus, input.newPrivateStatus)) throw new UserWorkspaceError("WORKSPACE_TRANSITION_INVALID");
-      const needsReason = input.conditions.readiness !== "CONDITIONS_MET";
+      if (!isPrivateRadarStatus(input.newPrivateStatus)) throw new UserWorkspaceError("WORKSPACE_TRANSITION_INVALID");
       const overrideReason = cleanText(input.overrideReason, 500);
-      if (needsReason && !overrideReason) throw new UserWorkspaceError("WORKSPACE_OVERRIDE_REASON_REQUIRED");
-      if (!needsReason && input.overrideReason !== null && input.overrideReason !== undefined) throw new UserWorkspaceError("WORKSPACE_INPUT_INVALID");
       const sessionReference = cleanText(input.sessionReference, 128);
       if (!sessionReference) throw new UserWorkspaceError("WORKSPACE_INPUT_INVALID");
       const now = input.now ?? new Date();
@@ -108,7 +105,6 @@ export async function createUserWorkspaceRepository(options: { databaseFilePath?
       const existing = this.get(actorId, identity);
       const effectivePrevious = existing?.private_status ?? input.previousPrivateStatus;
       if (existing && existing.private_status === input.newPrivateStatus) throw new UserWorkspaceError("WORKSPACE_DUPLICATE");
-      if (!isForwardTransition(effectivePrevious, input.newPrivateStatus)) throw new UserWorkspaceError("WORKSPACE_TRANSITION_INVALID");
       const audit: UserWorkspaceAuditEntry = {
         transition_id: `uws_${randomUUID()}`,
         actor_id: actorId,
@@ -136,6 +132,17 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         return audit;
       } catch {
         try { database.exec("ROLLBACK"); } catch { /* preserve original failure */ }
+        throw new UserWorkspaceError("WORKSPACE_UNAVAILABLE");
+      }
+    },
+
+    remove(input: { actorId: string; identity: string }): boolean {
+      const actorId = requireActor(input.actorId);
+      const identity = requireIdentity(input.identity);
+      try {
+        const result = database.prepare("DELETE FROM user_workspace_status WHERE actor_id = ? AND identity = ?").run(actorId, identity) as { changes?: unknown };
+        return Number(result.changes ?? 0) > 0;
+      } catch {
         throw new UserWorkspaceError("WORKSPACE_UNAVAILABLE");
       }
     },
@@ -213,9 +220,7 @@ function normalizeConditions(value: LifecycleConditions): LifecycleConditions {
   };
 }
 
-function isForwardTransition(from: SystemLifecycleStatus, to: SystemLifecycleStatus): boolean {
-  return (from === "NEW" && to === "FOLLOW_UP") || (from === "FOLLOW_UP" && to === "MAIN_RADAR");
-}
+function isPrivateRadarStatus(value: SystemLifecycleStatus): boolean { return value === "FOLLOW_UP" || value === "MAIN_RADAR"; }
 function assertStatus(value: unknown): asserts value is SystemLifecycleStatus { if (!["NEW", "FOLLOW_UP", "MAIN_RADAR"].includes(String(value))) throw new UserWorkspaceError("WORKSPACE_INPUT_INVALID"); }
 function safeActor(value: unknown): string { if (typeof value !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._-]{2,127}$/.test(value)) throw new UserWorkspaceError("WORKSPACE_INPUT_INVALID"); return value; }
 function safeIdentity(value: unknown): string { if (typeof value !== "string" || !/^[a-z0-9_-]{2,32}:[A-Za-z0-9]{20,128}$/.test(value)) throw new UserWorkspaceError("WORKSPACE_INPUT_INVALID"); return value; }

@@ -1,6 +1,7 @@
 import { isCandidateDetailTabId, type CandidateDetailTabId } from "./candidateDetailTabs";
 import type { ResearchStepNumber } from "./researchChecklistTypes";
 import { resolveTokenIdentity } from "./tokenLifecycle";
+import { isVerificationMissingTarget, type VerificationMissingTarget } from "./verificationMissingItemTargets";
 
 export const RESEARCH_VERIFICATION_CHECKS = ["honeypot"] as const;
 export type ResearchVerificationCheck = (typeof RESEARCH_VERIFICATION_CHECKS)[number];
@@ -43,6 +44,17 @@ export function resolveResearchVerificationCheck(): ResearchVerificationCheck | 
     : null;
 }
 
+export function resolveVerificationMissingTarget(): VerificationMissingTarget | null {
+  if (typeof window === "undefined") return null;
+  const value = new URLSearchParams(window.location.search).get("verification_target");
+  return isVerificationMissingTarget(value) ? value : null;
+}
+
+export function resolveVerificationDecisionOrigin(): boolean {
+  if (typeof window === "undefined") return false;
+  return new URLSearchParams(window.location.search).get("verification_origin") === "decision";
+}
+
 export function writeCandidateDetailRoute(
   identity: RouteTokenIdentity,
   tab: CandidateDetailTabId,
@@ -65,6 +77,42 @@ export function writeVerificationRoute(
   writeTokenRoute(identity, "external-checks", null, researchStep, false, researchCheck);
 }
 
+export function writeVerificationDecisionTargetRoute(identity: RouteTokenIdentity, target: VerificationMissingTarget) {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  url.searchParams.set("chain", identity.chain);
+  url.searchParams.set("contract", identity.contract_address);
+  url.searchParams.set("verification_target", target);
+  url.searchParams.set("verification_origin", "decision");
+  url.searchParams.delete("detail");
+  url.searchParams.delete("research_step");
+  url.searchParams.delete("research_check");
+  url.searchParams.delete("research_playbook");
+  url.hash = "external-checks";
+  window.history.pushState(null, "", url);
+}
+
+export function writeVerificationDecisionRoute(identity: RouteTokenIdentity) {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  url.searchParams.set("chain", identity.chain);
+  url.searchParams.set("contract", identity.contract_address);
+  url.searchParams.set("verification_tab", "decision");
+  url.searchParams.delete("verification_target");
+  url.searchParams.delete("verification_origin");
+  url.searchParams.delete("detail");
+  url.searchParams.delete("research_step");
+  url.searchParams.delete("research_check");
+  url.searchParams.delete("research_playbook");
+  url.hash = "external-checks";
+  window.history.pushState(null, "", url);
+}
+
+export function resolveVerificationTab(): "decision" | null {
+  if (typeof window === "undefined") return null;
+  return new URLSearchParams(window.location.search).get("verification_tab") === "decision" ? "decision" : null;
+}
+
 /**
  * Builds a normal browser route for a focused, read-only verification step.
  * This is intentionally separate from `writeVerificationRoute`: links need a
@@ -84,6 +132,9 @@ export function buildVerificationRouteHref(
   if (researchCheck) url.searchParams.set("research_check", researchCheck);
   else url.searchParams.delete("research_check");
   url.searchParams.delete("research_playbook");
+  url.searchParams.delete("verification_target");
+  url.searchParams.delete("verification_origin");
+  url.searchParams.delete("verification_tab");
   url.hash = "external-checks";
   return `${url.pathname}${url.search}${url.hash}`;
 }
@@ -97,6 +148,9 @@ export function writeVerificationListRoute() {
   url.searchParams.delete("research_step");
   url.searchParams.delete("research_check");
   url.searchParams.delete("research_playbook");
+  url.searchParams.delete("verification_target");
+  url.searchParams.delete("verification_origin");
+  url.searchParams.delete("verification_tab");
   url.hash = "external-checks";
   window.history.pushState(null, "", url);
 }
@@ -121,6 +175,9 @@ function writeTokenRoute(
   else url.searchParams.delete("research_check");
   if (focusResearchPlaybook) url.searchParams.set("research_playbook", "1");
   else url.searchParams.delete("research_playbook");
+  url.searchParams.delete("verification_target");
+  url.searchParams.delete("verification_origin");
+  url.searchParams.delete("verification_tab");
   url.hash = section;
   window.history.pushState(null, "", url);
 }

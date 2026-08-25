@@ -183,7 +183,7 @@ describe("P1.1 Radar operational usability", () => {
     assert.match(markup, /Do sprawdzenia/);
     assert.match(markup, /Główny Radar/);
     assert.match(markup, /Projekty wykryte przez system\. Większość nie wymaga teraz Twojej uwagi\./);
-    assert.match(markup, /Projekty, które spełniają aktualne warunki i wymagają dalszej analizy\./);
+    assert.match(markup, /Systemowy koszyk Dalsza obserwacja\./);
     assert.match(markup, /Projekty po pełnym procesie obserwacji i weryfikacji\./);
     assert.doesNotMatch(markup, /Łącznie obserwowane|Do działania teraz|Wyświetlane teraz|Wpisy Established/);
   });

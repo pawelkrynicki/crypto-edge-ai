@@ -907,13 +907,13 @@ assert.match(candidateResultsMarkup, /Maturing \/ follow-up/, "product radar ren
 assert.match(candidateResultsMarkup, /Established \/ main Radar/, "product radar renders established basket selector");
 assert.match(
   candidateResultsMarkup,
-  /Automatic Follow-up enrollment is blocked until the technical identity is valid/,
-  "new-emerging status explains the automatic next step and its visible blocker",
+  /Follow-up assessment is blocked until the technical identity is valid/,
+  "new-emerging status explains the visible blocker without promising an automatic run",
 );
 assert.doesNotMatch(candidateResultsMarkup, /OBSERVATION — NEW PROJECT/, "new-emerging does not duplicate the lifecycle badge");
 assert.match(candidateResultsMarkup, /observation_only=true/, "new-emerging preserves observation-only metadata");
 assert.match(candidateResultsMarkup, /No automated recommendation/, "new-emerging does not imply an automatic recommendation");
-assert.match(candidateResultsMarkup, /Last updated/, "radar summary renders generated data state");
+assert.match(candidateResultsMarkup, /LAST DATA UPDATE/, "radar summary renders the published data timestamp");
 assert.match(candidateResultsMarkup, /Current/, "fresh timestamp is displayed as current");
 assert.match(candidateResultsMarkup, /Data availability/, "radar summary renders source health");
 assert.ok(

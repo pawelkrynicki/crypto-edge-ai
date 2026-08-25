@@ -149,10 +149,10 @@ describe("Follow-up read-only product boundary", () => {
       if (locale === "pl") {
         assert.doesNotMatch(markup, />MATURING</);
         assert.doesNotMatch(markup, /CANDIDATE FOR ESTABLISHED/);
-        assert.match(markup, /Kandydat do Established/);
+        assert.match(markup, /Kandydat do dalszej obserwacji/);
       } else {
         assert.match(markup, /Maturing/);
-        assert.match(markup, /Candidate for Established/);
+        assert.match(markup, /Follow-up candidate/);
       }
     }
     assert.equal(formatProductElapsedSince("2026-06-01T00:00:00.000Z", new Date("2026-06-01T05:30:00.000Z"), "en", "missing"), "5 hours");

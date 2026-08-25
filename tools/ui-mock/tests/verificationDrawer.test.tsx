@@ -11,6 +11,7 @@ import { ExternalVerificationLinksView } from "../src/components/ExternalVerific
 import { VerificationTokenBrowser } from "../src/components/VerificationTokenBrowser.js";
 import { PERSISTABLE_SCANNER_SAMPLE } from "../src/fixtures/persistableScannerSample.js";
 import { ProductLocaleProvider } from "../src/productI18n.js";
+import { resolveVerificationMissingTarget } from "../src/verificationMissingItemTargets.js";
 
 void React;
 
@@ -110,7 +111,7 @@ describe("Verification drawer tabs", () => {
       assert.doesNotMatch(markup, /17\.08\.2026, 14:40|20\.08\.2026/);
     }
     assert.match(market, /Dane aktualne na/);
-    assert.match(data, /Brak informacji o źródle/);
+    assert.match(data, /Źródło zachowanej obserwacji nie zostało zapisane/);
     assert.doesNotMatch(data, />Follow-up</);
     assert.match(data, /https:\/\/dexscreener\.com\/bsc\/0xa2b1926Cb477e92445Cf70602f1A7200361F761D/);
     assert.match(data, /https:\/\/honeypot\.is\/\?address=0xe9bc5c6a86caa44fd7b469bf3cc7c563e4f77777/);
@@ -131,7 +132,7 @@ describe("Verification drawer tabs", () => {
     for (const markup of [security, decision]) {
       assert.doesNotMatch(markup, /honeypot_source|honeypot_status|liquidity_locked|top_10_wallets_pct|PARTIAL|MANUAL VERIFICATION REQUIRED/);
     }
-    for (const item of ["Honeypot — Brak wyniku", "Blokada płynności — Brak danych", "Udział Top 10 portfeli — Brak danych"]) assert.match(decision, new RegExp(item));
+    for (const item of ["Honeypot", "Blokada płynności", "Udział Top 10 portfeli"]) assert.match(decision, new RegExp(item));
     assert.match(security, /Dane częściowe/);
     assert.match(security, /Wymaga ręcznej weryfikacji/);
   });
@@ -143,6 +144,38 @@ describe("Verification drawer tabs", () => {
     assert.match(decision, /Twoja notatka/);
     assert.match(decision, /Szczegółów tokena/);
     assert.doesNotMatch(decision, /aria-checked="true"|owner|Candidate Detail|Krótka notatka ownera/);
+  });
+
+  it("maps Decision gaps to their exact Verification targets and preserves a clear return path", async () => {
+    const opened: string[] = [];
+    const renderer = await render(<ProductLocaleProvider initialLocale="pl"><ExternalVerificationLinksView
+      followUp={followUpCandidate}
+      initialActiveTab="decision"
+      onOpenMissingTarget={(target) => opened.push(target)}
+    /></ProductLocaleProvider>);
+    await act(async () => { await flushPromises(); });
+    await act(async () => { button(renderer, "Honeypot").props.onClick(); });
+    await act(async () => { button(renderer, "Blokada płynności").props.onClick(); });
+    await act(async () => { button(renderer, "Udział Top 10 portfeli").props.onClick(); });
+    assert.deepEqual(opened, ["honeypot", "liquidity_lock", "top10_wallets"]);
+    assert.equal(resolveVerificationMissingTarget("tokensniffer")?.target, "tokensniffer");
+    assert.equal(resolveVerificationMissingTarget("bubblemaps")?.target, "bubblemaps");
+    assert.equal(resolveVerificationMissingTarget("unknown_gap"), null);
+    await act(async () => { renderer.unmount(); });
+
+    let returned = 0;
+    const focused = await render(<ProductLocaleProvider initialLocale="pl"><ExternalVerificationLinksView
+      followUp={followUpCandidate}
+      focusedMissingTarget="honeypot"
+      decisionOrigin
+      onReturnToDecision={() => { returned += 1; }}
+    /></ProductLocaleProvider>);
+    await act(async () => { await flushPromises(); });
+    assert.equal(focused.root.findByProps({ "data-verification-target": "honeypot" }).props.tabIndex, -1);
+    assert.equal(focused.root.findByProps({ id: "verification-tab-security" }).props["aria-selected"], true);
+    await act(async () => { button(focused, "Wróć do decyzji weryfikacyjnej").props.onClick(); });
+    assert.equal(returned, 1);
+    await act(async () => { focused.unmount(); });
   });
 
   it("stacks token heading, metadata and tabs without letting long metadata overlap the drawer tabs", async () => {

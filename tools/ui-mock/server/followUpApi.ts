@@ -46,6 +46,9 @@ export type FollowUpPublicEntry = {
   last_seen_at: string;
   last_checked_at: string | null;
   market_observed_at: string | null;
+  /** Older Follow-up snapshots retained values and capture time, not provider provenance. */
+  market_provenance: "not_preserved";
+  filter_evaluated_at: string | null;
   next_check_at: string | null;
   completed_checkpoints: number[];
   market_metrics: {
@@ -170,6 +173,8 @@ function publicEntry(
     last_seen_at: entry.last_seen_at,
     last_checked_at: entry.last_checked_at,
     market_observed_at: market?.captured_at ?? null,
+    market_provenance: "not_preserved",
+    filter_evaluated_at: entry.latest_filter_result?.evaluated_at ?? null,
     next_check_at: lifecycle === "ESTABLISHED" ? null : entry.next_check_at,
     completed_checkpoints: [...entry.completed_checkpoints],
     market_metrics: {

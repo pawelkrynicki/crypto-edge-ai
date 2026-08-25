@@ -167,7 +167,7 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
 
       <section className="product-summary-grid primary" aria-label={t("radar.summary")}>
         <SummaryCard label={t("radar.newProjects")} value={String(lifecycleSummary?.system_new_total ?? newCandidates.length)} detail={t("radar.newProjectsDetail")} />
-        <SummaryCard label={t("radar.followUpReview")} value={String(lifecycleSummary?.follow_up_action_due ?? followUpStatus?.due_count ?? 0)} detail={t("radar.followUpReviewDetail")} tone="accent" />
+        <SummaryCard label={t("followUp.basket")} value={String(followUpTotal)} detail={locale === "pl" ? "Systemowy koszyk Dalsza obserwacja." : "System-owned Follow-up basket."} tone="accent" />
         <SummaryCard label={t("radar.mainRadar")} value={String(lifecycleRadar?.main_radar.total ?? lifecycleSummary?.system_main_radar_total ?? establishedEntries)} detail={t("radar.mainRadarDetail")} />
         <SummaryCard
           label={t("app.generated")}
@@ -215,6 +215,7 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
       </TechnicalDetails>
 
       <section className="basket-switcher" aria-label={t("radar.basketSelection")}>
+        {lifecycleRadar && <header className="private-radar-switcher-heading"><span>{locale === "pl" ? "TWÓJ RADAR" : "YOUR RADAR"}</span><p>{locale === "pl" ? "Prywatny widok organizacyjny; nie zmienia Radaru produktu." : "Private organizational view; it does not change Product Radar."}</p></header>}
         <button
           type="button"
           className={activeBasket === "new_emerging" ? "active" : ""}
@@ -318,7 +319,7 @@ function PrivateLifecycleBasket({ basket, group, locale, onLoadMore, onOpenDetai
     };
   const basketCopy = copy[basket];
   return <section className={`basket-content private-lifecycle-basket private-lifecycle-${basket}`} aria-label={basketCopy.title}>
-    <header className="basket-heading"><div><span>{basketCopy.title}</span><h3>{group.displayed}/{group.total}</h3><p>{copy.privateView}</p></div></header>
+    <header className="basket-heading"><div><span>{basketCopy.title}</span><h3>{locale === "pl" ? `${group.total} projektów` : `${group.total} projects`}</h3><p>{copy.privateView}</p></div></header>
     {group.cards.length === 0 ? <BasketEmpty title={basketCopy.title} detail={basketCopy.empty} code={`PRIVATE_${basket.toUpperCase()}_EMPTY`} /> : <div className="product-candidate-list">{group.cards.map((card) => <LifecycleRadarCardView key={card.identity} card={card} locale={locale} absentNotice={copy.absent} onOpenDetails={onOpenDetails} onLifecycleChanged={onLifecycleChanged} />)}</div>}
     {group.next_cursor && <button type="button" className="product-secondary-action" data-lifecycle-more={`private_${basket}`} onClick={() => onLoadMore?.(group.next_cursor!)}>{copy.more}</button>}
   </section>;
@@ -406,9 +407,7 @@ export function MaturingFollowUpBasket({
         </div>
         <StatusBadge tone="manual" className="basket-status observation">{t("followUp.readOnly")}</StatusBadge>
       </header>
-      <p className="follow-up-result-limit" role="status">
-        {t("followUp.displayedOfTotal", { displayed: entries.length, total: status?.entries_total ?? entries.length })}
-      </p>
+      <p className="follow-up-result-limit" role="status">{locale === "pl" ? `${entries.length} projektów w Dalszej obserwacji` : `${entries.length} projects in Follow-up`}</p>
       <div className="product-candidate-list">
         {entries.map((entry) => {
           const lifecycle = resolveTokenLifecycle({ followUp: entry, followUpStatus: status });

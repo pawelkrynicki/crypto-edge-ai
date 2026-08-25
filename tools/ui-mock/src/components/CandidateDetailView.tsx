@@ -7,8 +7,12 @@ import {
   type ProductLocale,
 } from "../productI18n";
 import {
+  BASIC_FILTER_CATEGORIES,
+  getProductFilterRequirement,
+  resolveCurrentProductFilterConditions,
   resolveProductFilterConditions,
   type BasicFilterCategory,
+  type BasicFilterConditionState,
 } from "../productFilterResolver";
 import { formatFilterReason, formatProductSourceLabel } from "../productPresentation";
 import {
@@ -38,7 +42,7 @@ import { OwnerFollowUpActionPanel } from "./OwnerFollowUpActionPanel";
 import { PersonalRadarPanel } from "./PersonalRadarPanel";
 import type { PrivateVerificationRecord } from "../services/manualOwnerActionsDataSource";
 import { ActionButton, CopyButton, CopyableAddress, StatusBadge, TechnicalDetails } from "./ProductUi";
-import { ResearchChecklistDetail, ResearchChecklistSummary, ResearchPlaybookContext } from "./ResearchChecklist";
+import { ResearchChecklistDetail, ResearchChecklistSummary } from "./ResearchChecklist";
 import {
   lifecycleActionLabel,
   lifecycleBlockingLabel,
@@ -168,15 +172,6 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
   const filterSummary = candidate.basicFilterStatus === "passed_basic_filter"
     ? t("detail.filterPassedSummary")
     : t("detail.filterRejectedSummary");
-  const passedFilters = filterResolution.conditions
-    .filter((condition) => condition.state === "passed")
-    .map((condition) => formatBasicFilterCategory(condition.category, t));
-  const failedFilters = filterResolution.conditions
-    .filter((condition) => condition.state === "failed")
-    .map((condition) => buildFailedFilterRow(condition.category, condition.failureReasons, candidate, locale, t));
-  const unknownFilters = filterResolution.conditions
-    .filter((condition) => condition.state === "unknown")
-    .map((condition) => formatBasicFilterCategory(condition.category, t));
   const showSecurityDetails = securityResolution.state === "partial"
     || isCompletedProductSecurityState(securityResolution.state);
   const hasFollowUpOwnership = Boolean(followUp || (ownerPromotionStatus && ownerPromotionStatus.source_layer !== "SCANNER"));
@@ -289,11 +284,7 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
           />
           <div><span>{t("detail.simpleExplanation")}</span><p>{filterSummary}</p></div>
         </div>
-        <div className="filter-condition-grid">
-          <ConditionList title={t("detail.conditionsMet")} items={passedFilters} empty={t("detail.noPassedConditions")} tone="ready" />
-          <FailedConditionList title={t("detail.conditionsNotMet")} items={failedFilters} empty={t("detail.noFailedConditions")} />
-          {unknownFilters.length > 0 && <ConditionList title={t("detail.conditionsUnknown")} items={unknownFilters} empty={t("detail.noUnknownConditions")} tone="neutral" />}
-        </div>
+        <FilterFacts resolution={filterResolution} candidate={candidate} locale={locale} historical={false} />
         {(filterResolution.preferredRangeNotes.length > 0 || filterResolution.informationalReasons.length > 0 || filterResolution.unknownReasons.length > 0) && (
           <div className="filter-additional-notes">
             {filterResolution.preferredRangeNotes.length > 0 && <FilterNoteList title={t("detail.preferredRangeNotes")} reasons={filterResolution.preferredRangeNotes} locale={locale} />}
@@ -319,6 +310,7 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
           </div>
           {showSecurityDetails && (
             <>
+              <h4 className="security-section-heading">{locale === "pl" ? "Potwierdzone / dostępne" : "Confirmed / available"}</h4>
               <div className="product-detail-grid security">
                 <DetailField label={t("detail.source")} value={securityResolution.sources.map(formatProductSourceLabel).join(", ") || t("radar.missingData")} />
                 <DetailField label={t("detail.securityLabel")} value={getSecurityStateTitle(securityResolution.state, t)} tone={getSecurityTone(securityResolution.state)} />
@@ -335,7 +327,7 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
               </div>
               <div className="security-lists">
                 <FlagList title={t("detail.riskFlags")} items={candidate.riskFlags.map((reason) => formatSecurityReason(reason, locale, t))} empty={getEmptyRiskFlagsText(securityResolution.state, t)} tone="critical" />
-                {missingSecurityItems.length > 0 && <FlagList title={t("detail.missingData")} items={missingSecurityItems} empty={t("detail.noMissingData")} tone="warning" />}
+                {missingSecurityItems.length > 0 && <FlagList title={locale === "pl" ? "Brakujące kontrole" : "Missing checks"} items={missingSecurityItems} empty={t("detail.noMissingData")} tone="warning" />}
               </div>
             </>
           )}
@@ -354,7 +346,6 @@ const CandidateDetailViewForIdentity: React.FC<CandidateDetailViewProps> = ({
       name={candidate.name}
       mode="detail"
       active
-      playbookContext={<ResearchPlaybookContext candidate={candidate} surface="ai" onOpenPlaybook={onBackToResearchPlaybook} />}
     />;
   } else if (activeTab === "data") {
     activeTabContent = (
@@ -647,7 +638,9 @@ function FollowUpOnlyDetail({
     content = (
       <section className="product-detail-section" aria-labelledby="filters-heading">
         <SectionHeader id="filters-heading" title={t("detail.filters")} />
-        <DetailField label={t("followUp.filterStatus")} value={formatFollowUpFilterStatus(followUp.filter_status, locale)} tone={followUp.filter_status === "passed_basic_filter" ? "ready" : "warning"} />
+        <DetailField label={locale === "pl" ? "Wynik przy ostatnim checkpointcie" : "Result at the last checkpoint"} value={formatFollowUpFilterStatus(followUp.filter_status, locale)} detail={followUp.filter_evaluated_at ? formatProductDateTime(followUp.filter_evaluated_at, locale) : undefined} tone={followUp.filter_status === "passed_basic_filter" ? "ready" : "warning"} />
+        <p className="product-filter-historical-note">{locale === "pl" ? "To zapisany wynik filtra z ostatniego checkpointu. Obecne dane rynkowe mogą się od niego różnić i nie zmieniają automatycznie etapu obserwacji." : "This is the recorded filter result from the last checkpoint. Current market data can differ and does not automatically change the observation stage."}</p>
+        <FilterFacts resolution={filterResolution} candidate={researchCandidate} locale={locale} historical />
         {filterResolution.hardFailureReasons.length > 0 && (
           <FilterNoteList title={t("detail.conditionsNotMet")} reasons={filterResolution.hardFailureReasons} locale={locale} />
         )}
@@ -668,7 +661,10 @@ function FollowUpOnlyDetail({
         <section className="product-detail-section" aria-labelledby="security-heading">
           <SectionHeader id="security-heading" title={t("detail.security")} />
           <DetailField label={t("followUp.securityStatus")} value={formatFollowUpSecurityStatus(followUp.security_status, locale)} tone="warning" />
-          {missingSecurityItems.length > 0 && <FlagList title={t("detail.missingData")} items={missingSecurityItems} empty={t("detail.noMissingData")} tone="warning" />}
+          <h4 className="security-section-heading">{locale === "pl" ? "Potwierdzone / dostępne" : "Confirmed / available"}</h4>
+          <p>{locale === "pl" ? "Ta zachowana obserwacja nie zawiera szczegółowych automatycznych kontroli bezpieczeństwa." : "This retained observation does not include detailed automated security controls."}</p>
+          <h4 className="security-section-heading">{locale === "pl" ? "Brakujące kontrole" : "Missing checks"}</h4>
+          <FlagList title={locale === "pl" ? "Do uzupełnienia" : "To complete"} items={missingSecurityItems} empty={t("detail.noMissingData")} tone="warning" />
           {onOpenFollowUpExternalChecks && <div className="product-detail-actions"><ActionButton variant="primary" icon="arrow" iconPosition="end" onClick={() => onOpenFollowUpExternalChecks(followUp)}>{t("detail.openVerification")}</ActionButton></div>}
           <ManualVerificationStatusCard chain={followUp.chain} contractAddress={followUp.contract_address} initialRecord={initialManualVerification} />
         </section>
@@ -686,7 +682,6 @@ function FollowUpOnlyDetail({
         name={followUp.display_name ?? followUp.symbol ?? ""}
         mode="detail"
         active
-        playbookContext={<ResearchPlaybookContext candidate={researchCandidate} surface="ai" onOpenPlaybook={onBackToResearchPlaybook} />}
       />
     );
   } else if (activeTab === "data") {
@@ -705,9 +700,10 @@ function FollowUpOnlyDetail({
           <div className="product-detail-grid data">
             <DetailField label={t("detail.contract")} value={followUp.contract_address} copyValue={followUp.contract_address} copyLabel={t("verification.copyContract")} mono />
             <DetailField label={t("detail.chain")} value={followUp.chain} />
-            <DetailField label={t("detail.source")} value={copy.missingData} tone="warning" />
+            <DetailField label={locale === "pl" ? "Pochodzenie danych rynkowych" : "Market-data provenance"} value={locale === "pl" ? "Źródło tej zachowanej obserwacji nie zostało zapisane." : "The source of this retained observation was not stored."} tone="warning" />
+            <DetailField label={locale === "pl" ? "Dane rynkowe z" : "Market data captured"} value={followUp.market_observed_at ? formatProductDateTime(followUp.market_observed_at, locale) : t("app.noData")} />
           </div>
-          <p>{locale === "pl" ? "Rekord Follow-up zachowuje zwalidowaną tożsamość, ale nie publikuje osobnej listy źródeł." : "The Follow-up record keeps a validated identity but does not publish a separate source list."}</p>
+          <p>{locale === "pl" ? "Widoczne wartości pochodzą z ostatniej prawidłowej, zachowanej obserwacji Follow-up. Ręczne linki weryfikacyjne są miejscem sprawdzenia danych, a nie automatycznym źródłem tych wartości." : "The displayed values come from the latest valid retained Follow-up observation. Manual verification links are places to check data, not an automatic source of these values."}</p>
         </section>
       </div>
     );
@@ -804,6 +800,7 @@ function DetailField({
   value,
   copyValue,
   copyLabel,
+  detail,
   mono = false,
   tone = "neutral",
 }: {
@@ -811,6 +808,7 @@ function DetailField({
   value: string;
   copyValue?: string;
   copyLabel?: string;
+  detail?: string;
   mono?: boolean;
   tone?: "neutral" | "ready" | "warning" | "critical";
 }) {
@@ -819,6 +817,7 @@ function DetailField({
     <div className={`product-detail-field ${tone}`}>
       <span>{label}</span>
       <div className={mono ? "mono" : ""} title={value}>{value}</div>
+      {detail && <small>{detail}</small>}
       {copyValue && (
         <CopyButton
           value={copyValue}
@@ -826,43 +825,6 @@ function DetailField({
           copiedLabel={t("app.copied")}
         />
       )}
-    </div>
-  );
-}
-
-function ConditionList({ title, items, empty, tone }: { title: string; items: string[]; empty: string; tone: "neutral" | "ready" | "warning" }) {
-  return <div className={`condition-list ${tone}`}><strong>{title}</strong>{items.length > 0 ? <ul>{items.map((item) => <li key={item}>{item}</li>)}</ul> : <p>{empty}</p>}</div>;
-}
-
-type FailedFilterRow = {
-  name: string;
-  actual: string;
-  required: string;
-  description: string;
-};
-
-function FailedConditionList({ title, items, empty }: { title: string; items: FailedFilterRow[]; empty: string }) {
-  const { locale } = useProductLocale();
-  const copy = locale === "pl"
-    ? { actual: "Wartość", required: "Wymaganie" }
-    : { actual: "Actual", required: "Required" };
-  return (
-    <div className={`condition-list ${items.length > 0 ? "warning" : "neutral"}`}>
-      <strong>{title}</strong>
-      {items.length > 0 ? (
-        <div className="failed-condition-rows">
-          {items.map((item) => (
-            <article key={item.name} className="failed-condition-row">
-              <h4>{item.name}</h4>
-              <dl>
-                <div><dt>{copy.actual}</dt><dd>{item.actual}</dd></div>
-                <div><dt>{copy.required}</dt><dd>{item.required}</dd></div>
-              </dl>
-              <p>{item.description}</p>
-            </article>
-          ))}
-        </div>
-      ) : <p>{empty}</p>}
     </div>
   );
 }
@@ -997,6 +959,56 @@ function formatFollowUpSecurityStatus(value: string, locale: ProductLocale): str
   return locale === "pl" ? "Wymagana ręczna weryfikacja" : "Manual verification required";
 }
 
+/** A presentation of the five canonical basic filters. Its state comes from
+ * resolveProductFilterConditions; it never recalculates lifecycle eligibility. */
+function FilterFacts({
+  resolution,
+  candidate,
+  locale,
+  historical,
+}: {
+  resolution: ReturnType<typeof resolveProductFilterConditions>;
+  candidate: Pick<UiTokenCandidate, "marketCap" | "fdvUsd" | "volume24h" | "liquidity" | "volumeMarketCapRatio" | "pairAgeDays">;
+  locale: ProductLocale;
+  historical: boolean;
+}) {
+  const { t } = useProductLocale();
+  const missing = t("radar.missingData");
+  const displayConditions = historical ? resolveCurrentProductFilterConditions(candidate) : resolution.conditions;
+  const status = (state: BasicFilterConditionState) => (
+    state === "passed" ? (locale === "pl" ? "Spełniony" : "Met")
+      : state === "failed" ? (locale === "pl" ? "Niespełniony" : "Not met")
+        : (locale === "pl" ? "Brak rozstrzygnięcia" : "Not resolved")
+  );
+  const value = (category: BasicFilterCategory): string => {
+    if (category === "market_cap") return formatProductUsd(candidate.marketCap ?? candidate.fdvUsd, locale, missing);
+    if (category === "volume_24h") return formatProductUsd(candidate.volume24h, locale, missing);
+    if (category === "liquidity") return formatProductUsd(candidate.liquidity, locale, missing);
+    if (category === "volume_market_cap_ratio") return candidate.volumeMarketCapRatio == null ? missing : `${(candidate.volumeMarketCapRatio * 100).toFixed(2)}%`;
+    return candidate.pairAgeDays == null ? missing : (locale === "pl" ? `${candidate.pairAgeDays} dni` : `${candidate.pairAgeDays} days`);
+  };
+  return <section className="filter-facts" aria-label={locale === "pl" ? "Podstawowe filtry" : "Basic filters"} data-filter-facts={historical ? "checkpoint" : "snapshot"}>
+    <h4>{locale === "pl" ? "Podstawowe filtry" : "Basic filters"}</h4>
+    <div className="product-detail-grid filter-facts-grid">
+      {BASIC_FILTER_CATEGORIES.map((category) => {
+        const condition = displayConditions.find((item) => item.category === category)!;
+        const requirement = getProductFilterRequirement(category);
+        return <DetailField
+          key={category}
+          label={formatBasicFilterCategory(category, t)}
+          value={`${value(category)} · ${status(condition.state)}`}
+          detail={`${historical ? (locale === "pl" ? "Aktualna ocena informacyjna — nie zmienia etapu obserwacji. " : "Current informational assessment — it does not change the observation stage. ") : ""}${locale === "pl" ? "Wymaganie" : "Required"}: ${localizeFilterRequirement(requirement.hard, locale)}${requirement.preferred ? ` · ${locale === "pl" ? "Preferowane, nie blokuje" : "Preferred, non-blocking"}: ${localizeFilterRequirement(requirement.preferred, locale)}` : ""}`}
+          tone={condition.state === "passed" ? "ready" : condition.state === "failed" ? "warning" : "neutral"}
+        />;
+      })}
+    </div>
+  </section>;
+}
+
+function localizeFilterRequirement(value: string, locale: ProductLocale): string {
+  return locale === "pl" ? value.replace("days", "dni") : value;
+}
+
 function formatSecurityMissingData(values: readonly string[], locale: ProductLocale): string[] {
   return [...new Set(values.map((value) => formatSecurityMissingItem(value, locale)).filter((value): value is string => value !== null))];
 }
@@ -1041,40 +1053,6 @@ function formatLiquidityLock(candidate: UiTokenCandidate, locale: ProductLocale)
   return locale === "pl"
     ? `Potwierdzona · ${candidate.security.liquidityLockDays} dni`
     : `Confirmed · ${candidate.security.liquidityLockDays} days`;
-}
-
-function buildFailedFilterRow(
-  category: BasicFilterCategory,
-  reasons: string[],
-  candidate: UiTokenCandidate,
-  locale: ProductLocale,
-  t: ProductTranslator,
-): FailedFilterRow {
-  const missing = t("radar.missingData");
-  const actual = category === "market_cap"
-    ? formatProductUsd(candidate.marketCap ?? candidate.fdvUsd, locale, missing)
-    : category === "volume_24h"
-      ? formatProductUsd(candidate.volume24h, locale, missing)
-      : category === "liquidity"
-        ? formatProductUsd(candidate.liquidity, locale, missing)
-        : category === "volume_market_cap_ratio"
-          ? candidate.volumeMarketCapRatio == null ? missing : `${(candidate.volumeMarketCapRatio * 100).toFixed(2)}%`
-          : candidate.pairAgeDays == null
-            ? missing
-            : locale === "pl" ? `${candidate.pairAgeDays} dni` : `${candidate.pairAgeDays} days`;
-  const required = category === "market_cap"
-    ? "$300k–$10m"
-    : category === "volume_24h" || category === "liquidity"
-      ? "≥ $30k"
-      : category === "volume_market_cap_ratio"
-        ? "1%–100%"
-        : locale === "pl" ? "> 7 dni" : "> 7 days";
-  return {
-    name: formatBasicFilterCategory(category, t),
-    actual,
-    required,
-    description: reasons.map((reason) => formatFilterReason(reason, locale).summary).join(" "),
-  };
 }
 
 function shortenAddress(value: string, missing: string): string {

@@ -91,13 +91,32 @@ describe("UX.2 Tabbed Token Detail Workspace", () => {
       filter_reasons: ["volume_market_cap_ratio_outside_sweet_spot_5_30_percent"],
     };
     const polish = render("pl", <CandidateDetailView followUp={entry} initialActiveTab="filters" initialOwnerPromotionStatus={null} />);
-    assert.match(polish, /Obecny wynik filtrów[\s\S]*Podstawowe filtry spełnione/);
+    assert.match(polish, /Wynik przy ostatnim checkpointcie[\s\S]*Podstawowe filtry spełnione/);
     assert.match(polish, /Uwagi[\s\S]*Relacja wolumenu do kapitalizacji jest poza preferowanym zakresem 5–30%/);
     assert.doesNotMatch(polish, /Brakujące dane|volume_market_cap_ratio_outside_sweet_spot_5_30_percent/);
 
     const english = render("en", <CandidateDetailView followUp={entry} initialActiveTab="filters" initialOwnerPromotionStatus={null} />);
     assert.match(english, /Notes[\s\S]*Volume-to-market-cap ratio is outside the preferred 5–30% range/);
     assert.doesNotMatch(english, /volume_market_cap_ratio_outside_sweet_spot_5_30_percent/);
+  });
+
+  it("keeps a historical Follow-up pass distinct from the current informational filter assessment", () => {
+    const entry = {
+      ...followUpCandidate,
+      market_metrics: {
+        ...followUpCandidate.market_metrics,
+        market_cap_usd: 32_076,
+        liquidity_usd: 12_465.93,
+        volume_market_cap_ratio: 1.2639,
+      },
+      filter_status: "passed_basic_filter" as const,
+      filter_reasons: [],
+    };
+    const polish = render("pl", <CandidateDetailView followUp={entry} initialActiveTab="filters" initialOwnerPromotionStatus={null} />);
+    assert.match(polish, /Wynik przy ostatnim checkpointcie[\s\S]*Podstawowe filtry spełnione/);
+    assert.match(polish, /Kapitalizacja[\s\S]*Niespełniony/);
+    assert.match(polish, /Aktualna ocena informacyjna — nie zmienia etapu obserwacji/);
+    assert.doesNotMatch(polish, /Obecne filtry spełnione/);
   });
 
   it("renders genuine missing inputs and hard filter failures in their own human-readable sections", () => {
@@ -342,7 +361,7 @@ describe("UX.3 client header and UX.4 provider-neutral AI", () => {
     ><div /></ProductWorkspaceShell>);
     const header = markup.slice(markup.indexOf("<header"), markup.indexOf("</header>") + 9);
     assert.match(header, /Crypto Edge AI/);
-    assert.match(header, /Last updated/);
+    assert.match(header, /LAST DATA UPDATE/);
     assert.match(header, /Refresh view/);
     assert.match(header, />EN<|>PL</);
     assert.doesNotMatch(header, /API connectivity|Snapshot freshness|Data status|Sources|Technical details|Environment|Run ID|Send feedback/);

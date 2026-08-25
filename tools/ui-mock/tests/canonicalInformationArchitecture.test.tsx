@@ -134,7 +134,8 @@ test("canonical product IA keeps one master, seven Candidate tabs and six Verifi
   assert.match(focused, /data-research-verification-action="honeypot"/);
   assert.doesNotMatch(focused, /verification-tab-data/);
   assert.match(verification, /data-research-playbook-context="verification"/);
-  assert.match(verification, new RegExp(`data-research-playbook-current-step="${checklist.current_step}"`));
+  assert.match(verification, /Kontekst ręcznej weryfikacji/);
+  assert.doesNotMatch(verification, /data-research-playbook-current-step=/);
   assert.match(verification, /sprawdzany punkt: Honeypot/);
   assert.doesNotMatch(verification, /research-checklist-focus-3/);
   assert.doesNotMatch(verification, /data-research-playbook-progress-tracker/);
@@ -164,7 +165,7 @@ test("canonical routes preserve candidate identity, focused step and specific ve
   }
 });
 
-test("one Checklist current step is composed consistently across every Playbook surface", () => {
+test("one Checklist current step is owned by the Playbook and not duplicated by AI", () => {
   const checklist = resolveResearchChecklist(candidate);
   const summary = render("pl", <CandidateDetailView candidate={candidate} initialOwnerPromotionStatus={null} />);
   const ai = render("pl", <CandidateDetailView candidate={candidate} initialOwnerPromotionStatus={null} activeTab="ai" />);
@@ -172,12 +173,12 @@ test("one Checklist current step is composed consistently across every Playbook 
   const verification = render("pl", <ExternalVerificationLinksView candidate={candidate} focusedResearchStep={checklist.current_step} focusedResearchCheck="honeypot" />);
 
   assert.match(summary, new RegExp(`data-research-current-step-cta="${checklist.current_step}"`));
-  assert.match(ai, new RegExp(`data-research-playbook-current-step="${checklist.current_step}"`));
-  assert.match(ai, new RegExp(`Aktualny etap: ${checklist.current_step}/7`));
+  assert.doesNotMatch(ai, /data-research-playbook-current-step=/);
+  assert.doesNotMatch(ai, /Aktualny etap|Current stage|Krok \d+\/7|Step \d+\/7/);
   assert.doesNotMatch(ai, /data-research-playbook-progress-tracker/);
   assert.match(focused, new RegExp(`Krok ${checklist.current_step}/7`));
-  assert.match(verification, new RegExp(`data-research-playbook-current-step="${checklist.current_step}"`));
-  assert.match(verification, new RegExp(`Narzędzie dla kroku ${checklist.current_step}/7`));
+  assert.match(verification, /Kontekst ręcznej weryfikacji/);
+  assert.doesNotMatch(verification, /data-research-playbook-current-step=|Narzędzie dla kroku/);
 });
 
 test("all seven stages are inspectable in Summary without creating a Verification playbook", () => {
@@ -193,7 +194,7 @@ test("all seven stages are inspectable in Summary without creating a Verificatio
   }
 });
 
-test("the canonical Follow-up read model receives the same Summary master and AI context", () => {
+test("the canonical Follow-up read model receives the Summary master without a duplicate AI context", () => {
   const projected = followUpToResearchCandidate(followUp);
   const checklist = resolveResearchChecklist(projected);
   const summary = render("pl", <CandidateDetailView candidate={null} followUp={followUp} initialOwnerPromotionStatus={null} />);
@@ -204,7 +205,7 @@ test("the canonical Follow-up read model receives the same Summary master and AI
   assert.equal(projected.marketCap, followUp.market_metrics.market_cap_usd);
   assert.match(summary, new RegExp(`data-research-current-step-cta="${checklist.current_step}"`));
   assert.equal((summary.match(/data-research-step-nav="[1-7]"/g) ?? []).length, 7);
-  assert.match(ai, new RegExp(`data-research-playbook-current-step="${checklist.current_step}"`));
+  assert.doesNotMatch(ai, /data-research-playbook-current-step=/);
   assert.match(verification, /data-research-playbook-context="verification"/);
   assert.match(verification, /sprawdzany punkt: Honeypot/);
 });
@@ -229,10 +230,10 @@ test("canonical document and AI boundary prohibit competing Playbook ownership",
     ].map((file) => readFile(resolve(root, "docs", file), "utf8")),
   ]);
   assert.match(document, /AUTHORITATIVE/);
-  assert.match(document, /AIKINTEL is not the runtime host/);
+  assert.match(document, /AI answers what follows from verified stored data/);
   assert.match(document, /Deal Breakers rule/);
   assert.match(checklist, /function resolveResearchChecklist/);
-  assert.match(aiSection, /playbookContext/);
+  assert.doesNotMatch(aiSection, /playbookContext/);
   assert.doesNotMatch(aiCanvas, /ResearchPlaybookProgressTracker/);
   assert.match(readme, /canonical_product_information_architecture/);
   assert.match(roadmap, /canonical_product_information_architecture/);

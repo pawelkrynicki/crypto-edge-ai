@@ -130,9 +130,9 @@ const EVM_TOKEN_CHAINS = new Set<SupportedTokenChain>([
 ]);
 const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 const NEXT_ACTION_LABELS: Record<TokenLifecycleNextActionType, string> = {
-  automatic_enrollment: "Automatic enrollment during the next central data cycle",
-  automatic_checkpoint: "Automatic checkpoint",
-  owner_decision: "Owner decision",
+  automatic_enrollment: "Assessment with a future central data cycle",
+  automatic_checkpoint: "Data reassessment at the checkpoint",
+  owner_decision: "Product decision",
   main_radar_monitoring: "Main Radar monitoring",
   resolve_identity: "Complete chain and contract address",
   restore_follow_up_data: "Restore read-only Follow-up data",

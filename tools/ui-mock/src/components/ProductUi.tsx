@@ -131,16 +131,19 @@ export function StatusBadge({
   children,
   tone = "neutral",
   className = "",
+  "aria-label": ariaLabel,
 }: {
   children: ReactNode;
   tone?: ProductStatusTone;
   className?: string;
+  "aria-label"?: string;
 }) {
   return (
     <span
       className={`product-status-badge ${tone} ${className}`.trim()}
       data-status-tone={tone}
       data-interaction="status"
+      aria-label={ariaLabel}
     >
       <span className="product-status-indicator" aria-hidden="true" />
       <span>{children}</span>

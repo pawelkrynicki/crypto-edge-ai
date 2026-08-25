@@ -112,8 +112,10 @@ test("PC.3A focus mode stays in Candidate Detail and Verification remains a boun
   assert.equal((drawer.match(/role="tab"/g) ?? []).length, 6);
   assert.match(drawer, /id="verification-tab-security"[^>]*aria-selected="true"/);
   assert.match(drawer, /data-research-playbook-context="verification"/);
-  assert.match(drawer, /Current stage: 2\/7 — Deal breakers/);
-  assert.match(drawer, /Tool for step 3\/7: Security \/ 3 checks/);
+  assert.match(drawer, /Manual verification context/);
+  assert.match(drawer, /Area: Security \/ 3 checks/);
+  assert.doesNotMatch(drawer, /Current stage: 2\/7/);
+  assert.doesNotMatch(drawer, /Tool for step 3\/7/);
   assert.doesNotMatch(drawer, /id="research-checklist-step-3"/);
   assert.doesNotMatch(drawer, /research-focus-drawer/);
   assert.match(normalDrawer, /external-checks-list/, "normal Data and sources keeps the external-card wall");

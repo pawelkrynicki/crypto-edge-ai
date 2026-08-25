@@ -17,12 +17,12 @@ export function AIProductionAnalysisCanvas({
     eyebrow: "ANALIZA AI", title: "Podsumowanie", summary: "CO Z TEGO WYNIKA TERAZ", findings: "NAJWAŻNIEJSZE POTWIERDZONE INFORMACJE", risks: "RYZYKA", missing: "NAJWAŻNIEJSZE BRAKI W DANYCH",
     context: "KONTEKST DANYCH", next: "NASTĘPNE KROKI RESEARCHU", futureNext: "JEŚLI TOKEN PRZEJDZIE KROK 1", futureNextSupport: "Po spełnieniu podstawowych filtrów kolejnym etapem będzie weryfikacja bezpieczeństwa.", futureNextPreview: "PODGLĄD KOLEJNEGO ETAPU", reassessment: "KIEDY WARTO WRÓCIĆ DO ANALIZY", evidence: "ŹRÓDŁA I DOWODY", market: "Rynek", security: "Bezpieczeństwo", liquidity: "Płynność", holders: "Holderzy",
     generated: "Przygotowano", snapshot: "Migawka danych", fresh: "Świeża", stale: "Wymaga odświeżenia", empty: "Brak dodatkowych danych w tej migawce.", boundary: "Analiza opiera się wyłącznie na zapisanych danych i służy do researchu, nie stanowi rekomendacji inwestycyjnej.",
-    guidance: "ETAP RESEARCHU", posture: "STAN RESEARCHU", blockers: "CO BLOKUJE DALSZY RESEARCH", actions: "CO ZROBIĆ TERAZ", why: "Dlaczego", resolves: "Co to rozstrzygnie", filterFailures: "DOKŁADNE WYNIKI FILTRÓW", details: "SZCZEGÓŁY ANALIZY",
+    guidance: "BIEŻĄCA OCENA AI", posture: "STAN OCENY", blockers: "CO BLOKUJE DALSZY RESEARCH", actions: "CO ZROBIĆ TERAZ", why: "Dlaczego", resolves: "Co to rozstrzygnie", filterFailures: "DOKŁADNE WYNIKI FILTRÓW", details: "SZCZEGÓŁY ANALIZY",
   } : {
     eyebrow: "AI ANALYSIS", title: "Summary", summary: "WHAT THIS MEANS NOW", findings: "KEY CONFIRMED FINDINGS", risks: "RISKS", missing: "HIGHEST-IMPACT DATA GAPS",
     context: "DATA CONTEXT", next: "NEXT RESEARCH STEPS", futureNext: "IF THE TOKEN PASSES STEP 1", futureNextSupport: "After the basic filters are met, the next stage will be security verification.", futureNextPreview: "NEXT-STAGE PREVIEW", reassessment: "WHEN TO REVISIT THE ANALYSIS", evidence: "SOURCES AND EVIDENCE", market: "Market", security: "Security", liquidity: "Liquidity", holders: "Holders",
     generated: "Generated", snapshot: "Data snapshot", fresh: "Fresh", stale: "Refreshing", empty: "No additional data in this snapshot.", boundary: "This analysis uses recorded data only and is for research, not investment advice.",
-    guidance: "RESEARCH STAGE", posture: "RESEARCH POSTURE", blockers: "WHAT BLOCKS FURTHER RESEARCH", actions: "WHAT TO DO NOW", why: "Why", resolves: "What this check should resolve", filterFailures: "EXACT FILTER RESULTS", details: "ANALYSIS DETAILS",
+    guidance: "CURRENT AI ASSESSMENT", posture: "ASSESSMENT STATE", blockers: "WHAT BLOCKS FURTHER RESEARCH", actions: "WHAT TO DO NOW", why: "Why", resolves: "What this check should resolve", filterFailures: "EXACT FILTER RESULTS", details: "ANALYSIS DETAILS",
   };
   return (
     <article className="ai-research-canvas ai-production-analysis" aria-labelledby="ai-production-analysis-title">

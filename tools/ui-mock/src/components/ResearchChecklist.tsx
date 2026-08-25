@@ -154,7 +154,9 @@ export function ResearchChecklistSummary({
   }, [candidate.chain, candidate.contractAddress, focusOnMount]);
   return <section id="research-playbook-summary" tabIndex={focusOnMount ? -1 : undefined} data-research-playbook-focused={focusOnMount ? "true" : undefined} className="research-checklist-summary" aria-label={pl ? "Research playbook" : "Research playbook"}>
     <header><span>{pl ? "RESEARCH PLAYBOOK" : "RESEARCH PLAYBOOK"}</span><button type="button" className="research-current-step-cta" data-research-current-step-cta={view.current_step} onClick={() => onOpenStep?.(view.current_step)} onKeyDown={(event) => handleResearchStepKeyDown(event, view.current_step, onOpenStep)} aria-label={openStepLabel(view.current_step, locale)}>{pl ? `Krok ${view.current_step}/7 — ${stepName(view.current_step, locale)}` : `Step ${view.current_step}/7 — ${stepName(view.current_step, locale)}`}</button></header>
-    <p>{pl ? "KOMPLETNOŚĆ RESEARCHU" : "RESEARCH COMPLETENESS"}: <b>{view.completeness.resolved_checks} / {view.completeness.total_checks}</b> ({view.completeness.percentage}%)</p>
+    <p>{pl
+      ? <>Rozstrzygnięto <b>{view.completeness.resolved_checks} z {view.completeness.total_checks}</b> kontroli ({view.completeness.percentage}%).</>
+      : <><b>{view.completeness.resolved_checks} of {view.completeness.total_checks}</b> checks resolved ({view.completeness.percentage}%).</>}</p>
     <ResearchPlaybookProgressTracker currentStep={view.current_step} stageStates={new Map(view.steps.map((step) => [step.number, step.state] as const))} locale={locale} />
     <ResearchKeyToolsOverview view={view} candidate={candidate} locale={locale} onOpenStep={onOpenStep} />
     <ol>{view.steps.map((step) => <li key={step.number} className={step.number === view.current_step ? "current" : ""}><button type="button" className="research-step-nav" data-research-step-nav={step.number} onClick={() => onOpenStep?.(step.number)} onKeyDown={(event) => handleResearchStepKeyDown(event, step.number, onOpenStep)} aria-label={openStepLabel(step.number, locale)}><span>{step.number}. {stepName(step.number, locale)}</span><ResearchStateBadge state={step.state} compact labelOverride={isIncompleteFinalStep(step) ? researchIncompleteName(locale) : undefined} /></button></li>)}</ol>
@@ -162,12 +164,10 @@ export function ResearchChecklistSummary({
 }
 
 /**
- * A small presentation-only overlay for surfaces that assist research without
- * owning it. The current step always comes from the same actor-private
- * Checklist read model as the Summary master.
+ * A small presentation-only overlay for a verification route opened from the
+ * Playbook. The Playbook remains the only owner of current-step progress.
  */
 export function ResearchPlaybookContext({
-  candidate,
   onOpenPlaybook,
   focusedStep = null,
   verificationCheck,
@@ -179,14 +179,13 @@ export function ResearchPlaybookContext({
   verificationCheck?: "honeypot" | null;
   surface: "ai" | "verification";
 }) {
-  const view = useResearchChecklist(candidate);
   const { locale } = useProductLocale();
   const pl = locale === "pl";
-  return <section className={`research-playbook-context research-playbook-context--${surface}`} data-research-playbook-context={surface} data-research-playbook-current-step={view.current_step}>
+  return <section className={`research-playbook-context research-playbook-context--${surface}`} data-research-playbook-context={surface}>
     <div>
       <span>{pl ? "RESEARCH PLAYBOOK" : "RESEARCH PLAYBOOK"}</span>
-      <strong>{pl ? `Aktualny etap: ${view.current_step}/7 — ${stepName(view.current_step, locale)}` : `Current stage: ${view.current_step}/7 — ${stepName(view.current_step, locale)}`}</strong>
-      {focusedStep && <p>{pl ? `Narzędzie dla kroku ${focusedStep}/7: ${stepName(focusedStep, locale)}` : `Tool for step ${focusedStep}/7: ${stepName(focusedStep, locale)}`}{verificationCheck === "honeypot" ? (pl ? " · sprawdzany punkt: Honeypot." : " · check: Honeypot.") : ""}</p>}
+      <strong>{pl ? "Kontekst ręcznej weryfikacji" : "Manual verification context"}</strong>
+      {focusedStep && <p>{pl ? `Obszar: ${stepName(focusedStep, locale)}` : `Area: ${stepName(focusedStep, locale)}`}{verificationCheck === "honeypot" ? (pl ? " · sprawdzany punkt: Honeypot." : " · check: Honeypot.") : ""}</p>}
     </div>
     {onOpenPlaybook && <ActionButton variant="secondary" onClick={onOpenPlaybook}>{surface === "verification" ? (pl ? "Wróć do Research Playbook" : "Return to Research Playbook") : (pl ? "Otwórz Research Playbook" : "Open Research Playbook")}</ActionButton>}
   </section>;
@@ -644,8 +643,8 @@ function ResearchKeyToolsOverview({ view, candidate, locale, onOpenStep }: {
 }) {
   const pl = locale === "pl";
   const tools = resolveKeyResearchTools(view);
-  return <section className="research-global-key-tools" data-research-global-tools aria-label={pl ? "Główne kontrole" : "Key checks"}>
-    <header><h4>{pl ? "Główne kontrole" : "Key checks"}</h4><span>{pl ? "4 narzędzia" : "4 tools"}</span></header>
+  return <section className="research-global-key-tools" data-research-global-tools aria-label={pl ? "Główne narzędzia researchu" : "Core research tools"}>
+    <header><h4>{pl ? "Główne narzędzia researchu" : "Core research tools"}</h4><span>{pl ? `${tools.length} narzędzia` : `${tools.length} tools`}</span></header>
     <div>{tools.map((item) => {
       const tool = item.manual_external_tool;
       const content = <><strong>{keyToolName(tool, locale)}</strong><span>{simpleToolStatus(item, candidate, locale)}</span></>;
@@ -725,7 +724,7 @@ function useResearchChecklistWithReload(candidate: UiTokenCandidate): { view: Re
 function ResearchProgress({ view }: { view: ResearchChecklistView }) {
   const { locale } = useProductLocale();
   const pl = locale === "pl";
-  return <div className="research-progress"><span>{pl ? "KOMPLETNOŚĆ RESEARCHU" : "RESEARCH COMPLETENESS"}</span><strong>{view.completeness.resolved_checks} / {view.completeness.total_checks}</strong><div aria-hidden="true"><i style={{ width: `${view.completeness.percentage}%` }} /></div></div>;
+  return <div className="research-progress"><span>{pl ? "Rozstrzygnięte kontrole" : "Resolved checks"}</span><strong>{pl ? `${view.completeness.resolved_checks} z ${view.completeness.total_checks}` : `${view.completeness.resolved_checks} of ${view.completeness.total_checks}`}</strong><div aria-hidden="true"><i style={{ width: `${view.completeness.percentage}%` }} /></div></div>;
 }
 
 function ResearchItem({ item, candidate, locale, writable = false, onSaved, incompleteResearch = false }: { item: ResearchChecklistItem; candidate?: UiTokenCandidate; locale: "pl" | "en"; writable?: boolean; onSaved?: () => Promise<void>; incompleteResearch?: boolean }) {

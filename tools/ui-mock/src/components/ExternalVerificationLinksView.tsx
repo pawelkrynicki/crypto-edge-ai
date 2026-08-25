@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   buildExternalVerificationTargets,
   normalizeExternalVerificationInput,
+  resolveManualResearchTarget,
   type ExternalVerificationInput,
   type ExternalVerificationTarget,
 } from "../externalVerificationTargets";
@@ -31,6 +32,7 @@ import { ActionButton, CopyButton, ExternalLinkAction } from "./ProductUi";
 import { TokenDetailDrawer } from "./TokenDetailDrawer";
 import { TokenDetailTabPanel, TokenDetailTabs } from "./TokenDetailTabs";
 import { ManualSourceGuidance, ResearchManualEvidencePanel, ResearchPlaybookContext, type ManualSourceGuidanceTopic } from "./ResearchChecklist";
+import { getVerificationMissingTargetPresentation, resolveVerificationMissingTarget, type VerificationMissingTarget } from "../verificationMissingItemTargets";
 
 const VERIFICATION_DRAWER_TAB_IDS = ["identity", "market", "filters", "security", "data", "decision"] as const;
 export type VerificationDrawerTabId = (typeof VERIFICATION_DRAWER_TAB_IDS)[number];
@@ -49,6 +51,10 @@ interface ExternalVerificationLinksViewProps {
   focusedResearchCheck?: "honeypot" | null;
   /** Returns from the focused checklist step to Candidate Detail > Summary. */
   onBackToResearchPlaybook?: () => void;
+  focusedMissingTarget?: VerificationMissingTarget | null;
+  decisionOrigin?: boolean;
+  onOpenMissingTarget?: (target: VerificationMissingTarget) => void;
+  onReturnToDecision?: () => void;
 }
 
 export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksViewProps> = ({
@@ -62,6 +68,10 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
   focusedResearchStep = null,
   focusedResearchCheck = null,
   onBackToResearchPlaybook,
+  focusedMissingTarget = null,
+  decisionOrigin = false,
+  onOpenMissingTarget,
+  onReturnToDecision,
 }) => {
   const { locale, t } = useProductLocale();
   const chain = candidate?.chain ?? followUp?.chain ?? "";
@@ -72,7 +82,9 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
   // the shared Playbook resolver instead of hiding context when the token is
   // not present in the current scanner batch.
   const researchCandidate = candidate ?? (followUp ? followUpToResearchCandidate(followUp) : null);
-  const [activeTab, setActiveTab] = useState<VerificationDrawerTabId>(focusedResearchStep === 3 ? "security" : initialActiveTab);
+  const focusedMissingMapping = focusedMissingTarget ? getVerificationMissingTargetPresentation(focusedMissingTarget) : null;
+  const focusedMissingTab = focusedMissingMapping?.tab ?? null;
+  const [activeTab, setActiveTab] = useState<VerificationDrawerTabId>(focusedMissingMapping?.tab ?? (focusedResearchStep === 3 ? "security" : initialActiveTab));
   const [verdict, setVerdict] = useState<ManualVerificationVerdict | null>(null);
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
@@ -93,6 +105,18 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
     });
     return () => { cancelled = true; };
   }, [chain, contractAddress]);
+
+  useEffect(() => {
+    if (!focusedMissingTab || typeof window === "undefined") return;
+    const frame = window.requestAnimationFrame(() => setActiveTab(focusedMissingTab));
+    return () => window.cancelAnimationFrame(frame);
+  }, [focusedMissingTab]);
+
+  useEffect(() => {
+    if (!focusedMissingTarget || typeof document === "undefined") return;
+    const frame = window.requestAnimationFrame(() => document.getElementById(`verification-target-${focusedMissingTarget}`)?.focus());
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeTab, focusedMissingTarget]);
 
   const fallbackMissing = useMemo(() => candidate?.missingData ?? followUp?.missing_data ?? [], [candidate?.missingData, followUp?.missing_data]);
   const fallbackAvailable = useMemo(() => {
@@ -159,6 +183,7 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
   if (activeTab === "identity") {
     activeContent = (
       <VerificationSection heading={tabCopy.identity} detail={locale === "pl" ? "Potwierdź tożsamość tokena przed oceną danych i ryzyka." : "Confirm the token identity before evaluating market data and risk."}>
+        {focusedMissingTarget && <VerificationMissingTargetFocus target={focusedMissingTarget} chain={chain} contractAddress={contractAddress} locale={locale} onReturnToDecision={decisionOrigin ? onReturnToDecision : undefined} />}
         <div className="product-detail-grid data verification-identity-grid">
           <VerificationMetric label={locale === "pl" ? "Nazwa" : "Name"} value={displayName || missingText} />
           <VerificationMetric label={locale === "pl" ? "Symbol" : "Symbol"} value={symbol || missingText} />
@@ -196,6 +221,7 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
   } else if (activeTab === "security") {
     activeContent = (
       <VerificationSection heading={tabCopy.security} detail={locale === "pl" ? "Brak kontroli jest pokazany jako brak danych — nie jako bezpieczny wynik." : "A missing control is shown as missing data, never as a safe result."}>
+        {focusedMissingTarget && <VerificationMissingTargetFocus target={focusedMissingTarget} chain={chain} contractAddress={contractAddress} locale={locale} onReturnToDecision={decisionOrigin ? onReturnToDecision : undefined} />}
         {followUp && !candidate ? (
           <div className="external-checks-review-grid">
             <VerificationMetric label={locale === "pl" ? "Status bezpieczeństwa" : "Security status"} value={formatFollowUpSecuritySummary(followUp.security_status, locale)} />
@@ -229,6 +255,7 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
   } else if (activeTab === "data") {
     activeContent = (
       <VerificationSection heading={tabCopy.data} detail={locale === "pl" ? "Źródła są opisane i linkowane; otwarcie oraz zmiana zakładki nie wykonują połączeń do dostawców." : "Sources are described and linked; opening and switching tabs do not call providers."}>
+        {focusedMissingTarget && <VerificationMissingTargetFocus target={focusedMissingTarget} chain={chain} contractAddress={contractAddress} locale={locale} onReturnToDecision={decisionOrigin ? onReturnToDecision : undefined} />}
         <div className="product-detail-grid data">
           <VerificationMetric label={locale === "pl" ? "Źródło danych rynkowych i filtrów" : "Market and filter source"} value={candidate ? formatProductSourceLabel(candidate.source) : formatFollowUpMarketSource(locale)} />
           <VerificationMetric label={locale === "pl" ? "Timestamp danych" : "Data timestamp"} value={marketObservedAt ? formatProductDateTime(marketObservedAt, locale) : missingText} />
@@ -260,6 +287,7 @@ export const ExternalVerificationLinksView: React.FC<ExternalVerificationLinksVi
         saveSucceeded={saveSucceeded}
         onSave={save}
         onReturnToDetail={onReturnToDetail}
+        onOpenMissingTarget={onOpenMissingTarget}
       />
     );
   }
@@ -300,6 +328,7 @@ function VerificationDecision({
   saveSucceeded,
   onSave,
   onReturnToDetail,
+  onOpenMissingTarget,
 }: {
   candidate: UiTokenCandidate | null | undefined;
   locale: ProductLocale;
@@ -315,6 +344,7 @@ function VerificationDecision({
   saveSucceeded: boolean;
   onSave: () => Promise<void>;
   onReturnToDetail?: () => void;
+  onOpenMissingTarget?: (target: VerificationMissingTarget) => void;
 }) {
   const pl = locale === "pl";
   return (
@@ -337,7 +367,7 @@ function VerificationDecision({
 
       <section className="verification-decision-impact"><strong>{pl ? "Podsumowanie skutków decyzji" : "Decision impact summary"}</strong><p>{verdict ? decisionImpactCopy(verdict, locale) : (pl ? "Wybierz decyzję, aby zobaczyć jej skutki." : "Choose a decision to see its impact.")}</p></section>
 
-      <section className="verification-decision-coverage"><div className="condition-list ready"><strong>{pl ? "Dostępne" : "Available"}</strong><ul>{availableData.map((item) => <li key={item}>{formatCoverageItem(item, locale)}</li>)}</ul></div><div className="condition-list warning"><strong>{pl ? "Brakujące" : "Missing"}</strong>{formatVerificationEvidenceItems(missingData, locale).length > 0 ? <ul>{formatVerificationEvidenceItems(missingData, locale).map((item) => <li key={item}>{item}</li>)}</ul> : <p>{pl ? "Brak" : "None"}</p>}</div></section>
+      <section className="verification-decision-coverage"><div className="condition-list ready"><strong>{pl ? "Dostępne" : "Available"}</strong><ul>{availableData.map((item) => <li key={item}>{formatCoverageItem(item, locale)}</li>)}</ul></div><div className="condition-list warning"><strong>{pl ? "Brakujące" : "Missing"}</strong>{missingData.length > 0 ? <ul>{missingData.map((item) => <MissingDecisionItem key={item} value={item} locale={locale} onOpenMissingTarget={onOpenMissingTarget} />)}</ul> : <p>{pl ? "Brak" : "None"}</p>}</div></section>
 
       {candidate && <ResearchManualEvidencePanel candidate={candidate} />}
 
@@ -371,6 +401,35 @@ function VerificationFilterRow({ category, state, value, reasons, advisory, loca
   const copy = filterCopy(category, locale);
   const stateLabel = state === "passed" ? locale === "pl" ? "Spełniony" : "Passed" : state === "failed" ? locale === "pl" ? "Niespełniony" : "Failed" : locale === "pl" ? "Brak danych" : "Missing data";
   return <article className={`condition-list ${state === "passed" ? "ready" : state === "failed" ? "warning" : "neutral"}`}><strong>{copy.label}</strong><p>{stateLabel}</p><dl><div><dt>{locale === "pl" ? "Wartość" : "Value"}</dt><dd>{value}</dd></div><div><dt>{locale === "pl" ? "Próg" : "Threshold"}</dt><dd>{copy.threshold}</dd></div></dl>{advisory && <p className="filter-preferred-advisory">{advisory}</p>}{reasons.length > 0 && <p>{reasons.join(", ")}</p>}</article>;
+}
+
+function MissingDecisionItem({ value, locale, onOpenMissingTarget }: { value: string; locale: ProductLocale; onOpenMissingTarget?: (target: VerificationMissingTarget) => void }) {
+  const mapping = resolveVerificationMissingTarget(value);
+  const label = mapping ? mapping.label[locale] : formatCoverageItem(value, locale);
+  if (!mapping || !onOpenMissingTarget) return <li><span>{label}</span><small>{locale === "pl" ? "Sprawdź ten brak w odpowiedniej zakładce Weryfikacji." : "Check this gap in the relevant Verification tab."}</small></li>;
+  return <li><button type="button" className="verification-missing-link" onClick={() => onOpenMissingTarget(mapping.target)} aria-label={locale === "pl" ? `Otwórz kontrolę: ${label}` : `Open check: ${label}`}>{label}</button></li>;
+}
+
+function VerificationMissingTargetFocus({ target, chain, contractAddress, locale, onReturnToDecision }: { target: VerificationMissingTarget; chain: string; contractAddress: string; locale: ProductLocale; onReturnToDecision?: () => void }) {
+  const presentation = getVerificationMissingTargetPresentation(target);
+  const topic: ManualSourceGuidanceTopic = target === "honeypot" ? "honeypot"
+    : target === "liquidity_lock" ? "liquidity"
+      : target === "top10_wallets" || target === "bubblemaps" ? "holders"
+        : "explorer";
+  const pl = locale === "pl";
+  const manualTool = target === "honeypot" ? "honeypot"
+    : target === "top10_wallets" || target === "bubblemaps" ? "bubblemaps"
+      : target === "tokensniffer" ? "tokensniffer"
+        : target === "defi_scanner" ? "defi_scanner"
+          : null;
+  const manualTarget = manualTool ? resolveManualResearchTarget(manualTool, { chain, contractAddress }) : null;
+  return <section id={`verification-target-${target}`} tabIndex={-1} className="verification-target-focus" data-verification-target={target}>
+    <strong>{pl ? `Sprawdź: ${presentation.label.pl}` : `Check: ${presentation.label.en}`}</strong>
+    <p>{pl ? "To jest dokładne miejsce kontroli wybrane z brakujących danych w decyzji weryfikacyjnej." : "This is the exact check selected from missing evidence in the verification decision."}</p>
+    <ManualSourceGuidance topic={topic} locale={locale} />
+    {manualTarget?.official_url && <ExternalLinkAction variant="secondary" href={manualTarget.official_url}>{pl ? `Otwórz kontrolę: ${presentation.label.pl}` : `Open check: ${presentation.label.en}`}</ExternalLinkAction>}
+    {onReturnToDecision && <ActionButton variant="tertiary" onClick={onReturnToDecision}>{pl ? "Wróć do decyzji weryfikacyjnej" : "Return to verification decision"}</ActionButton>}
+  </section>;
 }
 
 function filterAdvisory(category: BasicFilterCategory, notes: readonly string[], locale: ProductLocale): string | null {
@@ -525,7 +584,7 @@ function formatFollowUpManualState(status: string, missingData: readonly string[
 }
 
 function formatFollowUpMarketSource(locale: ProductLocale): string {
-  return locale === "pl" ? "Brak informacji o źródle" : "No source information";
+  return locale === "pl" ? "Źródło zachowanej obserwacji nie zostało zapisane" : "The source of the retained observation was not stored";
 }
 
 function formatLiquidityLock(locked: boolean | null | undefined, days: number | null | undefined, locale: ProductLocale): string {

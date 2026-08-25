@@ -35,6 +35,22 @@ export type ProductFilterThreshold = {
   format: "usd" | "percent" | "days";
 };
 
+/** Public filter requirements are display metadata owned beside the resolver,
+ * never a second pass/fail engine. Preferred ranges remain non-blocking. */
+export type ProductFilterRequirement = { hard: string; preferred: string | null };
+
+const FILTER_REQUIREMENTS: Record<BasicFilterCategory, ProductFilterRequirement> = {
+  market_cap: { hard: "$300K–$10M", preferred: null },
+  volume_24h: { hard: "≥ $30K", preferred: null },
+  liquidity: { hard: "≥ $30K", preferred: null },
+  volume_market_cap_ratio: { hard: "1%–100%", preferred: "5%–30%" },
+  pair_age: { hard: "> 7 days", preferred: "14–90 days" },
+};
+
+export function getProductFilterRequirement(category: BasicFilterCategory): ProductFilterRequirement {
+  return FILTER_REQUIREMENTS[category];
+}
+
 export type ProductFilterResolverInput = {
   basicFilterStatus: string;
   filterReasons: readonly string[];
@@ -130,6 +146,35 @@ export function resolveProductFilterConditions(
     informationalReasons,
     unknownReasons,
   };
+}
+
+/**
+ * Read-only presentation of the values in the current accepted snapshot.
+ * Follow-up retains the checkpoint result separately, so this never feeds
+ * lifecycle, reclassification, or a new checkpoint write.
+ */
+export function resolveCurrentProductFilterConditions(input: {
+  marketCap: number | null;
+  fdvUsd: number | null;
+  volume24h: number | null;
+  liquidity: number | null;
+  volumeMarketCapRatio: number | null;
+  pairAgeDays: number | null;
+}): BasicFilterConditionResolution[] {
+  const threshold = (reason: keyof typeof HARD_FILTER_THRESHOLD_BY_REASON) => HARD_FILTER_THRESHOLD_BY_REASON[reason].value;
+  const state = (value: number | null, minimumReason: keyof typeof HARD_FILTER_THRESHOLD_BY_REASON, maximumReason?: keyof typeof HARD_FILTER_THRESHOLD_BY_REASON, strictlyAbove = false): BasicFilterConditionState => {
+    if (value === null || !Number.isFinite(value)) return "unknown";
+    const minimum = threshold(minimumReason);
+    const maximum = maximumReason ? threshold(maximumReason) : null;
+    return (strictlyAbove ? value > minimum : value >= minimum) && (maximum === null || value <= maximum) ? "passed" : "failed";
+  };
+  return [
+    { category: "market_cap", state: state(input.marketCap ?? input.fdvUsd, "market_cap_below_300000", "market_cap_above_10000000"), failureReasons: [] },
+    { category: "volume_24h", state: state(input.volume24h, "volume_24h_below_30000"), failureReasons: [] },
+    { category: "liquidity", state: state(input.liquidity, "liquidity_below_30000"), failureReasons: [] },
+    { category: "volume_market_cap_ratio", state: state(input.volumeMarketCapRatio, "volume_market_cap_ratio_below_1_percent", "volume_market_cap_ratio_above_100_percent"), failureReasons: [] },
+    { category: "pair_age", state: state(input.pairAgeDays, "pair_age_not_above_7_days", undefined, true), failureReasons: [] },
+  ];
 }
 
 export const SUPPORTED_HARD_FILTER_REASONS = Object.freeze(

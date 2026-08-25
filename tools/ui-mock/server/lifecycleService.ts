@@ -168,6 +168,22 @@ export function createLifecycleService(options: {
     }
   }
 
+  async function clearPrivateStatus(input: {
+    chain: string;
+    contractAddress: string;
+    session: Pc1SessionContext;
+  }): Promise<LifecycleTokenView & { removed: boolean }> {
+    if (!input.session.capabilities.includes("CAMP_USER_WORKSPACE_WRITE")) throw new LifecycleServiceError("WORKSPACE_WRITE_FORBIDDEN", 403);
+    const view = await resolveToken(input.chain, input.contractAddress, input.session);
+    try {
+      const removed = (await workspace()).remove({ actorId: input.session.actor_id, identity: view.identity });
+      return { ...view, user_status: view.system_status, user_status_is_override: false, removed };
+    } catch (error) {
+      if (error instanceof UserWorkspaceError) throw new LifecycleServiceError(error.code, error.code === "WORKSPACE_UNAVAILABLE" ? 503 : 400);
+      throw error;
+    }
+  }
+
   async function summary(): Promise<LifecycleSummary> {
     const [inbox, followUp, universe, receipt, scanner] = await Promise.all([
       readNewInboxStore(paths.inbox),
@@ -321,7 +337,7 @@ export function createLifecycleService(options: {
       private_baskets: { new: privateNewGroup, follow_up: privateFollowUpGroup, main_radar: privateMainRadarGroup },
     };
   }
-  return { resolveToken, transition, summary, inbox, latestReceipt, workspaceIntegrity, radar };
+  return { resolveToken, transition, clearPrivateStatus, summary, inbox, latestReceipt, workspaceIntegrity, radar };
 }
 
 export type RadarCursor = { new_inbox: number; action_due: number; candidates_ready: number; observed: number; private_new: number; private_follow_up: number; private_main_radar: number };

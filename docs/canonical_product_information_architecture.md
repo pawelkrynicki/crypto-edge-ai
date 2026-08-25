@@ -84,8 +84,7 @@ applies, is the value rendered by:
 
 - Candidate Detail → Summary master;
 - Candidate Detail → Summary focused stage;
-- Candidate Detail → AI compact context;
-- Verification context when opened by a Playbook evidence action.
+- neutral Verification context when opened by a Playbook evidence action.
 
 There is no other product current-step resolver, lifecycle-derived stage,
 stored UI heuristic, hard-coded display value or provider-prose authority.
@@ -109,19 +108,68 @@ lifecycle, Radar or Established promotion.
 
 The heavy AI result remains shared and its identity never contains actor ID,
 session, private workspace or private research evidence. Candidate Detail → AI
-may render only a compact deterministic Research Playbook current-stage overlay.
-That overlay is composed from the current user's Checklist at presentation
-time; it never regenerates OpenAI, fragments the cache or mutates the stored
-canonical AI result. AI may independently show snapshot freshness, missing
-evidence, risks and server-owned next actions.
+never renders a current Playbook step, a 1/7–7/7 tracker or a stage label as
+an AI-owned state. It states its purpose plainly: it explains what follows from
+available verified data, the important risks and gaps, and what still requires
+research. It may link to the Summary master Playbook without duplicating its
+progress. AI availability distinguishes no analysis yet, queued, processing,
+ready, provider/system error and stale/new-evidence states according to the
+frozen v7 contract; absence of a request is not an error.
 
-## Freshness boundary
+## Candidate filters, security and provenance
+
+Candidate Detail → Filters presents the five canonical basic-filter facts:
+market cap, 24-hour volume, liquidity, volume/market-cap ratio and pair age.
+Each fact uses the canonical filter resolver for its current value, hard
+threshold and state. Preferred ranges are labelled non-blocking; they do not
+silently become lifecycle rules.
+
+Candidate Detail → Security separates **confirmed / available** canonical
+facts from **missing checks**. It never fabricates an unavailable security
+value, and its manual Verification CTA remains a source-checking action.
+
+Data and sources distinguishes canonical provenance from a manual destination.
+It shows a real captured source when the canonical snapshot retained it. When a
+historical Follow-up snapshot retained values and capture time but not source
+provenance, it says that simply; it never calls an external verification link
+the source of a value it did not produce. Persistence or projection vocabulary
+does not appear in normal CAMP UI.
+
+## Freshness, checkpoints and automation boundary
 
 Data freshness and Research Playbook progress are separate axes. A stale
 snapshot can be displayed next to the resolver-derived current stage; it does
 not redefine, rewind or become a second authority for that stage. Refresh is
 read-only: it loads an accepted snapshot and does not start collector,
 provider, queue, worker or OpenAI work.
+
+The header label **Last data update / Ostatnia aktualizacja danych** means the
+last accepted, published central product snapshot relevant to the view. It is
+not the time a browser read or refreshed its view. A delayed/stale state stays
+visible with the last-known-good data.
+
+A Follow-up checkpoint is a planned date to reassess data, not a guaranteed
+automatic operating-system execution. The UI shows an execution time only when
+the real automation-status contract proves one is scheduled. The central
+scheduler and collector, not a browser, create fresh data: on the VPS the
+scheduler wakes independently, one coordinator acquires the single-flight
+lock, publishes atomically and advances the product-version pointer for all
+readers.
+
+## Radar and private organization
+
+**Product Radar** is shared server-owned product state and answers which token
+to inspect. Its New, Further observation and Main Radar counts use one
+canonical basket meaning; pipeline metrics are labelled as pipeline metrics and
+never presented as competing basket totals or score-like `6/6` values.
+
+**Your Radar** is actor-private organization only. Its active state is named,
+visibly marked and accessible independently of Product Radar. CAMP users may
+move a private assignment between Further observation and Main Radar, or remove
+the private assignment. These controls use the same private-Radar component on
+Radar cards and Candidate Detail, state that the action is private-only, and
+never mutate product lifecycle, Established, shared research or another
+user's workspace.
 
 ## Evidence navigation and routes
 
@@ -146,6 +194,19 @@ context, the selected stage and the specific check. Verification always offers
 return to that same focused stage. It never embeds a full seven-stage
 Playbook in Data and sources.
 
+Missing Verification evidence uses one canonical mapping from a missing-item
+key to an exact internal check or external tool location where one exists.
+Decision items are keyboard-accessible, visibly interactive and retain
+candidate, locale and Decision origin. A focused check offers a return to the
+same Verification Decision context; an unmapped item gives truthful inline
+guidance instead of a dead link.
+
+## Reports
+
+Reports remain a backend/history and audit capability. They are not a CAMP
+frontend section: no normal sidebar item, route or product rendering exposes
+Reports, and an old `#reports` URL redirects to the canonical Radar start.
+
 ## Read/write boundaries and forbidden duplication
 
 Inspection, navigation, locale changes and refresh are read-only. Existing
@@ -160,18 +221,14 @@ private-write contracts. No future work may:
 - turn freshness into research progression;
 - duplicate Deal Breaker facts in another store.
 
-## Canonical deployment direction
+## Final RC deployment direction
 
-1. Finalize the standalone product locally.
-2. Produce the local Release Candidate.
-3. Move standalone Crypto Edge AI to the owner's VPS.
-4. Make it operate correctly and independently on the VPS.
-5. Complete full VPS regression and operational validation.
-6. Configure the tunnel/domain.
-7. AIKINTEL provides only entry, redirect or access path to standalone Crypto Edge AI.
-8. Do not rebuild Crypto Edge AI inside AIKINTEL.
-9. Final CAMP freeze.
+1. Finalize the local standalone product.
+2. Validate the local Release Candidate.
+3. Deploy it to the owner's VPS.
+4. Complete full VPS regression and operational validation.
+5. Configure the tunnel/domain.
+6. Use AIKINTEL only as the entry/redirect to Crypto Edge AI.
+7. Freeze CAMP after that validated path.
 
-Crypto Edge AI remains a standalone application. It is not being ported into
-AIKINTEL, and AIKINTEL is not the runtime host of Crypto Edge AI. After VPS
-and tunnel are complete, AIKINTEL is only an entry/redirect/access surface.
+AIKINTEL never hosts or reimplements Crypto Edge AI.

@@ -28,8 +28,10 @@ export function ResearchPlaybookProgressTracker({
     <ol className="research-playbook-progress-stages">
       {RESEARCH_PLAYBOOK_STAGES.map((stage) => {
         const state = resolveResearchPlaybookProgressState(stage.number, currentStep);
-        const stateLabel = progressStateLabel(state, locale);
         const canonicalItemState = stageStates?.get(stage.number);
+        const completedWithPartialData = state === "COMPLETED"
+          && (canonicalItemState === "MISSING_DATA" || canonicalItemState === "OPEN_EXTERNAL_TOOL");
+        const stateLabel = progressStateLabel(state, locale, completedWithPartialData);
         return <li
           key={stage.number}
           className={`research-playbook-progress-stage ${state.toLowerCase()}`}
@@ -43,7 +45,7 @@ export function ResearchPlaybookProgressTracker({
           <span className="research-playbook-progress-marker" aria-hidden="true">{progressStateMarker(state)}</span>
           <span className="research-playbook-progress-name"><b>{stage.number}</b>{stage.labels[locale]}</span>
           <span className="research-playbook-progress-state-label">{stateLabel}</span>
-          {canonicalItemState && <span className="research-playbook-progress-evidence" data-research-playbook-stage-evidence={stage.number}>{canonicalStateLabel(canonicalItemState, locale)}</span>}
+          {canonicalItemState && !completedWithPartialData && <span className="research-playbook-progress-evidence" data-research-playbook-stage-evidence={stage.number}>{canonicalStateLabel(canonicalItemState, locale)}</span>}
         </li>;
       })}
     </ol>
@@ -55,7 +57,8 @@ export function ResearchPlaybookProgressTracker({
   </section>;
 }
 
-function progressStateLabel(state: ResearchPlaybookProgressState, locale: ResearchPlaybookLocale): string {
+function progressStateLabel(state: ResearchPlaybookProgressState, locale: ResearchPlaybookLocale, completedWithPartialData = false): string {
+  if (state === "COMPLETED" && completedWithPartialData) return locale === "pl" ? "Ukończony, częściowe dane" : "Completed, partial data";
   const labels: Record<ResearchPlaybookProgressState, Record<ResearchPlaybookLocale, string>> = {
     COMPLETED: { pl: "Ukończony", en: "Completed" },
     CURRENT: { pl: "Bieżący", en: "Current" },

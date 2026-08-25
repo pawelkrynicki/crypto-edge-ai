@@ -304,7 +304,10 @@ export async function runInternalBetaCollector(
       readiness: buildDiscoveryReadiness(discovery.established, sourceHealth),
       security_candidate_limit: securityLimit,
       security_candidates_requested: securityRequested,
-      request_counts: requestCounts,
+      // Scanner metadata records only the discovery/context requests that
+      // were validated before publish. Later New-recheck work shares the
+      // client but belongs to the operational receipt, never this snapshot.
+      request_counts: { ...requestCounts },
       source_health: sourceHealth,
       context_provenance: contextProvenance,
       ...(requestCounts.goplus_security > 0

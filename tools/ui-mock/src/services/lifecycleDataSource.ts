@@ -14,6 +14,13 @@ export async function savePrivateLifecycleStatus(input: { chain: string; contrac
     return response.ok && isToken(value) ? value : null;
   } catch { return null; }
 }
+export async function clearPrivateLifecycleStatus(input: { chain: string; contractAddress: string }): Promise<LifecycleTokenView | null> {
+  try {
+    const response = await fetch("/api/lifecycle/token/status", { method: "DELETE", credentials: "same-origin", headers: { accept: "application/json", "content-type": "application/json" }, body: JSON.stringify({ chain: input.chain, contract_address: input.contractAddress }) });
+    const value = await response.json() as unknown;
+    return response.ok && isToken(value) ? value : null;
+  } catch { return null; }
+}
 export async function setLifecycleReviewRole(role: "CAMP_USER" | "OWNER"): Promise<boolean> {
   try {
     const suffix = role === "CAMP_USER" ? "camp-user" : "owner";

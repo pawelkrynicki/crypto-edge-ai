@@ -103,11 +103,9 @@ describe("AI.1 Visual Candidate Research Canvas", () => {
     const pl = render("pl", <AIResearchBriefCanvas brief={semanticBriefPl} symbol="SCOOBERT" name="Scoobert" />);
     const en = render("en", <AIResearchBriefCanvas brief={semanticBriefEn} symbol="SCOOBERT" name="Scoobert" />);
 
-    assert.match(pl, /Etap badawczy<\/span><strong>Nowe<\/strong>/);
     assert.match(pl, /Świeżość danych<\/span><strong>Nieaktualne<\/strong>/);
     assert.match(pl, /Podstawowe filtry<\/span><strong>Niewystarczające<\/strong>/);
     assert.match(pl, /Dane do oceny filtrów<\/span><strong>Wystarczające<\/strong>/);
-    assert.match(en, /Research stage<\/span><strong>New<\/strong>/);
     assert.match(en, /Data freshness<\/span><strong>Stale<\/strong>/);
     assert.match(en, /Basic filters<\/span><strong>Insufficient<\/strong>/);
     assert.match(en, /Data for filter assessment<\/span><strong>Sufficient<\/strong>/);
@@ -119,11 +117,11 @@ describe("AI.1 Visual Candidate Research Canvas", () => {
     const en = render("en", <AIResearchBriefCanvas brief={semanticBriefEn} symbol="SCOOBERT" name="Scoobert" />);
 
     for (const label of [
-      "Aktualny etap", "Nowe", "Dane nieaktualne i filtry niespełnione", "Poczekaj na świeżą migawkę",
+      "Dane nieaktualne i filtry niespełnione", "Poczekaj na świeżą migawkę",
       "Publikacja nowych danych i ponowne obliczenie filtrów",
     ]) assert.match(pl, new RegExp(label));
     for (const label of [
-      "Current stage", "New", "Data is stale and filters are not met", "Wait for a fresh snapshot",
+      "Data is stale and filters are not met", "Wait for a fresh snapshot",
       "Publication of new data and recalculation of filters",
     ]) assert.match(en, new RegExp(label));
     assert.match(pl, /data-action-variant="primary"[^>]*>[\s\S]*?Poczekaj na świeżą migawkę/);
@@ -429,7 +427,7 @@ describe("PC.2 action-first research guidance", () => {
     assert.match(markup, /Po spełnieniu podstawowych filtrów kolejnym etapem będzie weryfikacja bezpieczeństwa/);
     assert.match(markup, /PODGLĄD KOLEJNEGO ETAPU/);
     assert.match(markup, /SZCZEGÓŁY ANALIZY/);
-    assert.ok(markup.indexOf("ETAP RESEARCHU") < markup.indexOf("SZCZEGÓŁY ANALIZY"));
+    assert.ok(markup.indexOf("BIEŻĄCA OCENA AI") < markup.indexOf("SZCZEGÓŁY ANALIZY"));
   });
 
   it("does not render a duplicate seven-stage Research Playbook tracker inside AI", async () => {
@@ -459,8 +457,8 @@ describe("PC.2 action-first research guidance", () => {
     assert.doesNotMatch(enMarkup, /data-research-playbook-progress-stage=/);
     assert.doesNotMatch(plMarkup, /Krok 1\/7/);
     assert.doesNotMatch(enMarkup, /Step 1\/7/);
-    assert.match(plMarkup, /ETAP RESEARCHU/);
-    assert.match(enMarkup, /RESEARCH STAGE/);
+    assert.match(plMarkup, /BIEŻĄCA OCENA AI/);
+    assert.match(enMarkup, /CURRENT AI ASSESSMENT/);
 
     assert.equal(resolveResearchPlaybookProgressState(1, 3), "COMPLETED");
     assert.equal(resolveResearchPlaybookProgressState(3, 3), "CURRENT");

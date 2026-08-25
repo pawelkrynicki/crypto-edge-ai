@@ -873,6 +873,20 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
       return;
     }
 
+    if (req.method === "DELETE" && path === "/api/lifecycle/token/status") {
+      try {
+        const session = pc1Sessions.resolve(req);
+        if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
+        const body = validateLifecycleClearBody(await readOwnerJsonBody(req));
+        sendJson(req, res, 200, await lifecycle.clearPrivateStatus({
+          chain: body.chain,
+          contractAddress: body.contract_address,
+          session: session.context,
+        }), runtimeMode);
+      } catch (error) { sendLifecycleError(req, res, error, runtimeMode); }
+      return;
+    }
+
     if (req.method === "POST" && path === "/api/manual-verification") {
       try {
         requireResearchEvidenceMutationRequest(req);
@@ -2213,6 +2227,15 @@ function sendManualOwnerActionError(
     error: actionError.code,
     message: "Owner token action rejected",
   }, runtimeMode);
+}
+
+function validateLifecycleClearBody(value: unknown): { chain: string; contract_address: string } {
+  if (!isRecord(value) || Object.keys(value).sort().join(",") !== "chain,contract_address"
+    || typeof value.chain !== "string" || value.chain.length === 0 || value.chain.length > 32
+    || typeof value.contract_address !== "string" || value.contract_address.length === 0 || value.contract_address.length > 128) {
+    throw new LifecycleServiceError("LIFECYCLE_BODY_INVALID", 400);
+  }
+  return { chain: value.chain, contract_address: value.contract_address };
 }
 
 /**

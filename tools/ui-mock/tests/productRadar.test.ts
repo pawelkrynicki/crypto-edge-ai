@@ -753,7 +753,7 @@ describe("Product Radar owner acceptance", () => {
       candidates: [newCandidate], metadata: emptyMetadata, readiness: emptyReadiness, ageSeconds: 90, generatedAt: "2026-07-19T10:00:00.000Z", sourceIds: ["dexscreener"],
     }));
     assert.match(markup, /Status: Current/);
-    assert.match(markup, /Last updated/);
+    assert.match(markup, /LAST DATA UPDATE/);
     assert.doesNotMatch(markup, /product-freshness/);
   });
 
@@ -767,7 +767,7 @@ describe("Product Radar owner acceptance", () => {
         candidates: [newCandidate], metadata: emptyMetadata, readiness: staleReadiness, ageSeconds: 7200,
         generatedAt, freshnessStatus: "STALE", sourceIds: ["dexscreener"],
       }));
-      const label = locale === "en" ? "Last updated" : "Ostatnia aktualizacja";
+      const label = locale === "en" ? "LAST DATA UPDATE" : "OSTATNIA AKTUALIZACJA DANYCH";
       const delayed = locale === "en" ? "Delayed" : "Opóźnione";
       const timestamp = formatProductDateTime(generatedAt, locale);
       assert.match(markup, /product-stale-warning/);
@@ -855,12 +855,13 @@ describe("Product Radar owner acceptance", () => {
     assert.doesNotMatch(markup, /PASSTOKEN|LOWLIQTOKEN|FDVFALLBACKTOKEN/);
   });
 
-  it("preserves Radar, Details, Verification and Methodology while adding Reports and Control Center", async () => {
+  it("keeps Reports backend-only while preserving the normal Product navigation", async () => {
     const source = await readFile(resolve(productRoot, "src", "ProductApp.tsx"), "utf8");
-    for (const key of ["nav.radar", "nav.details", "nav.verification", "nav.reports", "nav.methodology", "nav.controlCenter"]) {
+    for (const key of ["nav.radar", "nav.details", "nav.verification", "nav.methodology", "nav.controlCenter"]) {
       assert.match(source, new RegExp(key.replace(".", "\\.")));
     }
-    assert.match(source, /"#reports":\s*"reports"/);
+    assert.doesNotMatch(source, /id:\s*"reports"/);
+    assert.match(source, /"#reports":\s*"candidate-results"/);
     assert.match(source, /groupLabel:\s*t\("nav\.groupReview"\)/);
     assert.doesNotMatch(source, /label: "(?:Token Lookup|Trusted Preview|Webinar Teaser|Feedback Notes)"/);
   });
@@ -928,7 +929,7 @@ describe("Product Radar owner acceptance", () => {
     const markup = renderToStaticMarkup(React.createElement(CandidateResultsView, {
       candidates: [newCandidate], metadata: emptyMetadata, readiness, ageSeconds: 60, sourceIds: ["dexscreener"],
     }));
-    assert.match(markup, /Automatic Follow-up enrollment is blocked until the technical identity is valid/);
+    assert.match(markup, /Follow-up assessment is blocked until the technical identity is valid/);
     assert.doesNotMatch(markup, /OBSERVATION — NEW PROJECT/);
     assert.doesNotMatch(markup, /Radar cannot read a valid scan/);
   });

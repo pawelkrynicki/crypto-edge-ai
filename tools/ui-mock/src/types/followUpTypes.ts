@@ -34,6 +34,9 @@ export type FollowUpPublicEntry = {
   last_seen_at: string;
   last_checked_at: string | null;
   market_observed_at?: string | null;
+  /** The legacy Follow-up snapshot is a valid value snapshot but did not retain a provider name. */
+  market_provenance?: "not_preserved";
+  filter_evaluated_at?: string | null;
   next_check_at: string | null;
   completed_checkpoints: number[];
   market_metrics: {

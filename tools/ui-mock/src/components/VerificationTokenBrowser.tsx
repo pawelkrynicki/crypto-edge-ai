@@ -9,6 +9,7 @@ import type { FollowUpPublicEntry } from "../types/followUpTypes";
 import type { PrivateVerificationRecord } from "../services/manualOwnerActionsDataSource";
 import type { ResearchStepNumber } from "../researchChecklistTypes";
 import type { ResearchVerificationCheck } from "../candidateDetailRoute";
+import type { VerificationMissingTarget } from "../verificationMissingItemTargets";
 import { ExternalVerificationLinksView } from "./ExternalVerificationLinksView";
 
 type VerificationTokenBrowserProps = {
@@ -24,6 +25,11 @@ type VerificationTokenBrowserProps = {
   onBackToResearchPlaybook?: () => void;
   focusedResearchStep?: ResearchStepNumber | null;
   focusedResearchCheck?: ResearchVerificationCheck | null;
+  focusedMissingTarget?: VerificationMissingTarget | null;
+  decisionOrigin?: boolean;
+  initialDecisionTab?: boolean;
+  onOpenMissingTarget?: (target: VerificationMissingTarget) => void;
+  onReturnToDecision?: () => void;
 };
 
 type VerificationListToken =
@@ -47,6 +53,11 @@ export function VerificationTokenBrowser({
   onBackToResearchPlaybook,
   focusedResearchStep = null,
   focusedResearchCheck = null,
+  focusedMissingTarget = null,
+  decisionOrigin = false,
+  initialDecisionTab = false,
+  onOpenMissingTarget,
+  onReturnToDecision,
 }: VerificationTokenBrowserProps) {
   const { locale } = useProductLocale();
   const tokens = useMemo<VerificationListToken[]>(() => {
@@ -121,6 +132,11 @@ export function VerificationTokenBrowser({
             onBackToResearchPlaybook={onBackToResearchPlaybook}
             focusedResearchStep={focusedResearchStep}
             focusedResearchCheck={focusedResearchCheck}
+            focusedMissingTarget={focusedMissingTarget}
+            decisionOrigin={decisionOrigin}
+            initialActiveTab={initialDecisionTab ? "decision" : undefined}
+            onOpenMissingTarget={onOpenMissingTarget}
+            onReturnToDecision={onReturnToDecision}
           />
         ) : (
           <section className="verification-token-drawer-placeholder" aria-label={locale === "pl" ? "Wybór tokena do weryfikacji" : "Verification token selection"}>

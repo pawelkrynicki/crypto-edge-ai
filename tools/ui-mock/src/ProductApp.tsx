@@ -8,21 +8,26 @@ import {
   resolveResearchChecklistStep,
   resolveResearchPlaybookFocus,
   resolveResearchVerificationCheck,
+  resolveVerificationDecisionOrigin,
+  resolveVerificationMissingTarget,
+  resolveVerificationTab,
   resolveRouteTokenIdentity,
   writeCandidateDetailRoute,
   writeResearchPlaybookRoute,
   writeVerificationListRoute,
+  writeVerificationDecisionRoute,
+  writeVerificationDecisionTargetRoute,
   writeVerificationRoute,
   type ResearchVerificationCheck,
   type RouteTokenIdentity,
 } from "./candidateDetailRoute";
+import type { VerificationMissingTarget } from "./verificationMissingItemTargets";
 import { CandidateDetailView } from "./components/CandidateDetailView";
 import { CandidateResultsView } from "./components/CandidateResultsView";
 import { VerificationTokenBrowser } from "./components/VerificationTokenBrowser";
 import { Feedback } from "./components/Feedback";
 import { Methodology } from "./components/Methodology";
 import { ProductControlCenter } from "./components/ProductControlCenter";
-import { ReportsLibrary } from "./components/ReportsLibrary";
 import { LoadingState } from "./components/ProductUi";
 import {
   ProductWorkspaceSection,
@@ -65,7 +70,6 @@ import {
   isSameTokenIdentity,
   resolveTokenIdentity,
 } from "./tokenLifecycle";
-import type { ReportDetail } from "./types/reportTypes";
 import type { FeedbackScreenContext, FeedbackSubjectRef } from "./services/feedbackDataSource";
 import type {
   ProductReadinessOutput,
@@ -90,7 +94,9 @@ const HASH_TO_SECTION: Record<string, ProductSectionId> = {
   "#candidate-detail": "candidate-detail",
   "#external-checks": "external-checks",
   "#feedback": "feedback",
-  "#reports": "reports",
+  // Reports are an internal/backend capability. Legacy user links return to
+  // the only safe public entry point instead of rendering a second product UI.
+  "#reports": "candidate-results",
   "#methodology": "methodology",
   "#control-center": "control-center",
 };
@@ -122,7 +128,6 @@ const SECTION_TO_HASH: Record<ProductSectionId, string> = {
   "candidate-detail": "#candidate-detail",
   "external-checks": "#external-checks",
   feedback: "#feedback",
-  reports: "#reports",
   methodology: "#methodology",
   "control-center": "#control-center",
 };
@@ -224,6 +229,9 @@ export function ProductAppContent({
   const [activeDetailTab, setActiveDetailTab] = useState<CandidateDetailTabId>(() => resolveDetailTab());
   const [focusedResearchStep, setFocusedResearchStep] = useState<ResearchStepNumber | null>(() => resolveResearchChecklistStep());
   const [focusedResearchCheck, setFocusedResearchCheck] = useState<ResearchVerificationCheck | null>(() => resolveResearchVerificationCheck());
+  const [focusedVerificationTarget, setFocusedVerificationTarget] = useState<VerificationMissingTarget | null>(() => resolveVerificationMissingTarget());
+  const [verificationDecisionOrigin, setVerificationDecisionOrigin] = useState(() => resolveVerificationDecisionOrigin());
+  const [verificationDecisionTab, setVerificationDecisionTab] = useState(() => resolveVerificationTab());
   const [focusResearchPlaybook, setFocusResearchPlaybook] = useState(() => resolveResearchPlaybookFocus());
   const [followUpStatus, setFollowUpStatus] = useState<FollowUpPublicStatus | null>(null);
   const [preferredLifecycleBasket, setPreferredLifecycleBasket] = useState<RadarBasketId | null>(null);
@@ -239,7 +247,6 @@ export function ProductAppContent({
   const [feedbackSubject, setFeedbackSubject] = useState<FeedbackSubjectRef | undefined>();
   const [feedbackSubjectLabel, setFeedbackSubjectLabel] = useState<string | undefined>();
   const [feedbackRefreshRevision, setFeedbackRefreshRevision] = useState(0);
-  const [selectedReportContext, setSelectedReportContext] = useState<ReportDetail | null>(null);
   const refreshPromiseRef = useRef<Promise<boolean> | null>(null);
   const productVersionPollerRef = useRef<ProductVersionPoller | null>(null);
   const reviewCommitAcknowledgementRef = useRef<string | null>(null);
@@ -276,7 +283,6 @@ export function ProductAppContent({
     { id: "candidate-results", label: t("nav.radar"), icon: "R", description: t("nav.radarDescription"), groupLabel: t("nav.groupProductFlow"), groupDescription: t("nav.groupProductFlowDescription") },
     { id: "candidate-detail", label: t("nav.details"), icon: "D", description: t("nav.detailsDescription"), groupLabel: t("nav.groupProductFlow"), groupDescription: t("nav.groupProductFlowDescription") },
     { id: "external-checks", label: t("nav.verification"), icon: "V", description: t("nav.verificationDescription"), groupLabel: t("nav.groupReview"), groupDescription: t("nav.groupReviewDescription") },
-    { id: "reports", label: t("nav.reports"), icon: "RP", description: t("nav.reportsDescription"), groupLabel: t("nav.groupReview"), groupDescription: t("nav.groupReviewDescription") },
     { id: "feedback", label: t("nav.feedback"), icon: "F", description: t("nav.feedbackDescription"), groupLabel: t("nav.groupReview"), groupDescription: t("nav.groupReviewDescription") },
     { id: "methodology", label: t("nav.methodology"), icon: "M", description: t("nav.methodologyDescription"), groupLabel: t("nav.groupStatus"), groupDescription: t("nav.groupStatusDescription") },
     { id: "control-center", label: t("nav.controlCenter"), icon: "C", description: t("nav.controlCenterDescription"), groupLabel: t("nav.groupStatus"), groupDescription: t("nav.groupStatusDescription") },
@@ -290,7 +296,6 @@ export function ProductAppContent({
     "candidate-results": { title: t("nav.radar"), description: t("section.radarDescription") },
     "candidate-detail": { title: t("nav.details"), description: t("section.detailsDescription") },
     "external-checks": { title: t("nav.verification"), description: t("section.verificationDescription") },
-    reports: { title: t("nav.reports"), description: t("section.reportsDescription") },
     feedback: { title: t("nav.feedback"), description: t("section.feedbackDescription") },
     methodology: { title: t("nav.methodology"), description: t("section.methodologyDescription") },
     "control-center": { title: t("nav.controlCenter"), description: t("section.controlCenterDescription") },
@@ -343,7 +348,7 @@ export function ProductAppContent({
   const workspaceGeneratedAt = resolveGlobalProductTimestamp(
     generatedAt,
     readiness?.context.generated_at,
-    selectedFollowUp?.last_seen_at,
+    null,
   );
 
   const loadData = useCallback((targetVersion: ProductVersion | null = null): Promise<boolean> => {
@@ -570,6 +575,9 @@ export function ProductAppContent({
   useEffect(() => {
     const handleRouteChange = () => {
       const requestedSection = resolveSection();
+      if (window.location.hash.trim().toLowerCase() === "#reports") {
+        window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}#candidate-results`);
+      }
       const section = resolveProductSectionForRole(
         requestedSection,
         productViewRef.current.lifecycleRadar?.actor.role,
@@ -584,6 +592,9 @@ export function ProductAppContent({
       setActiveDetailTab(resolveDetailTab());
       setFocusedResearchStep((section === "candidate-detail" || section === "external-checks") ? resolveResearchChecklistStep() : null);
       setFocusedResearchCheck(section === "external-checks" ? resolveResearchVerificationCheck() : null);
+      setFocusedVerificationTarget(section === "external-checks" ? resolveVerificationMissingTarget() : null);
+      setVerificationDecisionOrigin(section === "external-checks" && resolveVerificationDecisionOrigin());
+      setVerificationDecisionTab(section === "external-checks" ? resolveVerificationTab() : null);
       setFocusResearchPlaybook(section === "candidate-detail" && resolveResearchPlaybookFocus());
     };
     const handleHashChange = () => handleRouteChange();
@@ -615,15 +626,12 @@ export function ProductAppContent({
     if ((activeSection === "candidate-detail" || activeSection === "external-checks") && selectedCandidate) {
       setFeedbackSubject({ type: "candidate", id: selectedCandidate.id });
       setFeedbackSubjectLabel(`${selectedCandidate.symbol} · ${selectedCandidate.chain} · ${selectedCandidate.contractAddress}`);
-    } else if (activeSection === "reports" && selectedReportContext) {
-      setFeedbackSubject({ type: "report", id: selectedReportContext.report_id });
-      setFeedbackSubjectLabel(`${selectedReportContext.title} · ${selectedReportContext.report_id}`);
     } else {
       setFeedbackSubject(undefined);
       setFeedbackSubjectLabel(undefined);
     }
     navigate("feedback");
-  }, [activeSection, feedbackContext, navigate, selectedCandidate, selectedReportContext]);
+  }, [activeSection, feedbackContext, navigate, selectedCandidate]);
 
   const openCandidate = useCallback((candidateId: string) => {
     const candidate = candidates.find((entry) => entry.id === candidateId);
@@ -723,6 +731,12 @@ export function ProductAppContent({
     setActiveSection("candidate-detail");
   }, []);
 
+  useEffect(() => {
+    if (window.location.hash.trim().toLowerCase() === "#reports") {
+      window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}#candidate-results`);
+    }
+  }, []);
+
   const openVerification = useCallback((
     token: UiTokenCandidate | FollowUpPublicEntry,
     researchStep: ResearchStepNumber | null = null,
@@ -741,6 +755,9 @@ export function ProductAppContent({
     setManualVerificationRecord(null);
     setFocusedResearchStep(researchStep);
     setFocusedResearchCheck(researchCheck);
+    setFocusedVerificationTarget(null);
+    setVerificationDecisionOrigin(false);
+    setVerificationDecisionTab(null);
     setFocusResearchPlaybook(false);
     routeTokenIdentityRef.current = identity;
     setRouteTokenIdentity(identity);
@@ -751,6 +768,28 @@ export function ProductAppContent({
   const saveVerificationInPlace = useCallback((record: PrivateVerificationRecord) => {
     setManualVerificationRecord(record);
   }, []);
+
+  const openVerificationMissingTarget = useCallback((target: VerificationMissingTarget) => {
+    const identity = routeTokenIdentity;
+    if (!identity) return;
+    setFocusedResearchStep(null);
+    setFocusedResearchCheck(null);
+    setFocusedVerificationTarget(target);
+    setVerificationDecisionOrigin(true);
+    setVerificationDecisionTab(null);
+    writeVerificationDecisionTargetRoute(identity, target);
+    setActiveSection("external-checks");
+  }, [routeTokenIdentity]);
+
+  const returnToVerificationDecision = useCallback(() => {
+    const identity = routeTokenIdentity;
+    if (!identity) return;
+    setFocusedVerificationTarget(null);
+    setVerificationDecisionOrigin(false);
+    setVerificationDecisionTab("decision");
+    writeVerificationDecisionRoute(identity);
+    setActiveSection("external-checks");
+  }, [routeTokenIdentity]);
 
   const closeVerification = useCallback(() => {
     routeTokenIdentityRef.current = null;
@@ -821,22 +860,6 @@ export function ProductAppContent({
         </ProductWorkspaceSection>
       );
     }
-    if (activeSection === "reports") {
-      return (
-        <ProductWorkspaceSection {...copy}>
-          <ReportsLibrary
-            candidates={candidates}
-            onSelectedReportChange={setSelectedReportContext}
-            onOpenCandidate={openCandidate}
-            onOpenManualVerification={(candidateId) => {
-              const candidate = candidates.find((entry) => entry.id === candidateId);
-              if (candidate) openVerification(candidate);
-            }}
-          />
-        </ProductWorkspaceSection>
-      );
-    }
-
     if (loading && candidates.length === 0) {
       return (
         <ProductWorkspaceSection {...copy}>
@@ -930,6 +953,11 @@ export function ProductAppContent({
             onBackToResearchPlaybook={returnToResearchPlaybook}
             focusedResearchStep={focusedResearchStep}
             focusedResearchCheck={focusedResearchCheck}
+            focusedMissingTarget={focusedVerificationTarget}
+            decisionOrigin={verificationDecisionOrigin}
+            initialDecisionTab={verificationDecisionTab === "decision"}
+            onOpenMissingTarget={openVerificationMissingTarget}
+            onReturnToDecision={returnToVerificationDecision}
           />
         </ProductWorkspaceSection>
       );

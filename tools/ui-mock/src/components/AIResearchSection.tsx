@@ -56,7 +56,6 @@ export function AIResearchSection({
   mode = "detail",
   active = false,
   onOpen,
-  playbookContext,
 }: {
   chain: string;
   contractAddress: string;
@@ -66,8 +65,6 @@ export function AIResearchSection({
   mode?: "summary" | "detail";
   active?: boolean;
   onOpen?: () => void;
-  /** Deterministic actor-private Checklist overlay; never part of AI cache identity. */
-  playbookContext?: React.ReactNode;
 }) {
   const { locale } = useProductLocale();
   const ui = COPY[locale];
@@ -231,7 +228,6 @@ export function AIResearchSection({
         </div>
       </div>
       <span className="sr-only" role="status" aria-live="polite">{requesting ? ui.requestingStatus : ""}</span>
-      {playbookContext}
       {brief && expanded && <AIResearchBriefCanvas brief={brief} symbol={symbol} name={name} reviewMetrics={reviewMetrics} />}
       {analysis && expanded && <AIProductionAnalysisCanvas analysis={analysis} />}
     </section>
@@ -328,7 +324,7 @@ function stateTitle(value: AIResearchBriefLookup["availability"], locale: "pl" |
   }
   if (value === "COOLDOWN" || value === "RATE_LIMITED") return pl ? "Analiza AI jest chwilowo niedostępna." : "AI analysis is temporarily unavailable.";
   if (value === "INSUFFICIENT_DATA") return pl ? "Za mało danych do analizy" : "Not enough data for analysis";
-  return pl ? "Analiza nie jest jeszcze dostępna." : "The analysis is not available yet.";
+  return pl ? "Analiza AI nie została jeszcze przygotowana." : "AI analysis has not been prepared yet.";
 }
 
 function stateDetail(
@@ -354,7 +350,7 @@ function stateDetail(
 const COPY = {
   pl: {
     title: "Analiza AI",
-    intro: "Podsumowanie zweryfikowanych danych — bez sygnałów transakcyjnych.",
+    intro: "Analiza AI odpowiada, co wynika z dostępnych danych, jakie są ryzyka i braki oraz co wymaga dalszego sprawdzenia. Bez sygnałów transakcyjnych.",
     request: "Zleć analizę AI",
     retry: "Ponów zlecenie analizy",
     requesting: "Przygotowywanie analizy…",
@@ -371,7 +367,7 @@ const COPY = {
   },
   en: {
     title: "AI analysis",
-    intro: "A summary of verified data — without trading signals.",
+    intro: "AI analysis explains what follows from available data, the main risks and gaps, and what still needs checking. It never provides trading signals.",
     request: "Request analysis preparation",
     retry: "Retry analysis request",
     requesting: "Preparing analysis…",

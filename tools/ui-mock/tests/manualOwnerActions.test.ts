@@ -218,8 +218,9 @@ describe("manual owner Radar actions", () => {
       const baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
       const session = await fetch(`${baseUrl}/api/lifecycle/session`);
       assert.deepEqual(await session.json(), { actor: { role: "CAMP_USER", capabilities: ["CAMP_USER_WORKSPACE_WRITE"] } });
-      const scannerOnlyLookup = await fetch(`${baseUrl}/api/research-checklist?chain=${TEST_CANDIDATE.chain}&contract_address=${TEST_CANDIDATE.contract_address}`);
-      assert.equal(scannerOnlyLookup.status, 404, "the token exists only in canonical Follow-up, not in the latest scanner output");
+      const followUpLookup = await fetch(`${baseUrl}/api/research-checklist?chain=${TEST_CANDIDATE.chain}&contract_address=${TEST_CANDIDATE.contract_address}`);
+      assert.equal(followUpLookup.status, 200, "a canonical Follow-up-only token remains available to the Playbook after it leaves the latest scanner output");
+      assert.equal((await followUpLookup.json() as { schema_version: string }).schema_version, "research_checklist_view_v1");
       const lookup = async (cookie?: string) => fetch(`${baseUrl}/api/manual-verification?chain=${TEST_CANDIDATE.chain}&contract_address=${TEST_CANDIDATE.contract_address}`, {
         headers: cookie ? { cookie } : undefined,
       });

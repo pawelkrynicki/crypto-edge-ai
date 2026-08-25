@@ -69,7 +69,7 @@ describe("FLOW.1 visible token lifecycle contracts", () => {
       followUpEntries: [entry],
       followUpStatus: followUpStatus(),
     }));
-    assert.match(polish, /Automatyczne śledzenie jest aktywne; następny checkpoint wykona się automatycznie/);
+    assert.match(polish, /Następny checkpoint wyznacza planowany termin ponownej oceny danych/);
     assert.match(polish, /Pierwsze wykrycie/);
     assert.match(polish, /Następny checkpoint/);
     assert.match(polish, /Podstawowe filtry nie są obecnie spełnione/);
@@ -81,7 +81,7 @@ describe("FLOW.1 visible token lifecycle contracts", () => {
     const model = resolveTokenLifecycle({ candidate, followUpStatus: followUpStatus(), now: NOW });
     assert.equal(model.tracking_status, "waiting");
     assert.equal(model.next_action_type, "automatic_enrollment");
-    assert.equal(model.next_action_label, "Automatic enrollment during the next central data cycle");
+    assert.equal(model.next_action_label, "Assessment with a future central data cycle");
     assert.deepEqual(model.blocking_conditions, []);
 
     for (const locale of ["pl", "en"] as const) {
@@ -91,8 +91,8 @@ describe("FLOW.1 visible token lifecycle contracts", () => {
         followUpStatus: followUpStatus({ entries_total: 0 }),
       }));
       assert.match(markup, locale === "pl"
-        ? /Oczekuje na automatyczny zapis do Dalszej obserwacji podczas najbliższego cyklu danych\./
-        : /Waiting for automatic Follow-up enrollment during the next data cycle\./);
+        ? /Oczekuje na ocenę w przyszłym centralnym cyklu danych\./
+        : /Awaiting assessment from a future central data cycle\./);
       assert.match(markup, locale === "pl" ? /Brak blokad/ : /No blockers/);
       assert.doesNotMatch(markup, /Co blokuje przejście|What blocks progress|<dt>Następny krok<|<dt>Next action</);
       assert.doesNotMatch(markup, /error|błąd/i);
@@ -163,7 +163,7 @@ describe("FLOW.1 visible token lifecycle contracts", () => {
     assert.equal(futureModel.checkpoints[4]?.state, "future");
     const futureMarkup = render("pl", React.createElement(TokenCheckpointAxis, { model: futureModel }));
     assert.match(futureMarkup, /Zaplanowany na 31\.08\.2026/);
-    assert.match(futureMarkup, /Następne automatyczne sprawdzenie:[\s\S]*31\.08\.2026/);
+    assert.match(futureMarkup, /Następny checkpoint:[\s\S]*31\.08\.2026/);
     assert.doesNotMatch(futureMarkup, /Oczekiwany teraz/);
 
     const dueNowModel = resolveTokenLifecycle({
@@ -187,7 +187,7 @@ describe("FLOW.1 visible token lifecycle contracts", () => {
     });
     assert.match(
       render("pl", React.createElement(TokenCheckpointAxis, { model: unscheduledModel })),
-      /Brak kolejnego automatycznego sprawdzenia/,
+      /Brak kolejnego checkpointu/,
     );
   });
 
@@ -212,7 +212,7 @@ describe("FLOW.1 visible token lifecycle contracts", () => {
     assert.deepEqual(established.completed_stages, ["new", "follow_up", "candidate"]);
   });
 
-  it("renders Candidate, owner decision and completed Main Radar flow naturally in PL and EN", () => {
+  it("renders Follow-up candidate, product decision and completed Main Radar flow naturally in PL and EN", () => {
     const entry = followUpEntry({
       lifecycle_status: "CANDIDATE_FOR_ESTABLISHED",
       filter_status: "passed_basic_filter",
@@ -227,11 +227,11 @@ describe("FLOW.1 visible token lifecycle contracts", () => {
         React.createElement(TokenLifecycleStatus, { model: candidateModel }),
       ));
       const establishedMarkup = render(locale, React.createElement(TokenLifecycleFlow, { model: establishedModel }));
-      assert.match(candidateMarkup, locale === "pl" ? /Kandydat do Established/ : /Candidate for Established/);
-      assert.match(candidateMarkup, locale === "pl" ? /Decyzja właściciela/ : /Owner decision/);
-      assert.match(candidateMarkup, locale === "pl" ? /Nie dodano automatycznie/ : /not promoted automatically/i);
+      assert.match(candidateMarkup, locale === "pl" ? /Kandydat do dalszej obserwacji/ : /Follow-up candidate/);
+      assert.match(candidateMarkup, locale === "pl" ? /Decyzja produktu/ : /Product decision/);
+      assert.match(candidateMarkup, locale === "pl" ? /Przeniesienie pozostaje osobną decyzją produktu/ : /Promotion remains a separate product decision/);
       assert.match(establishedMarkup, locale === "pl" ? /Główny Radar/ : /Main Radar/);
-      assert.doesNotMatch(candidateMarkup, /CANDIDATE_FOR_ESTABLISHED|OWNER_DECISION_REQUIRED/);
+      assert.doesNotMatch(candidateMarkup, /CANDIDATE_FOR_ESTABLISHED|OWNER_DECISION_REQUIRED|właściciela|owner/i);
     }
   });
 
@@ -278,7 +278,7 @@ describe("FLOW.1 visible token lifecycle contracts", () => {
     assert.match(valid, /Weryfikacja źródłowa[\s\S]*Wymagana/);
     assert.doesNotMatch(valid, /OBSERWACJA — NOWY PROJEKT/);
     assert.doesNotMatch(valid, /Tożsamość adresu[\s\S]*Niezweryfikowana/);
-    assert.match(valid, /Automatyczny zapis w najbliższym centralnym cyklu danych/);
+    assert.match(valid, /Ocena w przyszłym centralnym cyklu danych/);
 
     const invalid = render("pl", React.createElement(CandidateDetailView, {
       candidate: productCandidate({ contractAddress: "not-an-address", addressIdentityVerified: false }),
@@ -287,7 +287,7 @@ describe("FLOW.1 visible token lifecycle contracts", () => {
     }));
     assert.match(invalid, /Tożsamość techniczna[\s\S]*Niepoprawna/);
     assert.match(invalid, /Brak poprawnego adresu kontraktu/);
-    assert.doesNotMatch(invalid, /Oczekuje na automatyczny zapis do Dalszej obserwacji/);
+    assert.doesNotMatch(invalid, /Oczekuje na ocenę w przyszłym centralnym cyklu danych/);
   });
 
   it("renders the Radar explanation as a collapsed accessible control", () => {
