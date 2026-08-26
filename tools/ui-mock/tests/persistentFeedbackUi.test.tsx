@@ -99,15 +99,12 @@ describe("Persistent Feedback product UI", () => {
     assert.doesNotMatch(component, /marked|markdown-to-jsx|react-markdown/i);
   });
 
-  it("submits the currently selected category, preserves it across locale renders and refreshes owner data", async () => {
+  it("preserves the historical feedback component contract without coupling it to normal CAMP navigation", async () => {
     assert.equal(resolveSelectedFeedbackCategory("IMPROVEMENT", "BLOCKER"), "IMPROVEMENT");
     assert.equal(resolveSelectedFeedbackCategory(null, "CLARIFICATION"), "CLARIFICATION");
     assert.equal(resolveSelectedFeedbackCategory(null, null), null);
 
-    const [component, app] = await Promise.all([
-      readFile(resolve(uiRoot, "src", "components", "Feedback.tsx"), "utf8"),
-      readFile(resolve(uiRoot, "src", "ProductApp.tsx"), "utf8"),
-    ]);
+    const component = await readFile(resolve(uiRoot, "src", "components", "Feedback.tsx"), "utf8");
     assert.match(component, /new FormData\(event\.currentTarget\)\.get\("feedback-category"\)/);
     assert.match(component, /category: selectedCategory/);
     assert.match(component, /categoryCopy\[locale\]\[receipt\.category\]\.label/);
@@ -117,20 +114,20 @@ describe("Persistent Feedback product UI", () => {
     assert.doesNotMatch(component, /useEffect\([\s\S]{0,300}setCategory/);
     assert.match(render("pl"), /value="IMPROVEMENT"/);
     assert.match(render("en"), /value="IMPROVEMENT"/);
-    assert.match(app, /refreshRevision=\{feedbackRefreshRevision\}/);
-    assert.match(app, /onFeedbackRecorded=\{refreshControlCenterAfterFeedback\}/);
     const owner = render("en", { initialOwnerStatus: { ...ownerStatus(), improvement_count: 1 } });
     assert.match(owner, /Improvements/);
     assert.match(owner, /<strong>1<\/strong>/);
   });
 
-  it("adds #feedback navigation to the INTERNAL_BETA Product Radar", async () => {
+  it("keeps the feedback backend contract while hiding it from normal INTERNAL_BETA Product Radar navigation", async () => {
     const [app, i18n] = await Promise.all([
       readFile(resolve(uiRoot, "src", "ProductApp.tsx"), "utf8"),
       readFile(resolve(uiRoot, "src", "productI18n.tsx"), "utf8"),
     ]);
-    assert.match(app, /"#feedback": "feedback"/);
-    assert.match(app, /id: "feedback"/);
+    assert.match(app, /"#feedback": "candidate-results"/);
+    assert.match(app, /"#opinion": "candidate-results"/);
+    assert.doesNotMatch(app, /id: "feedback"/);
+    assert.doesNotMatch(app, /activeSection === "feedback"/);
     assert.match(app, /groupLabel: t\("nav\.groupReview"\)/);
     assert.match(i18n, /"nav\.feedbackDescription": "Report an issue or idea"/);
     assert.match(i18n, /"nav\.feedbackDescription": "Zgłoś problem lub pomysł"/);

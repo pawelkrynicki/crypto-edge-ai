@@ -25,7 +25,6 @@ import type { VerificationMissingTarget } from "./verificationMissingItemTargets
 import { CandidateDetailView } from "./components/CandidateDetailView";
 import { CandidateResultsView } from "./components/CandidateResultsView";
 import { VerificationTokenBrowser } from "./components/VerificationTokenBrowser";
-import { Feedback } from "./components/Feedback";
 import { Methodology } from "./components/Methodology";
 import { ProductControlCenter } from "./components/ProductControlCenter";
 import { LoadingState } from "./components/ProductUi";
@@ -70,7 +69,6 @@ import {
   isSameRoutedTokenIdentity,
   resolveTokenIdentity,
 } from "./tokenLifecycle";
-import type { FeedbackScreenContext, FeedbackSubjectRef } from "./services/feedbackDataSource";
 import type {
   ProductReadinessOutput,
   UiTokenCandidate,
@@ -93,13 +91,24 @@ const HASH_TO_SECTION: Record<string, ProductSectionId> = {
   "#candidate-results": "candidate-results",
   "#candidate-detail": "candidate-detail",
   "#external-checks": "external-checks",
-  "#feedback": "feedback",
+  "#feedback": "candidate-results",
+  "#opinion": "candidate-results",
+  "#opinions": "candidate-results",
+  "#opinie": "candidate-results",
   // Reports are an internal/backend capability. Legacy user links return to
   // the only safe public entry point instead of rendering a second product UI.
   "#reports": "candidate-results",
   "#methodology": "methodology",
   "#control-center": "control-center",
 };
+
+const HIDDEN_CAMP_FRONTEND_HASHES = new Set([
+  "#reports",
+  "#feedback",
+  "#opinion",
+  "#opinions",
+  "#opinie",
+]);
 
 export function canAccessOperationalControlCenter(role: LifecycleRadarView["actor"]["role"] | undefined): boolean {
   return role === "OWNER" || role === "ADMIN";
@@ -127,7 +136,6 @@ const SECTION_TO_HASH: Record<ProductSectionId, string> = {
   "candidate-results": "#candidate-results",
   "candidate-detail": "#candidate-detail",
   "external-checks": "#external-checks",
-  feedback: "#feedback",
   methodology: "#methodology",
   "control-center": "#control-center",
 };
@@ -241,12 +249,6 @@ export function ProductAppContent({
   const [followUpEntries, setFollowUpEntries] = useState<FollowUpPublicEntry[]>([]);
   const [selectedFollowUpEntryId, setSelectedFollowUpEntryId] = useState<string | null>(null);
   const [manualVerificationRecord, setManualVerificationRecord] = useState<PrivateVerificationRecord | null>(null);
-  const [feedbackContext, setFeedbackContext] = useState<FeedbackScreenContext>(() => (
-    resolveSection() === "feedback" ? "feedback" : resolveSection()
-  ));
-  const [feedbackSubject, setFeedbackSubject] = useState<FeedbackSubjectRef | undefined>();
-  const [feedbackSubjectLabel, setFeedbackSubjectLabel] = useState<string | undefined>();
-  const [feedbackRefreshRevision, setFeedbackRefreshRevision] = useState(0);
   const refreshPromiseRef = useRef<Promise<boolean> | null>(null);
   const productVersionPollerRef = useRef<ProductVersionPoller | null>(null);
   const reviewCommitAcknowledgementRef = useRef<string | null>(null);
@@ -284,7 +286,6 @@ export function ProductAppContent({
     { id: "candidate-results", label: t("nav.radar"), icon: "R", description: t("nav.radarDescription"), groupLabel: t("nav.groupProductFlow"), groupDescription: t("nav.groupProductFlowDescription") },
     { id: "candidate-detail", label: t("nav.details"), icon: "D", description: t("nav.detailsDescription"), groupLabel: t("nav.groupProductFlow"), groupDescription: t("nav.groupProductFlowDescription") },
     { id: "external-checks", label: t("nav.verification"), icon: "V", description: t("nav.verificationDescription"), groupLabel: t("nav.groupReview"), groupDescription: t("nav.groupReviewDescription") },
-    { id: "feedback", label: t("nav.feedback"), icon: "F", description: t("nav.feedbackDescription"), groupLabel: t("nav.groupReview"), groupDescription: t("nav.groupReviewDescription") },
     { id: "methodology", label: t("nav.methodology"), icon: "M", description: t("nav.methodologyDescription"), groupLabel: t("nav.groupStatus"), groupDescription: t("nav.groupStatusDescription") },
     { id: "control-center", label: t("nav.controlCenter"), icon: "C", description: t("nav.controlCenterDescription"), groupLabel: t("nav.groupStatus"), groupDescription: t("nav.groupStatusDescription") },
   ], [t]);
@@ -297,7 +298,6 @@ export function ProductAppContent({
     "candidate-results": { title: t("nav.radar"), description: t("section.radarDescription") },
     "candidate-detail": { title: t("nav.details"), description: t("section.detailsDescription") },
     "external-checks": { title: t("nav.verification"), description: t("section.verificationDescription") },
-    feedback: { title: t("nav.feedback"), description: t("section.feedbackDescription") },
     methodology: { title: t("nav.methodology"), description: t("section.methodologyDescription") },
     "control-center": { title: t("nav.controlCenter"), description: t("section.controlCenterDescription") },
   }), [t]);
@@ -415,7 +415,6 @@ export function ProductAppContent({
       };
       productViewRef.current = nextProductView;
       setProductView(nextProductView);
-      setFeedbackRefreshRevision((value) => value + 1);
       return true;
     })().catch(() => {
       const preserved = preserveLastKnownGoodView(productViewRef.current);
@@ -490,16 +489,6 @@ export function ProductAppContent({
       setProductView(nextProductView);
     });
   }, [dataSources]);
-
-  const refreshControlCenterAfterFeedback = useCallback(() => {
-    if (!controlCenterAllowed) return;
-    void dataSources.loadControlCenter().then((value) => {
-      if (!value) return;
-      const nextProductView = { ...productViewRef.current, controlCenterStatus: value };
-      productViewRef.current = nextProductView;
-      setProductView(nextProductView);
-    });
-  }, [controlCenterAllowed, dataSources]);
 
   useEffect(() => {
     if (!loadVersionPointer) {
@@ -589,9 +578,7 @@ export function ProductAppContent({
   useEffect(() => {
     const handleRouteChange = () => {
       const requestedSection = resolveSection();
-      if (window.location.hash.trim().toLowerCase() === "#reports") {
-        window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}#candidate-results`);
-      }
+      redirectHiddenCampFrontendHash();
       const section = resolveProductSectionForRole(
         requestedSection,
         productViewRef.current.lifecycleRadar?.actor.role,
@@ -643,19 +630,6 @@ export function ProductAppContent({
       window.location.hash = SECTION_TO_HASH[permittedSection];
     }
   }, [operationalRole]);
-
-  const openFeedback = useCallback(() => {
-    const context = activeSection === "feedback" ? feedbackContext : activeSection;
-    setFeedbackContext(context);
-    if ((activeSection === "candidate-detail" || activeSection === "external-checks") && selectedCandidate) {
-      setFeedbackSubject({ type: "candidate", id: selectedCandidate.id });
-      setFeedbackSubjectLabel(`${selectedCandidate.symbol} · ${selectedCandidate.chain} · ${selectedCandidate.contractAddress}`);
-    } else {
-      setFeedbackSubject(undefined);
-      setFeedbackSubjectLabel(undefined);
-    }
-    navigate("feedback");
-  }, [activeSection, feedbackContext, navigate, selectedCandidate]);
 
   const openCandidate = useCallback((candidateId: string) => {
     const candidate = candidates.find((entry) => entry.id === candidateId);
@@ -759,9 +733,7 @@ export function ProductAppContent({
   }, []);
 
   useEffect(() => {
-    if (window.location.hash.trim().toLowerCase() === "#reports") {
-      window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}#candidate-results`);
-    }
+    redirectHiddenCampFrontendHash();
   }, []);
 
   const openVerification = useCallback((
@@ -871,19 +843,6 @@ export function ProductAppContent({
       return (
         <ProductWorkspaceSection {...sectionCopy["candidate-results"]}>
           <LoadingState label={t("app.loading")} />
-        </ProductWorkspaceSection>
-      );
-    }
-    if (activeSection === "feedback") {
-      return (
-        <ProductWorkspaceSection {...copy}>
-          <Feedback
-            screenContext={feedbackContext}
-            subjectRef={feedbackSubject}
-            subjectLabel={feedbackSubjectLabel}
-            refreshRevision={feedbackRefreshRevision}
-            onFeedbackRecorded={refreshControlCenterAfterFeedback}
-          />
         </ProductWorkspaceSection>
       );
     }
@@ -1016,8 +975,7 @@ export function ProductAppContent({
       <ProductWorkspaceShell
         navItems={visibleNavItems}
         activeSection={activeSection}
-        onSectionChange={(section) => section === "feedback" ? openFeedback() : navigate(section)}
-        onSendFeedback={openFeedback}
+        onSectionChange={navigate}
         loading={loading}
         runtimeMode={runtimeMode}
         resolvedSource={resolvedSource}
@@ -1281,6 +1239,13 @@ export function selectAIResearchReviewCandidate(candidates: UiTokenCandidate[]):
 function resolveSection(): ProductSectionId {
   if (typeof window === "undefined") return "candidate-results";
   return HASH_TO_SECTION[window.location.hash.trim().toLowerCase()] ?? "candidate-results";
+}
+
+function redirectHiddenCampFrontendHash(): void {
+  if (typeof window === "undefined") return;
+  const hash = window.location.hash.trim().toLowerCase();
+  if (!HIDDEN_CAMP_FRONTEND_HASHES.has(hash)) return;
+  window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}#candidate-results`);
 }
 
 function isReviewMode(): boolean {

@@ -7211,14 +7211,15 @@ button:disabled,
 }
 
 .personal-radar-active[data-status-active="true"] .product-status-indicator {
-  border-color: currentColor;
-  background: currentColor;
+  border-color: var(--color-status-ready);
+  background: var(--color-status-ready);
   color: var(--color-surface-1);
-  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 24%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-status-ready) 30%, transparent),
+    0 0 12px color-mix(in srgb, var(--color-status-ready) 52%, transparent);
 }
 
 .personal-radar-active[data-status-active="false"] .product-status-indicator {
-  color: var(--color-status-manual);
+  color: var(--color-status-neutral);
   border-style: dashed;
   background: transparent;
   box-shadow: none;

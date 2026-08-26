@@ -855,13 +855,20 @@ describe("Product Radar owner acceptance", () => {
     assert.doesNotMatch(markup, /PASSTOKEN|LOWLIQTOKEN|FDVFALLBACKTOKEN/);
   });
 
-  it("keeps Reports backend-only while preserving the normal Product navigation", async () => {
+  it("keeps Reports and Opinions backend-only while preserving the normal Product navigation", async () => {
     const source = await readFile(resolve(productRoot, "src", "ProductApp.tsx"), "utf8");
     for (const key of ["nav.radar", "nav.details", "nav.verification", "nav.methodology", "nav.controlCenter"]) {
       assert.match(source, new RegExp(key.replace(".", "\\.")));
     }
     assert.doesNotMatch(source, /id:\s*"reports"/);
-    assert.match(source, /"#reports":\s*"candidate-results"/);
+    assert.doesNotMatch(source, /id:\s*"feedback"/);
+    assert.doesNotMatch(source, /activeSection === "feedback"/);
+    assert.doesNotMatch(source, /import \{ Feedback \}/);
+    for (const legacyHash of ["reports", "feedback", "opinion", "opinions", "opinie"]) {
+      assert.match(source, new RegExp(`"#${legacyHash}":\\s*"candidate-results"`));
+    }
+    assert.match(source, /HIDDEN_CAMP_FRONTEND_HASHES/);
+    assert.match(source, /redirectHiddenCampFrontendHash\(\)/);
     assert.match(source, /groupLabel:\s*t\("nav\.groupReview"\)/);
     assert.doesNotMatch(source, /label: "(?:Token Lookup|Trusted Preview|Webinar Teaser|Feedback Notes)"/);
   });

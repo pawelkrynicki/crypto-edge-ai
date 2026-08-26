@@ -137,6 +137,14 @@ describe("P1.1 Radar operational usability", () => {
     assert.match(mainMarkup, /Radar produktu: Dalsza obserwacja/);
     assert.match(mainMarkup, /Twój Radar: Główny Radar/);
 
+    const followUpMarkup = renderToStaticMarkup(
+      <ProductLocaleProvider initialLocale="pl">
+        <PersonalRadarPanel chain="bsc" contractAddress="0x3333333333333333333333333333333333333333" initialView={lifecycleTokenView("FOLLOW_UP", "FOLLOW_UP", true)} />
+      </ProductLocaleProvider>,
+    );
+    assert.equal((followUpMarkup.match(/data-status-active="true"/g) ?? []).length, 2);
+    assert.match(followUpMarkup, /Twój Radar: Dalsza obserwacja/);
+
     const unassignedMarkup = renderToStaticMarkup(
       <ProductLocaleProvider initialLocale="pl">
         <PersonalRadarPanel chain="bsc" contractAddress="0x2222222222222222222222222222222222222222" initialView={lifecycleTokenView("FOLLOW_UP", "FOLLOW_UP", false)} />
@@ -146,6 +154,61 @@ describe("P1.1 Radar operational usability", () => {
     assert.match(unassignedMarkup, /Twój Radar: Brak prywatnego przypisania/);
     assert.equal((unassignedMarkup.match(/data-status-active="true"/g) ?? []).length, 1);
     assert.match(unassignedMarkup, /data-status-active="false"/);
+  });
+
+  it("uses a high-contrast mint marker only for active Radar states", async () => {
+    const css = await readFile(resolve(process.cwd(), "src", "index.css"), "utf8");
+    const activeRule = css.match(/\.personal-radar-active\[data-status-active="true"\] \.product-status-indicator\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
+    const unassignedRule = css.match(/\.personal-radar-active\[data-status-active="false"\] \.product-status-indicator\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
+
+    assert.match(activeRule, /background:\s*var\(--color-status-ready\)/);
+    assert.match(activeRule, /border-color:\s*var\(--color-status-ready\)/);
+    assert.match(activeRule, /0 0 12px color-mix\(in srgb, var\(--color-status-ready\)/);
+    assert.match(unassignedRule, /color:\s*var\(--color-status-neutral\)/);
+    assert.match(unassignedRule, /border-style:\s*dashed/);
+    assert.doesNotMatch(unassignedRule, /color-status-ready/);
+  });
+
+  it("redirects retired Opinions and Feedback hashes to Radar without restoring their screen", async () => {
+    const dataSources: ProductAppDataSources = {
+      loadScanner: async () => scannerUnavailable(),
+      loadReadiness: async () => ({ status: "ready", output: readyReadiness() }),
+      loadAutomation: async () => null,
+      loadEstablishedUniverse: async () => establishedStatus(0),
+      loadControlCenter: async () => null,
+      loadFollowUpStatus: async () => followUpStatus(0),
+      loadFollowUpList: async () => ({ schema_version: "follow_up_list_v1", validation_status: "valid", entries: [] }),
+    };
+    const browser = installBrowser("http://127.0.0.1:4180/#feedback");
+    const originalActEnvironment = globalThis.IS_REACT_ACT_ENVIRONMENT;
+    globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+    let renderer: ReturnType<typeof create> | undefined;
+
+    try {
+      await act(async () => {
+        renderer = create(
+          <ProductLocaleProvider initialLocale="pl">
+            <ProductAppContent dataSources={dataSources} runtimeModeOverride="INTERNAL_BETA" />
+          </ProductLocaleProvider>,
+        );
+        await flushPromises();
+      });
+      assert.equal(globalThis.window.location.hash, "#candidate-results");
+      assert.equal(renderer!.root.findByType(ProductWorkspaceShell).props.activeSection, "candidate-results");
+
+      await act(async () => {
+        globalThis.window.location.hash = "#opinion";
+        globalThis.window.dispatchEvent(new Event("hashchange"));
+        await flushPromises();
+      });
+      assert.equal(globalThis.window.location.hash, "#candidate-results");
+      assert.equal(renderer!.root.findByType(ProductWorkspaceShell).props.activeSection, "candidate-results");
+      assert.equal(renderer!.root.findAll((node) => node.props.children === "Opinie").length, 0);
+    } finally {
+      if (renderer) await act(async () => { renderer!.unmount(); });
+      browser.restore();
+      globalThis.IS_REACT_ACT_ENVIRONMENT = originalActEnvironment;
+    }
   });
 
   it("keeps the Your Radar heading outside a three-card desktop grid and uses two columns on tablets", async () => {
@@ -452,10 +515,11 @@ function installBrowser(initialHref: string) {
   const entries = [initialHref];
   let index = 0;
   const listeners = new Map<string, Set<(event: Event) => void>>();
-  const location = { href: "", search: "", hash: "" };
+  const location = { href: "", pathname: "", search: "", hash: "" };
   const apply = (href: string) => {
-    const url = new URL(href);
+    const url = new URL(href, location.href || initialHref);
     location.href = url.toString();
+    location.pathname = url.pathname;
     location.search = url.search;
     location.hash = url.hash;
   };
@@ -471,8 +535,12 @@ function installBrowser(initialHref: string) {
       history: {
         pushState: (_data: unknown, _unused: string, url: URL | string) => {
           entries.splice(index + 1);
-          entries.push(String(url));
+          entries.push(new URL(String(url), location.href || initialHref).toString());
           index = entries.length - 1;
+          apply(entries[index]!);
+        },
+        replaceState: (_data: unknown, _unused: string, url: URL | string) => {
+          entries[index] = new URL(String(url), location.href || initialHref).toString();
           apply(entries[index]!);
         },
       },

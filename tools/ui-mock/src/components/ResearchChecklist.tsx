@@ -725,7 +725,10 @@ function PrivateResearchProgressPanel({ step, state, locale, writable, onSaved }
   const [displayedState, setDisplayedState] = useState(state);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(false);
-  useEffect(() => { setDisplayedState(state); }, [state]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Persisted state is the canonical source after a route or token change.
+    setDisplayedState(state);
+  }, [state]);
   const save = async (next: PrivateResearchProgressState) => {
     if (!writable) return;
     setSaving(true); setError(false);

@@ -122,7 +122,10 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
     Boolean(scannerUnavailableReasonCode),
   ));
   useEffect(() => {
-    if (preferredLifecycleBasket) setActiveBasket(preferredLifecycleBasket);
+    if (preferredLifecycleBasket) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Route-selected basket must immediately mirror the parent preference.
+      setActiveBasket(preferredLifecycleBasket);
+    }
   }, [preferredLifecycleBasket]);
   const [lifecycleGuideOpen, setLifecycleGuideOpen] = useState(false);
   const visibleBasket = activeBasket;

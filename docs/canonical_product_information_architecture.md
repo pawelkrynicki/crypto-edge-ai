@@ -197,6 +197,11 @@ Radar cards and Candidate Detail, state that the action is private-only, and
 never mutate product lifecycle, Established, shared research or another
 user's workspace.
 
+An active Product Radar or Your Radar marker is bright mint/green in the dark
+theme. It supplements the named, accessible active state; an unassigned private
+state is neutral and dashed, never green and never presented as an active
+product signal.
+
 ## Evidence navigation and routes
 
 One route format is used for a selected candidate:
@@ -276,11 +281,20 @@ guidance instead of a dead link.
 23. Private progress is isolated by actor/workspace and canonical token
     identity, and is excluded from every shared AI cache identity.
 
-## Reports
+## Reports and Opinions / Feedback
 
 Reports remain a backend/history and audit capability. They are not a CAMP
 frontend section: no normal sidebar item, route or product rendering exposes
 Reports, and an old `#reports` URL redirects to the canonical Radar start.
+
+Opinions / Feedback persistence, APIs, stores, record types and backend tests
+remain available for historical and internal capability. They are likewise not
+a normal CAMP frontend surface: no sidebar item, normal route or Product
+section renders them. Historical `#feedback`, `#opinion`, `#opinions` and
+`#opinie` links safely redirect to the canonical Radar start without a route
+loop. This UI boundary does not delete historical data or change any backend
+contract. Reports and Opinions / Feedback may be re-enabled by a future
+product version without rebuilding either backend capability.
 
 ## Read/write boundaries and forbidden duplication
 
