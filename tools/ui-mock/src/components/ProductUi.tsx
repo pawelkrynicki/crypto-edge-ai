@@ -150,7 +150,7 @@ export function StatusBadge({
       aria-label={ariaLabel}
       role={activeState ? "status" : undefined}
     >
-      <span className="product-status-indicator" aria-hidden="true" />
+      <span className="product-status-indicator" aria-hidden="true">{activeState ? "✓" : "—"}</span>
       <span>{children}</span>
     </span>
   );

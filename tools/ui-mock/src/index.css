@@ -5972,12 +5972,17 @@ button:disabled,
 }
 
 .product-status-indicator {
-  width: 6px;
-  height: 6px;
-  flex: 0 0 6px;
+  display: grid;
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  place-items: center;
   border-radius: 50%;
-  background: currentColor;
-  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 11%, transparent);
+  border: 1px solid currentColor;
+  color: currentColor;
+  font-size: 6px;
+  font-weight: 900;
+  line-height: 1;
 }
 
 .product-status-badge.accent { color: var(--color-accent-strong); border-color: color-mix(in srgb, var(--color-accent) 26%, transparent); background: var(--color-accent-muted); }
@@ -7168,6 +7173,15 @@ button:disabled,
 
 .personal-radar-inline.card { grid-column: 1 / -1; }
 
+.lifecycle-radar-card-footer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-2);
+}
+
+.lifecycle-radar-open-details { align-self: start; }
+
 .personal-radar-statuses {
   display: flex;
   min-width: 0;
@@ -7191,24 +7205,38 @@ button:disabled,
 }
 
 .personal-radar-active .product-status-indicator {
-  width: 8px;
-  height: 8px;
-  flex-basis: 8px;
-  box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 17%, transparent);
+  width: 10px;
+  height: 10px;
+  flex-basis: 10px;
 }
 
 .personal-radar-active[data-status-active="true"] .product-status-indicator {
-  width: 9px;
-  height: 9px;
-  flex-basis: 9px;
-  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 20%, transparent);
+  border-color: currentColor;
+  background: currentColor;
+  color: var(--color-surface-1);
+  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 24%, transparent);
+}
+
+.personal-radar-active[data-status-active="false"] .product-status-indicator {
+  color: var(--color-status-manual);
+  border-style: dashed;
+  background: transparent;
+  box-shadow: none;
 }
 
 .personal-radar-confirmation {
   width: 100%;
   flex: 1 1 100%;
-  margin-top: 0;
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+  padding: var(--space-2);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-surface-2) 82%, transparent);
 }
+
+.personal-radar-management-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 
 .personal-radar-confirmation .product-technical-details-content {
   display: grid;
@@ -7318,6 +7346,8 @@ button:disabled,
 }
 
 @media (max-width: 700px) {
+  .lifecycle-radar-card-footer { grid-template-columns: 1fr; }
+  .lifecycle-radar-open-details { width: 100%; }
   .token-detail-next-step .personal-radar-inline.detail { width: 100%; margin-left: 0; }
   .personal-radar-review-switch { right: 6px; bottom: 6px; }
 }
@@ -8794,12 +8824,13 @@ summary {
 .research-playbook-progress-heading > strong { color: var(--text-secondary); font-size: 11px; }
 .research-playbook-progress-stages { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; min-width: 0; margin: 0; padding: 0; list-style: none; }
 .research-playbook-progress-tracker { overflow-x: auto; }
-.research-playbook-progress-stage { display: grid; grid-template-columns: 19px minmax(0, 1fr); grid-template-areas: "marker name" "state state" "evidence evidence"; gap: 2px 6px; min-width: 0; padding: 7px; border: 1px solid var(--border); border-radius: 7px; background: rgba(8, 12, 16, 0.28); }
+.research-playbook-progress-stage { display: grid; grid-template-columns: 19px minmax(0, 1fr); grid-template-areas: "marker name" "state state" "evidence evidence" "private private"; gap: 2px 6px; min-width: 0; padding: 7px; border: 1px solid var(--border); border-radius: 7px; background: rgba(8, 12, 16, 0.28); }
 .research-playbook-progress-marker { grid-area: marker; display: grid; place-items: center; width: 19px; height: 19px; border: 1px solid var(--border); border-radius: 999px; color: var(--text-helper); font-size: 11px; font-weight: 900; }
 .research-playbook-progress-name { grid-area: name; min-width: 0; color: var(--text-secondary); font-size: 10px; font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
 .research-playbook-progress-name b { margin-right: 4px; color: var(--text-helper); }
 .research-playbook-progress-state-label { grid-area: state; min-width: 0; color: var(--text-helper); font-size: 8px; font-weight: 800; letter-spacing: 0; overflow-wrap: anywhere; text-transform: uppercase; }
 .research-playbook-progress-evidence { grid-area: evidence; min-width: 0; color: var(--text-secondary); font-size: 8px; line-height: 1.25; overflow-wrap: anywhere; }
+.research-playbook-private-progress { grid-area: private; min-width: 0; color: var(--text-helper); font-size: 8px; line-height: 1.25; overflow-wrap: anywhere; }
 .research-playbook-progress-stage.completed { border-color: var(--accent-border); }
 .research-playbook-progress-stage.completed .research-playbook-progress-marker { color: var(--bg); background: var(--accent); border-color: var(--accent); }
 .research-playbook-progress-stage.completed .research-playbook-progress-state-label { color: var(--accent); }
@@ -8809,6 +8840,14 @@ summary {
 .research-playbook-progress-stage.current .research-playbook-progress-state-label { color: var(--warning); }
 .research-playbook-progress-stage.pending { border-style: dashed; opacity: 0.88; }
 .research-playbook-progress-unlock { margin: 0; padding-top: 2px; color: var(--text-secondary); font-size: 11px; line-height: 1.45; }
+
+.research-private-progress { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-2); align-items: center; margin-top: var(--space-3); padding: var(--space-2); border: 1px solid var(--color-border-default); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--color-surface-2) 76%, transparent); }
+.research-private-progress > div:first-child { display: grid; gap: 3px; }
+.research-private-progress > div:first-child > span { color: var(--color-text-helper); font-size: 9px; font-weight: 800; letter-spacing: .08em; }
+.research-private-progress > div:first-child > strong { color: var(--color-text-primary); font-size: 12px; }
+.research-private-progress p { margin: 0; color: var(--color-text-secondary); font-size: 10px; line-height: 1.35; }
+.research-private-progress-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); }
+@media (max-width: 700px) { .research-private-progress { grid-template-columns: 1fr; } .research-private-progress-actions { justify-content: flex-start; } }
 .research-playbook-context { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 12px; padding: 11px; border: 1px solid color-mix(in srgb, var(--accent) 46%, var(--border)); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--surface) 90%, var(--accent) 10%); }
 .research-playbook-context > div { display: grid; gap: 3px; min-width: 0; }
 .research-playbook-context span { color: var(--accent); font-size: 10px; font-weight: 800; letter-spacing: 0.08em; }

@@ -143,6 +143,60 @@ test("PC.3A API keeps trusted testers read-only and performs no provider or Open
   assert.equal((await write.json() as { error: string }).error, "forbidden");
 });
 
+test("PC.3A persists private Playbook progress for one CAMP session and keeps it isolated", async (t) => {
+  const root = await mkdtemp(resolve(tmpdir(), "crypto-edge-research-progress-api-"));
+  const fixturePath = resolve(root, "scanner.json");
+  const databaseFilePath = resolve(root, "research.sqlite");
+  await writeFile(fixturePath, JSON.stringify(scannerOutput()), "utf8");
+  const researchRepository = await createResearchEvidenceRepository({ databaseFilePath });
+  const previousRole = process.env.CRYPTO_EDGE_PC1_REVIEW_DEFAULT_ACTOR;
+  process.env.CRYPTO_EDGE_PC1_REVIEW_DEFAULT_ACTOR = "CAMP_USER";
+  const server = createServer(createScannerApiHandler({
+    runtimeMode: "DEVELOPMENT_DEMO",
+    scanner: { fixturePath, outputDirPath: resolve(root, "output"), allowFixtureFallback: true },
+    researchEvidence: { repository: researchRepository },
+  }));
+  t.after(async () => {
+    if (previousRole === undefined) delete process.env.CRYPTO_EDGE_PC1_REVIEW_DEFAULT_ACTOR;
+    else process.env.CRYPTO_EDGE_PC1_REVIEW_DEFAULT_ACTOR = previousRole;
+    await new Promise<void>((done) => server.close(() => done()));
+    researchRepository.close();
+    await rm(root, { recursive: true, force: true, maxRetries: 3, retryDelay: 40 });
+  });
+  await new Promise<void>((done) => server.listen(0, "127.0.0.1", () => done()));
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  const origin = `http://127.0.0.1:${address.port}`;
+  const firstLookup = await fetch(`${origin}/api/research-checklist?chain=base&contract_address=${ADDRESS}`);
+  assert.equal(firstLookup.status, 200, await firstLookup.clone().text());
+  const firstCookie = firstLookup.headers.get("set-cookie")?.split(";", 1)[0];
+  assert.ok(firstCookie);
+  const before = await firstLookup.json() as { private_progress: unknown[]; current_step: number; completeness: unknown };
+  assert.deepEqual(before.private_progress, []);
+
+  const save = await fetch(`${origin}/api/research-progress`, {
+    method: "PUT",
+    headers: { cookie: firstCookie, origin, "content-type": "application/json" },
+    body: JSON.stringify({ chain: "base", contract_address: ADDRESS, step_number: 2, state: "REVIEWED" }),
+  });
+  assert.equal(save.status, 200, await save.clone().text());
+  assert.equal((await save.json() as { progress: { state: string } }).progress.state, "REVIEWED");
+
+  const persistedLookup = await fetch(`${origin}/api/research-checklist?chain=base&contract_address=${ADDRESS}`, { headers: { cookie: firstCookie } });
+  assert.equal(persistedLookup.status, 200, await persistedLookup.clone().text());
+  const persisted = await persistedLookup.json() as { private_progress: Array<{ step_number: number; state: string }>; current_step: number; completeness: unknown };
+  assert.equal(persisted.private_progress.length, 1);
+  assert.equal(persisted.private_progress[0]?.step_number, 2);
+  assert.equal(persisted.private_progress[0]?.state, "REVIEWED");
+  assert.equal(persisted.current_step, before.current_step, "private review cannot change the canonical current step");
+  assert.deepEqual(persisted.completeness, before.completeness, "private review cannot change canonical completeness");
+
+  const secondLookup = await fetch(`${origin}/api/research-checklist?chain=base&contract_address=${ADDRESS}`);
+  assert.equal(secondLookup.status, 200, await secondLookup.clone().text());
+  const second = await secondLookup.json() as { private_progress: unknown[] };
+  assert.deepEqual(second.private_progress, [], "a fresh server-created CAMP actor cannot read User A progress");
+});
+
 function item(view: ReturnType<typeof resolveResearchChecklist>, step: number, key: string) {
   const result = view.steps.find((entry) => entry.number === step)?.items.find((entry) => entry.key === key);
   assert.ok(result, `Missing checklist item ${step}:${key}`);

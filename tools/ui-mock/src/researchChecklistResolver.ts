@@ -101,6 +101,8 @@ export function resolveResearchChecklist(
     chain: candidate.chain.trim().toLowerCase(),
     contract_address: normalizeAddress(candidate.contractAddress),
     manual_evidence_writable: false,
+    private_progress: [],
+    private_progress_writable: false,
     current_step: currentStep,
     completeness: {
       resolved_checks: effectiveScorecard.resolved_total,

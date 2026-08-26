@@ -113,8 +113,10 @@ import {
 import { resolveResearchChecklist } from "../src/researchChecklistResolver.js";
 import {
   isPersistedManualResearchState,
+  isPrivateResearchProgressState,
   isResearchChecklistItemKey,
   type PersistedManualResearchState,
+  type PrivateResearchProgressState,
   type ResearchChecklistItemKey,
   type ResearchStepNumber,
 } from "../src/researchChecklistTypes.js";
@@ -322,6 +324,8 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
         sendJson(req, res, 200, {
           ...resolveResearchChecklist(candidate, evidence),
           manual_evidence_writable: session.context.capabilities.includes("CAMP_USER_WORKSPACE_WRITE"),
+          private_progress: (await researchEvidenceRepository).listProgress(session.context.actor_id, query.chain, query.contract_address),
+          private_progress_writable: session.context.capabilities.includes("CAMP_USER_WORKSPACE_WRITE"),
         }, runtimeMode);
       } catch (error) {
         sendResearchChecklistError(req, res, error, runtimeMode);
@@ -379,8 +383,30 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
       return;
     }
 
-    if (path === "/api/research-checklist" || path === "/api/research-evidence") {
-      res.setHeader("allow", path === "/api/research-checklist" ? "GET" : "PUT, DELETE");
+    if (req.method === "PUT" && path === "/api/research-progress") {
+      try {
+        requireResearchEvidenceMutationRequest(req);
+        const session = pc1Sessions.resolve(req);
+        if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
+        if (!session.context.capabilities.includes("CAMP_USER_WORKSPACE_WRITE")) throw new ResearchChecklistRequestError("FORBIDDEN", 403);
+        const body = validateResearchProgressWriteBody(await readResearchEvidenceJsonBody(req));
+        await resolveResearchChecklistCandidate(body.chain, body.contract_address, scannerOptions, options.followUp);
+        const progress = (await researchEvidenceRepository).saveProgress({
+          actorId: session.context.actor_id,
+          chain: body.chain,
+          contractAddress: body.contract_address,
+          stepNumber: body.step_number,
+          state: body.state,
+        });
+        sendJson(req, res, 200, { schema_version: "private_research_progress_write_v1", progress }, runtimeMode);
+      } catch (error) {
+        sendResearchChecklistError(req, res, error, runtimeMode);
+      }
+      return;
+    }
+
+    if (path === "/api/research-checklist" || path === "/api/research-evidence" || path === "/api/research-progress") {
+      res.setHeader("allow", path === "/api/research-checklist" ? "GET" : path === "/api/research-evidence" ? "PUT, DELETE" : "PUT");
       sendJson(req, res, 405, { error: "method_not_allowed", message: "Method not allowed" }, runtimeMode);
       return;
     }
@@ -2227,6 +2253,23 @@ function sendManualOwnerActionError(
     error: actionError.code,
     message: "Owner token action rejected",
   }, runtimeMode);
+}
+
+function validateResearchProgressWriteBody(value: unknown): {
+  chain: string;
+  contract_address: string;
+  step_number: ResearchStepNumber;
+  state: PrivateResearchProgressState;
+} {
+  if (!isRecord(value) || Object.keys(value).length !== 4
+    || !["chain", "contract_address", "step_number", "state"].every((key) => Object.prototype.hasOwnProperty.call(value, key))) {
+    throw new ResearchChecklistRequestError("REQUEST_INVALID", 400);
+  }
+  const identity = identityFromResearchBody(value.chain, value.contract_address);
+  if (!isResearchStep(value.step_number) || !isPrivateResearchProgressState(value.state)) {
+    throw new ResearchChecklistRequestError("REQUEST_INVALID", 400);
+  }
+  return { ...identity, step_number: value.step_number, state: value.state };
 }
 
 function validateLifecycleClearBody(value: unknown): { chain: string; contract_address: string } {

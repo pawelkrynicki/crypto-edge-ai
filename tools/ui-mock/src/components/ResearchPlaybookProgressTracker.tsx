@@ -1,7 +1,8 @@
 import React from "react";
 import { RESEARCH_PLAYBOOK_STAGE_COUNT, RESEARCH_PLAYBOOK_STAGES, type ResearchPlaybookLocale } from "../researchPlaybookStages";
-import type { ResearchChecklistState, ResearchStepNumber } from "../researchChecklistTypes";
+import type { PrivateResearchProgressState, ResearchChecklistState, ResearchStepNumber } from "../researchChecklistTypes";
 import { resolveResearchPlaybookProgressState, type ResearchPlaybookProgressState } from "../researchPlaybookProgressState";
+import { privateResearchProgressLabel } from "../researchPrivateProgress";
 
 void React;
 
@@ -12,10 +13,12 @@ void React;
 export function ResearchPlaybookProgressTracker({
   currentStep,
   stageStates,
+  privateProgress,
   locale,
 }: {
   currentStep: ResearchStepNumber;
   stageStates?: ReadonlyMap<ResearchStepNumber, ResearchChecklistState>;
+  privateProgress?: ReadonlyMap<ResearchStepNumber, PrivateResearchProgressState>;
   locale: ResearchPlaybookLocale;
 }) {
   const pl = locale === "pl";
@@ -29,6 +32,7 @@ export function ResearchPlaybookProgressTracker({
       {RESEARCH_PLAYBOOK_STAGES.map((stage) => {
         const state = resolveResearchPlaybookProgressState(stage.number, currentStep);
         const canonicalItemState = stageStates?.get(stage.number);
+        const personalState = privateProgress?.get(stage.number) ?? "NOT_STARTED";
         const completedWithPartialData = state === "COMPLETED"
           && (canonicalItemState === "MISSING_DATA" || canonicalItemState === "OPEN_EXTERNAL_TOOL");
         const stateLabel = progressStateLabel(state, locale, completedWithPartialData);
@@ -46,6 +50,7 @@ export function ResearchPlaybookProgressTracker({
           <span className="research-playbook-progress-name"><b>{stage.number}</b>{stage.labels[locale]}</span>
           <span className="research-playbook-progress-state-label">{stateLabel}</span>
           {canonicalItemState && !completedWithPartialData && <span className="research-playbook-progress-evidence" data-research-playbook-stage-evidence={stage.number}>{canonicalStateLabel(canonicalItemState, locale)}</span>}
+          {personalState !== "NOT_STARTED" && <span className="research-playbook-private-progress" data-research-private-progress={stage.number}>{pl ? "Mój postęp" : "My progress"}: {privateResearchProgressLabel(personalState, locale)}</span>}
         </li>;
       })}
     </ol>

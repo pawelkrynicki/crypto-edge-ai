@@ -161,6 +161,20 @@ test("PC.3A focus mode stays in Candidate Detail and Verification remains a boun
   assert.match(returnedDetail, /role="tab"[^>]*aria-selected="true"[^>]*>Podsumowanie/);
 });
 
+test("private review progress is shown separately in every focused Playbook stage in PL and EN", () => {
+  for (const step of [1, 2, 3, 4, 5, 6, 7] as const) {
+    const polish = renderToStaticMarkup(<ProductLocaleProvider initialLocale="pl"><ResearchChecklistDetail candidate={candidate} focusedStep={step} /></ProductLocaleProvider>);
+    const english = renderToStaticMarkup(<ProductLocaleProvider initialLocale="en"><ResearchChecklistDetail candidate={candidate} focusedStep={step} /></ProductLocaleProvider>);
+    assert.match(polish, new RegExp(`data-research-private-progress-panel="${step}"`));
+    assert.match(polish, /MÓJ POSTĘP/);
+    assert.match(polish, /Nie rozpoczęto/);
+    assert.match(polish, /Nie zmienia systemowego wyniku etapu/);
+    assert.match(english, /MY PROGRESS/);
+    assert.match(english, /Not started/);
+    assert.match(english, /does not change the system stage result/);
+  }
+});
+
 test("PC.3A focus mode localizes methodology values, omits unavailable rows, and keeps red flags visible", () => {
   const unknownCandidate: UiTokenCandidate = {
     ...candidate,

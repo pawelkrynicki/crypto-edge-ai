@@ -17,7 +17,6 @@ export function PersonalRadarPanel({
   initialView,
   unavailable = false,
   placement = "card",
-  trailingAction,
 }: {
   chain: string;
   contractAddress: string;
@@ -25,12 +24,11 @@ export function PersonalRadarPanel({
   initialView?: LifecycleTokenView | null;
   unavailable?: boolean;
   placement?: "card" | "detail";
-  trailingAction?: React.ReactNode;
 }) {
   const { locale } = useProductLocale();
   const copy = lifecycleCopy(locale);
   const [view, setView] = useState<LifecycleTokenView | null>(null);
-  const [confirming, setConfirming] = useState<"set" | "clear" | null>(null);
+  const [expanded, setExpanded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,18 +43,16 @@ export function PersonalRadarPanel({
   const resolvedView = view ?? initialView;
   if (!resolvedView) return null;
   const canWrite = resolvedView.actor.capabilities.includes("CAMP_USER_WORKSPACE_WRITE");
-  const target = nextPrivateStatus(resolvedView.user_status);
-  const actionLabel = target === "MAIN_RADAR" ? copy.nextMain : copy.nextFollowUp;
   const privateStatus = resolvedView.user_status_is_override ? resolvedView.user_status : null;
 
   const publish = async (next: LifecycleTokenView | null) => {
     if (!next) { setError(copy.saveFailed); return; }
-    setView(next); setConfirming(null); setError(null); void onChanged?.(next);
+    setView(next); setExpanded(false); setError(null); void onChanged?.(next);
   };
-  const save = async () => {
+  const save = async (targetStatus: Exclude<SystemLifecycleStatus, "NEW">) => {
     if (!canWrite) return;
     setSaving(true);
-    await publish(await savePrivateLifecycleStatus({ chain, contractAddress, targetStatus: target, overrideReason: null }));
+    await publish(await savePrivateLifecycleStatus({ chain, contractAddress, targetStatus, overrideReason: null }));
     setSaving(false);
   };
   const clear = async () => {
@@ -66,27 +62,39 @@ export function PersonalRadarPanel({
     setSaving(false);
   };
 
+  const managementId = `personal-radar-management-${resolvedView.identity.replace(/[^a-z0-9_-]/gi, "-")}`;
+  const manageLabel = locale === "pl" ? "Zarządzaj moim Radarem" : "Manage my Radar";
+  const actions: Array<{ status: Exclude<SystemLifecycleStatus, "NEW">; label: string }> = privateStatus === "MAIN_RADAR"
+    ? [{ status: "FOLLOW_UP", label: copy.nextFollowUp }]
+    : privateStatus === "FOLLOW_UP"
+      ? [{ status: "MAIN_RADAR", label: copy.nextMain }]
+      : [{ status: "FOLLOW_UP", label: copy.nextFollowUp }, { status: "MAIN_RADAR", label: copy.nextMain }];
+
   return <div className={`personal-radar-inline ${placement}`} data-personal-radar="inline">
     <div className="personal-radar-statuses" aria-label={locale === "pl" ? "Status Radaru produktu i Twojego Radaru" : "Product Radar and Your Radar status"}>
       <StatusBadge tone={radarTone(resolvedView.system_status)} className="personal-radar-active" activeState aria-label={`${copy.system}: ${lifecycleStatusLabel(resolvedView.system_status, locale)}; ${locale === "pl" ? "aktywny status" : "active status"}`}>{copy.system}: {lifecycleStatusLabel(resolvedView.system_status, locale)}</StatusBadge>
-      <StatusBadge tone={privateStatus ? radarTone(privateStatus) : "manual"} className="personal-radar-active" activeState aria-label={`${copy.yours}: ${privateStatus ? lifecycleStatusLabel(privateStatus, locale) : copy.unassigned}; ${locale === "pl" ? "aktualny status prywatny" : "current private status"}`}>{copy.yours}: {privateStatus ? lifecycleStatusLabel(privateStatus, locale) : copy.unassigned}</StatusBadge>
+      <StatusBadge tone={privateStatus ? radarTone(privateStatus) : "manual"} className="personal-radar-active" activeState={Boolean(privateStatus)} aria-label={`${copy.yours}: ${privateStatus ? lifecycleStatusLabel(privateStatus, locale) : copy.unassigned}; ${privateStatus ? (locale === "pl" ? "aktualny status prywatny" : "current private status") : (locale === "pl" ? "brak prywatnego przypisania" : "no private assignment")}`}>{copy.yours}: {privateStatus ? lifecycleStatusLabel(privateStatus, locale) : copy.unassigned}</StatusBadge>
       {resolvedView.user_status_is_override && <small className="personal-radar-private-note">{locale === "pl" ? "To jest prywatna organizacja. Radar produktu pozostaje bez zmian." : "This is private organization. Product Radar stays unchanged."}</small>}
     </div>
-    {canWrite && !confirming && <div className="personal-radar-actions">
-      <ActionButton variant="secondary" onClick={() => setConfirming("set")} aria-expanded={confirming === "set"}>{actionLabel}</ActionButton>
-      {resolvedView.user_status_is_override && <ActionButton variant="tertiary" onClick={() => setConfirming("clear")} aria-expanded={confirming === "clear"}>{copy.remove}</ActionButton>}
+    {canWrite && <div className="personal-radar-actions">
+      <ActionButton
+        variant="secondary"
+        className="personal-radar-manage-trigger"
+        onClick={() => setExpanded((value) => !value)}
+        aria-expanded={expanded}
+        aria-controls={managementId}
+      >{manageLabel}</ActionButton>
     </div>}
-    {trailingAction}
-    {confirming && <div className="personal-radar-confirmation" role="status">
+    {expanded && <div id={managementId} className="personal-radar-confirmation" data-personal-radar-management role="group" aria-label={manageLabel}>
       <p>{copy.privateOnly}</p>
-      <div>{error && <p role="alert" className="product-inline-error">{error}</p>}<ActionButton variant={confirming === "clear" ? "tertiary" : "primary"} loading={saving} onClick={() => void (confirming === "clear" ? clear() : save())}>{confirming === "clear" ? copy.remove : actionLabel}</ActionButton><ActionButton variant="tertiary" disabled={saving} onClick={() => setConfirming(null)}>{copy.cancel}</ActionButton></div>
+      <div className="personal-radar-management-actions">
+        {error && <p role="alert" className="product-inline-error">{error}</p>}
+        {actions.map((action) => <ActionButton key={action.status} variant="primary" loading={saving} onClick={() => void save(action.status)}>{action.label}</ActionButton>)}
+        {privateStatus && <ActionButton variant="tertiary" loading={saving} onClick={() => void clear()}>{copy.remove}</ActionButton>}
+        <ActionButton variant="tertiary" disabled={saving} onClick={() => setExpanded(false)}>{copy.cancel}</ActionButton>
+      </div>
     </div>}
   </div>;
-}
-
-function nextPrivateStatus(value: SystemLifecycleStatus): Exclude<SystemLifecycleStatus, "NEW"> {
-  if (value === "NEW" || value === "MAIN_RADAR") return "FOLLOW_UP";
-  return "MAIN_RADAR";
 }
 
 function radarTone(status: SystemLifecycleStatus): "accent" | "ready" | "neutral" {

@@ -9,6 +9,10 @@ export const RESEARCH_CHECKLIST_STATES = [
 
 export type ResearchChecklistState = (typeof RESEARCH_CHECKLIST_STATES)[number];
 
+/** Actor-private review progress. This is never evidence or system progress. */
+export const PRIVATE_RESEARCH_PROGRESS_STATES = ["NOT_STARTED", "IN_PROGRESS", "REVIEWED"] as const;
+export type PrivateResearchProgressState = (typeof PRIVATE_RESEARCH_PROGRESS_STATES)[number];
+
 export const RESEARCH_STEP_NUMBERS = [1, 2, 3, 4, 5, 6, 7] as const;
 export type ResearchStepNumber = (typeof RESEARCH_STEP_NUMBERS)[number];
 
@@ -88,6 +92,15 @@ export type PublicResearchEvidence = {
   evidence_url: string | null;
   observed_at: string | null;
   created_at: string;
+  updated_at: string;
+};
+
+export type PrivateResearchProgress = {
+  schema_version: "private_research_progress_sqlite_v1";
+  chain: string;
+  contract_address: string;
+  step_number: ResearchStepNumber;
+  state: PrivateResearchProgressState;
   updated_at: string;
 };
 
@@ -217,6 +230,9 @@ export type ResearchChecklistView = {
   chain: string;
   contract_address: string;
   manual_evidence_writable: boolean;
+  /** Private actor/workspace state; it cannot affect canonical resolution. */
+  private_progress: PrivateResearchProgress[];
+  private_progress_writable: boolean;
   current_step: ResearchStepNumber;
   completeness: {
     resolved_checks: number;
@@ -236,4 +252,8 @@ export function isResearchChecklistItemKey(value: unknown): value is ResearchChe
 
 export function isPersistedManualResearchState(value: unknown): value is PersistedManualResearchState {
   return typeof value === "string" && PERSISTED_MANUAL_RESEARCH_STATES.includes(value as PersistedManualResearchState);
+}
+
+export function isPrivateResearchProgressState(value: unknown): value is PrivateResearchProgressState {
+  return typeof value === "string" && PRIVATE_RESEARCH_PROGRESS_STATES.includes(value as PrivateResearchProgressState);
 }

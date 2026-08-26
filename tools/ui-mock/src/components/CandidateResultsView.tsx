@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   formatFollowUpLifecycleStatus,
   formatProductAge,
@@ -121,6 +121,9 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
     followUpEntries,
     Boolean(scannerUnavailableReasonCode),
   ));
+  useEffect(() => {
+    if (preferredLifecycleBasket) setActiveBasket(preferredLifecycleBasket);
+  }, [preferredLifecycleBasket]);
   const [lifecycleGuideOpen, setLifecycleGuideOpen] = useState(false);
   const visibleBasket = activeBasket;
   const selectBasket = (basket: BasketId) => {
@@ -355,12 +358,10 @@ function LifecycleRadarCardView({ card, locale, absentNotice, onOpenDetails, onL
         contractAddress={card.contract_address}
         initialView={card}
         onChanged={onLifecycleChanged}
-        trailingAction={onOpenDetails ? (
-          <ActionButton variant="primary" icon="arrow" iconPosition="end" onClick={() => onOpenDetails({ chain: card.chain, contract_address: card.contract_address })}>
-            {t("radar.openDetails")}
-          </ActionButton>
-        ) : null}
       />
+      {onOpenDetails && <ActionButton className="lifecycle-radar-open-details" variant="primary" icon="arrow" iconPosition="end" onClick={() => onOpenDetails({ chain: card.chain, contract_address: card.contract_address })}>
+        {t("radar.openDetails")}
+      </ActionButton>}
     </footer>
   </article>;
 }

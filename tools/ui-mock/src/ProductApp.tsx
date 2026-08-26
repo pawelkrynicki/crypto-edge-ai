@@ -250,6 +250,7 @@ export function ProductAppContent({
   const refreshPromiseRef = useRef<Promise<boolean> | null>(null);
   const productVersionPollerRef = useRef<ProductVersionPoller | null>(null);
   const reviewCommitAcknowledgementRef = useRef<string | null>(null);
+  const lifecycleMutationVersionRef = useRef(0);
   const productViewRef = useRef(productView);
   const routeTokenIdentityRef = useRef<RouteTokenIdentity | null>(routeTokenIdentity);
   const {
@@ -460,18 +461,34 @@ export function ProductAppContent({
     });
   }, [dataSources]);
 
-  const refreshLifecycleRadar = useCallback(async (view?: LifecycleTokenView): Promise<void> => {
-    if (view) setPreferredLifecycleBasket(lifecycleStatusToBasket(view.user_status));
+  const refreshLifecycleRadar = useCallback((view?: LifecycleTokenView): void => {
+    const mutationVersion = view ? ++lifecycleMutationVersionRef.current : lifecycleMutationVersionRef.current;
+    if (view) {
+      const current = productViewRef.current;
+      const lifecycleRadar = reconcilePrivateLifecycleRadarMutation(current.lifecycleRadar, view);
+      const nextProductView = {
+        ...current,
+        lifecycleRadar,
+        lifecycleSummary: lifecycleRadar?.summary ?? current.lifecycleSummary,
+      };
+      productViewRef.current = nextProductView;
+      setProductView(nextProductView);
+      setPreferredLifecycleBasket(lifecycleStatusToBasket(view.user_status));
+    }
     if (!dataSources.loadLifecycleRadar) return;
-    const next = await dataSources.loadLifecycleRadar();
-    if (!next) return;
-    const nextProductView = {
-      ...productViewRef.current,
-      lifecycleRadar: next,
-      lifecycleSummary: next.summary,
-    };
-    productViewRef.current = nextProductView;
-    setProductView(nextProductView);
+    // The returned write view is already reconciled above. This first-party
+    // read only refreshes any cards outside the visible page; it never gates
+    // the confirmed private mutation or reloads the page.
+    void dataSources.loadLifecycleRadar().then((next) => {
+      if (!next || mutationVersion !== lifecycleMutationVersionRef.current) return;
+      const nextProductView = {
+        ...productViewRef.current,
+        lifecycleRadar: next,
+        lifecycleSummary: next.summary,
+      };
+      productViewRef.current = nextProductView;
+      setProductView(nextProductView);
+    });
   }, [dataSources]);
 
   const refreshControlCenterAfterFeedback = useCallback(() => {
@@ -1131,6 +1148,51 @@ function mergeLifecycleRadar(current: LifecycleRadarView | null, next: Lifecycle
     private_follow_up_total: privateFollowUp.total,
     private_main_radar_total: privateMainRadar.total,
     private_baskets: { new: privateNew, follow_up: privateFollowUp, main_radar: privateMainRadar },
+  };
+}
+
+/**
+ * Applies the canonical response of a successful private-Radar write to the
+ * in-memory private projection. Product-Radar groups are intentionally not
+ * touched: private organization never changes central lifecycle truth.
+ */
+export function reconcilePrivateLifecycleRadarMutation(
+  radar: LifecycleRadarView | null,
+  view: LifecycleTokenView,
+): LifecycleRadarView | null {
+  if (!radar) return radar;
+  const privateGroups = radar.private_baskets;
+  const allCards = [
+    ...radar.new_inbox.cards,
+    ...radar.follow_up.action_due.cards,
+    ...radar.follow_up.candidates_ready.cards,
+    ...radar.follow_up.observed.cards,
+    ...privateGroups.new.cards,
+    ...privateGroups.follow_up.cards,
+    ...privateGroups.main_radar.cards,
+  ];
+  const source = allCards.find((card) => card.identity === view.identity);
+  if (!source) return radar;
+  const canonicalCard: LifecycleRadarCard = { ...source, ...view };
+  const target = view.user_status === "NEW" ? "new" : view.user_status === "FOLLOW_UP" ? "follow_up" : "main_radar";
+  const entries = Object.entries(privateGroups) as Array<[keyof LifecycleRadarView["private_baskets"], LifecycleRadarView["private_baskets"]["new"]]>;
+  const nextGroups = Object.fromEntries(entries.map(([key, group]) => {
+    const withoutCard = group.cards.filter((card) => card.identity !== view.identity);
+    const removed = group.cards.length - withoutCard.length;
+    const cards = key === target ? [canonicalCard, ...withoutCard] : withoutCard;
+    return [key, {
+      ...group,
+      cards,
+      displayed: cards.length,
+      total: Math.max(0, group.total - removed + (key === target ? 1 : 0)),
+    }];
+  })) as LifecycleRadarView["private_baskets"];
+  return {
+    ...radar,
+    private_new_total: nextGroups.new.total,
+    private_follow_up_total: nextGroups.follow_up.total,
+    private_main_radar_total: nextGroups.main_radar.total,
+    private_baskets: nextGroups,
   };
 }
 

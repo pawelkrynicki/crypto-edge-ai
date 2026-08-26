@@ -5,6 +5,8 @@ import { resolveResearchChecklist } from "../researchChecklistResolver";
 import { researchPlaybookStageName as stepName } from "../researchPlaybookStages";
 import {
   type PersistedManualResearchState,
+  type PrivateResearchProgress,
+  type PrivateResearchProgressState,
   type ResearchChecklistItem,
   type ResearchChecklistItemKey,
   type ResearchChecklistStep,
@@ -18,6 +20,7 @@ import {
 import {
   deleteResearchEvidence,
   loadResearchChecklist,
+  saveResearchProgress,
   saveResearchEvidence,
 } from "../services/researchChecklistDataSource";
 import {
@@ -28,6 +31,7 @@ import { normalizeSafePublicHttpsUrl, normalizeSafeSocialLinkUrl, type SocialLin
 import type { UiTokenCandidate } from "../types/scannerTypes";
 import { ActionButton } from "./ProductUi";
 import { ResearchPlaybookProgressTracker } from "./ResearchPlaybookProgressTracker";
+import { privateResearchProgressLabel } from "../researchPrivateProgress";
 
 void React;
 
@@ -157,7 +161,7 @@ export function ResearchChecklistSummary({
     <p>{pl
       ? <>Rozstrzygnięto <b>{view.completeness.resolved_checks} z {view.completeness.total_checks}</b> kontroli ({view.completeness.percentage}%).</>
       : <><b>{view.completeness.resolved_checks} of {view.completeness.total_checks}</b> checks resolved ({view.completeness.percentage}%).</>}</p>
-    <ResearchPlaybookProgressTracker currentStep={view.current_step} stageStates={new Map(view.steps.map((step) => [step.number, step.state] as const))} locale={locale} />
+    <ResearchPlaybookProgressTracker currentStep={view.current_step} stageStates={new Map(view.steps.map((step) => [step.number, step.state] as const))} privateProgress={privateProgressMap(view)} locale={locale} />
     <ResearchKeyToolsOverview view={view} candidate={candidate} locale={locale} onOpenStep={onOpenStep} />
     <ol>{view.steps.map((step) => <li key={step.number} className={step.number === view.current_step ? "current" : ""}><button type="button" className="research-step-nav" data-research-step-nav={step.number} onClick={() => onOpenStep?.(step.number)} onKeyDown={(event) => handleResearchStepKeyDown(event, step.number, onOpenStep)} aria-label={openStepLabel(step.number, locale)}><span>{step.number}. {stepName(step.number, locale)}</span><ResearchStateBadge state={step.state} compact labelOverride={isIncompleteFinalStep(step) ? researchIncompleteName(locale) : undefined} /></button></li>)}</ol>
   </section>;
@@ -204,7 +208,7 @@ export function ResearchChecklistDetail({
   onOpenStep?: (step: ResearchStepNumber) => void;
   onOpenVerificationForStep?: (step: ResearchStepNumber) => void;
 }) {
-  const { view, reload } = useResearchChecklistWithReload(candidate);
+  const { view, reload, savePrivateProgress } = useResearchChecklistWithReload(candidate);
   const { locale } = useProductLocale();
   const pl = locale === "pl";
   useEffect(() => {
@@ -225,7 +229,7 @@ export function ResearchChecklistDetail({
         <button type="button" className="research-focus-back" data-research-playbook-back onClick={() => onBackToResearchPlaybook?.()}>{pl ? "← Wróć do Research Playbook" : "← Back to Research Playbook"}</button>
         <strong>{pl ? `Krok ${selectedStep.number}/7` : `Step ${selectedStep.number}/7`}</strong>
       </header>
-      <FocusedResearchStep step={selectedStep} view={view} candidate={candidate} locale={locale} writable={view.manual_evidence_writable} onSaved={reload} onOpenStep={onOpenStep} onOpenVerificationForStep={onOpenVerificationForStep} />
+      <FocusedResearchStep step={selectedStep} view={view} candidate={candidate} locale={locale} writable={view.manual_evidence_writable} onSaved={reload} privateProgress={privateProgressMap(view).get(selectedStep.number) ?? "NOT_STARTED"} privateProgressWritable={view.private_progress_writable} onPrivateProgressSaved={savePrivateProgress} onOpenStep={onOpenStep} onOpenVerificationForStep={onOpenVerificationForStep} />
     </section>;
   }
   return <section className="research-checklist-detail" aria-label={pl ? "7-stopniowa checklista researchu" : "7-step research checklist"}>
@@ -243,6 +247,9 @@ function ResearchStepCard({
   writable = false,
   onSaved,
   onOpenStep,
+  privateProgress,
+  privateProgressWritable = false,
+  onPrivateProgressSaved,
   children,
 }: {
   step: ResearchChecklistStep;
@@ -253,38 +260,45 @@ function ResearchStepCard({
   writable?: boolean;
   onSaved?: () => Promise<void>;
   onOpenStep?: (step: ResearchStepNumber) => void;
+  privateProgress?: PrivateResearchProgressState;
+  privateProgressWritable?: boolean;
+  onPrivateProgressSaved?: (step: ResearchStepNumber, state: PrivateResearchProgressState) => Promise<boolean>;
   children?: React.ReactNode;
 }) {
   const pl = locale === "pl";
   return <section id={`research-checklist-step-${step.number}`} tabIndex={focused ? -1 : undefined} data-research-step={step.number} data-research-focused={focused ? "true" : undefined} className={`research-checklist-step ${focused ? "focused" : ""}`}>
     <header><div><span>{pl ? `KROK ${step.number}` : `STEP ${step.number}`}</span><h4>{stepName(step.number, locale)}</h4></div><ResearchStateBadge state={step.state} labelOverride={isIncompleteFinalStep(step) ? researchIncompleteName(locale) : undefined} /></header>
     {children ?? <ResearchStepBody step={step} view={view} candidate={candidate} locale={locale} writable={writable} onSaved={onSaved} onOpenStep={onOpenStep} />}
+    {focused && candidate && privateProgress && onPrivateProgressSaved && <PrivateResearchProgressPanel step={step.number} state={privateProgress} locale={locale} writable={privateProgressWritable} onSaved={onPrivateProgressSaved} />}
   </section>;
 }
 
-function FocusedResearchStep({ step, view, candidate, locale, writable, onSaved, onOpenStep, onOpenVerificationForStep }: {
+function FocusedResearchStep({ step, view, candidate, locale, writable, onSaved, privateProgress, privateProgressWritable, onPrivateProgressSaved, onOpenStep, onOpenVerificationForStep }: {
   step: ResearchChecklistStep;
   view: ResearchChecklistView;
   candidate: UiTokenCandidate;
   locale: "pl" | "en";
   writable: boolean;
   onSaved: () => Promise<void>;
+  privateProgress: PrivateResearchProgressState;
+  privateProgressWritable: boolean;
+  onPrivateProgressSaved: (step: ResearchStepNumber, state: PrivateResearchProgressState) => Promise<boolean>;
   onOpenStep?: (step: ResearchStepNumber) => void;
   onOpenVerificationForStep?: (step: ResearchStepNumber) => void;
 }) {
   const [technicalExpanded, setTechnicalExpanded] = useState(false);
   if (step.number === 6) {
-    return <ResearchStepCard step={step} candidate={candidate} locale={locale} focused writable={writable} onSaved={onSaved} onOpenStep={onOpenStep}>
+    return <ResearchStepCard step={step} candidate={candidate} locale={locale} focused writable={writable} onSaved={onSaved} onOpenStep={onOpenStep} privateProgress={privateProgress} privateProgressWritable={privateProgressWritable} onPrivateProgressSaved={onPrivateProgressSaved}>
       <ResearchScorecardStep scorecard={view.effective_scorecard} locale={locale} onOpenStep={onOpenStep} />
     </ResearchStepCard>;
   }
   if (step.number === 7) {
-    return <ResearchStepCard step={step} candidate={candidate} locale={locale} focused writable={writable} onSaved={onSaved}>
+    return <ResearchStepCard step={step} candidate={candidate} locale={locale} focused writable={writable} onSaved={onSaved} privateProgress={privateProgress} privateProgressWritable={privateProgressWritable} onPrivateProgressSaved={onPrivateProgressSaved}>
       <ResearchFinalReadinessStep scorecard={view.effective_scorecard} locale={locale} />
     </ResearchStepCard>;
   }
   if (step.number === 5) {
-    return <ResearchStepCard step={step} candidate={candidate} locale={locale} focused writable={writable} onSaved={onSaved}>
+    return <ResearchStepCard step={step} candidate={candidate} locale={locale} focused writable={writable} onSaved={onSaved} privateProgress={privateProgress} privateProgressWritable={privateProgressWritable} onPrivateProgressSaved={onPrivateProgressSaved}>
       <SocialTeamDocsStep step={step} candidate={candidate} writable={writable} locale={locale} onSaved={onSaved} />
     </ResearchStepCard>;
   }
@@ -297,7 +311,7 @@ function FocusedResearchStep({ step, view, candidate, locale, writable, onSaved,
   const redFlags = summaryItems.filter((item) => item.state === "RED_FLAG");
   const toCheck = summaryItems.filter((item) => !isSimpleChecked(item.state) && item.state !== "RED_FLAG");
   const technicalRedFlags = technicalItems.filter((item) => item.state === "RED_FLAG");
-  return <ResearchStepCard step={step} candidate={candidate} locale={locale} focused writable={writable} onSaved={onSaved}>
+  return <ResearchStepCard step={step} candidate={candidate} locale={locale} focused writable={writable} onSaved={onSaved} privateProgress={privateProgress} privateProgressWritable={privateProgressWritable} onPrivateProgressSaved={onPrivateProgressSaved}>
     <section className="research-simple-summary" data-research-simple-summary={step.number} aria-label={pl ? "Prosty status researchu" : "Simple research status"}>
       <header><div><span>{simpleFocusTitle(step.number, locale)}</span><strong>{simpleResearchStatus(view, step, summaryItems, locale)}</strong></div>{technicalRedFlags.length > 0 && <button type="button" className="research-red-flag-reveal" data-research-red-flag-reveal onClick={() => setTechnicalExpanded(true)}>{pl ? `Wykryto ${technicalRedFlags.length} ${technicalRedFlags.length === 1 ? "czerwoną flagę" : "czerwone flagi"}` : `${technicalRedFlags.length} red ${technicalRedFlags.length === 1 ? "flag detected" : "flags detected"}`} <span>{pl ? "Zobacz" : "View"}</span></button>}</header>
       <div className="research-focused-step-summary">
@@ -700,13 +714,60 @@ function useResearchChecklist(candidate: UiTokenCandidate): ResearchChecklistVie
   return useResearchChecklistWithReload(candidate).view;
 }
 
-function useResearchChecklistWithReload(candidate: UiTokenCandidate): { view: ResearchChecklistView; reload: () => Promise<void> } {
+function PrivateResearchProgressPanel({ step, state, locale, writable, onSaved }: {
+  step: ResearchStepNumber;
+  state: PrivateResearchProgressState;
+  locale: "pl" | "en";
+  writable: boolean;
+  onSaved: (step: ResearchStepNumber, state: PrivateResearchProgressState) => Promise<boolean>;
+}) {
+  const pl = locale === "pl";
+  const [displayedState, setDisplayedState] = useState(state);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(false);
+  useEffect(() => { setDisplayedState(state); }, [state]);
+  const save = async (next: PrivateResearchProgressState) => {
+    if (!writable) return;
+    setSaving(true); setError(false);
+    const saved = await onSaved(step, next);
+    setSaving(false);
+    if (!saved) { setError(true); return; }
+    setDisplayedState(next);
+  };
+  return <aside className="research-private-progress" data-research-private-progress-panel={step} aria-label={pl ? "Mój postęp" : "My progress"}>
+    <div><span>{pl ? "MÓJ POSTĘP" : "MY PROGRESS"}</span><strong>{privateResearchProgressLabel(displayedState, locale)}</strong><p>{pl ? "To tylko Twój prywatny postęp. Nie zmienia systemowego wyniku etapu." : "This is only your private progress. It does not change the system stage result."}</p></div>
+    {writable ? <div className="research-private-progress-actions">
+      {displayedState === "NOT_STARTED" && <ActionButton variant="secondary" loading={saving} onClick={() => void save("IN_PROGRESS")}>{pl ? "Rozpocznij" : "Start"}</ActionButton>}
+      {displayedState === "IN_PROGRESS" && <ActionButton variant="secondary" loading={saving} onClick={() => void save("REVIEWED")}>{pl ? "Oznacz jako sprawdzone" : "Mark as reviewed"}</ActionButton>}
+      {displayedState === "REVIEWED" && <><ActionButton variant="tertiary" loading={saving} onClick={() => void save("IN_PROGRESS")}>{pl ? "Oznacz jako w trakcie" : "Mark in progress"}</ActionButton><ActionButton variant="tertiary" disabled={saving} onClick={() => void save("NOT_STARTED")}>{pl ? "Zresetuj" : "Reset"}</ActionButton></>}
+    </div> : <small>{pl ? "Tryb tylko do odczytu." : "Read-only mode."}</small>}
+    {error && <p className="product-inline-error" role="alert">{pl ? "Nie udało się zapisać prywatnego postępu. Spróbuj ponownie." : "Could not save private progress. Please try again."}</p>}
+  </aside>;
+}
+
+function privateProgressMap(view: ResearchChecklistView): ReadonlyMap<ResearchStepNumber, PrivateResearchProgressState> {
+  return new Map(view.private_progress.map((entry) => [entry.step_number, entry.state] as const));
+}
+
+function useResearchChecklistWithReload(candidate: UiTokenCandidate): { view: ResearchChecklistView; reload: () => Promise<void>; savePrivateProgress: (step: ResearchStepNumber, state: PrivateResearchProgressState) => Promise<boolean> } {
   const fallback = useMemo(() => resolveResearchChecklist(candidate), [candidate]);
   const [remoteView, setRemoteView] = useState<ResearchChecklistView | null>(null);
   const identity = `${candidate.chain}:${candidate.contractAddress}`.toLowerCase();
   const reload = useCallback(async () => {
     const value = await loadResearchChecklist(candidate.chain, candidate.contractAddress);
     if (value) setRemoteView(value);
+  }, [candidate.chain, candidate.contractAddress]);
+  const savePrivateProgress = useCallback(async (step: ResearchStepNumber, state: PrivateResearchProgressState): Promise<boolean> => {
+    const progress = await saveResearchProgress({ chain: candidate.chain, contractAddress: candidate.contractAddress, stepNumber: step, state });
+    if (!progress) return false;
+    setRemoteView((current) => {
+      if (!current) return current;
+      const private_progress: PrivateResearchProgress[] = state === "NOT_STARTED"
+        ? current.private_progress.filter((entry) => entry.step_number !== step)
+        : [...current.private_progress.filter((entry) => entry.step_number !== step), progress].sort((left, right) => left.step_number - right.step_number);
+      return { ...current, private_progress };
+    });
+    return true;
   }, [candidate.chain, candidate.contractAddress]);
   useEffect(() => {
     let active = true;
@@ -718,7 +779,7 @@ function useResearchChecklistWithReload(candidate: UiTokenCandidate): { view: Re
   const view = remoteView && `${remoteView.chain}:${remoteView.contract_address}`.toLowerCase() === identity
     ? remoteView
     : fallback;
-  return { view, reload };
+  return { view, reload, savePrivateProgress };
 }
 
 function ResearchProgress({ view }: { view: ResearchChecklistView }) {

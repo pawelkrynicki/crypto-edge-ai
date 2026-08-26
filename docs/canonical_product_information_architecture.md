@@ -254,6 +254,27 @@ guidance instead of a dead link.
     never substituted for each other.
 13. AI ineligibility is distinct from a provider or system failure and gives
     the deterministic eligibility reason without a request/retry action.
+14. A confirmed private-Radar write reconciles the visible private projection
+    immediately; a full-page refresh is never required to show the result.
+15. Private-Radar management is a compact expandable panel below the status
+    row. It never overlays or competes with the card's primary Detail CTA.
+16. Product Radar and Your Radar active markers distinguish a current state
+    from an unassigned state with text, a visible marker and accessible state
+    semantics; colour is supplementary.
+17. Lifecycle truth is keyed by canonical chain plus contract identity, never
+    by a display name or symbol alone.
+18. Research Playbook has two independent axes: canonical system research
+    state and actor-private user review progress.
+19. Private user review progress has exactly `NOT_STARTED`, `IN_PROGRESS` and
+    `REVIEWED` states.
+20. Private `REVIEWED` never advances or completes the canonical Research
+    Playbook, its current step, evidence, scorecard or lifecycle.
+21. Manual research evidence and a private review-progress marker are
+    different records with different meanings and controls.
+22. Deal Breakers keeps one canonical calculated evidence model; a private
+    review marker never creates a second evidence store or resolves a check.
+23. Private progress is isolated by actor/workspace and canonical token
+    identity, and is excluded from every shared AI cache identity.
 
 ## Reports
 

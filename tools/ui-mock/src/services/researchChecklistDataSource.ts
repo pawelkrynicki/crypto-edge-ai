@@ -1,5 +1,7 @@
 import type {
   PersistedManualResearchState,
+  PrivateResearchProgress,
+  PrivateResearchProgressState,
   PublicResearchEvidence,
   ResearchChecklistItemKey,
   ResearchChecklistView,
@@ -14,6 +16,31 @@ export async function loadResearchChecklist(chain: string, contractAddress: stri
     });
     const value = await response.json() as unknown;
     return response.ok && isChecklist(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function saveResearchProgress(input: {
+  chain: string;
+  contractAddress: string;
+  stepNumber: ResearchStepNumber;
+  state: PrivateResearchProgressState;
+}): Promise<PrivateResearchProgress | null> {
+  try {
+    const response = await fetch("/api/research-progress", {
+      method: "PUT",
+      credentials: "same-origin",
+      headers: { accept: "application/json", "content-type": "application/json" },
+      body: JSON.stringify({
+        chain: input.chain,
+        contract_address: input.contractAddress,
+        step_number: input.stepNumber,
+        state: input.state,
+      }),
+    });
+    const value = await response.json() as unknown;
+    return response.ok && isRecord(value) && isProgress(value.progress) ? value.progress : null;
   } catch {
     return null;
   }
@@ -89,12 +116,24 @@ function isChecklist(value: unknown): value is ResearchChecklistView {
     && typeof value.chain === "string"
     && typeof value.contract_address === "string"
     && typeof value.manual_evidence_writable === "boolean"
+    && typeof value.private_progress_writable === "boolean"
+    && Array.isArray(value.private_progress)
     && Number.isSafeInteger(value.current_step)
     && isRecord(value.completeness)
     && Array.isArray(value.steps)
     && isRecord(value.effective_scorecard)
     && value.effective_scorecard.schema_version === "research_scorecard_view_v1"
     && value.effective_scorecard.scoring_version === "research_scorecard_v1";
+}
+
+function isProgress(value: unknown): value is PrivateResearchProgress {
+  return isRecord(value)
+    && value.schema_version === "private_research_progress_sqlite_v1"
+    && typeof value.chain === "string"
+    && typeof value.contract_address === "string"
+    && Number.isSafeInteger(value.step_number)
+    && (value.state === "NOT_STARTED" || value.state === "IN_PROGRESS" || value.state === "REVIEWED")
+    && typeof value.updated_at === "string";
 }
 
 function isEvidence(value: unknown): value is PublicResearchEvidence {

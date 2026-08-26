@@ -126,7 +126,7 @@ describe("P1.1 Radar operational usability", () => {
     assert.match(verificationMarkup, /verification-panel-identity/);
   });
 
-  it("marks every effective Product and Private Radar state as active, including no private assignment", () => {
+  it("marks effective Product and assigned Private Radar states as active, while no assignment is neutral", () => {
     const mainMarkup = renderToStaticMarkup(
       <ProductLocaleProvider initialLocale="pl">
         <PersonalRadarPanel chain="bsc" contractAddress="0x1111111111111111111111111111111111111111" initialView={lifecycleTokenView("FOLLOW_UP", "MAIN_RADAR", true)} />
@@ -144,7 +144,8 @@ describe("P1.1 Radar operational usability", () => {
     );
     assert.match(unassignedMarkup, /Radar produktu: Dalsza obserwacja/);
     assert.match(unassignedMarkup, /Twój Radar: Brak prywatnego przypisania/);
-    assert.equal((unassignedMarkup.match(/data-status-active="true"/g) ?? []).length, 2);
+    assert.equal((unassignedMarkup.match(/data-status-active="true"/g) ?? []).length, 1);
+    assert.match(unassignedMarkup, /data-status-active="false"/);
   });
 
   it("keeps the Your Radar heading outside a three-card desktop grid and uses two columns on tablets", async () => {

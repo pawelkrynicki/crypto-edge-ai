@@ -4,8 +4,11 @@ import { fileURLToPath } from "node:url";
 import { resolveTokenIdentity } from "../src/tokenLifecycle.js";
 import {
   isPersistedManualResearchState,
+  isPrivateResearchProgressState,
   isResearchChecklistItemKey,
   type PersistedManualResearchState,
+  type PrivateResearchProgress,
+  type PrivateResearchProgressState,
   type PublicResearchEvidence,
   type ResearchChecklistItemKey,
   type ResearchStepNumber,
@@ -13,6 +16,7 @@ import {
 
 export const RESEARCH_EVIDENCE_SCHEMA_VERSION = "research_evidence_sqlite_v1";
 export const PRIVATE_VERIFICATION_DECISION_SCHEMA_VERSION = "private_verification_decision_sqlite_v1";
+export const PRIVATE_RESEARCH_PROGRESS_SCHEMA_VERSION = "private_research_progress_sqlite_v1";
 
 export type PrivateVerificationVerdict = "VERIFIED" | "NEEDS_MORE_DATA" | "CRITICAL_RISK" | "REJECT";
 
@@ -187,6 +191,72 @@ WHERE actor_id = ? AND chain = ? AND contract_address = ? AND step_number = ? AN
       }
     },
 
+    listProgress(actorId: string, chain: string, contractAddress: string): PrivateResearchProgress[] {
+      const actor = safeActor(actorId);
+      const identity = normalizeIdentity(chain, contractAddress);
+      try {
+        return database.prepare(`
+SELECT schema_version, chain, contract_address, step_number, state, updated_at
+FROM private_research_progress
+WHERE actor_id = ? AND chain = ? AND contract_address = ?
+ORDER BY step_number ASC
+`).all(actor, identity.chain, identity.contract_address).map(mapPrivateResearchProgress);
+      } catch {
+        throw new ResearchEvidenceError("RESEARCH_EVIDENCE_UNAVAILABLE");
+      }
+    },
+
+    saveProgress(input: {
+      actorId: string;
+      chain: string;
+      contractAddress: string;
+      stepNumber: ResearchStepNumber;
+      state: PrivateResearchProgressState;
+      now?: Date;
+    }): PrivateResearchProgress {
+      const actor = safeActor(input.actorId);
+      const identity = normalizeIdentity(input.chain, input.contractAddress);
+      const step = safeStep(input.stepNumber);
+      const state = safePrivateResearchProgressState(input.state);
+      const now = input.now ?? new Date();
+      if (!Number.isFinite(now.getTime())) throw new ResearchEvidenceError("RESEARCH_EVIDENCE_INPUT_INVALID");
+      const updatedAt = now.toISOString();
+      try {
+        if (state === "NOT_STARTED") {
+          database.prepare(`
+DELETE FROM private_research_progress
+WHERE actor_id = ? AND chain = ? AND contract_address = ? AND step_number = ?
+`).run(actor, identity.chain, identity.contract_address, step);
+          return {
+            schema_version: PRIVATE_RESEARCH_PROGRESS_SCHEMA_VERSION,
+            chain: identity.chain,
+            contract_address: identity.contract_address,
+            step_number: step,
+            state,
+            updated_at: updatedAt,
+          };
+        }
+        database.prepare(`
+INSERT INTO private_research_progress (
+  actor_id, schema_version, chain, contract_address, step_number, state, created_at, updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(actor_id, chain, contract_address, step_number) DO UPDATE SET
+  schema_version = excluded.schema_version,
+  state = excluded.state,
+  updated_at = excluded.updated_at
+`).run(actor, PRIVATE_RESEARCH_PROGRESS_SCHEMA_VERSION, identity.chain, identity.contract_address, step, state, updatedAt, updatedAt);
+        const row = database.prepare(`
+SELECT schema_version, chain, contract_address, step_number, state, updated_at
+FROM private_research_progress
+WHERE actor_id = ? AND chain = ? AND contract_address = ? AND step_number = ?
+`).get(actor, identity.chain, identity.contract_address, step);
+        return mapPrivateResearchProgress(row);
+      } catch (error) {
+        if (error instanceof ResearchEvidenceError) throw error;
+        throw new ResearchEvidenceError("RESEARCH_EVIDENCE_UNAVAILABLE");
+      }
+    },
+
     getVerificationDecision(actorId: string, chain: string, contractAddress: string): PrivateVerificationDecision | null {
       const actor = safeActor(actorId);
       const identity = normalizeIdentity(chain, contractAddress);
@@ -308,11 +378,26 @@ CREATE TABLE IF NOT EXISTS private_verification_decisions (
 );
 CREATE INDEX IF NOT EXISTS private_verification_decisions_actor_identity_idx
   ON private_verification_decisions(actor_id, chain, contract_address, updated_at DESC);
+CREATE TABLE IF NOT EXISTS private_research_progress (
+  actor_id TEXT NOT NULL,
+  schema_version TEXT NOT NULL,
+  chain TEXT NOT NULL,
+  contract_address TEXT NOT NULL,
+  step_number INTEGER NOT NULL,
+  state TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (actor_id, chain, contract_address, step_number)
+);
+CREATE INDEX IF NOT EXISTS private_research_progress_actor_identity_idx
+  ON private_research_progress(actor_id, chain, contract_address, updated_at DESC);
 `);
   database.prepare("INSERT INTO research_evidence_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
     .run("schema_version", RESEARCH_EVIDENCE_SCHEMA_VERSION);
   database.prepare("INSERT INTO research_evidence_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
     .run("private_verification_decision_schema_version", PRIVATE_VERIFICATION_DECISION_SCHEMA_VERSION);
+  database.prepare("INSERT INTO research_evidence_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+    .run("private_research_progress_schema_version", PRIVATE_RESEARCH_PROGRESS_SCHEMA_VERSION);
 }
 
 function mapEvidence(value: unknown): PublicResearchEvidence {
@@ -360,6 +445,22 @@ function mapPrivateVerificationDecision(value: unknown): PrivateVerificationDeci
   };
 }
 
+function mapPrivateResearchProgress(value: unknown): PrivateResearchProgress {
+  if (!isRecord(value)) throw new ResearchEvidenceError("RESEARCH_EVIDENCE_UNAVAILABLE");
+  const identity = normalizeIdentity(value.chain, value.contract_address);
+  if (value.schema_version !== PRIVATE_RESEARCH_PROGRESS_SCHEMA_VERSION) {
+    throw new ResearchEvidenceError("RESEARCH_EVIDENCE_UNAVAILABLE");
+  }
+  return {
+    schema_version: PRIVATE_RESEARCH_PROGRESS_SCHEMA_VERSION,
+    chain: identity.chain,
+    contract_address: identity.contract_address,
+    step_number: safeStep(value.step_number),
+    state: safePrivateResearchProgressState(value.state),
+    updated_at: strictTimestamp(value.updated_at),
+  };
+}
+
 function normalizeIdentity(chain: unknown, contractAddress: unknown): Identity {
   if (typeof chain !== "string" || typeof contractAddress !== "string") throw new ResearchEvidenceError("RESEARCH_EVIDENCE_INPUT_INVALID");
   const resolved = resolveTokenIdentity(chain, contractAddress);
@@ -391,6 +492,11 @@ function safePrivateVerificationVerdict(value: unknown): PrivateVerificationVerd
   if (value !== "VERIFIED" && value !== "NEEDS_MORE_DATA" && value !== "CRITICAL_RISK" && value !== "REJECT") {
     throw new ResearchEvidenceError("RESEARCH_EVIDENCE_INPUT_INVALID");
   }
+  return value;
+}
+
+function safePrivateResearchProgressState(value: unknown): PrivateResearchProgressState {
+  if (!isPrivateResearchProgressState(value)) throw new ResearchEvidenceError("RESEARCH_EVIDENCE_INPUT_INVALID");
   return value;
 }
 

@@ -443,8 +443,9 @@ describe("PC.1 bounded lifecycle Radar API", () => {
       let markup = JSON.stringify(renderer!.toJSON());
       assert.match(markup, /Product Radar[\s\S]*New/);
       assert.match(markup, /Your Radar[\s\S]*Follow-up/);
-      assert.match(markup, /Move to my Main Radar/);
       await act(async () => { action().props.onClick(); });
+      markup = JSON.stringify(renderer!.toJSON());
+      assert.match(markup, /Move to my Main Radar/);
       saveButton = renderer!.root.findAllByType("button").find((node) => node.props["data-action-variant"] === "primary")!;
       await act(async () => { saveButton.props.onClick(); await flush(); });
       markup = JSON.stringify(renderer!.toJSON());
@@ -455,10 +456,9 @@ describe("PC.1 bounded lifecycle Radar API", () => {
       await act(async () => { saveButton.props.onClick(); await flush(); });
       markup = JSON.stringify(renderer!.toJSON());
       assert.match(markup, /Your Radar[\s\S]*Follow-up/);
+      await act(async () => { action().props.onClick(); });
       const remove = renderer!.root.findAllByType("button").find((node) => String(node.children?.join("")) === "Remove from my Radar")!;
-      await act(async () => { remove.props.onClick(); });
-      const removeConfirmation = renderer!.root.findAllByType("button").find((node) => node.props["data-action-variant"] === "tertiary" && String(node.children?.join("")) === "Remove from my Radar")!;
-      await act(async () => { removeConfirmation.props.onClick(); await flush(); });
+      await act(async () => { remove.props.onClick(); await flush(); });
       markup = JSON.stringify(renderer!.toJSON());
       assert.match(markup, /Your Radar[\s\S]*New/);
       assert.deepEqual(submitted.map(({ target_status, override_reason }) => ({ target_status, override_reason })), [
@@ -469,6 +469,34 @@ describe("PC.1 bounded lifecycle Radar API", () => {
       ]);
     } finally {
       if (renderer) await act(async () => { renderer!.unmount(); });
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("keeps the last confirmed private state when a private Radar write fails", async () => {
+    const originalFetch = globalThis.fetch;
+    const initial: LifecycleTokenView = {
+      identity: IDENTITY,
+      system_status: "FOLLOW_UP",
+      user_status: "FOLLOW_UP",
+      user_status_is_override: false,
+      conditions: UNMET,
+      actor: { role: "CAMP_USER", capabilities: ["CAMP_USER_WORKSPACE_WRITE"] },
+    };
+    globalThis.fetch = (async () => new Response(JSON.stringify({ error: "failed" }), { status: 500, headers: { "content-type": "application/json" } })) as typeof fetch;
+    let renderer: ReturnType<typeof create> | undefined;
+    try {
+      await act(async () => { renderer = create(React.createElement(ProductLocaleProvider, { initialLocale: "pl" }, React.createElement(PersonalRadarPanel, { chain: "base", contractAddress: ADDRESS, initialView: initial }))); });
+      const manage = renderer!.root.findAllByType("button").find((node) => node.props["aria-expanded"] === false)!;
+      await act(async () => { manage.props.onClick(); });
+      const main = renderer!.root.findAllByType("button").find((node) => String(node.children?.join("")) === "Przenieś do mojego Głównego Radaru")!;
+      await act(async () => { main.props.onClick(); await flush(); });
+      const markup = JSON.stringify(renderer!.toJSON());
+      assert.match(markup, /Radar produktu[\s\S]*Dalsza obserwacja/);
+      assert.match(markup, /Twój Radar[\s\S]*Brak prywatnego przypisania/);
+      assert.match(markup, /Nie udało się zapisać zmiany/);
+    } finally {
+      renderer?.unmount();
       globalThis.fetch = originalFetch;
     }
   });
@@ -567,7 +595,7 @@ describe("PC.1 bounded lifecycle Radar API", () => {
         await flush();
       });
       const markup = JSON.stringify(renderer!.toJSON());
-      assert.match(markup, /Move to Follow-up/);
+      assert.match(markup, /Manage my Radar/);
       assert.match(markup, /Open details/);
       const footer = renderer!.root.find((node) => typeof node.props.className === "string" && node.props.className.includes("lifecycle-radar-card-footer"));
       assert.equal(footer.findAllByType("button").length, 2);
