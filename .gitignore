@@ -42,6 +42,7 @@ Thumbs.db
 # Local outputs
 coverage/
 htmlcov/
+release-artifacts/
 tools/data-poc/output/
 tools/data-poc/.local/
 tools/ui-mock/.local/
