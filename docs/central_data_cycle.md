@@ -20,6 +20,8 @@ Tożsamością Follow-up jest wyłącznie znormalizowane `chain + contract_addre
 
 Scanner/context są najpierw walidowane i publikowane do niezmiennych katalogów runu przez plik tymczasowy i atomic rename. Dopiero końcowy zapis `automation-state.json` zatwierdza `last_published_scanner_run_id` oraz `last_published_context_run_id`. API INTERNAL_BETA czyta tylko te wskaźniki, więc kompletny, lecz osierocony plik po przerwanym cyklu nie staje się widoczny.
 
+Jawny `OWNER_ONE_SHOT` wykonuje ten końcowy, atomowy commit publikacji po wyniku `SUCCESS` albo prawidłowym `PARTIAL`; dzięki temu może bezpiecznie utworzyć pierwszy `automation-state.json` na świeżym VPS. Nie jest to uruchomienie schedulera: one-shot nie instaluje zadania, nie włącza ani nie wznawia automatyzacji, nie ustawia pobudek ani retry i zachowuje istniejące `automation_suspended`, `resume_required`, `suspended_at` oraz `suspended_reason`. Błąd one-shot nie przesuwa wskaźników LKG ani nie zapisuje stanu błędu schedulera.
+
 Jeśli jedno źródło context jest chwilowo niedostępne, cykl może przenieść tylko jego poprzedni, nadal poprawny snapshot i oznacza źródło oraz cały cykl `PARTIAL`. Brak poprawnego LKG zatrzymuje publikację. Pełny błąd zachowuje poprzednie wskaźniki i zwraca w UI `LAST_KNOWN_GOOD`; nie ma automatycznego retry całego cyklu.
 
 `GET /api/automation/status` udostępnia bezpieczne pola: cycle ID/status/duration, czasy próby/sukcesu/snapshotu, wiek snapshotu, received/valid/rejected/new, Follow-up ingest, checkpointy, source health, kod błędu i status danych `FRESH`, `STALE`, `PARTIAL`, `LAST_KNOWN_GOOD`, `IN_PROGRESS` albo `UNAVAILABLE`. UI pokazuje osobno czas snapshotu oraz lokalny czas odświeżenia widoku.
@@ -46,7 +48,7 @@ Jedyny jawny tryb live:
 scripts\win\run-central-data-cycle.cmd --run-once-live
 ```
 
-Launcher wymaga `INTERNAL_BETA`, podwójnego opt-in dla providera danych, ustawia AI research provider na `DISABLED`, czyści `OPENAI_API_KEY`, nie wykonuje retry, nie dotyka feedbacku, VPS, Cloudflare ani Task Scheduler. Po zdobyciu locka, przed pierwszą mutacją, zapisuje manifest backupu pod `tools/data-poc/.local/data-cycle/backups/<backup_id>/manifest.json`. Manifest zawiera relative path, rozmiar, SHA-256, mtime oraz chroniony hash Established Universe. Receipt cyklu znajduje się w `tools/data-poc/.local/data-cycle/last-run-once.json`.
+Launcher wymaga `INTERNAL_BETA`, podwójnego opt-in dla providera danych, ustawia AI research provider na `DISABLED`, czyści `OPENAI_API_KEY`, nie wykonuje retry, nie dotyka feedbacku, VPS, Cloudflare ani Task Scheduler. Po zdobyciu locka, przed pierwszą mutacją, zapisuje manifest backupu pod `tools/data-poc/.local/data-cycle/backups/<backup_id>/manifest.json`. Manifest zawiera relative path, rozmiar, SHA-256, mtime oraz chroniony hash Established Universe. Receipt cyklu znajduje się w `tools/data-poc/.local/data-cycle/last-run-once.json`. Na świeżym VPS prawidłowy wynik one-shot publikuje również pierwsze wskaźniki scanner/context w `automation-state.json`, ale nadal nie aktywuje automatyzacji trwałej.
 
 Rollback konkretnego backupu:
 

@@ -1,9 +1,14 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
+import { access, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { afterEach, describe, it } from "node:test";
-import { createInitialAutomationState, type AutomationState, type AutomationStateStore } from "../src/automation/automationState.js";
+import {
+  createAutomationStateStore,
+  createInitialAutomationState,
+  type AutomationState,
+  type AutomationStateStore,
+} from "../src/automation/automationState.js";
 import { acquireGlobalCollectorLock } from "../src/automation/globalCollectorLock.js";
 import { runCentralLiveCycleOnce, runCentralSchedulerOnce } from "../src/automation/runCentralAutomation.js";
 
@@ -14,7 +19,7 @@ afterEach(async () => {
 });
 
 describe("owner one-shot central data smoke", () => {
-  it("executes once from a suspended operator state and preserves that state without scheduling a follow-up", async () => {
+  it("publishes one successful suspended owner run without resuming or scheduling automation", async () => {
     const automationDirectoryPath = await tempAutomationDirectory();
     const before: AutomationState = {
       ...createInitialAutomationState(),
@@ -38,8 +43,14 @@ describe("owner one-shot central data smoke", () => {
 
     assert.equal(result.run_status, "SUCCESS");
     assert.equal(runnerCalls, 1);
-    assert.equal(store.writes, 0);
-    assert.deepEqual(store.state, before);
+    assert.equal(store.writes, 1);
+    assert.equal(store.state.last_published_scanner_run_id, "scan_owner_once");
+    assert.equal(store.state.last_published_context_run_id, "context_owner_once");
+    assert.equal(store.state.automation_suspended, true);
+    assert.equal(store.state.resume_required, true);
+    assert.equal(store.state.suspended_at, before.suspended_at);
+    assert.equal(store.state.suspended_reason, before.suspended_reason);
+    assert.equal(store.state.next_scanner_run_at, before.next_scanner_run_at);
 
     const scheduled = await runCentralSchedulerOnce({
       enabled: true,
@@ -52,6 +63,33 @@ describe("owner one-shot central data smoke", () => {
       },
     });
     assert.equal(scheduled.decision, "AUTOMATION_SUSPENDED");
+  });
+
+  it("creates and atomically commits a fresh owner one-shot publication state", async () => {
+    const automationDirectoryPath = await tempAutomationDirectory();
+    const result = await runCentralLiveCycleOnce({
+      automationDirectoryPath,
+      now: () => new Date("2026-08-28T14:40:00.000Z"),
+      runner: async () => ({
+        request_counts: { dexscreener: 0, alternative_me_fng: 0, defillama_api: 0 },
+        scanner_run_id: "scan_fresh_vps_owner_once",
+        context_run_id: "approved_sources_fresh_vps_owner_once",
+        snapshot_generated_at: "2026-08-28T14:40:00.000Z",
+        source_statuses: { dexscreener: "READY", alternative_me_fng: "READY", defillama_api: "READY" },
+      }),
+    });
+
+    assert.equal(result.run_status, "SUCCESS");
+    const statePath = resolve(automationDirectoryPath, "automation-state.json");
+    await access(statePath);
+    const state = await createAutomationStateStore(automationDirectoryPath).read();
+    assert.equal(state.last_published_scanner_run_id, "scan_fresh_vps_owner_once");
+    assert.equal(state.last_published_context_run_id, "approved_sources_fresh_vps_owner_once");
+    assert.equal(state.automation_suspended, false);
+    assert.equal(state.resume_required, false);
+    assert.equal(state.next_scanner_run_at, null);
+    assert.equal(state.next_alternative_me_run_at, null);
+    assert.equal(state.next_defillama_run_at, null);
   });
 
   it("preserves an enabled schedule and lets only its normal future cadence run", async () => {
@@ -77,8 +115,12 @@ describe("owner one-shot central data smoke", () => {
       },
     });
     assert.equal(oneShotCalls, 1);
-    assert.equal(store.writes, 0);
-    assert.deepEqual(store.state, before);
+    assert.equal(store.writes, 1);
+    assert.equal(store.state.last_published_scanner_run_id, "scan_owner_once");
+    assert.equal(store.state.last_published_context_run_id, "context_owner_once");
+    assert.equal(store.state.next_scanner_run_at, before.next_scanner_run_at);
+    assert.equal(store.state.next_defillama_run_at, before.next_defillama_run_at);
+    assert.equal(store.state.next_alternative_me_run_at, before.next_alternative_me_run_at);
 
     const beforeCadence = await runCentralSchedulerOnce({
       enabled: true,
@@ -135,6 +177,70 @@ describe("owner one-shot central data smoke", () => {
     } finally {
       if (active.status === "ACQUIRED") await active.release();
     }
+  });
+
+  it("does not publish a failed one-shot or change its suspended governance", async () => {
+    const automationDirectoryPath = await tempAutomationDirectory();
+    const before: AutomationState = {
+      ...createInitialAutomationState(),
+      last_published_scanner_run_id: "scan_last_known_good",
+      last_published_context_run_id: "approved_sources_last_known_good",
+      automation_suspended: true,
+      suspended_at: "2026-08-25T10:00:00.000Z",
+      suspended_reason: "TEST_SUSPENSION",
+      resume_required: true,
+      retry_not_before: "2026-08-25T10:30:00.000Z",
+    };
+    const store = memoryStore(before);
+
+    const result = await runCentralLiveCycleOnce({
+      automationDirectoryPath,
+      stateStore: store.store,
+      runner: async () => {
+        throw Object.assign(new Error("mock provider failure"), { code: "MOCK_PROVIDER_FAILED" });
+      },
+    });
+
+    assert.equal(result.run_status, "FAILED");
+    assert.equal(store.writes, 0);
+    assert.deepEqual(store.state, before);
+  });
+
+  it("publishes a valid partial one-shot without changing scheduler governance", async () => {
+    const automationDirectoryPath = await tempAutomationDirectory();
+    const before: AutomationState = {
+      ...createInitialAutomationState(),
+      scheduler_schema_version: "central_source_scheduler_v2",
+      last_scheduler_check_at: "2026-08-28T14:30:00.000Z",
+      last_decision: "NOTHING_DUE",
+      next_scanner_run_at: "2026-08-28T14:45:00.000Z",
+      next_alternative_me_run_at: "2026-08-28T20:30:00.000Z",
+      next_defillama_run_at: "2026-08-28T16:30:00.000Z",
+      consecutive_failure_count: 2,
+      retry_not_before: "2026-08-28T14:35:00.000Z",
+    };
+    const store = memoryStore(before);
+
+    const result = await runCentralLiveCycleOnce({
+      automationDirectoryPath,
+      stateStore: store.store,
+      runner: async () => ({
+        scanner_run_id: "scan_partial_owner_once",
+        context_run_id: "approved_sources_partial_owner_once",
+        source_statuses: { dexscreener: "READY", defillama_api: "DEGRADED" },
+      }),
+    });
+
+    assert.equal(result.run_status, "PARTIAL");
+    assert.equal(store.writes, 1);
+    assert.equal(store.state.last_published_scanner_run_id, "scan_partial_owner_once");
+    assert.equal(store.state.last_published_context_run_id, "approved_sources_partial_owner_once");
+    assert.equal(store.state.last_result, "PARTIAL");
+    assert.equal(store.state.next_scanner_run_at, before.next_scanner_run_at);
+    assert.equal(store.state.next_alternative_me_run_at, before.next_alternative_me_run_at);
+    assert.equal(store.state.next_defillama_run_at, before.next_defillama_run_at);
+    assert.equal(store.state.consecutive_failure_count, before.consecutive_failure_count);
+    assert.equal(store.state.retry_not_before, before.retry_not_before);
   });
 });
 

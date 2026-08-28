@@ -8,6 +8,11 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+if ($ReleaseId -notmatch '^CAMP2026-VPS-(RC[0-9]+)$') {
+  throw "RELEASE_ID_INVALID:$ReleaseId"
+}
+$localTag = "camp2026-vps-$($Matches[1].ToLowerInvariant())"
+
 function Require-Command([string]$Name) {
   if (-not (Get-Command $Name -ErrorAction SilentlyContinue)) {
     throw "REQUIRED_COMMAND_MISSING:$Name"
@@ -166,7 +171,7 @@ try {
     packaging_commit_sha = $head
     git_commit = $head
     git_branch = $branch
-    git_tag = "camp2026-vps-rc1"
+    git_tag = $localTag
     runtime_mode = "INTERNAL_BETA"
     target_platform = "Windows VPS"
     default_internal_host = "127.0.0.1"
@@ -228,7 +233,7 @@ try {
     "",
     "- Release: $ReleaseId",
     "- Commit: $head",
-    "- Local tag: camp2026-vps-rc1",
+    "- Local tag: $localTag",
     "- Runtime: INTERNAL_BETA",
     "- Application archive: $appArchiveName",
     "- Application archive SHA-256: $($manifest.application_archive_sha256)",
@@ -243,7 +248,7 @@ try {
 
   Copy-Item -LiteralPath (Join-Path $repoRoot "tools\ui-mock\.env.example") -Destination $environmentTemplate -Force
   @(
-    "# CAMP2026 VPS RC1 rollback manifest",
+    "# $ReleaseId rollback manifest",
     "",
     "- Release: $ReleaseId",
     "- Application rollback source: previously verified application archive and checksum.",

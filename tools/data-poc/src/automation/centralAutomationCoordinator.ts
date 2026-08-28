@@ -170,8 +170,7 @@ export async function runCentralAutomation<T extends CentralAutomationRunnerResu
     }
 
     const cycleStatus = resolveCycleStatus(result);
-    if (!isOwnerOneShot) {
-      await writeStateFailClosed(stateStore, buildCompletedState(
+    const completedState = buildCompletedState(
         previous,
         runId,
         attemptAt,
@@ -179,7 +178,15 @@ export async function runCentralAutomation<T extends CentralAutomationRunnerResu
         result,
         options.mode ?? "scanner_and_context",
         cycleStatus,
-      ));
+      );
+    if (isOwnerOneShot) {
+      // A one-shot is not a scheduler run, but its validated immutable outputs must
+      // still become the canonical product snapshot. Keep all scheduler and
+      // suspension governance exactly as it was while atomically advancing only
+      // the completed data-publication state.
+      await writeStateFailClosed(stateStore, buildOwnerOneShotPublicationState(previous, completedState));
+    } else {
+      await writeStateFailClosed(stateStore, completedState);
     }
     return { status: cycleStatus, run_id: runId, result };
   } finally {
@@ -241,6 +248,35 @@ function buildCompletedState<T extends CentralAutomationRunnerResult>(
       : previous.next_defillama_run_at,
     consecutive_failure_count: 0,
     retry_not_before: null,
+  };
+}
+
+function buildOwnerOneShotPublicationState(
+  previous: AutomationState,
+  completed: AutomationState,
+): AutomationState {
+  return {
+    ...completed,
+    // Scheduler observation and cadence remain owned by the persistent scheduler.
+    scheduler_schema_version: previous.scheduler_schema_version,
+    last_scheduler_check_at: previous.last_scheduler_check_at,
+    last_decision: previous.last_decision,
+    next_scanner_run_at: previous.next_scanner_run_at,
+    next_alternative_me_run_at: previous.next_alternative_me_run_at,
+    next_defillama_run_at: previous.next_defillama_run_at,
+    last_scanner_success_at: previous.last_scanner_success_at,
+    last_context_success_at: previous.last_context_success_at,
+    last_scanner_run_id: previous.last_scanner_run_id,
+    last_context_run_id: previous.last_context_run_id,
+    missed_schedule_count: previous.missed_schedule_count,
+    consecutive_failure_count: previous.consecutive_failure_count,
+    retry_not_before: previous.retry_not_before,
+    // An explicit owner run must never resume or clear suspended governance.
+    automation_suspended: previous.automation_suspended,
+    suspended_at: previous.suspended_at,
+    suspended_reason: previous.suspended_reason,
+    last_failure_class: previous.last_failure_class,
+    resume_required: previous.resume_required,
   };
 }
 

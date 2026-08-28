@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { access, mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { after, before, describe, it } from "node:test";
 import { createScannerApiServer } from "../server/scannerApiServer.js";
+import { resolveCanonicalProductDataPaths } from "../server/canonicalProductDataPaths.js";
 import {
   ContextOutputError,
   readLatestContextOutput,
@@ -21,6 +22,8 @@ import type {
   PersistableScannerOutput,
 } from "../src/types/scannerTypes.js";
 import { getWorkspaceNavGroups } from "../src/workspaceNavigation.js";
+import { createAutomationStateStore } from "../../data-poc/src/automation/automationState.js";
+import { runCentralLiveCycleOnce } from "../../data-poc/src/automation/runCentralAutomation.js";
 
 const NOW = new Date("2026-07-16T12:00:00.000Z");
 let tempRoot = "";
@@ -346,6 +349,93 @@ describe("API and frontend fail-closed behavior", () => {
       assert.notEqual(contextResult.reason_code, "DATA_UNAVAILABLE");
       assert.equal(isRecord(scannerResult._source_meta) && scannerResult._source_meta.selected_run_id, committedScanner.scan_run.run_id);
       assert.equal(contextResult.run_id, committedContext.run_id);
+    } finally {
+      await close(server);
+    }
+  });
+
+  it("bootstraps a fresh VPS owner one-shot into canonical INTERNAL_BETA readiness", async () => {
+    const productRoot = resolve(tempRoot, `fresh-vps-${crypto.randomUUID()}`);
+    const dataPocRoot = resolve(productRoot, "data-poc");
+    const automationDirectoryPath = resolve(dataPocRoot, ".local", "automation");
+    const outputDirPath = resolve(dataPocRoot, "output");
+    const statePath = resolve(automationDirectoryPath, "automation-state.json");
+    const scannerRunId = "scan_fresh_vps_owner_once";
+    const contextRunId = "approved_sources_fresh_vps_owner_once";
+    await mkdir(automationDirectoryPath, { recursive: true });
+    await writeFile(resolve(dataPocRoot, "package.json"), JSON.stringify({ name: "@crypto-edge-ai/data-poc" }), "utf8");
+
+    let injectedProviderRuns = 0;
+    const openAiCalls = 0;
+    const result = await runCentralLiveCycleOnce({
+      automationDirectoryPath,
+      now: () => NOW,
+      runner: async () => {
+        injectedProviderRuns += 1;
+        const scanner = makeScannerOutput();
+        setScannerRunId(scanner, scannerRunId);
+        setScannerTime(scanner, NOW.toISOString());
+        const context = makeContextOutput();
+        setContextIdentity(context, contextRunId, NOW.toISOString());
+        setScannerManifestV2(scanner, contextRunId);
+        await mkdir(resolve(outputDirPath, scannerRunId), { recursive: true });
+        await mkdir(resolve(outputDirPath, contextRunId), { recursive: true });
+        await writeFile(resolve(outputDirPath, scannerRunId, "full_output.json"), JSON.stringify(scanner), "utf8");
+        await writeFile(resolve(outputDirPath, contextRunId, "approved_sources_output.json"), JSON.stringify(context), "utf8");
+        return {
+          request_counts: { dexscreener: 0, goplus_security: 0, alternative_me_fng: 0, defillama_api: 0 },
+          scanner_run_id: scannerRunId,
+          context_run_id: contextRunId,
+          snapshot_generated_at: NOW.toISOString(),
+          source_statuses: { dexscreener: "READY", goplus_security: "READY", alternative_me_fng: "READY", defillama_api: "READY" },
+        };
+      },
+    });
+
+    assert.equal(result.run_status, "SUCCESS");
+    assert.equal(injectedProviderRuns, 1);
+    assert.equal(openAiCalls, 0);
+    await access(statePath);
+    const state = await createAutomationStateStore(automationDirectoryPath).read();
+    assert.equal(state.last_published_scanner_run_id, scannerRunId);
+    assert.equal(state.last_published_context_run_id, contextRunId);
+    assert.equal(state.next_scanner_run_at, null);
+    assert.equal(state.automation_suspended, false);
+
+    const priorDataPocRoot = process.env.CRYPTO_EDGE_DATA_POC_ROOT;
+    process.env.CRYPTO_EDGE_DATA_POC_ROOT = dataPocRoot;
+    try {
+      const canonical = await resolveCanonicalProductDataPaths();
+      assert.equal(canonical.automationStatePath, statePath);
+      assert.equal(canonical.scannerRunId, scannerRunId);
+      assert.equal(canonical.contextRunId, contextRunId);
+      assert.equal(canonical.outputDirPath, outputDirPath);
+    } finally {
+      if (priorDataPocRoot === undefined) delete process.env.CRYPTO_EDGE_DATA_POC_ROOT;
+      else process.env.CRYPTO_EDGE_DATA_POC_ROOT = priorDataPocRoot;
+    }
+
+    const [scanner, context] = await Promise.all([
+      readLatestScannerOutput({ runtimeMode: "INTERNAL_BETA", outputDirPath, automationStatePath: statePath, now: NOW }),
+      readLatestContextOutput({ runtimeMode: "INTERNAL_BETA", outputDirPath, automationStatePath: statePath, now: NOW }),
+    ]);
+    assert.equal(isRecord(scanner._source_meta) && scanner._source_meta.selected_run_id, scannerRunId);
+    assert.equal(context.run_id, contextRunId);
+
+    const server = createScannerApiServer({
+      runtimeMode: "INTERNAL_BETA",
+      scanner: { outputDirPath, automationStatePath: statePath, now: NOW },
+      context: { outputDirPath, automationStatePath: statePath, now: NOW },
+      automation: { enabled: false, stateFilePath: statePath },
+    });
+    await listen(server);
+    try {
+      const address = server.address() as AddressInfo;
+      const response = await fetch(`http://127.0.0.1:${address.port}/api/readiness`);
+      const readiness = await response.json() as Record<string, unknown>;
+      assert.equal(response.status, 200);
+      assert.equal(isRecord(readiness.scanner) && readiness.scanner.ready, true);
+      assert.equal(isRecord(readiness.context) && readiness.context.ready, true);
     } finally {
       await close(server);
     }

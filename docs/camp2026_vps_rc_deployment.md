@@ -1,7 +1,7 @@
-# CAMP2026 VPS RC1 deployment and rollback
+# CAMP2026 VPS RC2 deployment and rollback
 
-Release identifier: `CAMP2026-VPS-RC1`
-Local tag: `camp2026-vps-rc1`
+Release identifier: `CAMP2026-VPS-RC2`
+Local tag: `camp2026-vps-rc2`
 Runtime: `INTERNAL_BETA`
 
 ## Release boundary
@@ -59,7 +59,7 @@ This RC intentionally starts without a copied shared-state bundle. The deploymen
 2. **VPS.2 — verify local same-origin runtime.** Start only `start-product-vps.cmd`, check `/api/health`, `/api/readiness`, `/api/scanner/latest`, and the frontend. Stop it after the check if no operator session is required.
 3. **VPS.3 — restore/bootstrap approved shared product state.** This RC has no default bootstrap. Use only a later store-level owner-approved export with validation and restore preview.
 4. **VPS.4 — verify AI configuration only after explicit owner authorization.** Add the server-side AI secrets/configuration through the protected environment boundary, keep `CRYPTO_EDGE_AI_WORKER_ENABLED=0`, and make no AI call until a separately authorized smoke test.
-5. **VPS.5 — verify one central data operation only after explicit owner authorization.** A one-shot must use the approved owner operation and its normal guards. It must not become a scheduled task.
+5. **VPS.5 — verify one central data operation only after explicit owner authorization.** A one-shot must use the approved owner operation and its normal guards. On a fresh VPS, a successful or valid partial one-shot atomically creates `tools/data-poc/.local/automation/automation-state.json` and commits the validated scanner/context run pointers, so `/api/readiness` can resolve those exact snapshots. It must not install a Task Scheduler task, enable or resume persistent automation, schedule a wake-up/retry, or clear suspension governance.
 6. **VPS.6 — enable persistent central automation only after all previous gates pass.** First run the offline scheduler/status/single-flight checks, use the task-registration preview, and require an explicit owner authorization for installation. Confirm `IgnoreNew`, the canonical wrapper, logs, and rollback configuration.
 7. **VPS.7 — complete a 24-hour or otherwise owner-agreed bounded operational soak.** Record state, health, errors, source freshness, and automation outcomes.
 
