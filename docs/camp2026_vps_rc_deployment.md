@@ -1,7 +1,7 @@
-# CAMP2026 VPS RC3 deployment and rollback
+# CAMP2026 VPS RC4 deployment and rollback
 
-Release identifier: `CAMP2026-VPS-RC3`
-Local tag: `camp2026-vps-rc3`
+Release identifier: `CAMP2026-VPS-RC4`
+Local tag: `camp2026-vps-rc4`
 Runtime: `INTERNAL_BETA`
 
 ## Release boundary
@@ -33,7 +33,7 @@ The product archive is immutable and is replaced at every RC. CAMP participant s
 Create or update the external `C:\CryptoEdge\start-cryptoedge-product.cmd` from the packaged `scripts\win\start-cryptoedge-product-vps.cmd` template. It must set these server-only variables before it calls the active release launcher:
 
 ```cmd
-set "CRYPTO_EDGE_RELEASE_ROOT=C:\CryptoEdge\releases\CAMP2026-VPS-RC3"
+set "CRYPTO_EDGE_RELEASE_ROOT=C:\CryptoEdge\releases\CAMP2026-VPS-RC4"
 set "CRYPTO_EDGE_VPS_STATE_ROOT=C:\CryptoEdge\state"
 set "CRYPTO_EDGE_PC1_REVIEW_DEFAULT_ACTOR=CAMP_USER"
 set "CRYPTO_EDGE_CAMP_COOKIE_SECURE=1"
@@ -42,7 +42,7 @@ call "%CRYPTO_EDGE_RELEASE_ROOT%\scripts\win\start-product-vps.cmd"
 
 `start-product-vps.cmd` expands the stable root to these explicit overrides unless a more specific server configuration already set one:
 
-| Private store | Effective environment variable | RC3 external path |
+| Private store | Effective environment variable | RC4 external path |
 | --- | --- | --- |
 | CAMP opaque-cookie hash registry | `CRYPTO_EDGE_CAMP_IDENTITY_REGISTRY_PATH` | `C:\CryptoEdge\state\camp-user-identities.json` |
 | Private Radar workspace | `CRYPTO_EDGE_USER_WORKSPACE_SQLITE_PATH` | `C:\CryptoEdge\state\user-workspace.sqlite` |
@@ -52,6 +52,12 @@ call "%CRYPTO_EDGE_RELEASE_ROOT%\scripts\win\start-product-vps.cmd"
 The registry stores `sha256(cookie-token)` to a pseudonymous `camp-user-*` actor id. It never stores the raw browser credential or accepts actor ids from query parameters, JSON, or request headers. Its 180-day cookie is `HttpOnly` and `SameSite=Lax`. Set `CRYPTO_EDGE_CAMP_COOKIE_SECURE=1` behind the final HTTPS tunnel; leave it unset/`0` only for local `127.0.0.1` HTTP regression.
 
 The registry, workspace, research evidence, and feedback are participant-private state. They are deliberately separate from scanner/context/lifecycle canonical stores, automation state, and the shared heavy AI cache. A participant's Radar or playbook state must never change Product Radar, system lifecycle, Established, or the shared AI cache identity.
+
+### Retained private Playbook after scanner dropout
+
+If a token has disappeared from the newest scanner snapshot but remains an active canonical New Inbox record, a CAMP participant who already retained that exact identity in their private workspace may continue private Research Playbook progress, evidence, and manual verification. The server verifies both the actor-scoped workspace entry and the canonical Inbox record; it never trusts token facts, actor ids, or lifecycle values from the browser.
+
+The Checklist then uses a truthful partial server-owned projection: current scanner market and security facts are unavailable rather than recreated. A user without that private assignment receives no retained-token access, and private progress remains excluded from Product Radar, system lifecycle, Established, and shared AI cache identity.
 
 ### Explicit RC2 private-state migration
 

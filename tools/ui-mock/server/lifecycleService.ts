@@ -21,6 +21,7 @@ import type { PersistableScannerOutput } from "../../data-poc/src/persistableSca
 import { readLatestScannerOutput, type LatestScannerOutputOptions } from "./latestScannerOutput.js";
 import type { Pc1SessionContext } from "./lifecycleSession.js";
 import { createUserWorkspaceRepository, UserWorkspaceError, type UserWorkspaceRepository } from "./userWorkspaceRepository.js";
+import type { UiTokenCandidate } from "../src/types/scannerTypes.js";
 
 export type LifecycleTokenView = {
   identity: string;
@@ -184,6 +185,33 @@ export function createLifecycleService(options: {
     }
   }
 
+  /**
+   * A current scanner observation is not required for a CAMP participant to
+   * continue private research on an active canonical New record they retained
+   * in their own workspace. The workspace grants access only after the Inbox
+   * independently proves the token was a product record; browser facts never
+   * participate in this decision.
+   */
+  async function resolveRetainedPrivateResearchCandidate(
+    chainInput: string,
+    addressInput: string,
+    session: Pc1SessionContext,
+  ): Promise<UiTokenCandidate | null> {
+    const identity = normalizeIdentity(chainInput, addressInput);
+    const [inbox, workspaceRepository] = await Promise.all([
+      readNewInboxStore(paths.inbox),
+      workspace(),
+    ]);
+    const privateEntry = workspaceRepository.get(session.actor_id, identity.identity);
+    if (!privateEntry) return null;
+    const retained = inbox.entries.find((entry) => (
+      entry.identity === identity.identity
+      && entry.archived_at === null
+      && entry.rejected_at === null
+    ));
+    return retained ? researchCandidateFromRetainedInbox(retained) : null;
+  }
+
   async function summary(): Promise<LifecycleSummary> {
     const [inbox, followUp, universe, receipt, scanner] = await Promise.all([
       readNewInboxStore(paths.inbox),
@@ -337,7 +365,7 @@ export function createLifecycleService(options: {
       private_baskets: { new: privateNewGroup, follow_up: privateFollowUpGroup, main_radar: privateMainRadarGroup },
     };
   }
-  return { resolveToken, transition, clearPrivateStatus, summary, inbox, latestReceipt, workspaceIntegrity, radar };
+  return { resolveToken, transition, clearPrivateStatus, resolveRetainedPrivateResearchCandidate, summary, inbox, latestReceipt, workspaceIntegrity, radar };
 }
 
 export type RadarCursor = { new_inbox: number; action_due: number; candidates_ready: number; observed: number; private_new: number; private_follow_up: number; private_main_radar: number };
@@ -496,6 +524,55 @@ function lifecycleEvaluationContext(input: {
   };
 }
 function unavailableConditions(): LifecycleConditions { return { conditions_met: [], conditions_unmet: ["VALIDATED_LIFECYCLE_RECORD_REQUIRED"], missing_data: ["LIFECYCLE_RECORD"], risks: [], readiness: "CONDITIONS_UNMET", security_state: "UNKNOWN", verification_state: "UNKNOWN" }; }
+
+function researchCandidateFromRetainedInbox(entry: Awaited<ReturnType<typeof readNewInboxStore>>["entries"][number]): UiTokenCandidate {
+  const missingData = [...new Set([
+    "CURRENT_SCANNER_OBSERVATION_UNAVAILABLE",
+    ...entry.last_evaluation.missing_data,
+  ])];
+  return {
+    id: `retained-lifecycle:${entry.identity}`,
+    runId: entry.last_scanner_run_id,
+    symbol: entry.symbol ?? entry.display_name ?? entry.contract_address,
+    name: entry.display_name ?? entry.symbol ?? entry.contract_address,
+    chain: entry.chain,
+    dex: "",
+    source: "retained_lifecycle_inbox",
+    contractAddress: entry.contract_address,
+    pairAddress: "",
+    sourceUrl: "",
+    discoveryBasket: "new_emerging",
+    discoveryMethod: "dexscreener_latest_token_profiles",
+    observationOnly: true,
+    establishedEligible: false,
+    universeVersion: null,
+    universeEntryIndex: null,
+    addressIdentityVerified: entry.last_evaluation.conditions_met.includes("IDENTITY_VALID"),
+    priceUsd: null,
+    marketCap: null,
+    fdvUsd: null,
+    liquidity: null,
+    volume24h: null,
+    volumeMarketCapRatio: null,
+    pairCreatedAt: entry.first_seen_at,
+    pairAgeDays: null,
+    basicFilterStatus: "not_evaluated",
+    securityLabel: "NOT_CHECKED",
+    finalLabel: "NEEDS_MANUAL_VERIFICATION",
+    mainReason: "CURRENT_SCANNER_OBSERVATION_UNAVAILABLE",
+    filterReasons: [],
+    criticalReasons: [],
+    warningReasons: missingData,
+    finalReasons: [],
+    missingData,
+    riskFlags: [...entry.last_evaluation.risks],
+    security: null,
+    scorecard: null,
+    candidateSnapshotAt: entry.last_seen_at,
+    lastCheckedAt: entry.last_seen_at,
+  };
+}
+
 function scannerOutput(value: unknown): PersistableScannerOutput | null {
   if (!isRecord(value) || !isRecord(value.scan_run) || !Array.isArray(value.candidates) || !Array.isArray(value.security_checks) || !Array.isArray(value.scorecards)) return null;
   return value as unknown as PersistableScannerOutput;

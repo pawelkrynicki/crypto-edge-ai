@@ -17,6 +17,7 @@
     "test:product-radar": "node --import tsx --test tests/productRadar.test.ts",
     "test:pc1": "node --import tsx --test tests/pc1Lifecycle.test.ts",
     "test:camp-identity": "node --import tsx --test tests/campPersistentIdentity.test.ts tests/privateRadarResearchProgress.test.ts",
+    "test:private-playbook-dropout": "node --import tsx --test tests/privatePlaybookScannerDropout.test.ts",
     "test:new-recheck": "node --import tsx --test tests/newRecheckReadModel.test.ts",
     "test:pc2": "node --import tsx --test tests/pc2AiProductionPath.test.ts",
     "test:pc3a": "node --import tsx --test tests/researchChecklist.test.ts tests/researchChecklistUi.test.tsx",
