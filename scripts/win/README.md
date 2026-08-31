@@ -77,6 +77,8 @@ scripts\win\preview-central-automation-task.cmd
 
 `build-product-vps.cmd` synchronizes only the `tools/ui-mock` locked dependencies and builds the fixture-free `INTERNAL_BETA` surface. `start-product-vps.cmd` serves the UI and the existing `/api/*` contract from one Node process on `127.0.0.1:4180`; it does not start the collector, configure Cloudflare, or create a Scheduled Task. `check-product-vps-runtime.cmd` uses a dedicated random high port and always closes its server. `check-automation-single-flight.cmd` runs only offline lock/coordinator tests against isolated temporary files.
 
+For CAMP VPS deployment, copy `start-cryptoedge-product-vps.cmd` outside every versioned release as `C:\CryptoEdge\start-cryptoedge-product.cmd`. Configure `CRYPTO_EDGE_RELEASE_ROOT` and the durable `CRYPTO_EDGE_VPS_STATE_ROOT` there; `start-product-vps.cmd` then derives the explicit private-store paths. See `docs/camp2026_vps_rc_deployment.md` for the required variables and the explicit preview/apply migration command.
+
 `check-central-scheduler.cmd` uses injected clocks/runners and includes cadence, decision, lock, coordinator and Task Scheduler source checks offline. `check-automation-status-api.cmd` starts the same-origin product runtime on a random local port, performs 100 read-only status requests, verifies unchanged state and zero runner/provider calls, then closes the process. `preview-central-automation-task.cmd` prints the default five-minute task plan without changing Windows.
 
 Source schedule:

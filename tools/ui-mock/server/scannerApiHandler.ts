@@ -104,6 +104,10 @@ import { followUpToResearchCandidate } from "../src/followUpResearchCandidate.js
 import type { LifecycleCycleReceipt } from "../../data-poc/src/systemLifecycle.js";
 import { createLifecycleService, LifecycleServiceError, parseRadarCursor } from "./lifecycleService.js";
 import { createPc1SessionContextService, type Pc1ActorRole } from "./lifecycleSession.js";
+import {
+  getDefaultCampUserIdentityRegistryPath,
+  type CampUserIdentityRegistry,
+} from "./campUserIdentityRegistry.js";
 import { getDefaultUserWorkspaceDatabasePath, type UserWorkspaceRepository } from "./userWorkspaceRepository.js";
 import {
   createResearchEvidenceRepository,
@@ -158,6 +162,9 @@ export type ScannerApiHandlerOptions = {
     workspaceDatabasePath?: string;
     workspace?: UserWorkspaceRepository;
     defaultSessionRole?: Pc1ActorRole;
+    campIdentityRegistryPath?: string;
+    campIdentityRegistry?: CampUserIdentityRegistry;
+    cookieSecure?: boolean;
   };
   researchEvidence?: {
     databaseFilePath?: string;
@@ -273,7 +280,12 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
   const presentResearchLookup = async (chain: string, contractAddress: string, locale: "pl" | "en") => presentResearchLookupValue(
     await aiResearchService.getBrief(chain, contractAddress, locale), chain, contractAddress, locale,
   );
-  const pc1Sessions = createPc1SessionContextService({ defaultRole: options.lifecycle?.defaultSessionRole });
+  const pc1Sessions = createPc1SessionContextService({
+    defaultRole: options.lifecycle?.defaultSessionRole,
+    campIdentityRegistry: options.lifecycle?.campIdentityRegistry,
+    campIdentityRegistryPath: options.lifecycle?.campIdentityRegistryPath ?? getDefaultCampUserIdentityRegistryPath(),
+    cookieSecure: options.lifecycle?.cookieSecure,
+  });
   const lifecycle = createLifecycleService({
     scanner: scannerOptions,
     followUpStorePath: options.followUp?.storePath,

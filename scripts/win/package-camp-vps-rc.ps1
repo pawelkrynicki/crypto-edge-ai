@@ -145,12 +145,13 @@ try {
     "ai_queue_cache_sqlite",
     "user_workspace_sqlite",
     "research_evidence_sqlite",
+    "camp_identity_registry",
     "central_automation_state"
   )
   $classification = [ordered]@{
     immutable_application = "included: committed source at $head plus freshly-built tools/ui-mock/dist"
     canonical_shared_state = "not included: NOT_CREATED_SAFETY_BOUNDARY; requires owner-approved, store-level export"
-    owner_private_state = "excluded: user workspace, research evidence, tester feedback"
+    owner_private_state = "excluded: CAMP identity registry, user workspace, research evidence/progress/private verification, tester feedback; configure an external stable state root"
     transient_runtime_state = "excluded: AI queue/cache, automation state, local databases, runtime output"
     secrets = "excluded: environment values and key material; only empty-value .env.example is included"
     excluded_logical_stores = $excludedStores
@@ -256,7 +257,7 @@ try {
     "- State rollback source: only a validated owner-approved recovery bundle; no .local directory copy.",
     "- Pre-import restore-preview: required; --apply is prohibited for release validation.",
     "- Automation rollback: keep disabled; do not install or enable a Task Scheduler task during rollback.",
-    "- Private state excluded from shared rollback: user workspace, research evidence, manual verification decisions, and tester feedback.",
+    "- Private state excluded from shared rollback: CAMP identity registry, user workspace, research evidence, private progress/manual verification decisions, and tester feedback.",
     "",
     "See docs/camp2026_vps_rc_deployment.md for the stop, deploy, restore-preview, and verification sequence."
   ) | Set-Content -LiteralPath $rollbackManifest -Encoding utf8
@@ -269,6 +270,9 @@ try {
     "$(Get-Sha256 $rollbackManifest)  ROLLBACK_MANIFEST.md",
     "$(Get-Sha256 (Join-Path $repoRoot 'scripts\\win\\build-product-vps.cmd'))  source/scripts/win/build-product-vps.cmd",
     "$(Get-Sha256 (Join-Path $repoRoot 'scripts\\win\\start-product-vps.cmd'))  source/scripts/win/start-product-vps.cmd",
+    "$(Get-Sha256 (Join-Path $repoRoot 'scripts\\win\\start-cryptoedge-product-vps.cmd'))  source/scripts/win/start-cryptoedge-product-vps.cmd",
+    "$(Get-Sha256 (Join-Path $repoRoot 'scripts\\win\\migrate-camp-private-state.cmd'))  source/scripts/win/migrate-camp-private-state.cmd",
+    "$(Get-Sha256 (Join-Path $repoRoot 'scripts\\win\\migrate-camp-private-state.ps1'))  source/scripts/win/migrate-camp-private-state.ps1",
     "$(Get-Sha256 (Join-Path $repoRoot 'scripts\\win\\check-product-vps-runtime.cmd'))  source/scripts/win/check-product-vps-runtime.cmd",
     "$(Get-Sha256 (Join-Path $repoRoot 'scripts\\win\\package-camp-vps-rc.cmd'))  source/scripts/win/package-camp-vps-rc.cmd",
     "$(Get-Sha256 (Join-Path $repoRoot 'scripts\\win\\package-camp-vps-rc.ps1'))  source/scripts/win/package-camp-vps-rc.ps1"

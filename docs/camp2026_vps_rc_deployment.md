@@ -1,7 +1,7 @@
-# CAMP2026 VPS RC2 deployment and rollback
+# CAMP2026 VPS RC3 deployment and rollback
 
-Release identifier: `CAMP2026-VPS-RC2`
-Local tag: `camp2026-vps-rc2`
+Release identifier: `CAMP2026-VPS-RC3`
+Local tag: `camp2026-vps-rc3`
 Runtime: `INTERNAL_BETA`
 
 ## Release boundary
@@ -14,7 +14,7 @@ No default shared-state bootstrap is created for this release: `NOT_CREATED_SAFE
 | --- | --- |
 | Immutable application | Include exact committed source and the INTERNAL_BETA `dist` build. |
 | Shared canonical product state | Exclude until an owner approves a store-level, validated export. |
-| Owner-private state | Exclude: user workspace, research evidence, feedback. |
+| Owner-private state | Exclude from the immutable archive; keep it in the external CAMP state root: workspace, research evidence/progress/private verification, feedback, and the identity registry. |
 | Transient state | Exclude: queue/cache, automation state, local runtime output. |
 | Secrets | Exclude. Configure them only in the VPS server environment. |
 
@@ -26,13 +26,50 @@ No default shared-state bootstrap is created for this release: `NOT_CREATED_SAFE
 4. Configure a server-owned environment file outside the deployed release directory. `tools/ui-mock/.env.example` is the safe variable template; it contains no values.
 5. Bind the service only to the intended private interface/reverse proxy. The default product launcher uses `127.0.0.1`.
 
+## Durable CAMP private state
+
+The product archive is immutable and is replaced at every RC. CAMP participant state must therefore be rooted outside `C:\CryptoEdge\releases\...`, for example in `C:\CryptoEdge\state`.
+
+Create or update the external `C:\CryptoEdge\start-cryptoedge-product.cmd` from the packaged `scripts\win\start-cryptoedge-product-vps.cmd` template. It must set these server-only variables before it calls the active release launcher:
+
+```cmd
+set "CRYPTO_EDGE_RELEASE_ROOT=C:\CryptoEdge\releases\CAMP2026-VPS-RC3"
+set "CRYPTO_EDGE_VPS_STATE_ROOT=C:\CryptoEdge\state"
+set "CRYPTO_EDGE_PC1_REVIEW_DEFAULT_ACTOR=CAMP_USER"
+set "CRYPTO_EDGE_CAMP_COOKIE_SECURE=1"
+call "%CRYPTO_EDGE_RELEASE_ROOT%\scripts\win\start-product-vps.cmd"
+```
+
+`start-product-vps.cmd` expands the stable root to these explicit overrides unless a more specific server configuration already set one:
+
+| Private store | Effective environment variable | RC3 external path |
+| --- | --- | --- |
+| CAMP opaque-cookie hash registry | `CRYPTO_EDGE_CAMP_IDENTITY_REGISTRY_PATH` | `C:\CryptoEdge\state\camp-user-identities.json` |
+| Private Radar workspace | `CRYPTO_EDGE_USER_WORKSPACE_SQLITE_PATH` | `C:\CryptoEdge\state\user-workspace.sqlite` |
+| Research evidence, private Research Playbook progress, private manual-verification decisions | `CRYPTO_EDGE_RESEARCH_EVIDENCE_SQLITE_PATH` | `C:\CryptoEdge\state\research-evidence.sqlite` |
+| Backend-preserved feedback | `CRYPTO_EDGE_FEEDBACK_SQLITE_PATH` | `C:\CryptoEdge\state\tester-feedback.sqlite` |
+
+The registry stores `sha256(cookie-token)` to a pseudonymous `camp-user-*` actor id. It never stores the raw browser credential or accepts actor ids from query parameters, JSON, or request headers. Its 180-day cookie is `HttpOnly` and `SameSite=Lax`. Set `CRYPTO_EDGE_CAMP_COOKIE_SECURE=1` behind the final HTTPS tunnel; leave it unset/`0` only for local `127.0.0.1` HTTP regression.
+
+The registry, workspace, research evidence, and feedback are participant-private state. They are deliberately separate from scanner/context/lifecycle canonical stores, automation state, and the shared heavy AI cache. A participant's Radar or playbook state must never change Product Radar, system lifecycle, Established, or the shared AI cache identity.
+
+### Explicit RC2 private-state migration
+
+Do not copy a release `.local` directory into a new release. If an operator has existing RC2 private files to retain, stop the product runtime and run a read-only preview first:
+
+```text
+scripts\win\migrate-camp-private-state.cmd -SourcePrivateStateRoot "C:\CryptoEdge\releases\CAMP2026-VPS-RC2\tools\ui-mock\.local" -TargetStateRoot "C:\CryptoEdge\state"
+```
+
+Only after reviewing the JSON preview, run the same command with `-Apply`. Apply copies only missing files and never overwrites or deletes a target. RC2 did not have the persistent identity registry, so pre-existing RC2 cookies cannot be mapped retroactively; affected participants receive a new isolated CAMP identity after RC3. This is intentional rather than a silent or unsafe identity migration.
+
 ## Install and build
 
 1. Extract the application archive into an empty deployment directory.
 2. Confirm the source commit matches `git_commit` in `RC_RELEASE_MANIFEST.json` (the archive itself intentionally has no `.git` directory).
 3. In `tools/ui-mock`, run `pnpm install --frozen-lockfile --prefer-offline`.
 4. From the extracted repository root, run `scripts\win\build-product-vps.cmd`.
-5. Start only `scripts\win\start-product-vps.cmd`. Set `CRYPTO_EDGE_PRODUCT_HOST` and `CRYPTO_EDGE_PRODUCT_PORT` in the server environment if a non-default bind is required.
+5. Set the external launcher's `CRYPTO_EDGE_RELEASE_ROOT` to this extracted release, then start only `C:\CryptoEdge\start-cryptoedge-product.cmd`. Set `CRYPTO_EDGE_PRODUCT_HOST` and `CRYPTO_EDGE_PRODUCT_PORT` in the server environment if a non-default bind is required.
 
 The VPS launcher starts only the product runtime. It must not start a collector, scheduler, automation cycle, provider call, or AI worker.
 
@@ -51,11 +88,12 @@ This RC intentionally starts without a copied shared-state bundle. The deploymen
 2. Confirm `/api/health` and the frontend respond from the same-origin product server.
 3. Confirm the visible runtime reports `INTERNAL_BETA`, not `DEVELOPMENT_DEMO` or fixtures.
 4. Confirm that no collector, scheduler, AI worker, provider request, or OpenAI request was launched.
-5. Record the manifest, checksum verification, host/port, and operator in the deployment log.
+5. Verify a CAMP browser's persistent cookie resolves to the same private workspace after a product restart and after changing only `CRYPTO_EDGE_RELEASE_ROOT` to the next release.
+6. Record the manifest, checksum verification, host/port, external state root, and operator in the deployment log.
 
 ## Ordered owner-gated VPS stages
 
-1. **VPS.1 — deploy application only.** Verify checksums, extract to a clean directory, install locked dependencies, and build. Do not copy a `.local` directory or start a worker.
+1. **VPS.1 — deploy application only.** Verify checksums, extract to a clean directory, install locked dependencies, and build. Configure the external state root and external launcher; do not copy a `.local` directory or start a worker.
 2. **VPS.2 — verify local same-origin runtime.** Start only `start-product-vps.cmd`, check `/api/health`, `/api/readiness`, `/api/scanner/latest`, and the frontend. Stop it after the check if no operator session is required.
 3. **VPS.3 — restore/bootstrap approved shared product state.** This RC has no default bootstrap. Use only a later store-level owner-approved export with validation and restore preview.
 4. **VPS.4 — verify AI configuration only after explicit owner authorization.** Add the server-side AI secrets/configuration through the protected environment boundary, keep `CRYPTO_EDGE_AI_WORKER_ENABLED=0`, and make no AI call until a separately authorized smoke test.
