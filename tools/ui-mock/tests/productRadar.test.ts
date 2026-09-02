@@ -855,7 +855,7 @@ describe("Product Radar owner acceptance", () => {
     assert.doesNotMatch(markup, /PASSTOKEN|LOWLIQTOKEN|FDVFALLBACKTOKEN/);
   });
 
-  it("keeps Reports and Opinions backend-only while preserving the normal Product navigation", async () => {
+  it("keeps Reports and Opinions backend-only, retains Methodology technically, and leaves CAMP navigation focused", async () => {
     const source = await readFile(resolve(productRoot, "src", "ProductApp.tsx"), "utf8");
     for (const key of ["nav.radar", "nav.details", "nav.verification", "nav.methodology", "nav.controlCenter"]) {
       assert.match(source, new RegExp(key.replace(".", "\\.")));
@@ -870,6 +870,10 @@ describe("Product Radar owner acceptance", () => {
     assert.match(source, /HIDDEN_CAMP_FRONTEND_HASHES/);
     assert.match(source, /redirectHiddenCampFrontendHash\(\)/);
     assert.match(source, /groupLabel:\s*t\("nav\.groupReview"\)/);
+    assert.match(source, /item\.id === "methodology"/);
+    assert.match(source, /return canAccessOperationalControlCenter\(role\)/);
+    assert.match(source, /"#methodology": "methodology"/);
+    assert.match(source, /<Methodology \/>/);
     assert.doesNotMatch(source, /label: "(?:Token Lookup|Trusted Preview|Webinar Teaser|Feedback Notes)"/);
   });
 

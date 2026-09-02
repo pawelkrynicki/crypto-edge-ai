@@ -20,7 +20,7 @@ import { mapPersistableScannerOutputToUiCandidates } from "../src/adapters/scann
 import { formatProductDateTime, ProductLocaleProvider } from "../src/productI18n.js";
 import type { ScannerDataSourceLoadResult } from "../src/services/scannerDataSource.js";
 import type { FollowUpPublicEntry, FollowUpPublicStatus } from "../src/types/followUpTypes.js";
-import type { LifecycleTokenView } from "../src/types/lifecycleTypes.js";
+import type { LifecycleRadarView, LifecycleTokenView } from "../src/types/lifecycleTypes.js";
 import type { ProductReadinessOutput } from "../src/types/scannerTypes.js";
 import { resolveGlobalProductTimestamp } from "../src/productRefreshState.js";
 
@@ -277,13 +277,60 @@ describe("P1.1 Radar operational usability", () => {
     assert.match(markup, /Alternative\.me/);
     assert.match(markup, /DefiLlama/);
     assert.match(markup, /Crypto Edge wykrywa nowe projekty i obserwuje je w czasie\./);
-    assert.match(markup, /Nowe \/ obserwacja/);
+    assert.match(markup, /Aktywne w obserwacji/);
     assert.match(markup, /Do sprawdzenia/);
     assert.match(markup, /Główny Radar/);
-    assert.match(markup, /Projekty wykryte przez system\. Większość nie wymaga teraz Twojej uwagi\./);
+    assert.match(markup, /Tokeny aktualnie dostępne w sekcji Nowe \/ obserwacja Twojego Radaru\./);
     assert.match(markup, /Systemowy koszyk Dalsza obserwacja\./);
     assert.match(markup, /Projekty po pełnym procesie obserwacji i weryfikacji\./);
     assert.doesNotMatch(markup, /Łącznie obserwowane|Do działania teraz|Wyświetlane teraz|Wpisy Established/);
+  });
+
+  it("separates the active Radar observation count from historical detections and keeps Polish load-more copy valid", () => {
+    const candidate = {
+      ...mapPersistableScannerOutputToUiCandidates(PERSISTABLE_SCANNER_SAMPLE)[0]!,
+      discoveryBasket: "new_emerging" as const,
+    };
+    const lifecycleRadar = lifecycleRadarView(2, 290, "next-page");
+    const markup = renderToStaticMarkup(
+      <ProductLocaleProvider initialLocale="pl">
+        <CandidateResultsView candidates={[candidate]} lifecycleRadar={lifecycleRadar} />
+      </ProductLocaleProvider>,
+    );
+
+    assert.match(markup, /<span>Aktywne w obserwacji<\/span><strong>2<\/strong>/);
+    assert.match(markup, /Więcej informacji o danych[\s\S]*?<span>Wykryte łącznie<\/span><strong>290<\/strong>/);
+    assert.match(markup, /Pokaż więcej/);
+    assert.doesNotMatch(markup, /Poka\u0139\u013d wi\u00c4\u2122cej/);
+  });
+
+  it("selects Verification by canonical chain and contract, with safe direct and stale-route fallbacks", () => {
+    const first = mapPersistableScannerOutputToUiCandidates(PERSISTABLE_SCANNER_SAMPLE)[0]!;
+    const selected = { ...first, id: "same-symbol-other-contract", contractAddress: "0x2222222222222222222222222222222222222222", symbol: first.symbol };
+    const selectedIdentity = { chain: selected.chain, contract_address: selected.contractAddress };
+    const selectedMarkup = renderToStaticMarkup(
+      <ProductLocaleProvider initialLocale="pl">
+        <VerificationTokenBrowser candidates={[first, selected]} followUpEntries={[]} selectedIdentity={selectedIdentity} onSelectToken={() => undefined} onCloseToken={() => undefined} />
+      </ProductLocaleProvider>,
+    );
+    assert.match(selectedMarkup, new RegExp(`data-verification-token="${escapeRegExp(`${selected.chain}:${selected.contractAddress}`)}"`));
+    assert.match(selectedMarkup, new RegExp(`data-verification-token="${escapeRegExp(`${selected.chain}:${selected.contractAddress}`)}"[\\s\\S]*?aria-pressed="true"|aria-pressed="true"[\\s\\S]*?data-verification-token="${escapeRegExp(`${selected.chain}:${selected.contractAddress}`)}"`));
+    assert.match(selectedMarkup, new RegExp(escapeRegExp(selected.contractAddress)));
+
+    const directMarkup = renderToStaticMarkup(
+      <ProductLocaleProvider initialLocale="pl">
+        <VerificationTokenBrowser candidates={[first]} followUpEntries={[]} onSelectToken={() => undefined} onCloseToken={() => undefined} />
+      </ProductLocaleProvider>,
+    );
+    const staleMarkup = renderToStaticMarkup(
+      <ProductLocaleProvider initialLocale="pl">
+        <VerificationTokenBrowser candidates={[first]} followUpEntries={[]} selectedIdentity={{ chain: "base", contract_address: "0x3333333333333333333333333333333333333333" }} onSelectToken={() => undefined} onCloseToken={() => undefined} />
+      </ProductLocaleProvider>,
+    );
+    for (const markup of [directMarkup, staleMarkup]) {
+      assert.match(markup, /Wybierz token do weryfikacji/);
+      assert.equal((markup.match(/aria-pressed="true"/g) ?? []).length, 0);
+    }
   });
 
   it("keeps Follow-up usable without scanner data and explains the 100-of-385 limit", () => {
@@ -380,6 +427,10 @@ describe("P1.1 Radar operational usability", () => {
       await act(async () => { verificationButton.props.onClick(); await flushPromises(); });
       assert.equal(globalThis.window.location.hash, "#external-checks");
       assert.deepEqual(resolveRouteTokenIdentity(), { chain: entry.chain, contract_address: entry.contract_address });
+      const verification = renderer!.root.findByType(VerificationTokenBrowser);
+      assert.deepEqual(verification.props.selectedIdentity, { chain: entry.chain, contract_address: entry.contract_address });
+      const selectedVerificationToken = renderer!.root.find((node) => node.props["data-verification-token"] === `${entry.chain}:${entry.contract_address}`);
+      assert.equal(selectedVerificationToken.props["aria-pressed"], true);
       assert.equal(renderer!.root.findAll((node) => node.props.role === "tab").length, 6);
     } finally {
       if (renderer) await act(async () => { renderer!.unmount(); });
@@ -430,6 +481,39 @@ function lifecycleTokenView(system: LifecycleTokenView["system_status"], user: L
     user_status_is_override: override,
     conditions: { conditions_met: [], conditions_unmet: [], missing_data: [], risks: [], readiness: "CONDITIONS_UNMET", security_state: "PARTIAL", verification_state: "PENDING" },
     actor: { role: "CAMP_USER", capabilities: ["CAMP_USER_WORKSPACE_WRITE"] },
+  };
+}
+
+function lifecycleRadarView(activeNewTotal: number, detectedTotal: number, nextCursor: string | null): LifecycleRadarView {
+  const emptyGroup = { total: 0, displayed: 0, limit: 100, next_cursor: null, cards: [] };
+  const newGroup = { total: activeNewTotal, displayed: 0, limit: 100, next_cursor: nextCursor, cards: [] };
+  return {
+    schema_version: "lifecycle_radar_view_v1",
+    summary: {
+      schema_version: "lifecycle_summary_v1",
+      system_new_total: detectedTotal,
+      system_follow_up_total: 0,
+      system_main_radar_total: 0,
+      follow_up_action_due: 0,
+      follow_up_candidates_ready: 0,
+      follow_up_displayed: 0,
+      follow_up_store_version: "test",
+      last_lifecycle_change_at: null,
+      last_central_cycle_id: null,
+      summary_as_of: null,
+      last_completed_cycle_id: null,
+      last_completed_cycle_at: null,
+      delta_source: "NONE",
+      last_change_summary: { added: 0, updated: 0, promoted_to_follow_up: 0, promoted_to_main_radar: 0, archived: 0, rejected: 0, duplicate_noop: 0 },
+    },
+    actor: { role: "CAMP_USER", capabilities: [] },
+    new_inbox: { ...newGroup },
+    follow_up: { action_due: { ...emptyGroup }, candidates_ready: { ...emptyGroup }, observed: { ...emptyGroup } },
+    main_radar: { total: 0 },
+    private_new_total: activeNewTotal,
+    private_follow_up_total: 0,
+    private_main_radar_total: 0,
+    private_baskets: { new: newGroup, follow_up: { ...emptyGroup }, main_radar: { ...emptyGroup } },
   };
 }
 

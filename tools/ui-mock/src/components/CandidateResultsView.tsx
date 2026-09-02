@@ -140,6 +140,15 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
     ?? establishedCandidates.length;
   const followUpTotal = lifecycleSummary?.system_follow_up_total ?? followUpStatus?.entries_total ?? 0;
   const followUpDisplayed = lifecycleRadar?.summary.follow_up_displayed ?? lifecycleSummary?.follow_up_displayed ?? displayedFollowUpEntries.length;
+  // The primary observation tile describes the user's currently visible Radar
+  // section. The lifecycle summary remains available separately as history.
+  const activeObservationTotal = lifecycleRadar?.private_baskets.new.total
+    ?? lifecycleRadar?.new_inbox.total
+    ?? lifecycleSummary?.system_new_total
+    ?? newCandidates.length;
+  const detectedTotal = lifecycleRadar?.summary.system_new_total
+    ?? lifecycleSummary?.system_new_total
+    ?? newCandidates.length;
   const establishedAfterFilters = metadata?.established?.candidates_after_filters
     ?? establishedCandidates.filter((candidate) => candidate.basicFilterStatus === "passed_basic_filter").length;
   const securityChecked = establishedCandidates.filter((candidate) => (
@@ -172,7 +181,7 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
       </section>
 
       <section className="product-summary-grid primary" aria-label={t("radar.summary")}>
-        <SummaryCard label={t("radar.newProjects")} value={String(lifecycleSummary?.system_new_total ?? newCandidates.length)} detail={t("radar.newProjectsDetail")} />
+        <SummaryCard label={t("radar.newProjects")} value={String(activeObservationTotal)} detail={t("radar.newProjectsDetail")} />
         <SummaryCard label={t("followUp.basket")} value={String(followUpTotal)} detail={locale === "pl" ? "Systemowy koszyk Dalsza obserwacja." : "System-owned Follow-up basket."} tone="accent" />
         <SummaryCard label={t("radar.mainRadar")} value={String(lifecycleRadar?.main_radar.total ?? lifecycleSummary?.system_main_radar_total ?? establishedEntries)} detail={t("radar.mainRadarDetail")} />
         <SummaryCard
@@ -215,6 +224,7 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
       <TechnicalDetails label={t("radar.additionalData")} className="radar-operational-details">
         <section className="product-summary-grid operational" aria-label={t("radar.data")}>
           <SummaryCard label={t("radar.afterInitialReview")} value={String(establishedAfterFilters)} detail={t("radar.afterInitialReviewDetail")} />
+          <SummaryCard label={t("radar.detectedTotal")} value={String(detectedTotal)} detail={t("radar.detectedTotalDetail")} />
           <SummaryCard label={t("radar.securityOverview")} value={String(securityChecked)} detail={t("radar.securityOverviewDetail")} />
           <SummaryCard label={t("radar.dataAvailability")} value={sourceState.value} detail={sourceState.detail} tone={sourceState.tone} />
         </section>
@@ -310,11 +320,11 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
 function PrivateLifecycleBasket({ basket, group, locale, onLoadMore, onOpenDetails, onLifecycleChanged }: { basket: "new" | "follow_up" | "main_radar"; group: LifecycleRadarView["private_baskets"]["new"]; locale: ProductLocale; onLoadMore?: (cursor: string) => void; onOpenDetails?: (identity: { chain: string; contract_address: string }) => void; onLifecycleChanged?: (view: LifecycleTokenView) => void | Promise<void> }) {
   const copy = locale === "pl"
     ? {
-      new: { title: "Nowe projekty", empty: "Brak projektĂłw w Twoim prywatnym widoku Nowe." },
-      follow_up: { title: "Dalsza obserwacja", empty: "Brak projektĂłw w Twojej prywatnej dalszej obserwacji." },
-      main_radar: { title: "GĹ‚Ăłwny Radar", empty: "Brak projektĂłw w Twoim prywatnym GĹ‚Ăłwnym Radarze." },
-      absent: "Projekt nie wystÄ…piĹ‚ w ostatnim skanie, ale pozostaje w Twoim prywatnym Radarze.",
-      more: "PokaĹĽ wiÄ™cej",
+      new: { title: "Nowe projekty", empty: "Brak projektów w Twoim prywatnym widoku Nowe." },
+      follow_up: { title: "Dalsza obserwacja", empty: "Brak projektów w Twojej prywatnej dalszej obserwacji." },
+      main_radar: { title: "Główny Radar", empty: "Brak projektów w Twoim prywatnym Głównym Radarze." },
+      absent: "Projekt nie wystąpił w ostatnim skanie, ale pozostaje w Twoim prywatnym Radarze.",
+      more: "Pokaż więcej",
       privateView: "Widok dopasowany do Ciebie",
     }
     : {

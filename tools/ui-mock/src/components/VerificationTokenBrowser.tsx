@@ -8,7 +8,7 @@ import type { UiTokenCandidate } from "../types/scannerTypes";
 import type { FollowUpPublicEntry } from "../types/followUpTypes";
 import type { PrivateVerificationRecord } from "../services/manualOwnerActionsDataSource";
 import type { ResearchStepNumber } from "../researchChecklistTypes";
-import type { ResearchVerificationCheck } from "../candidateDetailRoute";
+import type { ResearchVerificationCheck, RouteTokenIdentity } from "../candidateDetailRoute";
 import type { VerificationMissingTarget } from "../verificationMissingItemTargets";
 import { ExternalVerificationLinksView } from "./ExternalVerificationLinksView";
 
@@ -17,6 +17,7 @@ type VerificationTokenBrowserProps = {
   followUpEntries: FollowUpPublicEntry[];
   selectedCandidate?: UiTokenCandidate | null;
   selectedFollowUp?: FollowUpPublicEntry | null;
+  selectedIdentity?: RouteTokenIdentity | null;
   onSelectToken: (token: UiTokenCandidate | FollowUpPublicEntry) => void;
   onCloseToken: () => void;
   onOpenResearchBrief?: () => void;
@@ -45,6 +46,7 @@ export function VerificationTokenBrowser({
   followUpEntries,
   selectedCandidate = null,
   selectedFollowUp = null,
+  selectedIdentity = null,
   onSelectToken,
   onCloseToken,
   onOpenResearchBrief,
@@ -71,11 +73,34 @@ export function VerificationTokenBrowser({
     return [...currentCandidates, ...followUpOnly];
   }, [candidates, followUpEntries]);
 
-  const selectedIdentity = selectedCandidate
+  const explicitSelectedIdentity = selectedCandidate
     ? { chain: selectedCandidate.chain, contract_address: selectedCandidate.contractAddress }
     : selectedFollowUp
       ? { chain: selectedFollowUp.chain, contract_address: selectedFollowUp.contract_address }
       : null;
+  const routedSelection = selectedIdentity
+    ? tokens.find((item) => isSameRoutedTokenIdentity(
+      { chain: item.token.chain, contract_address: item.kind === "candidate" ? item.token.contractAddress : item.token.contract_address },
+      selectedIdentity,
+    )) ?? null
+    : null;
+  const resolvedCandidate = routedSelection?.kind === "candidate"
+    ? routedSelection.token
+    : selectedIdentity === null
+      ? selectedCandidate
+      : null;
+  const resolvedFollowUp = routedSelection?.kind === "follow-up"
+    ? routedSelection.token
+    : selectedIdentity === null
+      ? selectedFollowUp
+      : null;
+  const resolvedSelectedIdentity = selectedIdentity === null
+    ? explicitSelectedIdentity
+    : resolvedCandidate
+      ? { chain: resolvedCandidate.chain, contract_address: resolvedCandidate.contractAddress }
+      : resolvedFollowUp
+        ? { chain: resolvedFollowUp.chain, contract_address: resolvedFollowUp.contract_address }
+        : null;
 
   return (
     <div className="verification-token-browser" data-verification-presentation="shared-details-drawer">
@@ -94,9 +119,9 @@ export function VerificationTokenBrowser({
                 : item.token.contract_address;
               const name = item.kind === "candidate" ? item.token.name : item.token.display_name;
               const symbol = item.token.symbol;
-              const selected = Boolean(selectedIdentity && isSameRoutedTokenIdentity(
+              const selected = Boolean(resolvedSelectedIdentity && isSameRoutedTokenIdentity(
                 { chain, contract_address: contractAddress },
-                selectedIdentity,
+                resolvedSelectedIdentity,
               ));
               return (
                 <button
@@ -120,11 +145,11 @@ export function VerificationTokenBrowser({
       </section>
 
       <div className="verification-token-drawer-region" aria-live="polite">
-        {selectedCandidate || selectedFollowUp ? (
+        {resolvedCandidate || resolvedFollowUp ? (
           <ExternalVerificationLinksView
-            key={`${selectedCandidate?.chain ?? selectedFollowUp?.chain}:${selectedCandidate?.contractAddress ?? selectedFollowUp?.contract_address}:${focusedResearchStep ?? "none"}:${focusedMissingTarget ?? "none"}:${initialDecisionTab ? "decision" : "identity"}`}
-            candidate={selectedCandidate}
-            followUp={selectedFollowUp}
+            key={`${resolvedCandidate?.chain ?? resolvedFollowUp?.chain}:${resolvedCandidate?.contractAddress ?? resolvedFollowUp?.contract_address}:${focusedResearchStep ?? "none"}:${focusedMissingTarget ?? "none"}:${initialDecisionTab ? "decision" : "identity"}`}
+            candidate={resolvedCandidate}
+            followUp={resolvedFollowUp}
             onClose={onCloseToken}
             onOpenResearchBrief={onOpenResearchBrief}
             onVerificationSaved={onVerificationSaved}

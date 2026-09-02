@@ -127,7 +127,13 @@ export function getProductNavItemsForRole(
   navItems: ProductNavItem[],
   role: LifecycleRadarView["actor"]["role"] | undefined,
 ): ProductNavItem[] {
-  return navItems.filter((item) => item.id !== "control-center" || canAccessOperationalControlCenter(role));
+  return navItems.filter((item) => {
+    if (item.id === "control-center") return canAccessOperationalControlCenter(role);
+    // CAMP keeps the route and component available for other product surfaces,
+    // but does not expose Methodology in its primary navigation.
+    if (item.id === "methodology") return canAccessOperationalControlCenter(role);
+    return true;
+  });
 }
 
 type RadarBasketId = "new_emerging" | "maturing" | "established";
@@ -931,6 +937,7 @@ export function ProductAppContent({
             followUpEntries={followUpEntries}
             selectedCandidate={verificationCandidate}
             selectedFollowUp={verificationFollowUp}
+            selectedIdentity={routeTokenIdentity}
             onSelectToken={openVerification}
             onCloseToken={closeVerification}
             onOpenResearchBrief={() => changeDetailTab("ai")}
