@@ -105,6 +105,13 @@ import type { LifecycleCycleReceipt } from "../../data-poc/src/systemLifecycle.j
 import { createLifecycleService, LifecycleServiceError, parseRadarCursor } from "./lifecycleService.js";
 import { createPc1SessionContextService, type Pc1ActorRole, type Pc1SessionContext } from "./lifecycleSession.js";
 import {
+  AikintelAuthError,
+  createAikintelAuthService,
+  resolveProductAuthMode,
+  type AikintelAuthOptions,
+  type ProductAuthMode,
+} from "./aikintelAuth.js";
+import {
   getDefaultCampUserIdentityRegistryPath,
   type CampUserIdentityRegistry,
 } from "./campUserIdentityRegistry.js";
@@ -139,6 +146,8 @@ export type ScannerApiHealthOptions = {
 
 export type ScannerApiHandlerOptions = {
   runtimeMode?: ProductRuntimeMode | string;
+  authMode?: ProductAuthMode | string;
+  aikintelAuth?: AikintelAuthOptions;
   scanner?: LatestScannerOutputOptions;
   context?: LatestContextOutputOptions;
   reviewSession?: ReviewSessionFileStoreOptions;
@@ -184,6 +193,8 @@ export type ScannerApiHandlerOptions = {
 
 export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}): RequestListener {
   const runtimeMode = resolveProductRuntimeMode(options.runtimeMode ?? process.env.CRYPTO_EDGE_RUNTIME_MODE);
+  const authMode = resolveProductAuthMode(options.authMode ?? process.env.CRYPTO_EDGE_AUTH_MODE);
+  const aikintelAuth = authMode === "AIKINTEL" ? createAikintelAuthService(options.aikintelAuth) : null;
   const aiResearchRenderPreview = options.aiResearch?.renderPreview
     ?? process.env.CRYPTO_EDGE_AI_RESEARCH_RENDER_PREVIEW === "1";
   const reviewSessionProvider = options.reviewSessionProvider
@@ -299,12 +310,55 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
   });
   const researchEvidenceRepository = options.researchEvidence?.repository
     ?? awaitResearchEvidenceRepository(options.researchEvidence?.databaseFilePath);
+  const resolveSession = (req: IncomingMessage): { context: Pc1SessionContext; setCookie?: string } => {
+    if (aikintelAuth) {
+      const session = aikintelAuth.resolve(req);
+      if (!session) throw new AikintelAuthError("AIKINTEL_SESSION_INVALID", 401);
+      return session;
+    }
+    return pc1Sessions.resolve(req);
+  };
 
   return async (req, res) => {
     const path = getRequestPath(req.url);
 
+    if (req.method === "GET" && path === "/api/auth/aikintel/exchange") {
+      if (!aikintelAuth) {
+        sendJson(req, res, 404, { error: "not_found", message: "Route not found" }, runtimeMode);
+        return;
+      }
+      try {
+        const credential = new URL(req.url ?? "/", "http://crypto-edge.invalid").searchParams.get("credential");
+        if (!credential) throw new AikintelAuthError("AIKINTEL_CREDENTIAL_INVALID", 401);
+        const session = aikintelAuth.exchange(req, credential);
+        res.setHeader("set-cookie", session.setCookie);
+        res.writeHead(303, {
+          ...responseHeaders(req, runtimeMode),
+          location: "/",
+          "cache-control": "no-store, max-age=0",
+          "referrer-policy": "no-referrer",
+        });
+        res.end();
+      } catch (error) {
+        sendAikintelAuthError(req, res, error, runtimeMode);
+      }
+      return;
+    }
+
+    if (aikintelAuth && path.startsWith("/api/")) {
+      try {
+        if (!aikintelAuth.resolve(req)) {
+          sendJson(req, res, 401, { error: "AUTH_REQUIRED", message: "Authentication required" }, runtimeMode);
+          return;
+        }
+      } catch (error) {
+        sendAikintelAuthError(req, res, error, runtimeMode);
+        return;
+      }
+    }
+
     if (req.method === "GET" && path === "/api/lifecycle/session") {
-      const session = pc1Sessions.resolve(req);
+      const session = resolveSession(req);
       if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
       sendJson(req, res, 200, { actor: { role: session.context.role, capabilities: session.context.capabilities } }, runtimeMode);
       return;
@@ -328,7 +382,7 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
 
     if (req.method === "GET" && path === "/api/research-checklist") {
       try {
-        const session = pc1Sessions.resolve(req);
+        const session = resolveSession(req);
         if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
         const query = validateResearchChecklistQuery(req.url);
         const candidate = await resolveResearchChecklistCandidate(query.chain, query.contract_address, scannerOptions, options.followUp, session.context, lifecycle);
@@ -348,7 +402,7 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
     if (req.method === "PUT" && path === "/api/research-evidence") {
       try {
         requireResearchEvidenceMutationRequest(req);
-        const session = pc1Sessions.resolve(req);
+        const session = resolveSession(req);
         if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
         if (!session.context.capabilities.includes("CAMP_USER_WORKSPACE_WRITE")) throw new ResearchChecklistRequestError("FORBIDDEN", 403);
         const body = validateResearchEvidenceWriteBody(await readResearchEvidenceJsonBody(req));
@@ -377,7 +431,7 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
     if (req.method === "DELETE" && path === "/api/research-evidence") {
       try {
         requireResearchEvidenceMutationRequest(req);
-        const session = pc1Sessions.resolve(req);
+        const session = resolveSession(req);
         if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
         if (!session.context.capabilities.includes("CAMP_USER_WORKSPACE_WRITE")) throw new ResearchChecklistRequestError("FORBIDDEN", 403);
         const body = validateResearchEvidenceDeleteBody(await readResearchEvidenceJsonBody(req));
@@ -398,7 +452,7 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
     if (req.method === "PUT" && path === "/api/research-progress") {
       try {
         requireResearchEvidenceMutationRequest(req);
-        const session = pc1Sessions.resolve(req);
+        const session = resolveSession(req);
         if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
         if (!session.context.capabilities.includes("CAMP_USER_WORKSPACE_WRITE")) throw new ResearchChecklistRequestError("FORBIDDEN", 403);
         const body = validateResearchProgressWriteBody(await readResearchEvidenceJsonBody(req));
@@ -430,7 +484,7 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
 
     if (req.method === "GET" && path === "/api/lifecycle/radar") {
       try {
-        const session = pc1Sessions.resolve(req);
+        const session = resolveSession(req);
         if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
         const query = validateLifecycleRadarQuery(req.url);
         sendJson(req, res, 200, await lifecycle.radar(session.context, query), runtimeMode);
@@ -440,7 +494,7 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
 
     if (req.method === "GET" && path === "/api/lifecycle/new-inbox") {
       try {
-        const session = pc1Sessions.resolve(req);
+        const session = resolveSession(req);
         if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
         if (!session.context.capabilities.includes("LIFECYCLE_SCAN_NOW")) throw new LifecycleServiceError("LIFECYCLE_OWNER_ONLY", 403);
         sendJson(req, res, 200, await lifecycle.inbox(), runtimeMode);
@@ -450,7 +504,7 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
 
     if (req.method === "GET" && path === "/api/lifecycle/workspace/integrity") {
       try {
-        const session = pc1Sessions.resolve(req);
+        const session = resolveSession(req);
         if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
         if (!session.context.capabilities.includes("LIFECYCLE_SCAN_NOW")) throw new LifecycleServiceError("LIFECYCLE_OWNER_ONLY", 403);
         sendJson(req, res, 200, await lifecycle.workspaceIntegrity(), runtimeMode);
@@ -460,7 +514,7 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
 
     if (req.method === "GET" && path === "/api/lifecycle/token") {
       try {
-        const session = pc1Sessions.resolve(req);
+        const session = resolveSession(req);
         if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
         const query = validateManualOwnerQuery(req.url);
         sendJson(req, res, 200, await lifecycle.resolveToken(query.chain, query.contract_address, session.context), runtimeMode);
@@ -470,7 +524,7 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
 
     if (req.method === "POST" && path === "/api/lifecycle/token/status") {
       try {
-        const session = pc1Sessions.resolve(req);
+        const session = resolveSession(req);
         if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
         const body = validateLifecycleTransitionBody(await readOwnerJsonBody(req));
         sendJson(req, res, 200, await lifecycle.transition({
@@ -486,7 +540,7 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
 
     if (req.method === "GET" && path === "/api/lifecycle/scan-preview") {
       try {
-        const session = pc1Sessions.resolve(req);
+        const session = resolveSession(req);
         if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
         if (!session.context.capabilities.includes("LIFECYCLE_SCAN_NOW")) throw new LifecycleServiceError("LIFECYCLE_SCAN_FORBIDDEN", 403);
         const preview = await ownerOperations.createRefreshPreview(isLocalOwnerRequest(req));
@@ -497,7 +551,7 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
 
     if (req.method === "POST" && path === "/api/lifecycle/scan-now") {
       try {
-        const session = pc1Sessions.resolve(req);
+        const session = resolveSession(req);
         if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
         if (!session.context.capabilities.includes("LIFECYCLE_SCAN_NOW")) throw new LifecycleServiceError("LIFECYCLE_SCAN_FORBIDDEN", 403);
         const body = validateOwnerRefreshBody(await readOwnerJsonBody(req));
@@ -530,7 +584,7 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
 
     if (req.method === "GET" && path === "/api/ai-research/brief") {
       try {
-        const session = pc1Sessions.resolve(req);
+        const session = resolveSession(req);
         if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
         const query = parseAIResearchQuery(req.url);
         sendJson(req, res, 200, await presentResearchLookup(query.chain, query.contract_address, query.locale), runtimeMode);
@@ -542,7 +596,7 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
 
     if (req.method === "GET" && (path === "/api/v1/ai-analyses/status" || path === "/api/v1/ai-analyses/result")) {
       try {
-        const session = pc1Sessions.resolve(req);
+        const session = resolveSession(req);
         if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
         const query = parseAIResearchQuery(req.url);
         sendJson(req, res, 200, await presentResearchLookup(query.chain, query.contract_address, query.locale), runtimeMode);
@@ -568,7 +622,7 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
 
     if (req.method === "POST" && path === "/api/ai-research/generate") {
       try {
-        const session = pc1Sessions.resolve(req);
+        const session = resolveSession(req);
         if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
         const body = await readAIResearchGenerateRequest(req);
         sendJson(req, res, 200, await presentResearchLookupValue(
@@ -583,7 +637,7 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
 
     if (req.method === "POST" && path === "/api/v1/ai-analyses/requests") {
       try {
-        const session = pc1Sessions.resolve(req);
+        const session = resolveSession(req);
         if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
         const body = await readAIResearchGenerateRequest(req);
         sendJson(req, res, 202, presentAIProductionLookup(await aiResearchService.generate(body, session.context.actor_id), body.locale), runtimeMode);
@@ -894,7 +948,7 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
 
     if (req.method === "GET" && path === "/api/manual-verification") {
       try {
-        const session = pc1Sessions.resolve(req);
+        const session = resolveSession(req);
         if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
         const query = validateManualOwnerQuery(req.url);
         sendJson(req, res, 200, {
@@ -913,7 +967,7 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
 
     if (req.method === "DELETE" && path === "/api/lifecycle/token/status") {
       try {
-        const session = pc1Sessions.resolve(req);
+        const session = resolveSession(req);
         if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
         const body = validateLifecycleClearBody(await readOwnerJsonBody(req));
         sendJson(req, res, 200, await lifecycle.clearPrivateStatus({
@@ -928,7 +982,7 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
     if (req.method === "POST" && path === "/api/manual-verification") {
       try {
         requireResearchEvidenceMutationRequest(req);
-        const session = pc1Sessions.resolve(req);
+        const session = resolveSession(req);
         if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
         if (!session.context.capabilities.includes("CAMP_USER_WORKSPACE_WRITE")) {
           throw new ManualOwnerActionError("VERIFICATION_WRITE_FORBIDDEN", 403);
@@ -1047,7 +1101,7 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
     }
 
     if (req.method === "GET" && path === "/api/control-center/status") {
-      const session = pc1Sessions.resolve(req);
+      const session = resolveSession(req);
       if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
       if (!isOperationalControlCenterRole(session.context.role)) {
         sendJson(req, res, 403, { error: "control_center_forbidden" }, runtimeMode);
@@ -1269,7 +1323,7 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
         sendJson(req, res, 404, { error: "not_found" }, runtimeMode);
         return;
       }
-      const session = pc1Sessions.resolve(req);
+      const session = resolveSession(req);
       if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
       if (!isReviewDiagnosticsRole(session.context.role)) {
         sendJson(req, res, 403, { error: "review_diagnostics_forbidden" }, runtimeMode);
@@ -1338,6 +1392,20 @@ function sendJson(
 ): void {
   res.writeHead(status, responseHeaders(req, runtimeMode));
   res.end(JSON.stringify(body));
+}
+
+function sendAikintelAuthError(
+  req: IncomingMessage,
+  res: ServerResponse,
+  error: unknown,
+  runtimeMode: ResolvedProductRuntimeMode,
+): void {
+  const authError = error instanceof AikintelAuthError ? error : new AikintelAuthError("AIKINTEL_AUTH_STATE_UNAVAILABLE", 503);
+  const status = authError.httpStatus === 401 ? 401 : 503;
+  sendJson(req, res, status, {
+    error: status === 401 ? "AUTH_REQUIRED" : "AUTH_UNAVAILABLE",
+    message: status === 401 ? "Authentication required" : "Authentication service unavailable",
+  }, runtimeMode);
 }
 
 function sendText(

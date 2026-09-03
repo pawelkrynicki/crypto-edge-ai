@@ -89,6 +89,8 @@ export function createProductVpsServer(options: ProductVpsServerOptions): Server
   const distPath = resolve(options.distPath);
   const apiHandler = createScannerApiHandler({
     runtimeMode: "INTERNAL_BETA",
+    authMode: options.authMode,
+    aikintelAuth: options.aikintelAuth,
     scanner: options.scanner,
     context: options.context,
     reviewSession: options.reviewSession,
