@@ -340,7 +340,7 @@ export function ProductAppContent({
     ? candidates.find((candidate) => isSameRoutedTokenIdentity(
       { chain: candidate.chain, contract_address: candidate.contractAddress },
       routeTokenIdentity,
-    )) ?? null
+    )) ?? routedLifecycleCandidate
     : null;
   const verificationFollowUp = routeTokenIdentity
     ? followUpEntries.find((entry) => isSameRoutedTokenIdentity(entry, routeTokenIdentity)) ?? null

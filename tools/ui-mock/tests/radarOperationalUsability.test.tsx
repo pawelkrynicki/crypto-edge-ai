@@ -20,7 +20,7 @@ import { mapPersistableScannerOutputToUiCandidates } from "../src/adapters/scann
 import { formatProductDateTime, ProductLocaleProvider } from "../src/productI18n.js";
 import type { ScannerDataSourceLoadResult } from "../src/services/scannerDataSource.js";
 import type { FollowUpPublicEntry, FollowUpPublicStatus } from "../src/types/followUpTypes.js";
-import type { LifecycleRadarView, LifecycleTokenView } from "../src/types/lifecycleTypes.js";
+import type { LifecycleRadarCard, LifecycleRadarView, LifecycleTokenView } from "../src/types/lifecycleTypes.js";
 import type { ProductReadinessOutput } from "../src/types/scannerTypes.js";
 import { resolveGlobalProductTimestamp } from "../src/productRefreshState.js";
 
@@ -331,6 +331,17 @@ describe("P1.1 Radar operational usability", () => {
       assert.match(markup, /Wybierz token do weryfikacji/);
       assert.equal((markup.match(/aria-pressed="true"/g) ?? []).length, 0);
     }
+
+    const lifecycleOnly = { ...selected, id: "lifecycle-only", contractAddress: "0x4444444444444444444444444444444444444444" };
+    const lifecycleOnlyIdentity = { chain: lifecycleOnly.chain, contract_address: lifecycleOnly.contractAddress };
+    const lifecycleOnlyMarkup = renderToStaticMarkup(
+      <ProductLocaleProvider initialLocale="pl">
+        <VerificationTokenBrowser candidates={[first]} followUpEntries={[]} selectedCandidate={lifecycleOnly} selectedIdentity={lifecycleOnlyIdentity} onSelectToken={() => undefined} onCloseToken={() => undefined} />
+      </ProductLocaleProvider>,
+    );
+    assert.match(lifecycleOnlyMarkup, new RegExp(escapeRegExp(lifecycleOnly.contractAddress)));
+    assert.match(lifecycleOnlyMarkup, /data-token-detail-drawer="true"/);
+    assert.equal((lifecycleOnlyMarkup.match(/aria-pressed="true"/g) ?? []).length, 0, "a lifecycle-only route must not select a different sidebar token");
   });
 
   it("keeps Follow-up usable without scanner data and explains the 100-of-385 limit", () => {
@@ -439,6 +450,70 @@ describe("P1.1 Radar operational usability", () => {
       globalThis.IS_REACT_ACT_ENVIRONMENT = originalActEnvironment;
     }
   });
+
+  it("keeps a lifecycle-only Candidate Detail identity through sidebar and source-verification navigation", async () => {
+    const lifecycleCard = lifecycleOnlyCard();
+    const dataSources: ProductAppDataSources = {
+      loadScanner: async () => ({ status: "ready", source: "api", resolvedSource: "real-output", usedFallback: false, output: PERSISTABLE_SCANNER_SAMPLE }),
+      loadReadiness: async () => ({ status: "ready", output: readyReadiness() }),
+      loadAutomation: async () => null,
+      loadEstablishedUniverse: async () => establishedStatus(7),
+      loadControlCenter: async () => null,
+      loadFollowUpStatus: async () => followUpStatus(0),
+      loadFollowUpList: async () => ({ schema_version: "follow_up_list_v1", validation_status: "valid", entries: [] }),
+      loadLifecycleRadar: async () => lifecycleRadarWithCard(lifecycleCard),
+      now: () => "2026-08-02T14:00:00.000Z",
+    };
+    const browser = installBrowser(`http://127.0.0.1:4180/?chain=${lifecycleCard.chain}&contract=${lifecycleCard.contract_address}#candidate-detail`);
+    const originalFetch = globalThis.fetch;
+    const originalActEnvironment = globalThis.IS_REACT_ACT_ENVIRONMENT;
+    const localRequests: string[] = [];
+    globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      localRequests.push(String(input));
+      return new Response("{}", { status: 404, headers: { "content-type": "application/json" } });
+    }) as typeof fetch;
+    let renderer: ReturnType<typeof create> | undefined;
+
+    try {
+      await act(async () => {
+        renderer = create(
+          <ProductLocaleProvider initialLocale="pl">
+            <ProductAppContent dataSources={dataSources} runtimeModeOverride="INTERNAL_BETA" />
+          </ProductLocaleProvider>,
+        );
+        await flushPromises();
+      });
+
+      let detail = renderer!.root.findByType(CandidateDetailView);
+      assert.equal(detail.props.candidate.contractAddress, lifecycleCard.contract_address);
+      const shell = renderer!.root.findByType(ProductWorkspaceShell);
+      await act(async () => { shell.props.onSectionChange("external-checks"); await flushPromises(); });
+
+      let verification = renderer!.root.findByType(VerificationTokenBrowser);
+      assert.deepEqual(verification.props.selectedIdentity, { chain: lifecycleCard.chain, contract_address: lifecycleCard.contract_address });
+      assert.equal(verification.props.selectedCandidate.contractAddress, lifecycleCard.contract_address);
+      assert.equal(renderer!.root.findAllByProps({ "data-token-detail-drawer": "true" }).length, 1);
+      assert.equal(renderer!.root.findAll((node) => node.props["data-verification-token"] === `${lifecycleCard.chain}:${lifecycleCard.contract_address}`).length, 0, "the Verification list remains the scanner/Follow-up list");
+
+      await act(async () => { verification.props.onReturnToDetail(); await flushPromises(); });
+      detail = renderer!.root.findByType(CandidateDetailView);
+      const sourceVerification = renderer!.root.findAllByType("button").find((node) => node.children.some((child) => child === "Przejdź do weryfikacji źródłowej"));
+      assert.ok(sourceVerification, "Candidate Detail must expose the source-verification CTA");
+      await act(async () => { sourceVerification.props.onClick(); await flushPromises(); });
+
+      verification = renderer!.root.findByType(VerificationTokenBrowser);
+      assert.deepEqual(verification.props.selectedIdentity, { chain: lifecycleCard.chain, contract_address: lifecycleCard.contract_address });
+      assert.equal(verification.props.selectedCandidate.contractAddress, lifecycleCard.contract_address);
+      assert.equal(renderer!.root.findAllByProps({ "data-token-detail-drawer": "true" }).length, 1);
+      assert.equal(localRequests.some((url) => /provider|openai/i.test(url)), false);
+    } finally {
+      if (renderer) await act(async () => { renderer!.unmount(); });
+      browser.restore();
+      globalThis.fetch = originalFetch;
+      globalThis.IS_REACT_ACT_ENVIRONMENT = originalActEnvironment;
+    }
+  });
 });
 
 function followUpEntry(index: number): FollowUpPublicEntry {
@@ -514,6 +589,45 @@ function lifecycleRadarView(activeNewTotal: number, detectedTotal: number, nextC
     private_follow_up_total: 0,
     private_main_radar_total: 0,
     private_baskets: { new: newGroup, follow_up: { ...emptyGroup }, main_radar: { ...emptyGroup } },
+  };
+}
+
+function lifecycleOnlyCard(): LifecycleRadarCard {
+  return {
+    identity: "bsc:0x4444444444444444444444444444444444444444",
+    chain: "bsc",
+    contract_address: "0x4444444444444444444444444444444444444444",
+    display_name: "RWASWEEP",
+    symbol: "RWASWEEP",
+    system_status: "NEW",
+    user_status: "NEW",
+    user_status_is_override: false,
+    conditions: {
+      conditions_met: ["IDENTITY_VALID"],
+      conditions_unmet: [],
+      missing_data: [],
+      risks: [],
+      readiness: "CONDITIONS_MET",
+      security_state: "PARTIAL",
+      verification_state: "PENDING",
+    },
+    actor: { role: "CAMP_USER", capabilities: [] },
+    first_seen_at: "2026-08-02T12:00:00.000Z",
+    last_seen_at: "2026-08-02T13:00:00.000Z",
+    snapshot_present: false,
+    snapshot_absence_notice: true,
+    market: null,
+    follow_up: null,
+  };
+}
+
+function lifecycleRadarWithCard(card: LifecycleRadarCard): LifecycleRadarView {
+  const radar = lifecycleRadarView(1, 1, null);
+  const newInbox = { ...radar.new_inbox, total: 1, displayed: 1, cards: [card] };
+  return {
+    ...radar,
+    new_inbox: newInbox,
+    private_baskets: { ...radar.private_baskets, new: { ...radar.private_baskets.new, total: 1, displayed: 1, cards: [card] } },
   };
 }
 

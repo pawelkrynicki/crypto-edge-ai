@@ -84,14 +84,22 @@ export function VerificationTokenBrowser({
       selectedIdentity,
     )) ?? null
     : null;
+  const selectedCandidateMatchesRoute = Boolean(selectedIdentity && selectedCandidate && isSameRoutedTokenIdentity(
+    { chain: selectedCandidate.chain, contract_address: selectedCandidate.contractAddress },
+    selectedIdentity,
+  ));
+  const selectedFollowUpMatchesRoute = Boolean(selectedIdentity && selectedFollowUp && isSameRoutedTokenIdentity(
+    selectedFollowUp,
+    selectedIdentity,
+  ));
   const resolvedCandidate = routedSelection?.kind === "candidate"
     ? routedSelection.token
-    : selectedIdentity === null
+    : selectedIdentity === null || selectedCandidateMatchesRoute
       ? selectedCandidate
       : null;
   const resolvedFollowUp = routedSelection?.kind === "follow-up"
     ? routedSelection.token
-    : selectedIdentity === null
+    : !resolvedCandidate && (selectedIdentity === null || selectedFollowUpMatchesRoute)
       ? selectedFollowUp
       : null;
   const resolvedSelectedIdentity = selectedIdentity === null
