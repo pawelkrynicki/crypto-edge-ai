@@ -3,6 +3,7 @@ import {
   resolveCanonicalDataPaths,
   type DataCycleCanonicalPaths,
 } from "../../data-poc/src/automation/dataCycleOperations.js";
+import { getDataPocRuntimeRoot } from "../../data-poc/src/dataPocRuntimeRoot.js";
 
 export type CanonicalProductDataPaths = {
   automationStatePath: string;
@@ -15,8 +16,7 @@ export async function resolveCanonicalProductDataPaths(
   resolver: () => Promise<DataCycleCanonicalPaths> = resolveCanonicalDataPaths,
 ): Promise<CanonicalProductDataPaths> {
   const canonical = await resolver();
-  const dataPocRoot = resolve(dirname(canonical.automation_state), "..", "..");
-  const outputDirPath = resolve(dataPocRoot, "output");
+  const outputDirPath = resolve(getDataPocRuntimeRoot(), "output");
 
   return {
     automationStatePath: canonical.automation_state,
