@@ -566,7 +566,8 @@ function lifecycleRadarView(activeNewTotal: number, detectedTotal: number, nextC
     schema_version: "lifecycle_radar_view_v1",
     summary: {
       schema_version: "lifecycle_summary_v1",
-      system_new_total: detectedTotal,
+      system_new_total: activeNewTotal,
+      system_detected_total: detectedTotal,
       system_follow_up_total: 0,
       system_main_radar_total: 0,
       follow_up_action_due: 0,

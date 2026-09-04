@@ -28,6 +28,7 @@ import {
   getDefaultLifecycleAuditStorePath,
   getDefaultLifecycleCycleReceiptPath,
   getDefaultLifecycleOperationJournalPath,
+  getDefaultNewInboxArchiveSqlitePath,
   getDefaultNewInboxStorePath,
   validateLifecycleAuditStore,
   validateLifecycleCycleReceiptStore,
@@ -70,6 +71,7 @@ export type ProductRecoveryPaths = {
   followUpStore: string;
   followUpBackup: string;
   newInboxStore: string;
+  newInboxArchiveSqlite: string;
   lifecycleAuditStore: string;
   lifecycleCycleReceipt: string;
   lifecycleOperationJournal: string;
@@ -248,6 +250,7 @@ export async function resolveProductRecoveryPaths(
     followUpStore: getDefaultFollowUpStorePath(env),
     followUpBackup: `${getDefaultFollowUpStorePath(env)}.bak`,
     newInboxStore: getDefaultNewInboxStorePath(env),
+    newInboxArchiveSqlite: getDefaultNewInboxArchiveSqlitePath(env),
     lifecycleAuditStore: getDefaultLifecycleAuditStorePath(env),
     lifecycleCycleReceipt: getDefaultLifecycleCycleReceiptPath(env),
     lifecycleOperationJournal: getDefaultLifecycleOperationJournalPath(env),
@@ -650,6 +653,7 @@ async function buildStoreInventory(
     paths.followUpStore,
     paths.followUpBackup,
     paths.newInboxStore,
+    paths.newInboxArchiveSqlite,
     paths.lifecycleAuditStore,
     paths.lifecycleCycleReceipt,
     paths.lifecycleOperationJournal,
@@ -700,6 +704,13 @@ async function buildStoreInventory(
     descriptor("research_evidence_sqlite", paths.researchEvidenceSqlite, "stores/sqlite/research-evidence.sqlite", "sqlite", true),
     descriptor("central_automation_state", paths.automationState, "stores/automation/automation-state.json", "json", true),
   ];
+  if (await exists(paths.newInboxArchiveSqlite)) {
+    descriptors.splice(
+      descriptors.findIndex((item) => item.logicalStoreId === "lifecycle_audit_store"),
+      0,
+      descriptor("new_inbox_archive_sqlite", paths.newInboxArchiveSqlite, "stores/lifecycle/new-inbox-archive.sqlite", "sqlite", true, ["new_inbox_store"]),
+    );
+  }
   if (paths.newRecheckStore && await exists(paths.newRecheckStore)) {
     descriptors.push(descriptor("new_recheck_store", paths.newRecheckStore, "stores/new-recheck/store.json", "json", false, ["new_inbox_store"]));
   }
@@ -932,6 +943,7 @@ async function mapManifestToTargets(manifest: ProductBackupManifest, paths: Prod
     follow_up_store: paths.followUpStore,
     follow_up_backup: paths.followUpBackup,
     new_inbox_store: paths.newInboxStore,
+    new_inbox_archive_sqlite: paths.newInboxArchiveSqlite,
     ...(paths.newRecheckStore ? { new_recheck_store: paths.newRecheckStore } : {}),
     lifecycle_audit_store: paths.lifecycleAuditStore,
     lifecycle_cycle_receipt: paths.lifecycleCycleReceipt,
@@ -1036,7 +1048,7 @@ function groupTargetMappings(
   const priority = [
     "active_scanner_snapshot", "active_context_snapshot", "follow_up_store", "follow_up_backup",
     "established_universe_store", "established_address_config", "feedback_sqlite",
-    "ai_queue_cache_sqlite", "user_workspace_sqlite", "research_evidence_sqlite", "new_inbox_store", "lifecycle_audit_store", "lifecycle_cycle_receipt", "lifecycle_operation_journal", "reports_library", "runtime_policy_config",
+    "ai_queue_cache_sqlite", "user_workspace_sqlite", "research_evidence_sqlite", "new_inbox_store", "new_inbox_archive_sqlite", "lifecycle_audit_store", "lifecycle_cycle_receipt", "lifecycle_operation_journal", "reports_library", "runtime_policy_config",
     "established_discovery_query_plan", "data_source_registry", "central_run_once_receipt",
     "central_automation_state",
   ];
@@ -1048,7 +1060,7 @@ async function publishGroup(group: PublishGroup, operation: ProductRecoveryOpera
   for (const file of group.files) if (await exists(file.targetPath)) existing = true;
   const log = { logical_store_id: group.logicalStoreId, target_existed: existing, published: false, rolled_back: false };
   operation.publication_log.push(log);
-  if (group.logicalStoreId === "feedback_sqlite" || group.logicalStoreId === "ai_queue_cache_sqlite" || group.logicalStoreId === "user_workspace_sqlite" || group.logicalStoreId === "research_evidence_sqlite") {
+  if (group.logicalStoreId === "feedback_sqlite" || group.logicalStoreId === "ai_queue_cache_sqlite" || group.logicalStoreId === "user_workspace_sqlite" || group.logicalStoreId === "research_evidence_sqlite" || group.logicalStoreId === "new_inbox_archive_sqlite") {
     for (const file of group.files) await quiesceAndPreserveSqliteSidecars(file.targetPath, file.previousPath);
   }
   for (const file of group.files) {
@@ -1214,6 +1226,12 @@ async function assertSqliteLogicalSchema(path: string, logicalStoreId: string): 
       !tables.has("research_evidence")
       || !tables.has("research_evidence_meta")
     )) throw new ProductRecoveryError("RESEARCH_EVIDENCE_SQLITE_SCHEMA_INVALID");
+    if (logicalStoreId === "new_inbox_archive_sqlite" && (
+      !tables.has("new_inbox_archive_events")
+      || !tables.has("new_inbox_detected_identities")
+    )) {
+      throw new ProductRecoveryError("NEW_INBOX_ARCHIVE_SQLITE_SCHEMA_INVALID");
+    }
   } finally {
     database.close();
   }

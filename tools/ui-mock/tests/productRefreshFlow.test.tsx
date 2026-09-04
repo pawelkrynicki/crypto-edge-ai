@@ -536,6 +536,7 @@ function privateFollowUpRadar(): LifecycleRadarView {
     summary: {
       schema_version: "lifecycle_summary_v1",
       system_new_total: 1,
+      system_detected_total: 1,
       system_follow_up_total: 0,
       system_main_radar_total: 0,
       follow_up_action_due: 0,

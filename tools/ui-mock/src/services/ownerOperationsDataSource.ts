@@ -48,6 +48,7 @@ export type OwnerRefreshResult = {
     new_inbox_updated: number;
     promoted_to_follow_up: number;
     promoted_to_main_radar: number;
+    archived: number;
     duplicates: number;
     lifecycle_cycle_id: string | null;
     lifecycle_status: "SUCCESS" | "PARTIAL" | "FAILED" | null;
@@ -146,7 +147,7 @@ function isOwnerRefreshResult(value: unknown): value is OwnerRefreshResult {
 
 function isLifecycleReceipt(value: unknown): boolean {
   return isRecord(value)
-    && ["found", "valid", "rejected", "new_inbox", "new_inbox_updated", "promoted_to_follow_up", "promoted_to_main_radar", "duplicates"].every((key) => Number.isSafeInteger(value[key]) && Number(value[key]) >= 0)
+    && ["found", "valid", "rejected", "new_inbox", "new_inbox_updated", "promoted_to_follow_up", "promoted_to_main_radar", "archived", "duplicates"].every((key) => Number.isSafeInteger(value[key]) && Number(value[key]) >= 0)
     && isStringArray(value.source_errors)
     && isNullableIso(value.snapshot_at)
     && (value.lifecycle_cycle_id === null || isSafeText(value.lifecycle_cycle_id))

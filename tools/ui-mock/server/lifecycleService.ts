@@ -1,12 +1,14 @@
 import { createHash } from "node:crypto";
 import {
   buildLifecycleSummary,
+  countNewInboxDetectedIdentities,
   evaluateFollowUpToMainRadar,
   evaluateNewToFollowUp,
   getDefaultLifecycleCycleReceiptPath,
   getDefaultNewInboxStorePath,
   readLatestLifecycleCycleReceipt,
   readNewInboxStore,
+  resolveNewInboxArchiveStorePath,
   type LifecycleCycleReceipt,
   type LifecycleEvaluationContext,
   type LifecycleConditions,
@@ -80,6 +82,7 @@ export function createLifecycleService(options: {
   followUpStorePath?: string;
   establishedStorePath?: string;
   newInboxStorePath?: string;
+  newInboxArchiveStorePath?: string;
   auditStorePath?: string;
   cycleReceiptPath?: string;
   newRecheckStorePath?: string;
@@ -95,6 +98,7 @@ export function createLifecycleService(options: {
     followUp: options.followUpStorePath,
     established: options.establishedStorePath ?? getDefaultEstablishedUniverseStorePath(),
     inbox: options.newInboxStorePath ?? getDefaultNewInboxStorePath(),
+    archive: resolveNewInboxArchiveStorePath(options.newInboxStorePath, options.newInboxArchiveStorePath),
     receipt: options.cycleReceiptPath ?? getDefaultLifecycleCycleReceiptPath(),
     newRecheck: options.newRecheckStorePath ?? getDefaultNewRecheckStorePath(),
   };
@@ -220,9 +224,17 @@ export function createLifecycleService(options: {
       readLatestLifecycleCycleReceipt(paths.receipt),
       readLatestScannerOutput(options.scanner).catch(() => null),
     ]);
+    const detectedIdentityCount = await countNewInboxDetectedIdentities(paths.archive);
     const grouping = resolveCurrentSystemFollowUpGrouping(inbox, followUp, universe.current.entries, receipt, scannerOutput(scanner), new Date());
     return {
-      ...buildLifecycleSummary(inbox, followUp, universe.current.entries.filter((entry) => entry.enabled).length, receipt),
+      ...buildLifecycleSummary(
+        inbox,
+        followUp,
+        universe.current.entries.filter((entry) => entry.enabled).length,
+        receipt,
+        new Date(),
+        Math.max(detectedIdentityCount, new Set(inbox.entries.map((entry) => entry.identity)).size),
+      ),
       follow_up_action_due: grouping.action_due,
       follow_up_candidates_ready: grouping.candidates_ready,
     };
@@ -233,7 +245,7 @@ export function createLifecycleService(options: {
   async function workspaceIntegrity() { return (await workspace()).integrity(); }
 
   async function radar(session: Pc1SessionContext, input: { limit: number; cursor: RadarCursor | null }): Promise<LifecycleRadarView> {
-    const [inbox, followUp, universe, scanner, receipt, newRecheck, workspaceRepository] = await Promise.all([
+    const [inbox, followUp, universe, scanner, receipt, newRecheck, workspaceRepository, detectedIdentityCount] = await Promise.all([
       readNewInboxStore(paths.inbox),
       readFollowUpStore(paths.followUp),
       readEstablishedUniverseStore(paths.established),
@@ -241,6 +253,7 @@ export function createLifecycleService(options: {
       readLatestLifecycleCycleReceipt(paths.receipt),
       readNewRecheckStore(paths.newRecheck),
       workspace(),
+      countNewInboxDetectedIdentities(paths.archive),
     ]);
     const now = new Date();
     const mainEntries = universe.current.entries.filter((entry) => entry.enabled);
@@ -348,7 +361,14 @@ export function createLifecycleService(options: {
     const privateNewGroup = pageRadarGroup(actionAwareCards.filter((card) => card.user_status === "NEW").sort(compareInbox), cursor.private_new, input.limit, "private_new", cursor);
     const privateFollowUpGroup = pageRadarGroup(actionAwareCards.filter((card) => card.user_status === "FOLLOW_UP").sort(compareInbox), cursor.private_follow_up, input.limit, "private_follow_up", cursor);
     const privateMainRadarGroup = pageRadarGroup(actionAwareCards.filter((card) => card.user_status === "MAIN_RADAR").sort(compareInbox), cursor.private_main_radar, input.limit, "private_main_radar", cursor);
-    const summary = buildLifecycleSummary(inbox, followUp, mainIdentities.size, receipt, now);
+    const summary = buildLifecycleSummary(
+      inbox,
+      followUp,
+      mainIdentities.size,
+      receipt,
+      now,
+      Math.max(detectedIdentityCount, new Set(inbox.entries.map((entry) => entry.identity)).size),
+    );
     summary.follow_up_action_due = dueGroup.total;
     summary.follow_up_candidates_ready = readyGroup.total;
     summary.follow_up_displayed = dueGroup.displayed + readyGroup.displayed + observedGroup.displayed;

@@ -12,6 +12,7 @@ import {
 import {
   validateEstablishedAddressUniverse,
 } from "../../data-poc/src/establishedAddressUniverse.js";
+import { createNewInboxArchiveEvent, persistNewInboxArchiveEvents, upsertNewInboxDetectedIdentities } from "../../data-poc/src/newInboxArchiveStore.js";
 import { createInitialAutomationState } from "../../data-poc/src/automation/automationState.js";
 import { createFeedbackStore } from "../server/feedbackStore.js";
 import { createAIAnalysisQueueStore } from "../server/aiResearchQueueStore.js";
@@ -33,6 +34,7 @@ export function createIsolatedRecoveryPaths(root: string): ProductRecoveryPaths 
     followUpStore: resolve(productRoot, "tools", "data-poc", ".local", "follow-up", "store.json"),
     followUpBackup: resolve(productRoot, "tools", "data-poc", ".local", "follow-up", "store.json.bak"),
     newInboxStore: resolve(productRoot, "tools", "data-poc", ".local", "lifecycle", "new-inbox.json"),
+    newInboxArchiveSqlite: resolve(productRoot, "tools", "data-poc", ".local", "lifecycle", "new-inbox-archive.sqlite"),
     lifecycleAuditStore: resolve(productRoot, "tools", "data-poc", ".local", "lifecycle", "audit.json"),
     lifecycleCycleReceipt: resolve(productRoot, "tools", "data-poc", ".local", "lifecycle", "cycle-receipts.json"),
     lifecycleOperationJournal: resolve(productRoot, "tools", "data-poc", ".local", "lifecycle", "operation-journal.json"),
@@ -64,6 +66,28 @@ export async function seedIsolatedProductState(paths: ProductRecoveryPaths): Pro
   await writeJson(paths.followUpStore, followUp);
   await writeJson(paths.followUpBackup, followUp);
   await writeJson(paths.newInboxStore, createEmptyNewInboxStore(new Date(FIXTURE_TIME)));
+  const archiveFixture = createNewInboxArchiveEvent({
+    identity: "base:archive-fixture",
+    chain: "base",
+    contract_address: "archive-fixture",
+    display_name: "Archive fixture",
+    symbol: "ARCH",
+    first_seen_at: FIXTURE_TIME,
+    last_seen_at: FIXTURE_TIME,
+    archived_at: FIXTURE_TIME,
+    previous_system_status: "NEW",
+    payload_json: "{}",
+  });
+  await upsertNewInboxDetectedIdentities([{
+    identity: archiveFixture.identity,
+    chain: archiveFixture.chain,
+    contract_address: archiveFixture.contract_address,
+    first_seen_at: archiveFixture.first_seen_at,
+    last_seen_at: archiveFixture.last_seen_at,
+    display_name: archiveFixture.display_name,
+    symbol: archiveFixture.symbol,
+  }], paths.newInboxArchiveSqlite);
+  await persistNewInboxArchiveEvents([archiveFixture], paths.newInboxArchiveSqlite);
   await writeJson(paths.lifecycleAuditStore, createEmptyLifecycleAuditStore(new Date(FIXTURE_TIME)));
   await writeJson(paths.lifecycleCycleReceipt, createEmptyLifecycleCycleReceiptStore(new Date(FIXTURE_TIME)));
   await writeJson(paths.lifecycleOperationJournal, createEmptyLifecycleOperationJournalStore(new Date(FIXTURE_TIME)));

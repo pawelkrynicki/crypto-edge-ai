@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, open, readFile, rename, rm } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
+import { performance } from "node:perf_hooks";
 import {
   getDefaultEstablishedUniverseStorePath,
   normalizeEstablishedAddress,
@@ -29,6 +30,27 @@ import {
   type PersistableScannerOutput,
 } from "./persistableScannerModel.js";
 import { getDataPocRuntimeRoot } from "./dataPocRuntimeRoot.js";
+import {
+  countNewInboxDetectedIdentities,
+  createNewInboxArchiveEvent,
+  getDefaultNewInboxArchiveSqlitePath,
+  persistNewInboxArchiveEvents,
+  upsertNewInboxDetectedIdentities,
+} from "./newInboxArchiveStore.js";
+
+export {
+  NEW_INBOX_ARCHIVE_REASON,
+  countNewInboxArchiveEvents,
+  countNewInboxArchiveIdentities,
+  countNewInboxDetectedIdentities,
+  createNewInboxArchiveEvent,
+  findNewInboxArchiveEventsByIdentity,
+  findRecentNewInboxArchiveEvents,
+  getDefaultNewInboxArchiveSqlitePath,
+  newInboxArchiveEventId,
+  persistNewInboxArchiveEvents,
+  upsertNewInboxDetectedIdentities,
+} from "./newInboxArchiveStore.js";
 
 export const SYSTEM_LIFECYCLE_POLICY_VERSION = "system_lifecycle_policy_v1";
 export const NEW_INBOX_SCHEMA_VERSION = "new_inbox_store_v1";
@@ -36,6 +58,7 @@ export const LIFECYCLE_AUDIT_SCHEMA_VERSION = "lifecycle_audit_store_v1";
 export const LIFECYCLE_SUMMARY_SCHEMA_VERSION = "lifecycle_summary_v1";
 export const LIFECYCLE_OPERATION_JOURNAL_SCHEMA_VERSION = "lifecycle_operation_journal_v1";
 export const LIFECYCLE_CYCLE_RECEIPT_SCHEMA_VERSION = "lifecycle_cycle_receipt_v1";
+export const NEW_INBOX_INACTIVITY_RETENTION_DAYS = 7;
 
 export type SystemLifecycleStatus = "NEW" | "FOLLOW_UP" | "MAIN_RADAR";
 
@@ -108,6 +131,7 @@ export type LifecycleAuditStore = {
 export type LifecycleSummary = {
   schema_version: typeof LIFECYCLE_SUMMARY_SCHEMA_VERSION;
   system_new_total: number;
+  system_detected_total: number;
   system_follow_up_total: number;
   system_main_radar_total: number;
   follow_up_action_due: number;
@@ -132,6 +156,9 @@ export type LifecycleSummary = {
 };
 
 export type LifecycleOperationStage = "PLAN_CREATED" | "TARGET_STORE_APPLIED" | "FOLLOW_UP_SYNCED" | "NEW_INBOX_APPLIED" | "AUDIT_APPLIED" | "COMMITTED";
+export type LifecycleFailureStage = LifecycleOperationStage | "ARCHIVE_PERSISTED";
+export type LifecycleTimingPhase = "DETECTED_REGISTRY_UPSERT" | "ARCHIVE_PERSIST" | "ACTIVE_NEW_JSON_REWRITE";
+export type LifecycleTimingObserver = (phase: LifecycleTimingPhase, durationMs: number) => void;
 export type LifecycleOperationJournalEntry = {
   operation_id: string;
   identity: string;
@@ -217,6 +244,13 @@ export function getDefaultLifecycleOperationJournalPath(env: NodeJS.ProcessEnv =
 
 export function getDefaultLifecycleCycleReceiptPath(env: NodeJS.ProcessEnv = process.env): string {
   return resolve(env.CRYPTO_EDGE_LIFECYCLE_CYCLE_RECEIPT_PATH?.trim() || resolve(getDataPocRuntimeRoot(env), ".local", "lifecycle", "cycle-receipts.json"));
+}
+
+export function resolveNewInboxArchiveStorePath(newInboxStorePath?: string, archiveStorePath?: string): string {
+  if (archiveStorePath?.trim()) return resolve(archiveStorePath);
+  return newInboxStorePath
+    ? resolve(dirname(newInboxStorePath), "new-inbox-archive.sqlite")
+    : getDefaultNewInboxArchiveSqlitePath();
 }
 
 export function createEmptyNewInboxStore(now = new Date(0)): NewInboxStore {
@@ -373,6 +407,7 @@ export function evaluateFollowUpToMainRadar(entry: FollowUpEntry, context: Lifec
 
 export async function applySystemLifecycle(snapshot: PersistableScannerOutput, options: {
   newInboxStorePath?: string;
+  newInboxArchiveStorePath?: string;
   auditStorePath?: string;
   operationJournalPath?: string;
   cycleReceiptPath?: string;
@@ -381,7 +416,8 @@ export async function applySystemLifecycle(snapshot: PersistableScannerOutput, o
   centralCycleId?: string;
   contextRunId?: string | null;
   now?: Date;
-  failureInjection?: (stage: LifecycleOperationStage, identity: string) => void | Promise<void>;
+  failureInjection?: (stage: LifecycleFailureStage, identity: string) => void | Promise<void>;
+  timingObserver?: LifecycleTimingObserver;
 } = {}): Promise<SystemLifecycleRunResult> {
   const lifecycleLockPath = `${options.newInboxStorePath ?? getDefaultNewInboxStorePath()}.system-lifecycle`;
   return withStoreLock(lifecycleLockPath, () => applySystemLifecycleLocked(snapshot, options));
@@ -467,6 +503,7 @@ export async function bootstrapLifecycleReview(snapshot: PersistableScannerOutpu
 
 async function applySystemLifecycleLocked(snapshot: PersistableScannerOutput, options: {
   newInboxStorePath?: string;
+  newInboxArchiveStorePath?: string;
   auditStorePath?: string;
   operationJournalPath?: string;
   cycleReceiptPath?: string;
@@ -475,10 +512,15 @@ async function applySystemLifecycleLocked(snapshot: PersistableScannerOutput, op
   centralCycleId?: string;
   contextRunId?: string | null;
   now?: Date;
-  failureInjection?: (stage: LifecycleOperationStage, identity: string) => void | Promise<void>;
+  failureInjection?: (stage: LifecycleFailureStage, identity: string) => void | Promise<void>;
+  timingObserver?: LifecycleTimingObserver;
 }): Promise<SystemLifecycleRunResult> {
   const now = options.now ?? new Date();
   const newInboxPath = options.newInboxStorePath ?? getDefaultNewInboxStorePath();
+  const archivePath = resolveNewInboxArchiveStorePath(
+    options.newInboxStorePath ? newInboxPath : undefined,
+    options.newInboxArchiveStorePath,
+  );
   const auditPath = options.auditStorePath ?? getDefaultLifecycleAuditStorePath();
   const journalPath = options.operationJournalPath ?? (options.newInboxStorePath ? resolve(dirname(newInboxPath), "operation-journal.json") : getDefaultLifecycleOperationJournalPath());
   const cycleReceiptPath = options.cycleReceiptPath ?? (options.newInboxStorePath ? resolve(dirname(newInboxPath), "cycle-receipts.json") : getDefaultLifecycleCycleReceiptPath());
@@ -506,7 +548,7 @@ async function applySystemLifecycleLocked(snapshot: PersistableScannerOutput, op
   let promotedFollowUp = 0;
   let duplicateNoop = 0;
   const eligibleCandidates = new Map<string, PersistableCandidate>();
-  await updateNewInboxStore((current) => {
+  const inboxAfterIngest = await updateNewInboxStore((current) => {
     const entries = new Map(current.entries.map((entry) => [entry.identity, entry]));
     let changed = false;
     for (const candidate of snapshot.candidates.filter((item) => item.discovery_basket === "new_emerging")) {
@@ -551,6 +593,68 @@ async function applySystemLifecycleLocked(snapshot: PersistableScannerOutput, op
       ? finalizeInbox({ ...current, store_version: current.store_version + 1, entries: [...entries.values()] }, now)
       : current;
   }, newInboxPath);
+
+  const registryStartedAt = performance.now();
+  await upsertNewInboxDetectedIdentities(inboxAfterIngest.entries.map((entry) => ({
+    identity: entry.identity,
+    chain: entry.chain,
+    contract_address: entry.contract_address,
+    first_seen_at: entry.first_seen_at,
+    last_seen_at: entry.last_seen_at,
+    display_name: entry.display_name,
+    symbol: entry.symbol,
+  })), archivePath);
+  options.timingObserver?.("DETECTED_REGISTRY_UPSERT", performance.now() - registryStartedAt);
+  const cutoff = now.getTime() - NEW_INBOX_INACTIVITY_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+  const staleNewEntries = inboxAfterIngest.entries.filter((entry) => (
+    entry.system_status === "NEW"
+    && entry.archived_at === null
+    && entry.rejected_at === null
+    && Date.parse(entry.last_seen_at) <= cutoff
+  ));
+  const archiveEvents = staleNewEntries.map((entry) => createNewInboxArchiveEvent({
+    identity: entry.identity,
+    chain: entry.chain,
+    contract_address: entry.contract_address,
+    display_name: entry.display_name,
+    symbol: entry.symbol,
+    first_seen_at: entry.first_seen_at,
+    last_seen_at: entry.last_seen_at,
+    archived_at: iso(now),
+    previous_system_status: entry.system_status,
+    payload_json: JSON.stringify(entry),
+  }));
+  const archiveStartedAt = performance.now();
+  try {
+    await persistNewInboxArchiveEvents(archiveEvents, archivePath);
+  } finally {
+    options.timingObserver?.("ARCHIVE_PERSIST", performance.now() - archiveStartedAt);
+  }
+  for (const entry of staleNewEntries) await failAt(options, "ARCHIVE_PERSISTED", entry.identity);
+  let archived = 0;
+  const activeRewriteStartedAt = performance.now();
+  try {
+    await updateNewInboxStore((current) => {
+      const eventsByIdentity = new Map(archiveEvents.map((event) => [event.identity, event]));
+      let removed = 0;
+      const entries = current.entries.filter((entry) => {
+        const event = eventsByIdentity.get(entry.identity);
+        const shouldRemove = event !== undefined
+          && entry.system_status === "NEW"
+          && entry.archived_at === null
+          && entry.rejected_at === null
+          && entry.last_seen_at === event.last_seen_at;
+        if (shouldRemove) removed += 1;
+        return !shouldRemove;
+      });
+      archived = removed;
+      return removed > 0
+        ? finalizeInbox({ ...current, store_version: current.store_version + 1, entries }, now)
+        : current;
+    }, newInboxPath);
+  } finally {
+    options.timingObserver?.("ACTIVE_NEW_JSON_REWRITE", performance.now() - activeRewriteStartedAt);
+  }
 
   let followUpStore = beforeFollowUp;
   for (const [identity, candidate] of eligibleCandidates) {
@@ -634,7 +738,11 @@ async function applySystemLifecycleLocked(snapshot: PersistableScannerOutput, op
       throw error;
     }
   }
-  const [updatedInbox, finalUniverse] = await Promise.all([readNewInboxStore(newInboxPath), readEstablishedUniverseStore(establishedPath)]);
+  const [updatedInbox, finalUniverse, detectedIdentityCount] = await Promise.all([
+    readNewInboxStore(newInboxPath),
+    readEstablishedUniverseStore(establishedPath),
+    countNewInboxDetectedIdentities(archivePath),
+  ]);
   const lifecycleReceipt = await writeLifecycleCycleReceipt({
     central_cycle_id: cycleId,
     scanner_run_id: scannerRunId,
@@ -645,7 +753,7 @@ async function applySystemLifecycleLocked(snapshot: PersistableScannerOutput, op
     new_inbox_updated: updated,
     promoted_to_follow_up: promotedFollowUp,
     promoted_to_main_radar: promotedMain,
-    archived: 0,
+    archived,
     rejected: 0,
     duplicate_noop: duplicateNoop,
     status: "SUCCESS",
@@ -659,7 +767,14 @@ async function applySystemLifecycleLocked(snapshot: PersistableScannerOutput, op
     duplicate_noop: duplicateNoop,
     follow_up_store: followUpStore,
     lifecycle_receipt: lifecycleReceipt,
-    summary: buildLifecycleSummary(updatedInbox, followUpStore, finalUniverse.current.entries.filter((entry) => entry.enabled).length, lifecycleReceipt, now),
+    summary: buildLifecycleSummary(
+      updatedInbox,
+      followUpStore,
+      finalUniverse.current.entries.filter((entry) => entry.enabled).length,
+      lifecycleReceipt,
+      now,
+      detectedIdentityCount,
+    ),
   };
 }
 
@@ -677,7 +792,7 @@ export async function applyNewRecheckLifecycle(candidate: PersistableCandidate, 
   followUpStorePath?: string;
   establishedStorePath?: string;
   now?: Date;
-  failureInjection?: (stage: LifecycleOperationStage, identity: string) => void | Promise<void>;
+  failureInjection?: (stage: LifecycleFailureStage, identity: string) => void | Promise<void>;
 }): Promise<NewRecheckLifecycleResult> {
   const lifecycleLockPath = `${options.newInboxStorePath ?? getDefaultNewInboxStorePath()}.system-lifecycle`;
   return withStoreLock(lifecycleLockPath, async () => {
@@ -734,7 +849,7 @@ export async function applyNewRecheckLifecycle(candidate: PersistableCandidate, 
   });
 }
 
-export function buildLifecycleSummary(inbox: NewInboxStore, followUp: FollowUpStore, mainRadarTotal = 0, receipt: LifecycleCycleReceipt | null = null, now = new Date()): LifecycleSummary {
+export function buildLifecycleSummary(inbox: NewInboxStore, followUp: FollowUpStore, mainRadarTotal = 0, receipt: LifecycleCycleReceipt | null = null, now = new Date(), historicalDetectedTotal = inbox.entries.length): LifecycleSummary {
   const systemNew = inbox.entries.filter((entry) => entry.system_status === "NEW" && entry.archived_at === null && entry.rejected_at === null).length;
   const followUpEntries = followUp.entries.filter((entry) => entry.lifecycle_status !== "ESTABLISHED" && entry.lifecycle_status !== "ARCHIVED");
   const summaryAsOf = [inbox.generated_at, followUp.generated_at, receipt?.finished_at ?? null]
@@ -743,6 +858,7 @@ export function buildLifecycleSummary(inbox: NewInboxStore, followUp: FollowUpSt
   return {
     schema_version: LIFECYCLE_SUMMARY_SCHEMA_VERSION,
     system_new_total: systemNew,
+    system_detected_total: historicalDetectedTotal,
     system_follow_up_total: followUpEntries.length,
     system_main_radar_total: mainRadarTotal,
     follow_up_action_due: followUpEntries.filter((entry) => entry.next_check_at !== null && Date.parse(entry.next_check_at) <= now.getTime()).length,
@@ -923,7 +1039,7 @@ async function promoteNewCandidateToFollowUp(input: {
   auditPath: string;
   followUpStorePath?: string;
   universe: EstablishedAddressUniverse;
-  failureInjection?: (stage: LifecycleOperationStage, identity: string) => void | Promise<void>;
+  failureInjection?: (stage: LifecycleFailureStage, identity: string) => void | Promise<void>;
 }): Promise<FollowUpStore> {
   const transition = newTransition({
     identity: input.identity,
@@ -974,7 +1090,7 @@ function lifecycleConditionsFromAudit(entry: LifecycleAuditEntry): LifecycleCond
   return conditions(entry.conditions_met, entry.conditions_unmet, entry.missing_data, [], entry.security_state, entry.verification_state);
 }
 
-async function failAt(options: { failureInjection?: (stage: LifecycleOperationStage, identity: string) => void | Promise<void> }, stage: LifecycleOperationStage, identity: string): Promise<void> {
+async function failAt(options: { failureInjection?: (stage: LifecycleFailureStage, identity: string) => void | Promise<void> }, stage: LifecycleFailureStage, identity: string): Promise<void> {
   await options.failureInjection?.(stage, identity);
 }
 

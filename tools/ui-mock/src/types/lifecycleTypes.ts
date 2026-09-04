@@ -19,6 +19,7 @@ export type LifecycleTokenView = {
 export type LifecycleSummary = {
   schema_version: "lifecycle_summary_v1";
   system_new_total: number;
+  system_detected_total: number;
   system_follow_up_total: number;
   system_main_radar_total: number;
   follow_up_action_due: number;

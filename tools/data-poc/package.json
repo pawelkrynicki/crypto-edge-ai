@@ -43,7 +43,7 @@
     "follow-up:bootstrap": "tsc && node dist/src/runFollowUpBootstrap.js",
     "test:follow-up": "tsc && node --test dist/tests/followUpBasket.test.js dist/tests/followUpCollector.test.js",
     "test:new-recheck": "tsc && node --test dist/tests/newRecheckEngine.test.js dist/tests/newRecheckStore.test.js",
-    "test:pc1": "tsc && node --test dist/tests/systemLifecycle.test.js dist/tests/pc1LifecycleReviewPreparation.test.js dist/tests/pc1LifecycleReviewBootstrap.test.js",
+    "test:pc1": "tsc && node --test dist/tests/systemLifecycle.test.js dist/tests/newInboxArchiveStore.test.js dist/tests/pc1LifecycleReviewPreparation.test.js dist/tests/pc1LifecycleReviewBootstrap.test.js",
     "test:pc3c": "tsc && node --test dist/tests/pc3cOnchainNormalization.test.js",
     "test:pc3d": "tsc && node --test dist/tests/pc3dSocialLinkNormalization.test.js",
     "test": "tsc && node --test dist/tests/*.js",

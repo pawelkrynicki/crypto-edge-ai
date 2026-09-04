@@ -146,7 +146,9 @@ export const CandidateResultsView: React.FC<CandidateResultsViewProps> = ({
     ?? lifecycleRadar?.new_inbox.total
     ?? lifecycleSummary?.system_new_total
     ?? newCandidates.length;
-  const detectedTotal = lifecycleRadar?.summary.system_new_total
+  const detectedTotal = lifecycleRadar?.summary.system_detected_total
+    ?? lifecycleSummary?.system_detected_total
+    ?? lifecycleRadar?.summary.system_new_total
     ?? lifecycleSummary?.system_new_total
     ?? newCandidates.length;
   const establishedAfterFilters = metadata?.established?.candidates_after_filters

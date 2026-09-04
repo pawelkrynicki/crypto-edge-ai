@@ -81,6 +81,7 @@ export type InternalBetaCollectorOptions = {
   previousContextRunId?: string | null;
   followUpStorePath?: string;
   newInboxStorePath?: string;
+  newInboxArchiveStorePath?: string;
   newRecheckStorePath?: string;
   lifecycleAuditStorePath?: string;
   establishedStorePath?: string;
@@ -128,6 +129,7 @@ export type InternalBetaCollectorResult = {
     new_inbox_updated: number;
     promoted_to_follow_up: number;
     promoted_to_main_radar: number;
+    archived: number;
     duplicate_noop: number;
   };
   new_recheck: NewRecheckRunResult;
@@ -352,6 +354,7 @@ export async function runInternalBetaCollector(
     new_inbox_updated: 0,
     promoted_to_follow_up: 0,
     promoted_to_main_radar: 0,
+    archived: 0,
     duplicate_noop: 0,
   };
   let newRecheck: NewRecheckRunResult = {
@@ -384,6 +387,7 @@ export async function runInternalBetaCollector(
     const lifecycleResult = await applySystemLifecycle(scanner, {
       followUpStorePath,
       newInboxStorePath: options.newInboxStorePath,
+      newInboxArchiveStorePath: options.newInboxArchiveStorePath,
       auditStorePath: options.lifecycleAuditStorePath,
       establishedStorePath: options.establishedStorePath,
       centralCycleId: runId,
@@ -400,6 +404,7 @@ export async function runInternalBetaCollector(
       new_inbox_updated: lifecycleResult.new_inbox_updated,
       promoted_to_follow_up: lifecycleResult.promoted_to_follow_up,
       promoted_to_main_radar: lifecycleResult.promoted_to_main_radar,
+      archived: lifecycleResult.lifecycle_receipt.archived,
       duplicate_noop: lifecycleResult.duplicate_noop,
     };
   } catch (error) {

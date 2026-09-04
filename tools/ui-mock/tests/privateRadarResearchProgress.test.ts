@@ -82,7 +82,7 @@ function lifecycleRadar(card: LifecycleRadarCard): LifecycleRadarView {
   const empty = () => group([]);
   return {
     schema_version: "lifecycle_radar_view_v1",
-    summary: { schema_version: "lifecycle_summary_v1", system_new_total: 0, system_follow_up_total: 1, system_main_radar_total: 0, follow_up_action_due: 0, follow_up_candidates_ready: 0, follow_up_displayed: 1, follow_up_store_version: "test", last_lifecycle_change_at: null, last_central_cycle_id: null, summary_as_of: null, last_completed_cycle_id: null, last_completed_cycle_at: null, delta_source: "NONE", last_change_summary: { added: 0, updated: 0, promoted_to_follow_up: 0, promoted_to_main_radar: 0, archived: 0, rejected: 0, duplicate_noop: 0 } },
+    summary: { schema_version: "lifecycle_summary_v1", system_new_total: 0, system_detected_total: 0, system_follow_up_total: 1, system_main_radar_total: 0, follow_up_action_due: 0, follow_up_candidates_ready: 0, follow_up_displayed: 1, follow_up_store_version: "test", last_lifecycle_change_at: null, last_central_cycle_id: null, summary_as_of: null, last_completed_cycle_id: null, last_completed_cycle_at: null, delta_source: "NONE", last_change_summary: { added: 0, updated: 0, promoted_to_follow_up: 0, promoted_to_main_radar: 0, archived: 0, rejected: 0, duplicate_noop: 0 } },
     actor: card.actor,
     new_inbox: empty(),
     follow_up: { action_due: group([card]), candidates_ready: empty(), observed: empty() },

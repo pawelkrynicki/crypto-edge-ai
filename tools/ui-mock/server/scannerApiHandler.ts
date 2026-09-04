@@ -165,6 +165,7 @@ export type ScannerApiHandlerOptions = {
   aiResearch?: AIResearchApiOptions;
   lifecycle?: {
     newInboxStorePath?: string;
+    newInboxArchiveStorePath?: string;
     newRecheckStorePath?: string;
     auditStorePath?: string;
     cycleReceiptPath?: string;
@@ -302,6 +303,7 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
     followUpStorePath: options.followUp?.storePath,
     establishedStorePath: options.establishedUniverse?.storeFilePath,
     newInboxStorePath: options.lifecycle?.newInboxStorePath,
+    newInboxArchiveStorePath: options.lifecycle?.newInboxArchiveStorePath,
     newRecheckStorePath: options.lifecycle?.newRecheckStorePath,
     auditStorePath: options.lifecycle?.auditStorePath,
     cycleReceiptPath: options.lifecycle?.cycleReceiptPath,
@@ -2461,6 +2463,7 @@ function lastCompletedLifecycleReceipt(receipt: LifecycleCycleReceipt | null, fa
   new_inbox_updated: number;
   promoted_to_follow_up: number;
   promoted_to_main_radar: number;
+  archived: number;
   duplicates: number;
   lifecycle_cycle_id: string | null;
   lifecycle_status: LifecycleCycleReceipt["status"] | null;
@@ -2471,6 +2474,7 @@ function lastCompletedLifecycleReceipt(receipt: LifecycleCycleReceipt | null, fa
     new_inbox_updated: receipt?.new_inbox_updated ?? 0,
     promoted_to_follow_up: receipt?.promoted_to_follow_up ?? 0,
     promoted_to_main_radar: receipt?.promoted_to_main_radar ?? 0,
+    archived: receipt?.archived ?? 0,
     duplicates: receipt?.duplicate_noop ?? 0,
     lifecycle_cycle_id: receipt?.central_cycle_id ?? null,
     lifecycle_status: receipt?.status ?? null,
