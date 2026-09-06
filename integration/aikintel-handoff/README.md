@@ -1,7 +1,8 @@
-# AIKINTEL Integration Handoff Pack v1
+# AIKINTEL Integration Handoff Pack v2
 
-Owner: Paweł Grądziuk  
-Crypto Edge baseline: `9b48ba945dcef2bb0f73068a22edc4a2be63779f`  
+Owner: Paweł Grądziuk
+Canonical Crypto Edge source: `d55892dc04421c50ea94ebc18918e1dfe842e47e`
+Production runtime: `RC9 Product`
 Integration shape: thin SSO launch boundary
 
 ## Purpose
@@ -10,8 +11,17 @@ AIKINTEL remains the owner of login and primary user identity. Crypto Edge remai
 
 The integration does not move Crypto Edge data, queues, workers, prompts, providers, cron jobs or existing user records into AIKINTEL.
 
+## Start here
+
+Begin with `PAWEL_GRADZIUK_START_HERE.md`. It defines the integration boundary,
+the required AIKINTEL-side wiring and the acceptance tests for the owner.
+
 ## Files in this pack
 
+- `PAWEL_GRADZIUK_START_HERE.md` — concise owner entry point.
+- `CURRENT_PRODUCTION_STATE.md` — non-secret production state as of 06.09.2026.
+- `VPS_RUNTIME_FREEZE.md` — operational facts and integration freeze guardrails.
+- `HANDOFF_MANIFEST.md` — canonical source, auth model and complete file list.
 - `ARCHITECTURE.md` — boundary and request flow.
 - `AUTH_CONTRACT.md` — signed credential, exchange and session contract.
 - `SECURITY.md` — security controls and acceptance checks.
@@ -36,6 +46,42 @@ The browser never signs a credential, never receives the shared secret, never ca
 
 The local receiver contract test is `node --import tsx --test tests/aikintelAuth.test.ts` from `tools/ui-mock`.
 
+## Automatic AI Lifecycle Analysis V1
+
+Automatic AI is a Crypto Edge-owned shared system analysis. New / Observation
+does not receive automatic heavy AI. Active Follow-up and enabled Main Radar
+receive automatic shared AI qualification. Reconciliation runs worker-side
+with a persistent fair cursor, so eligible identities are processed in a
+bounded but eventually fair order.
+
+The heavy AI result is system-shared, not per-user. For the same
+`chain`, `contract_address`, `snapshot_fingerprint` and prompt/model/schema
+identity, the existing shared result/job is reused. Changing presentation
+locale between Polish and English does not create another heavy analysis;
+both locales consume the same shared heavy result.
+
+If material canonical evidence changes and the canonical
+`snapshot_fingerprint` changes, the system may create exactly one new current
+shared analysis identity for the changed evidence. The previous valid result
+may remain last-known-good under existing AI v7 semantics. Repeated
+reconciliation for the same new fingerprint does not create duplicate heavy
+jobs. A routine scanner refresh does not automatically imply a new AI call.
+
+The queue is shared and deduplicated by canonical cache identity. The existing
+AI v7 provider integration remains unchanged. The lifecycle is fail-open:
+AI outage, budget, queue or suspension state does not block promotion to
+Follow-up or Main Radar.
+
+Production acceptance evidence: TART / TartSwap on BSC,
+contract `0x7ab8d02cbb51ff7223fde700eaaaa2a91bf750314`, was a controlled RC9
+one-shot deployment acceptance. The persistent scheduled AI Worker remained
+DISABLED. The flow reached Follow-up, automatic lifecycle reconciliation,
+exactly one new shared queue record, exactly one worker claim, exactly one
+OpenAI provider call, `VALID`, `READY` and automatic display in the Product
+UI. Manual `Zleć analizę AI` was not used. This proves Automatic AI V1
+end-to-end behavior and does not mean the persistent Worker was enabled for
+continuous production at that moment.
+
 ## Required owner adapter
 
 The only AIKINTEL-specific application mapping is:
@@ -53,7 +99,7 @@ Do not substitute email, a browser parameter, a role claim or a display name. Th
 | Launch exchange and Crypto Edge session | Crypto Edge | External auth-state file outside release directory |
 | Scanner, lifecycle, Radar, Follow-up | Crypto Edge | Existing shared/system and private state |
 | Research Playbook and Verification | Crypto Edge | Existing `actor_id`-keyed private state |
-| AI v7, queue, provider and worker | Crypto Edge | Existing AI v7 state and limits |
+| AI v7, Automatic AI reconciliation, queue, provider and worker | Crypto Edge | Existing shared AI state and limits |
 
 ## AIKINTEL guideline alignment
 
@@ -69,7 +115,7 @@ Do not substitute email, a browser parameter, a role claim or a display name. Th
 | Environment secrets | READY | `process.env` only; no hardcoded credentials. |
 | UTC | READY | Credential timestamps are Unix UTC seconds. |
 | Deployment handoff | READY | Checklist and Cloudflare sequence are included. |
-| AI async | READY | Existing Crypto Edge AI v7 remains asynchronous through its queue/worker. |
+| AI async | READY | Existing Crypto Edge AI v7 and Automatic AI remain asynchronous through the shared queue/worker. |
 | Data collection | NOT PORTED BY DESIGN | Existing Crypto Edge scanner and Central Automation remain on the VPS. |
 | Database tables | NOT PORTED BY DESIGN | Crypto Edge keeps its existing stores and actor-keyed workspace. |
 | Cron scripts | NOT PORTED BY DESIGN | Crypto Edge Central Automation and AI worker remain existing VPS processes. |

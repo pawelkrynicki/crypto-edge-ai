@@ -2,6 +2,12 @@
 
 Owner: Paweł Grądziuk
 
+CANONICAL SOURCE: `d55892dc04421c50ea94ebc18918e1dfe842e47e`
+
+PRODUCT: `RC9`
+
+MAIN: NOT CANONICAL FOR THIS HANDOFF
+
 ## 1. Copy the references
 
 - [ ] Copy the server router pattern from `aikintel-snippets/server/routers/cryptoEdge.ts`.
@@ -56,14 +62,43 @@ Owner: Paweł Grądziuk
 - [ ] A credential containing OWNER/ADMIN claims cannot elevate.
 - [ ] The exchange response redirects to a clean URL.
 
-## 8. Cloudflare cutover
+## 8. Production readiness before Cloudflare cutover
+
+Before changing Cloudflare Access, require:
+
+- [ ] Product RC9 is healthy.
+- [ ] The current Radar timestamp is present and operationally current.
+- [ ] Central Automation continues publishing canonical snapshots.
+- [ ] The existing Automatic AI result is readable.
+- [ ] AI Worker may remain intentionally disabled; enabling it is not an
+      AIKINTEL acceptance requirement.
+- [ ] Integration does not enable or reconfigure the Worker.
+- [ ] New Inbox retention remains active.
+- [ ] Persistent state remains unchanged.
+- [ ] User A/User B identity isolation passes.
+
+AI Worker running is **not** an AIKINTEL acceptance requirement. The owner
+will separately enable the normal production Worker configuration before
+CAMP.
+
+## 9. Cloudflare cutover
+
+Before changing Cloudflare Access, confirm:
+
+- [ ] Crypto Edge standalone production remains healthy
+- [ ] Product timestamp is current
+- [ ] Central Automation continues publishing
+- [ ] AI Worker state is recorded as intentionally disabled if it has not yet
+      been enabled by the owner
+- [ ] retention remains active
+- [ ] no AIKINTEL test changes data-poc/runtime ownership
 
 - [ ] Complete `CLOUDFLARE_CUTOVER.md` in order.
 - [ ] Keep Tunnel configuration unchanged.
 - [ ] Change Access only after public-hostname two-user tests pass.
 - [ ] Test rollback to the previous Access policy.
 
-## 9. Final acceptance
+## 10. Final acceptance
 
 - [ ] Existing default CAMP mode regression passes.
 - [ ] AIKINTEL mode is fail-closed without a Crypto Edge session.
@@ -71,9 +106,9 @@ Owner: Paweł Grądziuk
 - [ ] Different subjects are isolated.
 - [ ] No secrets or credentials appear in source, bundle, URL logs or browser storage.
 - [ ] No OpenAI live call is needed for SSO acceptance.
-- [ ] Crypto Edge scanner, lifecycle, AI v7, queue, worker and Central Automation remain unchanged.
+- [ ] Crypto Edge scanner, lifecycle, Automatic AI, AI v7, queue, worker and
+      Central Automation remain unchanged.
 
 ## Rollback
 
 Disable the AIKINTEL launch entry and restore the previous Cloudflare Access policy. Keep the external auth-state file and existing Crypto Edge state intact; do not delete or migrate private workspace data during rollback.
-
