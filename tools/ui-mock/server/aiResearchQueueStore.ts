@@ -35,6 +35,7 @@ type SqliteModule = { DatabaseSync: new (filename: string) => SqliteDatabase };
 
 export const AI_ANALYSIS_ACTIVE_STATUSES = ["QUEUED", "PROCESSING"] as const;
 export const AI_LIFECYCLE_AUTO_INITIATION_SCOPE = "AI_LIFECYCLE_AUTO" as const;
+export const AI_LIFECYCLE_AUTO_RECONCILIATION_SCOPE = AI_LIFECYCLE_AUTO_INITIATION_SCOPE;
 export const AI_ANALYSIS_PROVIDER_ATTEMPT_STATUSES = ["NOT_ATTEMPTED", "STARTED", "RESPONSE_RECEIVED", "FAILED"] as const;
 export const AI_ANALYSIS_FAILURE_STAGES = [
   "CONTEXT_BUILD",
@@ -167,6 +168,12 @@ export type AIAnalysisCircuitBreakerState = {
   consecutive_failures: number;
   open_until: string | null;
   half_open_in_flight: boolean;
+  updated_at: string;
+};
+
+export type AIAnalysisReconciliationCursor = {
+  scope: string;
+  last_examined_identity: string | null;
   updated_at: string;
 };
 
@@ -504,6 +511,44 @@ INSERT INTO crypto_ai_analysis_recovery_audit (
         initiation_mode: "SYSTEM",
         queue_depth_limit: input.queue_depth_limit,
       });
+    },
+
+    getReconciliationCursor(scope: string): AIAnalysisReconciliationCursor | null {
+      const normalizedScope = scope.trim();
+      if (!normalizedScope || normalizedScope.length > 128) throw new AIAnalysisQueueStoreError("STORE_SCHEMA_INVALID");
+      const row = requireDb().prepare(`
+SELECT scope, last_examined_identity, updated_at
+FROM crypto_ai_reconciliation_state
+WHERE scope = ?
+LIMIT 1
+`).get(normalizedScope);
+      return safeReconciliationCursor(row);
+    },
+
+    advanceReconciliationCursor(input: {
+      scope: string;
+      last_examined_identity: string;
+      now: Date;
+    }): void {
+      const scope = input.scope.trim();
+      if (!scope || scope.length > 128 || !input.last_examined_identity || input.last_examined_identity.length > 256) {
+        throw new AIAnalysisQueueStoreError("STORE_SCHEMA_INVALID");
+      }
+      const db = requireDb();
+      const nowIso = input.now.toISOString();
+      db.exec("BEGIN IMMEDIATE TRANSACTION");
+      try {
+        db.prepare(`
+INSERT INTO crypto_ai_reconciliation_state (scope, last_examined_identity, updated_at)
+VALUES (?, ?, ?)
+ON CONFLICT(scope) DO UPDATE SET last_examined_identity = excluded.last_examined_identity, updated_at = excluded.updated_at
+`).run(scope, input.last_examined_identity, nowIso);
+        db.exec("COMMIT");
+      } catch (error) {
+        try { db.exec("ROLLBACK"); } catch { /* preserve original */ }
+        if (error instanceof AIAnalysisQueueStoreError) throw error;
+        throw new AIAnalysisQueueStoreError("STORE_UNAVAILABLE");
+      }
     },
 
     claimNext(input: { worker_id: string; now: Date; lease_ms: number }): AIAnalysisQueueRecord | null {
@@ -1079,6 +1124,11 @@ CREATE TABLE IF NOT EXISTS crypto_ai_analysis_recovery_audit (
   owner_scope_hash TEXT NOT NULL,
   requested_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS crypto_ai_reconciliation_state (
+  scope TEXT PRIMARY KEY,
+  last_examined_identity TEXT,
+  updated_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS crypto_ai_worker_state (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   schema_version TEXT NOT NULL CHECK (schema_version = 'ai_analysis_queue_v1'),
@@ -1141,7 +1191,12 @@ PRAGMA user_version = 1;
     owner_scope_hash TEXT NOT NULL,
     requested_at TEXT NOT NULL
   )`);
-  database.exec("PRAGMA user_version = 9");
+  database.exec(`CREATE TABLE IF NOT EXISTS crypto_ai_reconciliation_state (
+    scope TEXT PRIMARY KEY,
+    last_examined_identity TEXT,
+    updated_at TEXT NOT NULL
+  )`);
+  database.exec("PRAGMA user_version = 10");
 }
 
 function ensureQueueColumn(database: SqliteDatabase, name: string, definition: string): void {
@@ -1164,6 +1219,21 @@ function assertSchema(database: SqliteDatabase): void {
     "failure_stage", "created_at", "updated_at",
   ];
   if (required.some((name) => !names.has(name))) throw new AIAnalysisQueueStoreError("STORE_SCHEMA_INVALID");
+}
+
+function safeReconciliationCursor(value: unknown): AIAnalysisReconciliationCursor | null {
+  if (value === undefined || value === null) return null;
+  if (!isRecord(value)
+    || typeof value.scope !== "string"
+    || typeof value.updated_at !== "string"
+    || (value.last_examined_identity !== null && typeof value.last_examined_identity !== "string")) {
+    throw new AIAnalysisQueueStoreError("STORE_SCHEMA_INVALID");
+  }
+  return {
+    scope: value.scope,
+    last_examined_identity: value.last_examined_identity,
+    updated_at: value.updated_at,
+  };
 }
 
 function safeRecord(value: unknown): AIAnalysisQueueRecord | null {

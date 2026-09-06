@@ -4,7 +4,7 @@ import { readEstablishedUniverseStore } from "../../data-poc/src/establishedUniv
 import { readFollowUpStore, type FollowUpStore } from "../../data-poc/src/followUpBasket.js";
 import {
   AIAnalysisQueueStoreError,
-  AI_LIFECYCLE_AUTO_INITIATION_SCOPE,
+  AI_LIFECYCLE_AUTO_RECONCILIATION_SCOPE,
   type AIAnalysisQueueStore,
 } from "./aiResearchQueueStore.js";
 import {
@@ -15,7 +15,7 @@ import {
 import { buildAIResearchCacheIdentity } from "./aiResearchService.js";
 
 export const AI_LIFECYCLE_AUTO_RECONCILE_MAX_PER_CYCLE = 25;
-export const AI_LIFECYCLE_AUTO_RECONCILE_SCOPE = AI_LIFECYCLE_AUTO_INITIATION_SCOPE;
+export const AI_LIFECYCLE_AUTO_RECONCILE_SCOPE = AI_LIFECYCLE_AUTO_RECONCILIATION_SCOPE;
 
 export type AIResearchLifecycleReconciliation = {
   auto_eligible: number;
@@ -81,7 +81,14 @@ export function createAIResearchLifecycleReconciler(options: AIResearchLifecycle
         return result;
       }
       result.auto_eligible = eligible.length;
-      const selected = eligible.slice(0, maxPerCycle);
+      let cursor: ReturnType<AIAnalysisQueueStore["getReconciliationCursor"]>;
+      try {
+        cursor = options.store.getReconciliationCursor(AI_LIFECYCLE_AUTO_RECONCILE_SCOPE);
+      } catch {
+        result.auto_failed = 1;
+        return result;
+      }
+      const selected = selectCircularWindow(eligible, cursor?.last_examined_identity ?? null, maxPerCycle);
       result.auto_examined = selected.length;
       const contextOptions: AIResearchContextOptions = {
         scanner: options.scanner,
@@ -118,6 +125,16 @@ export function createAIResearchLifecycleReconciler(options: AIResearchLifecycle
             continue;
           }
           result.auto_failed += 1;
+        } finally {
+          try {
+            options.store.advanceReconciliationCursor({
+              scope: AI_LIFECYCLE_AUTO_RECONCILE_SCOPE,
+              last_examined_identity: item.identity,
+              now: now(),
+            });
+          } catch {
+            result.auto_failed += 1;
+          }
         }
       }
       return result;
@@ -145,6 +162,20 @@ function emptyReconciliation(): AIResearchLifecycleReconciliation {
 function isCurrent(record: ReturnType<AIAnalysisQueueStore["lookup"]>["record"]): boolean {
   return record !== null
     && (record.status === "READY" || record.status === "QUEUED" || record.status === "PROCESSING" || record.status === "STALE" && record.result !== null);
+}
+
+function selectCircularWindow(
+  eligible: EligibleIdentity[],
+  lastExaminedIdentity: string | null,
+  maxPerCycle: number,
+): EligibleIdentity[] {
+  if (eligible.length === 0 || maxPerCycle < 1) return [];
+  const cursorIndex = lastExaminedIdentity === null
+    ? -1
+    : eligible.findIndex((item) => item.identity === lastExaminedIdentity);
+  const start = cursorIndex >= 0 ? (cursorIndex + 1) % eligible.length : 0;
+  const windowSize = Math.min(maxPerCycle, eligible.length - start);
+  return eligible.slice(start, start + windowSize);
 }
 
 async function readEligibleIdentities(

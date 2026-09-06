@@ -6,6 +6,7 @@ import { after, describe, it } from "node:test";
 import {
   calculateUniverseChecksum,
   ESTABLISHED_UNIVERSE_SCHEMA_VERSION,
+  universeIdentityKey,
   type EstablishedAddressUniverse,
   type EstablishedAddressUniverseEntry,
 } from "../../data-poc/src/establishedAddressUniverse.js";
@@ -17,7 +18,10 @@ import {
   type FollowUpStore,
 } from "../../data-poc/src/followUpBasket.js";
 import { buildAIResearchContext, type AIResearchContext } from "../server/aiResearchContext.js";
-import { reconcileAIResearchLifecycle } from "../server/aiResearchLifecycleReconciler.js";
+import {
+  AI_LIFECYCLE_AUTO_RECONCILE_SCOPE,
+  reconcileAIResearchLifecycle,
+} from "../server/aiResearchLifecycleReconciler.js";
 import type { AIResearchProvider } from "../server/aiResearchProvider.js";
 import { createAIAnalysisQueueStore } from "../server/aiResearchQueueStore.js";
 import { createAIResearchService } from "../server/aiResearchService.js";
@@ -37,6 +41,162 @@ await writeFile(fixturePath, `${JSON.stringify(PERSISTABLE_SCANNER_SAMPLE)}\n`, 
 after(async () => { await rm(root, { recursive: true, force: true }); });
 
 describe("automatic AI lifecycle reconciliation", () => {
+  it("walks a large eligible set fairly across bounded cycles", async () => {
+    await writeFollowUp(manyFollowUps(60));
+    await writeEstablished(emptyUniverse());
+    const store = await createAIAnalysisQueueStore({ databaseFilePath: resolve(root, "fairness.sqlite") });
+
+    const cycles = [
+      await reconcile(store, { maxPerCycle: 25 }),
+      await reconcile(store, { maxPerCycle: 25 }),
+      await reconcile(store, { maxPerCycle: 25 }),
+    ];
+
+    assert.deepEqual(cycles.map((cycle) => cycle.auto_examined), [25, 25, 10]);
+    assert.deepEqual(cycles.map((cycle) => cycle.auto_queued), [25, 25, 10]);
+    assert.equal(cycles[2]?.auto_already_current, 0);
+    assert.equal(store.stats().records, 60);
+    assert.equal(store.stats().queued, 60);
+    store.close();
+  });
+
+  it("advances beyond repeatedly insufficient identities instead of starving later entries", async () => {
+    await writeFollowUp(sparseFollowUps(40));
+    await writeEstablished(emptyUniverse());
+    const store = await createAIAnalysisQueueStore({ databaseFilePath: resolve(root, "starvation.sqlite") });
+    const examined: number[] = [];
+    const insufficient: number[] = [];
+    const cursors: string[] = [];
+
+    for (let cycleIndex = 0; cycleIndex < 4; cycleIndex += 1) {
+      const result = await reconcile(store, { maxPerCycle: 10 });
+      examined.push(result.auto_examined);
+      insufficient.push(result.auto_insufficient);
+      cursors.push(store.getReconciliationCursor("AI_LIFECYCLE_AUTO")?.last_examined_identity ?? "");
+    }
+
+    assert.deepEqual(examined, [10, 10, 10, 10]);
+    assert.deepEqual(insufficient, [10, 10, 10, 10]);
+    assert.equal(new Set(cursors).size, 4);
+    assert.equal(store.stats().records, 0);
+    store.close();
+  });
+
+  it("persists the traversal cursor across queue store restart", async () => {
+    await writeFollowUp(manyFollowUps(30));
+    await writeEstablished(emptyUniverse());
+    const databaseFilePath = resolve(root, "restart-cursor.sqlite");
+    const firstStore = await createAIAnalysisQueueStore({ databaseFilePath });
+    const first = await reconcile(firstStore, { maxPerCycle: 10 });
+    const firstCursor = firstStore.getReconciliationCursor("AI_LIFECYCLE_AUTO")?.last_examined_identity;
+    assert.equal(first.auto_examined, 10);
+    assert.ok(firstCursor);
+    firstStore.close();
+
+    const restartedStore = await createAIAnalysisQueueStore({ databaseFilePath });
+    const second = await reconcile(restartedStore, { maxPerCycle: 10 });
+    const secondCursor = restartedStore.getReconciliationCursor("AI_LIFECYCLE_AUTO")?.last_examined_identity;
+    assert.equal(second.auto_examined, 10);
+    assert.ok(secondCursor);
+    assert.notEqual(secondCursor, firstCursor);
+    assert.equal(restartedStore.stats().records, 20);
+    restartedStore.close();
+  });
+
+  it("MISSING CURSOR IDENTITY CONTINUES FAIR PROGRESS", async () => {
+    const addresses = [1, 2, 3, 4, 5, 6].map((index) => `0x${String(index).padStart(40, "0")}`);
+    const initial = ingestFollowUpObservations(
+      createEmptyFollowUpStore(START),
+      addresses.map((contract_address, index) => observation({
+        candidate_id: `candidate-missing-cursor-${String.fromCharCode(65 + index)}`,
+        contract_address,
+      }, index)),
+      START.toISOString(),
+      "scan_follow_up_missing_cursor",
+    );
+    await writeFollowUp(initial);
+    await writeEstablished(emptyUniverse());
+
+    const databaseFilePath = resolve(root, "missing-cursor.sqlite");
+    const firstStore = await createAIAnalysisQueueStore({ databaseFilePath });
+    const first = await reconcile(firstStore, { maxPerCycle: 2 });
+    assert.equal(first.auto_eligible, 6);
+    assert.equal(first.auto_examined, 2);
+    assert.equal(first.auto_queued, 2);
+    assert.equal(
+      firstStore.getReconciliationCursor(AI_LIFECYCLE_AUTO_RECONCILE_SCOPE)?.last_examined_identity,
+      universeIdentityKey("base", addresses[1]),
+    );
+    firstStore.close();
+
+    const restartedStore = await createAIAnalysisQueueStore({ databaseFilePath });
+    assert.equal(
+      restartedStore.getReconciliationCursor(AI_LIFECYCLE_AUTO_RECONCILE_SCOPE)?.last_examined_identity,
+      universeIdentityKey("base", addresses[1]),
+    );
+
+    const changed = withFollowUpEntries(
+      initial,
+      initial.entries.filter((entry) => entry.contract_address.toLowerCase() !== addresses[1].toLowerCase()),
+      new Date(START.getTime() + 60 * 60_000),
+    );
+    await writeFollowUp(changed);
+
+    const second = await reconcile(restartedStore, { maxPerCycle: 2 });
+    assert.equal(second.auto_eligible, 5);
+    assert.equal(second.auto_examined, 2);
+    assert.equal(second.auto_already_current, 1);
+    assert.equal(second.auto_queued, 1);
+    assert.equal(second.auto_failed, 0);
+
+    const third = await reconcile(restartedStore, { maxPerCycle: 2 });
+    const fourth = await reconcile(restartedStore, { maxPerCycle: 2 });
+    const fifth = await reconcile(restartedStore, { maxPerCycle: 2 });
+    assert.deepEqual([third.auto_examined, fourth.auto_examined, fifth.auto_examined], [2, 1, 2]);
+    assert.equal(fourth.auto_queued, 1);
+    assert.equal(fifth.auto_already_current, 2);
+    assert.equal(restartedStore.stats().records, 6);
+    assert.equal(restartedStore.stats().queued, 6);
+    restartedStore.close();
+  });
+
+  it("continues safely when eligibility membership changes", async () => {
+    const initial = manyFollowUps(5);
+    await writeFollowUp(initial);
+    await writeEstablished(emptyUniverse());
+    const store = await createAIAnalysisQueueStore({ databaseFilePath: resolve(root, "changing-membership.sqlite") });
+    const first = await reconcile(store, { maxPerCycle: 2 });
+    assert.equal(first.auto_examined, 2);
+
+    const changed = ingestFollowUpObservations(
+      withFollowUpEntries(initial, initial.entries.filter((_, index) => index !== 1), new Date(START.getTime() + 60 * 60_000)),
+      [observation({}, 5)],
+      new Date(START.getTime() + 60 * 60_000).toISOString(),
+      "scan_follow_up_membership_change",
+    );
+    await writeFollowUp(changed);
+    const second = await reconcile(store, { maxPerCycle: 2, now: () => new Date(START.getTime() + 60 * 60_000) });
+    const third = await reconcile(store, { maxPerCycle: 2, now: () => new Date(START.getTime() + 60 * 60_000) });
+    assert.equal(second.auto_examined, 2);
+    assert.equal(third.auto_examined, 2);
+    assert.equal(store.stats().records, 5);
+    store.close();
+  });
+
+  it("examines every small eligible list and relies on shared dedupe on the next round", async () => {
+    await writeFollowUp(manyFollowUps(3));
+    await writeEstablished(emptyUniverse());
+    const store = await createAIAnalysisQueueStore({ databaseFilePath: resolve(root, "small-list.sqlite") });
+    const first = await reconcile(store, { maxPerCycle: 25 });
+    const second = await reconcile(store, { maxPerCycle: 25 });
+    assert.equal(first.auto_examined, 3);
+    assert.equal(first.auto_queued, 3);
+    assert.equal(second.auto_examined, 3);
+    assert.equal(second.auto_already_current, 3);
+    assert.equal(store.stats().records, 3);
+    store.close();
+  });
+
   it("queues one Follow-up identity, then remains idempotent", async () => {
     await writeFollowUp(fullFollowUp());
     await writeEstablished(emptyUniverse());
@@ -182,13 +342,13 @@ function contextOptions() {
   };
 }
 
-function observation(overrides: Partial<FollowUpObservationCandidate> = {}): FollowUpObservationCandidate {
+function observation(overrides: Partial<FollowUpObservationCandidate> = {}, index = 0): FollowUpObservationCandidate {
   return {
-    candidate_id: "candidate-follow-up",
+    candidate_id: `candidate-follow-up-${index}`,
     symbol: "FUP",
     name: "Follow-up Token",
     chain: "base",
-    contract_address: ADDRESS,
+    contract_address: index === 0 ? ADDRESS : `0x${String(index + 1).padStart(40, "0")}`,
     pair_address: "0x3333333333333333333333333333333333333333",
     pair_created_at: "2026-07-01T00:00:00.000Z",
     price_usd: 1,
@@ -211,7 +371,23 @@ function fullFollowUp(): FollowUpStore {
 }
 
 function sparseFollowUp(): FollowUpStore {
-  const seeded = fullFollowUp();
+  return sparseStore(fullFollowUp());
+}
+
+function manyFollowUps(count: number): FollowUpStore {
+  return ingestFollowUpObservations(
+    createEmptyFollowUpStore(START),
+    Array.from({ length: count }, (_, index) => observation({}, index)),
+    START.toISOString(),
+    `scan_follow_up_${count}`,
+  );
+}
+
+function sparseFollowUps(count: number): FollowUpStore {
+  return sparseStore(manyFollowUps(count));
+}
+
+function sparseStore(seeded: FollowUpStore): FollowUpStore {
   const entries = seeded.entries.map((entry) => ({
     ...entry,
     last_checked_at: null,
@@ -221,6 +397,11 @@ function sparseFollowUp(): FollowUpStore {
     latest_security_status: { status: "UNAVAILABLE" as const, source: null, checked_at: null, missing_data: [], risk_flags: [] },
   }));
   const base = { schema_version: seeded.schema_version, generated_at: START.toISOString(), entries, audit_log: seeded.audit_log };
+  return { ...base, checksum: calculateFollowUpChecksum(base) };
+}
+
+function withFollowUpEntries(store: FollowUpStore, entries: FollowUpStore["entries"], now: Date): FollowUpStore {
+  const base = { schema_version: store.schema_version, generated_at: now.toISOString(), entries, audit_log: store.audit_log };
   return { ...base, checksum: calculateFollowUpChecksum(base) };
 }
 
