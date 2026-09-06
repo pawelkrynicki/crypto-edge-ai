@@ -33,7 +33,7 @@
     "test:ux1": "node --import tsx --test tests/interactionAffordance.test.ts",
     "test:ai1": "node --import tsx --test tests/aiResearchContracts.test.ts tests/aiResearchSemanticQuality.test.ts tests/aiResearchNarrativeV5.test.ts tests/aiResearchUi.test.tsx",
     "test:ai2": "node --import tsx --test tests/aiResearchLiveValidation.test.ts",
-    "test:ai3": "node --import tsx --test tests/aiResearchQueue.test.ts tests/aiResearchApiQueue.test.ts",
+    "test:ai3": "node --import tsx --test tests/aiResearchQueue.test.ts tests/aiResearchApiQueue.test.ts tests/aiResearchLifecycleReconciler.test.ts",
     "test:ai3-launcher": "node --import tsx --test tests/aiResearchLauncherContract.test.ts",
     "test:ai3-ui": "node --import tsx --test tests/aiResearchUi.test.tsx tests/aiResearchLauncherFlow.test.tsx",
     "test:tabbed-detail": "node --import tsx --test tests/tabbedDetailWorkspace.test.tsx",

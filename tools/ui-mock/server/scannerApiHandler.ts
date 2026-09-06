@@ -206,6 +206,8 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
     runtimeMode: "DEVELOPMENT_DEMO",
     allowFixtureFallback: false,
   } : scannerOptions;
+  const aiResearchEstablishedUniverseOptions = options.aiResearch?.establishedUniverse
+    ?? (options.establishedUniverse?.storeFilePath ? { storePath: options.establishedUniverse.storeFilePath } : undefined);
   const contextOptions: LatestContextOutputOptions = { ...options.context, runtimeMode };
   const productVersionOptions: ProductVersionOptions = {
     automationStatePath: options.productVersion?.automationStatePath ?? options.scanner?.automationStatePath,
@@ -274,6 +276,7 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
     ...options.aiResearch,
     scanner: aiResearchScannerOptions,
     followUp: options.followUp,
+    establishedUniverse: aiResearchEstablishedUniverseOptions,
     reports: options.reports,
   });
   const presentResearchLookupValue = async (
@@ -283,9 +286,10 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
     locale: "pl" | "en",
   ) => {
     const context = await buildAIResearchContext(chain, contractAddress, locale, {
-      scanner: aiResearchScannerOptions,
-      followUp: options.followUp,
-      reports: options.reports,
+    scanner: aiResearchScannerOptions,
+    followUp: options.followUp,
+    establishedUniverse: aiResearchEstablishedUniverseOptions,
+    reports: options.reports,
     });
     return presentAIProductionLookup(lookup, locale, context.guidance);
   };

@@ -34,6 +34,7 @@ type SqliteDatabase = {
 type SqliteModule = { DatabaseSync: new (filename: string) => SqliteDatabase };
 
 export const AI_ANALYSIS_ACTIVE_STATUSES = ["QUEUED", "PROCESSING"] as const;
+export const AI_LIFECYCLE_AUTO_INITIATION_SCOPE = "AI_LIFECYCLE_AUTO" as const;
 export const AI_ANALYSIS_PROVIDER_ATTEMPT_STATUSES = ["NOT_ATTEMPTED", "STARTED", "RESPONSE_RECEIVED", "FAILED"] as const;
 export const AI_ANALYSIS_FAILURE_STAGES = [
   "CONTEXT_BUILD",
@@ -309,6 +310,8 @@ ORDER BY completed_at DESC LIMIT 20
       now: Date;
       rate_limits: AIAnalysisRateLimits;
       force?: boolean;
+      initiation_mode?: "USER" | "SYSTEM";
+      queue_depth_limit?: number;
     }): AIAnalysisEnqueueResult {
       const db = requireDb();
       const nowIso = input.now.toISOString();
@@ -344,7 +347,36 @@ ORDER BY completed_at DESC LIMIT 20
             };
           }
         }
-        enforceRateLimits(db, input.identity, input.session_scope_hash, input.rate_limits, input.now);
+        if (input.initiation_mode === "SYSTEM") {
+          const worker = parseWorkerState(db.prepare("SELECT * FROM crypto_ai_worker_state WHERE id = 1").get());
+          if (worker.suspended) {
+            db.exec("COMMIT");
+            return { record: existing, last_known_good: lastKnownGood, outcome: "SUSPENDED", retry_after_seconds: null };
+          }
+          const breaker = readCircuitBreaker(db, input.now);
+          if (breaker.state === "OPEN" && breaker.open_until && Date.parse(breaker.open_until) > nowMs) {
+            db.exec("COMMIT");
+            return {
+              record: existing,
+              last_known_good: lastKnownGood,
+              outcome: "RATE_LIMITED",
+              retry_after_seconds: Math.max(1, Math.ceil((Date.parse(breaker.open_until) - nowMs) / 1_000)),
+            };
+          }
+          if (breaker.state === "HALF_OPEN" && breaker.half_open_in_flight) {
+            db.exec("COMMIT");
+            return { record: existing, last_known_good: lastKnownGood, outcome: "RATE_LIMITED", retry_after_seconds: 1 };
+          }
+          const queueDepthLimit = input.queue_depth_limit ?? 250;
+          if (!Number.isSafeInteger(queueDepthLimit) || queueDepthLimit < 1) throw new AIAnalysisQueueStoreError("STORE_SCHEMA_INVALID");
+          const active = db.prepare("SELECT COUNT(*) AS count FROM crypto_ai_analysis_queue WHERE status IN ('QUEUED', 'PROCESSING')").get();
+          if (integerField(active, "count") >= queueDepthLimit) {
+            db.exec("COMMIT");
+            return { record: existing, last_known_good: lastKnownGood, outcome: "RATE_LIMITED", retry_after_seconds: 60 };
+          }
+        } else {
+          enforceRateLimits(db, input.identity, input.session_scope_hash, input.rate_limits, input.now);
+        }
         if (existing) {
           db.prepare(`
 UPDATE crypto_ai_analysis_queue SET status = 'QUEUED', requested_at = ?, queued_at = ?, started_at = NULL,
@@ -381,7 +413,7 @@ INSERT INTO crypto_ai_analysis_queue (
             nowIso,
           );
         }
-        recordRateRequest(db, input.identity, input.session_scope_hash, nowIso);
+        if (input.initiation_mode !== "SYSTEM") recordRateRequest(db, input.identity, input.session_scope_hash, nowIso);
         const record = lookupSharedRecord(db, input.identity.cache_key);
         if (!record) throw new AIAnalysisQueueStoreError("STORE_UNAVAILABLE");
         db.exec("COMMIT");
@@ -457,6 +489,21 @@ INSERT INTO crypto_ai_analysis_recovery_audit (
         if (error instanceof AIAnalysisQueueStoreError) throw error;
         throw new AIAnalysisQueueStoreError("STORE_UNAVAILABLE");
       }
+    },
+
+    enqueueSystem(input: {
+      identity: AIAnalysisCacheIdentity;
+      now: Date;
+      queue_depth_limit?: number;
+    }): AIAnalysisEnqueueResult {
+      return this.enqueue({
+        identity: input.identity,
+        session_scope_hash: hashAIAnalysisRateScope(AI_LIFECYCLE_AUTO_INITIATION_SCOPE),
+        now: input.now,
+        rate_limits: { windowMs: 60_000, session: 1, identity: 1, global: 1, cooldownMs: 60_000 },
+        initiation_mode: "SYSTEM",
+        queue_depth_limit: input.queue_depth_limit,
+      });
     },
 
     claimNext(input: { worker_id: string; now: Date; lease_ms: number }): AIAnalysisQueueRecord | null {

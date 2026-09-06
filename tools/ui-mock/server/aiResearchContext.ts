@@ -1,4 +1,6 @@
 import { createHash } from "node:crypto";
+import type { EstablishedAddressUniverse, EstablishedAddressUniverseEntry } from "../../data-poc/src/establishedAddressUniverse.js";
+import { readEstablishedUniverseStore } from "../../data-poc/src/establishedUniverseManager.js";
 import { mapPersistableScannerOutputToUiCandidates } from "../src/adapters/scannerOutputAdapter.js";
 import { resolveProductSecurityState } from "../src/productSecurityResolver.js";
 import {
@@ -32,7 +34,7 @@ import {
 } from "./aiResearchNarrativeContract.js";
 import { AI_RESEARCH_COMPOSITION_POLICY_VERSION } from "./aiResearchCompositionPolicy.js";
 import { AI_RESEARCH_SEMANTIC_POLICY_VERSION } from "./aiResearchSemanticPolicy.js";
-import { readFollowUpList, readFollowUpStatus, type FollowUpApiOptions } from "./followUpApi.js";
+import { readFollowUpByIdentity, readFollowUpList, readFollowUpStatus, type FollowUpApiOptions } from "./followUpApi.js";
 import {
   readLatestScannerOutput,
   type LatestScannerOutputOptions,
@@ -45,6 +47,10 @@ export const AI_RESEARCH_METHODOLOGY_VERSION = "crypto_edge_methodology_v1";
 export type AIResearchContextOptions = {
   scanner?: LatestScannerOutputOptions;
   followUp?: FollowUpApiOptions;
+  establishedUniverse?: {
+    storePath?: string;
+    universe?: EstablishedAddressUniverse | null;
+  };
   reports?: ReportsLibraryOptions;
   now?: () => Date;
 };
@@ -170,11 +176,13 @@ export async function buildAIResearchContext(
     );
   }
 
-  const [scannerResult, followUpList, followUpStatus, reportList] = await Promise.allSettled([
+  const [scannerResult, followUpList, followUpByIdentity, followUpStatus, reportList, establishedUniverseResult] = await Promise.allSettled([
     readAIResearchScannerSingleFlight(options.scanner),
     readFollowUpList(options.followUp),
+    readFollowUpByIdentity(identity.chain, identity.contract_address, options.followUp),
     readFollowUpStatus(options.followUp),
     readReportsList(options.reports),
+    readAIResearchEstablishedUniverse(options.establishedUniverse),
   ]);
   const scanner = scannerResult.status === "fulfilled" ? scannerResult.value as ScannerApiOutput : null;
   const candidates = scanner ? mapPersistableScannerOutputToUiCandidates(scanner) : [];
@@ -185,46 +193,62 @@ export async function buildAIResearchContext(
     value.contractAddress,
   )) ?? null;
   const followUps = followUpList.status === "fulfilled" ? followUpList.value.entries : [];
-  const followUp = followUps.find((value) => sameIdentity(
+  const followUp = (followUpByIdentity.status === "fulfilled" ? followUpByIdentity.value : null)
+    ?? followUps.find((value) => sameIdentity(
+      identity.chain,
+      identity.contract_address,
+      value.chain,
+      value.contract_address,
+    ))
+    ?? null;
+  const establishedUniverse = establishedUniverseResult.status === "fulfilled" ? establishedUniverseResult.value : null;
+  const mainRadarEntry = establishedUniverse?.entries.find((entry) => entry.enabled && sameIdentity(
     identity.chain,
     identity.contract_address,
-    value.chain,
-    value.contract_address,
+    entry.chain,
+    entry.contract_address,
   )) ?? null;
-  if (!candidate && !followUp) throw new AIResearchContextError("CANDIDATE_NOT_FOUND", 404);
+  const canonicalFollowUp = mainRadarEntry
+    ? followUp
+      ? { ...followUp, lifecycle_status: "ESTABLISHED" as const, established_membership: true, next_check_at: null, next_review_step: "ESTABLISHED_MONITORING" as const }
+      : mainRadarAsFollowUpEntry(mainRadarEntry)
+    : followUp;
+  if (!candidate && !canonicalFollowUp) throw new AIResearchContextError("CANDIDATE_NOT_FOUND", 404);
 
   const status = followUpStatus.status === "fulfilled" ? followUpStatus.value : null;
   const dataGeneratedAt = scanner?.provenance?.generated_at
     ?? scanner?.scan_run.finished_at
-    ?? followUp?.last_checked_at
-    ?? followUp?.last_seen_at
-    ?? followUp?.first_seen_at
+    ?? canonicalFollowUp?.last_checked_at
+    ?? canonicalFollowUp?.last_seen_at
+    ?? canonicalFollowUp?.first_seen_at
+    ?? mainRadarEntry?.updated_at
+    ?? mainRadarEntry?.added_at
     ?? new Date(0).toISOString();
   const lifecycle = resolveTokenLifecycle({
     candidate,
-    followUp,
+    followUp: canonicalFollowUp,
     followUpStatus: status,
-    establishedMembership: followUp?.established_membership === true || candidate?.discoveryBasket === "established",
+    establishedMembership: canonicalFollowUp?.established_membership === true || candidate?.discoveryBasket === "established",
     // The persisted data clock, not the view refresh clock, keeps the analysis
     // fingerprint and deterministic skeleton stable for the same stored state.
     now: new Date(dataGeneratedAt),
   });
   const freshness = scanner?._source_meta?.freshness_status ?? "UNKNOWN";
-  const sourceReferences = buildSources(candidate, followUp, reportList.status === "fulfilled" ? reportList.value.reports : [], dataGeneratedAt, locale);
-  const factCandidates = buildFactCandidates(candidate, followUp, lifecycle, freshness, locale);
-  const missingInformation = buildMissing(candidate, followUp, freshness, sourceReferences, locale);
-  const riskCandidates = buildRisks(candidate, followUp, freshness, locale);
-  const coverage = buildCoverage(candidate, followUp, missingInformation, locale);
-  const researchState = resolveResearchState(candidate, followUp, freshness, factCandidates.length);
-  const actionCatalog = resolveAIResearchActions(candidate, followUp, lifecycle, freshness, sourceReferences, locale);
-  const statusChangeConditions = buildStatusConditions(candidate, followUp, lifecycle, freshness, locale);
-  const metrics = marketMetrics(candidate, followUp);
-  const securityCoverage = resolveSecurityCoverage(candidate, followUp);
+  const sourceReferences = buildSources(candidate, canonicalFollowUp, reportList.status === "fulfilled" ? reportList.value.reports : [], dataGeneratedAt, locale);
+  const factCandidates = buildFactCandidates(candidate, canonicalFollowUp, lifecycle, freshness, locale);
+  const missingInformation = buildMissing(candidate, canonicalFollowUp, freshness, sourceReferences, locale);
+  const riskCandidates = buildRisks(candidate, canonicalFollowUp, freshness, locale);
+  const coverage = buildCoverage(candidate, canonicalFollowUp, missingInformation, locale);
+  const researchState = resolveResearchState(candidate, canonicalFollowUp, freshness, factCandidates.length);
+  const actionCatalog = resolveAIResearchActions(candidate, canonicalFollowUp, lifecycle, freshness, sourceReferences, locale);
+  const statusChangeConditions = buildStatusConditions(candidate, canonicalFollowUp, lifecycle, freshness, locale);
+  const metrics = marketMetrics(candidate, canonicalFollowUp);
+  const securityCoverage = resolveSecurityCoverage(candidate, canonicalFollowUp);
   const guidance: AIResearchGuidanceInput = {
     freshness: freshness === "FRESH" || freshness === "STALE" ? freshness : "UNKNOWN",
     filters: {
-      status: candidate?.basicFilterStatus ?? followUp?.filter_status ?? "not_checked",
-      reasons: [...(candidate?.filterReasons ?? followUp?.filter_reasons ?? [])].sort(),
+      status: candidate?.basicFilterStatus ?? canonicalFollowUp?.filter_status ?? "not_checked",
+      reasons: [...(candidate?.filterReasons ?? canonicalFollowUp?.filter_reasons ?? [])].sort(),
       metrics,
     },
     security: {
@@ -240,8 +264,8 @@ export async function buildAIResearchContext(
     address_identity_verified: candidate?.addressIdentityVerified === true,
     action_catalog: actionCatalog,
   };
-  const symbol = boundedUntrustedText(candidate?.symbol ?? followUp?.symbol ?? "", 32);
-  const name = boundedUntrustedText(candidate?.name ?? followUp?.display_name ?? symbol, 120);
+  const symbol = boundedUntrustedText(candidate?.symbol ?? canonicalFollowUp?.symbol ?? "", 32);
+  const name = boundedUntrustedText(candidate?.name ?? canonicalFollowUp?.display_name ?? symbol, 120);
   const narrativeContract = buildAIResearchNarrativeContract({
     fact_candidates: factCandidates,
     risk_candidates: riskCandidates,
@@ -266,10 +290,10 @@ export async function buildAIResearchContext(
     freshness,
     metrics,
     filters: {
-      status: candidate?.basicFilterStatus ?? followUp?.filter_status ?? "not_checked",
-      reasons: [...(candidate?.filterReasons ?? followUp?.filter_reasons ?? [])].sort(),
+      status: candidate?.basicFilterStatus ?? canonicalFollowUp?.filter_status ?? "not_checked",
+      reasons: [...(candidate?.filterReasons ?? canonicalFollowUp?.filter_reasons ?? [])].sort(),
     },
-    security: securityFingerprint(candidate, followUp),
+    security: securityFingerprint(candidate, canonicalFollowUp),
     // Observation timestamps describe when a source was read, not a change to the
     // candidate evidence. In particular, the fallback scanner timestamp changes
     // for every global run even when this Follow-up candidate is not in that run.
@@ -281,14 +305,14 @@ export async function buildAIResearchContext(
       source_type,
       completeness,
     })),
-    follow_up_checkpoint: followUp ? {
-      lifecycle_status: followUp.lifecycle_status,
-      completed_checkpoints: [...followUp.completed_checkpoints].sort((left, right) => left - right),
-      next_check_at: followUp.next_check_at,
-      last_checked_at: followUp.last_checked_at,
-      missing_data: [...followUp.missing_data].sort(),
+    follow_up_checkpoint: canonicalFollowUp ? {
+      lifecycle_status: canonicalFollowUp.lifecycle_status,
+      completed_checkpoints: [...canonicalFollowUp.completed_checkpoints].sort((left, right) => left - right),
+      next_check_at: canonicalFollowUp.next_check_at,
+      last_checked_at: canonicalFollowUp.last_checked_at,
+      missing_data: [...canonicalFollowUp.missing_data].sort(),
     } : null,
-    membership: followUp?.established_membership === true || candidate?.discoveryBasket === "established",
+    membership: canonicalFollowUp?.established_membership === true || candidate?.discoveryBasket === "established",
     report_assets: sourceReferences
       .filter(({ source_type }) => source_type === "report")
       .map(({ id, observed_at }) => ({ id, observed_at })),
@@ -667,12 +691,21 @@ function resolveResearchState(
 ): AIResearchState {
   if (freshness === "STALE") return "DATA_STALE";
   if (factCount < 3) return "INSUFFICIENT_DATA";
+  if (followUp && !followUp.established_membership && !candidate && !hasFollowUpEvidence(followUp)) return "INSUFFICIENT_DATA";
   const filters = candidate?.basicFilterStatus ?? followUp?.filter_status;
   if (filters === "rejected_basic_filter") return "BASIC_FILTERS_FAILED";
   if (followUp?.established_membership || candidate?.discoveryBasket === "established") return "ESTABLISHED_RESEARCH";
   if (followUp?.next_review_step === "OWNER_DECISION_REQUIRED") return "OWNER_DECISION_REQUIRED";
   if (resolveSecurityCoverage(candidate, followUp) !== "complete") return "MANUAL_VERIFICATION_REQUIRED";
   return "KEEP_OBSERVING";
+}
+
+function hasFollowUpEvidence(followUp: FollowUpPublicEntry): boolean {
+  return followUp.market_observed_at !== null
+    || followUp.last_checked_at !== null
+    || followUp.completed_checkpoints.length > 0
+    || followUp.filter_status !== "not_checked"
+    || followUp.security_status !== "UNAVAILABLE";
 }
 
 function marketMetrics(candidate: UiTokenCandidate | null, followUp: FollowUpPublicEntry | null) {
@@ -717,6 +750,52 @@ function sameIdentity(chainA: string, addressA: string, chainB: string, addressB
   const left = resolveTokenIdentity(chainA, addressA);
   const right = resolveTokenIdentity(chainB, addressB);
   return left.status === "valid" && right.status === "valid" && left.key === right.key;
+}
+
+async function readAIResearchEstablishedUniverse(
+  options: AIResearchContextOptions["establishedUniverse"],
+): Promise<EstablishedAddressUniverse | null> {
+  if (options?.universe !== undefined) return options.universe;
+  try {
+    return (await readEstablishedUniverseStore(options?.storePath)).current;
+  } catch {
+    return null;
+  }
+}
+
+function mainRadarAsFollowUpEntry(entry: EstablishedAddressUniverseEntry): FollowUpPublicEntry {
+  return {
+    entry_id: `main-radar:${entry.entry_id}`,
+    chain: entry.chain,
+    contract_address: entry.contract_address,
+    display_name: entry.display_name ?? null,
+    symbol: entry.symbol_hint ?? null,
+    pair_address: null,
+    lifecycle_status: "ESTABLISHED",
+    pair_age: null,
+    first_seen_at: entry.added_at,
+    last_seen_at: entry.updated_at,
+    last_checked_at: null,
+    market_observed_at: null,
+    market_provenance: "not_preserved",
+    filter_evaluated_at: null,
+    next_check_at: null,
+    completed_checkpoints: [],
+    market_metrics: {
+      price_usd: null,
+      market_cap_usd: null,
+      fdv_usd: null,
+      liquidity_usd: null,
+      volume_24h_usd: null,
+      volume_market_cap_ratio: null,
+    },
+    filter_status: "not_checked",
+    filter_reasons: [],
+    security_status: "UNAVAILABLE",
+    missing_data: ["CURRENT_SCANNER_OBSERVATION_UNAVAILABLE"],
+    established_membership: true,
+    next_review_step: "ESTABLISHED_MONITORING",
+  };
 }
 
 export function stableJson(value: unknown): string {

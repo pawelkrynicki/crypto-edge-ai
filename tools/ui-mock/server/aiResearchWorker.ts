@@ -5,11 +5,7 @@ import {
 } from "../src/types/aiResearchTypes.js";
 import { resolveProductRuntimeMode } from "../src/runtimeMode.js";
 import { AIResearchContextError, buildAIResearchContext, type AIResearchContextOptions } from "./aiResearchContext.js";
-import { AI_RESEARCH_NARRATIVE_VERSION } from "./aiResearchNarrativeContract.js";
-import { AI_RESEARCH_COMPOSITION_POLICY_VERSION } from "./aiResearchCompositionPolicy.js";
-import { AI_RESEARCH_SEMANTIC_POLICY_VERSION } from "./aiResearchSemanticPolicy.js";
 import {
-  AI_RESEARCH_PROVIDER_WIRE_SCHEMA_VERSION,
   AIResearchProviderWireSchemaError,
   buildAIResearchProviderWireSchema,
 } from "./aiResearchProviderWireSchema.js";
@@ -22,20 +18,20 @@ import {
   type AIResearchProviderConfig,
   type AIResearchUsageRecorder,
 } from "./aiResearchProvider.js";
+import { reconcileAIResearchLifecycle, resolveAIResearchLifecycleReconcileMax } from "./aiResearchLifecycleReconciler.js";
 import {
   AIResearchValidationError,
   parseAIResearchProviderNarrativeWithDiagnostics,
 } from "./aiResearchSchema.js";
 import {
   AIAnalysisQueueStoreError,
-  buildAIAnalysisCacheIdentity,
   createAIAnalysisQueueStore,
   type AIAnalysisFailureStage,
   type AIAnalysisQueueRecord,
   type AIAnalysisQueueStore,
   type AIAnalysisQueueStoreOptions,
 } from "./aiResearchQueueStore.js";
-import { hydrateAIResearchBrief } from "./aiResearchService.js";
+import { buildAIResearchCacheIdentity, hydrateAIResearchBrief } from "./aiResearchService.js";
 
 export type AIResearchWorkerLimits = {
   maxConcurrency: number;
@@ -54,6 +50,7 @@ export type AIResearchWorkerLimits = {
   circuitFailureThreshold: number;
   circuitOpenMs: number;
   circuitDeferralMs: number;
+  autoReconcileMaxPerCycle: number;
 };
 
 export type AIResearchWorkerOptions = AIResearchContextOptions & {
@@ -76,6 +73,12 @@ export type AIResearchWorkerCycleResult = {
   retried: number;
   suspended: number;
   provider_calls: number;
+  auto_eligible: number;
+  auto_examined: number;
+  auto_queued: number;
+  auto_already_current: number;
+  auto_insufficient: number;
+  auto_failed: number;
   safe_error_code: string | null;
 };
 
@@ -93,6 +96,7 @@ export function resolveAIResearchWorkerContextOptions(
   return {
     scanner: options.scanner ?? { runtimeMode: resolveProductRuntimeMode(env.CRYPTO_EDGE_RUNTIME_MODE) },
     followUp: options.followUp,
+    establishedUniverse: options.establishedUniverse,
     reports: options.reports,
     now: options.now,
   };
@@ -119,6 +123,7 @@ export function resolveAIResearchWorkerLimits(
     circuitFailureThreshold: bounded(input.circuitFailureThreshold, envInteger(env.CRYPTO_EDGE_AI_CIRCUIT_FAILURE_THRESHOLD), 3, 1, 100),
     circuitOpenMs: bounded(input.circuitOpenMs, envInteger(env.CRYPTO_EDGE_AI_CIRCUIT_OPEN_MS), 60_000, 1_000, 24 * 60 * 60_000),
     circuitDeferralMs: bounded(input.circuitDeferralMs, envInteger(env.CRYPTO_EDGE_AI_CIRCUIT_DEFERRAL_MS), 5_000, 1_000, 24 * 60 * 60_000),
+    autoReconcileMaxPerCycle: resolveAIResearchLifecycleReconcileMax(input.autoReconcileMaxPerCycle, env),
   };
 }
 
@@ -134,6 +139,7 @@ export function createAIResearchWorker(options: AIResearchWorkerOptions = {}) {
   const contextOptions = resolveAIResearchWorkerContextOptions({
     scanner: options.scanner,
     followUp: options.followUp,
+    establishedUniverse: options.establishedUniverse,
     reports: options.reports,
     now,
   });
@@ -155,6 +161,19 @@ export function createAIResearchWorker(options: AIResearchWorkerOptions = {}) {
       }
 
       const result = cycle(workerId, "IDLE", null);
+      const reconciliation = await reconcileAIResearchLifecycle({
+        ...contextOptions,
+        store,
+        modelId: provider.model ?? AI_RESEARCH_TARGET_MODEL,
+        maxPerCycle: limits.autoReconcileMaxPerCycle,
+        now,
+      });
+      result.auto_eligible = reconciliation.auto_eligible;
+      result.auto_examined = reconciliation.auto_examined;
+      result.auto_queued = reconciliation.auto_queued;
+      result.auto_already_current = reconciliation.auto_already_current;
+      result.auto_insufficient = reconciliation.auto_insufficient;
+      result.auto_failed = reconciliation.auto_failed;
       let reservations = 0;
       const consume = async () => {
         while (reservations < limits.maxAnalysesPerCycle) {
@@ -228,18 +247,7 @@ async function processClaim(
     // requester's presentation locale.
     const context = await buildAIResearchContext(claimed.chain, claimed.contract_address, "en", contextOptions);
     stage = "IDENTITY_CHECK";
-    const currentIdentity = buildAIAnalysisCacheIdentity({
-      ...context.identity,
-      locale: "en",
-      snapshot_fingerprint: context.snapshot_fingerprint,
-      prompt_version: context.prompt_version,
-      narrative_contract_version: AI_RESEARCH_NARRATIVE_VERSION,
-      semantic_policy_version: AI_RESEARCH_SEMANTIC_POLICY_VERSION,
-      composition_policy_version: AI_RESEARCH_COMPOSITION_POLICY_VERSION,
-      provider_wire_schema_version: AI_RESEARCH_PROVIDER_WIRE_SCHEMA_VERSION,
-      model_id: claimed.model_id,
-      analysis_schema_version: claimed.analysis_schema_version,
-    });
+    const currentIdentity = buildAIResearchCacheIdentity(context, claimed.model_id);
     if (currentIdentity.cache_key !== (claimed.shared_cache_key ?? claimed.cache_key)) {
       throw new AIResearchWorkerContractError("DATA_STALE");
     }
@@ -596,6 +604,12 @@ function cycle(workerId: string, status: AIResearchWorkerCycleResult["status"], 
     retried: 0,
     suspended: 0,
     provider_calls: 0,
+    auto_eligible: 0,
+    auto_examined: 0,
+    auto_queued: 0,
+    auto_already_current: 0,
+    auto_insufficient: 0,
+    auto_failed: 0,
     safe_error_code: safeErrorCode,
   };
 }

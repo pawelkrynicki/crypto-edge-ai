@@ -32,6 +32,25 @@ import {
   type AIAnalysisRateLimits,
 } from "./aiResearchQueueStore.js";
 
+export function buildAIResearchCacheIdentity(
+  context: AIResearchContext,
+  modelId: string,
+): AIAnalysisCacheIdentity {
+  const wireSchema = buildAIResearchProviderWireSchema(context);
+  return buildAIAnalysisCacheIdentity({
+    ...context.identity,
+    locale: "en",
+    snapshot_fingerprint: context.snapshot_fingerprint,
+    prompt_version: context.prompt_version,
+    narrative_contract_version: AI_RESEARCH_NARRATIVE_VERSION,
+    semantic_policy_version: AI_RESEARCH_SEMANTIC_POLICY_VERSION,
+    composition_policy_version: AI_RESEARCH_COMPOSITION_POLICY_VERSION,
+    provider_wire_schema_version: wireSchema.version,
+    model_id: modelId,
+    analysis_schema_version: AI_RESEARCH_SCHEMA_VERSION,
+  });
+}
+
 export type AIResearchServiceOptions = AIResearchContextOptions & {
   queueStore?: AIAnalysisQueueStore;
   queueStoreOptions?: AIAnalysisQueueStoreOptions;
@@ -112,19 +131,7 @@ export function createAIResearchService(options: AIResearchServiceOptions = {}) 
     // A shared job has one bilingual provider result. Request locale is deliberately
     // not allowed to reach the cache identity or start another heavy generation.
     const context = await buildAIResearchContext(chain, contractAddress, "en", contextOptions);
-    const wireSchema = buildAIResearchProviderWireSchema(context);
-    const identity = buildAIAnalysisCacheIdentity({
-      ...context.identity,
-      locale: "en",
-      snapshot_fingerprint: context.snapshot_fingerprint,
-      prompt_version: context.prompt_version,
-      narrative_contract_version: AI_RESEARCH_NARRATIVE_VERSION,
-      semantic_policy_version: AI_RESEARCH_SEMANTIC_POLICY_VERSION,
-      composition_policy_version: AI_RESEARCH_COMPOSITION_POLICY_VERSION,
-      provider_wire_schema_version: wireSchema.version,
-      model_id: modelId,
-      analysis_schema_version: AI_RESEARCH_SCHEMA_VERSION,
-    });
+    const identity = buildAIResearchCacheIdentity(context, modelId);
     return { context, identity };
   };
 
