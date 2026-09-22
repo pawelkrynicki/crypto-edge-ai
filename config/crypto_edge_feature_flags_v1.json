@@ -1,0 +1,13 @@
+{
+  "schema_version": "crypto_edge_feature_flags_v1",
+  "defaults": {
+    "CRYPTO_EDGE_INVESTMENT_V2": false,
+    "CRYPTO_EDGE_VISUAL_V2": false,
+    "CRYPTO_EDGE_MULTI_SOURCE_DISCOVERY": false,
+    "CRYPTO_EDGE_SOURCE_INTELLIGENCE": false,
+    "CRYPTO_EDGE_FUTURES_SIGNALS": false,
+    "CRYPTO_EDGE_RISK_ENGINE": false,
+    "CRYPTO_EDGE_EXECUTION": false,
+    "CRYPTO_EDGE_KRAKEN": false
+  }
+}
