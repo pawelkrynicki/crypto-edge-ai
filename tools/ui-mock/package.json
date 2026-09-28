@@ -52,6 +52,7 @@
     "test:control-center": "node --import tsx --test tests/controlCenter.test.ts",
     "test:reports": "node --import tsx --test tests/reportsLibrary.test.ts",
     "test:owner-operations": "node --import tsx --test tests/ownerOperations.test.ts",
+    "test:axi-signal-gateway": "node --import tsx --test tests/axiSignalGateway.test.ts",
     "test:established-promotion": "node --import tsx --test tests/establishedPromotion.test.ts tests/establishedPromotionUi.test.tsx",
     "test:feedback": "node --import tsx --test tests/persistentFeedback.test.ts tests/persistentFeedbackUi.test.tsx",
     "test:boundary": "node --import tsx --test tests/realDataBoundary.test.ts",
