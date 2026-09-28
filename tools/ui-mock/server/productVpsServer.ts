@@ -104,6 +104,7 @@ export function createProductVpsServer(options: ProductVpsServerOptions): Server
     aiResearch: options.aiResearch,
     feedback: options.feedback,
     ownerOperations: options.ownerOperations,
+    krakenCopy: options.krakenCopy,
     health: {
       service: "crypto-edge-ai-product",
       buildSha: normalizeBuildSha(options.buildSha),

@@ -147,6 +147,10 @@ import {
   type AxiSignalRepository,
 } from "./axiSignalRepository.js";
 import {
+  createKrakenAccountSource,
+  type KrakenAccountSource,
+} from "./krakenAccount.js";
+import {
   resolveCryptoEdgeFeatureFlags,
   type CryptoEdgeFeatureFlagEnvironment,
 } from "../../data-poc/src/cryptoEdgeFeatureFlags.js";
@@ -212,6 +216,12 @@ export type ScannerApiHandlerOptions = {
     featureFlagEnvironment?: CryptoEdgeFeatureFlagEnvironment;
     now?: () => Date;
   };
+  krakenCopy?: {
+    accountSource?: KrakenAccountSource;
+    featureFlagEnvironment?: CryptoEdgeFeatureFlagEnvironment;
+    /** Server-only environment for the initial owner-pilot credential source. */
+    accountEnvironment?: Readonly<Record<string, string | undefined>>;
+  };
 };
 
 export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}): RequestListener {
@@ -229,6 +239,10 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
     }
     return axiSignalRepositoryPromise;
   };
+  const krakenCopyEnabled = isKrakenCopyFeatureEnabled(options.krakenCopy?.featureFlagEnvironment);
+  const krakenAccountSource = options.krakenCopy?.accountSource ?? createKrakenAccountSource({
+    env: options.krakenCopy?.accountEnvironment ?? process.env,
+  });
   const aiResearchRenderPreview = options.aiResearch?.renderPreview
     ?? process.env.CRYPTO_EDGE_AI_RESEARCH_RENDER_PREVIEW === "1";
   const reviewSessionProvider = options.reviewSessionProvider
@@ -430,6 +444,35 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
         sendAikintelAuthError(req, res, error, runtimeMode);
         return;
       }
+    }
+
+    if (path === "/api/v1/trading/kraken/account") {
+      if (req.method !== "GET") {
+        res.setHeader("allow", "GET");
+        sendJson(req, res, 405, { error: "method_not_allowed", message: "Method not allowed" }, runtimeMode);
+        return;
+      }
+      try {
+        const session = resolveSession(req);
+        if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
+        if (!krakenCopyEnabled) {
+          sendJson(req, res, 503, { error: "KRAKEN_COPY_DISABLED", message: "Kraken Copy is disabled" }, runtimeMode);
+          return;
+        }
+        // Live account access remains an owner-pilot capability. Simulated
+        // account readiness is available to authenticated product sessions.
+        if (krakenAccountSource.mode === "KRAKEN_LIVE" && !isOperationalControlCenterRole(session.context.role)) {
+          sendJson(req, res, 403, { error: "kraken_copy_forbidden", message: "Live Kraken account access requires OWNER or ADMIN access" }, runtimeMode);
+          return;
+        }
+        const snapshot = await krakenAccountSource.getSnapshot();
+        sendJson(req, res, 200, snapshot, runtimeMode);
+      } catch {
+        // A source error is never reflected verbatim because it can carry
+        // provider or credential-adjacent details.
+        sendJson(req, res, 503, { error: "KRAKEN_ACCOUNT_UNAVAILABLE", message: "Kraken account data is unavailable" }, runtimeMode);
+      }
+      return;
     }
 
     if (isAxiSignalsReadApiPath(path)) {
@@ -2741,6 +2784,14 @@ function isReportsApiPath(path: string): boolean {
 function isAxiSignalsFeatureEnabled(env: CryptoEdgeFeatureFlagEnvironment | undefined): boolean {
   try {
     return resolveCryptoEdgeFeatureFlags(env).flags.CRYPTO_EDGE_AXI_SIGNALS === true;
+  } catch {
+    return false;
+  }
+}
+
+function isKrakenCopyFeatureEnabled(env: CryptoEdgeFeatureFlagEnvironment | undefined): boolean {
+  try {
+    return resolveCryptoEdgeFeatureFlags(env).flags.CRYPTO_EDGE_KRAKEN === true;
   } catch {
     return false;
   }

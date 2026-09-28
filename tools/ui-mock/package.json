@@ -54,6 +54,7 @@
     "test:owner-operations": "node --import tsx --test tests/ownerOperations.test.ts",
     "test:axi-signal-gateway": "node --import tsx --test tests/axiSignalGateway.test.ts",
     "test:live-signals": "node --import tsx --test tests/liveSignalsUi.test.tsx",
+    "test:kraken-copy": "node --import tsx --test tests/krakenAccount.test.ts tests/krakenCopyUi.test.tsx",
     "test:established-promotion": "node --import tsx --test tests/establishedPromotion.test.ts tests/establishedPromotionUi.test.tsx",
     "test:feedback": "node --import tsx --test tests/persistentFeedback.test.ts tests/persistentFeedbackUi.test.tsx",
     "test:boundary": "node --import tsx --test tests/realDataBoundary.test.ts",

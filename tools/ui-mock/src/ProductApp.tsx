@@ -28,6 +28,7 @@ import { VerificationTokenBrowser } from "./components/VerificationTokenBrowser"
 import { Methodology } from "./components/Methodology";
 import { ProductControlCenter } from "./components/ProductControlCenter";
 import { LiveSignals } from "./components/LiveSignals";
+import { KrakenCopy } from "./components/KrakenCopy";
 import { LoadingState } from "./components/ProductUi";
 import {
   ProductWorkspaceSection,
@@ -57,6 +58,7 @@ import {
 } from "./services/establishedUniverseStatusDataSource";
 import { loadControlCenterStatus } from "./services/controlCenterStatusDataSource";
 import { loadAxiSignalDetail, loadAxiSignals } from "./services/axiSignalsDataSource";
+import { loadKrakenAccount } from "./services/krakenAccountDataSource";
 import { loadFollowUpByIdentity, loadFollowUpList, loadFollowUpStatus } from "./services/followUpDataSource";
 import { loadLifecycleRadar, setLifecycleReviewRole } from "./services/lifecycleDataSource";
 import {
@@ -94,6 +96,7 @@ const HASH_TO_SECTION: Record<string, ProductSectionId> = {
   "#candidate-detail": "candidate-detail",
   "#external-checks": "external-checks",
   "#live-signals": "live-signals",
+  "#kraken-copy": "kraken-copy",
   "#feedback": "candidate-results",
   "#opinion": "candidate-results",
   "#opinions": "candidate-results",
@@ -146,6 +149,7 @@ const SECTION_TO_HASH: Record<ProductSectionId, string> = {
   "candidate-detail": "#candidate-detail",
   "external-checks": "#external-checks",
   "live-signals": "#live-signals",
+  "kraken-copy": "#kraken-copy",
   methodology: "#methodology",
   "control-center": "#control-center",
 };
@@ -173,6 +177,7 @@ export type ProductAppDataSources = {
   acknowledgeReviewPublicationCommit?: typeof acknowledgeReviewPublicationCommit;
   loadAxiSignals?: typeof loadAxiSignals;
   loadAxiSignalDetail?: typeof loadAxiSignalDetail;
+  loadKrakenAccount?: typeof loadKrakenAccount;
   now: () => string;
 };
 
@@ -191,6 +196,7 @@ const DEFAULT_PRODUCT_APP_DATA_SOURCES: ProductAppDataSources = {
   acknowledgeReviewPublicationCommit,
   loadAxiSignals,
   loadAxiSignalDetail,
+  loadKrakenAccount,
   now: () => new Date().toISOString(),
 };
 
@@ -301,6 +307,7 @@ export function ProductAppContent({
     { id: "candidate-detail", label: t("nav.details"), icon: "D", description: t("nav.detailsDescription"), groupLabel: t("nav.groupProductFlow"), groupDescription: t("nav.groupProductFlowDescription") },
     { id: "external-checks", label: t("nav.verification"), icon: "V", description: t("nav.verificationDescription"), groupLabel: t("nav.groupReview"), groupDescription: t("nav.groupReviewDescription") },
     { id: "live-signals", label: t("nav.liveSignals"), icon: "L", description: t("nav.liveSignalsDescription"), groupLabel: t("nav.groupTrading"), groupDescription: t("nav.groupTradingDescription") },
+    { id: "kraken-copy", label: t("nav.krakenCopy"), icon: "K", description: t("nav.krakenCopyDescription"), groupLabel: t("nav.groupTrading"), groupDescription: t("nav.groupTradingDescription") },
     { id: "methodology", label: t("nav.methodology"), icon: "M", description: t("nav.methodologyDescription"), groupLabel: t("nav.groupStatus"), groupDescription: t("nav.groupStatusDescription") },
     { id: "control-center", label: t("nav.controlCenter"), icon: "C", description: t("nav.controlCenterDescription"), groupLabel: t("nav.groupStatus"), groupDescription: t("nav.groupStatusDescription") },
   ], [t]);
@@ -314,6 +321,7 @@ export function ProductAppContent({
     "candidate-detail": { title: t("nav.details"), description: t("section.detailsDescription") },
     "external-checks": { title: t("nav.verification"), description: t("section.verificationDescription") },
     "live-signals": { title: t("nav.liveSignals"), description: t("section.liveSignalsDescription") },
+    "kraken-copy": { title: t("nav.krakenCopy"), description: t("section.krakenCopyDescription") },
     methodology: { title: t("nav.methodology"), description: t("section.methodologyDescription") },
     "control-center": { title: t("nav.controlCenter"), description: t("section.controlCenterDescription") },
   }), [t]);
@@ -862,7 +870,7 @@ export function ProductAppContent({
         </ProductWorkspaceSection>
       );
     }
-    if (loading && candidates.length === 0 && activeSection !== "live-signals") {
+    if (loading && candidates.length === 0 && activeSection !== "live-signals" && activeSection !== "kraken-copy") {
       return (
         <ProductWorkspaceSection {...copy}>
           <LoadingState label={t("app.loading")} />
@@ -973,6 +981,14 @@ export function ProductAppContent({
             loadSignals={dataSources.loadAxiSignals}
             loadSignalDetail={dataSources.loadAxiSignalDetail}
           />
+        </ProductWorkspaceSection>
+      );
+    }
+
+    if (activeSection === "kraken-copy") {
+      return (
+        <ProductWorkspaceSection {...copy}>
+          <KrakenCopy loadAccount={dataSources.loadKrakenAccount} />
         </ProductWorkspaceSection>
       );
     }
