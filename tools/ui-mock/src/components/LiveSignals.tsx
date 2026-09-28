@@ -8,6 +8,10 @@ import {
   loadAxiSignals,
   type AxiSignalRecord,
 } from "../services/axiSignalsDataSource";
+import {
+  loadSignalEquityPlan,
+  type SignalEquityPlanResponse,
+} from "../services/signalEquityPlanDataSource";
 import { ActionButton, LoadingState, ReadOnlyCard, StatusBadge } from "./ProductUi";
 
 type FeedState =
@@ -25,24 +29,34 @@ type DetailState =
   | { kind: "forbidden" }
   | { kind: "error" };
 
+type EquityPlanState =
+  | { kind: "idle" }
+  | { kind: "loading" }
+  | { kind: "ready"; response: SignalEquityPlanResponse }
+  | { kind: "error" };
+
 type LiveSignalsProps = {
   loadSignals?: typeof loadAxiSignals;
   loadSignalDetail?: typeof loadAxiSignalDetail;
+  loadEquityPlan?: typeof loadSignalEquityPlan;
 };
 
 /** Read-only presentation for records accepted by the AXI signal gateway. */
 export function LiveSignals({
   loadSignals = loadAxiSignals,
   loadSignalDetail = loadAxiSignalDetail,
+  loadEquityPlan = loadSignalEquityPlan,
 }: LiveSignalsProps) {
   const { locale } = useProductLocale();
   const copy = LIVE_SIGNALS_COPY[locale];
   const [state, setState] = useState<FeedState>({ kind: "loading" });
   const [detail, setDetail] = useState<DetailState>({ kind: "idle" });
+  const [equityPlan, setEquityPlan] = useState<EquityPlanState>({ kind: "idle" });
 
   const reload = useCallback(async () => {
     setState({ kind: "loading" });
     setDetail({ kind: "idle" });
+    setEquityPlan({ kind: "idle" });
     try {
       const signals = sortNewestFirst(await loadSignals(50));
       setState({ kind: "ready", signals });
@@ -67,12 +81,22 @@ export function LiveSignals({
 
   const selectSignal = useCallback(async (signalId: string) => {
     setDetail({ kind: "loading", signalId });
-    try {
-      setDetail({ kind: "ready", record: await loadSignalDetail(signalId) });
-    } catch (error) {
-      setDetail(classifyDetailError(error, signalId));
+    setEquityPlan({ kind: "loading" });
+    const [detailResult, planResult] = await Promise.allSettled([
+      loadSignalDetail(signalId),
+      loadEquityPlan(signalId),
+    ]);
+    if (detailResult.status === "fulfilled") {
+      setDetail({ kind: "ready", record: detailResult.value });
+    } else {
+      setDetail(classifyDetailError(detailResult.reason, signalId));
     }
-  }, [loadSignalDetail]);
+    if (planResult.status === "fulfilled") {
+      setEquityPlan({ kind: "ready", response: planResult.value });
+    } else {
+      setEquityPlan({ kind: "error" });
+    }
+  }, [loadEquityPlan, loadSignalDetail]);
 
   const counts = useMemo(() => state.kind === "ready" ? summarizeSignals(state.signals) : null, [state]);
 
@@ -146,7 +170,7 @@ export function LiveSignals({
                 />
               ))}
             </div>
-            <SignalDetailPanel detail={detail} locale={locale} copy={copy} />
+            <SignalDetailPanel detail={detail} equityPlan={equityPlan} locale={locale} copy={copy} />
           </div>
         </>
       )}
@@ -202,7 +226,17 @@ function SignalCard({
   );
 }
 
-function SignalDetailPanel({ detail, locale, copy }: { detail: DetailState; locale: ProductLocale; copy: LiveSignalsCopy }) {
+function SignalDetailPanel({
+  detail,
+  equityPlan,
+  locale,
+  copy,
+}: {
+  detail: DetailState;
+  equityPlan: EquityPlanState;
+  locale: ProductLocale;
+  copy: LiveSignalsCopy;
+}) {
   if (detail.kind === "idle") {
     return <aside className="live-signal-detail live-signal-detail-placeholder" data-live-signals-detail-state="idle"><p>{copy.detailPlaceholder}</p></aside>;
   }
@@ -233,7 +267,37 @@ function SignalDetailPanel({ detail, locale, copy }: { detail: DetailState; loca
         <Fact label={copy.receivedAt} value={formatSignalTimestamp(detail.record.received_at, locale)} />
       </dl>
       <p className="live-signal-detail-boundary">{copy.detailBoundary}</p>
+      <EquityPlanPanel state={equityPlan} locale={locale} copy={copy} />
     </aside>
+  );
+}
+
+function EquityPlanPanel({ state, locale, copy }: { state: EquityPlanState; locale: ProductLocale; copy: LiveSignalsCopy }) {
+  if (state.kind === "idle") return null;
+  if (state.kind === "loading") return <section className="signal-equity-plan" data-signal-equity-plan-state="loading"><p>{copy.planLoading}</p></section>;
+  if (state.kind === "error") return <section className="signal-equity-plan" data-signal-equity-plan-state="error"><strong>{copy.planUnavailable}</strong><p>{copy.planUnavailableDetail}</p></section>;
+  const { plan, account_source: accountSource } = state.response;
+  const statusTone = plan.status === "READY" ? "ready" : plan.status === "REDUCED_BY_LIMIT" ? "warning" : "critical";
+  const missing = copy.unavailableValue;
+  return (
+    <section className="signal-equity-plan" data-signal-equity-plan-state="ready" aria-label={copy.yourPositionPlan}>
+      <span className="section-label">{copy.yourPositionPlan}</span>
+      <StatusBadge tone={statusTone}>{plan.status}</StatusBadge>
+      <dl className="live-signal-detail-facts">
+        <Fact label={copy.planAccountMode} value={accountSource === "CRYPTO_EDGE_SIMULATION" ? copy.planSimulation : "Kraken Futures"} />
+        <Fact label={copy.planEquity} value={formatUsd(plan.equity_usd, locale)} />
+        <Fact label={copy.planRiskPct} value={formatPercent(plan.risk_pct_per_trade, locale)} />
+        <Fact label={copy.planRequestedRisk} value={formatUsd(plan.requested_risk_usd, locale)} />
+        <Fact label={copy.planStopDistance} value={formatPercent(plan.stop_distance_pct * 100, locale)} />
+        <Fact label={copy.planNotional} value={formatUsd(plan.planned_notional_usd, locale)} />
+        <Fact label={copy.planRisk} value={formatUsd(plan.planned_risk_usd, locale)} />
+        <Fact label={copy.planLeverage} value={`${formatSignalNumber(plan.effective_leverage, locale)}×`} />
+        <Fact label={copy.planMargin} value={formatUsd(plan.required_margin_usd, locale)} />
+        <Fact label={copy.planRiskUtilization} value={plan.risk_utilization_pct === null ? missing : formatPercent(plan.risk_utilization_pct, locale)} />
+        <Fact label={copy.planReasonCodes} value={plan.reason_codes.length ? plan.reason_codes.map((code) => humanizePlanReason(code, locale)).join(", ") : copy.planNoReduction} />
+      </dl>
+      <p className="live-signal-detail-boundary">{copy.planBoundary}</p>
+    </section>
   );
 }
 
@@ -318,6 +382,39 @@ function formatDuration(seconds: number, locale: ProductLocale): string {
   return locale === "pl" ? `${seconds} sek.` : `${seconds} sec`;
 }
 
+function formatUsd(value: number, locale: ProductLocale): string {
+  return new Intl.NumberFormat(locale === "pl" ? "pl-PL" : "en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: value < 1 ? 6 : 2,
+  }).format(value);
+}
+
+function formatPercent(value: number, locale: ProductLocale): string {
+  return `${formatSignalNumber(value, locale)}%`;
+}
+
+function humanizePlanReason(code: string, locale: ProductLocale): string {
+  const labels: Record<string, [string, string]> = {
+    AVAILABLE_MARGIN_CAP: ["Available-margin cap", "Limit dostępnego marginu"],
+    MAX_LEVERAGE_CAP: ["Maximum-leverage cap", "Limit maksymalnej dźwigni"],
+    MAX_POSITION_NOTIONAL_CAP: ["Maximum-notional cap", "Limit maksymalnego nominału"],
+    MAX_RISK_CAP: ["Maximum-risk cap", "Limit maksymalnego ryzyka"],
+    INVALID_EQUITY_USD: ["Invalid equity", "Nieprawidłowe equity"],
+    INVALID_AVAILABLE_MARGIN_USD: ["Invalid available margin", "Nieprawidłowy dostępny margin"],
+    INVALID_RISK_PCT_PER_TRADE: ["Invalid risk setting", "Nieprawidłowe ustawienie ryzyka"],
+    INVALID_MAX_LEVERAGE: ["Invalid leverage setting", "Nieprawidłowe ustawienie dźwigni"],
+    INVALID_MAX_POSITION_NOTIONAL_USD: ["Invalid notional cap", "Nieprawidłowy limit nominału"],
+    INVALID_ENTRY_PRICE: ["Invalid entry price", "Nieprawidłowa cena wejścia"],
+    INVALID_STOP_LOSS: ["Invalid stop loss", "Nieprawidłowy stop loss"],
+    INVALID_TAKE_PROFIT: ["Invalid take profit", "Nieprawidłowy take profit"],
+    INVALID_PRICE_GEOMETRY: ["Invalid signal geometry", "Nieprawidłowa geometria sygnału"],
+    ZERO_STOP_DISTANCE: ["Zero stop distance", "Zerowy dystans stop loss"],
+    ZERO_PLANNED_NOTIONAL: ["Zero planned notional", "Zerowy planowany nominał"],
+  };
+  return (labels[code] ?? [code, code])[locale === "pl" ? 1 : 0];
+}
+
 type LiveSignalsCopy = {
   eyebrow: string;
   title: string;
@@ -358,6 +455,25 @@ type LiveSignalsCopy = {
   setupFamily: string;
   sourceTimeBasis: string;
   detailBoundary: string;
+  yourPositionPlan: string;
+  planLoading: string;
+  planUnavailable: string;
+  planUnavailableDetail: string;
+  planAccountMode: string;
+  planSimulation: string;
+  planEquity: string;
+  planRiskPct: string;
+  planRequestedRisk: string;
+  planStopDistance: string;
+  planNotional: string;
+  planRisk: string;
+  planLeverage: string;
+  planMargin: string;
+  planRiskUtilization: string;
+  planReasonCodes: string;
+  planNoReduction: string;
+  planBoundary: string;
+  unavailableValue: string;
 };
 
 const LIVE_SIGNALS_COPY: Record<ProductLocale, LiveSignalsCopy> = {
@@ -401,6 +517,25 @@ const LIVE_SIGNALS_COPY: Record<ProductLocale, LiveSignalsCopy> = {
     setupFamily: "Setup family",
     sourceTimeBasis: "Source time basis",
     detailBoundary: "This is a received source record. It does not indicate an order, position, fill, or execution result.",
+    yourPositionPlan: "Your position plan",
+    planLoading: "Calculating your personal sizing plan…",
+    planUnavailable: "Your position plan is unavailable",
+    planUnavailableDetail: "The source signal remains available. Try loading the personal plan again later.",
+    planAccountMode: "Account mode / source",
+    planSimulation: "Crypto Edge per-user simulation",
+    planEquity: "Equity",
+    planRiskPct: "Risk %",
+    planRequestedRisk: "Requested risk USD",
+    planStopDistance: "Stop distance %",
+    planNotional: "Planned position notional USD",
+    planRisk: "Planned risk USD",
+    planLeverage: "Effective leverage",
+    planMargin: "Required margin USD",
+    planRiskUtilization: "Risk utilization %",
+    planReasonCodes: "Reduction / block reasons",
+    planNoReduction: "No reduction",
+    planBoundary: "This is a sizing plan, not an executed order.",
+    unavailableValue: "Unavailable",
   },
   pl: {
     eyebrow: "Trading · feed źródłowych sygnałów AXI",
@@ -442,5 +577,24 @@ const LIVE_SIGNALS_COPY: Record<ProductLocale, LiveSignalsCopy> = {
     setupFamily: "Rodzina setupu",
     sourceTimeBasis: "Podstawa czasu źródłowego",
     detailBoundary: "To odebrany rekord źródłowy. Nie wskazuje zlecenia, pozycji, wypełnienia ani wyniku wykonania.",
+    yourPositionPlan: "Twój plan pozycji",
+    planLoading: "Wyliczanie Twojego osobistego planu wielkości…",
+    planUnavailable: "Twój plan pozycji jest niedostępny",
+    planUnavailableDetail: "Sygnał źródłowy pozostaje dostępny. Spróbuj ponownie załadować osobisty plan później.",
+    planAccountMode: "Tryb / źródło konta",
+    planSimulation: "Symulacja Crypto Edge per użytkownik",
+    planEquity: "Equity",
+    planRiskPct: "Ryzyko %",
+    planRequestedRisk: "Żądane ryzyko USD",
+    planStopDistance: "Odległość stop loss %",
+    planNotional: "Planowany nominał pozycji USD",
+    planRisk: "Planowane ryzyko USD",
+    planLeverage: "Efektywna dźwignia",
+    planMargin: "Wymagany margin USD",
+    planRiskUtilization: "Wykorzystanie ryzyka %",
+    planReasonCodes: "Powody redukcji / blokady",
+    planNoReduction: "Brak redukcji",
+    planBoundary: "To plan wielkości, nie wykonane zlecenie.",
+    unavailableValue: "Niedostępne",
   },
 };

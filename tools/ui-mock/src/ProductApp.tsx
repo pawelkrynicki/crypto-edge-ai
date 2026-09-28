@@ -59,6 +59,8 @@ import {
 import { loadControlCenterStatus } from "./services/controlCenterStatusDataSource";
 import { loadAxiSignalDetail, loadAxiSignals } from "./services/axiSignalsDataSource";
 import { loadKrakenAccount } from "./services/krakenAccountDataSource";
+import { loadKrakenCopyProfile, saveKrakenCopyProfile } from "./services/krakenCopyProfileDataSource";
+import { loadSignalEquityPlan } from "./services/signalEquityPlanDataSource";
 import { loadFollowUpByIdentity, loadFollowUpList, loadFollowUpStatus } from "./services/followUpDataSource";
 import { loadLifecycleRadar, setLifecycleReviewRole } from "./services/lifecycleDataSource";
 import {
@@ -177,7 +179,10 @@ export type ProductAppDataSources = {
   acknowledgeReviewPublicationCommit?: typeof acknowledgeReviewPublicationCommit;
   loadAxiSignals?: typeof loadAxiSignals;
   loadAxiSignalDetail?: typeof loadAxiSignalDetail;
+  loadSignalEquityPlan?: typeof loadSignalEquityPlan;
   loadKrakenAccount?: typeof loadKrakenAccount;
+  loadKrakenCopyProfile?: typeof loadKrakenCopyProfile;
+  saveKrakenCopyProfile?: typeof saveKrakenCopyProfile;
   now: () => string;
 };
 
@@ -196,7 +201,10 @@ const DEFAULT_PRODUCT_APP_DATA_SOURCES: ProductAppDataSources = {
   acknowledgeReviewPublicationCommit,
   loadAxiSignals,
   loadAxiSignalDetail,
+  loadSignalEquityPlan,
   loadKrakenAccount,
+  loadKrakenCopyProfile,
+  saveKrakenCopyProfile,
   now: () => new Date().toISOString(),
 };
 
@@ -980,6 +988,7 @@ export function ProductAppContent({
           <LiveSignals
             loadSignals={dataSources.loadAxiSignals}
             loadSignalDetail={dataSources.loadAxiSignalDetail}
+            loadEquityPlan={dataSources.loadSignalEquityPlan}
           />
         </ProductWorkspaceSection>
       );
@@ -988,7 +997,11 @@ export function ProductAppContent({
     if (activeSection === "kraken-copy") {
       return (
         <ProductWorkspaceSection {...copy}>
-          <KrakenCopy loadAccount={dataSources.loadKrakenAccount} />
+          <KrakenCopy
+            loadAccount={dataSources.loadKrakenAccount}
+            loadProfile={dataSources.loadKrakenCopyProfile}
+            saveProfile={dataSources.saveKrakenCopyProfile}
+          />
         </ProductWorkspaceSection>
       );
     }

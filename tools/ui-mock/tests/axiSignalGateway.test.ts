@@ -184,7 +184,7 @@ describe("AXI signal gateway v1", () => {
     );
   });
 
-  it("serves list and detail records only to OWNER or ADMIN session roles", async () => {
+  it("serves list and detail records to CAMP_USER, OWNER, and ADMIN, but not TRUSTED_TESTER", async () => {
     const root = await tempRoot();
     const api = await startApi(root, { defaultSessionRole: "OWNER" });
     try {
@@ -212,14 +212,18 @@ describe("AXI signal gateway v1", () => {
       await api.close();
     }
 
-    const denied = await startApi(root, { defaultSessionRole: "CAMP_USER" });
+    const camp = await startApi(root, { defaultSessionRole: "CAMP_USER" });
+    try {
+      assert.equal((await fetch(`${camp.base}/api/v1/trading/signals`)).status, 200);
+      assert.equal((await fetch(`${camp.base}/api/v1/trading/signals/read-market-0001`)).status, 200);
+    } finally { await camp.close(); }
+
+    const denied = await startApi(root, { defaultSessionRole: "TRUSTED_TESTER" });
     try {
       const response = await fetch(`${denied.base}/api/v1/trading/signals`);
       assert.equal(response.status, 403);
       assert.equal((await response.json() as { error: string }).error, "axi_signals_forbidden");
-    } finally {
-      await denied.close();
-    }
+    } finally { await denied.close(); }
   });
 
   it("accepts machine ingress before AIKINTEL browser-session authentication", async () => {
@@ -306,7 +310,7 @@ async function startApi(
   options: {
     featureFlagEnvironment?: Record<string, string | undefined>;
     databaseFilePath?: string;
-    defaultSessionRole?: "CAMP_USER" | "OWNER";
+    defaultSessionRole?: "TRUSTED_TESTER" | "CAMP_USER" | "OWNER" | "ADMIN";
     authMode?: ScannerApiHandlerOptions["authMode"];
     aikintelAuth?: ScannerApiHandlerOptions["aikintelAuth"];
   } = {},

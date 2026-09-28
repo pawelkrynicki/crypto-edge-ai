@@ -11,6 +11,12 @@ import {
   loadKrakenAccount,
   type KrakenAccountSnapshot,
 } from "../src/services/krakenAccountDataSource.js";
+import {
+  loadKrakenCopyProfile,
+  saveKrakenCopyProfile,
+  type KrakenCopyProfile,
+  type KrakenCopyProfileWrite,
+} from "../src/services/krakenCopyProfileDataSource.js";
 
 void React;
 
@@ -43,7 +49,11 @@ describe("01E-B Kraken Copy UI", () => {
       assert.match(text, /COPY \/ EXECUTION IS NOT ACTIVE YET/);
       assert.match(text, /\$10,000/);
       assert.match(text, /Position sizing is calculated separately/);
-      assert.equal(simulated.root.findAll((node) => node.type === "button").length, 0, "Kraken Copy exposes no order-like controls");
+      assert.deepEqual(
+        simulated.root.findAll((node) => node.type === "button").map((node) => node.children.join("")),
+        ["Save risk settings"],
+        "Kraken Copy exposes risk-profile saving only, not an order CTA",
+      );
     } finally {
       await act(async () => { simulated.unmount(); });
     }
@@ -67,9 +77,68 @@ describe("01E-B Kraken Copy UI", () => {
       assert.match(text, /SYMULACJA/);
       assert.match(text, /KOPIOWANIE \/ WYKONANIE NIE JEST JESZCZE AKTYWNE/);
       assert.match(text, /Symulacja Crypto Edge/);
+      assert.match(text, /Twoje ustawienia ryzyka/);
     } finally {
       await act(async () => { polish.unmount(); });
     }
+  });
+
+  it("uses the session-protected profile GET and PUT endpoints without browser-side account credentials", async () => {
+    const requests: Array<{ url: string; init: RequestInit | undefined }> = [];
+    const fetchProfile = async (url: string | URL | Request, init?: RequestInit) => {
+      requests.push({ url: String(url), init });
+      return jsonResponse(profile());
+    };
+    assert.equal((await loadKrakenCopyProfile(fetchProfile)).simulated_equity_usd, 10_000);
+    const write: KrakenCopyProfileWrite = {
+      simulated_equity_usd: 10_000,
+      risk_pct_per_trade: 0.5,
+      max_leverage: 1,
+      max_position_notional_usd: null,
+    };
+    await saveKrakenCopyProfile(write, fetchProfile);
+    assert.deepEqual(requests[0], {
+      url: "/api/v1/trading/kraken/profile",
+      init: { method: "GET", credentials: "same-origin", headers: { accept: "application/json" } },
+    });
+    assert.equal(requests[1]?.url, "/api/v1/trading/kraken/profile");
+    assert.equal(requests[1]?.init?.method, "PUT");
+    assert.match(String(requests[1]?.init?.body), /"simulated_equity_usd":10000/);
+    assert.doesNotMatch(String(requests[1]?.init?.body), /actor_id|secret|api.?key/i);
+  });
+
+  it("saves a per-user simulated profile and keeps account-size editing hidden in live mode", async () => {
+    let saved: KrakenCopyProfileWrite | null = null;
+    const simulated = await renderKraken({
+      locale: "en",
+      snapshot: simulatedSnapshot(),
+      saveProfile: async (write) => {
+        saved = write;
+        return { ...profile(), ...write };
+      },
+    });
+    try {
+      const inputs = simulated.root.findAll((node) => node.type === "input");
+      assert.equal(inputs.length, 4);
+      await act(async () => {
+        inputs[0]!.props.onChange({ target: { value: "1000" } });
+      });
+      const save = simulated.root.findAll((node) => node.type === "button" && node.children.join("") === "Save risk settings")[0]!;
+      await act(async () => {
+        save.props.onClick();
+        await flushPromises();
+      });
+      assert.equal(saved?.simulated_equity_usd, 1_000);
+      assert.equal(saved?.risk_pct_per_trade, 0.5);
+      assert.doesNotMatch(markup(simulated), /order.*CTA/i);
+    } finally { await act(async () => { simulated.unmount(); }); }
+
+    const live = await renderKraken({ locale: "en", snapshot: liveSnapshot() });
+    try {
+      assert.equal(live.root.findAll((node) => node.type === "input").length, 3);
+      assert.doesNotMatch(markup(live), /Account size \/ Equity USD/);
+      assert.match(markup(live), /read-only/);
+    } finally { await act(async () => { live.unmount(); }); }
   });
 
   it("keeps Live Signals first and Kraken Copy second inside Trading without changing other groups", () => {
@@ -113,20 +182,35 @@ describe("01E-B Kraken Copy UI", () => {
 async function renderKraken({
   locale,
   snapshot,
+  profile: suppliedProfile = profile(),
+  saveProfile = async (write) => ({ ...suppliedProfile, ...write }),
 }: {
   locale: "en" | "pl";
   snapshot: KrakenAccountSnapshot;
+  profile?: KrakenCopyProfile;
+  saveProfile?: (write: KrakenCopyProfileWrite) => Promise<KrakenCopyProfile>;
 }): Promise<TestRenderer.ReactTestRenderer> {
   let renderer: TestRenderer.ReactTestRenderer | undefined;
   await act(async () => {
     renderer = create(
       <ProductLocaleProvider initialLocale={locale}>
-        <KrakenCopy loadAccount={async () => snapshot} />
+        <KrakenCopy loadAccount={async () => snapshot} loadProfile={async () => suppliedProfile} saveProfile={saveProfile} />
       </ProductLocaleProvider>,
     );
     await flushPromises();
   });
   return renderer!;
+}
+
+function profile(): KrakenCopyProfile {
+  return {
+    schema_version: "crypto_edge_kraken_copy_profile_v1",
+    simulated_equity_usd: 10_000,
+    risk_pct_per_trade: 0.5,
+    max_leverage: 1,
+    max_position_notional_usd: null,
+    updated_at: "2026-09-28T12:00:00.000Z",
+  };
 }
 
 function simulatedSnapshot(): KrakenAccountSnapshot {

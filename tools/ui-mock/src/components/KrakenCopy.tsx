@@ -7,10 +7,18 @@ import {
   loadKrakenAccount,
   type KrakenAccountSnapshot,
 } from "../services/krakenAccountDataSource";
-import { LoadingState, ReadOnlyCard, StatusBadge, type ProductStatusTone } from "./ProductUi";
+import {
+  loadKrakenCopyProfile,
+  saveKrakenCopyProfile,
+  type KrakenCopyProfile,
+  type KrakenCopyProfileWrite,
+} from "../services/krakenCopyProfileDataSource";
+import { ActionButton, LoadingState, ReadOnlyCard, StatusBadge, type ProductStatusTone } from "./ProductUi";
 
 type KrakenCopyProps = {
   loadAccount?: typeof loadKrakenAccount;
+  loadProfile?: typeof loadKrakenCopyProfile;
+  saveProfile?: typeof saveKrakenCopyProfile;
 };
 
 type AccountState =
@@ -18,11 +26,21 @@ type AccountState =
   | { kind: "ready"; snapshot: KrakenAccountSnapshot }
   | { kind: "unavailable"; reason: "disabled" | "forbidden" | "error" };
 
+type ProfileState =
+  | { kind: "loading" }
+  | { kind: "ready"; profile: KrakenCopyProfile }
+  | { kind: "unavailable" };
+
 /** Account and readiness view only. It has no execution or order controls. */
-export function KrakenCopy({ loadAccount = loadKrakenAccount }: KrakenCopyProps) {
+export function KrakenCopy({
+  loadAccount = loadKrakenAccount,
+  loadProfile = loadKrakenCopyProfile,
+  saveProfile = saveKrakenCopyProfile,
+}: KrakenCopyProps) {
   const { locale } = useProductLocale();
   const copy = KRAKEN_COPY[locale];
   const [state, setState] = useState<AccountState>({ kind: "loading" });
+  const [profileState, setProfileState] = useState<ProfileState>({ kind: "loading" });
 
   useEffect(() => {
     let cancelled = false;
@@ -33,8 +51,25 @@ export function KrakenCopy({ loadAccount = loadKrakenAccount }: KrakenCopyProps)
       .catch((error) => {
         if (!cancelled) setState({ kind: "unavailable", reason: classifyUnavailableReason(error) });
       });
+    void loadProfile()
+      .then((profile) => {
+        if (!cancelled) setProfileState({ kind: "ready", profile });
+      })
+      .catch(() => {
+        if (!cancelled) setProfileState({ kind: "unavailable" });
+      });
     return () => { cancelled = true; };
-  }, [loadAccount]);
+  }, [loadAccount, loadProfile]);
+
+  const profileSaved = async (profile: KrakenCopyProfile) => {
+    setProfileState({ kind: "ready", profile });
+    try {
+      setState({ kind: "loading" });
+      setState({ kind: "ready", snapshot: await loadAccount() });
+    } catch (error) {
+      setState({ kind: "unavailable", reason: classifyUnavailableReason(error) });
+    }
+  };
 
   const headlineBadge = useMemo(() => state.kind === "ready"
     ? { label: state.snapshot.mode === "SIMULATED" ? copy.simulatedMode : copy.liveMode, tone: state.snapshot.mode === "SIMULATED" ? "warning" as const : "accent" as const }
@@ -58,7 +93,16 @@ export function KrakenCopy({ loadAccount = loadKrakenAccount }: KrakenCopyProps)
 
       {state.kind === "loading" && <LoadingState label={copy.loading} />}
       {state.kind === "unavailable" && <UnavailableCard reason={state.reason} copy={copy} />}
-      {state.kind === "ready" && <AccountSnapshotView snapshot={state.snapshot} locale={locale} copy={copy} />}
+      {state.kind === "ready" && (
+        <AccountSnapshotView
+          snapshot={state.snapshot}
+          locale={locale}
+          copy={copy}
+          profileState={profileState}
+          saveProfile={saveProfile}
+          onProfileSaved={profileSaved}
+        />
+      )}
     </div>
   );
 }
@@ -67,10 +111,16 @@ function AccountSnapshotView({
   snapshot,
   locale,
   copy,
+  profileState,
+  saveProfile,
+  onProfileSaved,
 }: {
   snapshot: KrakenAccountSnapshot;
   locale: ProductLocale;
   copy: KrakenCopyCopy;
+  profileState: ProfileState;
+  saveProfile: typeof saveKrakenCopyProfile;
+  onProfileSaved: (profile: KrakenCopyProfile) => Promise<void>;
 }) {
   const missing = copy.unavailableValue;
   const connection = connectionPresentation(snapshot.connection_status, copy);
@@ -129,8 +179,137 @@ function AccountSnapshotView({
         <strong>{copy.sizingTitle}</strong>
         <p>{copy.sizingDetail}</p>
       </ReadOnlyCard>
+
+      {profileState.kind === "loading" && <LoadingState label={copy.profileLoading} />}
+      {profileState.kind === "unavailable" && (
+        <ReadOnlyCard className="kraken-copy-unavailable"><strong>{copy.profileUnavailable}</strong></ReadOnlyCard>
+      )}
+      {profileState.kind === "ready" && (
+        <KrakenCopyProfileEditor
+          mode={snapshot.mode}
+          profile={profileState.profile}
+          locale={locale}
+          copy={copy}
+          saveProfile={saveProfile}
+          onProfileSaved={onProfileSaved}
+        />
+      )}
     </>
   );
+}
+
+function KrakenCopyProfileEditor({
+  mode,
+  profile,
+  locale,
+  copy,
+  saveProfile,
+  onProfileSaved,
+}: {
+  mode: KrakenAccountSnapshot["mode"];
+  profile: KrakenCopyProfile;
+  locale: ProductLocale;
+  copy: KrakenCopyCopy;
+  saveProfile: typeof saveKrakenCopyProfile;
+  onProfileSaved: (profile: KrakenCopyProfile) => Promise<void>;
+}) {
+  const [draft, setDraft] = useState(() => profileToDraft(profile));
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "error">("idle");
+
+  const save = async () => {
+    const write = draftToProfileWrite(draft, profile.simulated_equity_usd);
+    if (!write) {
+      setSaveState("error");
+      return;
+    }
+    setSaveState("saving");
+    try {
+      const saved = await saveProfile(write);
+      await onProfileSaved(saved);
+      setSaveState("idle");
+    } catch {
+      setSaveState("error");
+    }
+  };
+
+  return (
+    <ReadOnlyCard className="kraken-copy-profile" data-kraken-copy-profile-mode={mode}>
+      <span className="section-label">{copy.profileLabel}</span>
+      <p>{mode === "SIMULATED" ? copy.profileSimulatedDetail : copy.profileLiveDetail}</p>
+      <div className="kraken-copy-profile-fields">
+        {mode === "SIMULATED" && (
+          <ProfileField label={copy.accountSize} value={draft.simulated_equity_usd} onChange={(value) => setDraft((current) => ({ ...current, simulated_equity_usd: value }))} />
+        )}
+        <ProfileField label={copy.riskPerTrade} value={draft.risk_pct_per_trade} onChange={(value) => setDraft((current) => ({ ...current, risk_pct_per_trade: value }))} />
+        <ProfileField label={copy.maxLeverage} value={draft.max_leverage} minimum={1} onChange={(value) => setDraft((current) => ({ ...current, max_leverage: value }))} />
+        <ProfileField label={copy.maxPositionNotional} value={draft.max_position_notional_usd} optional onChange={(value) => setDraft((current) => ({ ...current, max_position_notional_usd: value }))} />
+      </div>
+      {saveState === "error" && <p className="kraken-copy-profile-error">{copy.profileSaveError}</p>}
+      <ActionButton variant="secondary" onClick={() => void save()} disabled={saveState === "saving"}>
+        {saveState === "saving" ? copy.saving : copy.save}
+      </ActionButton>
+      <p className="kraken-copy-profile-updated">{copy.profileUpdated}: {formatProductDateTime(profile.updated_at, locale)}</p>
+    </ReadOnlyCard>
+  );
+}
+
+function ProfileField({
+  label,
+  value,
+  onChange,
+  minimum,
+  optional = false,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  minimum?: number;
+  optional?: boolean;
+}) {
+  return (
+    <label>
+      <span>{label}</span>
+      <input
+        type="number"
+        inputMode="decimal"
+        min={minimum ?? 0}
+        step="any"
+        value={value}
+        placeholder={optional ? "—" : undefined}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </label>
+  );
+}
+
+type ProfileDraft = Record<keyof KrakenCopyProfileWrite, string>;
+
+function profileToDraft(profile: KrakenCopyProfile): ProfileDraft {
+  return {
+    simulated_equity_usd: String(profile.simulated_equity_usd),
+    risk_pct_per_trade: String(profile.risk_pct_per_trade),
+    max_leverage: String(profile.max_leverage),
+    max_position_notional_usd: profile.max_position_notional_usd === null ? "" : String(profile.max_position_notional_usd),
+  };
+}
+
+function draftToProfileWrite(draft: ProfileDraft, simulatedEquityUsd: number): KrakenCopyProfileWrite | null {
+  const risk = Number(draft.risk_pct_per_trade);
+  const leverage = Number(draft.max_leverage);
+  const equity = draft.simulated_equity_usd.trim() === "" ? simulatedEquityUsd : Number(draft.simulated_equity_usd);
+  const notional = draft.max_position_notional_usd.trim() === "" ? null : Number(draft.max_position_notional_usd);
+  if (!isPositiveFinite(equity) || !isPositiveFinite(risk) || !Number.isFinite(leverage) || leverage < 1
+    || (notional !== null && !isPositiveFinite(notional))) return null;
+  return {
+    simulated_equity_usd: equity,
+    risk_pct_per_trade: risk,
+    max_leverage: leverage,
+    max_position_notional_usd: notional,
+  };
+}
+
+function isPositiveFinite(value: number): boolean {
+  return Number.isFinite(value) && value > 0;
 }
 
 function UnavailableCard({ reason, copy }: { reason: "disabled" | "forbidden" | "error"; copy: KrakenCopyCopy }) {
@@ -221,6 +400,19 @@ const KRAKEN_COPY = {
     statusAuthFailed: "Authentication failed",
     statusUnavailable: "Provider unavailable",
     statusInvalidResponse: "Provider response invalid",
+    profileLoading: "Loading your Kraken Copy risk profile",
+    profileUnavailable: "Your Kraken Copy risk profile is unavailable.",
+    profileLabel: "Your risk settings",
+    profileSimulatedDetail: "These settings and the Crypto Edge simulated account size are personal to your signed-in account.",
+    profileLiveDetail: "Kraken equity and margin above are read-only. You can still save your personal risk settings.",
+    accountSize: "Account size / Equity USD",
+    riskPerTrade: "Risk per trade %",
+    maxLeverage: "Max leverage",
+    maxPositionNotional: "Max position notional USD (optional)",
+    save: "Save risk settings",
+    saving: "Saving…",
+    profileSaveError: "Enter valid positive values and try again.",
+    profileUpdated: "Profile updated",
   },
   pl: {
     eyebrow: "Gotowość tradingowa",
@@ -265,5 +457,18 @@ const KRAKEN_COPY = {
     statusAuthFailed: "Uwierzytelnienie nie powiodło się",
     statusUnavailable: "Dostawca niedostępny",
     statusInvalidResponse: "Nieprawidłowa odpowiedź dostawcy",
+    profileLoading: "Ładowanie Twojego profilu ryzyka Kraken Copy",
+    profileUnavailable: "Twój profil ryzyka Kraken Copy jest niedostępny.",
+    profileLabel: "Twoje ustawienia ryzyka",
+    profileSimulatedDetail: "Te ustawienia i symulowana wielkość konta Crypto Edge są osobiste dla zalogowanego konta.",
+    profileLiveDetail: "Equity i margin Kraken powyżej są tylko do odczytu. Nadal możesz zapisać własne ustawienia ryzyka.",
+    accountSize: "Wielkość konta / Equity USD",
+    riskPerTrade: "Ryzyko na transakcję %",
+    maxLeverage: "Maks. dźwignia",
+    maxPositionNotional: "Maks. nominał pozycji USD (opcjonalnie)",
+    save: "Zapisz ustawienia ryzyka",
+    saving: "Zapisywanie…",
+    profileSaveError: "Wprowadź poprawne dodatnie wartości i spróbuj ponownie.",
+    profileUpdated: "Profil zaktualizowano",
   },
 } as const;

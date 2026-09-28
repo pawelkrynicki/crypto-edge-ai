@@ -13,6 +13,10 @@ import {
   loadAxiSignals,
   type AxiSignalRecord,
 } from "../src/services/axiSignalsDataSource.js";
+import {
+  loadSignalEquityPlan,
+  type SignalEquityPlanResponse,
+} from "../src/services/signalEquityPlanDataSource.js";
 
 void React;
 
@@ -79,6 +83,51 @@ describe("01D Live Signals UI", () => {
       url: "/api/v1/trading/signals/market-0001",
       init: { method: "GET", credentials: "same-origin", headers: { accept: "application/json" } },
     });
+
+    let planRequest: { url: string; init: RequestInit | undefined } | null = null;
+    await loadSignalEquityPlan("market-0001", async (url, init) => {
+      planRequest = { url: String(url), init };
+      return jsonResponse(equityPlan());
+    });
+    assert.deepEqual(planRequest, {
+      url: "/api/v1/trading/signals/market-0001/equity-plan",
+      init: { method: "GET", credentials: "same-origin", headers: { accept: "application/json" } },
+    });
+  });
+
+  it("shows a personalized sizing plan separately from the source record and leaves that record visible when the plan fails", async () => {
+    const record = marketSignal();
+    const ready = await renderLive({
+      loadSignals: async () => [record],
+      loadSignalDetail: async () => record,
+      loadEquityPlan: async () => equityPlan(),
+    });
+    try {
+      const openDetail = ready.root.findAll((node) => node.type === "button" && node.children.join("") === "View source details")[0]!;
+      await act(async () => { openDetail.props.onClick(); await flushPromises(); });
+      const rendered = markup(ready);
+      assert.match(rendered, /Your position plan/);
+      assert.match(rendered, /Crypto Edge per-user simulation/);
+      assert.match(rendered, /Requested risk USD/);
+      assert.match(rendered, /Planned position notional USD/);
+      assert.match(rendered, /This is a sizing plan, not an executed order/);
+      assert.doesNotMatch(rendered, /kraken_quantity|order_quantity/i);
+    } finally { await act(async () => { ready.unmount(); }); }
+
+    const failure = await renderLive({
+      locale: "pl",
+      loadSignals: async () => [record],
+      loadSignalDetail: async () => record,
+      loadEquityPlan: async () => { throw new Error("plan unavailable"); },
+    });
+    try {
+      const openDetail = failure.root.findAll((node) => node.type === "button" && node.children.join("") === "Pokaż szczegóły źródła")[0]!;
+      await act(async () => { openDetail.props.onClick(); await flushPromises(); });
+      const rendered = markup(failure);
+      assert.match(rendered, /Szczegóły rekordu źródłowego/);
+      assert.match(rendered, /Twój plan pozycji jest niedostępny/);
+      assert.match(rendered, /BTCUSD/);
+    } finally { await act(async () => { failure.unmount(); }); }
   });
 
   it("renders loaded BUY and LIMIT source fields, truthful loaded-only counts, PL copy, and a source-detail panel", async () => {
@@ -185,16 +234,18 @@ async function renderLive({
   locale = "en",
   loadSignals,
   loadSignalDetail,
+  loadEquityPlan,
 }: {
   locale?: "en" | "pl";
   loadSignals: (limit?: number) => Promise<AxiSignalRecord[]>;
   loadSignalDetail?: (signalId: string) => Promise<AxiSignalRecord>;
+  loadEquityPlan?: (signalId: string) => Promise<SignalEquityPlanResponse>;
 }): Promise<TestRenderer.ReactTestRenderer> {
   let renderer: TestRenderer.ReactTestRenderer | undefined;
   await act(async () => {
     renderer = create(
       <ProductLocaleProvider initialLocale={locale}>
-        <LiveSignals loadSignals={loadSignals} loadSignalDetail={loadSignalDetail} />
+        <LiveSignals loadSignals={loadSignals} loadSignalDetail={loadSignalDetail} loadEquityPlan={loadEquityPlan} />
       </ProductLocaleProvider>,
     );
     await flushPromises();
@@ -244,6 +295,34 @@ function limitSignal(overrides: Partial<AxiSignalRecord> = {}): AxiSignalRecord 
     },
     received_at: "2026-09-28T12:01:00.000Z",
     ...overrides,
+  };
+}
+
+function equityPlan(): SignalEquityPlanResponse {
+  return {
+    schema_version: "crypto_edge_signal_equity_plan_v1",
+    signal_id: "market-0001",
+    account_source: "CRYPTO_EDGE_SIMULATION",
+    account_observed_at: "2026-09-28T12:00:00.000Z",
+    profile_updated_at: "2026-09-28T12:00:00.000Z",
+    plan: {
+      schema_version: "crypto_edge_equity_plan_v1",
+      status: "READY",
+      reason_codes: [],
+      account_mode: "SIMULATED",
+      equity_usd: 10_000,
+      risk_pct_per_trade: 0.5,
+      requested_risk_usd: 50,
+      effective_risk_cap_usd: 50,
+      stop_distance_pct: 0.1,
+      risk_based_notional_usd: 500,
+      planned_notional_usd: 500,
+      planned_risk_usd: 50,
+      effective_leverage: 0.05,
+      required_margin_usd: 500,
+      risk_utilization_pct: 100,
+      signal: { side: "BUY", entry_price: 100, stop_loss: 90, take_profit: 120 },
+    },
   };
 }
 
