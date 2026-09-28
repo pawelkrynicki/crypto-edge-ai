@@ -1,4 +1,5 @@
 import type { IncomingMessage, RequestListener, ServerResponse } from "node:http";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { readAutomationStatus, type AutomationStatusOptions } from "./automationStatus.js";
 import {
   readEstablishedUniverseStatus,
@@ -135,6 +136,20 @@ import { resolveTokenIdentity } from "../src/tokenLifecycle.js";
 import { normalizeSafeSocialLinkUrl } from "../src/socialLinks.js";
 import { mapPersistableScannerOutputToUiCandidates } from "../src/adapters/scannerOutputAdapter.js";
 import type { PersistableScannerOutput, UiTokenCandidate } from "../src/types/scannerTypes.js";
+import {
+  AXI_CRYPTO_SIGNAL_MAX_BODY_BYTES,
+  AxiCryptoSignalValidationError,
+  validateAxiCryptoSignal,
+} from "./axiCryptoSignalContract.js";
+import {
+  AxiSignalRepositoryError,
+  createAxiSignalRepository,
+  type AxiSignalRepository,
+} from "./axiSignalRepository.js";
+import {
+  resolveCryptoEdgeFeatureFlags,
+  type CryptoEdgeFeatureFlagEnvironment,
+} from "../../data-poc/src/cryptoEdgeFeatureFlags.js";
 
 const DEMO_CORS_ORIGINS = new Set(["http://127.0.0.1:5173", "http://localhost:5173"]);
 
@@ -190,12 +205,30 @@ export type ScannerApiHandlerOptions = {
     rateWindowMs?: number;
     resolveSubject?: FeedbackServiceOptions["resolveSubject"];
   };
+  axiSignals?: {
+    repository?: AxiSignalRepository;
+    databaseFilePath?: string;
+    token?: string;
+    featureFlagEnvironment?: CryptoEdgeFeatureFlagEnvironment;
+    now?: () => Date;
+  };
 };
 
 export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}): RequestListener {
   const runtimeMode = resolveProductRuntimeMode(options.runtimeMode ?? process.env.CRYPTO_EDGE_RUNTIME_MODE);
   const authMode = resolveProductAuthMode(options.authMode ?? process.env.CRYPTO_EDGE_AUTH_MODE);
   const aikintelAuth = authMode === "AIKINTEL" ? createAikintelAuthService(options.aikintelAuth) : null;
+  const axiSignalsEnabled = isAxiSignalsFeatureEnabled(options.axiSignals?.featureFlagEnvironment);
+  const axiSignalToken = options.axiSignals?.token ?? process.env.CRYPTO_EDGE_AXI_SIGNAL_TOKEN;
+  let axiSignalRepositoryPromise: Promise<AxiSignalRepository> | null = options.axiSignals?.repository
+    ? Promise.resolve(options.axiSignals.repository)
+    : null;
+  const getAxiSignalRepository = (): Promise<AxiSignalRepository> => {
+    if (!axiSignalRepositoryPromise) {
+      axiSignalRepositoryPromise = createAxiSignalRepository({ databaseFilePath: options.axiSignals?.databaseFilePath });
+    }
+    return axiSignalRepositoryPromise;
+  };
   const aiResearchRenderPreview = options.aiResearch?.renderPreview
     ?? process.env.CRYPTO_EDGE_AI_RESEARCH_RENDER_PREVIEW === "1";
   const reviewSessionProvider = options.reviewSessionProvider
@@ -328,6 +361,42 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
   return async (req, res) => {
     const path = getRequestPath(req.url);
 
+    if (isAxiSignalsApiPath(path) && !axiSignalsEnabled) {
+      sendJson(req, res, 404, { error: "not_found", message: "Route not found" }, runtimeMode);
+      return;
+    }
+
+    // Machine ingress deliberately precedes AIKINTEL browser-session enforcement.
+    if (req.method === "POST" && path === "/api/v1/trading/signals/axi") {
+      try {
+        requireAxiSignalIngressRequest(req, axiSignalToken);
+        const signal = validateAxiCryptoSignal(await readAxiSignalJsonBody(req));
+        const result = (await getAxiSignalRepository()).ingest({ signal, now: options.axiSignals?.now?.() });
+        if (result.status === "CONFLICT") {
+          sendJson(req, res, 409, {
+            error: "AXI_SIGNAL_ID_CONFLICT",
+            message: "signal_id is already associated with a different signal payload",
+          }, runtimeMode);
+          return;
+        }
+        sendJson(req, res, result.status === "CREATED" ? 201 : 200, {
+          schema_version: "axi_signal_ingest_receipt_v1",
+          status: result.status,
+          signal_id: result.record.signal.signal_id,
+          received_at: result.record.received_at,
+        }, runtimeMode);
+      } catch (error) {
+        sendAxiSignalGatewayError(req, res, error, runtimeMode);
+      }
+      return;
+    }
+
+    if (path === "/api/v1/trading/signals/axi") {
+      res.setHeader("allow", "POST");
+      sendJson(req, res, 405, { error: "method_not_allowed", message: "Method not allowed" }, runtimeMode);
+      return;
+    }
+
     if (req.method === "GET" && path === "/api/auth/aikintel/exchange") {
       if (!aikintelAuth) {
         sendJson(req, res, 404, { error: "not_found", message: "Route not found" }, runtimeMode);
@@ -361,6 +430,42 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
         sendAikintelAuthError(req, res, error, runtimeMode);
         return;
       }
+    }
+
+    if (isAxiSignalsReadApiPath(path)) {
+      if (req.method !== "GET") {
+        res.setHeader("allow", "GET");
+        sendJson(req, res, 405, { error: "method_not_allowed", message: "Method not allowed" }, runtimeMode);
+        return;
+      }
+      try {
+        const session = resolveSession(req);
+        if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
+        if (!isOperationalControlCenterRole(session.context.role)) {
+          sendJson(req, res, 403, { error: "axi_signals_forbidden", message: "Signal reads require OWNER or ADMIN access" }, runtimeMode);
+          return;
+        }
+        if (path === "/api/v1/trading/signals") {
+          const limit = parseAxiSignalListLimit(req.url);
+          const repository = await getAxiSignalRepository();
+          sendJson(req, res, 200, {
+            schema_version: "axi_signal_list_v1",
+            signals: repository.list(limit),
+          }, runtimeMode);
+          return;
+        }
+        const signalId = parseAxiSignalDetailId(path);
+        const repository = await getAxiSignalRepository();
+        const record = repository.get(signalId);
+        if (!record) {
+          sendJson(req, res, 404, { error: "AXI_SIGNAL_NOT_FOUND", message: "Signal not found" }, runtimeMode);
+          return;
+        }
+        sendJson(req, res, 200, { schema_version: "axi_signal_detail_v1", ...record }, runtimeMode);
+      } catch (error) {
+        sendAxiSignalGatewayError(req, res, error, runtimeMode);
+      }
+      return;
     }
 
     if (req.method === "GET" && path === "/api/lifecycle/session") {
@@ -2631,6 +2736,143 @@ function validateReviewCommitAcknowledgement(value: unknown): { scanner_run_id: 
 
 function isReportsApiPath(path: string): boolean {
   return path === "/api/reports" || path === "/api/reports/status" || path.startsWith("/api/reports/");
+}
+
+function isAxiSignalsFeatureEnabled(env: CryptoEdgeFeatureFlagEnvironment | undefined): boolean {
+  try {
+    return resolveCryptoEdgeFeatureFlags(env).flags.CRYPTO_EDGE_AXI_SIGNALS === true;
+  } catch {
+    return false;
+  }
+}
+
+function isAxiSignalsApiPath(path: string): boolean {
+  return path === "/api/v1/trading/signals" || path.startsWith("/api/v1/trading/signals/");
+}
+
+function isAxiSignalsReadApiPath(path: string): boolean {
+  return path === "/api/v1/trading/signals"
+    || (path.startsWith("/api/v1/trading/signals/") && path !== "/api/v1/trading/signals/axi");
+}
+
+class AxiSignalGatewayRequestError extends Error {
+  readonly code:
+    | "AXI_SIGNAL_AUTH_INVALID"
+    | "AXI_SIGNAL_CONTENT_TYPE_INVALID"
+    | "AXI_SIGNAL_BODY_TOO_LARGE"
+    | "AXI_SIGNAL_JSON_INVALID"
+    | "AXI_SIGNAL_LIST_LIMIT_INVALID"
+    | "AXI_SIGNAL_DETAIL_ID_INVALID";
+  readonly httpStatus: 400 | 401 | 413;
+
+  constructor(
+    code: AxiSignalGatewayRequestError["code"],
+    httpStatus: AxiSignalGatewayRequestError["httpStatus"],
+  ) {
+    super(code);
+    this.name = "AxiSignalGatewayRequestError";
+    this.code = code;
+    this.httpStatus = httpStatus;
+  }
+}
+
+function requireAxiSignalIngressRequest(req: IncomingMessage, expectedToken: string | undefined): void {
+  if (!hasValidAxiSignalBearerToken(req.headers.authorization, expectedToken)) {
+    throw new AxiSignalGatewayRequestError("AXI_SIGNAL_AUTH_INVALID", 401);
+  }
+  const contentType = req.headers["content-type"];
+  if (typeof contentType !== "string" || !/^application\/json(?:\s*;\s*charset=utf-8)?$/i.test(contentType.trim())) {
+    throw new AxiSignalGatewayRequestError("AXI_SIGNAL_CONTENT_TYPE_INVALID", 400);
+  }
+}
+
+function hasValidAxiSignalBearerToken(authorization: string | undefined, expectedToken: string | undefined): boolean {
+  if (typeof expectedToken !== "string" || expectedToken.length === 0 || expectedToken.length > 512 || typeof authorization !== "string") return false;
+  const match = /^Bearer\s+([^\s]{1,512})$/.exec(authorization);
+  if (!match) return false;
+  const suppliedDigest = createHash("sha256").update(match[1]!, "utf8").digest();
+  const expectedDigest = createHash("sha256").update(expectedToken, "utf8").digest();
+  return timingSafeEqual(suppliedDigest, expectedDigest);
+}
+
+async function readAxiSignalJsonBody(req: IncomingMessage): Promise<unknown> {
+  const contentLength = req.headers["content-length"];
+  if (typeof contentLength === "string" && /^\d+$/.test(contentLength) && Number(contentLength) > AXI_CRYPTO_SIGNAL_MAX_BODY_BYTES) {
+    throw new AxiSignalGatewayRequestError("AXI_SIGNAL_BODY_TOO_LARGE", 413);
+  }
+  const chunks: Buffer[] = [];
+  let totalBytes = 0;
+  for await (const chunk of req) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    totalBytes += buffer.length;
+    if (totalBytes > AXI_CRYPTO_SIGNAL_MAX_BODY_BYTES) {
+      throw new AxiSignalGatewayRequestError("AXI_SIGNAL_BODY_TOO_LARGE", 413);
+    }
+    chunks.push(buffer);
+  }
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString("utf8")) as unknown;
+  } catch {
+    throw new AxiSignalGatewayRequestError("AXI_SIGNAL_JSON_INVALID", 400);
+  }
+}
+
+function parseAxiSignalListLimit(url: string | undefined): number {
+  let parsed: URL;
+  try {
+    parsed = new URL(url ?? "/", "http://crypto-edge.invalid");
+  } catch {
+    throw new AxiSignalGatewayRequestError("AXI_SIGNAL_LIST_LIMIT_INVALID", 400);
+  }
+  const values = parsed.searchParams.getAll("limit");
+  if (values.length > 1 || [...parsed.searchParams.keys()].some((key) => key !== "limit")) {
+    throw new AxiSignalGatewayRequestError("AXI_SIGNAL_LIST_LIMIT_INVALID", 400);
+  }
+  if (values.length === 0) return 50;
+  if (!/^[1-9]\d{0,2}$/.test(values[0]!) || !Number.isSafeInteger(Number(values[0])) || Number(values[0]) > 100) {
+    throw new AxiSignalGatewayRequestError("AXI_SIGNAL_LIST_LIMIT_INVALID", 400);
+  }
+  return Number(values[0]);
+}
+
+function parseAxiSignalDetailId(path: string): string {
+  const encoded = path.slice("/api/v1/trading/signals/".length);
+  if (!encoded || encoded.includes("/")) throw new AxiSignalGatewayRequestError("AXI_SIGNAL_DETAIL_ID_INVALID", 400);
+  try {
+    return decodeURIComponent(encoded);
+  } catch {
+    throw new AxiSignalGatewayRequestError("AXI_SIGNAL_DETAIL_ID_INVALID", 400);
+  }
+}
+
+function sendAxiSignalGatewayError(
+  req: IncomingMessage,
+  res: ServerResponse,
+  error: unknown,
+  runtimeMode: ResolvedProductRuntimeMode,
+): void {
+  if (error instanceof AxiSignalGatewayRequestError) {
+    sendJson(req, res, error.httpStatus, { error: error.code, message: axiSignalErrorMessage(error.code) }, runtimeMode);
+    return;
+  }
+  if (error instanceof AxiCryptoSignalValidationError) {
+    sendJson(req, res, 400, { error: error.code, message: "AXI signal payload is invalid" }, runtimeMode);
+    return;
+  }
+  if (error instanceof AxiSignalRepositoryError) {
+    sendJson(req, res, 503, { error: "AXI_SIGNAL_UNAVAILABLE", message: "Signal gateway is temporarily unavailable" }, runtimeMode);
+    return;
+  }
+  sendJson(req, res, 503, { error: "AXI_SIGNAL_UNAVAILABLE", message: "Signal gateway is temporarily unavailable" }, runtimeMode);
+}
+
+function axiSignalErrorMessage(code: AxiSignalGatewayRequestError["code"]): string {
+  if (code === "AXI_SIGNAL_AUTH_INVALID") return "Invalid signal gateway authorization";
+  if (code === "AXI_SIGNAL_CONTENT_TYPE_INVALID") return "Content-Type must be application/json";
+  if (code === "AXI_SIGNAL_BODY_TOO_LARGE") return "Signal request body is too large";
+  if (code === "AXI_SIGNAL_JSON_INVALID") return "Signal request body must be valid JSON";
+  if (code === "AXI_SIGNAL_LIST_LIMIT_INVALID") return "limit must be an integer from 1 through 100";
+  return "Signal identifier is invalid";
 }
 
 function isFollowUpApiPath(path: string): boolean {
