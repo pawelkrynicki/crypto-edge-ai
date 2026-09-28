@@ -13,6 +13,21 @@ canonical AI result.
 
 ## Product surfaces
 
+### Trading
+
+Trading is a separate top-level product surface. Its first item, **Live
+Signals**, is a read-only feed of source records received by the AXI Signal
+Gateway. It shows source setup, trade intent, source and received timestamps,
+and source-engine metadata. It is not a record of orders, positions, fills,
+execution status, risk decisions, or any other trading action.
+
+The server-owned AXI feature flag remains authoritative. When the read API is
+unavailable (including a feature-disabled `404`), the navigation remains safe
+and the screen states that the source feed is unavailable; the browser does not
+receive or infer a server flag or any machine-ingress secret. Trading does not
+add a Candidate Detail tab, a Verification tab, a Research Playbook stage, or
+any ownership of research state.
+
 ### Radar
 
 Product Radar is the entry point for current shared and private baskets. It is

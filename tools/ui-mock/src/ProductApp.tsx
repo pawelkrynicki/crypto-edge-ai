@@ -27,6 +27,7 @@ import { CandidateResultsView } from "./components/CandidateResultsView";
 import { VerificationTokenBrowser } from "./components/VerificationTokenBrowser";
 import { Methodology } from "./components/Methodology";
 import { ProductControlCenter } from "./components/ProductControlCenter";
+import { LiveSignals } from "./components/LiveSignals";
 import { LoadingState } from "./components/ProductUi";
 import {
   ProductWorkspaceSection,
@@ -55,6 +56,7 @@ import {
   type EstablishedUniverseStatus,
 } from "./services/establishedUniverseStatusDataSource";
 import { loadControlCenterStatus } from "./services/controlCenterStatusDataSource";
+import { loadAxiSignalDetail, loadAxiSignals } from "./services/axiSignalsDataSource";
 import { loadFollowUpByIdentity, loadFollowUpList, loadFollowUpStatus } from "./services/followUpDataSource";
 import { loadLifecycleRadar, setLifecycleReviewRole } from "./services/lifecycleDataSource";
 import {
@@ -91,6 +93,7 @@ const HASH_TO_SECTION: Record<string, ProductSectionId> = {
   "#candidate-results": "candidate-results",
   "#candidate-detail": "candidate-detail",
   "#external-checks": "external-checks",
+  "#live-signals": "live-signals",
   "#feedback": "candidate-results",
   "#opinion": "candidate-results",
   "#opinions": "candidate-results",
@@ -142,6 +145,7 @@ const SECTION_TO_HASH: Record<ProductSectionId, string> = {
   "candidate-results": "#candidate-results",
   "candidate-detail": "#candidate-detail",
   "external-checks": "#external-checks",
+  "live-signals": "#live-signals",
   methodology: "#methodology",
   "control-center": "#control-center",
 };
@@ -167,6 +171,8 @@ export type ProductAppDataSources = {
   loadProductVersion?: typeof loadProductVersion;
   loadReviewPublicationStatus?: typeof loadReviewPublicationStatus;
   acknowledgeReviewPublicationCommit?: typeof acknowledgeReviewPublicationCommit;
+  loadAxiSignals?: typeof loadAxiSignals;
+  loadAxiSignalDetail?: typeof loadAxiSignalDetail;
   now: () => string;
 };
 
@@ -183,6 +189,8 @@ const DEFAULT_PRODUCT_APP_DATA_SOURCES: ProductAppDataSources = {
   loadProductVersion,
   loadReviewPublicationStatus,
   acknowledgeReviewPublicationCommit,
+  loadAxiSignals,
+  loadAxiSignalDetail,
   now: () => new Date().toISOString(),
 };
 
@@ -292,6 +300,7 @@ export function ProductAppContent({
     { id: "candidate-results", label: t("nav.radar"), icon: "R", description: t("nav.radarDescription"), groupLabel: t("nav.groupProductFlow"), groupDescription: t("nav.groupProductFlowDescription") },
     { id: "candidate-detail", label: t("nav.details"), icon: "D", description: t("nav.detailsDescription"), groupLabel: t("nav.groupProductFlow"), groupDescription: t("nav.groupProductFlowDescription") },
     { id: "external-checks", label: t("nav.verification"), icon: "V", description: t("nav.verificationDescription"), groupLabel: t("nav.groupReview"), groupDescription: t("nav.groupReviewDescription") },
+    { id: "live-signals", label: t("nav.liveSignals"), icon: "L", description: t("nav.liveSignalsDescription"), groupLabel: t("nav.groupTrading"), groupDescription: t("nav.groupTradingDescription") },
     { id: "methodology", label: t("nav.methodology"), icon: "M", description: t("nav.methodologyDescription"), groupLabel: t("nav.groupStatus"), groupDescription: t("nav.groupStatusDescription") },
     { id: "control-center", label: t("nav.controlCenter"), icon: "C", description: t("nav.controlCenterDescription"), groupLabel: t("nav.groupStatus"), groupDescription: t("nav.groupStatusDescription") },
   ], [t]);
@@ -304,6 +313,7 @@ export function ProductAppContent({
     "candidate-results": { title: t("nav.radar"), description: t("section.radarDescription") },
     "candidate-detail": { title: t("nav.details"), description: t("section.detailsDescription") },
     "external-checks": { title: t("nav.verification"), description: t("section.verificationDescription") },
+    "live-signals": { title: t("nav.liveSignals"), description: t("section.liveSignalsDescription") },
     methodology: { title: t("nav.methodology"), description: t("section.methodologyDescription") },
     "control-center": { title: t("nav.controlCenter"), description: t("section.controlCenterDescription") },
   }), [t]);
@@ -852,7 +862,7 @@ export function ProductAppContent({
         </ProductWorkspaceSection>
       );
     }
-    if (loading && candidates.length === 0) {
+    if (loading && candidates.length === 0 && activeSection !== "live-signals") {
       return (
         <ProductWorkspaceSection {...copy}>
           <LoadingState label={t("app.loading")} />
@@ -951,6 +961,17 @@ export function ProductAppContent({
             initialDecisionTab={verificationDecisionTab === "decision"}
             onOpenMissingTarget={openVerificationMissingTarget}
             onReturnToDecision={returnToVerificationDecision}
+          />
+        </ProductWorkspaceSection>
+      );
+    }
+
+    if (activeSection === "live-signals") {
+      return (
+        <ProductWorkspaceSection {...copy}>
+          <LiveSignals
+            loadSignals={dataSources.loadAxiSignals}
+            loadSignalDetail={dataSources.loadAxiSignalDetail}
           />
         </ProductWorkspaceSection>
       );

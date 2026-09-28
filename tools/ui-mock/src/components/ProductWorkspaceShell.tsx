@@ -21,6 +21,7 @@ export type ProductSectionId =
   | "candidate-results"
   | "candidate-detail"
   | "external-checks"
+  | "live-signals"
   | "methodology"
   | "control-center";
 
@@ -306,6 +307,7 @@ function ProductNavIcon({ id }: { id: ProductSectionId }) {
   if (id === "candidate-results") return <svg viewBox="0 0 24 24"><path d="M4 18V9m5 9V5m5 13v-7m5 7V3" /></svg>;
   if (id === "candidate-detail") return <svg viewBox="0 0 24 24"><circle cx="10" cy="10" r="5" /><path d="m14 14 5 5" /></svg>;
   if (id === "external-checks") return <svg viewBox="0 0 24 24"><path d="M12 3 4.5 6v5.5c0 4.7 3 7.8 7.5 9.5 4.5-1.7 7.5-4.8 7.5-9.5V6L12 3Z" /><path d="m9 12 2 2 4-4" /></svg>;
+  if (id === "live-signals") return <svg viewBox="0 0 24 24"><path d="M4 16h3l2-6 4 10 2-5h5" /><path d="M4 5h16" /></svg>;
   if (id === "methodology") return <svg viewBox="0 0 24 24"><path d="M5 4h14v16H5z" /><path d="M8 8h8M8 12h8M8 16h5" /></svg>;
   return <svg viewBox="0 0 24 24"><path d="M4 12h4l2-5 4 10 2-5h4" /></svg>;
 }
