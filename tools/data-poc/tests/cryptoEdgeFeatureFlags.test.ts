@@ -16,7 +16,7 @@ import {
 const ALL_FALSE = Object.fromEntries(CRYPTO_EDGE_FEATURE_FLAGS.map((flag) => [flag, false]));
 
 describe("Crypto Edge Next feature flags", () => {
-  it("keeps the versioned manifest to exactly the eight canonical disabled flags", () => {
+  it("keeps the versioned manifest to exactly the canonical disabled flags", () => {
     const manifest = loadCryptoEdgeFeatureFlagsManifest();
 
     assert.equal(manifest.schema_version, CRYPTO_EDGE_FEATURE_FLAGS_SCHEMA_VERSION);
