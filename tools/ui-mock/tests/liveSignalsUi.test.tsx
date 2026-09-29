@@ -171,10 +171,9 @@ describe("01D Live Signals UI", () => {
       assert.match(detailMarkup, /Source record details/);
       assert.match(detailMarkup, /ETHUSD/);
       assert.match(detailMarkup, /SELL/);
-      assert.match(detailMarkup, /Source terminal/);
-      assert.match(detailMarkup, /axi-mt4-primary/);
+      assert.match(detailMarkup, /ALLinCrypto Engine/);
       assert.match(detailMarkup, /does not indicate an order, position, fill, or execution result/);
-      assert.doesNotMatch(detailMarkup, /mean-revert-x|Mean Revert X|mean-reversion|Strategy version|2026\.09|Setup family/);
+      assert.doesNotMatch(detailMarkup, /limit-0001|axi-mt4-primary|AXI_SERVER|mean-revert-x|Mean Revert X|mean-reversion|Strategy version|2026\.09|Setup family|Source terminal|Source time basis/);
     } finally {
       if (renderer) await act(async () => { renderer.unmount(); });
     }
