@@ -653,6 +653,15 @@ export function ProductAppContent({
     };
   }, []);
 
+  useEffect(() => {
+    if (operationalRole === undefined) return;
+    const permittedSection = resolveProductSectionForRole(activeSection, operationalRole);
+    if (permittedSection === activeSection) return;
+    if (window.location.hash !== SECTION_TO_HASH[permittedSection]) {
+      window.location.hash = SECTION_TO_HASH[permittedSection];
+    }
+  }, [activeSection, operationalRole]);
+
   const navigate = useCallback((section: ProductSectionId) => {
     const permittedSection = resolveProductSectionForRole(section, operationalRole);
     setActiveSection(permittedSection);
@@ -874,7 +883,8 @@ export function ProductAppContent({
 
   const renderSection = () => {
     const copy = sectionCopy[activeSection];
-    if (activeSection === "control-center" && !controlCenterAllowed) {
+    const adminOnlySection = activeSection === "control-center" || activeSection === "live-signals" || activeSection === "kraken-copy";
+    if (adminOnlySection && !controlCenterAllowed) {
       return (
         <ProductWorkspaceSection {...sectionCopy["candidate-results"]}>
           <LoadingState label={t("app.loading")} />
