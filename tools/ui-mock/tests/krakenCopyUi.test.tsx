@@ -151,8 +151,11 @@ describe("01E-B Kraken Copy UI", () => {
       { id: "methodology", label: "Methodology", icon: "M", description: "Methodology", groupLabel: "Status" },
       { id: "control-center", label: "Control Center", icon: "C", description: "Control", groupLabel: "Status" },
     ];
-    const visible = getProductNavItemsForRole(navItems, "CAMP_USER");
-    assert.deepEqual(visible.map((item) => item.id), ["candidate-results", "candidate-detail", "external-checks", "live-signals", "kraken-copy"]);
+    const campVisible = getProductNavItemsForRole(navItems, "CAMP_USER");
+    assert.deepEqual(campVisible.map((item) => item.id), ["candidate-results", "candidate-detail", "external-checks"]);
+
+    const visible = getProductNavItemsForRole(navItems, "OWNER");
+    assert.deepEqual(visible.map((item) => item.id), ["candidate-results", "candidate-detail", "external-checks", "live-signals", "kraken-copy", "methodology", "control-center"]);
 
     const markup = renderToStaticMarkup(
       <ProductLocaleProvider initialLocale="en">

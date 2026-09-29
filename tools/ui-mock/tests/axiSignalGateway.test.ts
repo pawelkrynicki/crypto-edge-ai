@@ -184,7 +184,7 @@ describe("AXI signal gateway v1", () => {
     );
   });
 
-  it("serves list and detail records to CAMP_USER, OWNER, and ADMIN, but not TRUSTED_TESTER", async () => {
+  it("serves list and detail records only to OWNER and ADMIN", async () => {
     const root = await tempRoot();
     const api = await startApi(root, { defaultSessionRole: "OWNER" });
     try {
@@ -212,18 +212,20 @@ describe("AXI signal gateway v1", () => {
       await api.close();
     }
 
-    const camp = await startApi(root, { defaultSessionRole: "CAMP_USER" });
+    const admin = await startApi(root, { defaultSessionRole: "ADMIN" });
     try {
-      assert.equal((await fetch(`${camp.base}/api/v1/trading/signals`)).status, 200);
-      assert.equal((await fetch(`${camp.base}/api/v1/trading/signals/read-market-0001`)).status, 200);
-    } finally { await camp.close(); }
+      assert.equal((await fetch(`${admin.base}/api/v1/trading/signals`)).status, 200);
+      assert.equal((await fetch(`${admin.base}/api/v1/trading/signals/read-market-0001`)).status, 200);
+    } finally { await admin.close(); }
 
-    const denied = await startApi(root, { defaultSessionRole: "TRUSTED_TESTER" });
-    try {
-      const response = await fetch(`${denied.base}/api/v1/trading/signals`);
-      assert.equal(response.status, 403);
-      assert.equal((await response.json() as { error: string }).error, "axi_signals_forbidden");
-    } finally { await denied.close(); }
+    for (const role of ["CAMP_USER", "TRUSTED_TESTER"] as const) {
+      const denied = await startApi(root, { defaultSessionRole: role });
+      try {
+        const response = await fetch(`${denied.base}/api/v1/trading/signals`);
+        assert.equal(response.status, 403);
+        assert.equal((await response.json() as { error: string }).error, "axi_signals_forbidden");
+      } finally { await denied.close(); }
+    }
   });
 
   it("accepts machine ingress before AIKINTEL browser-session authentication", async () => {

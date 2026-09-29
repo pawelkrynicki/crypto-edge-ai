@@ -33,8 +33,11 @@ describe("01D Live Signals UI", () => {
       { id: "methodology", label: "Methodology", icon: "M", description: "Methodology", groupLabel: "Status" },
       { id: "control-center", label: "Control Center", icon: "C", description: "Control", groupLabel: "Status" },
     ];
-    const visible = getProductNavItemsForRole(navItems, "CAMP_USER");
-    assert.deepEqual(visible.map((item) => item.id), ["candidate-results", "candidate-detail", "external-checks", "live-signals"]);
+    const campVisible = getProductNavItemsForRole(navItems, "CAMP_USER");
+    assert.deepEqual(campVisible.map((item) => item.id), ["candidate-results", "candidate-detail", "external-checks"]);
+
+    const visible = getProductNavItemsForRole(navItems, "OWNER");
+    assert.ok(visible.some((item) => item.id === "live-signals"));
 
     const markup = renderToStaticMarkup(
       <ProductLocaleProvider initialLocale="en">

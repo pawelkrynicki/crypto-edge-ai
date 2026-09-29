@@ -169,7 +169,7 @@ describe("01E-B Kraken account source", () => {
 
   it("serves a session-protected secrets-free snapshot only when the canonical Kraken flag is enabled", async () => {
     const source = simulatedSource();
-    const enabled = await startApi(source, { CRYPTO_EDGE_KRAKEN: "1" });
+    const enabled = await startApi(source, { CRYPTO_EDGE_KRAKEN: "1" }, "OWNER");
     try {
       const response = await fetch(`${enabled.base}/api/v1/trading/kraken/account`);
       assert.equal(response.status, 200);
@@ -181,7 +181,14 @@ describe("01E-B Kraken account source", () => {
       await enabled.close();
     }
 
-    const disabled = await startApi(source, {});
+    const camp = await startApi(source, { CRYPTO_EDGE_KRAKEN: "1" }, "CAMP_USER");
+    try {
+      assert.equal((await fetch(`${camp.base}/api/v1/trading/kraken/account`)).status, 403);
+    } finally {
+      await camp.close();
+    }
+
+    const disabled = await startApi(source, {}, "OWNER");
     try {
       const response = await fetch(`${disabled.base}/api/v1/trading/kraken/account`);
       assert.equal(response.status, 503);
@@ -229,7 +236,7 @@ function jsonResponse(value: unknown): Response {
 async function startApi(
   accountSource: { mode: "SIMULATED" | "KRAKEN_LIVE"; getSnapshot: () => Promise<KrakenAccountSnapshot> },
   featureFlagEnvironment: Record<string, string | undefined>,
-  defaultSessionRole: "CAMP_USER" | "OWNER" = "CAMP_USER",
+  defaultSessionRole: "CAMP_USER" | "OWNER" | "ADMIN" = "CAMP_USER",
 ) {
   const server = createServer(createScannerApiHandler({
     runtimeMode: "DEVELOPMENT_DEMO",

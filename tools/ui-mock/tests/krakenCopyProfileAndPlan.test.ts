@@ -31,19 +31,12 @@ describe("01E-C per-user Kraken Copy profile and equity plans", () => {
       assert.ok(!JSON.stringify(first.body).includes("actor_id"));
       assert.ok(!JSON.stringify(first.body).match(/secret|api.?key/i));
 
-      const actorA = first.cookie;
-      const savedA = await profilePut(api.base, actorA, profileWrite(10_000));
-      assert.equal(savedA.status, 200);
+      const ownerCookie = first.cookie;
+      const saved = await profilePut(api.base, ownerCookie, profileWrite(10_000));
+      assert.equal(saved.status, 200);
 
-      const second = await profileGet(api.base);
-      const actorB = second.cookie;
-      assert.notEqual(actorA, actorB);
-      const savedB = await profilePut(api.base, actorB, profileWrite(1_000));
-      assert.equal(savedB.status, 200);
-
-      assert.equal(profileValues((await profileGet(api.base, actorA)).body).simulated_equity_usd, 10_000);
-      assert.equal(profileValues((await profileGet(api.base, actorB)).body).simulated_equity_usd, 1_000);
-      assert.equal(profileValues((await profileGet(api.base, actorB)).body).risk_pct_per_trade, 0.5);
+      assert.equal(profileValues((await profileGet(api.base, ownerCookie)).body).simulated_equity_usd, 10_000);
+      assert.equal(profileValues((await profileGet(api.base, ownerCookie)).body).risk_pct_per_trade, 0.5);
 
       for (const invalid of [
         { ...profileWrite(1_000), actor_id: "pc1-owner" },
@@ -54,23 +47,31 @@ describe("01E-C per-user Kraken Copy profile and equity plans", () => {
         { ...profileWrite(1_000), max_leverage: 0 },
         { ...profileWrite(1_000), max_position_notional_usd: "NaN" },
       ]) {
-        const response = await profilePut(api.base, actorA, invalid);
+        const response = await profilePut(api.base, ownerCookie, invalid);
         assert.equal(response.status, 400);
       }
     } finally { await api.close(); }
   });
 
-  it("allows CAMP_USER profile access and denies TRUSTED_TESTER", async () => {
-    const camp = await startApi({ role: "CAMP_USER" });
-    const tester = await startApi({ role: "TRUSTED_TESTER" });
-    try {
-      assert.equal((await profileGet(camp.base)).response.status, 200);
-      const forbidden = await fetch(`${tester.base}/api/v1/trading/kraken/profile`);
-      assert.equal(forbidden.status, 403);
-      assert.equal((await forbidden.json() as { error: string }).error, "kraken_copy_forbidden");
-    } finally {
-      await camp.close();
-      await tester.close();
+  it("allows OWNER and ADMIN profile access and denies CAMP_USER and TRUSTED_TESTER", async () => {
+    for (const role of ["OWNER", "ADMIN"] as const) {
+      const allowed = await startApi({ role });
+      try {
+        assert.equal((await profileGet(allowed.base)).response.status, 200);
+      } finally {
+        await allowed.close();
+      }
+    }
+
+    for (const role of ["CAMP_USER", "TRUSTED_TESTER"] as const) {
+      const denied = await startApi({ role });
+      try {
+        const forbidden = await fetch(`${denied.base}/api/v1/trading/kraken/profile`);
+        assert.equal(forbidden.status, 403);
+        assert.equal((await forbidden.json() as { error: string }).error, "kraken_copy_forbidden");
+      } finally {
+        await denied.close();
+      }
     }
   });
 
@@ -182,7 +183,7 @@ async function startApi(options: {
   });
   const server = createServer(createScannerApiHandler({
     runtimeMode: "DEVELOPMENT_DEMO",
-    lifecycle: { defaultSessionRole: options.role ?? "CAMP_USER", campIdentityRegistryPath: resolve(root, "camp-identities.json") },
+    lifecycle: { defaultSessionRole: options.role ?? "OWNER", campIdentityRegistryPath: resolve(root, "camp-identities.json") },
     axiSignals: { repository: axiRepository, token: TOKEN, featureFlagEnvironment: { CRYPTO_EDGE_AXI_SIGNALS: "1" } },
     krakenCopy: {
       accountSource: options.accountSource ?? { mode: "SIMULATED", getSnapshot: async () => simulatedSnapshot() },

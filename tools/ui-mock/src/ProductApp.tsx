@@ -126,7 +126,8 @@ export function resolveProductSectionForRole(
   section: ProductSectionId,
   role: LifecycleRadarView["actor"]["role"] | undefined,
 ): ProductSectionId {
-  return section === "control-center" && role !== undefined && !canAccessOperationalControlCenter(role)
+  const adminOnly = section === "control-center" || section === "live-signals" || section === "kraken-copy";
+  return adminOnly && role !== undefined && !canAccessOperationalControlCenter(role)
     ? "candidate-results"
     : section;
 }
@@ -136,7 +137,9 @@ export function getProductNavItemsForRole(
   role: LifecycleRadarView["actor"]["role"] | undefined,
 ): ProductNavItem[] {
   return navItems.filter((item) => {
-    if (item.id === "control-center") return canAccessOperationalControlCenter(role);
+    if (item.id === "control-center" || item.id === "live-signals" || item.id === "kraken-copy") {
+      return canAccessOperationalControlCenter(role);
+    }
     // CAMP keeps the route and component available for other product surfaces,
     // but does not expose Methodology in its primary navigation.
     if (item.id === "methodology") return canAccessOperationalControlCenter(role);

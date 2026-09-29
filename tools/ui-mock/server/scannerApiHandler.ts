@@ -487,7 +487,7 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
           return;
         }
         if (!isKrakenCopyProfileRole(session.context.role)) {
-          sendJson(req, res, 403, { error: "kraken_copy_forbidden", message: "Kraken Copy requires CAMP_USER, OWNER, or ADMIN access" }, runtimeMode);
+          sendJson(req, res, 403, { error: "kraken_copy_forbidden", message: "Kraken Copy requires OWNER or ADMIN access" }, runtimeMode);
           return;
         }
         // Live account access remains an owner-pilot capability. Simulated
@@ -528,7 +528,7 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
           return;
         }
         if (!isKrakenCopyProfileRole(session.context.role)) {
-          sendJson(req, res, 403, { error: "kraken_copy_forbidden", message: "Kraken Copy requires CAMP_USER, OWNER, or ADMIN access" }, runtimeMode);
+          sendJson(req, res, 403, { error: "kraken_copy_forbidden", message: "Kraken Copy requires OWNER or ADMIN access" }, runtimeMode);
           return;
         }
         const repository = await getKrakenCopyProfileRepository();
@@ -552,7 +552,7 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
         const session = resolveSession(req);
         if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
         if (!isKrakenCopyProfileRole(session.context.role)) {
-          sendJson(req, res, 403, { error: "kraken_copy_forbidden", message: "Equity plans require CAMP_USER, OWNER, or ADMIN access" }, runtimeMode);
+          sendJson(req, res, 403, { error: "kraken_copy_forbidden", message: "Equity plans require OWNER or ADMIN access" }, runtimeMode);
           return;
         }
         if (!krakenCopyEnabled) {
@@ -617,7 +617,7 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
         const session = resolveSession(req);
         if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
         if (!isAxiSignalReaderRole(session.context.role)) {
-          sendJson(req, res, 403, { error: "axi_signals_forbidden", message: "Signal reads require CAMP_USER, OWNER, or ADMIN access" }, runtimeMode);
+          sendJson(req, res, 403, { error: "axi_signals_forbidden", message: "Signal reads require OWNER or ADMIN access" }, runtimeMode);
           return;
         }
         if (path === "/api/v1/trading/signals") {
@@ -2902,11 +2902,11 @@ function isOperationalControlCenterRole(role: Pc1ActorRole): boolean {
 }
 
 function isKrakenCopyProfileRole(role: Pc1ActorRole): boolean {
-  return role === "CAMP_USER" || role === "OWNER" || role === "ADMIN";
+  return role === "OWNER" || role === "ADMIN";
 }
 
 function isAxiSignalReaderRole(role: Pc1ActorRole): boolean {
-  return role === "CAMP_USER" || role === "OWNER" || role === "ADMIN";
+  return role === "OWNER" || role === "ADMIN";
 }
 
 function validateReviewCommitAcknowledgement(value: unknown): { scanner_run_id: string } {
