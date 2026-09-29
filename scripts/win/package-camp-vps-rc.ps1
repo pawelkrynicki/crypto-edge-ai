@@ -115,7 +115,7 @@ try {
   $secretViolations = @()
   Get-ChildItem -LiteralPath $stageAppRoot -Recurse -File | Where-Object { $_.Name -match '^\.env(?:\..+)?$' } | ForEach-Object {
     foreach ($line in (Get-Content -LiteralPath $_.FullName)) {
-      if ($line -match '^\s*(OPENAI_API_KEY|CRYPTO_EDGE_AI_RESEARCH_SESSION_SECRET)\s*=\s*(.*)$' -and -not (Test-EmptyEnvironmentValue $Matches[2])) {
+      if ($line -match '^\s*(OPENAI_API_KEY|CRYPTO_EDGE_AI_RESEARCH_SESSION_SECRET|CRYPTO_EDGE_AXI_SIGNAL_TOKEN|CRYPTO_EDGE_KRAKEN_FUTURES_API_KEY|CRYPTO_EDGE_KRAKEN_FUTURES_API_SECRET)\s*=\s*(.*)$' -and -not (Test-EmptyEnvironmentValue $Matches[2])) {
         $secretViolations += "$($_.FullName):$($Matches[1])"
       }
     }
@@ -146,12 +146,14 @@ try {
     "user_workspace_sqlite",
     "research_evidence_sqlite",
     "camp_identity_registry",
+    "axi_signal_sqlite",
+    "kraken_copy_profile_sqlite",
     "central_automation_state"
   )
   $classification = [ordered]@{
     immutable_application = "included: committed source at $head plus freshly-built tools/ui-mock/dist"
     canonical_shared_state = "not included: NOT_CREATED_SAFETY_BOUNDARY; requires owner-approved, store-level export"
-    owner_private_state = "excluded: CAMP identity registry, user workspace, research evidence/progress/private verification, tester feedback; configure an external stable state root"
+    owner_private_state = "excluded: CAMP identity registry, user workspace, research evidence/progress/private verification, tester feedback, AXI signal store and per-user Kraken Copy profiles; configure an external stable state root"
     transient_runtime_state = "excluded: AI queue/cache, automation state, local databases, runtime output"
     secrets = "excluded: environment values and key material; only empty-value .env.example is included"
     excluded_logical_stores = $excludedStores
@@ -190,7 +192,7 @@ try {
     backup_created_at_utc = $BackupCreatedAtUtc
     canonical_document = "docs/camp2026_vps_rc_deployment.md"
     required_environment_variable_names = @($environmentNames)
-    required_secret_names = @("OPENAI_API_KEY", "CRYPTO_EDGE_AI_RESEARCH_SESSION_SECRET")
+    required_secret_names = @("OPENAI_API_KEY", "CRYPTO_EDGE_AI_RESEARCH_SESSION_SECRET", "CRYPTO_EDGE_AXI_SIGNAL_TOKEN", "CRYPTO_EDGE_KRAKEN_FUTURES_API_KEY", "CRYPTO_EDGE_KRAKEN_FUTURES_API_SECRET")
     initial_automation_policy = "disabled; no collector, scheduler, provider call, or AI worker is started by the VPS launcher"
     reports_frontend_policy = "hidden from CAMP frontend"
     opinions_frontend_policy = "hidden from CAMP frontend"
@@ -217,7 +219,7 @@ try {
     validation = [ordered]@{
       source = "git archive exact commit"
       internal_beta_dist = "tools/ui-mock/dist/index.html present"
-      secret_values = "no non-empty OPENAI_API_KEY or CRYPTO_EDGE_AI_RESEARCH_SESSION_SECRET in packaged env files"
+      secret_values = "no non-empty protected API keys, bearer tokens, or provider secrets in packaged env files"
       secret_canaries = "only the two allowlisted synthetic backup/restore test canaries are present"
       forbidden_runtime_paths = "no .local, node_modules, release-artifacts, or sqlite/db files"
       local_path_leaks = "no C:\\Users or AppData paths in package text files"
