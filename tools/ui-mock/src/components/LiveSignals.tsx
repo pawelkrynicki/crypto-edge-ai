@@ -196,9 +196,8 @@ function SignalCard({
     <ReadOnlyCard className={`live-signal-card ${selected ? "selected" : ""}`}>
       <header className="live-signal-card-header">
         <div>
-          <span className="live-signal-setup-id">{signal.setup.setup_id}</span>
-          <h4>{signal.setup.setup_name}</h4>
-          <p>{signal.trade.symbol} <span aria-hidden="true">·</span> {signal.setup.timeframe}</p>
+          <h4>{signal.trade.symbol}</h4>
+          <p>{signal.setup.timeframe}</p>
         </div>
         <div className="live-signal-badges">
           <StatusBadge tone={signal.trade.side === "BUY" ? "ready" : "critical"}>{signal.trade.side}</StatusBadge>
@@ -218,7 +217,7 @@ function SignalCard({
       </dl>
 
       <footer className="live-signal-card-footer">
-        <p>{signal.source.engine} {signal.source.engine_version} <span aria-hidden="true">·</span> {copy.strategy} {signal.source.strategy_version}</p>
+        <p>{signal.source.engine} {signal.source.engine_version}</p>
         <p>{copy.receivedAt}: {formatSignalTimestamp(record.received_at, locale)}</p>
         <ActionButton variant="tertiary" onClick={() => onSelect(signal.signal_id)}>{copy.openDetail}</ActionButton>
       </footer>
@@ -256,13 +255,11 @@ function SignalDetailPanel({
   return (
     <aside className="live-signal-detail" data-live-signals-detail-state="ready" aria-label={copy.detailLabel}>
       <span className="section-label">{copy.detailLabel}</span>
-      <h4>{signal.setup.setup_name}</h4>
+      <h4>{signal.trade.symbol} <span aria-hidden="true">·</span> {signal.trade.side}</h4>
       <p className="live-signal-detail-id">{signal.signal_id}</p>
       <dl className="live-signal-detail-facts">
         <Fact label={copy.sourceEngine} value={`${signal.source.engine} ${signal.source.engine_version}`} />
-        <Fact label={copy.strategy} value={signal.source.strategy_version} />
         <Fact label={copy.sourceTerminal} value={signal.source.terminal_id} />
-        <Fact label={copy.setupFamily} value={signal.setup.family} />
         <Fact label={copy.sourceTimeBasis} value={signal.trade.source_time_basis} />
         <Fact label={copy.receivedAt} value={formatSignalTimestamp(detail.record.received_at, locale)} />
       </dl>
@@ -440,7 +437,6 @@ type LiveSignalsCopy = {
   maxHold: string;
   cancelPrice: string;
   validFor: string;
-  strategy: string;
   receivedAt: string;
   openDetail: string;
   detailPlaceholder: string;
@@ -452,7 +448,6 @@ type LiveSignalsCopy = {
   detailLabel: string;
   sourceEngine: string;
   sourceTerminal: string;
-  setupFamily: string;
   sourceTimeBasis: string;
   detailBoundary: string;
   yourPositionPlan: string;
@@ -502,7 +497,6 @@ const LIVE_SIGNALS_COPY: Record<ProductLocale, LiveSignalsCopy> = {
     maxHold: "Max hold",
     cancelPrice: "Cancel price",
     validFor: "Valid for",
-    strategy: "Strategy version",
     receivedAt: "Received",
     openDetail: "View source details",
     detailPlaceholder: "Select a source signal to read its received record details.",
@@ -514,7 +508,6 @@ const LIVE_SIGNALS_COPY: Record<ProductLocale, LiveSignalsCopy> = {
     detailLabel: "Source record details",
     sourceEngine: "Source engine",
     sourceTerminal: "Source terminal",
-    setupFamily: "Setup family",
     sourceTimeBasis: "Source time basis",
     detailBoundary: "This is a received source record. It does not indicate an order, position, fill, or execution result.",
     yourPositionPlan: "Your position plan",
@@ -562,7 +555,6 @@ const LIVE_SIGNALS_COPY: Record<ProductLocale, LiveSignalsCopy> = {
     maxHold: "Maks. czas utrzymania",
     cancelPrice: "Cena anulowania",
     validFor: "Ważny przez",
-    strategy: "Wersja strategii",
     receivedAt: "Odebrano",
     openDetail: "Pokaż szczegóły źródła",
     detailPlaceholder: "Wybierz sygnał źródłowy, aby odczytać szczegóły odebranego rekordu.",
@@ -574,7 +566,6 @@ const LIVE_SIGNALS_COPY: Record<ProductLocale, LiveSignalsCopy> = {
     detailLabel: "Szczegóły rekordu źródłowego",
     sourceEngine: "Silnik źródłowy",
     sourceTerminal: "Terminal źródłowy",
-    setupFamily: "Rodzina setupu",
     sourceTimeBasis: "Podstawa czasu źródłowego",
     detailBoundary: "To odebrany rekord źródłowy. Nie wskazuje zlecenia, pozycji, wypełnienia ani wyniku wykonania.",
     yourPositionPlan: "Twój plan pozycji",

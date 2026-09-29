@@ -158,10 +158,9 @@ describe("01D Live Signals UI", () => {
       assert.match(loaded, /Cancel price/);
       assert.match(loaded, /Valid for/);
       assert.match(loaded, /ALLinCrypto Engine/);
-      assert.match(loaded, /Strategy version/);
-      assert.match(loaded, /2026\.09/);
       assert.match(loaded, /Received/);
-      assert.ok(loaded.indexOf("mean-revert-x") < loaded.indexOf("trend-reclaim-v9"), "newest received record is first");
+      assert.ok(loaded.indexOf("ETHUSD") < loaded.indexOf("BTCUSD"), "newest received record is first");
+      assert.doesNotMatch(loaded, /trend-reclaim-v9|Trend reclaim v9|mean-revert-x|Mean Revert X|custom-trend|mean-reversion|Strategy version|2026\.09/);
 
       const openDetail = renderer!.root.findAll((node) => node.type === "button" && node.children.join("") === "View source details")[0]!;
       await act(async () => {
@@ -170,9 +169,12 @@ describe("01D Live Signals UI", () => {
       });
       const detailMarkup = markup(renderer!);
       assert.match(detailMarkup, /Source record details/);
+      assert.match(detailMarkup, /ETHUSD/);
+      assert.match(detailMarkup, /SELL/);
       assert.match(detailMarkup, /Source terminal/);
       assert.match(detailMarkup, /axi-mt4-primary/);
       assert.match(detailMarkup, /does not indicate an order, position, fill, or execution result/);
+      assert.doesNotMatch(detailMarkup, /mean-revert-x|Mean Revert X|mean-reversion|Strategy version|2026\.09|Setup family/);
     } finally {
       if (renderer) await act(async () => { renderer.unmount(); });
     }
