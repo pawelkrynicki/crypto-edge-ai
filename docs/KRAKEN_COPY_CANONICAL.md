@@ -121,3 +121,10 @@ Releases: C:\CryptoEdge\releases\...
 Public app: https://cryptoedge.crmallintraders.pl behind Cloudflare Access.
 
 Never infer VPS state from Pablito files. Verify MT4/Engine and Crypto Edge AI separately on the VPS.
+
+## 9. Canonical command delivery rule
+
+For VPS administration, ChatGPT must NEVER copy commands or scripts to Paweł's clipboard unless Paweł explicitly asks for that.
+Default delivery is always directly in the chat, in one separate paste-ready code block/window.
+Paweł copies that block manually into PowerShell on the VPS and returns the output in the same chat.
+Do not replace the visible paste-ready block with clipboard actions.
