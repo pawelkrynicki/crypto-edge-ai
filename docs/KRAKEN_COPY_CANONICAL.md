@@ -93,7 +93,7 @@ VPS deployment state must always be checked separately.
 
 1. Claude/Paweł changes ONLY Crypto Engine setup/trading logic.
 2. Preserve the three Crypto Edge hooks.
-3. Run C:\Users\pawel\Documents\ChatGPT\KRAKEN_COPY\verify-current-engine.ps1 on Pablito.
+3. Run %USERPROFILE%\Documents\ChatGPT\KRAKEN_COPY\verify-current-engine.ps1 on Pablito.
 4. It must return KRAKEN_COPY_ENGINE_CHECK=PASS and 0 errors / 0 warnings.
 5. Copy the verified Engine source/ex4 to the VPS MT4 runtime.
 6. Do NOT edit CryptoEdgePublisher.mqh or CryptoEdge Bridge merely because setups changed.
@@ -180,7 +180,7 @@ Its Worker branch validates INTERNAL_BETA/OpenAI worker config and runs pnpm ai:
 Therefore Product and Worker are currently version-pinned to different release generations and must be reconciled deliberately.
 
 3. Legacy generic launcher C:\CryptoEdge\start-cryptoedge.cmd contains:
-cd /d C:\Users\nazwa\Documents\GitHub\crypto-edge-ai\tools\ui-mock
+cd /d %USERPROFILE%\Documents\GitHub\crypto-edge-ai\tools\ui-mock
 call node_modules\.bin\vite.cmd preview --host 127.0.0.1 --port 4180
 This launches from a mutable Git working tree, not an immutable C:\CryptoEdge\releases\... release. It must not be treated as the canonical production launcher. Before disabling/removing it, verify which Scheduled Task (if any) still invokes it and its current state/last result.
 
