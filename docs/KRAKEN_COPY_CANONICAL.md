@@ -165,3 +165,21 @@ Interpretation:
 - Crypto Edge AI product is running separately.
 - the transport Crypto Engine -> Crypto Edge AI is currently disabled/not deployed end-to-end.
 - do not change setup logic to fix transport; complete Publisher/Bridge deployment separately.
+
+## 11. Verified VPS launcher findings - 2026-09-30
+
+Manual VPS PowerShell inspection showed three launcher patterns:
+
+1. Product Runtime scheduled task uses:
+C:\CryptoEdge\start-cryptoedge-product-rc10.ps1 -Mode Product
+This launcher sets CRYPTO_EDGE_RELEASE_ROOT and delegates product startup to C:\CryptoEdge\start-cryptoedge-product.cmd.
+
+2. Worker scheduled task uses:
+C:\CryptoEdge\start-cryptoedge-ai-rc9.ps1 -Mode Worker
+Its Worker branch validates INTERNAL_BETA/OpenAI worker config and runs pnpm ai:worker from its configured UiRoot.
+Therefore Product and Worker are currently version-pinned to different release generations and must be reconciled deliberately.
+
+3. Legacy generic launcher C:\CryptoEdge\start-cryptoedge.cmd contains:
+cd /d C:\Users\nazwa\Documents\GitHub\crypto-edge-ai\tools\ui-mock
+call node_modules\.bin\vite.cmd preview --host 127.0.0.1 --port 4180
+This launches from a mutable Git working tree, not an immutable C:\CryptoEdge\releases\... release. It must not be treated as the canonical production launcher. Before disabling/removing it, verify which Scheduled Task (if any) still invokes it and its current state/last result.
