@@ -269,3 +269,22 @@ Canonical decision:
 - preview uses isolated release/state and OWNER/ADMIN visibility.
 - preview Kraken mode is SIMULATED and CRYPTO_EDGE_EXECUTION=0.
 - preview Bridge targets 127.0.0.1:4181, never PROD 4180 during validation.
+
+## 16. RC11 PREVIEW live on VPS - 2026-09-30
+
+Verified manually on VPS after deployment:
+- PROD remains on 127.0.0.1:4180, observed PID 9388.
+- RC11 PREVIEW is live on 127.0.0.1:4181, observed PID 13700.
+- PREVIEW /api/health returned status=ok, service=crypto-edge-ai-product, runtime_mode=INTERNAL_BETA.
+- PREVIEW build_sha reported 59d5d45bd4c1e1a9e9ee56f54f23f2a29474671f.
+- PREVIEW role default = OWNER.
+- PREVIEW Kraken mode = SIMULATED.
+- PREVIEW CRYPTO_EDGE_EXECUTION = OFF.
+- PREVIEW AXI Gateway = ON.
+- Bridge launcher was started with endpoint target 127.0.0.1:4181.
+- Crypto Engine publishing is still disabled: InpCE_Enabled=false.
+
+Next gate before enabling Engine publishing:
+1. independently verify the Bridge process is alive;
+2. prove one synthetic/test signal reaches RC11 PREVIEW and is readable in Live Signals;
+3. only then set InpCE_Enabled=true on the VPS Crypto Engine.
