@@ -288,3 +288,26 @@ Next gate before enabling Engine publishing:
 1. independently verify the Bridge process is alive;
 2. prove one synthetic/test signal reaches RC11 PREVIEW and is readable in Live Signals;
 3. only then set InpCE_Enabled=true on the VPS Crypto Engine.
+
+## 17. Full transport smoke PASS - 2026-09-30
+
+Verified on VPS with a synthetic signal written into the real MetaTrader COMMON CryptoEdge outbox:
+- signal id: preview-smoke-20260930123512
+- OUTBOX -> Bridge: PASS
+- Bridge -> RC11 PREVIEW AXI Gateway: PASS
+- signal stored/readable in RC11 PREVIEW
+- setup: PREVIEW_SMOKE
+- symbol: BTCUSD
+- final result: FULL TRANSPORT TEST = PASS
+
+This proves the entire decoupled transport path before enabling the real Engine publisher:
+MetaTrader COMMON outbox -> separate Bridge -> RC11 PREVIEW AXI Gateway -> Live Signals storage.
+
+Safety state at PASS:
+- PROD 4180 untouched
+- PREVIEW 4181 only
+- Kraken SIMULATED
+- CRYPTO_EDGE_EXECUTION=0
+- real Crypto Engine InpCE_Enabled still false
+
+Next canonical step: enable InpCE_Enabled=true on the actual ALLinCrypto Engine chart on the VPS. Do not change setup/trading logic. Then observe the next genuine Engine-generated signal reaching RC11 PREVIEW.
