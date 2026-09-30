@@ -273,6 +273,7 @@ try {
     "$(Get-Sha256 (Join-Path $repoRoot 'scripts\\win\\build-product-vps.cmd'))  source/scripts/win/build-product-vps.cmd",
     "$(Get-Sha256 (Join-Path $repoRoot 'scripts\\win\\start-product-vps.cmd'))  source/scripts/win/start-product-vps.cmd",
     "$(Get-Sha256 (Join-Path $repoRoot 'scripts\\win\\start-cryptoedge-product-vps.cmd'))  source/scripts/win/start-cryptoedge-product-vps.cmd",
+    "$(Get-Sha256 (Join-Path $repoRoot 'scripts\\win\\start-axi-mt4-bridge-vps.cmd'))  source/scripts/win/start-axi-mt4-bridge-vps.cmd",
     "$(Get-Sha256 (Join-Path $repoRoot 'scripts\\win\\migrate-camp-private-state.cmd'))  source/scripts/win/migrate-camp-private-state.cmd",
     "$(Get-Sha256 (Join-Path $repoRoot 'scripts\\win\\migrate-camp-private-state.ps1'))  source/scripts/win/migrate-camp-private-state.ps1",
     "$(Get-Sha256 (Join-Path $repoRoot 'scripts\\win\\check-product-vps-runtime.cmd'))  source/scripts/win/check-product-vps-runtime.cmd",

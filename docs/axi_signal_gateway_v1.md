@@ -36,6 +36,50 @@ The token is compared as fixed-length SHA-256 digests with a constant-time
 comparison. It is never written to application logs or response bodies. The
 body limit is 16,384 bytes.
 
+## MT4 COMMON-file bridge (separate VPS process)
+
+`CryptoEdge Bridge` is intentionally separate from the product runtime. MT4
+does not use `WebRequest`; ALLinCrypto Engine writes JSON files to its shared
+COMMON folder and the bridge forwards their original bytes to this local
+gateway:
+
+```text
+ALLinCrypto Engine
+  -> MetaTrader COMMON Files\CryptoEdge\outbox\*.json
+  -> CryptoEdge Bridge (separate process)
+  -> http://127.0.0.1:4180/api/v1/trading/signals/axi
+  -> existing AXI Signal Gateway SQLite store
+```
+
+Start the product runtime and the bridge as two independently supervised VPS
+processes. From a release worktree, the bridge launcher is:
+
+```cmd
+scripts\win\start-axi-mt4-bridge-vps.cmd
+```
+
+The bridge reads only `outbox/*.json` under its configured root. Its default
+root is `%APPDATA%\MetaQuotes\Terminal\Common\Files\CryptoEdge`; set
+`CRYPTO_EDGE_MT4_BRIDGE_ROOT` only to use another root. It creates `sent` and
+`rejected` beneath that same root. A successful `201` or idempotent `200`
+moves the exact source file to `sent`; `400`, `409`, and `413` move it to
+`rejected`. `401`, `403`, disabled-route `404`, timeouts, connection errors,
+and `5xx` responses stay in `outbox` for retry. A file that cannot yet be read
+or parsed is also retried, since MT4 may still be completing its write.
+
+Configuration is server-side only:
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `CRYPTO_EDGE_AXI_SIGNAL_TOKEN` | none (required) | Gateway Bearer token; never log or expose it. |
+| `CRYPTO_EDGE_MT4_BRIDGE_ROOT` | APPDATA MetaTrader COMMON CryptoEdge root | Shared bridge root. |
+| `CRYPTO_EDGE_AXI_SIGNAL_ENDPOINT` | `http://127.0.0.1:4180/api/v1/trading/signals/axi` | Local gateway endpoint; only loopback HTTP endpoints are accepted. |
+| `CRYPTO_EDGE_MT4_BRIDGE_POLL_MS` | `1000` | Poll cadence, 100 through 60,000 ms. |
+
+For an operator smoke check without a persistent loop, append `--once` to the
+launcher. The bridge has no execution or Kraken-order behavior; successful
+handoff into this gateway is its terminal responsibility.
+
 The body must have exactly this shape. Nullable fields must be present with a
 value or `null`; unknown fields are rejected.
 
