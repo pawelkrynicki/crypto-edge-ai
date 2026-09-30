@@ -335,3 +335,21 @@ Operational correction:
 - retarget Bridge to 127.0.0.1:4280
 - repeat one transport smoke against 4280
 - only after PASS enable InpCE_Enabled=true on the real VPS Engine
+
+## 19. Canonical RC11 PREVIEW restored on 4280 - 2026-09-30
+
+Verified on VPS after correcting the temporary 4181 detour:
+- PROD remains healthy on 127.0.0.1:4180, observed PID 9388.
+- canonical KRAKEN Copy / Crypto Edge AI PREVIEW is live on 127.0.0.1:4280, observed PID 14056.
+- temporary 4181 preview stack is stopped; 4181 no longer listens.
+- PREVIEW health: status=ok, service=crypto-edge-ai-product, runtime_mode=INTERNAL_BETA.
+- PREVIEW build_sha: 59d5d45bd4c1e1a9e9ee56f54f23f2a29474671f.
+- Bridge target is canonical PREVIEW 4280.
+- synthetic outbox smoke id preview4280-smoke-20260930130431 passed:
+  OUTBOX -> BRIDGE = PASS
+  BRIDGE -> PREVIEW 4280 = PASS
+  FULL TRANSPORT TEST 4280 = PASS
+- CRYPTO_EDGE_EXECUTION remains OFF.
+- real ALLinCrypto Engine publishing remains OFF (InpCE_Enabled=false).
+
+This is the restored canonical baseline. Next step, only after this PASS, is to enable InpCE_Enabled=true on the real VPS ALLinCrypto Engine without changing setup/trading logic, then observe the next genuine Engine signal arriving on PREVIEW 4280.
