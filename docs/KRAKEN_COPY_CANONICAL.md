@@ -311,3 +311,27 @@ Safety state at PASS:
 - real Crypto Engine InpCE_Enabled still false
 
 Next canonical step: enable InpCE_Enabled=true on the actual ALLinCrypto Engine chart on the VPS. Do not change setup/trading logic. Then observe the next genuine Engine-generated signal reaching RC11 PREVIEW.
+
+## 18. CORRECTION - canonical PREVIEW port is 4280
+
+This section SUPERSEDES the earlier temporary 4181 preview-port decision in sections 15-17.
+
+User-provided VPS browser evidence confirms the established KRAKEN Copy / Crypto Edge AI PREVIEW used before this session is:
+- http://127.0.0.1:4280
+- route shown: #live-signals
+- this preview already displayed the earlier source-signal smoke record and Kraken Copy navigation.
+
+Correct canonical port ownership:
+- 4180 = Crypto Edge AI PROD
+- 4280 = canonical Crypto Edge AI / KRAKEN Copy PREVIEW
+- 4173 = BSS / bet-smart-system frontend preview; never use for Crypto Edge
+- 4181 = temporary owner-review slot accidentally used during 2026-09-30 troubleshooting; NOT canonical KRAKEN Copy preview and must be retired after verification
+
+Operational correction:
+- do NOT enable ALLinCrypto Engine publishing while Bridge still targets 4181
+- verify 4280 health/build/process first
+- stop temporary RC11 product/Bridge processes bound to the accidental 4181 preview stack
+- deploy/verify RC11 on canonical PREVIEW 4280 if needed
+- retarget Bridge to 127.0.0.1:4280
+- repeat one transport smoke against 4280
+- only after PASS enable InpCE_Enabled=true on the real VPS Engine
