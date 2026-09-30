@@ -254,3 +254,18 @@ Local artifact:
 %USERPROFILE%\Documents\GitHub\crypto-edge-ai-kraken-bridge\release-artifacts\CAMP2026-VPS-RC11\crypto-edge-ai-CAMP2026-VPS-RC11-app.zip
 
 Status: PREVIEW CANDIDATE. Do not promote to PROD until isolated preview deployment, owner/admin end-to-end PASS, and explicit owner promotion decision.
+
+## 15. Canonical VPS port ownership - 2026-09-30
+
+Verified on VPS:
+- 4173 is occupied by BSS / bet-smart-system frontend Vite preview. Do not use it for Crypto Edge.
+- legacy Scheduled Task `Crypto Edge AI Preview` is Disabled and points to old `C:\CryptoEdge\start-cryptoedge.cmd`; do not re-enable it.
+- 4180 is Crypto Edge AI PROD.
+- 4181 is free and already has an existing Crypto Edge owner-review convention in repo (`start-feedback-loop-review.cmd`).
+
+Canonical decision:
+- use 4181 for RC11 KRAKEN Copy PREVIEW.
+- keep 4180 PROD untouched during preview validation.
+- preview uses isolated release/state and OWNER/ADMIN visibility.
+- preview Kraken mode is SIMULATED and CRYPTO_EDGE_EXECUTION=0.
+- preview Bridge targets 127.0.0.1:4181, never PROD 4180 during validation.
