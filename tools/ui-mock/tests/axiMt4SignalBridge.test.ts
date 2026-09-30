@@ -18,8 +18,8 @@ after(async () => {
 
 describe("AXI MT4 signal bridge", () => {
   it("uses the APPDATA MetaTrader COMMON root and local product endpoint by default", () => {
-    const config = resolveAxiMt4SignalBridgeConfig({ APPDATA: "C:\\Users\\bridge\\AppData\\Roaming", CRYPTO_EDGE_AXI_SIGNAL_TOKEN: TOKEN });
-    assert.equal(config.root, resolve("C:\\Users\\bridge\\AppData\\Roaming", "MetaQuotes", "Terminal", "Common", "Files", "CryptoEdge"));
+    const config = resolveAxiMt4SignalBridgeConfig({ APPDATA: "C:\\BridgeFixture\\AppData\\Roaming", CRYPTO_EDGE_AXI_SIGNAL_TOKEN: TOKEN });
+    assert.equal(config.root, resolve("C:\\BridgeFixture\\AppData\\Roaming", "MetaQuotes", "Terminal", "Common", "Files", "CryptoEdge"));
     assert.equal(config.endpoint, "http://127.0.0.1:4180/api/v1/trading/signals/axi");
     assert.equal(config.pollMs, 1_000);
   });
