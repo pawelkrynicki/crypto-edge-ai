@@ -353,3 +353,28 @@ Verified on VPS after correcting the temporary 4181 detour:
 - real ALLinCrypto Engine publishing remains OFF (InpCE_Enabled=false).
 
 This is the restored canonical baseline. Next step, only after this PASS, is to enable InpCE_Enabled=true on the real VPS ALLinCrypto Engine without changing setup/trading logic, then observe the next genuine Engine signal arriving on PREVIEW 4280.
+
+## 20. Canonical end-to-end acceptance gate before PROD
+
+Do NOT promote KRAKEN Copy to PROD and do NOT treat Engine->Live Signals as sufficient validation.
+
+Current RC11 boundary verified 2026-09-30:
+- Kraken account reader exists.
+- Equity Planner exists and ends at planned USD notional.
+- Kraken order executor does NOT yet exist.
+- krakenAccount execution_enabled is hard-coded false.
+- Kraken Copy UI explicitly has no copy switch, auto-trading, Kraken order endpoint, or final order quantity.
+
+Therefore the required PREVIEW acceptance path is:
+1. Build Kraken Executor in PREVIEW/DRY-RUN mode first.
+2. Add Kraken instrument adapter: source symbol -> Kraken Futures instrument + exchange constraints/contract sizing.
+3. Convert Equity Planner planned USD notional into an exact Kraken order quantity without guessing contract facts.
+4. Produce an idempotent order intent with MARKET/LIMIT, side, quantity, entry constraints, SL/TP linkage, and safe reason codes.
+5. Keep real Kraken order submission disabled during initial PREVIEW tests.
+6. Only when executor DRY-RUN is ready, enable InpCE_Enabled=true on the real VPS ALLinCrypto Engine while Bridge still targets canonical PREVIEW 4280.
+7. Observe a genuine Engine signal through: Engine -> Outbox -> Bridge -> Live Signals -> Equity Planner -> Kraken Executor DRY-RUN.
+8. Verify blocked/reduced/error/idempotency behavior and no duplicate orders.
+9. Then run a separately approved controlled live Kraken pilot with minimum safe exposure.
+10. Only after full E2E PASS and explicit owner approval promote the validated candidate to PROD 4180.
+
+Until step 6, keep real Engine InpCE_Enabled=false. PROD remains untouched.
