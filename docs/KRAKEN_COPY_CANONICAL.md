@@ -100,3 +100,24 @@ VPS deployment state must always be checked separately.
 7. Only change the integration layer if the generic signal contract itself changes.
 
 This is the permanent rule: setup changes are routine Engine changes, not Kraken Copy integration projects.
+
+## 8. Canonical VPS access method
+
+As of 2026-09-30, Desktop Commander does NOT expose the production Windows VPS as a connected device.
+Connected devices are Pablito and Paweł's second laptop only.
+Do not claim direct VPS inspection unless the VPS appears as its own connected device or another authenticated admin channel is explicitly established.
+
+The proven administration method used in prior Crypto Edge deployments is:
+1. Paweł opens PowerShell directly on the Windows VPS, preferably as Administrator.
+2. ChatGPT provides commands/audit scripts.
+3. Paweł pastes them into that VPS PowerShell.
+4. ChatGPT analyzes the returned output and provides the next command if needed.
+
+Crypto Edge AI VPS root: C:\CryptoEdge
+Product loopback: http://127.0.0.1:4180
+Persistent state: C:\CryptoEdge\state
+Config: C:\CryptoEdge\config\cryptoedge-ai-v7.env
+Releases: C:\CryptoEdge\releases\...
+Public app: https://cryptoedge.crmallintraders.pl behind Cloudflare Access.
+
+Never infer VPS state from Pablito files. Verify MT4/Engine and Crypto Edge AI separately on the VPS.
