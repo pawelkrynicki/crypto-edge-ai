@@ -435,3 +435,16 @@ Therefore the required PREVIEW acceptance path is:
 10. Only after full E2E PASS and explicit owner approval promote the validated candidate to PROD 4180.
 
 Until step 6, keep real Engine InpCE_Enabled=false. PROD remains untouched.
+
+## 21. Real Engine publisher enabled on VPS - 2026-09-30
+
+Paweł enabled `InpCE_Enabled=true` in the actual ALLinCrypto Engine inputs on the VPS MT4 chart and confirmed it was applied.
+No other Engine parameter was intentionally changed.
+
+Current gate:
+- wait for the first genuine signal produced by the real Engine after this enablement;
+- match the same signal_id from MetaTrader COMMON sent archive through Crypto Edge AI PREVIEW 4280 Live Signals;
+- verify setup, symbol, side, entry, SL and TP;
+- only then mark `REAL ENGINE -> CRYPTO EDGE AI = PASS`.
+
+Kraken remains out of scope until this gate passes.
