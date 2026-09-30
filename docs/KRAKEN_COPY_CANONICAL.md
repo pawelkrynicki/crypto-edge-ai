@@ -128,3 +128,40 @@ For VPS administration, ChatGPT must NEVER copy commands or scripts to Paweł's 
 Default delivery is always directly in the chat, in one separate paste-ready code block/window.
 Paweł copies that block manually into PowerShell on the VPS and returns the output in the same chat.
 Do not replace the visible paste-ready block with clipboard actions.
+
+## 10. Verified VPS snapshot - 2026-09-30
+
+Verified manually on the Windows VPS via PowerShell.
+
+Crypto Edge AI product runtime:
+- loopback listener: 127.0.0.1:4180
+- /api/health: status=ok
+- service=crypto-edge-ai-product
+- runtime_mode=INTERNAL_BETA
+- observed PID: 9388
+- Product Runtime scheduled task launches C:\CryptoEdge\start-cryptoedge-product-rc10.ps1 -Mode Product
+- RC10 release directory exists: C:\CryptoEdge\releases\CAMP2026-VPS-RC10
+
+Crypto Edge AI worker:
+- scheduled task still launches C:\CryptoEdge\start-cryptoedge-ai-rc9.ps1 -Mode Worker
+- therefore the VPS currently has a mixed RC10 Product / RC9 Worker startup configuration that must be reviewed before further deployment changes.
+
+Bridge:
+- RC10 bridge launcher file: absent
+- RC10 axiMt4SignalBridge.ts: absent
+- no running bridge process was observed
+- therefore the decoupled MT4 -> Crypto Edge Bridge branch has NOT been deployed to the VPS yet.
+
+MT4 / Crypto Engine on VPS:
+- latest ALLinCrypto Engine EX4 is present on VPS
+- observed VPS EX4 SHA256: 2A75A4D72CC96BEF3F07889194D34B2F0E0D44365F739FC3771ED2EE8AE66E96
+- this matched the then-current local Pablito EX4 before the later verifier recompilation changed the local EX4 hash
+- Engine is loaded on the MT4 chart
+- active chart setting: InpCE_Enabled=false
+- MT4 outbox was empty
+
+Interpretation:
+- Crypto Engine is running as the signal engine.
+- Crypto Edge AI product is running separately.
+- the transport Crypto Engine -> Crypto Edge AI is currently disabled/not deployed end-to-end.
+- do not change setup logic to fix transport; complete Publisher/Bridge deployment separately.
