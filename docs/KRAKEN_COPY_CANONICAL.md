@@ -227,3 +227,30 @@ KRAKEN Copy visibility during current stage:
 - OWNER / ADMIN only
 - CAMP_USER and TRUSTED_TESTER must not see Trading/Kraken Copy surfaces yet
 - CRYPTO_EDGE_EXECUTION remains disabled until separate executor validation
+
+## 14. RC11 PREVIEW candidate checkpoint - 2026-09-30
+
+RC11 has been built and packaged locally as a PREVIEW candidate only. PROD on the VPS has not been modified.
+
+Candidate source branch:
+feature/kraken-copy-02-decoupled-mt4-bridge
+
+Candidate source commit:
+59d5d45bd4c1e1a9e9ee56f54f23f2a29474671f
+
+Focused validation before packaging:
+- AXI MT4 Bridge: 5/5 PASS
+- AXI Signal Gateway: 10/10 PASS
+- Live Signals UI: 5/5 PASS
+- Kraken Copy account/UI: 14/14 PASS
+- Kraken Copy profile/planner: 5/5 PASS
+- INTERNAL_BETA build boundary: PASS
+- release packaging safety checks: PASS
+
+Release id:
+CAMP2026-VPS-RC11
+
+Local artifact:
+%USERPROFILE%\Documents\GitHub\crypto-edge-ai-kraken-bridge\release-artifacts\CAMP2026-VPS-RC11\crypto-edge-ai-CAMP2026-VPS-RC11-app.zip
+
+Status: PREVIEW CANDIDATE. Do not promote to PROD until isolated preview deployment, owner/admin end-to-end PASS, and explicit owner promotion decision.
