@@ -183,3 +183,47 @@ Therefore Product and Worker are currently version-pinned to different release g
 cd /d C:\Users\nazwa\Documents\GitHub\crypto-edge-ai\tools\ui-mock
 call node_modules\.bin\vite.cmd preview --host 127.0.0.1 --port 4180
 This launches from a mutable Git working tree, not an immutable C:\CryptoEdge\releases\... release. It must not be treated as the canonical production launcher. Before disabling/removing it, verify which Scheduled Task (if any) still invokes it and its current state/last result.
+
+## 12. Verified active VPS processes - 2026-09-30
+
+Process inspection confirmed the actual active runtime split:
+- Crypto Edge Product is genuinely running from C:\CryptoEdge\releases\CAMP2026-VPS-RC10\tools\ui-mock\server\productVpsServer.ts.
+- observed RC10 product process chain includes PID 10624 -> PID 9388.
+- PID 9388 owns the healthy Product runtime on port 4180.
+- Crypto Edge AI Worker is genuinely running from C:\CryptoEdge\releases\CAMP2026-VPS-RC9\tools\ui-mock\server\runAIResearchWorker.ts.
+- observed worker process chain includes cmd/pnpm/tsx/node processes ending in RC9 runAIResearchWorker.ts.
+- no active Vite preview process on port 4180 was observed, so the legacy C:\CryptoEdge\start-cryptoedge.cmd exists but is not the active Product runtime in this snapshot.
+
+Canonical current VPS runtime state is therefore: RC10 Product + RC9 Worker + no MT4 Bridge + Crypto Engine publishing disabled (InpCE_Enabled=false).
+
+## 13. Recovered canonical PROD / PREVIEW decision tree
+
+This was already part of the wider Crypto Edge AI architecture and must not be reinvented in future chats.
+
+PROD:
+- canonical user-facing Crypto Edge AI runtime
+- loopback product origin: 127.0.0.1:4180
+- public/private domain path through existing Cloudflare Tunnel + Cloudflare Access
+- changes are promoted here only after preview validation and owner approval
+- do not use PROD as the first test surface for new KRAKEN Copy work
+
+PREVIEW:
+- separate pre-production/trusted-preview surface
+- existing preview contract reserves port 4173 for preview service
+- existing repo routes/scripts include #trusted-preview and preview launchers
+- preview must remain private/gated, easy to disable, and not publicly open
+- no secrets exposed, no browser provider calls
+- preview is the validation surface before promotion to PROD
+
+Promotion order:
+1. Build candidate outside PROD.
+2. Validate locally/offline and through existing preview checks.
+3. Deploy candidate to PREVIEW only.
+4. Owner/admin validates end-to-end behavior.
+5. Only after PASS and explicit owner decision promote the same candidate to PROD.
+6. Keep rollback available and do not change PROD during preview testing.
+
+KRAKEN Copy visibility during current stage:
+- OWNER / ADMIN only
+- CAMP_USER and TRUSTED_TESTER must not see Trading/Kraken Copy surfaces yet
+- CRYPTO_EDGE_EXECUTION remains disabled until separate executor validation
