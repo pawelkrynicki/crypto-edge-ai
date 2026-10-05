@@ -19,42 +19,45 @@ Status: canonical. Use this file as the first reference in every new KRAKEN Copy
 - **4181 = temporary troubleshooting owner-review slot; retired and not canonical.**
 
 ## Current verified PREVIEW state — 2026-10-05
-- **RC12 PREVIEW is live on `127.0.0.1:4280`.**
+- **RC13 PREVIEW is live on `127.0.0.1:4280`.**
 - PREVIEW health = `ok`.
-- PREVIEW RC12 runtime build SHA = `3273d55ce28e47a23282a9f87e89407379d01738`.
+- PREVIEW RC13 runtime build SHA = `2c589466c5397d84cbd424f206cf808065ae0108`.
 - Bridge targets PREVIEW `4280`.
-- Genuine Engine signals reach Live Signals and RC12 Kraken Executor DRY-RUN end-to-end.
-- Genuine J/ETHUSD signal passed: Equity Planner -> PF_ETHUSD -> quantity -> deterministic order intent.
+- Genuine Engine signals reach Live Signals and Kraken Executor DRY-RUN end-to-end.
+- RC13 OWNER-only live-pilot preflight is PASS with submission route hidden, execution not submitted and both live flags OFF.
+- Hard live-pilot code ceiling = 25 USD notional.
 - PROD `4180` remained untouched and running.
 
 ## What is NOT yet proven / implemented
 - **PROVEN:** genuine runtime Crypto Engine signals reach Crypto Edge AI PREVIEW 4280 end-to-end.
 - **PROVEN ON PREVIEW:** RC12 Kraken Executor DRY-RUN converts a genuine Engine signal through Equity Planner -> Kraken instrument -> exact quantity -> deterministic/idempotent order intent.
-- **LOCAL RC13 CANDIDATE IMPLEMENTED, NOT DEPLOYED YET:** live-capable safety core with Kraken `sendorder` request construction/auth transport, persistent idempotency ledger, timeout reconciliation by `cliOrdId`, hard live-pilot cap and read-only OWNER preflight endpoint.
-- **NOT EXPOSED:** no API/UI/runtime path invokes live `execute()`; only the read-only `kraken-live-pilot-plan` preflight is exposed in the RC13 candidate.
-- **NOT YET PROVEN:** a separately approved minimum-exposure live Kraken pilot.
+- **PROVEN ON PREVIEW:** RC13 live-pilot safety/preflight is deployed and PASS with submission route hidden, execution not submitted, both live flags OFF and hard pilot cap 25 USD.
+- **NOT YET PROVEN:** Kraken live account readiness on PREVIEW with server-side credentials and General API FULL_ACCESS while execution remains OFF.
+- **NOT YET PROVEN:** a separately owner-approved minimum-exposure live Kraken pilot and post-trade reconciliation.
 
 ## Current hard safety state
 - `InpCE_Enabled=true` on the real VPS Crypto Engine.
 - Bridge targets PREVIEW `4280`.
-- RC12 PREVIEW 4280 is currently running.
-- `CRYPTO_EDGE_EXECUTION=0` and repository default remains `false`.
+- RC13 PREVIEW 4280 is currently running.
+- `CRYPTO_EDGE_EXECUTION=0`.
+- `CRYPTO_EDGE_KRAKEN_LIVE_PILOT=0`.
+- `submission_route_exposed=false` and `execution_submitted=false` are confirmed on PREVIEW.
 - RC13 live gate requires OWNER + execution flag + separate pilot flag + exact approved intent id + exact approved Kraken symbol + KRAKEN_LIVE + General API FULL_ACCESS + explicit pilot max notional.
 - Hard code ceiling for the first live pilot candidate = **25 USD notional**; configured pilot cap must be <= this value.
 - Timeout/ambiguous send is never automatically retried; same intent remains duplicate-blocked and requires `cliOrdId` reconciliation.
 - PROD `4180` remains blocked from any KRAKEN Copy promotion until live pilot + reconciliation PASS.
 
 ## NEXT SINGLE STEP
-**Commit/package RC13 and deploy it to PREVIEW 4280 with `CRYPTO_EDGE_EXECUTION=0`; validate only the read-only live-pilot preflight. No real Kraken order may be submitted.**
+**Configure and verify Kraken live account readiness on PREVIEW 4280 using server-side credentials while `CRYPTO_EDGE_EXECUTION=0` and `CRYPTO_EDGE_KRAKEN_LIVE_PILOT=0`. No real Kraken order may be submitted.**
 
 Required next acceptance sequence:
-1. Deploy RC13 only to PREVIEW `4280`; PROD `4180` untouched.
-2. Keep `CRYPTO_EDGE_EXECUTION=0`; do not expose or call live execute route.
-3. Validate PREVIEW health/build and existing Engine -> Live Signals -> DRY-RUN flow.
-4. Validate OWNER-only `kraken-live-pilot-plan` on the genuine Engine signal and confirm `submission_route_exposed=false`, `execution_submitted=false`.
-5. Configure/read Kraken live account readiness only when Paweł is ready: server-side key, General API FULL_ACCESS required for orders, Transfer permission should remain NO_ACCESS.
-6. Preflight must show exact pilot quantity, symbol, `cliOrdId`, cap <= 25 USD and all blocking reasons while execution remains OFF.
-7. Present the exact pilot parameters to Paweł for explicit approval before any submit path is exposed or enabled.
+1. Keep RC13 on PREVIEW `4280`; PROD `4180` untouched.
+2. Add Kraken Futures credentials only to the PREVIEW server-side environment/secrets source; never expose them to browser/UI/logs/chat.
+3. Switch PREVIEW account source to `KRAKEN_LIVE` while keeping both execution flags OFF.
+4. Verify API-key readiness: account is connected, General API permission is FULL_ACCESS, Transfer permission should remain NO_ACCESS, and secrets are absent from all responses/logs.
+5. Re-run OWNER-only `kraken-live-pilot-plan` on a genuine Engine signal. It must remain blocked only by execution/pilot approval gates, not by account-readiness reasons.
+6. Confirm exact capped pilot quantity, PF_* symbol, deterministic `cliOrdId`, and max notional <= 25 USD while `submission_route_exposed=false` and `execution_submitted=false`.
+7. Present the exact pilot parameters to Paweł for explicit approval before exposing/enabling any submit path.
 8. PROD `4180` promotion remains blocked until controlled live pilot and post-trade reconciliation both PASS.
 
 ## Hard process rules
@@ -617,3 +620,43 @@ Release candidate:
 - packaging/build safety gate: PASS
 
 RC13 deployment rule: PREVIEW 4280 only, with `CRYPTO_EDGE_EXECUTION=0`. The live submit service remains unexposed. First VPS acceptance is read-only preflight only; no real Kraken private order call is permitted.
+
+## 26. RC13 PREVIEW live-pilot preflight = PASS - 2026-10-05
+
+Confirmed from VPS canonical PREVIEW 4280.
+
+Observed genuine Engine signal used by RC13 preflight:
+- signal_id: `ACC1246441380-D-1791165600-BUY-MARKET`
+- setup: D
+- symbol: ETHUSD
+- side: BUY
+- entry: 2731.17
+- SL: 2700.75
+- TP: 2807.22
+
+Existing DRY-RUN:
+- intent_id: `ki_599c601787c8d758c46d68f6826a2160`
+- quantity: 1.643 ETH
+- DRY-RUN = PASS
+
+Live-pilot preflight state:
+- mode: PREFLIGHT_ONLY
+- submission_route_exposed: false
+- execution_submitted: false
+- live_gate.allowed: false
+- blocking reasons include EXECUTION_FLAG_OFF, PILOT_FLAG_OFF, KRAKEN_MODE_NOT_LIVE, ACCOUNT_NOT_LIVE, ACCOUNT_NOT_FULL_ACCESS, APPROVED_INTENT_MISSING, PILOT_SYMBOL_MISSING
+- hard max notional: 25 USD
+- configured max notional: 25 USD
+
+Acceptance result:
+- RC13 PREVIEW 4280 = PASS
+- existing DRY-RUN = PASS
+- live pilot preflight = PASS
+- submission route exposed = false
+- execution submitted = false
+- CRYPTO_EDGE_EXECUTION = OFF
+- live pilot flag = OFF
+- hard pilot cap = 25 USD
+- PROD 4180 = untouched / running
+
+Canonical conclusion: RC13 PREVIEW safety/preflight gate is PASS. Next gate is live Kraken account readiness on PREVIEW with server-side credentials while both execution flags remain OFF. No real order submission is permitted yet.
