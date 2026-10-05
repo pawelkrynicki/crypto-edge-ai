@@ -676,3 +676,26 @@ Result:
 - order endpoint called = false
 
 Canonical conclusion: the new Kraken Futures key pair is valid and has the exact required permission split for the live pilot. Next step is to store this verified pair only in PREVIEW server-side secrets, switch PREVIEW account source to KRAKEN_LIVE, keep `CRYPTO_EDGE_EXECUTION=0` and `CRYPTO_EDGE_KRAKEN_LIVE_PILOT=0`, then verify connected account readiness and preflight remains blocked only by explicit execution/pilot approval gates.
+
+## 28. Canonical KRAKEN Copy distribution model: LEADER -> FOLLOWERS - 2026-10-05
+
+Owner-confirmed target architecture:
+
+- Paweł's Kraken Futures account is the **KRAKEN LEADER ACCOUNT**.
+- The real Crypto Engine signal is first evaluated in Crypto Edge AI and executed on the LEADER account.
+- Copy distribution begins only after the LEADER order has a confirmed Kraken order/fill state according to the execution/reconciliation rules.
+- Each user who opts into KRAKEN Copy connects their own Kraken Futures account as a **FOLLOWER ACCOUNT** using their own server-side credentials.
+- Follower accounts never receive the LEADER position size 1:1. They receive the trade intent and calculate their own quantity using follower equity, risk profile, leverage/caps and exchange constraints.
+- Each follower has independent order execution, idempotency, audit trail, failure status and reconciliation.
+- One follower failure must not block or duplicate execution for other followers.
+- The system must never use Paweł's LEADER credentials to trade on follower accounts.
+
+Canonical high-level flow:
+`Crypto Engine -> Crypto Edge AI -> Equity/Risk Planner -> KRAKEN LEADER EXECUTOR -> Kraken LEADER order/fill confirmation -> COPY ORCHESTRATOR -> per-user FOLLOWER Risk Adapter -> per-user Kraken FOLLOWER Executor`.
+
+Planned validation sequence after LEADER live pilot PASS:
+1. Leader fill event -> Copy Orchestrator contract.
+2. Multi-user follower simulator / DRY-RUN.
+3. Per-follower risk sizing and idempotency.
+4. First test FOLLOWER account on PREVIEW.
+5. Only after follower E2E PASS may KRAKEN Copy distribution be considered for PROD/users.
