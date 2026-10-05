@@ -506,3 +506,18 @@ Verification:
 - safety scan: no sendorder/placeOrder/submitOrder/private Kraken order submission path added.
 
 This candidate is NOT deployed yet. PROD remains untouched. Next step: commit/package as RC12 and deploy only to canonical PREVIEW 4280 for validation against the genuine stored Engine signal.
+
+## 24. RC12 Kraken Executor DRY-RUN package ready - 2026-10-05
+
+Source commit: `3273d55ce28e47a23282a9f87e89407379d01738` on `feature/kraken-copy-03-executor-dry-run`.
+
+Release candidate:
+- release id: CAMP2026-VPS-RC12
+- local archive: `%USERPROFILE%\Documents\GitHub\crypto-edge-ai-kraken-bridge\release-artifacts\CAMP2026-VPS-RC12\crypto-edge-ai-CAMP2026-VPS-RC12-app.zip`
+- size: 2303205 bytes
+- SHA256: `588179D9D9D5A0E56D0767F98A306FB0E60B02A9C9ED73073D9B3F550216AE35`
+- package safety gate: PASS
+
+RC12 is a PREVIEW candidate only. It must be deployed to canonical PREVIEW 4280, reusing preview state, with `CRYPTO_EDGE_EXECUTION=0`. PROD 4180 must remain untouched.
+
+Required first PREVIEW validation after deploy: select the genuine J/ETHUSD signal already stored from the real Engine, call its OWNER/ADMIN-only `kraken-order-intent` DRY-RUN endpoint twice, verify same intent id/quantity, `execution_submitted=false`, instrument `PF_ETHUSD`, and no private Kraken order submission.
