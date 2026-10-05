@@ -164,6 +164,8 @@ import {
   type KrakenInstrumentSource,
 } from "./krakenInstrumentAdapter.js";
 import { buildKrakenOrderIntent } from "./krakenOrderIntent.js";
+import { evaluateKrakenLivePilotGate } from "./krakenLiveExecutionGate.js";
+import { buildKrakenLivePilotEntryPlan } from "./krakenLiveRequestBuilder.js";
 import { planEquity, type EquityPlanAccount } from "../../data-poc/src/trading/equityPlanner.js";
 import {
   resolveCryptoEdgeFeatureFlags,
@@ -691,6 +693,103 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
           order_intent: orderIntent,
           execution_submitted: false,
           execution_boundary: "NO_KRAKEN_ORDER_SUBMISSION",
+        }, runtimeMode);
+      } catch (error) {
+        sendKrakenExecutorDryRunError(req, res, error, runtimeMode);
+      }
+      return;
+    }
+
+    if (isAxiSignalKrakenLivePilotPlanApiPath(path)) {
+      if (req.method !== "GET") {
+        res.setHeader("allow", "GET");
+        sendJson(req, res, 405, { error: "method_not_allowed", message: "Method not allowed" }, runtimeMode);
+        return;
+      }
+      try {
+        const session = resolveSession(req);
+        if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
+        if (session.context.role !== "OWNER") {
+          sendJson(req, res, 403, {
+            error: "kraken_live_pilot_forbidden",
+            message: "Kraken live pilot preflight requires OWNER access",
+          }, runtimeMode);
+          return;
+        }
+        if (!krakenCopyEnabled) {
+          sendJson(req, res, 503, {
+            error: "KRAKEN_COPY_DISABLED",
+            message: "Kraken Copy is disabled",
+          }, runtimeMode);
+          return;
+        }
+
+        const signalId = parseAxiSignalKrakenLivePilotPlanId(path);
+        const record = (await getAxiSignalRepository()).get(signalId);
+        if (!record) {
+          sendJson(req, res, 404, { error: "AXI_SIGNAL_NOT_FOUND", message: "Signal not found" }, runtimeMode);
+          return;
+        }
+
+        const profile = (await getKrakenCopyProfileRepository()).get(session.context.actor_id);
+        const snapshot = await krakenAccountSource.getSnapshot();
+        const planAccount = equityPlanAccountFromSnapshot(
+          krakenAccountSource.mode,
+          snapshot,
+          profile.simulated_equity_usd,
+          profile,
+        );
+        if (!planAccount) {
+          sendJson(req, res, 409, {
+            error: "KRAKEN_LIVE_EQUITY_UNAVAILABLE",
+            message: "Kraken equity is not available for pilot preflight",
+          }, runtimeMode);
+          return;
+        }
+
+        const plan = planEquity({
+          account: planAccount.account,
+          signal: {
+            side: record.signal.trade.side,
+            entry_price: record.signal.trade.entry_price,
+            stop_loss: record.signal.trade.stop_loss,
+            take_profit: record.signal.trade.take_profit,
+          },
+        });
+        const instrument = await krakenInstrumentSource.getInstrument(record.signal.trade.symbol);
+        const orderIntent = buildKrakenOrderIntent({
+          signal: record.signal,
+          plan,
+          instrument,
+        });
+
+        const gate = evaluateKrakenLivePilotGate({
+          env: options.krakenCopy?.accountEnvironment ?? process.env,
+          role: session.context.role,
+          account: snapshot,
+          intent: orderIntent,
+        });
+
+        const configuredMax = gate.config.configured_max_notional_usd;
+        const pilotPlan = orderIntent.status === "READY"
+          && configuredMax !== null
+          && configuredMax <= gate.config.hard_max_notional_usd
+          ? buildKrakenLivePilotEntryPlan(orderIntent, configuredMax)
+          : null;
+
+        sendJson(req, res, 200, {
+          schema_version: "crypto_edge_kraken_live_pilot_preflight_v1",
+          mode: "PREFLIGHT_ONLY",
+          signal_id: record.signal.signal_id,
+          account_source: snapshot.source,
+          account_observed_at: snapshot.observed_at,
+          instrument,
+          plan,
+          order_intent: orderIntent,
+          live_gate: gate,
+          pilot_plan: pilotPlan,
+          submission_route_exposed: false,
+          execution_submitted: false,
         }, runtimeMode);
       } catch (error) {
         sendKrakenExecutorDryRunError(req, res, error, runtimeMode);
@@ -3045,6 +3144,10 @@ function isAxiSignalKrakenOrderIntentApiPath(path: string): boolean {
   return /^\/api\/v1\/trading\/signals\/[^/]+\/kraken-order-intent$/.test(path);
 }
 
+function isAxiSignalKrakenLivePilotPlanApiPath(path: string): boolean {
+  return /^\/api\/v1\/trading\/signals\/[^/]+\/kraken-live-pilot-plan$/.test(path);
+}
+
 function withSimulatedProfileEquity(snapshot: KrakenAccountSnapshot, simulatedEquityUsd: number): KrakenAccountSnapshot {
   return {
     ...snapshot,
@@ -3267,6 +3370,18 @@ function parseAxiSignalEquityPlanId(path: string): string {
 function parseAxiSignalKrakenOrderIntentId(path: string): string {
   const prefix = "/api/v1/trading/signals/";
   const suffix = "/kraken-order-intent";
+  const encoded = path.slice(prefix.length, -suffix.length);
+  if (!encoded || encoded.includes("/")) throw new AxiSignalGatewayRequestError("AXI_SIGNAL_DETAIL_ID_INVALID", 400);
+  try {
+    return decodeURIComponent(encoded);
+  } catch {
+    throw new AxiSignalGatewayRequestError("AXI_SIGNAL_DETAIL_ID_INVALID", 400);
+  }
+}
+
+function parseAxiSignalKrakenLivePilotPlanId(path: string): string {
+  const prefix = "/api/v1/trading/signals/";
+  const suffix = "/kraken-live-pilot-plan";
   const encoded = path.slice(prefix.length, -suffix.length);
   if (!encoded || encoded.includes("/")) throw new AxiSignalGatewayRequestError("AXI_SIGNAL_DETAIL_ID_INVALID", 400);
   try {

@@ -18,40 +18,44 @@ Status: canonical. Use this file as the first reference in every new KRAKEN Copy
 - **4173 = BSS / bet-smart-system preview**. Never use for Crypto Edge.
 - **4181 = temporary troubleshooting owner-review slot; retired and not canonical.**
 
-## Current verified PREVIEW state — 2026-09-30
-- RC11 PREVIEW is live on `127.0.0.1:4280`.
+## Current verified PREVIEW state — 2026-10-05
+- **RC12 PREVIEW is live on `127.0.0.1:4280`.**
 - PREVIEW health = `ok`.
-- PREVIEW build SHA = `59d5d45bd4c1e1a9e9ee56f54f23f2a29474671f`.
+- PREVIEW RC12 runtime build SHA = `3273d55ce28e47a23282a9f87e89407379d01738`.
 - Bridge targets PREVIEW `4280`.
-- Synthetic transport test PASSED: `MT4 Common Outbox -> Bridge -> AXI Gateway -> Live Signals PREVIEW`.
-- PROD `4180` remained untouched.
+- Genuine Engine signals reach Live Signals and RC12 Kraken Executor DRY-RUN end-to-end.
+- Genuine J/ETHUSD signal passed: Equity Planner -> PF_ETHUSD -> quantity -> deterministic order intent.
+- PROD `4180` remained untouched and running.
 
 ## What is NOT yet proven / implemented
 - **PROVEN:** genuine runtime Crypto Engine signals reach Crypto Edge AI PREVIEW 4280 end-to-end.
 - **PROVEN ON PREVIEW:** RC12 Kraken Executor DRY-RUN converts a genuine Engine signal through Equity Planner -> Kraken instrument -> exact quantity -> deterministic/idempotent order intent.
-- **NOT IMPLEMENTED:** real Kraken order submission. No private Kraken order submission path is active.
+- **LOCAL RC13 CANDIDATE IMPLEMENTED, NOT DEPLOYED YET:** live-capable safety core with Kraken `sendorder` request construction/auth transport, persistent idempotency ledger, timeout reconciliation by `cliOrdId`, hard live-pilot cap and read-only OWNER preflight endpoint.
+- **NOT EXPOSED:** no API/UI/runtime path invokes live `execute()`; only the read-only `kraken-live-pilot-plan` preflight is exposed in the RC13 candidate.
 - **NOT YET PROVEN:** a separately approved minimum-exposure live Kraken pilot.
 
 ## Current hard safety state
 - `InpCE_Enabled=true` on the real VPS Crypto Engine.
 - Bridge targets PREVIEW `4280`.
-- RC12 PREVIEW 4280 is running with Kraken Executor DRY-RUN.
-- `CRYPTO_EDGE_EXECUTION=0`.
-- DRY-RUN response explicitly reports `execution_submitted=false` and `NO_KRAKEN_ORDER_SUBMISSION`.
-- PROD `4180` remained untouched and running.
-- KRAKEN Copy / Live Signals trading surfaces: OWNER / ADMIN only at this stage.
+- RC12 PREVIEW 4280 is currently running.
+- `CRYPTO_EDGE_EXECUTION=0` and repository default remains `false`.
+- RC13 live gate requires OWNER + execution flag + separate pilot flag + exact approved intent id + exact approved Kraken symbol + KRAKEN_LIVE + General API FULL_ACCESS + explicit pilot max notional.
+- Hard code ceiling for the first live pilot candidate = **25 USD notional**; configured pilot cap must be <= this value.
+- Timeout/ambiguous send is never automatically retried; same intent remains duplicate-blocked and requires `cliOrdId` reconciliation.
+- PROD `4180` remains blocked from any KRAKEN Copy promotion until live pilot + reconciliation PASS.
 
 ## NEXT SINGLE STEP
-**Design the separately owner-approved minimum-exposure live Kraken pilot and the live-execution safety gate. Do not enable or submit any real Kraken order yet.**
+**Commit/package RC13 and deploy it to PREVIEW 4280 with `CRYPTO_EDGE_EXECUTION=0`; validate only the read-only live-pilot preflight. No real Kraken order may be submitted.**
 
 Required next acceptance sequence:
-1. Verify current official Kraken Futures private order API and permission requirements from official Kraken sources.
-2. Define a live-execution boundary separate from DRY-RUN: explicit feature flag, owner-only activation, server-side credentials only, idempotency keyed to signal/order intent, hard max exposure, fail-closed errors and audit trail.
-3. Implement the live-capable executor behind `CRYPTO_EDGE_EXECUTION=0`; code may exist, but no real order may be submitted while the flag remains off.
-4. Validate request construction and error handling without submitting a live order.
-5. Present the exact minimum-exposure pilot parameters for Paweł's explicit approval.
-6. Only after explicit owner approval switch the pilot gate for one controlled order.
-7. PROD `4180` promotion remains blocked until the controlled live pilot and post-trade reconciliation both PASS.
+1. Deploy RC13 only to PREVIEW `4280`; PROD `4180` untouched.
+2. Keep `CRYPTO_EDGE_EXECUTION=0`; do not expose or call live execute route.
+3. Validate PREVIEW health/build and existing Engine -> Live Signals -> DRY-RUN flow.
+4. Validate OWNER-only `kraken-live-pilot-plan` on the genuine Engine signal and confirm `submission_route_exposed=false`, `execution_submitted=false`.
+5. Configure/read Kraken live account readiness only when Paweł is ready: server-side key, General API FULL_ACCESS required for orders, Transfer permission should remain NO_ACCESS.
+6. Preflight must show exact pilot quantity, symbol, `cliOrdId`, cap <= 25 USD and all blocking reasons while execution remains OFF.
+7. Present the exact pilot parameters to Paweł for explicit approval before any submit path is exposed or enabled.
+8. PROD `4180` promotion remains blocked until controlled live pilot and post-trade reconciliation both PASS.
 
 ## Hard process rules
 - Never deploy new KRAKEN Copy work first to PROD. PREVIEW first, PROD only after PASS + explicit Paweł approval.
@@ -564,3 +568,39 @@ Acceptance gates:
 - PROD 4180 = UNTOUCHED / RUNNING
 
 Canonical conclusion: PREVIEW DRY-RUN gate is closed with PASS. Real Kraken execution remains disabled and requires a separate owner-approved live pilot design and gate before any order submission is allowed.
+
+## 26. RC13 live-execution safety core local candidate - 2026-10-05
+
+Branch: `feature/kraken-copy-04-live-execution-gate`, based on RC12 checkpoint `f2c52ca61d8da27a6facd1df439676adfe814ddf`.
+
+Official Kraken contract verified before implementation:
+- Derivatives REST private base: `https://futures.kraken.com/derivatives/api/v3`;
+- send order: POST `/api/v3/sendorder`, General API key with FULL_ACCESS;
+- private auth: `APIKey` + `Authent`, signing URL-encoded postData + optional nonce + endpointPath with SHA-256 then HMAC-SHA-512 using base64-decoded secret;
+- send order fields used: orderType, symbol, side, size, cliOrdId, optional limitPrice/stopPrice/triggerSignal/reduceOnly/processBefore;
+- `result=success` alone is not enough; `sendStatus.status` must be checked;
+- reconciliation: POST `/api/v3/orders/status` with `cliOrdIds`, for open orders or recently filled/cancelled orders.
+
+Local RC13 safety core implemented:
+- hard pilot ceiling `HARD_MAX_KRAKEN_LIVE_PILOT_NOTIONAL_USD = 25`;
+- explicit gate: OWNER only, `CRYPTO_EDGE_EXECUTION=1`, separate `CRYPTO_EDGE_KRAKEN_LIVE_PILOT=1`, KRAKEN_LIVE account, General FULL_ACCESS, exact approved intent id, exact symbol, explicit max notional <= hard cap;
+- live pilot request caps source order quantity down to the configured pilot notional and Kraken quantity step;
+- deterministic globally unique-style `cliOrdId` derived from intent id;
+- SL/TP request builder uses actual filled quantity, opposite side, `reduceOnly=true`, mark trigger; peer cancel is explicitly required after first exit fills;
+- `processBefore` stale-request protection on live send;
+- persistent SQLite execution ledger reserves intent before transport and prevents duplicate submit across process restarts;
+- transport ambiguity/timeout is never auto-retried;
+- reconciliation by `cliOrdId` exists as a separate read path;
+- read-only OWNER preflight endpoint: `/api/v1/trading/signals/:id/kraken-live-pilot-plan`;
+- preflight returns `submission_route_exposed=false` and `execution_submitted=false`;
+- no runtime/API/UI reference invokes `createKrakenLiveExecutionService(...).execute()`.
+
+Validation after all changes:
+- full focused/regression suite: 67 PASS, 0 FAIL;
+- new live gate + transport + ledger + reconciliation + preflight tests PASS;
+- INTERNAL_BETA build PASS;
+- runtime execution path scan: `NO_RUNTIME_EXECUTION_REFERENCES`;
+- `CRYPTO_EDGE_EXECUTION` repository default = false;
+- git diff check PASS.
+
+No live Kraken request was made during development or testing; all private send/status tests used mocked transports.
