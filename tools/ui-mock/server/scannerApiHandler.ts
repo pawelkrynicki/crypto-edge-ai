@@ -158,6 +158,12 @@ import {
   type KrakenCopyProfileRepository,
   type KrakenCopyProfileWrite,
 } from "./krakenCopyProfileRepository.js";
+import {
+  createKrakenPublicInstrumentSource,
+  KrakenInstrumentError,
+  type KrakenInstrumentSource,
+} from "./krakenInstrumentAdapter.js";
+import { buildKrakenOrderIntent } from "./krakenOrderIntent.js";
 import { planEquity, type EquityPlanAccount } from "../../data-poc/src/trading/equityPlanner.js";
 import {
   resolveCryptoEdgeFeatureFlags,
@@ -227,6 +233,7 @@ export type ScannerApiHandlerOptions = {
   };
   krakenCopy?: {
     accountSource?: KrakenAccountSource;
+    instrumentSource?: KrakenInstrumentSource;
     profileRepository?: KrakenCopyProfileRepository;
     profileDatabaseFilePath?: string;
     featureFlagEnvironment?: CryptoEdgeFeatureFlagEnvironment;
@@ -257,6 +264,7 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
   const krakenAccountSource = options.krakenCopy?.accountSource ?? createKrakenAccountSource({
     env: options.krakenCopy?.accountEnvironment ?? process.env,
   });
+  const krakenInstrumentSource = options.krakenCopy?.instrumentSource ?? createKrakenPublicInstrumentSource();
   let krakenCopyProfileRepositoryPromise: Promise<KrakenCopyProfileRepository> | null = options.krakenCopy?.profileRepository
     ? Promise.resolve(options.krakenCopy.profileRepository)
     : null;
@@ -603,6 +611,89 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
         }, runtimeMode);
       } catch (error) {
         sendKrakenCopyPlanError(req, res, error, runtimeMode);
+      }
+      return;
+    }
+
+    if (isAxiSignalKrakenOrderIntentApiPath(path)) {
+      if (req.method !== "GET") {
+        res.setHeader("allow", "GET");
+        sendJson(req, res, 405, { error: "method_not_allowed", message: "Method not allowed" }, runtimeMode);
+        return;
+      }
+      try {
+        const session = resolveSession(req);
+        if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
+        if (!isKrakenCopyProfileRole(session.context.role)) {
+          sendJson(req, res, 403, {
+            error: "kraken_copy_forbidden",
+            message: "Kraken Executor DRY-RUN requires OWNER or ADMIN access",
+          }, runtimeMode);
+          return;
+        }
+        if (!krakenCopyEnabled) {
+          sendJson(req, res, 503, {
+            error: "KRAKEN_COPY_DISABLED",
+            message: "Kraken Copy is disabled",
+          }, runtimeMode);
+          return;
+        }
+
+        const signalId = parseAxiSignalKrakenOrderIntentId(path);
+        const record = (await getAxiSignalRepository()).get(signalId);
+        if (!record) {
+          sendJson(req, res, 404, { error: "AXI_SIGNAL_NOT_FOUND", message: "Signal not found" }, runtimeMode);
+          return;
+        }
+
+        const profile = (await getKrakenCopyProfileRepository()).get(session.context.actor_id);
+        const snapshot = await krakenAccountSource.getSnapshot();
+        const planAccount = equityPlanAccountFromSnapshot(
+          krakenAccountSource.mode,
+          snapshot,
+          profile.simulated_equity_usd,
+          profile,
+        );
+        if (!planAccount) {
+          sendJson(req, res, 409, {
+            error: "KRAKEN_LIVE_EQUITY_UNAVAILABLE",
+            message: "Live Kraken equity is not available for a dry-run order intent",
+          }, runtimeMode);
+          return;
+        }
+
+        const plan = planEquity({
+          account: planAccount.account,
+          signal: {
+            side: record.signal.trade.side,
+            entry_price: record.signal.trade.entry_price,
+            stop_loss: record.signal.trade.stop_loss,
+            take_profit: record.signal.trade.take_profit,
+          },
+        });
+
+        const instrument = await krakenInstrumentSource.getInstrument(record.signal.trade.symbol);
+        const orderIntent = buildKrakenOrderIntent({
+          signal: record.signal,
+          plan,
+          instrument,
+        });
+
+        sendJson(req, res, 200, {
+          schema_version: "crypto_edge_kraken_executor_dry_run_v1",
+          mode: "DRY_RUN",
+          signal_id: record.signal.signal_id,
+          account_source: snapshot.source,
+          account_observed_at: snapshot.observed_at,
+          profile_updated_at: profile.updated_at,
+          instrument,
+          plan,
+          order_intent: orderIntent,
+          execution_submitted: false,
+          execution_boundary: "NO_KRAKEN_ORDER_SUBMISSION",
+        }, runtimeMode);
+      } catch (error) {
+        sendKrakenExecutorDryRunError(req, res, error, runtimeMode);
       }
       return;
     }
@@ -2950,6 +3041,10 @@ function isAxiSignalEquityPlanApiPath(path: string): boolean {
   return /^\/api\/v1\/trading\/signals\/[^/]+\/equity-plan$/.test(path);
 }
 
+function isAxiSignalKrakenOrderIntentApiPath(path: string): boolean {
+  return /^\/api\/v1\/trading\/signals\/[^/]+\/kraken-order-intent$/.test(path);
+}
+
 function withSimulatedProfileEquity(snapshot: KrakenAccountSnapshot, simulatedEquityUsd: number): KrakenAccountSnapshot {
   return {
     ...snapshot,
@@ -3169,6 +3264,18 @@ function parseAxiSignalEquityPlanId(path: string): string {
   }
 }
 
+function parseAxiSignalKrakenOrderIntentId(path: string): string {
+  const prefix = "/api/v1/trading/signals/";
+  const suffix = "/kraken-order-intent";
+  const encoded = path.slice(prefix.length, -suffix.length);
+  if (!encoded || encoded.includes("/")) throw new AxiSignalGatewayRequestError("AXI_SIGNAL_DETAIL_ID_INVALID", 400);
+  try {
+    return decodeURIComponent(encoded);
+  } catch {
+    throw new AxiSignalGatewayRequestError("AXI_SIGNAL_DETAIL_ID_INVALID", 400);
+  }
+}
+
 function sendAxiSignalGatewayError(
   req: IncomingMessage,
   res: ServerResponse,
@@ -3222,6 +3329,28 @@ function sendKrakenCopyPlanError(
     return;
   }
   sendJson(req, res, 503, { error: "KRAKEN_EQUITY_PLAN_UNAVAILABLE", message: "A personalized sizing plan is temporarily unavailable" }, runtimeMode);
+}
+
+function sendKrakenExecutorDryRunError(
+  req: IncomingMessage,
+  res: ServerResponse,
+  error: unknown,
+  runtimeMode: ResolvedProductRuntimeMode,
+): void {
+  if (error instanceof AxiSignalGatewayRequestError || error instanceof AxiSignalRepositoryError) {
+    sendAxiSignalGatewayError(req, res, error, runtimeMode);
+    return;
+  }
+  if (error instanceof KrakenCopyProfileRepositoryError) {
+    sendJson(req, res, 503, { error: error.code, message: "Kraken Copy profile is temporarily unavailable" }, runtimeMode);
+    return;
+  }
+  if (error instanceof KrakenInstrumentError) {
+    const status = error.code === "KRAKEN_INSTRUMENT_SOURCE_SYMBOL_UNSUPPORTED" ? 422 : 503;
+    sendJson(req, res, status, { error: error.code, message: "Kraken instrument data is unavailable for this signal" }, runtimeMode);
+    return;
+  }
+  sendJson(req, res, 503, { error: "KRAKEN_EXECUTOR_DRY_RUN_UNAVAILABLE", message: "Kraken Executor DRY-RUN is temporarily unavailable" }, runtimeMode);
 }
 
 function axiSignalErrorMessage(code: AxiSignalGatewayRequestError["code"]): string {
