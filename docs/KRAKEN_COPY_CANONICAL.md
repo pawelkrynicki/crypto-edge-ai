@@ -604,3 +604,16 @@ Validation after all changes:
 - git diff check PASS.
 
 No live Kraken request was made during development or testing; all private send/status tests used mocked transports.
+
+## 27. RC13 package ready - 2026-10-05
+
+Source/app commit: `2c589466c5397d84cbd424f206cf808065ae0108` on `feature/kraken-copy-04-live-execution-gate`.
+
+Release candidate:
+- release id: `CAMP2026-VPS-RC13`
+- local archive: `%USERPROFILE%\Documents\GitHub\crypto-edge-ai-kraken-bridge\release-artifacts\CAMP2026-VPS-RC13\crypto-edge-ai-CAMP2026-VPS-RC13-app.zip`
+- size: 2327087 bytes
+- SHA256: `CC90A1BBDDBD7C67CFB0970E53E853C292979E3335BD2CA819AC570C96B82F99`
+- packaging/build safety gate: PASS
+
+RC13 deployment rule: PREVIEW 4280 only, with `CRYPTO_EDGE_EXECUTION=0`. The live submit service remains unexposed. First VPS acceptance is read-only preflight only; no real Kraken private order call is permitted.
