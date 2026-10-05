@@ -723,3 +723,11 @@ The inquiry asks Kraken to confirm the partner-grade follower onboarding path fo
 Canonical decision remains:
 - LEADER work may continue.
 - FOLLOWER credential/onboarding architecture must not be finalized until Kraken clarifies OAuth/Futures support.
+
+## 30. Corporate email signature rule - 2026-10-05
+
+For all future external communication sent from Paweł's corporate mailbox pawel.krynicki@allintraders.com:
+- use the mailbox's existing configured corporate signature exactly as stored in the mail client/webmail;
+- do not invent or manually recreate a substitute signature;
+- when sending through direct SMTP, remember that the webmail signature is not appended automatically, so retrieve the current signature first and include it explicitly;
+- if the signature cannot be read/verified, stop before sending and ask Paweł rather than sending without it.
