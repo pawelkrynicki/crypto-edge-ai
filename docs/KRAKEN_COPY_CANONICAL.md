@@ -699,3 +699,27 @@ Planned validation sequence after LEADER live pilot PASS:
 3. Per-follower risk sizing and idempotency.
 4. First test FOLLOWER account on PREVIEW.
 5. Only after follower E2E PASS may KRAKEN Copy distribution be considered for PROD/users.
+
+## 29. Kraken OAuth / API Partner outreach sent - 2026-10-05
+
+A formal technical inquiry was sent from the corporate mailbox:
+- from: pawel.krynicki@allintraders.com
+- to: vipdesk@kraken.com
+- subject: Kraken Connect OAuth for Futures copy trading - API Partner inquiry
+- send status: PASS
+- UTC send time: 2026-10-05T11:50:43.1365072Z
+- BCC copy to sender: yes
+
+The inquiry asks Kraken to confirm the partner-grade follower onboarding path for Futures, specifically:
+- whether Kraken Connect OAuth / Fast API Keys can authenticate Kraken Futures / Derivatives endpoints;
+- required OAuth scopes for trading with Transfer/Withdrawal disabled;
+- Futures authentication model after OAuth;
+- IP restriction capability;
+- recommended API Partner flow for automated/copy trading;
+- fallback partner-grade onboarding if OAuth does not support Futures;
+- partner attribution / broker identifiers;
+- availability of UAT or sandbox for end-to-end testing.
+
+Canonical decision remains:
+- LEADER work may continue.
+- FOLLOWER credential/onboarding architecture must not be finalized until Kraken clarifies OAuth/Futures support.
