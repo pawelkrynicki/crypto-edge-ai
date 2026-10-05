@@ -660,3 +660,19 @@ Acceptance result:
 - PROD 4180 = untouched / running
 
 Canonical conclusion: RC13 PREVIEW safety/preflight gate is PASS. Next gate is live Kraken account readiness on PREVIEW with server-side credentials while both execution flags remain OFF. No real order submission is permitted yet.
+
+## 27. Kraken Futures credentials/auth readiness = PASS - 2026-10-05
+
+Verified manually on VPS against official Kraken Futures private endpoints using a newly generated Futures API key pair.
+
+Result:
+- API key format: PASS
+- private key Base64 format: PASS (88 chars, 66 decoded bytes)
+- Kraken API-key check: AUTH = PASS
+- General API permission = FULL_ACCESS
+- Transfer/Withdrawal API permission = NO_ACCESS
+- live accounts read endpoint = PASS
+- keys saved to disk during this verification = false
+- order endpoint called = false
+
+Canonical conclusion: the new Kraken Futures key pair is valid and has the exact required permission split for the live pilot. Next step is to store this verified pair only in PREVIEW server-side secrets, switch PREVIEW account source to KRAKEN_LIVE, keep `CRYPTO_EDGE_EXECUTION=0` and `CRYPTO_EDGE_KRAKEN_LIVE_PILOT=0`, then verify connected account readiness and preflight remains blocked only by explicit execution/pilot approval gates.
