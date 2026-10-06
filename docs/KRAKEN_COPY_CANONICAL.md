@@ -731,3 +731,24 @@ For all future external communication sent from Paweł's corporate mailbox pawel
 - do not invent or manually recreate a substitute signature;
 - when sending through direct SMTP, remember that the webmail signature is not appended automatically, so retrieve the current signature first and include it explicitly;
 - if the signature cannot be read/verified, stop before sending and ask Paweł rather than sending without it.
+
+## 31. RC13 PREVIEW + Bridge restored after VPS reboot; autostart configured - 2026-10-06
+
+Verified directly on the Windows VPS after an unexpected reboot:
+- RC13 PREVIEW health on 127.0.0.1:4280 = PASS;
+- runtime build SHA = 2c589466c5397d84cbd424f206cf808065ae0108;
+- RC13 MT4 Bridge -> 4280 = RUNNING;
+- genuine archived ALLinCrypto Engine signal replay through the Bridge to PREVIEW = PASS;
+- MT4 terminal processes are running;
+- PROD 4180 remained untouched/running;
+- CRYPTO_EDGE_EXECUTION remains OFF.
+
+Persistent Windows Scheduled Tasks created:
+- Crypto Edge AI KRAKEN Preview RC13
+- Crypto Edge AI KRAKEN Bridge RC13
+
+Both tasks use AtStartup triggers, run as SYSTEM with Highest privileges, StartWhenAvailable, automatic restart on failure, and explicit fixed MT4 COMMON bridge root under the VPS user profile so SYSTEM APPDATA is not used accidentally.
+
+Observed task state after manual launch through the same Scheduled Tasks: Running. LastTaskResult 267009 = 0x41301 = task is currently running, not a failure.
+
+Important: autostart configuration is functionally validated through the Scheduled Tasks, but the final reboot-specific acceptance is still pending until the next real VPS restart confirms both PREVIEW 4280 and Bridge return automatically without manual intervention.
