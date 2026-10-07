@@ -799,3 +799,28 @@ Important: autostart configuration is functionally validated through the Schedul
 - Repo branch: feature/kraken-copy-05-signal-lifecycle.
 - Contract refactor commits: 289068d92e8b48c904cf43c5044c83a3b7867493 + EOF cleanup 59a0d46b29d7f4ab89b76386e48b3dd52e151b19.
 - IMPORTANT: this refactor is NOT deployed to VPS yet. The VPS still has the previously deployed Engine 1.10 build from checkpoint 56e06c8; do not redeploy solely for this refactor. Use this accepted candidate as the baseline for lifecycle 05B and perform one later controlled Engine deployment.
+
+
+## 2026-10-07 — Signal lifecycle 05B local E2E PASS
+- Branch: feature/kraken-copy-05-signal-lifecycle.
+- Code checkpoint: 65aa0838684b43613d2be9f8b7efb3ef6a9594b3; EOF cleanup 45997fba9345491b9c9c4d1c60837783438c0ddf.
+- Engine remains version 1.10; this is a newer build of the same Engine version, not Engine 1.11.
+- Engine now persists source-signal identity metadata per MT4 ticket and emits lifecycle events without changing setup logic A-M.
+- MARKET and LIMIT actual fills emit ORDER_FILLED with actual MT4 fill price.
+- LIMIT without fill emits SIGNAL_EXPIRED or SIGNAL_CANCELLED.
+- Filled positions emit POSITION_CLOSED with canonical close reason TP / SL / TIME_EXIT / MANUAL / OTHER.
+- Lifecycle ticket metadata is retained for retry until the outbox event is written successfully; recent MT4 history is scanned to retry terminal lifecycle publication after order history transitions/restarts.
+- Shared CryptoEdgePublisher.mqh remains setup-agnostic/version-agnostic and now writes lifecycle JSON into the same FILE_COMMON CryptoEdge outbox.
+- Bridge routes SIGNAL_CREATED to /api/v1/trading/signals/axi and lifecycle event types to /api/v1/trading/signals/axi-lifecycle.
+- Backend MARKET lifecycle now records actual fill before accepting POSITION_CLOSED; LIMIT remains PENDING until fill.
+- Focused Crypto Edge lifecycle/gateway/bridge suite: 26/26 PASS.
+- Full local transport test PASS: MT4-style outbox -> Bridge -> API -> SQLite -> CLOSED / TP / +2R.
+- INTERNAL_BETA build boundary PASS.
+- Engine verifier now includes lifecycle ticket/fill/terminal/retry and publisher lifecycle checks; final lifecycle Engine 1.10 verifier PASS with 0 errors / 0 warnings.
+- Final lifecycle Engine MQ4 SHA256: 585667314F383E7F372DE50669A4AD955656BD5E9CF167930163EB775CE3ADF7.
+- Final verifier-produced lifecycle Engine EX4 SHA256: 53E7E38EF97BDACC95A56E092097CEB15C96DA2AB5573508725A746CEC070125.
+- Final lifecycle publisher SHA256: B21269F5B8B6CF35B9AD382F11A7DC2FD6AD86398AA23F8B2B0516D83E1BFA1C.
+- Local release folder: C:\Users\pawel\Documents\ChatGPT\KRAKEN_COPY\release_engine_1.10_lifecycle\out.
+- Release ZIP: C:\Users\pawel\Documents\ChatGPT\KRAKEN_COPY\release_engine_1.10_lifecycle\ALLinCrypto_Engine_1.10_CE_Lifecycle.zip; SHA256 D7512FC335B98CFD85400ECFE91CDEFB787BC365A1C5A720702D312AE9A27E83.
+- VPS NOT DEPLOYED for 05B yet. Existing VPS Engine 1.10 build remains running/installed as previously recorded. Do not restart or replace it until a controlled deployment is explicitly executed.
+- Next product step: 05C Live Signals lifecycle read-model/UI, then 05D reference equity curve from 10,000 USD.
