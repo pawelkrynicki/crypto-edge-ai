@@ -824,3 +824,30 @@ Important: autostart configuration is functionally validated through the Schedul
 - Release ZIP: C:\Users\pawel\Documents\ChatGPT\KRAKEN_COPY\release_engine_1.10_lifecycle\ALLinCrypto_Engine_1.10_CE_Lifecycle.zip; SHA256 D7512FC335B98CFD85400ECFE91CDEFB787BC365A1C5A720702D312AE9A27E83.
 - VPS NOT DEPLOYED for 05B yet. Existing VPS Engine 1.10 build remains running/installed as previously recorded. Do not restart or replace it until a controlled deployment is explicitly executed.
 - Next product step: 05C Live Signals lifecycle read-model/UI, then 05D reference equity curve from 10,000 USD.
+
+
+## 2026-10-07 — Live Signals lifecycle UI 05C PASS
+- Branch: feature/kraken-copy-05-signal-lifecycle.
+- Commit: d2c85bca96c16bd29a56ce6ac50aca74a4a1a4b2.
+- Signal list/detail read-model now includes resolved Engine lifecycle state.
+- Live Signals shows PENDING / ACTIVE / EXPIRED / CANCELLED / CLOSED with Polish/English labels.
+- CLOSED signals show TP / SL / TIME_EXIT / MANUAL / OTHER, actual Engine fill, close price and result in R.
+- UI explicitly distinguishes AXI/ALLinCrypto Engine lifecycle from Kraken Copy execution.
+- Focused lifecycle + Bridge + gateway + Live Signals suite: 31/31 PASS.
+- INTERNAL_BETA build boundary PASS.
+
+## 2026-10-07 — Reference equity curve 05D PASS
+- Branch: feature/kraken-copy-05-signal-lifecycle.
+- Commit: 508504309d36278cb4afe92cca26427374847952.
+- Added canonical reference strategy equity curve derived only from CLOSED ALLinCrypto Engine lifecycle results.
+- Starting equity: 10,000 USD.
+- Canonical reference risk: 1.0% of current compounded equity per closed trade.
+- P/L formula: current equity * 1% * result_r; equity compounds after each closed trade.
+- OPEN / PENDING / EXPIRED / CANCELLED signals do not change equity.
+- Curve includes: ending equity, net P/L, net return, total R, win rate, max drawdown and per-trade points.
+- API: GET /api/v1/trading/signals/equity-curve, protected by the same OWNER/ADMIN signal-read boundary.
+- Live Signals now renders the reference equity panel and chart, explicitly labeled as strategy reference and NOT Kraken account equity.
+- Mathematical control sequence +2R, -1R, +1R from 10,000 USD at 1% risk produced 10,200 -> 10,098 -> 10,198.98 USD, max DD 1%, as expected.
+- Combined lifecycle/Bridge/gateway/UI/equity suite: 32/32 PASS.
+- INTERNAL_BETA build boundary PASS.
+- NEXT: package/deploy this branch to PREVIEW 4280 only, keep PROD 4180 untouched, then verify real Engine lifecycle events and the equity curve with genuine signals before any PROD consideration.
