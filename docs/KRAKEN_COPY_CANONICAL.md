@@ -765,3 +765,20 @@ Important: autostart configuration is functionally validated through the Schedul
 - Backup created under C:\CryptoEdge\backup\ALLinCrypto_1.10\deploy-20261007-100533.
 - MT4 was NOT restarted; open orders were NOT touched. The running EA remains the already-loaded in-memory instance until the next EA reload / MT4 restart; after that the new default-on build becomes active.
 - Future Engine releases must follow docs/CLAUDE_ENGINE_UPDATE_RULES.md and pass scripts/win/verify-engine-integration-contract.ps1 before deployment.
+
+
+## 2026-10-07 — Signal lifecycle backend 05A PASS
+- Branch: feature/kraken-copy-05-signal-lifecycle
+- Commit: e38e5f4b908d487d49eb8b13dc799c4dfaa6a768
+- Added append-only AXI signal lifecycle contract linked by signal_id.
+- Supported lifecycle events: ORDER_FILLED, SIGNAL_EXPIRED, SIGNAL_CANCELLED, POSITION_CLOSED.
+- Resolved statuses: PENDING, ACTIVE, EXPIRED, CANCELLED, CLOSED.
+- POSITION_CLOSED stores close_reason (TP/SL/TIME_EXIT/MANUAL/OTHER), close_price and deterministic result_r.
+- MARKET starts ACTIVE at source signal price/time; LIMIT starts PENDING and requires ORDER_FILLED before CLOSED.
+- Lifecycle events are persisted in the same axi-signals SQLite repository, idempotent by event_id, conflict-detecting, and rebuilt deterministically after repository reopen.
+- Added machine-token lifecycle ingress POST /api/v1/trading/signals/axi-lifecycle.
+- Added OWNER/ADMIN lifecycle read endpoint GET /api/v1/trading/signals/:id/lifecycle.
+- Focused lifecycle + existing gateway tests: 19/19 PASS.
+- INTERNAL_BETA build boundary: PASS.
+- This is backend/read-model foundation only. Crypto Engine lifecycle emission, Live Signals lifecycle UI, and 10,000 USD reference equity curve are the next layers.
+- Do not modify Engine in parallel while Claude is currently applying the separate Engine/publisher release-contract refactor.
