@@ -851,3 +851,14 @@ Important: autostart configuration is functionally validated through the Schedul
 - Combined lifecycle/Bridge/gateway/UI/equity suite: 32/32 PASS.
 - INTERNAL_BETA build boundary PASS.
 - NEXT: package/deploy this branch to PREVIEW 4280 only, keep PROD 4180 untouched, then verify real Engine lifecycle events and the equity curve with genuine signals before any PROD consideration.
+
+
+## 2026-10-07 — RC14 package ready PASS
+- Release id: CAMP2026-VPS-RC14.
+- Source commit: e51610351c53ba6eab699185c67b86a165530f4a on feature/kraken-copy-05-signal-lifecycle.
+- Package includes lifecycle 05B, Live Signals lifecycle UI 05C and 10k reference equity 05D.
+- Application archive size: 2,364,232 bytes.
+- SHA256: 82F3DF79ABE2A1BC82C53999A68B3AFF67DC1272C22C05B186FF72CAF051C951.
+- Packaging safety gate PASS after sanitizing local absolute paths from the repo canonical document.
+- Deployment rule: PREVIEW 4280 only. PROD 4180 untouched. CRYPTO_EDGE_EXECUTION remains OFF.
+- Next acceptance: deploy RC14 to PREVIEW, keep existing state isolated, verify health, real Engine SIGNAL_CREATED + lifecycle events through Bridge, Live Signals statuses and reference equity endpoint/UI.
