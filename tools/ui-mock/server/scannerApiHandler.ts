@@ -147,6 +147,10 @@ import {
   type AxiSignalRepository,
 } from "./axiSignalRepository.js";
 import {
+  AxiSignalLifecycleError,
+  validateAxiSignalLifecycleEvent,
+} from "./axiSignalLifecycle.js";
+import {
   createKrakenAccountSource,
   type KrakenAccountSnapshot,
   type KrakenAccountSource,
@@ -442,7 +446,32 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
       return;
     }
 
-    if (path === "/api/v1/trading/signals/axi") {
+    if (req.method === "POST" && path === "/api/v1/trading/signals/axi-lifecycle") {
+      try {
+        requireAxiSignalIngressRequest(req, axiSignalToken);
+        const event = validateAxiSignalLifecycleEvent(await readAxiSignalJsonBody(req));
+        const result = (await getAxiSignalRepository()).ingestLifecycle({ event, now: options.axiSignals?.now?.() });
+        if (result.status === "CONFLICT") {
+          sendJson(req, res, 409, {
+            error: "AXI_LIFECYCLE_EVENT_ID_CONFLICT",
+            message: "event_id is already associated with a different lifecycle payload",
+          }, runtimeMode);
+          return;
+        }
+        sendJson(req, res, result.status === "CREATED" ? 201 : 200, {
+          schema_version: "axi_signal_lifecycle_ingest_receipt_v1",
+          status: result.status,
+          signal_id: event.signal_id,
+          event_id: event.event_id,
+          lifecycle: result.snapshot.state,
+        }, runtimeMode);
+      } catch (error) {
+        sendAxiSignalGatewayError(req, res, error, runtimeMode);
+      }
+      return;
+    }
+
+    if (path === "/api/v1/trading/signals/axi" || path === "/api/v1/trading/signals/axi-lifecycle") {
       res.setHeader("allow", "POST");
       sendJson(req, res, 405, { error: "method_not_allowed", message: "Method not allowed" }, runtimeMode);
       return;
@@ -816,6 +845,20 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
           sendJson(req, res, 200, {
             schema_version: "axi_signal_list_v1",
             signals: repository.list(limit),
+          }, runtimeMode);
+          return;
+        }
+        if (isAxiSignalLifecycleApiPath(path)) {
+          const signalId = parseAxiSignalLifecycleId(path);
+          const repository = await getAxiSignalRepository();
+          if (!repository.get(signalId)) {
+            sendJson(req, res, 404, { error: "AXI_SIGNAL_NOT_FOUND", message: "Signal not found" }, runtimeMode);
+            return;
+          }
+          sendJson(req, res, 200, {
+            schema_version: "axi_signal_lifecycle_detail_v1",
+            signal_id: signalId,
+            ...repository.getLifecycle(signalId),
           }, runtimeMode);
           return;
         }
@@ -3133,7 +3176,13 @@ function isAxiSignalsApiPath(path: string): boolean {
 
 function isAxiSignalsReadApiPath(path: string): boolean {
   return path === "/api/v1/trading/signals"
-    || (path.startsWith("/api/v1/trading/signals/") && path !== "/api/v1/trading/signals/axi");
+    || (path.startsWith("/api/v1/trading/signals/")
+      && path !== "/api/v1/trading/signals/axi"
+      && path !== "/api/v1/trading/signals/axi-lifecycle");
+}
+
+function isAxiSignalLifecycleApiPath(path: string): boolean {
+  return /^\/api\/v1\/trading\/signals\/[^/]+\/lifecycle$/.test(path);
 }
 
 function isAxiSignalEquityPlanApiPath(path: string): boolean {
@@ -3379,6 +3428,18 @@ function parseAxiSignalKrakenOrderIntentId(path: string): string {
   }
 }
 
+function parseAxiSignalLifecycleId(path: string): string {
+  const prefix = "/api/v1/trading/signals/";
+  const suffix = "/lifecycle";
+  const encoded = path.slice(prefix.length, -suffix.length);
+  if (!encoded || encoded.includes("/")) throw new AxiSignalGatewayRequestError("AXI_SIGNAL_DETAIL_ID_INVALID", 400);
+  try {
+    return decodeURIComponent(encoded);
+  } catch {
+    throw new AxiSignalGatewayRequestError("AXI_SIGNAL_DETAIL_ID_INVALID", 400);
+  }
+}
+
 function parseAxiSignalKrakenLivePilotPlanId(path: string): string {
   const prefix = "/api/v1/trading/signals/";
   const suffix = "/kraken-live-pilot-plan";
@@ -3403,6 +3464,10 @@ function sendAxiSignalGatewayError(
   }
   if (error instanceof AxiCryptoSignalValidationError) {
     sendJson(req, res, 400, { error: error.code, message: "AXI signal payload is invalid" }, runtimeMode);
+    return;
+  }
+  if (error instanceof AxiSignalLifecycleError) {
+    sendJson(req, res, 400, { error: error.code, message: "AXI signal lifecycle payload or transition is invalid" }, runtimeMode);
     return;
   }
   if (error instanceof AxiSignalRepositoryError) {

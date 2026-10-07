@@ -9,17 +9,41 @@ import {
   validateAxiSignalId,
   type AxiCryptoSignal,
 } from "./axiCryptoSignalContract.js";
+import {
+  AxiSignalLifecycleError,
+  applyAxiSignalLifecycleEvent,
+  canonicalAxiSignalLifecycleEvent,
+  initialAxiSignalLifecycleState,
+  validateAxiSignalLifecycleEvent,
+  type AxiSignalLifecycleEvent,
+  type AxiSignalLifecycleState,
+} from "./axiSignalLifecycle.js";
 
-export const AXI_SIGNAL_REPOSITORY_SCHEMA_VERSION = "axi_signal_repository_sqlite_v1" as const;
+export const AXI_SIGNAL_REPOSITORY_SCHEMA_VERSION = "axi_signal_repository_sqlite_v2" as const;
 
 export type AxiStoredSignal = {
   signal: AxiCryptoSignal;
   received_at: string;
 };
 
+export type AxiStoredLifecycleEvent = {
+  event: AxiSignalLifecycleEvent;
+  received_at: string;
+};
+
+export type AxiSignalLifecycleSnapshot = {
+  state: AxiSignalLifecycleState;
+  events: AxiStoredLifecycleEvent[];
+};
+
 export type AxiSignalIngestResult =
   | { status: "CREATED"; record: AxiStoredSignal }
   | { status: "DUPLICATE"; record: AxiStoredSignal }
+  | { status: "CONFLICT" };
+
+export type AxiLifecycleIngestResult =
+  | { status: "CREATED"; snapshot: AxiSignalLifecycleSnapshot }
+  | { status: "DUPLICATE"; snapshot: AxiSignalLifecycleSnapshot }
   | { status: "CONFLICT" };
 
 export type AxiSignalRepository = Awaited<ReturnType<typeof createAxiSignalRepository>>;
@@ -37,12 +61,12 @@ const DEFAULT_PATH = resolve(ROOT, ".local", "axi-signals.sqlite");
 const dynamicImport = new Function("specifier", "return import(specifier)") as (specifier: string) => Promise<unknown>;
 
 export class AxiSignalRepositoryError extends Error {
-  readonly code: "AXI_SIGNAL_REPOSITORY_UNAVAILABLE";
+  readonly code: "AXI_SIGNAL_REPOSITORY_UNAVAILABLE" | "AXI_SIGNAL_NOT_FOUND";
 
-  constructor() {
-    super("AXI_SIGNAL_REPOSITORY_UNAVAILABLE");
+  constructor(code: "AXI_SIGNAL_REPOSITORY_UNAVAILABLE" | "AXI_SIGNAL_NOT_FOUND" = "AXI_SIGNAL_REPOSITORY_UNAVAILABLE") {
+    super(code);
     this.name = "AxiSignalRepositoryError";
-    this.code = "AXI_SIGNAL_REPOSITORY_UNAVAILABLE";
+    this.code = code;
   }
 }
 
@@ -75,6 +99,30 @@ WHERE signal_id = ?
     } catch {
       throw new AxiSignalRepositoryError();
     }
+  };
+
+  const listLifecycleEvents = (signalId: string): AxiStoredLifecycleEvent[] => {
+    try {
+      return database.prepare(`
+SELECT event_id, signal_id, canonical_payload, received_at
+FROM axi_signal_lifecycle_events
+WHERE signal_id = ?
+ORDER BY source_event_time ASC, event_id ASC
+`).all(signalId).map(mapStoredLifecycleEvent);
+    } catch {
+      throw new AxiSignalRepositoryError();
+    }
+  };
+
+  const lifecycleSnapshot = (signalId: string): AxiSignalLifecycleSnapshot => {
+    const record = getById(signalId);
+    if (!record) throw new AxiSignalRepositoryError("AXI_SIGNAL_NOT_FOUND");
+    const events = listLifecycleEvents(signalId);
+    let state = initialAxiSignalLifecycleState(record.signal);
+    for (const stored of events) {
+      state = applyAxiSignalLifecycleEvent(record.signal, state, stored.event);
+    }
+    return { state, events };
   };
 
   return {
@@ -121,15 +169,73 @@ INSERT INTO axi_crypto_signals (
         return { status: "CREATED", record: { signal, received_at: receivedAt } };
       } catch (error) {
         if (transactionOpen) {
-          try { database.exec("ROLLBACK"); } catch { /* preserve the original error */ }
+          try { database.exec("ROLLBACK"); } catch { /* preserve original error */ }
         }
         if (error instanceof AxiCryptoSignalValidationError) throw error;
         throw new AxiSignalRepositoryError();
       }
     },
 
+    ingestLifecycle(input: { event: AxiSignalLifecycleEvent; now?: Date }): AxiLifecycleIngestResult {
+      const event = validateAxiSignalLifecycleEvent(input.event);
+      const receivedAt = receivedAtFrom(input.now ?? new Date());
+      const canonicalPayload = canonicalAxiSignalLifecycleEvent(event);
+      const signal = getById(event.signal_id);
+      if (!signal) throw new AxiSignalRepositoryError("AXI_SIGNAL_NOT_FOUND");
+
+      let transactionOpen = false;
+      try {
+        database.exec("BEGIN IMMEDIATE TRANSACTION");
+        transactionOpen = true;
+
+        const existing = database.prepare(`
+SELECT event_id, signal_id, canonical_payload, received_at
+FROM axi_signal_lifecycle_events
+WHERE event_id = ?
+`).get(event.event_id);
+
+        if (existing) {
+          const stored = mapStoredLifecycleEvent(existing);
+          database.exec("COMMIT");
+          transactionOpen = false;
+          if (canonicalAxiSignalLifecycleEvent(stored.event) !== canonicalPayload) return { status: "CONFLICT" };
+          return { status: "DUPLICATE", snapshot: lifecycleSnapshot(event.signal_id) };
+        }
+
+        const current = lifecycleSnapshot(event.signal_id);
+        applyAxiSignalLifecycleEvent(signal.signal, current.state, event);
+
+        database.prepare(`
+INSERT INTO axi_signal_lifecycle_events (
+  event_id, signal_id, event_type, canonical_payload, received_at, source_event_time
+) VALUES (?, ?, ?, ?, ?, ?)
+`).run(
+          event.event_id,
+          event.signal_id,
+          event.event_type,
+          canonicalPayload,
+          receivedAt,
+          event.source_event_time,
+        );
+
+        database.exec("COMMIT");
+        transactionOpen = false;
+        return { status: "CREATED", snapshot: lifecycleSnapshot(event.signal_id) };
+      } catch (error) {
+        if (transactionOpen) {
+          try { database.exec("ROLLBACK"); } catch { /* preserve original error */ }
+        }
+        if (error instanceof AxiSignalLifecycleError || error instanceof AxiSignalRepositoryError) throw error;
+        throw new AxiSignalRepositoryError();
+      }
+    },
+
     get(signalId: string): AxiStoredSignal | null {
       return getById(validateAxiSignalId(signalId));
+    },
+
+    getLifecycle(signalId: string): AxiSignalLifecycleSnapshot {
+      return lifecycleSnapshot(validateAxiSignalId(signalId));
     },
 
     list(limit: number): AxiStoredSignal[] {
@@ -176,6 +282,17 @@ CREATE TABLE IF NOT EXISTS axi_crypto_signals (
 );
 CREATE INDEX IF NOT EXISTS axi_crypto_signals_received_at_idx
   ON axi_crypto_signals(received_at DESC, signal_id ASC);
+CREATE TABLE IF NOT EXISTS axi_signal_lifecycle_events (
+  event_id TEXT NOT NULL PRIMARY KEY,
+  signal_id TEXT NOT NULL,
+  event_type TEXT NOT NULL,
+  canonical_payload TEXT NOT NULL,
+  received_at TEXT NOT NULL,
+  source_event_time TEXT NOT NULL,
+  FOREIGN KEY(signal_id) REFERENCES axi_crypto_signals(signal_id)
+);
+CREATE INDEX IF NOT EXISTS axi_signal_lifecycle_signal_time_idx
+  ON axi_signal_lifecycle_events(signal_id, source_event_time ASC, event_id ASC);
 `);
   database.prepare("INSERT INTO axi_signal_repository_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
     .run("schema_version", AXI_SIGNAL_REPOSITORY_SCHEMA_VERSION);
@@ -190,6 +307,21 @@ function mapStoredSignal(value: unknown): AxiStoredSignal {
     const signal = validateAxiCryptoSignal(JSON.parse(value.canonical_payload) as unknown);
     if (signal.signal_id !== value.signal_id) throw new Error("signal id mismatch");
     return { signal, received_at: receivedAt };
+  } catch {
+    throw new AxiSignalRepositoryError();
+  }
+}
+
+function mapStoredLifecycleEvent(value: unknown): AxiStoredLifecycleEvent {
+  if (!isRecord(value) || typeof value.event_id !== "string"
+    || typeof value.signal_id !== "string" || typeof value.canonical_payload !== "string") {
+    throw new AxiSignalRepositoryError();
+  }
+  const receivedAt = receivedAtFrom(value.received_at);
+  try {
+    const event = validateAxiSignalLifecycleEvent(JSON.parse(value.canonical_payload) as unknown);
+    if (event.event_id !== value.event_id || event.signal_id !== value.signal_id) throw new Error("lifecycle id mismatch");
+    return { event, received_at: receivedAt };
   } catch {
     throw new AxiSignalRepositoryError();
   }
