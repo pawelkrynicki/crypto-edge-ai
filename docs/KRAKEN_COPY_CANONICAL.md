@@ -820,8 +820,8 @@ Important: autostart configuration is functionally validated through the Schedul
 - Final lifecycle Engine MQ4 SHA256: 585667314F383E7F372DE50669A4AD955656BD5E9CF167930163EB775CE3ADF7.
 - Final verifier-produced lifecycle Engine EX4 SHA256: 53E7E38EF97BDACC95A56E092097CEB15C96DA2AB5573508725A746CEC070125.
 - Final lifecycle publisher SHA256: B21269F5B8B6CF35B9AD382F11A7DC2FD6AD86398AA23F8B2B0516D83E1BFA1C.
-- Local release folder: C:\Users\pawel\Documents\ChatGPT\KRAKEN_COPY\release_engine_1.10_lifecycle\out.
-- Release ZIP: C:\Users\pawel\Documents\ChatGPT\KRAKEN_COPY\release_engine_1.10_lifecycle\ALLinCrypto_Engine_1.10_CE_Lifecycle.zip; SHA256 D7512FC335B98CFD85400ECFE91CDEFB787BC365A1C5A720702D312AE9A27E83.
+- Local release folder: %USERPROFILE%\Documents\ChatGPT\KRAKEN_COPY\release_engine_1.10_lifecycle\out.
+- Release ZIP: %USERPROFILE%\Documents\ChatGPT\KRAKEN_COPY\release_engine_1.10_lifecycle\ALLinCrypto_Engine_1.10_CE_Lifecycle.zip; SHA256 D7512FC335B98CFD85400ECFE91CDEFB787BC365A1C5A720702D312AE9A27E83.
 - VPS NOT DEPLOYED for 05B yet. Existing VPS Engine 1.10 build remains running/installed as previously recorded. Do not restart or replace it until a controlled deployment is explicitly executed.
 - Next product step: 05C Live Signals lifecycle read-model/UI, then 05D reference equity curve from 10,000 USD.
 
