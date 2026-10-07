@@ -782,3 +782,20 @@ Important: autostart configuration is functionally validated through the Schedul
 - INTERNAL_BETA build boundary: PASS.
 - This is backend/read-model foundation only. Crypto Engine lifecycle emission, Live Signals lifecycle UI, and 10,000 USD reference equity curve are the next layers.
 - Do not modify Engine in parallel while Claude is currently applying the separate Engine/publisher release-contract refactor.
+
+
+## 2026-10-07 — Engine-owned Crypto Edge metadata contract PASS
+- Claude's local Engine 1.10 refactor was reviewed and accepted architecturally.
+- Canonical rule from now on: ALLinCrypto Engine declares InpCE_Enabled / InpCE_EngineVer / InpCE_StrategyVer / InpCE_TerminalId before including CryptoEdgePublisher.mqh.
+- Shared CryptoEdgePublisher.mqh is setup-agnostic AND version-agnostic; it declares no InpCE_* defaults.
+- InpCE_Enabled must default true in every released Engine.
+- InpCE_EngineVer must match #property version; strategy version is deliberate and may evolve independently.
+- Verifier now checks the publisher actually resolved from the MQL4 Include root used for compilation, compiles Engine + publisher in isolation, requires 0 errors / 0 warnings, and treats the verifier-produced EX4 as the release EX4.
+- MetaEditor can be auto-discovered; an explicit -MetaEditor path remains supported.
+- Engine 1.10 candidate checked against the new contract: 27/27 detailed checks PASS, compile 0/0.
+- Verified candidate MQ4 SHA256: 628348293F8FAFD6F095D7ECA85D9672C0827D5AC449917A1023F490F3EB6ABF.
+- Shared publisher SHA256: 3C6697085E1DF9D6217B1D14E7AD30D9CB474E67858992C849D0FAF1C588C221.
+- MetaEditor EX4 bytes are not assumed deterministic across separate compiles; use the EX4 emitted by the PASS verifier run for any release package.
+- Repo branch: feature/kraken-copy-05-signal-lifecycle.
+- Contract refactor commits: 289068d92e8b48c904cf43c5044c83a3b7867493 + EOF cleanup 59a0d46b29d7f4ab89b76386e48b3dd52e151b19.
+- IMPORTANT: this refactor is NOT deployed to VPS yet. The VPS still has the previously deployed Engine 1.10 build from checkpoint 56e06c8; do not redeploy solely for this refactor. Use this accepted candidate as the baseline for lifecycle 05B and perform one later controlled Engine deployment.
