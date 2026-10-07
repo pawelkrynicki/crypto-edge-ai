@@ -21,6 +21,7 @@ describe("AXI MT4 signal bridge", () => {
     const config = resolveAxiMt4SignalBridgeConfig({ APPDATA: "C:\\BridgeFixture\\Roaming", CRYPTO_EDGE_AXI_SIGNAL_TOKEN: TOKEN });
     assert.equal(config.root, resolve("C:\\BridgeFixture\\Roaming", "MetaQuotes", "Terminal", "Common", "Files", "CryptoEdge"));
     assert.equal(config.endpoint, "http://127.0.0.1:4180/api/v1/trading/signals/axi");
+    assert.equal(config.lifecycleEndpoint, "http://127.0.0.1:4180/api/v1/trading/signals/axi-lifecycle");
     assert.equal(config.pollMs, 1_000);
   });
 
@@ -43,6 +44,40 @@ describe("AXI MT4 signal bridge", () => {
     assert.equal(await readFile(join(root, "sent", "first.json"), "utf8"), '{"signal_id":"first"}');
     assert.equal(await readFile(join(root, "sent", "second.json"), "utf8"), '{"signal_id":"second"}');
     assert.doesNotMatch(logs.join("\n"), new RegExp(TOKEN));
+  });
+
+
+
+  it("routes lifecycle payloads to the lifecycle endpoint while source signals stay on the signal endpoint", async () => {
+    const root = await bridgeRoot();
+    await writeOutbox(root, "a-signal.json", JSON.stringify({
+      schema_version: "axi_crypto_signal_v1",
+      event_type: "SIGNAL_CREATED",
+      signal_id: "route-signal",
+    }));
+    await writeOutbox(root, "b-fill.json", JSON.stringify({
+      schema_version: "axi_signal_lifecycle_v1",
+      event_type: "ORDER_FILLED",
+      event_id: "route-signal-ORDER_FILLED",
+      signal_id: "route-signal",
+      source_event_time: "2026-10-07T12:00:00.000Z",
+      fill_price: 100,
+    }));
+
+    const urls: string[] = [];
+    const result = await runAxiMt4SignalBridgeCycle(configFor(root), {
+      fetchImpl: async (input) => {
+        urls.push(String(input));
+        return new Response("created", { status: 201 });
+      },
+      logger: testLogger([]),
+    });
+
+    assert.deepEqual(result, { scanned: 2, sent: 2, rejected: 0, retryable: 0 });
+    assert.deepEqual(urls, [
+      "http://127.0.0.1:4180/api/v1/trading/signals/axi",
+      "http://127.0.0.1:4180/api/v1/trading/signals/axi-lifecycle",
+    ]);
   });
 
   it("preserves retryable gateway failures and unreadable source files in the outbox", async () => {
@@ -97,7 +132,13 @@ describe("AXI MT4 signal bridge", () => {
 });
 
 function configFor(root: string): AxiMt4SignalBridgeConfig {
-  return { root, endpoint: "http://127.0.0.1:4180/api/v1/trading/signals/axi", token: TOKEN, pollMs: 1_000 };
+  return {
+    root,
+    endpoint: "http://127.0.0.1:4180/api/v1/trading/signals/axi",
+    lifecycleEndpoint: "http://127.0.0.1:4180/api/v1/trading/signals/axi-lifecycle",
+    token: TOKEN,
+    pollMs: 1_000,
+  };
 }
 
 async function bridgeRoot(): Promise<string> {

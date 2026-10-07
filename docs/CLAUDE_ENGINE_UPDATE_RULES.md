@@ -106,6 +106,36 @@ For LIMIT signals publish:
 
 LIMIT signals MUST be published when generated, not only after the pending order fills.
 
+## Lifecycle contract
+
+Every released Engine must preserve lifecycle reporting for executed source signals.
+
+Mandatory lifecycle events:
+- ORDER_FILLED for both MARKET and LIMIT once an MT4 order is actually filled;
+- SIGNAL_EXPIRED when a pending LIMIT expires without fill;
+- SIGNAL_CANCELLED when a pending LIMIT is cancelled without fill;
+- POSITION_CLOSED for every tracked filled position.
+
+POSITION_CLOSED.close_reason must be one of: TP, SL, TIME_EXIT, MANUAL, OTHER.
+
+Lifecycle requirements:
+- lifecycle events are linked to the original deterministic signal_id;
+- MARKET and LIMIT preserve the original source signal identity, including immediate-market execution of a LIMIT;
+- ticket-to-signal tracking survives normal MT4 processing through persistent ticket metadata;
+- lifecycle outbox writes are retryable and idempotent;
+- terminal ticket metadata is not erased before the outbox event write succeeds;
+- publisher lifecycle code remains setup-agnostic and version-agnostic;
+- lifecycle files use the same FILE_COMMON CryptoEdge outbox boundary;
+- Bridge owns HTTP/API delivery.
+
+The shared publisher must expose and preserve:
+- CryptoEdgePublishOrderFilled
+- CryptoEdgePublishSignalExpired
+- CryptoEdgePublishSignalCancelled
+- CryptoEdgePublishPositionClosed
+
+Normal setup changes must not remove or bypass lifecycle hooks.
+
 ## Signal identity
 
 Signal IDs must remain deterministic and idempotent for the same source signal.
@@ -160,6 +190,12 @@ Before saying an Engine update is complete, Claude must explicitly verify:
 - [ ] MARKET mapping correct
 - [ ] LIMIT mapping correct
 - [ ] LIMIT cancel_price and validity are passed
+- [ ] MARKET and LIMIT execution both preserve ticket-to-signal lifecycle tracking
+- [ ] ORDER_FILLED is emitted once per actual MT4 fill
+- [ ] pending LIMIT terminal paths emit EXPIRED or CANCELLED
+- [ ] filled position terminal paths emit POSITION_CLOSED with canonical close reason
+- [ ] lifecycle retry/history hook remains present
+- [ ] publisher exposes all four lifecycle event writers
 - [ ] Engine declares all four `InpCE_*` inputs before the publisher include
 - [ ] InpCE_Enabled default = true
 - [ ] InpCE_EngineVer matches Engine version
@@ -184,6 +220,9 @@ MARKET mapping: PASS
 LIMIT mapping: PASS
 Publisher default enabled: PASS
 Engine version metadata synced: PASS
+Lifecycle ticket tracking: PASS
+Lifecycle fill/terminal/retry hooks: PASS
+Publisher lifecycle contract: PASS
 Compile: 0 errors / 0 warnings
 MQ4 SHA256: <hash>
 EX4 SHA256: <hash>

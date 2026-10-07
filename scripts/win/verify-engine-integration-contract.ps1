@@ -163,6 +163,17 @@ $pubUses = ($publisher -match 'InpCE_Enabled') -and ($publisher -match 'InpCE_En
 $pubVersionLiteral = $publisher -match '"\s*v?\d+\.\d+[^"]*"'
 $pubSetupLiteral = $publisher -match '"[A-Z]"'
 
+$engineLifecycleTracking = ([regex]::Matches($engine, 'CETrackTicket\s*\(')).Count -ge 3
+$engineLifecycleFill = ([regex]::Matches($engine, 'CEPublishFillIfNeeded\s*\(')).Count -ge 4
+$engineLifecycleTerminal = ([regex]::Matches($engine, 'CEPublishTerminalHistory\s*\(')).Count -ge 5
+$engineLifecycleRetry = ([regex]::Matches($engine, 'CERetryLifecycleHistory\s*\(')).Count -ge 2
+$publisherLifecycle = (
+  ($publisher -match 'CryptoEdgePublishOrderFilled\s*\(') -and
+  ($publisher -match 'CryptoEdgePublishSignalExpired\s*\(') -and
+  ($publisher -match 'CryptoEdgePublishSignalCancelled\s*\(') -and
+  ($publisher -match 'CryptoEdgePublishPositionClosed\s*\(')
+)
+
 # ------------------------------------------------------------ compile Engine + resolved publisher in isolation
 $work = Join-Path $env:TEMP ("ce_verify_" + (Get-Date -Format "yyyyMMdd_HHmmss") + "_" + [guid]::NewGuid().ToString("N").Substring(0, 6))
 $wInc = Join-Path $work "MQL4\Include"
@@ -227,6 +238,11 @@ $checks = [ordered]@{
   PUBLISHER_NO_WEBREQUEST         = ($publisher -notmatch 'WebRequest\s*\(')
   PUBLISHER_NO_KRAKEN             = ($publisherRaw -notmatch '(?i)kraken')
   PUBLISHER_NO_ORDERS             = ($publisher -notmatch 'Order(Send|Modify|Close|Delete)\s*\(')
+  ENGINE_LIFECYCLE_TICKET_TRACKING = $engineLifecycleTracking
+  ENGINE_LIFECYCLE_FILL_HOOK       = $engineLifecycleFill
+  ENGINE_LIFECYCLE_TERMINAL_HOOK   = $engineLifecycleTerminal
+  ENGINE_LIFECYCLE_RETRY           = $engineLifecycleRetry
+  PUBLISHER_LIFECYCLE_CONTRACT     = $publisherLifecycle
   COMPILED_ENGINE_IS_INPUT        = $compiledEngineOk
   COMPILE_0_ERRORS_0_WARNINGS     = ($errors -eq 0 -and $warnings -eq 0)
   EX4_PRODUCED                    = $ex4Ok
@@ -247,6 +263,9 @@ $report.Add("MARKET mapping: " + (PF $checks.MARKET_MAPPING))
 $report.Add("LIMIT mapping: " + (PF ($checks.LIMIT_CANCEL -and $checks.LIMIT_VALIDITY)))
 $report.Add("Publisher default enabled: " + (PF $checks.ENGINE_CE_ENABLED_DEFAULT_TRUE))
 $report.Add("Engine version metadata synced: " + (PF $checks.ENGINE_VERSION_METADATA_SYNC))
+$report.Add("Lifecycle ticket tracking: " + (PF $checks.ENGINE_LIFECYCLE_TICKET_TRACKING))
+$report.Add("Lifecycle fill/terminal/retry hooks: " + (PF ($checks.ENGINE_LIFECYCLE_FILL_HOOK -and $checks.ENGINE_LIFECYCLE_TERMINAL_HOOK -and $checks.ENGINE_LIFECYCLE_RETRY)))
+$report.Add("Publisher lifecycle contract: " + (PF $checks.PUBLISHER_LIFECYCLE_CONTRACT))
 $report.Add("Compile: $errors errors / $warnings warnings")
 $report.Add("MQ4 SHA256: $engineSha")
 $report.Add("EX4 SHA256: $ex4Sha")

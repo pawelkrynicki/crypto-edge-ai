@@ -2,16 +2,15 @@
 #define CRYPTO_EDGE_PUBLISHER_MQH
 
 //+------------------------------------------------------------------+
-//| CryptoEdgePublisher.mqh - wspolny publisher sygnalow Crypto Edge |
-//| Niezalezny od setupow i od wersji Engine.                        |
-//| Engine MUSI zadeklarowac PRZED #include <CryptoEdgePublisher.mqh>:|
+//| CryptoEdgePublisher.mqh - shared Crypto Edge publisher           |
+//| Setup-agnostic and Engine-version-agnostic.                      |
+//| Engine MUST declare before this include:                         |
 //|   input bool   InpCE_Enabled     = true;                         |
-//|   input string InpCE_EngineVer   = "<= #property version>";      |
-//|   input string InpCE_StrategyVer = "<wersja strategii>";         |
+//|   input string InpCE_EngineVer   = "<#property version>";        |
+//|   input string InpCE_StrategyVer = "<strategy version>";         |
 //|   input string InpCE_TerminalId  = "";                           |
-//| Publisher tylko czyta te wartosci; brak deklaracji = blad        |
-//| kompilacji (celowo - bez cichych wartosci domyslnych).           |
-//| Tylko zapis do FILE_COMMON\CryptoEdge\outbox (bez HTTP).         |
+//| Writes SIGNAL_CREATED + lifecycle events to FILE_COMMON outbox.  |
+//| No network/API, order placement or setup-specific logic.         |
 //+------------------------------------------------------------------+
 
 #define CE_COMMON_ROOT "CryptoEdge"
@@ -69,6 +68,51 @@ string CE_MakeSignalId(string terminalId, string setupId, datetime tclose, strin
    return raw;
 }
 
+string CryptoEdgeSignalId(string setupId, datetime sourceCloseServer, string side, string orderType)
+{
+   return CE_MakeSignalId(
+      CE_TerminalId(),
+      CE_AsciiId(setupId),
+      sourceCloseServer,
+      CE_AsciiId(side),
+      CE_AsciiId(orderType)
+   );
+}
+
+string CE_MakeEventId(string signalId, string eventType)
+{
+   string suffix = "-" + CE_AsciiId(eventType);
+   int maxBase = 128 - StringLen(suffix);
+   if(maxBase < 1) maxBase = 1;
+   string base = CE_AsciiId(signalId);
+   if(StringLen(base) > maxBase) base = StringSubstr(base, 0, maxBase);
+   return base + suffix;
+}
+
+bool CE_WriteOutboxJson(string fileName, string json, string label)
+{
+   int h = FileOpen(fileName, FILE_WRITE|FILE_BIN|FILE_COMMON);
+   if(h == INVALID_HANDLE)
+   {
+      Print("ALLinCrypto CE: cannot write outbox file for ", label, ", error ", GetLastError());
+      return false;
+   }
+
+   uchar bytes[];
+   int count = StringToCharArray(json, bytes, 0, WHOLE_ARRAY, CP_UTF8) - 1;
+   if(count < 0) count = 0;
+   ArrayResize(bytes, count);
+   uint written = FileWriteArray(h, bytes, 0, count);
+   FileFlush(h);
+   FileClose(h);
+   if((int)written != count)
+   {
+      Print("ALLinCrypto CE: incomplete outbox write for ", label);
+      return false;
+   }
+   return true;
+}
+
 bool CryptoEdgeInit()
 {
    if(!InpCE_Enabled) return true;
@@ -103,7 +147,7 @@ bool CryptoEdgePublishSignal(
    string safeSetupId = CE_AsciiId(setupId);
    string safeSide = CE_AsciiId(side);
    string safeOrderType = CE_AsciiId(orderType);
-   string signalId = CE_MakeSignalId(terminalId, safeSetupId, sourceCloseServer, safeSide, safeOrderType);
+   string signalId = CryptoEdgeSignalId(safeSetupId, sourceCloseServer, safeSide, safeOrderType);
 
    string maxHold = (maxHoldSeconds > 0) ? IntegerToString(maxHoldSeconds) : "null";
    string validFor = (validForSeconds > 0) ? IntegerToString(validForSeconds) : "null";
@@ -143,26 +187,85 @@ bool CryptoEdgePublishSignal(
    json += "}";
 
    string fileName = CE_OUTBOX_DIR + "\\" + signalId + ".json";
-   int h = FileOpen(fileName, FILE_WRITE|FILE_BIN|FILE_COMMON);
-   if(h == INVALID_HANDLE)
-   {
-      Print("ALLinCrypto CE: cannot write outbox file for ", signalId, ", error ", GetLastError());
-      return false;
-   }
+   return CE_WriteOutboxJson(fileName, json, signalId);
+}
 
-   uchar bytes[];
-   int count = StringToCharArray(json, bytes, 0, WHOLE_ARRAY, CP_UTF8) - 1;
-   if(count < 0) count = 0;
-   ArrayResize(bytes, count);
-   uint written = FileWriteArray(h, bytes, 0, count);
-   FileFlush(h);
-   FileClose(h);
-   if((int)written != count)
-   {
-      Print("ALLinCrypto CE: incomplete outbox write for ", signalId);
-      return false;
-   }
-   return true;
+bool CryptoEdgePublishOrderFilled(
+   string signalId,
+   datetime sourceEventServer,
+   double fillPrice,
+   int digits
+)
+{
+   if(!InpCE_Enabled) return true;
+   string eventType = "ORDER_FILLED";
+   string eventId = CE_MakeEventId(signalId, eventType);
+   string json = "{";
+   json += "\"schema_version\":\"axi_signal_lifecycle_v1\",";
+   json += "\"event_type\":\"" + eventType + "\",";
+   json += "\"event_id\":\"" + CE_JsonEscape(eventId) + "\",";
+   json += "\"signal_id\":\"" + CE_JsonEscape(signalId) + "\",";
+   json += "\"source_event_time\":\"" + CE_Iso8601(CE_ServerToUtc(sourceEventServer)) + "\",";
+   json += "\"fill_price\":" + DoubleToString(fillPrice, digits);
+   json += "}";
+   string fileName = CE_OUTBOX_DIR + "\\" + signalId + ".zz.ORDER_FILLED.json";
+   return CE_WriteOutboxJson(fileName, json, eventId);
+}
+
+bool CryptoEdgePublishSignalExpired(string signalId, datetime sourceEventServer)
+{
+   if(!InpCE_Enabled) return true;
+   string eventType = "SIGNAL_EXPIRED";
+   string eventId = CE_MakeEventId(signalId, eventType);
+   string json = "{";
+   json += "\"schema_version\":\"axi_signal_lifecycle_v1\",";
+   json += "\"event_type\":\"" + eventType + "\",";
+   json += "\"event_id\":\"" + CE_JsonEscape(eventId) + "\",";
+   json += "\"signal_id\":\"" + CE_JsonEscape(signalId) + "\",";
+   json += "\"source_event_time\":\"" + CE_Iso8601(CE_ServerToUtc(sourceEventServer)) + "\"";
+   json += "}";
+   string fileName = CE_OUTBOX_DIR + "\\" + signalId + ".zz.SIGNAL_EXPIRED.json";
+   return CE_WriteOutboxJson(fileName, json, eventId);
+}
+
+bool CryptoEdgePublishSignalCancelled(string signalId, datetime sourceEventServer)
+{
+   if(!InpCE_Enabled) return true;
+   string eventType = "SIGNAL_CANCELLED";
+   string eventId = CE_MakeEventId(signalId, eventType);
+   string json = "{";
+   json += "\"schema_version\":\"axi_signal_lifecycle_v1\",";
+   json += "\"event_type\":\"" + eventType + "\",";
+   json += "\"event_id\":\"" + CE_JsonEscape(eventId) + "\",";
+   json += "\"signal_id\":\"" + CE_JsonEscape(signalId) + "\",";
+   json += "\"source_event_time\":\"" + CE_Iso8601(CE_ServerToUtc(sourceEventServer)) + "\"";
+   json += "}";
+   string fileName = CE_OUTBOX_DIR + "\\" + signalId + ".zz.SIGNAL_CANCELLED.json";
+   return CE_WriteOutboxJson(fileName, json, eventId);
+}
+
+bool CryptoEdgePublishPositionClosed(
+   string signalId,
+   datetime sourceEventServer,
+   double closePrice,
+   string closeReason,
+   int digits
+)
+{
+   if(!InpCE_Enabled) return true;
+   string eventType = "POSITION_CLOSED";
+   string eventId = CE_MakeEventId(signalId, eventType);
+   string json = "{";
+   json += "\"schema_version\":\"axi_signal_lifecycle_v1\",";
+   json += "\"event_type\":\"" + eventType + "\",";
+   json += "\"event_id\":\"" + CE_JsonEscape(eventId) + "\",";
+   json += "\"signal_id\":\"" + CE_JsonEscape(signalId) + "\",";
+   json += "\"source_event_time\":\"" + CE_Iso8601(CE_ServerToUtc(sourceEventServer)) + "\",";
+   json += "\"close_price\":" + DoubleToString(closePrice, digits) + ",";
+   json += "\"close_reason\":\"" + CE_JsonEscape(CE_AsciiId(closeReason)) + "\"";
+   json += "}";
+   string fileName = CE_OUTBOX_DIR + "\\" + signalId + ".zz.POSITION_CLOSED.json";
+   return CE_WriteOutboxJson(fileName, json, eventId);
 }
 
 #endif

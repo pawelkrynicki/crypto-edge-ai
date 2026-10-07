@@ -7,12 +7,24 @@ import {
   validateAxiSignalLifecycleEvent,
 } from "../server/axiSignalLifecycle.js";
 
-test("MARKET starts ACTIVE and closes at TP with configured RR", () => {
+test("MARKET starts ACTIVE, records actual fill, and closes at TP with configured RR", () => {
   const signal = marketSignal({ signal_id: "life-market-1" });
   const initial = initialAxiSignalLifecycleState(signal);
   assert.equal(initial.status, "ACTIVE");
+  assert.equal(initial.filled_at, null);
 
-  const closed = applyAxiSignalLifecycleEvent(signal, initial, validateAxiSignalLifecycleEvent({
+  const filled = applyAxiSignalLifecycleEvent(signal, initial, validateAxiSignalLifecycleEvent({
+    schema_version: "axi_signal_lifecycle_v1",
+    event_type: "ORDER_FILLED",
+    event_id: "life-market-1-fill",
+    signal_id: signal.signal_id,
+    source_event_time: "2026-09-28T12:00:00.000Z",
+    fill_price: signal.trade.entry_price,
+  }));
+  assert.equal(filled.status, "ACTIVE");
+  assert.equal(filled.filled_at, "2026-09-28T12:00:00.000Z");
+
+  const closed = applyAxiSignalLifecycleEvent(signal, filled, validateAxiSignalLifecycleEvent({
     schema_version: "axi_signal_lifecycle_v1",
     event_type: "POSITION_CLOSED",
     event_id: "life-market-1-close",

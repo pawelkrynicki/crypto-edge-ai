@@ -10,6 +10,7 @@ const REQUEST_TIMEOUT_MS = 15_000;
 export type AxiMt4SignalBridgeConfig = {
   root: string;
   endpoint: string;
+  lifecycleEndpoint: string;
   token: string;
   pollMs: number;
 };
@@ -42,6 +43,8 @@ export function resolveAxiMt4SignalBridgeConfig(
 
   const endpoint = (env.CRYPTO_EDGE_AXI_SIGNAL_ENDPOINT?.trim() || DEFAULT_ENDPOINT);
   assertLocalHttpEndpoint(endpoint);
+  const lifecycleEndpoint = env.CRYPTO_EDGE_AXI_LIFECYCLE_ENDPOINT?.trim() || deriveLifecycleEndpoint(endpoint);
+  assertLocalHttpEndpoint(lifecycleEndpoint);
 
   const token = env.CRYPTO_EDGE_AXI_SIGNAL_TOKEN?.trim();
   if (!token) throw new AxiMt4SignalBridgeError("AXI_SIGNAL_TOKEN_REQUIRED");
@@ -49,6 +52,7 @@ export function resolveAxiMt4SignalBridgeConfig(
   return {
     root: resolve(configuredRoot || resolve(appData!, "MetaQuotes", "Terminal", "Common", "Files", "CryptoEdge")),
     endpoint,
+    lifecycleEndpoint,
     token,
     pollMs: parsePollMs(env.CRYPTO_EDGE_MT4_BRIDGE_POLL_MS),
   };
@@ -96,9 +100,10 @@ export async function runAxiMt4SignalBridgeCycle(
     }
 
     let payload: Buffer;
+    let parsedPayload: unknown;
     try {
       payload = await readFile(source);
-      JSON.parse(payload.toString("utf8"));
+      parsedPayload = JSON.parse(payload.toString("utf8"));
     } catch {
       // MT4 may still be writing the file. JSON parse failures stay retryable too.
       result.retryable += 1;
@@ -108,7 +113,7 @@ export async function runAxiMt4SignalBridgeCycle(
 
     let response: Response;
     try {
-      response = await postSignal(fetchImpl, config, payload, options.signal);
+      response = await postSignal(fetchImpl, config, payload, parsedPayload, options.signal);
     } catch {
       result.retryable += 1;
       log(logger, "warn", `AXI MT4 bridge will retry delivery: ${basename(source)}`);
@@ -187,6 +192,7 @@ async function postSignal(
   fetchImpl: FetchLike,
   config: AxiMt4SignalBridgeConfig,
   payload: Buffer,
+  parsedPayload: unknown,
   shutdownSignal?: AbortSignal,
 ): Promise<Response> {
   const controller = new AbortController();
@@ -194,7 +200,7 @@ async function postSignal(
   shutdownSignal?.addEventListener("abort", onShutdown, { once: true });
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
-    return await fetchImpl(config.endpoint, {
+    return await fetchImpl(resolvePayloadEndpoint(config, parsedPayload), {
       method: "POST",
       headers: {
         authorization: `Bearer ${config.token}`,
@@ -261,6 +267,26 @@ function assertLocalHttpEndpoint(endpoint: string): void {
   ) {
     throw new AxiMt4SignalBridgeError("AXI_SIGNAL_ENDPOINT_MUST_BE_LOCAL_HTTP");
   }
+}
+
+function resolvePayloadEndpoint(config: AxiMt4SignalBridgeConfig, payload: unknown): string {
+  if (isRecord(payload) && typeof payload.event_type === "string"
+    && ["ORDER_FILLED", "SIGNAL_EXPIRED", "SIGNAL_CANCELLED", "POSITION_CLOSED"].includes(payload.event_type)) {
+    return config.lifecycleEndpoint;
+  }
+  return config.endpoint;
+}
+
+function deriveLifecycleEndpoint(signalEndpoint: string): string {
+  const parsed = new URL(signalEndpoint);
+  parsed.pathname = "/api/v1/trading/signals/axi-lifecycle";
+  parsed.search = "";
+  parsed.hash = "";
+  return parsed.toString();
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function parsePollMs(value: string | undefined): number {

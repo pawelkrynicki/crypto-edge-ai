@@ -119,7 +119,7 @@ export function initialAxiSignalLifecycleState(signal: AxiCryptoSignal): AxiSign
     signal_id: signal.signal_id,
     status: signal.trade.order_type === "LIMIT" ? "PENDING" : "ACTIVE",
     entry_price: signal.trade.order_type === "MARKET" ? signal.trade.entry_price : null,
-    filled_at: signal.trade.order_type === "MARKET" ? signal.trade.source_signal_time : null,
+    filled_at: null,
     closed_at: null,
     close_price: null,
     close_reason: null,
@@ -141,7 +141,9 @@ export function applyAxiSignalLifecycleEvent(
   }
 
   if (event.event_type === "ORDER_FILLED") {
-    if (signal.trade.order_type !== "LIMIT" || state.status !== "PENDING") fail("AXI_LIFECYCLE_INVALID_TRANSITION");
+    const limitFill = signal.trade.order_type === "LIMIT" && state.status === "PENDING";
+    const marketFill = signal.trade.order_type === "MARKET" && state.status === "ACTIVE" && state.filled_at === null;
+    if (!limitFill && !marketFill) fail("AXI_LIFECYCLE_INVALID_TRANSITION");
     return {
       ...state,
       status: "ACTIVE",
@@ -161,7 +163,7 @@ export function applyAxiSignalLifecycleEvent(
     return { ...state, status: "CANCELLED", last_event_time: event.source_event_time };
   }
 
-  if (state.status !== "ACTIVE" || state.entry_price === null) fail("AXI_LIFECYCLE_INVALID_TRANSITION");
+  if (state.status !== "ACTIVE" || state.entry_price === null || state.filled_at === null) fail("AXI_LIFECYCLE_INVALID_TRANSITION");
   const resultR = resolveResultR(signal, state.entry_price, event.close_price);
   return {
     ...state,
