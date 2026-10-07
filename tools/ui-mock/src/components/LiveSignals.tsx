@@ -6,6 +6,8 @@ import {
   AxiSignalsDataSourceError,
   loadAxiSignalDetail,
   loadAxiSignals,
+  type AxiSignalDetailRecord,
+  type AxiSignalLifecycleState,
   type AxiSignalRecord,
 } from "../services/axiSignalsDataSource";
 import {
@@ -24,7 +26,7 @@ type FeedState =
 type DetailState =
   | { kind: "idle" }
   | { kind: "loading"; signalId: string }
-  | { kind: "ready"; record: AxiSignalRecord }
+  | { kind: "ready"; record: AxiSignalDetailRecord }
   | { kind: "not-found"; signalId: string }
   | { kind: "forbidden" }
   | { kind: "error" };
@@ -191,7 +193,8 @@ function SignalCard({
   selected: boolean;
   onSelect: (signalId: string) => void;
 }) {
-  const { signal } = record;
+  const { signal, lifecycle } = record;
+  const lifecycleBadge = lifecyclePresentation(lifecycle, locale);
   return (
     <ReadOnlyCard className={`live-signal-card ${selected ? "selected" : ""}`}>
       <header className="live-signal-card-header">
@@ -200,6 +203,7 @@ function SignalCard({
           <p>{signal.setup.timeframe}</p>
         </div>
         <div className="live-signal-badges">
+          <StatusBadge tone={lifecycleBadge.tone}>{lifecycleBadge.label}</StatusBadge>
           <StatusBadge tone={signal.trade.side === "BUY" ? "ready" : "critical"}>{signal.trade.side}</StatusBadge>
           <StatusBadge tone="accent">{signal.trade.order_type}</StatusBadge>
         </div>
@@ -211,6 +215,12 @@ function SignalCard({
         <Fact label={copy.stopLoss} value={formatSignalNumber(signal.trade.stop_loss, locale)} />
         <Fact label={copy.takeProfit} value={formatSignalNumber(signal.trade.take_profit, locale)} />
         <Fact label="RR" value={`1:${formatSignalNumber(signal.trade.rr, locale)}`} />
+        {lifecycle.filled_at !== null && lifecycle.entry_price !== null && (
+          <Fact label={copy.actualFill} value={formatSignalNumber(lifecycle.entry_price, locale)} />
+        )}
+        {lifecycle.status === "CLOSED" && lifecycle.result_r !== null && (
+          <Fact label={copy.resultR} value={formatR(lifecycle.result_r, locale)} />
+        )}
         {signal.setup.max_hold_seconds !== null && <Fact label={copy.maxHold} value={formatDuration(signal.setup.max_hold_seconds, locale)} />}
         {signal.trade.order_type === "LIMIT" && signal.trade.cancel_price !== null && <Fact label={copy.cancelPrice} value={formatSignalNumber(signal.trade.cancel_price, locale)} />}
         {signal.trade.order_type === "LIMIT" && signal.trade.valid_for_seconds !== null && <Fact label={copy.validFor} value={formatDuration(signal.trade.valid_for_seconds, locale)} />}
@@ -251,14 +261,22 @@ function SignalDetailPanel({
   if (detail.kind === "error") {
     return <aside className="live-signal-detail live-signal-detail-state" data-live-signals-detail-state="error"><strong>{copy.detailErrorTitle}</strong><p>{copy.detailErrorDetail}</p></aside>;
   }
-  const { signal } = detail.record;
+  const { signal, lifecycle } = detail.record;
+  const lifecycleBadge = lifecyclePresentation(lifecycle, locale);
   return (
     <aside className="live-signal-detail" data-live-signals-detail-state="ready" aria-label={copy.detailLabel}>
       <span className="section-label">{copy.detailLabel}</span>
       <h4>{signal.trade.symbol} <span aria-hidden="true">·</span> {signal.trade.side}</h4>
+      <StatusBadge tone={lifecycleBadge.tone}>{lifecycleBadge.label}</StatusBadge>
       <dl className="live-signal-detail-facts">
         <Fact label={copy.sourceEngine} value={`${signal.source.engine} ${signal.source.engine_version}`} />
         <Fact label={copy.receivedAt} value={formatSignalTimestamp(detail.record.received_at, locale)} />
+        {lifecycle.filled_at !== null && <Fact label={copy.filledAt} value={formatSignalTimestamp(lifecycle.filled_at, locale)} />}
+        {lifecycle.entry_price !== null && lifecycle.filled_at !== null && <Fact label={copy.actualFill} value={formatSignalNumber(lifecycle.entry_price, locale)} />}
+        {lifecycle.closed_at !== null && <Fact label={copy.closedAt} value={formatSignalTimestamp(lifecycle.closed_at, locale)} />}
+        {lifecycle.close_price !== null && <Fact label={copy.closePrice} value={formatSignalNumber(lifecycle.close_price, locale)} />}
+        {lifecycle.close_reason !== null && <Fact label={copy.closeReason} value={lifecycleCloseReasonLabel(lifecycle.close_reason, locale)} />}
+        {lifecycle.result_r !== null && <Fact label={copy.resultR} value={formatR(lifecycle.result_r, locale)} />}
       </dl>
       <p className="live-signal-detail-boundary">{copy.detailBoundary}</p>
       <EquityPlanPanel state={equityPlan} locale={locale} copy={copy} />
@@ -354,6 +372,39 @@ function classifyDetailError(error: unknown, signalId: string): DetailState {
   return { kind: "error" };
 }
 
+function lifecyclePresentation(
+  lifecycle: AxiSignalLifecycleState,
+  locale: ProductLocale,
+): { label: string; tone: "neutral" | "accent" | "ready" | "warning" | "critical" } {
+  if (lifecycle.status === "PENDING") return { label: locale === "pl" ? "OCZEKUJE" : "PENDING", tone: "warning" };
+  if (lifecycle.status === "EXPIRED") return { label: locale === "pl" ? "WYGASŁ" : "EXPIRED", tone: "neutral" };
+  if (lifecycle.status === "CANCELLED") return { label: locale === "pl" ? "ANULOWANY" : "CANCELLED", tone: "neutral" };
+  if (lifecycle.status === "ACTIVE") {
+    if (lifecycle.filled_at === null) return { label: locale === "pl" ? "OCZEKUJE NA FILL" : "AWAITING FILL", tone: "warning" };
+    return { label: locale === "pl" ? "AKTYWNY" : "ACTIVE", tone: "accent" };
+  }
+  if (lifecycle.close_reason === "TP") return { label: "TP", tone: "ready" };
+  if (lifecycle.close_reason === "SL") return { label: "SL", tone: "critical" };
+  if (lifecycle.close_reason === "TIME_EXIT") return { label: locale === "pl" ? "CZAS" : "TIME EXIT", tone: "warning" };
+  if (lifecycle.close_reason === "MANUAL") return { label: locale === "pl" ? "RĘCZNIE" : "MANUAL", tone: "neutral" };
+  return { label: locale === "pl" ? "ZAMKNIĘTY" : "CLOSED", tone: "neutral" };
+}
+
+function lifecycleCloseReasonLabel(
+  reason: NonNullable<AxiSignalLifecycleState["close_reason"]>,
+  locale: ProductLocale,
+): string {
+  if (reason === "TP" || reason === "SL") return reason;
+  if (reason === "TIME_EXIT") return locale === "pl" ? "Wyjście po czasie" : "Time exit";
+  if (reason === "MANUAL") return locale === "pl" ? "Ręcznie" : "Manual";
+  return locale === "pl" ? "Inne" : "Other";
+}
+
+function formatR(value: number, locale: ProductLocale): string {
+  const prefix = value > 0 ? "+" : "";
+  return prefix + formatSignalNumber(value, locale) + "R";
+}
+
 function formatSignalNumber(value: number, locale: ProductLocale): string {
   return new Intl.NumberFormat(locale === "pl" ? "pl-PL" : "en-US", {
     maximumFractionDigits: 8,
@@ -429,6 +480,12 @@ type LiveSignalsCopy = {
   feedLabel: string;
   sourceSignalTime: string;
   entry: string;
+  actualFill: string;
+  filledAt: string;
+  closedAt: string;
+  closePrice: string;
+  closeReason: string;
+  resultR: string;
   stopLoss: string;
   takeProfit: string;
   maxHold: string;
@@ -470,8 +527,8 @@ const LIVE_SIGNALS_COPY: Record<ProductLocale, LiveSignalsCopy> = {
   en: {
     eyebrow: "Trading · AXI source feed",
     title: "Live Signals",
-    intro: "Latest source signals received by the AXI gateway. This feed is read-only.",
-    sourceOnly: "Source signals only · not executed trades",
+    intro: "Latest AXI source signals with their observed ALLinCrypto Engine lifecycle.",
+    sourceOnly: "AXI source + Engine lifecycle · not Kraken execution",
     loading: "Loading live source signals…",
     unavailableTitle: "Live Signals are unavailable",
     unavailableDetail: "The AXI signal feed may be disabled or is not available in this environment.",
@@ -486,7 +543,13 @@ const LIVE_SIGNALS_COPY: Record<ProductLocale, LiveSignalsCopy> = {
     totalLoaded: "Loaded",
     feedLabel: "AXI live source signals",
     sourceSignalTime: "Source signal time",
-    entry: "Entry",
+    entry: "Signal entry",
+    actualFill: "Actual Engine fill",
+    filledAt: "Filled",
+    closedAt: "Closed",
+    closePrice: "Close price",
+    closeReason: "Close reason",
+    resultR: "Result",
     stopLoss: "Stop loss",
     takeProfit: "Take profit",
     maxHold: "Max hold",
@@ -502,7 +565,7 @@ const LIVE_SIGNALS_COPY: Record<ProductLocale, LiveSignalsCopy> = {
     detailErrorDetail: "The list remains available; try selecting the signal again later.",
     detailLabel: "Source record details",
     sourceEngine: "Source engine",
-    detailBoundary: "This is a received source record. It does not indicate an order, position, fill, or execution result.",
+    detailBoundary: "Lifecycle reflects the AXI ALLinCrypto Engine execution. It is separate from Kraken Copy execution.",
     yourPositionPlan: "Your position plan",
     planLoading: "Calculating your personal sizing plan…",
     planUnavailable: "Your position plan is unavailable",
@@ -526,8 +589,8 @@ const LIVE_SIGNALS_COPY: Record<ProductLocale, LiveSignalsCopy> = {
   pl: {
     eyebrow: "Trading · feed źródłowych sygnałów AXI",
     title: "Sygnały na żywo",
-    intro: "Najnowsze sygnały źródłowe odebrane przez bramkę AXI. Ten feed jest tylko do odczytu.",
-    sourceOnly: "Tylko sygnały źródłowe · to nie są wykonane transakcje",
+    intro: "Najnowsze sygnały AXI wraz z obserwowanym przebiegiem transakcji w ALLinCrypto Engine.",
+    sourceOnly: "Źródło AXI + cykl Engine · to nie jest wykonanie na Krakenie",
     loading: "Ładowanie sygnałów źródłowych…",
     unavailableTitle: "Sygnały na żywo są niedostępne",
     unavailableDetail: "Feed sygnałów AXI może być wyłączony albo niedostępny w tym środowisku.",
@@ -542,7 +605,13 @@ const LIVE_SIGNALS_COPY: Record<ProductLocale, LiveSignalsCopy> = {
     totalLoaded: "Załadowano",
     feedLabel: "Źródłowe sygnały AXI na żywo",
     sourceSignalTime: "Czas sygnału źródłowego",
-    entry: "Wejście",
+    entry: "Wejście z sygnału",
+    actualFill: "Faktyczne wejście Engine",
+    filledAt: "Aktywacja",
+    closedAt: "Zamknięcie",
+    closePrice: "Cena zamknięcia",
+    closeReason: "Powód zamknięcia",
+    resultR: "Wynik",
     stopLoss: "Stop loss",
     takeProfit: "Take profit",
     maxHold: "Maks. czas utrzymania",
@@ -558,7 +627,7 @@ const LIVE_SIGNALS_COPY: Record<ProductLocale, LiveSignalsCopy> = {
     detailErrorDetail: "Lista pozostaje dostępna; spróbuj wybrać sygnał ponownie później.",
     detailLabel: "Szczegóły rekordu źródłowego",
     sourceEngine: "Silnik źródłowy",
-    detailBoundary: "To odebrany rekord źródłowy. Nie wskazuje zlecenia, pozycji, wypełnienia ani wyniku wykonania.",
+    detailBoundary: "Lifecycle pokazuje wykonanie w źródłowym ALLinCrypto Engine na AXI. Jest oddzielne od wykonania KRAKEN Copy.",
     yourPositionPlan: "Twój plan pozycji",
     planLoading: "Wyliczanie Twojego osobistego planu wielkości…",
     planUnavailable: "Twój plan pozycji jest niedostępny",

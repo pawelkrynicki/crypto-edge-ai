@@ -11,6 +11,7 @@ import {
   AxiSignalsDataSourceError,
   loadAxiSignalDetail,
   loadAxiSignals,
+  type AxiSignalDetailRecord,
   type AxiSignalRecord,
 } from "../src/services/axiSignalsDataSource.js";
 import {
@@ -67,7 +68,7 @@ describe("01D Live Signals UI", () => {
     let request: { url: string; init: RequestInit | undefined } | null = null;
     const records = await loadAxiSignals(50, async (url, init) => {
       request = { url: String(url), init };
-      return jsonResponse({ schema_version: "axi_signal_list_v1", signals: [marketSignal()] });
+      return jsonResponse({ schema_version: "axi_signal_list_v2", signals: [marketSignal()] });
     });
 
     assert.equal(records.length, 1);
@@ -79,7 +80,7 @@ describe("01D Live Signals UI", () => {
     let detailRequest: { url: string; init: RequestInit | undefined } | null = null;
     const detail = await loadAxiSignalDetail("market-0001", async (url, init) => {
       detailRequest = { url: String(url), init };
-      return jsonResponse({ schema_version: "axi_signal_detail_v1", ...marketSignal() });
+      return jsonResponse({ schema_version: "axi_signal_detail_v2", ...marketDetail() });
     });
     assert.equal(detail.signal.signal_id, "market-0001");
     assert.deepEqual(detailRequest, {
@@ -102,7 +103,7 @@ describe("01D Live Signals UI", () => {
     const record = marketSignal();
     const ready = await renderLive({
       loadSignals: async () => [record],
-      loadSignalDetail: async () => record,
+      loadSignalDetail: async () => asDetail(record),
       loadEquityPlan: async () => equityPlan(),
     });
     try {
@@ -120,7 +121,7 @@ describe("01D Live Signals UI", () => {
     const failure = await renderLive({
       locale: "pl",
       loadSignals: async () => [record],
-      loadSignalDetail: async () => record,
+      loadSignalDetail: async () => asDetail(record),
       loadEquityPlan: async () => { throw new Error("plan unavailable"); },
     });
     try {
@@ -139,11 +140,11 @@ describe("01D Live Signals UI", () => {
     const detail = { ...limit, signal: { ...limit.signal, source: { ...limit.signal.source, terminal_id: "axi-mt4-primary" } } };
     const renderer = await renderLive({
       loadSignals: async () => [market, limit],
-      loadSignalDetail: async () => detail,
+      loadSignalDetail: async () => asDetail(detail),
     });
     try {
       const loaded = markup(renderer!);
-      assert.match(loaded, /Source signals only.*not executed trades/);
+      assert.match(loaded, /AXI source \+ Engine lifecycle.*not Kraken execution/);
       assert.match(loaded, /Loaded/);
       assert.match(loaded, /"children":\["2"\]/);
       assert.match(loaded, /BTCUSD/);
@@ -153,7 +154,7 @@ describe("01D Live Signals UI", () => {
       assert.match(loaded, /MARKET/);
       assert.match(loaded, /LIMIT/);
       assert.match(loaded, /Source signal time/);
-      assert.match(loaded, /Entry/);
+      assert.match(loaded, /Signal entry/);
       assert.match(loaded, /Stop loss/);
       assert.match(loaded, /Take profit/);
       assert.match(loaded, /RR/);
@@ -175,7 +176,7 @@ describe("01D Live Signals UI", () => {
       assert.match(detailMarkup, /ETHUSD/);
       assert.match(detailMarkup, /SELL/);
       assert.match(detailMarkup, /ALLinCrypto Engine/);
-      assert.match(detailMarkup, /does not indicate an order, position, fill, or execution result/);
+      assert.match(detailMarkup, /Lifecycle reflects the AXI ALLinCrypto Engine execution/);
       assert.doesNotMatch(detailMarkup, /limit-0001|axi-mt4-primary|AXI_SERVER|mean-revert-x|Mean Revert X|mean-reversion|Strategy version|2026\.09|Setup family|Source terminal|Source time basis/);
     } finally {
       if (renderer) await act(async () => { renderer.unmount(); });
@@ -242,7 +243,7 @@ async function renderLive({
 }: {
   locale?: "en" | "pl";
   loadSignals: (limit?: number) => Promise<AxiSignalRecord[]>;
-  loadSignalDetail?: (signalId: string) => Promise<AxiSignalRecord>;
+  loadSignalDetail?: (signalId: string) => Promise<AxiSignalDetailRecord>;
   loadEquityPlan?: (signalId: string) => Promise<SignalEquityPlanResponse>;
 }): Promise<TestRenderer.ReactTestRenderer> {
   let renderer: TestRenderer.ReactTestRenderer | undefined;
@@ -281,6 +282,17 @@ function marketSignal(overrides: Partial<AxiSignalRecord> = {}): AxiSignalRecord
       },
     },
     received_at: "2026-09-28T12:00:00.000Z",
+    lifecycle: {
+      signal_id: "market-0001",
+      status: "ACTIVE",
+      entry_price: 100,
+      filled_at: "2026-09-28T12:00:00.000Z",
+      closed_at: null,
+      close_price: null,
+      close_reason: null,
+      result_r: null,
+      last_event_time: "2026-09-28T12:00:00.000Z",
+    },
   };
   return { ...record, ...overrides };
 }
@@ -298,8 +310,28 @@ function limitSignal(overrides: Partial<AxiSignalRecord> = {}): AxiSignalRecord 
       },
     },
     received_at: "2026-09-28T12:01:00.000Z",
+    lifecycle: {
+      signal_id: "limit-0001",
+      status: "PENDING",
+      entry_price: null,
+      filled_at: null,
+      closed_at: null,
+      close_price: null,
+      close_reason: null,
+      result_r: null,
+      last_event_time: "2026-09-28T11:58:59.000Z",
+    },
     ...overrides,
   };
+}
+
+
+function asDetail(record: AxiSignalRecord): AxiSignalDetailRecord {
+  return { ...record, lifecycle_events: [] };
+}
+
+function marketDetail(): AxiSignalDetailRecord {
+  return asDetail(marketSignal());
 }
 
 function equityPlan(): SignalEquityPlanResponse {
