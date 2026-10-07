@@ -1,10 +1,18 @@
-#ifndef CRYPTO_EDGE_PUBLISHER_MQH
+﻿#ifndef CRYPTO_EDGE_PUBLISHER_MQH
 #define CRYPTO_EDGE_PUBLISHER_MQH
 
-input bool   InpCE_Enabled     = false;
-input string InpCE_EngineVer   = "1.00";
-input string InpCE_StrategyVer = "1.00";
-input string InpCE_TerminalId  = "";
+//+------------------------------------------------------------------+
+//| CryptoEdgePublisher.mqh - wspolny publisher sygnalow Crypto Edge |
+//| Niezalezny od setupow i od wersji Engine.                        |
+//| Engine MUSI zadeklarowac PRZED #include <CryptoEdgePublisher.mqh>:|
+//|   input bool   InpCE_Enabled     = true;                         |
+//|   input string InpCE_EngineVer   = "<= #property version>";      |
+//|   input string InpCE_StrategyVer = "<wersja strategii>";         |
+//|   input string InpCE_TerminalId  = "";                           |
+//| Publisher tylko czyta te wartosci; brak deklaracji = blad        |
+//| kompilacji (celowo - bez cichych wartosci domyslnych).           |
+//| Tylko zapis do FILE_COMMON\CryptoEdge\outbox (bez HTTP).         |
+//+------------------------------------------------------------------+
 
 #define CE_COMMON_ROOT "CryptoEdge"
 #define CE_OUTBOX_DIR  "CryptoEdge\\outbox"
@@ -158,3 +166,4 @@ bool CryptoEdgePublishSignal(
 }
 
 #endif
+

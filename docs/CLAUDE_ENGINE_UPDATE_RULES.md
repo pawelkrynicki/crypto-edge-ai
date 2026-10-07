@@ -27,10 +27,12 @@ Crypto Edge receives the source signal whether or not MT4 later executes the tra
 
 ## Publisher contract
 
-`CryptoEdgePublisher.mqh` is setup-agnostic.
+`CryptoEdgePublisher.mqh` is setup-agnostic and version-agnostic.
 
 It must NOT:
+- declare `InpCE_Enabled`, `InpCE_EngineVer`, `InpCE_StrategyVer` or `InpCE_TerminalId`;
 - contain setup-specific logic or hardcoded A/B/C/... families;
+- contain Engine-version literals;
 - place trades;
 - call Kraken;
 - perform HTTP/WebRequest;
@@ -40,6 +42,20 @@ It only serializes a completed Engine signal into:
 `FILE_COMMON\CryptoEdge\outbox\<signal_id>.json`
 
 The Bridge owns transport from outbox to Crypto Edge AI.
+
+## Engine-owned Crypto Edge inputs
+
+Every released Engine MUST declare these inputs in the Engine source, immediately before:
+`#include <CryptoEdgePublisher.mqh>`
+
+Required shape:
+
+`input bool   InpCE_Enabled     = true;`
+`input string InpCE_EngineVer   = "<same as #property version>";`
+`input string InpCE_StrategyVer = "<deliberate strategy version>";`
+`input string InpCE_TerminalId  = "";`
+
+The publisher only reads these values. If an Engine does not declare them, compilation must fail rather than silently fall back to stale defaults.
 
 ## Default publishing state
 
@@ -54,8 +70,9 @@ The user may still manually disable publishing through MT4 inputs when intention
 
 For every Engine release:
 - `#property version` must contain the actual Engine version;
-- `InpCE_EngineVer` default must match the actual Engine version;
-- `InpCE_StrategyVer` must be deliberately set and not accidentally left stale.
+- `InpCE_EngineVer` in the Engine must match the actual Engine version;
+- `InpCE_StrategyVer` must be deliberately set and not accidentally left stale;
+- the shared publisher must contain no Engine-version default.
 
 Example for Engine 1.10:
 - `#property version "1.10"`
@@ -117,14 +134,18 @@ Claude must NOT require a change in `CryptoEdgePublisher.mqh` merely because the
 
 Every Engine release delivered by Claude must include:
 1. updated `.mq4`
-2. compiled `.ex4`
-3. canonical `CryptoEdgePublisher.mqh`
+2. compiled `.ex4` produced by the verifier run
+3. canonical, shared, version-agnostic `CryptoEdgePublisher.mqh`
 4. compile result: `0 errors, 0 warnings`
 5. release version
 6. setup list
 7. SHA256 of MQ4, EX4 and publisher
+8. `ENGINE_RELEASE_CHECK.txt`
+9. compile log
 
 Never deliver only EX4.
+
+MetaEditor output is not assumed byte-deterministic across independent compiles. The release EX4 is the EX4 produced by the PASS verifier run and copied into its output directory.
 
 ## Mandatory release checks
 
@@ -139,11 +160,14 @@ Before saying an Engine update is complete, Claude must explicitly verify:
 - [ ] MARKET mapping correct
 - [ ] LIMIT mapping correct
 - [ ] LIMIT cancel_price and validity are passed
+- [ ] Engine declares all four `InpCE_*` inputs before the publisher include
 - [ ] InpCE_Enabled default = true
 - [ ] InpCE_EngineVer matches Engine version
-- [ ] no Kraken/API/HTTP logic in publisher
+- [ ] publisher declares no `InpCE_*` inputs and contains no Engine-version defaults
+- [ ] verifier resolves the publisher from the actual MQL4 Include root used for compilation
+- [ ] no Kraken/API/HTTP/order-placement logic in publisher
 - [ ] compilation = 0 errors / 0 warnings
-- [ ] MQ4 + EX4 + publisher are all delivered
+- [ ] MQ4 + verifier-produced EX4 + publisher are all delivered
 
 ## What Claude should report after every update
 
