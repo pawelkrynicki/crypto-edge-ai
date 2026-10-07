@@ -166,4 +166,3 @@ bool CryptoEdgePublishSignal(
 }
 
 #endif
-
