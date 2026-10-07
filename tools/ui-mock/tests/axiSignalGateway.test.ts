@@ -208,6 +208,13 @@ describe("AXI signal gateway v1", () => {
       const detailBody = await detail.json() as { schema_version: string; signal: AxiCryptoSignal };
       assert.equal(detailBody.schema_version, "axi_signal_detail_v2");
       assert.equal(detailBody.signal.setup.setup_id, "independent-setup");
+
+      const equity = await fetch(`${api.base}/api/v1/trading/signals/equity-curve`, { headers: { cookie: cookie! } });
+      assert.equal(equity.status, 200);
+      const equityBody = await equity.json() as { schema_version: string; starting_equity_usd: number; risk_pct_per_trade: number };
+      assert.equal(equityBody.schema_version, "axi_reference_equity_curve_v1");
+      assert.equal(equityBody.starting_equity_usd, 10_000);
+      assert.equal(equityBody.risk_pct_per_trade, 1);
     } finally {
       await api.close();
     }
@@ -216,6 +223,7 @@ describe("AXI signal gateway v1", () => {
     try {
       assert.equal((await fetch(`${admin.base}/api/v1/trading/signals`)).status, 200);
       assert.equal((await fetch(`${admin.base}/api/v1/trading/signals/read-market-0001`)).status, 200);
+      assert.equal((await fetch(`${admin.base}/api/v1/trading/signals/equity-curve`)).status, 200);
     } finally { await admin.close(); }
 
     for (const role of ["CAMP_USER", "TRUSTED_TESTER"] as const) {

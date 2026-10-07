@@ -252,6 +252,20 @@ LIMIT ?
       }
     },
 
+    listForLifecycle(limit = 5000): AxiStoredSignal[] {
+      if (!Number.isSafeInteger(limit) || limit < 1 || limit > 10000) throw new AxiSignalRepositoryError();
+      try {
+        return database.prepare(`
+SELECT signal_id, canonical_payload, received_at
+FROM axi_crypto_signals
+ORDER BY received_at ASC, signal_id ASC
+LIMIT ?
+`).all(limit).map(mapStoredSignal);
+      } catch {
+        throw new AxiSignalRepositoryError();
+      }
+    },
+
     close(): void {
       database.close();
     },

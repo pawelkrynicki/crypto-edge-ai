@@ -18,6 +18,7 @@ import {
   loadSignalEquityPlan,
   type SignalEquityPlanResponse,
 } from "../src/services/signalEquityPlanDataSource.js";
+import type { AxiReferenceEquityCurve } from "../src/services/axiReferenceEquityDataSource.js";
 
 void React;
 
@@ -162,6 +163,10 @@ describe("01D Live Signals UI", () => {
       assert.match(loaded, /Cancel price/);
       assert.match(loaded, /Valid for/);
       assert.match(loaded, /ALLinCrypto Engine/);
+      assert.match(loaded, /Reference equity · \$10,000/);
+      assert.match(loaded, /risk \/ trade/);
+      assert.match(loaded, /Closed trades/);
+      assert.match(loaded, /Max DD/);
       assert.match(loaded, /Received/);
       assert.ok(loaded.indexOf("ETHUSD") < loaded.indexOf("BTCUSD"), "newest received record is first");
       assert.doesNotMatch(loaded, /trend-reclaim-v9|Trend reclaim v9|mean-revert-x|Mean Revert X|custom-trend|mean-reversion|Strategy version|2026\.09/);
@@ -240,17 +245,24 @@ async function renderLive({
   loadSignals,
   loadSignalDetail,
   loadEquityPlan,
+  loadReferenceEquity = async () => referenceEquity(),
 }: {
   locale?: "en" | "pl";
   loadSignals: (limit?: number) => Promise<AxiSignalRecord[]>;
   loadSignalDetail?: (signalId: string) => Promise<AxiSignalDetailRecord>;
   loadEquityPlan?: (signalId: string) => Promise<SignalEquityPlanResponse>;
+  loadReferenceEquity?: () => Promise<AxiReferenceEquityCurve>;
 }): Promise<TestRenderer.ReactTestRenderer> {
   let renderer: TestRenderer.ReactTestRenderer | undefined;
   await act(async () => {
     renderer = create(
       <ProductLocaleProvider initialLocale={locale}>
-        <LiveSignals loadSignals={loadSignals} loadSignalDetail={loadSignalDetail} loadEquityPlan={loadEquityPlan} />
+        <LiveSignals
+          loadSignals={loadSignals}
+          loadSignalDetail={loadSignalDetail}
+          loadEquityPlan={loadEquityPlan}
+          loadReferenceEquity={loadReferenceEquity}
+        />
       </ProductLocaleProvider>,
     );
     await flushPromises();
@@ -332,6 +344,66 @@ function asDetail(record: AxiSignalRecord): AxiSignalDetailRecord {
 
 function marketDetail(): AxiSignalDetailRecord {
   return asDetail(marketSignal());
+}
+
+function referenceEquity(): AxiReferenceEquityCurve {
+  return {
+    schema_version: "axi_reference_equity_curve_v1",
+    basis: "ENGINE_LIFECYCLE",
+    starting_equity_usd: 10_000,
+    risk_pct_per_trade: 1,
+    closed_trade_count: 3,
+    win_count: 2,
+    loss_count: 1,
+    flat_count: 0,
+    win_rate_pct: 66.67,
+    ending_equity_usd: 10_198.98,
+    net_pnl_usd: 198.98,
+    net_return_pct: 1.9898,
+    max_drawdown_pct: 1,
+    total_r: 2,
+    points: [
+      {
+        signal_id: "eq-1",
+        setup_id: "A",
+        symbol: "BTCUSD",
+        side: "BUY",
+        closed_at: "2026-10-01T11:00:00.000Z",
+        close_reason: "TP",
+        result_r: 2,
+        equity_before_usd: 10_000,
+        pnl_usd: 200,
+        equity_after_usd: 10_200,
+        drawdown_pct: 0,
+      },
+      {
+        signal_id: "eq-2",
+        setup_id: "B",
+        symbol: "BTCUSD",
+        side: "BUY",
+        closed_at: "2026-10-02T11:00:00.000Z",
+        close_reason: "SL",
+        result_r: -1,
+        equity_before_usd: 10_200,
+        pnl_usd: -102,
+        equity_after_usd: 10_098,
+        drawdown_pct: 1,
+      },
+      {
+        signal_id: "eq-3",
+        setup_id: "C",
+        symbol: "BTCUSD",
+        side: "BUY",
+        closed_at: "2026-10-03T11:00:00.000Z",
+        close_reason: "OTHER",
+        result_r: 1,
+        equity_before_usd: 10_098,
+        pnl_usd: 100.98,
+        equity_after_usd: 10_198.98,
+        drawdown_pct: 0.0098,
+      },
+    ],
+  };
 }
 
 function equityPlan(): SignalEquityPlanResponse {

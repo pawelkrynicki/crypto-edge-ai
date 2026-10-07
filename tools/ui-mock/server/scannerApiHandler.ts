@@ -150,6 +150,7 @@ import {
   AxiSignalLifecycleError,
   validateAxiSignalLifecycleEvent,
 } from "./axiSignalLifecycle.js";
+import { buildAxiReferenceEquityCurve } from "./axiReferenceEquityCurve.js";
 import {
   createKrakenAccountSource,
   type KrakenAccountSnapshot,
@@ -837,6 +838,11 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
         if (session.setCookie) res.setHeader("set-cookie", session.setCookie);
         if (!isAxiSignalReaderRole(session.context.role)) {
           sendJson(req, res, 403, { error: "axi_signals_forbidden", message: "Signal reads require OWNER or ADMIN access" }, runtimeMode);
+          return;
+        }
+        if (path === "/api/v1/trading/signals/equity-curve") {
+          const repository = await getAxiSignalRepository();
+          sendJson(req, res, 200, buildAxiReferenceEquityCurve(repository), runtimeMode);
           return;
         }
         if (path === "/api/v1/trading/signals") {

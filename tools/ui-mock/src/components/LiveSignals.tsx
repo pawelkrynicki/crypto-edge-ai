@@ -14,6 +14,10 @@ import {
   loadSignalEquityPlan,
   type SignalEquityPlanResponse,
 } from "../services/signalEquityPlanDataSource";
+import {
+  loadAxiReferenceEquityCurve,
+  type AxiReferenceEquityCurve,
+} from "../services/axiReferenceEquityDataSource";
 import { ActionButton, LoadingState, ReadOnlyCard, StatusBadge } from "./ProductUi";
 
 type FeedState =
@@ -37,10 +41,16 @@ type EquityPlanState =
   | { kind: "ready"; response: SignalEquityPlanResponse }
   | { kind: "error" };
 
+type ReferenceEquityState =
+  | { kind: "loading" }
+  | { kind: "ready"; curve: AxiReferenceEquityCurve }
+  | { kind: "error" };
+
 type LiveSignalsProps = {
   loadSignals?: typeof loadAxiSignals;
   loadSignalDetail?: typeof loadAxiSignalDetail;
   loadEquityPlan?: typeof loadSignalEquityPlan;
+  loadReferenceEquity?: typeof loadAxiReferenceEquityCurve;
 };
 
 /** Read-only presentation for records accepted by the AXI signal gateway. */
@@ -48,12 +58,14 @@ export function LiveSignals({
   loadSignals = loadAxiSignals,
   loadSignalDetail = loadAxiSignalDetail,
   loadEquityPlan = loadSignalEquityPlan,
+  loadReferenceEquity = loadAxiReferenceEquityCurve,
 }: LiveSignalsProps) {
   const { locale } = useProductLocale();
   const copy = LIVE_SIGNALS_COPY[locale];
   const [state, setState] = useState<FeedState>({ kind: "loading" });
   const [detail, setDetail] = useState<DetailState>({ kind: "idle" });
   const [equityPlan, setEquityPlan] = useState<EquityPlanState>({ kind: "idle" });
+  const [referenceEquity, setReferenceEquity] = useState<ReferenceEquityState>({ kind: "loading" });
 
   const reload = useCallback(async () => {
     setState({ kind: "loading" });
@@ -80,6 +92,21 @@ export function LiveSignals({
       cancelled = true;
     };
   }, [loadSignals]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setReferenceEquity({ kind: "loading" });
+    void loadReferenceEquity()
+      .then((curve) => {
+        if (!cancelled) setReferenceEquity({ kind: "ready", curve });
+      })
+      .catch(() => {
+        if (!cancelled) setReferenceEquity({ kind: "error" });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [loadReferenceEquity]);
 
   const selectSignal = useCallback(async (signalId: string) => {
     setDetail({ kind: "loading", signalId });
@@ -112,6 +139,8 @@ export function LiveSignals({
         </div>
         <StatusBadge tone="warning" className="live-signals-source-only">{copy.sourceOnly}</StatusBadge>
       </section>
+
+      <ReferenceEquityPanel state={referenceEquity} locale={locale} copy={copy} />
 
       {state.kind === "loading" && <LoadingState label={copy.loading} />}
 
@@ -177,6 +206,74 @@ export function LiveSignals({
         </>
       )}
     </div>
+  );
+}
+
+function ReferenceEquityPanel({
+  state,
+  locale,
+  copy,
+}: {
+  state: ReferenceEquityState;
+  locale: ProductLocale;
+  copy: LiveSignalsCopy;
+}) {
+  if (state.kind === "loading") {
+    return <ReadOnlyCard className="live-signals-equity"><p>{copy.referenceEquityLoading}</p></ReadOnlyCard>;
+  }
+  if (state.kind === "error") {
+    return <ReadOnlyCard className="live-signals-equity"><strong>{copy.referenceEquityUnavailable}</strong></ReadOnlyCard>;
+  }
+
+  const curve = state.curve;
+  const values = [curve.starting_equity_usd, ...curve.points.map((point) => point.equity_after_usd)];
+  const width = 720;
+  const height = 180;
+  const pad = 18;
+  const minValue = Math.min(...values);
+  const maxValue = Math.max(...values);
+  const span = Math.max(1, maxValue - minValue);
+  const xStep = values.length > 1 ? (width - 2 * pad) / (values.length - 1) : 0;
+  const chartPoints = values.map((value, index) => {
+    const x = pad + index * xStep;
+    const y = pad + (maxValue - value) / span * (height - 2 * pad);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+
+  return (
+    <ReadOnlyCard className="live-signals-equity" aria-label={copy.referenceEquityTitle}>
+      <header className="live-signals-equity-header">
+        <div>
+          <span className="section-label">{copy.referenceEquityEyebrow}</span>
+          <h4>{copy.referenceEquityTitle}</h4>
+          <p>{copy.referenceEquityBasis}</p>
+        </div>
+        <StatusBadge tone="accent">{formatSignalNumber(curve.risk_pct_per_trade, locale)}% {copy.riskPerTrade}</StatusBadge>
+      </header>
+
+      <dl className="live-signals-equity-metrics">
+        <SummaryMetric label={copy.startingEquity} value={formatUsd(curve.starting_equity_usd, locale)} />
+        <SummaryMetric label={copy.endingEquity} value={formatUsd(curve.ending_equity_usd, locale)} />
+        <SummaryMetric label={copy.netResult} value={formatSignedUsd(curve.net_pnl_usd, locale)} />
+        <SummaryMetric label={copy.totalR} value={formatR(curve.total_r, locale)} />
+        <SummaryMetric label={copy.winRate} value={curve.win_rate_pct === null ? "—" : `${formatSignalNumber(curve.win_rate_pct, locale)}%`} />
+        <SummaryMetric label={copy.maxDrawdown} value={`${formatSignalNumber(curve.max_drawdown_pct, locale)}%`} />
+      </dl>
+
+      {curve.closed_trade_count === 0 ? (
+        <p className="live-signals-equity-empty">{copy.noClosedTrades}</p>
+      ) : (
+        <div className="live-signals-equity-chart">
+          <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={copy.referenceEquityChartLabel}>
+            <polyline className="live-signals-equity-line" points={chartPoints} fill="none" />
+          </svg>
+          <footer>
+            <span>{copy.closedTrades}: {curve.closed_trade_count}</span>
+            <span>{copy.referenceEquityLast}: {formatSignalTimestamp(curve.points[curve.points.length - 1]!.closed_at, locale)}</span>
+          </footer>
+        </div>
+      )}
+    </ReadOnlyCard>
   );
 }
 
@@ -405,6 +502,11 @@ function formatR(value: number, locale: ProductLocale): string {
   return prefix + formatSignalNumber(value, locale) + "R";
 }
 
+function formatSignedUsd(value: number, locale: ProductLocale): string {
+  const prefix = value > 0 ? "+" : "";
+  return prefix + formatUsd(value, locale);
+}
+
 function formatSignalNumber(value: number, locale: ProductLocale): string {
   return new Intl.NumberFormat(locale === "pl" ? "pl-PL" : "en-US", {
     maximumFractionDigits: 8,
@@ -486,6 +588,22 @@ type LiveSignalsCopy = {
   closePrice: string;
   closeReason: string;
   resultR: string;
+  referenceEquityEyebrow: string;
+  referenceEquityTitle: string;
+  referenceEquityBasis: string;
+  referenceEquityLoading: string;
+  referenceEquityUnavailable: string;
+  referenceEquityChartLabel: string;
+  riskPerTrade: string;
+  startingEquity: string;
+  endingEquity: string;
+  netResult: string;
+  totalR: string;
+  winRate: string;
+  maxDrawdown: string;
+  closedTrades: string;
+  noClosedTrades: string;
+  referenceEquityLast: string;
   stopLoss: string;
   takeProfit: string;
   maxHold: string;
@@ -550,6 +668,22 @@ const LIVE_SIGNALS_COPY: Record<ProductLocale, LiveSignalsCopy> = {
     closePrice: "Close price",
     closeReason: "Close reason",
     resultR: "Result",
+    referenceEquityEyebrow: "Strategy reference",
+    referenceEquityTitle: "Reference equity · $10,000",
+    referenceEquityBasis: "Compounded from closed ALLinCrypto Engine lifecycle results only. This is not Kraken account equity.",
+    referenceEquityLoading: "Loading reference equity…",
+    referenceEquityUnavailable: "Reference equity is temporarily unavailable",
+    referenceEquityChartLabel: "Reference equity curve from closed Engine trades",
+    riskPerTrade: "risk / trade",
+    startingEquity: "Start",
+    endingEquity: "Current",
+    netResult: "Net P/L",
+    totalR: "Total R",
+    winRate: "Win rate",
+    maxDrawdown: "Max DD",
+    closedTrades: "Closed trades",
+    noClosedTrades: "No closed Engine trades yet. The curve starts at $10,000.",
+    referenceEquityLast: "Last close",
     stopLoss: "Stop loss",
     takeProfit: "Take profit",
     maxHold: "Max hold",
@@ -612,6 +746,22 @@ const LIVE_SIGNALS_COPY: Record<ProductLocale, LiveSignalsCopy> = {
     closePrice: "Cena zamknięcia",
     closeReason: "Powód zamknięcia",
     resultR: "Wynik",
+    referenceEquityEyebrow: "Wynik referencyjny strategii",
+    referenceEquityTitle: "Krzywa kapitału · 10 000 USD",
+    referenceEquityBasis: "Kapitał składany wyłącznie z zamkniętych transakcji lifecycle ALLinCrypto Engine. To nie jest equity konta Kraken.",
+    referenceEquityLoading: "Ładowanie krzywej kapitału…",
+    referenceEquityUnavailable: "Referencyjna krzywa kapitału jest chwilowo niedostępna",
+    referenceEquityChartLabel: "Referencyjna krzywa kapitału z zamkniętych transakcji Engine",
+    riskPerTrade: "ryzyka / trade",
+    startingEquity: "Start",
+    endingEquity: "Aktualnie",
+    netResult: "Wynik netto",
+    totalR: "Suma R",
+    winRate: "Skuteczność",
+    maxDrawdown: "Max DD",
+    closedTrades: "Zamknięte transakcje",
+    noClosedTrades: "Brak zamkniętych transakcji Engine. Krzywa startuje od 10 000 USD.",
+    referenceEquityLast: "Ostatnie zamknięcie",
     stopLoss: "Stop loss",
     takeProfit: "Take profit",
     maxHold: "Maks. czas utrzymania",
