@@ -752,3 +752,16 @@ Both tasks use AtStartup triggers, run as SYSTEM with Highest privileges, StartW
 Observed task state after manual launch through the same Scheduled Tasks: Running. LastTaskResult 267009 = 0x41301 = task is currently running, not a failure.
 
 Important: autostart configuration is functionally validated through the Scheduled Tasks, but the final reboot-specific acceptance is still pending until the next real VPS restart confirms both PREVIEW 4280 and Bridge return automatically without manual intervention.
+
+## 2026-10-07 — ALLinCrypto Engine 1.10 Crypto Edge default-on deploy PASS
+- Canonical VPS MT4 instance: CRYPTO ENGINE.
+- Engine source confirmed: ALLinCrypto Engine 1.10.mq4, #property version 1.10, NS=11.
+- Crypto Edge integration hooks confirmed: CryptoEdgePublisher.mqh include, CryptoEdgeInit(), CryptoEdgePublishSignal(...).
+- Canonical publisher restored on VPS and changed to default InpCE_Enabled=true.
+- InpCE_EngineVer synchronized to 1.10.
+- Separate CE build compiled with 0 errors / 0 warnings.
+- Build SHA256: 92681E45C40511ABBB5C995AFCB80D6D75CB581C629F787071BC0A894DDA1122.
+- Active ALLinCrypto Engine 1.10.ex4 on disk replaced with verified build; deploy PASS.
+- Backup created under C:\CryptoEdge\backup\ALLinCrypto_1.10\deploy-20261007-100533.
+- MT4 was NOT restarted; open orders were NOT touched. The running EA remains the already-loaded in-memory instance until the next EA reload / MT4 restart; after that the new default-on build becomes active.
+- Future Engine releases must follow docs/CLAUDE_ENGINE_UPDATE_RULES.md and pass scripts/win/verify-engine-integration-contract.ps1 before deployment.
