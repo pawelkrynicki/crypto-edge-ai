@@ -154,6 +154,8 @@ describe("01D Live Signals UI", () => {
       assert.match(loaded, /SELL/);
       assert.match(loaded, /MARKET/);
       assert.match(loaded, /LIMIT/);
+      assert.match(loaded, /STATUS UNCONFIRMED/);
+      assert.match(loaded, /No lifecycle event has been received from Engine/);
       assert.match(loaded, /Source signal time/);
       assert.match(loaded, /Signal entry/);
       assert.match(loaded, /Stop loss/);
@@ -294,6 +296,7 @@ function marketSignal(overrides: Partial<AxiSignalRecord> = {}): AxiSignalRecord
       },
     },
     received_at: "2026-09-28T12:00:00.000Z",
+    lifecycle_event_count: 1,
     lifecycle: {
       signal_id: "market-0001",
       status: "ACTIVE",
@@ -322,6 +325,7 @@ function limitSignal(overrides: Partial<AxiSignalRecord> = {}): AxiSignalRecord 
       },
     },
     received_at: "2026-09-28T12:01:00.000Z",
+    lifecycle_event_count: 0,
     lifecycle: {
       signal_id: "limit-0001",
       status: "PENDING",

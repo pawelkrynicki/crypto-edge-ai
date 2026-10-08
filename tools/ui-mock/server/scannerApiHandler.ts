@@ -848,10 +848,14 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
         if (path === "/api/v1/trading/signals") {
           const limit = parseAxiSignalListLimit(req.url);
           const repository = await getAxiSignalRepository();
-          const signals = repository.list(limit).map((record) => ({
-            ...record,
-            lifecycle: repository.getLifecycle(record.signal.signal_id).state,
-          }));
+          const signals = repository.list(limit).map((record) => {
+            const lifecycle = repository.getLifecycle(record.signal.signal_id);
+            return {
+              ...record,
+              lifecycle: lifecycle.state,
+              lifecycle_event_count: lifecycle.events.length,
+            };
+          });
           sendJson(req, res, 200, {
             schema_version: "axi_signal_list_v2",
             signals,
@@ -884,6 +888,7 @@ export function createScannerApiHandler(options: ScannerApiHandlerOptions = {}):
           schema_version: "axi_signal_detail_v2",
           ...record,
           lifecycle: lifecycle.state,
+          lifecycle_event_count: lifecycle.events.length,
           lifecycle_events: lifecycle.events,
         }, runtimeMode);
       } catch (error) {

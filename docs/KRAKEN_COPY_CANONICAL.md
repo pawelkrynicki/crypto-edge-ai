@@ -18,47 +18,46 @@ Status: canonical. Use this file as the first reference in every new KRAKEN Copy
 - **4173 = BSS / bet-smart-system preview**. Never use for Crypto Edge.
 - **4181 = temporary troubleshooting owner-review slot; retired and not canonical.**
 
-## Current verified PREVIEW state — 2026-10-05
-- **RC13 PREVIEW is live on `127.0.0.1:4280`.**
+## Current verified PREVIEW state — 2026-10-08
+- **RC14 PREVIEW is live on `127.0.0.1:4280`.**
 - PREVIEW health = `ok`.
-- PREVIEW RC13 runtime build SHA = `2c589466c5397d84cbd424f206cf808065ae0108`.
-- Bridge targets PREVIEW `4280`.
-- Genuine Engine signals reach Live Signals and Kraken Executor DRY-RUN end-to-end.
-- RC13 OWNER-only live-pilot preflight is PASS with submission route hidden, execution not submitted and both live flags OFF.
-- Hard live-pilot code ceiling = 25 USD notional.
+- PREVIEW RC14 runtime build SHA = `e51610351c53ba6eab699185c67b86a165530f4a`.
+- RC14 Bridge is running and targets PREVIEW `4280`.
+- RC14 isolated lifecycle acceptance PASS on localhost `4281`: SIGNAL_CREATED, ORDER_FILLED, POSITION_CLOSED TP/SL, SIGNAL_EXPIRED, SIGNAL_CANCELLED, result R and reference equity 10,000 -> 10,098 all passed.
+- Isolated UI review runtime PASS.
+- A real stale-state mismatch was found on PREVIEW: a historical ETHUSD LIMIT signal remained shown as PENDING/OCZEKUJE although the canonical MT4 Engine had already removed the order. Root cause: the historical signal has no lifecycle terminal event.
 - PROD `4180` remained untouched and running.
 
-## What is NOT yet proven / implemented
-- **PROVEN:** genuine runtime Crypto Engine signals reach Crypto Edge AI PREVIEW 4280 end-to-end.
-- **PROVEN ON PREVIEW:** RC12 Kraken Executor DRY-RUN converts a genuine Engine signal through Equity Planner -> Kraken instrument -> exact quantity -> deterministic/idempotent order intent.
-- **PROVEN ON PREVIEW:** RC13 live-pilot safety/preflight is deployed and PASS with submission route hidden, execution not submitted, both live flags OFF and hard pilot cap 25 USD.
-- **NOT YET PROVEN:** Kraken live account readiness on PREVIEW with server-side credentials and General API FULL_ACCESS while execution remains OFF.
-- **NOT YET PROVEN:** a separately owner-approved minimum-exposure live Kraken pilot and post-trade reconciliation.
+## What is proven / still blocked
+- **PROVEN:** genuine runtime Crypto Engine source signals reach Crypto Edge AI PREVIEW 4280.
+- **PROVEN:** RC14 lifecycle backend, Bridge routing, Live Signals lifecycle read-model and 10k reference equity work in isolated PREVIEW acceptance.
+- **PROVEN:** Kraken Executor DRY-RUN and RC13/RC14 live-pilot safety preflight remain fail-closed with real submission disabled.
+- **PROVEN:** Kraken Futures credential/auth readiness was verified separately with General API FULL_ACCESS and Transfer/Withdrawal NO_ACCESS.
+- **BLOCKED:** lifecycle-capable Engine 1.10 is NOT deployed to the canonical VPS MT4 runtime during current PREVIEW testing.
+- **BLOCKED:** real Kraken order submission and PROD promotion.
 
 ## Current hard safety state
-- `InpCE_Enabled=true` on the real VPS Crypto Engine.
-- Bridge targets PREVIEW `4280`.
-- RC13 PREVIEW 4280 is currently running.
+- PROD Crypto Edge AI `4180` = frozen. Do not modify during current tests.
+- Canonical VPS MT4 `CRYPTO ENGINE` = frozen for change-control purposes. Do not deploy the lifecycle-capable Engine build without separate explicit Paweł approval.
+- PREVIEW `4280` is the only active product test surface.
 - `CRYPTO_EDGE_EXECUTION=0`.
 - `CRYPTO_EDGE_KRAKEN_LIVE_PILOT=0`.
-- `submission_route_exposed=false` and `execution_submitted=false` are confirmed on PREVIEW.
-- RC13 live gate requires OWNER + execution flag + separate pilot flag + exact approved intent id + exact approved Kraken symbol + KRAKEN_LIVE + General API FULL_ACCESS + explicit pilot max notional.
-- Hard code ceiling for the first live pilot candidate = **25 USD notional**; configured pilot cap must be <= this value.
-- Timeout/ambiguous send is never automatically retried; same intent remains duplicate-blocked and requires `cliOrdId` reconciliation.
-- PROD `4180` remains blocked from any KRAKEN Copy promotion until live pilot + reconciliation PASS.
+- Real Kraken order submission remains OFF.
+- Hard code ceiling for any future owner-approved live pilot candidate remains 25 USD notional.
+- PROD promotion remains blocked until PREVIEW acceptance is complete and Paweł explicitly approves promotion.
 
 ## NEXT SINGLE STEP
-**Configure and verify Kraken live account readiness on PREVIEW 4280 using server-side credentials while `CRYPTO_EDGE_EXECUTION=0` and `CRYPTO_EDGE_KRAKEN_LIVE_PILOT=0`. No real Kraken order may be submitted.**
+**Fix stale/unconfirmed lifecycle presentation on PREVIEW only. Historical/source-only PENDING or ACTIVE states with zero lifecycle events must not be shown as authoritative current MT4 status.**
 
 Required next acceptance sequence:
-1. Keep RC13 on PREVIEW `4280`; PROD `4180` untouched.
-2. Add Kraken Futures credentials only to the PREVIEW server-side environment/secrets source; never expose them to browser/UI/logs/chat.
-3. Switch PREVIEW account source to `KRAKEN_LIVE` while keeping both execution flags OFF.
-4. Verify API-key readiness: account is connected, General API permission is FULL_ACCESS, Transfer permission should remain NO_ACCESS, and secrets are absent from all responses/logs.
-5. Re-run OWNER-only `kraken-live-pilot-plan` on a genuine Engine signal. It must remain blocked only by execution/pilot approval gates, not by account-readiness reasons.
-6. Confirm exact capped pilot quantity, PF_* symbol, deterministic `cliOrdId`, and max notional <= 25 USD while `submission_route_exposed=false` and `execution_submitted=false`.
-7. Present the exact pilot parameters to Paweł for explicit approval before exposing/enabling any submit path.
-8. PROD `4180` promotion remains blocked until controlled live pilot and post-trade reconciliation both PASS.
+1. Keep PROD `4180` and canonical MT4 `CRYPTO ENGINE` untouched.
+2. Add lifecycle evidence metadata to the Live Signals read model.
+3. Show `STATUS NIEPOTWIERDZONY` / `STATUS UNCONFIRMED` when no Engine lifecycle event has been observed for an initial PENDING/ACTIVE source state.
+4. Explain in UI that the record confirms the source signal only, not that an MT4 order still exists.
+5. Preserve authoritative TP, SL, EXPIRED, CANCELLED and ACTIVE-after-fill lifecycle statuses.
+6. Run focused gateway + Live Signals + lifecycle tests and INTERNAL_BETA build.
+7. Package the fix as a new immutable PREVIEW candidate and deploy to `4280` only.
+8. Verify the real historical ETHUSD record no longer appears as confidently `OCZEKUJE`.
 
 ## Hard process rules
 - Never deploy new KRAKEN Copy work first to PROD. PREVIEW first, PROD only after PASS + explicit Paweł approval.
@@ -862,3 +861,128 @@ Important: autostart configuration is functionally validated through the Schedul
 - Packaging safety gate PASS after sanitizing local absolute paths from the repo canonical document.
 - Deployment rule: PREVIEW 4280 only. PROD 4180 untouched. CRYPTO_EDGE_EXECUTION remains OFF.
 - Next acceptance: deploy RC14 to PREVIEW, keep existing state isolated, verify health, real Engine SIGNAL_CREATED + lifecycle events through Bridge, Live Signals statuses and reference equity endpoint/UI.
+
+
+## 2026-10-07 — RC14 PREVIEW deploy attempt STOP; automatic rollback PASS
+- Target remained PREVIEW 127.0.0.1:4280 only; PROD 4180 was not intentionally touched.
+- RC14 package checksum precheck passed and locked dependency install completed successfully (PNPM_INSTALL=PASS).
+- RC14 PREVIEW and Bridge launcher preparation passed; RC14 Scheduled Task registration passed.
+- During controlled RC13 -> RC14 switch, RC14 PREVIEW failed the health gate: /api/health on 4280 did not become OK within the deployment timeout.
+- Deployment script automatically rolled back to RC13.
+- Rollback verification: PREVIEW 4280 status=ok; build_sha=2c589466c5397d84cbd424f206cf808065ae0108.
+- RC14 must NOT be retried blindly. Next step is read-only diagnosis of RC14 launcher/task/log/startup failure, then FIX and a second controlled PREVIEW-only deployment attempt.
+- Real Kraken execution remains OFF. PROD promotion remains blocked.
+
+
+## 2026-10-07 — RC14 PREVIEW startup root cause identified
+- Failed RC14 PREVIEW switch was diagnosed from VPS runtime log.
+- RC14 release contents are present and valid under C:\CryptoEdge\releases\CAMP2026-VPS-RC14.
+- Failure cause is the generated RC14 autostart launcher using the wrong ReleaseRoot: C:\CryptoEdge\preview\releases\CAMP2026-VPS-RC14.
+- The launcher therefore attempted to execute C:\CryptoEdge\preview\releases\CAMP2026-VPS-RC14\scripts\win\start-product-vps.cmd, which does not exist.
+- RC13 rollback remains healthy on PREVIEW 4280 with build_sha 2c589466c5397d84cbd424f206cf808065ae0108.
+- RC14 tasks remain disabled pending correction.
+- Next step: correct RC14 PREVIEW and Bridge ReleaseRoot to C:\CryptoEdge\releases\CAMP2026-VPS-RC14, verify launcher contents, then perform a second controlled PREVIEW-only switch.
+
+
+## 2026-10-07 — RC14 PREVIEW deployment PASS
+- RC14 PREVIEW deployed successfully on canonical port 127.0.0.1:4280.
+- Runtime health = ok.
+- Runtime mode = INTERNAL_BETA.
+- Runtime build_sha = e51610351c53ba6eab699185c67b86a165530f4a.
+- RC14 Bridge task started successfully and is Running; LastTaskResult 267009 (0x41301 = currently running).
+- RC14 PREVIEW launcher root corrected to C:\CryptoEdge\releases\CAMP2026-VPS-RC14 after the first failed attempt exposed an incorrect C:\CryptoEdge\preview\releases path.
+- Safety flags confirmed during deployment: CRYPTO_EDGE_EXECUTION=0 and CRYPTO_EDGE_KRAKEN_LIVE_PILOT=0.
+- PROD 4180 integrity check PASS and remained untouched.
+- Old RC13 PREVIEW and Bridge tasks were disabled after successful RC14 switch.
+- Deployment status: PASS.
+- Next acceptance gate: verify Bridge really targets 4280, confirm genuine Engine SIGNAL_CREATED reaches RC14, then deploy/activate the lifecycle-capable Engine 1.10 build and verify real lifecycle event(s), Live Signals status/R, and the reference equity endpoint/UI before any PROD consideration.
+
+
+## 2026-10-07 — RC14 Bridge acceptance PASS
+- PREVIEW 4280 health = ok, runtime_mode=INTERNAL_BETA, build_sha=e51610351c53ba6eab699185c67b86a165530f4a.
+- RC14 PREVIEW task = Running, LastTaskResult 267009.
+- RC14 Bridge task = Running, LastTaskResult 267009.
+- Bridge launcher ReleaseRoot = C:\CryptoEdge\releases\CAMP2026-VPS-RC14.
+- Bridge endpoint = http://127.0.0.1:4280/api/v1/trading/signals/axi.
+- Active Bridge processes run from the RC14 release tree.
+- No RC13 process remains.
+- GET /api/v1/trading/signals/equity-curve returned HTTP 200 with schema axi_reference_equity_curve_v1, starting_equity_usd=10000, risk_pct_per_trade=1, closed_trade_count=0, ending_equity_usd=10000 and empty points, which is correct before lifecycle CLOSED trades arrive.
+- RC14 PREVIEW + Bridge infrastructure acceptance = PASS.
+- Next gate: controlled deployment of lifecycle-capable ALLinCrypto Engine 1.10 to canonical VPS MT4 instance CRYPTO ENGINE, then observe real SIGNAL_CREATED + lifecycle events through RC14 and validate Live Signals status/R plus reference equity updates.
+
+
+## 2026-10-08 — PROD freeze clarified by owner
+- Owner explicitly confirmed that current work remains PREVIEW-only.
+- PROD Crypto Edge AI on port 4180 must not be modified during this test phase.
+- The canonical VPS MT4 instance CRYPTO ENGINE is also treated as production runtime for change-control purposes. Do NOT deploy the lifecycle-capable Engine 1.10 build there during PREVIEW testing without separate explicit owner approval.
+- RC14 PREVIEW 4280 and RC14 Bridge remain the active test surface.
+- The previously proposed next step of deploying lifecycle Engine 1.10 to the canonical VPS MT4 is STOPPED.
+- Next work must validate lifecycle on an isolated PREVIEW/test MT4 path or equivalent non-production harness, while keeping PROD 4180 and the canonical CRYPTO ENGINE runtime unchanged.
+- Real Kraken execution remains OFF.
+
+
+## 2026-10-08 — RC14 PREVIEW lifecycle acceptance STOP before mutation
+- The attempted PREVIEW lifecycle acceptance stopped at the safety gate before any synthetic lifecycle files were written.
+- PREVIEW 4280 health/build and PROD 4180 pre-check both passed.
+- STOP reason was a test-script false negative: it incorrectly required CRYPTO_EDGE_EXECUTION=0 to be declared inside the RC14 Bridge autostart launcher.
+- CRYPTO_EDGE_EXECUTION and CRYPTO_EDGE_KRAKEN_LIVE_PILOT are product-runtime safety flags and must be verified on the PREVIEW product launch chain; the Bridge launcher itself does not need to declare them.
+- No lifecycle acceptance payloads were injected and the canonical CRYPTO ENGINE was not modified.
+- PROD 4180 remained untouched.
+- Next step: read-only verification of the RC14 PREVIEW task/wrapper safety flags and Bridge task/root contract, then rerun lifecycle acceptance using an isolated PREVIEW test root rather than the canonical MT4 outbox.
+
+
+## 2026-10-08 — RC14 safety contract read-only check PASS
+- RC14 PREVIEW wrapper explicitly sets CRYPTO_EDGE_EXECUTION=0, CRYPTO_EDGE_KRAKEN_LIVE_PILOT=0 and CRYPTO_EDGE_PRODUCT_PORT=4280.
+- RC14 Bridge wrapper also explicitly keeps CRYPTO_EDGE_EXECUTION=0 and CRYPTO_EDGE_KRAKEN_LIVE_PILOT=0 and targets http://127.0.0.1:4280/api/v1/trading/signals/axi.
+- RC14 PREVIEW autostart ReleaseRoot = C:\CryptoEdge\releases\CAMP2026-VPS-RC14 and sets product port 4280 plus both execution flags OFF.
+- RC14 Bridge autostart ReleaseRoot = C:\CryptoEdge\releases\CAMP2026-VPS-RC14 and targets PREVIEW 4280.
+- Scheduled Tasks Crypto Edge AI KRAKEN Preview RC14 and Crypto Edge AI KRAKEN Bridge RC14 are both Running and execute the RC14 wrappers.
+- Safety contract = PASS.
+- Next acceptance should use a fully isolated RC14 lifecycle harness with its own localhost port, SQLite state and Bridge root, so neither PROD 4180, PREVIEW 4280 state, nor canonical CRYPTO ENGINE/MT4 outbox are mutated by synthetic lifecycle events.
+
+
+## 2026-10-08 — RC14 isolated lifecycle acceptance PASS
+- Fully isolated RC14 lifecycle harness ran on localhost port 4281 with its own SQLite state and isolated Bridge root.
+- Canonical PROD 4180, canonical PREVIEW 4280 and canonical VPS MT4 CRYPTO ENGINE were not modified.
+- Synthetic MT4-style lifecycle path PASS: SIGNAL_CREATED -> ORDER_FILLED -> POSITION_CLOSED(TP), POSITION_CLOSED(SL), SIGNAL_EXPIRED, SIGNAL_CANCELLED.
+- Lifecycle read model PASS: TP trade resolved CLOSED / TP / +2R; SL trade resolved CLOSED / SL / -1R; LIMIT signals resolved EXPIRED and CANCELLED.
+- Reference equity PASS from 10,000 USD at 1% compounded risk: +2R -> 10,200; -1R -> 10,098; total R = +1; max drawdown = 1%.
+- Bridge delivery PASS with all test events delivered and no rejected payloads.
+- Real-environment integrity PASS: PROD 4180 untouched, PREVIEW 4280 untouched, CRYPTO ENGINE untouched.
+- Kraken execution remained OFF.
+- Evidence root on VPS: C:\CryptoEdge\preview\acceptance\rc14-lifecycle-20261008-072940.
+- Isolated harness was stopped cleanly after acceptance.
+- Next gate: UI acceptance for lifecycle/Live Signals and equity rendering, still without touching PROD or canonical CRYPTO ENGINE. Use isolated or preview-safe data only.
+
+
+## 2026-10-08 — RC14 isolated UI review runtime PASS
+- Isolated RC14 UI review runtime started successfully on localhost port 4281 using the previously accepted isolated lifecycle SQLite state.
+- UI_REVIEW_RUNTIME=PASS.
+- PROD 4180 integrity check PASS and PID unchanged.
+- PREVIEW 4280 integrity check PASS and PID unchanged.
+- Canonical CRYPTO ENGINE remained untouched.
+- Review URL: http://127.0.0.1:4281/#live-signals
+- Next gate: visual UI acceptance of Live Signals lifecycle labels/details and reference equity rendering from the isolated accepted state.
+
+
+## 2026-10-08 — Real stale PENDING mismatch identified on PREVIEW
+- Owner compared PREVIEW Live Signals with the canonical MT4 CRYPTO ENGINE screen.
+- The ETHUSD SELL LIMIT record shown as OCZEKUJE in PREVIEW matches the real Engine signal by price geometry: entry 2578.589, SL ~2597.03 and cancel price 2551.32.
+- MT4 Engine notifications show that this LIMIT was later removed/cancelled, while the current MT4 account has 0 open positions/orders.
+- PREVIEW still shows the signal as PENDING because it received SIGNAL_CREATED but no corresponding SIGNAL_CANCELLED lifecycle event from the currently running production Engine integration.
+- This is therefore a real stale-state mismatch, not an active pending MT4 order.
+- Product/UI must not present such legacy/non-lifecycle records as confidently OCZEKUJE. They need a distinct legacy/unknown-lifecycle treatment until lifecycle telemetry is available.
+- PROD and canonical CRYPTO ENGINE remain frozen. Fix/test must stay PREVIEW-only or isolated.
+
+
+## 2026-10-08 — Stale/unconfirmed lifecycle presentation local FIX PASS
+- Branch: feature/kraken-copy-05-signal-lifecycle.
+- Read model now exposes lifecycle_event_count for Live Signals list/detail responses.
+- Live Signals no longer presents an initial PENDING state or an ACTIVE state without fill evidence as authoritative current MT4 status when lifecycle_event_count=0.
+- Such source-only records now show STATUS NIEPOTWIERDZONY / STATUS UNCONFIRMED.
+- UI explanation: the record confirms that Engine emitted the source signal, not that an MT4 order still exists.
+- Authoritative lifecycle states remain unchanged when Engine lifecycle evidence exists: ACTIVE after ORDER_FILLED, TP/SL/TIME_EXIT/MANUAL/OTHER after POSITION_CLOSED, EXPIRED and CANCELLED.
+- Focused validation: AXI gateway 10/10 PASS; Live Signals UI 5/5 PASS; lifecycle/equity suite 11/11 PASS. Combined focused suite 26/26 PASS.
+- INTERNAL_BETA build PASS.
+- PROD 4180 and canonical VPS MT4 CRYPTO ENGINE were not modified.
+- Next: commit/package as a new immutable PREVIEW candidate and deploy only to 4280, then verify the historical ETHUSD record displays unconfirmed rather than OCZEKUJE.

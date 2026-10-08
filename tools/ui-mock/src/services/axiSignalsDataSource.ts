@@ -64,6 +64,7 @@ export type AxiSignalRecord = {
   };
   received_at: string;
   lifecycle: AxiSignalLifecycleState;
+  lifecycle_event_count: number;
 };
 
 export type AxiSignalDetailRecord = AxiSignalRecord & {
@@ -120,6 +121,7 @@ export async function loadAxiSignalDetail(
     signal: value.signal,
     received_at: value.received_at,
     lifecycle: value.lifecycle,
+    lifecycle_event_count: value.lifecycle_event_count,
     lifecycle_events: value.lifecycle_events,
   };
 }
@@ -145,6 +147,7 @@ function isSignalDetail(value: unknown): value is {
   signal: AxiSignalRecord["signal"];
   received_at: string;
   lifecycle: AxiSignalLifecycleState;
+  lifecycle_event_count: number;
   lifecycle_events: AxiSignalLifecycleEventRecord[];
 } {
   return isRecord(value)
@@ -152,6 +155,7 @@ function isSignalDetail(value: unknown): value is {
     && isSignal(value.signal)
     && isUtcTimestamp(value.received_at)
     && isLifecycleState(value.lifecycle)
+    && isNonNegativeInteger(value.lifecycle_event_count)
     && Array.isArray(value.lifecycle_events)
     && value.lifecycle_events.every(isLifecycleEventRecord);
 }
@@ -160,7 +164,8 @@ function isSignalRecord(value: unknown): value is AxiSignalRecord {
   return isRecord(value)
     && isSignal(value.signal)
     && isUtcTimestamp(value.received_at)
-    && isLifecycleState(value.lifecycle);
+    && isLifecycleState(value.lifecycle)
+    && isNonNegativeInteger(value.lifecycle_event_count);
 }
 
 function isSignal(value: unknown): value is AxiSignalRecord["signal"] {
@@ -240,6 +245,10 @@ function isNullablePositiveNumber(value: unknown): value is number | null {
 
 function isNullablePositiveInteger(value: unknown): value is number | null {
   return value === null || (typeof value === "number" && Number.isSafeInteger(value) && value > 0);
+}
+
+function isNonNegativeInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 }
 
 function isFiniteNumber(value: unknown): value is number {

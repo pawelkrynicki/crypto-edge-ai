@@ -198,16 +198,18 @@ describe("AXI signal gateway v1", () => {
 
       const list = await fetch(`${api.base}/api/v1/trading/signals?limit=1`, { headers: { cookie: cookie! } });
       assert.equal(list.status, 200);
-      const listBody = await list.json() as { schema_version: string; signals: Array<{ signal: AxiCryptoSignal }> };
+      const listBody = await list.json() as { schema_version: string; signals: Array<{ signal: AxiCryptoSignal; lifecycle_event_count: number }> };
       assert.equal(listBody.schema_version, "axi_signal_list_v2");
       assert.equal(listBody.signals.length, 1);
       assert.equal(listBody.signals[0]?.signal.signal_id, "read-limit-0001");
+      assert.equal(listBody.signals[0]?.lifecycle_event_count, 0);
 
       const detail = await fetch(`${api.base}/api/v1/trading/signals/read-market-0001`, { headers: { cookie: cookie! } });
       assert.equal(detail.status, 200);
-      const detailBody = await detail.json() as { schema_version: string; signal: AxiCryptoSignal };
+      const detailBody = await detail.json() as { schema_version: string; signal: AxiCryptoSignal; lifecycle_event_count: number };
       assert.equal(detailBody.schema_version, "axi_signal_detail_v2");
       assert.equal(detailBody.signal.setup.setup_id, "independent-setup");
+      assert.equal(detailBody.lifecycle_event_count, 0);
 
       const equity = await fetch(`${api.base}/api/v1/trading/signals/equity-curve`, { headers: { cookie: cookie! } });
       assert.equal(equity.status, 200);
