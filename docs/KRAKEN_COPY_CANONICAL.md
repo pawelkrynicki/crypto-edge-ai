@@ -23,8 +23,10 @@ Status: canonical. Use this file as the first reference in every new KRAKEN Copy
 - PREVIEW health = `ok`.
 - PREVIEW RC15 runtime build SHA = `c7702f215e5f569ede643ffd5fb6b43bbbb30a83`.
 - RC15 Bridge is running and targets PREVIEW `4280`.
-- RC14 isolated lifecycle acceptance on localhost `4281` remains PASS: SIGNAL_CREATED, ORDER_FILLED, POSITION_CLOSED TP/SL, SIGNAL_EXPIRED, SIGNAL_CANCELLED, result R and reference equity 10,000 -> 10,098.
-- RC15 adds truthful stale-state presentation: source-only initial states with zero lifecycle events are shown as STATUS NIEPOTWIERDZONY / STATUS UNCONFIRMED instead of authoritative PENDING/ACTIVE.
+- Historical executed trades were reconciled against MT4/broker logs on PREVIEW only. Current reference equity is 9,566.01 USD from 9 CLOSED broker-executed trades; source-only records with no MT4 ticket are excluded from equity.
+- B BTCUSD ticket 301285982 is CLOSED / TP / +2.06371R. E ETHUSD ticket 300745776 is CLOSED / SL / -1.002151R.
+- Source-only records with no broker ticket must not be presented as active trades. Next candidate simplifies them to SYGNAŁ / SIGNAL.
+- Local next-candidate refresh behavior is implemented and validated: full product snapshot every 15 minutes; Live Signals feed + reference equity poll every 2 seconds and refresh immediately on window focus.
 - PROD `4180` remained untouched and running.
 - Canonical VPS MT4 `CRYPTO ENGINE` remained untouched.
 
@@ -47,15 +49,17 @@ Status: canonical. Use this file as the first reference in every new KRAKEN Copy
 - PROD promotion remains blocked until PREVIEW acceptance is complete and Paweł explicitly approves promotion.
 
 ## NEXT SINGLE STEP
-**Verify RC15 visually on PREVIEW 4280 against the real historical ETHUSD stale record.**
+**Package and deploy the refresh/status candidate to PREVIEW 4280 only.**
 
 Required next acceptance sequence:
 1. Keep PROD `4180` and canonical MT4 `CRYPTO ENGINE` untouched.
-2. Refresh PREVIEW `http://127.0.0.1:4280/#live-signals`.
-3. Confirm the historical ETHUSD LIMIT record with no lifecycle events shows `STATUS NIEPOTWIERDZONY`, not `OCZEKUJE`.
-4. Confirm the explanatory note says the record proves the source signal only, not that an MT4 order still exists.
-5. Confirm authoritative lifecycle records still render TP, SL, WYGASŁ, ANULOWANY and ACTIVE-after-fill correctly.
-6. Only after this UI acceptance choose the next PREVIEW-only development gate.
+2. Package a new immutable PREVIEW candidate containing: SYGNAŁ / SIGNAL for source-only records, no technical warning prose, 15-minute product snapshot refresh, and 2-second Live Signals + equity background refresh.
+3. Publish the archive through GitHub Releases and download it directly on the VPS with SHA256 verification.
+4. Deploy only to PREVIEW `4280` with rollback to RC15 on failure.
+5. Verify a new MARKET source signal appears on Live Signals within a few seconds without F5.
+6. Verify TP/SL/equity changes appear automatically without F5.
+7. Verify the rest of Crypto Edge AI refreshes automatically on the 15-minute snapshot cadence.
+8. PROD promotion remains blocked.
 
 ## Hard process rules
 - Never deploy new KRAKEN Copy work first to PROD. PREVIEW first, PROD only after PASS + explicit Paweł approval.
@@ -1141,3 +1145,16 @@ Important: autostart configuration is functionally validated through the Schedul
 - Total R = -4.378441; closed trades = 9; win rate = 22.22%; max DD = 6.2741%.
 - This is the last broker-executed unresolved trade found by the current audit. Remaining unresolved real records are source-signal-only with no matching MT4 ticket and must not be treated as open trades or included in reference equity.
 - PROD 4180 and canonical CRYPTO ENGINE remained untouched.
+
+
+## 2026-10-08 — Automatic refresh + immediate MARKET visibility local PASS
+- Owner requirement: Crypto Edge AI must refresh automatically like token snapshots and MARKET signals must appear without manual F5.
+- Implemented full product data refresh every 15 minutes using the existing bounded last-known-good refresh path. This refreshes product data without reloading the browser route or losing the current section.
+- Implemented dedicated Live Signals background polling every 2 seconds. It refreshes the signal list and reference equity without putting the page back into a loading state.
+- When a source record is selected, its lifecycle detail is also refreshed in the same live poll.
+- Window focus triggers an immediate Live Signals refresh.
+- This keeps MARKET delivery independent from the 15-minute product snapshot. With the existing Bridge poll of ~1 second, a new Engine SIGNAL_CREATED should normally become visible on an open Live Signals page within a few seconds.
+- Source-only UI simplification remains part of the candidate: no STATUS NIEPOTWIERDZONY and no technical explanatory paragraph; source-only records display SYGNAŁ / SIGNAL.
+- Validation: Live Signals UI 7/7 PASS, Product refresh flow 8/8 PASS, AXI gateway 10/10 PASS, lifecycle/equity 11/11 PASS, INTERNAL_BETA build PASS.
+- PROD 4180 and canonical CRYPTO ENGINE were not modified.
+- Next: package immutable PREVIEW candidate, publish via GitHub Releases, deploy to 4280 only and visually verify auto-refresh behavior.

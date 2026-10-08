@@ -149,6 +149,8 @@ export function getProductNavItemsForRole(
 
 type RadarBasketId = "new_emerging" | "maturing" | "established";
 
+export const PRODUCT_SNAPSHOT_AUTO_REFRESH_MS = 15 * 60 * 1_000;
+
 const SECTION_TO_HASH: Record<ProductSectionId, string> = {
   "candidate-results": "#candidate-results",
   "candidate-detail": "#candidate-detail",
@@ -604,6 +606,13 @@ export function ProductAppContent({
       }
     }).catch(() => loadData().then(() => undefined));
   }, [loadData, loadVersionPointer]);
+
+  useEffect(() => {
+    const timer = globalThis.setInterval(() => {
+      void refreshView();
+    }, PRODUCT_SNAPSHOT_AUTO_REFRESH_MS);
+    return () => globalThis.clearInterval(timer);
+  }, [refreshView]);
 
   useEffect(() => {
     if (activeSection !== "candidate-detail" && activeSection !== "external-checks" && routeTokenIdentity === null) return;

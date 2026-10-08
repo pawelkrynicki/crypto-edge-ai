@@ -4,7 +4,7 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import TestRenderer from "react-test-renderer";
 import { getProductNavItemsForRole } from "../src/ProductApp.js";
-import { LiveSignals } from "../src/components/LiveSignals.js";
+import { LIVE_SIGNALS_POLL_INTERVAL_MS, LiveSignals } from "../src/components/LiveSignals.js";
 import { ProductWorkspaceShell, type ProductNavItem } from "../src/components/ProductWorkspaceShell.js";
 import { ProductLocaleProvider } from "../src/productI18n.js";
 import {
@@ -26,6 +26,35 @@ const { act, create } = TestRenderer;
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 describe("01D Live Signals UI", () => {
+  it("uses a two-second live poll so MARKET signals do not wait for the 15-minute product snapshot", () => {
+    assert.equal(LIVE_SIGNALS_POLL_INTERVAL_MS, 2_000);
+  });
+
+  it("background polling refreshes signals and reference equity without a manual page refresh", async () => {
+    let signalReads = 0;
+    let equityReads = 0;
+    const renderer = await renderLive({
+      pollIntervalMs: 10,
+      loadSignals: async () => {
+        signalReads += 1;
+        return [marketSignal()];
+      },
+      loadReferenceEquity: async () => {
+        equityReads += 1;
+        return referenceEquity();
+      },
+    });
+    try {
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 35));
+      });
+      assert.ok(signalReads >= 2, "signal feed should refresh in the background");
+      assert.ok(equityReads >= 2, "reference equity should refresh in the background");
+    } finally {
+      await act(async () => { renderer.unmount(); });
+    }
+  });
+
   it("places Live Signals as the first Trading navigation item without changing existing sections", () => {
     const navItems: ProductNavItem[] = [
       { id: "candidate-results", label: "Radar", icon: "R", description: "Radar", groupLabel: "Product Flow" },
@@ -248,12 +277,14 @@ async function renderLive({
   loadSignalDetail,
   loadEquityPlan,
   loadReferenceEquity = async () => referenceEquity(),
+  pollIntervalMs = 0,
 }: {
   locale?: "en" | "pl";
   loadSignals: (limit?: number) => Promise<AxiSignalRecord[]>;
   loadSignalDetail?: (signalId: string) => Promise<AxiSignalDetailRecord>;
   loadEquityPlan?: (signalId: string) => Promise<SignalEquityPlanResponse>;
   loadReferenceEquity?: () => Promise<AxiReferenceEquityCurve>;
+  pollIntervalMs?: number;
 }): Promise<TestRenderer.ReactTestRenderer> {
   let renderer: TestRenderer.ReactTestRenderer | undefined;
   await act(async () => {
@@ -264,6 +295,7 @@ async function renderLive({
           loadSignalDetail={loadSignalDetail}
           loadEquityPlan={loadEquityPlan}
           loadReferenceEquity={loadReferenceEquity}
+          pollIntervalMs={pollIntervalMs}
         />
       </ProductLocaleProvider>,
     );

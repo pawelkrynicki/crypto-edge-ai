@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import React from "react";
 import TestRenderer from "react-test-renderer";
 import {
+  PRODUCT_SNAPSHOT_AUTO_REFRESH_MS,
   ProductAppContent,
   type ProductAppDataSources,
 } from "../src/ProductApp.js";
@@ -29,6 +30,10 @@ const CONTRACT = "0x1111111111111111111111111111111111111111";
 const PAIR = "0x2222222222222222222222222222222222222222";
 
 describe("ProductApp Refresh View last-known-good flow", () => {
+  it("keeps the product snapshot refresh cadence at 15 minutes", () => {
+    assert.equal(PRODUCT_SNAPSHOT_AUTO_REFRESH_MS, 15 * 60 * 1_000);
+  });
+
   it("keeps the complete accepted view through a failed refresh and replaces it on the next success", async () => {
     const first = readyResult(scannerOutput("scan_refresh_1", "FIRST", "2026-07-30T12:00:00.000Z"));
     const next = readyResult(scannerOutput("scan_refresh_2", "NEXT", "2026-07-30T12:05:00.000Z"));

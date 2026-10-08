@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 void React; // Required by the Node TSX test runtime's classic JSX transform.
 import { useProductLocale, type ProductLocale } from "../productI18n";
@@ -46,11 +46,14 @@ type ReferenceEquityState =
   | { kind: "ready"; curve: AxiReferenceEquityCurve }
   | { kind: "error" };
 
+export const LIVE_SIGNALS_POLL_INTERVAL_MS = 2_000;
+
 type LiveSignalsProps = {
   loadSignals?: typeof loadAxiSignals;
   loadSignalDetail?: typeof loadAxiSignalDetail;
   loadEquityPlan?: typeof loadSignalEquityPlan;
   loadReferenceEquity?: typeof loadAxiReferenceEquityCurve;
+  pollIntervalMs?: number;
 };
 
 /** Read-only presentation for records accepted by the AXI signal gateway. */
@@ -59,6 +62,7 @@ export function LiveSignals({
   loadSignalDetail = loadAxiSignalDetail,
   loadEquityPlan = loadSignalEquityPlan,
   loadReferenceEquity = loadAxiReferenceEquityCurve,
+  pollIntervalMs = LIVE_SIGNALS_POLL_INTERVAL_MS,
 }: LiveSignalsProps) {
   const { locale } = useProductLocale();
   const copy = LIVE_SIGNALS_COPY[locale];
@@ -66,49 +70,76 @@ export function LiveSignals({
   const [detail, setDetail] = useState<DetailState>({ kind: "idle" });
   const [equityPlan, setEquityPlan] = useState<EquityPlanState>({ kind: "idle" });
   const [referenceEquity, setReferenceEquity] = useState<ReferenceEquityState>({ kind: "loading" });
+  const selectedSignalIdRef = useRef<string | null>(null);
+
+  const refreshLiveData = useCallback(async (foreground = false) => {
+    if (foreground) {
+      setState({ kind: "loading" });
+      setReferenceEquity({ kind: "loading" });
+      setDetail({ kind: "idle" });
+      setEquityPlan({ kind: "idle" });
+      selectedSignalIdRef.current = null;
+    }
+
+    const selectedSignalId = selectedSignalIdRef.current;
+    const [signalsResult, equityResult, detailResult] = await Promise.allSettled([
+      loadSignals(50),
+      loadReferenceEquity(),
+      selectedSignalId ? loadSignalDetail(selectedSignalId) : Promise.resolve(null),
+    ]);
+
+    if (signalsResult.status === "fulfilled") {
+      setState({ kind: "ready", signals: sortNewestFirst(signalsResult.value) });
+    } else {
+      setState((current) => foreground || current.kind !== "ready"
+        ? classifyFeedError(signalsResult.reason)
+        : current);
+    }
+
+    if (equityResult.status === "fulfilled") {
+      setReferenceEquity({ kind: "ready", curve: equityResult.value });
+    } else {
+      setReferenceEquity((current) => foreground || current.kind !== "ready"
+        ? { kind: "error" }
+        : current);
+    }
+
+    if (selectedSignalId && detailResult.status === "fulfilled" && detailResult.value) {
+      setDetail({ kind: "ready", record: detailResult.value });
+    }
+  }, [loadReferenceEquity, loadSignalDetail, loadSignals]);
 
   const reload = useCallback(async () => {
-    setState({ kind: "loading" });
-    setDetail({ kind: "idle" });
-    setEquityPlan({ kind: "idle" });
-    try {
-      const signals = sortNewestFirst(await loadSignals(50));
-      setState({ kind: "ready", signals });
-    } catch (error) {
-      setState(classifyFeedError(error));
-    }
-  }, [loadSignals]);
+    await refreshLiveData(true);
+  }, [refreshLiveData]);
 
   useEffect(() => {
-    let cancelled = false;
-    void loadSignals(50)
-      .then((signals) => {
-        if (!cancelled) setState({ kind: "ready", signals: sortNewestFirst(signals) });
-      })
-      .catch((error) => {
-        if (!cancelled) setState(classifyFeedError(error));
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [loadSignals]);
+    void refreshLiveData().catch(() => undefined);
+  }, [refreshLiveData]);
 
   useEffect(() => {
-    let cancelled = false;
-    setReferenceEquity({ kind: "loading" });
-    void loadReferenceEquity()
-      .then((curve) => {
-        if (!cancelled) setReferenceEquity({ kind: "ready", curve });
-      })
-      .catch(() => {
-        if (!cancelled) setReferenceEquity({ kind: "error" });
-      });
-    return () => {
-      cancelled = true;
+    if (!Number.isFinite(pollIntervalMs) || pollIntervalMs <= 0) return undefined;
+    let inFlight = false;
+    const poll = () => {
+      if (inFlight) return;
+      inFlight = true;
+      void refreshLiveData()
+        .catch(() => undefined)
+        .finally(() => {
+          inFlight = false;
+        });
     };
-  }, [loadReferenceEquity]);
+    const timer = globalThis.setInterval(poll, pollIntervalMs);
+    const focusHandler = () => poll();
+    if (typeof window !== "undefined") window.addEventListener("focus", focusHandler);
+    return () => {
+      globalThis.clearInterval(timer);
+      if (typeof window !== "undefined") window.removeEventListener("focus", focusHandler);
+    };
+  }, [pollIntervalMs, refreshLiveData]);
 
   const selectSignal = useCallback(async (signalId: string) => {
+    selectedSignalIdRef.current = signalId;
     setDetail({ kind: "loading", signalId });
     setEquityPlan({ kind: "loading" });
     const [detailResult, planResult] = await Promise.allSettled([
