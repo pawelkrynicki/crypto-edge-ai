@@ -986,3 +986,17 @@ Important: autostart configuration is functionally validated through the Schedul
 - INTERNAL_BETA build PASS.
 - PROD 4180 and canonical VPS MT4 CRYPTO ENGINE were not modified.
 - Next: commit/package as a new immutable PREVIEW candidate and deploy only to 4280, then verify the historical ETHUSD record displays unconfirmed rather than OCZEKUJE.
+
+
+## 2026-10-08 — RC15 PREVIEW package ready PASS
+- Release id: CAMP2026-VPS-RC15.
+- Source commit: c7702f215e5f569ede643ffd5fb6b43bbbb30a83 on feature/kraken-copy-05-signal-lifecycle.
+- Purpose: stale/unconfirmed lifecycle presentation fix for Live Signals.
+- Focused validation before packaging: AXI gateway 10/10 PASS; Live Signals UI 5/5 PASS; lifecycle/equity 11/11 PASS; combined 26/26 PASS.
+- INTERNAL_BETA build boundary PASS.
+- Application archive: release-artifacts\CAMP2026-VPS-RC15\crypto-edge-ai-CAMP2026-VPS-RC15-app.zip.
+- Archive size: 2,368,445 bytes.
+- SHA256: CF9A7FFBA93C63E66F004BDF877600036DB38F072E67E80E35B5678846E86420.
+- Packaging safety gate PASS.
+- Deployment rule: PREVIEW 4280 only. PROD 4180 and canonical VPS MT4 CRYPTO ENGINE remain frozen.
+- After PREVIEW deployment, verify the real historical ETHUSD source signal shows STATUS NIEPOTWIERDZONY rather than OCZEKUJE and that authoritative lifecycle records still show TP/SL/EXPIRED/CANCELLED/ACTIVE correctly.
