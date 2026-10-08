@@ -291,7 +291,6 @@ function SignalCard({
   onSelect: (signalId: string) => void;
 }) {
   const { signal, lifecycle } = record;
-  const lifecycleUnconfirmed = isLifecycleUnconfirmed(lifecycle, record.lifecycle_event_count);
   const lifecycleBadge = lifecyclePresentation(lifecycle, record.lifecycle_event_count, locale);
   return (
     <ReadOnlyCard className={`live-signal-card ${selected ? "selected" : ""}`}>
@@ -306,10 +305,6 @@ function SignalCard({
           <StatusBadge tone="accent">{signal.trade.order_type}</StatusBadge>
         </div>
       </header>
-
-      {lifecycleUnconfirmed && (
-        <p className="live-signal-lifecycle-note">{copy.lifecycleUnconfirmedNote}</p>
-      )}
 
       <dl className="live-signal-facts">
         <Fact label={copy.sourceSignalTime} value={formatSignalTimestamp(signal.trade.source_signal_time, locale)} />
@@ -364,16 +359,12 @@ function SignalDetailPanel({
     return <aside className="live-signal-detail live-signal-detail-state" data-live-signals-detail-state="error"><strong>{copy.detailErrorTitle}</strong><p>{copy.detailErrorDetail}</p></aside>;
   }
   const { signal, lifecycle } = detail.record;
-  const lifecycleUnconfirmed = isLifecycleUnconfirmed(lifecycle, detail.record.lifecycle_event_count);
   const lifecycleBadge = lifecyclePresentation(lifecycle, detail.record.lifecycle_event_count, locale);
   return (
     <aside className="live-signal-detail" data-live-signals-detail-state="ready" aria-label={copy.detailLabel}>
       <span className="section-label">{copy.detailLabel}</span>
       <h4>{signal.trade.symbol} <span aria-hidden="true">·</span> {signal.trade.side}</h4>
       <StatusBadge tone={lifecycleBadge.tone}>{lifecycleBadge.label}</StatusBadge>
-      {lifecycleUnconfirmed && (
-        <p className="live-signal-lifecycle-note">{copy.lifecycleUnconfirmedNote}</p>
-      )}
       <dl className="live-signal-detail-facts">
         <Fact label={copy.sourceEngine} value={`${signal.source.engine} ${signal.source.engine_version}`} />
         <Fact label={copy.receivedAt} value={formatSignalTimestamp(detail.record.received_at, locale)} />
@@ -489,7 +480,7 @@ function lifecyclePresentation(
   locale: ProductLocale,
 ): { label: string; tone: "neutral" | "accent" | "ready" | "warning" | "critical" } {
   if (isLifecycleUnconfirmed(lifecycle, eventCount)) {
-    return { label: locale === "pl" ? "STATUS NIEPOTWIERDZONY" : "STATUS UNCONFIRMED", tone: "warning" };
+    return { label: locale === "pl" ? "SYGNAŁ" : "SIGNAL", tone: "neutral" };
   }
   if (lifecycle.status === "PENDING") return { label: locale === "pl" ? "OCZEKUJE" : "PENDING", tone: "warning" };
   if (lifecycle.status === "EXPIRED") return { label: locale === "pl" ? "WYGASŁ" : "EXPIRED", tone: "neutral" };
@@ -637,7 +628,6 @@ type LiveSignalsCopy = {
   detailErrorDetail: string;
   detailLabel: string;
   sourceEngine: string;
-  lifecycleUnconfirmedNote: string;
   detailBoundary: string;
   yourPositionPlan: string;
   planLoading: string;
@@ -718,7 +708,6 @@ const LIVE_SIGNALS_COPY: Record<ProductLocale, LiveSignalsCopy> = {
     detailErrorDetail: "The list remains available; try selecting the signal again later.",
     detailLabel: "Source record details",
     sourceEngine: "Source engine",
-    lifecycleUnconfirmedNote: "No lifecycle event has been received from Engine. This confirms the source signal only, not that an order is still active on MT4.",
     detailBoundary: "Lifecycle reflects the AXI ALLinCrypto Engine execution. It is separate from Kraken Copy execution.",
     yourPositionPlan: "Your position plan",
     planLoading: "Calculating your personal sizing plan…",
@@ -797,7 +786,6 @@ const LIVE_SIGNALS_COPY: Record<ProductLocale, LiveSignalsCopy> = {
     detailErrorDetail: "Lista pozostaje dostępna; spróbuj wybrać sygnał ponownie później.",
     detailLabel: "Szczegóły rekordu źródłowego",
     sourceEngine: "Silnik źródłowy",
-    lifecycleUnconfirmedNote: "Brak eventu lifecycle z Engine. Ten rekord potwierdza tylko wysłanie sygnału, a nie to, że zlecenie nadal istnieje na MT4.",
     detailBoundary: "Lifecycle pokazuje wykonanie w źródłowym ALLinCrypto Engine na AXI. Jest oddzielne od wykonania KRAKEN Copy.",
     yourPositionPlan: "Twój plan pozycji",
     planLoading: "Wyliczanie Twojego osobistego planu wielkości…",

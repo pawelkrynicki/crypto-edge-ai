@@ -154,8 +154,8 @@ describe("01D Live Signals UI", () => {
       assert.match(loaded, /SELL/);
       assert.match(loaded, /MARKET/);
       assert.match(loaded, /LIMIT/);
-      assert.match(loaded, /STATUS UNCONFIRMED/);
-      assert.match(loaded, /No lifecycle event has been received from Engine/);
+      assert.match(loaded, /SIGNAL/);
+      assert.doesNotMatch(loaded, /STATUS UNCONFIRMED|No lifecycle event has been received from Engine/);
       assert.match(loaded, /Source signal time/);
       assert.match(loaded, /Signal entry/);
       assert.match(loaded, /Stop loss/);

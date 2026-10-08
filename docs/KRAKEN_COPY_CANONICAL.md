@@ -19,14 +19,14 @@ Status: canonical. Use this file as the first reference in every new KRAKEN Copy
 - **4181 = temporary troubleshooting owner-review slot; retired and not canonical.**
 
 ## Current verified PREVIEW state — 2026-10-08
-- **RC14 PREVIEW is live on `127.0.0.1:4280`.**
+- **RC15 PREVIEW is live on `127.0.0.1:4280`.**
 - PREVIEW health = `ok`.
-- PREVIEW RC14 runtime build SHA = `e51610351c53ba6eab699185c67b86a165530f4a`.
-- RC14 Bridge is running and targets PREVIEW `4280`.
-- RC14 isolated lifecycle acceptance PASS on localhost `4281`: SIGNAL_CREATED, ORDER_FILLED, POSITION_CLOSED TP/SL, SIGNAL_EXPIRED, SIGNAL_CANCELLED, result R and reference equity 10,000 -> 10,098 all passed.
-- Isolated UI review runtime PASS.
-- A real stale-state mismatch was found on PREVIEW: a historical ETHUSD LIMIT signal remained shown as PENDING/OCZEKUJE although the canonical MT4 Engine had already removed the order. Root cause: the historical signal has no lifecycle terminal event.
+- PREVIEW RC15 runtime build SHA = `c7702f215e5f569ede643ffd5fb6b43bbbb30a83`.
+- RC15 Bridge is running and targets PREVIEW `4280`.
+- RC14 isolated lifecycle acceptance on localhost `4281` remains PASS: SIGNAL_CREATED, ORDER_FILLED, POSITION_CLOSED TP/SL, SIGNAL_EXPIRED, SIGNAL_CANCELLED, result R and reference equity 10,000 -> 10,098.
+- RC15 adds truthful stale-state presentation: source-only initial states with zero lifecycle events are shown as STATUS NIEPOTWIERDZONY / STATUS UNCONFIRMED instead of authoritative PENDING/ACTIVE.
 - PROD `4180` remained untouched and running.
+- Canonical VPS MT4 `CRYPTO ENGINE` remained untouched.
 
 ## What is proven / still blocked
 - **PROVEN:** genuine runtime Crypto Engine source signals reach Crypto Edge AI PREVIEW 4280.
@@ -47,17 +47,15 @@ Status: canonical. Use this file as the first reference in every new KRAKEN Copy
 - PROD promotion remains blocked until PREVIEW acceptance is complete and Paweł explicitly approves promotion.
 
 ## NEXT SINGLE STEP
-**Fix stale/unconfirmed lifecycle presentation on PREVIEW only. Historical/source-only PENDING or ACTIVE states with zero lifecycle events must not be shown as authoritative current MT4 status.**
+**Verify RC15 visually on PREVIEW 4280 against the real historical ETHUSD stale record.**
 
 Required next acceptance sequence:
 1. Keep PROD `4180` and canonical MT4 `CRYPTO ENGINE` untouched.
-2. Add lifecycle evidence metadata to the Live Signals read model.
-3. Show `STATUS NIEPOTWIERDZONY` / `STATUS UNCONFIRMED` when no Engine lifecycle event has been observed for an initial PENDING/ACTIVE source state.
-4. Explain in UI that the record confirms the source signal only, not that an MT4 order still exists.
-5. Preserve authoritative TP, SL, EXPIRED, CANCELLED and ACTIVE-after-fill lifecycle statuses.
-6. Run focused gateway + Live Signals + lifecycle tests and INTERNAL_BETA build.
-7. Package the fix as a new immutable PREVIEW candidate and deploy to `4280` only.
-8. Verify the real historical ETHUSD record no longer appears as confidently `OCZEKUJE`.
+2. Refresh PREVIEW `http://127.0.0.1:4280/#live-signals`.
+3. Confirm the historical ETHUSD LIMIT record with no lifecycle events shows `STATUS NIEPOTWIERDZONY`, not `OCZEKUJE`.
+4. Confirm the explanatory note says the record proves the source signal only, not that an MT4 order still exists.
+5. Confirm authoritative lifecycle records still render TP, SL, WYGASŁ, ANULOWANY and ACTIVE-after-fill correctly.
+6. Only after this UI acceptance choose the next PREVIEW-only development gate.
 
 ## Hard process rules
 - Never deploy new KRAKEN Copy work first to PROD. PREVIEW first, PROD only after PASS + explicit Paweł approval.
@@ -1000,3 +998,127 @@ Important: autostart configuration is functionally validated through the Schedul
 - Packaging safety gate PASS.
 - Deployment rule: PREVIEW 4280 only. PROD 4180 and canonical VPS MT4 CRYPTO ENGINE remain frozen.
 - After PREVIEW deployment, verify the real historical ETHUSD source signal shows STATUS NIEPOTWIERDZONY rather than OCZEKUJE and that authoritative lifecycle records still show TP/SL/EXPIRED/CANCELLED/ACTIVE correctly.
+
+
+## 2026-10-08 — PREVIEW release distribution via GitHub Releases
+- To eliminate manual Pablito -> VPS file copying, RC15 was published as a GitHub Release asset in the public repository pawelkrynicki/crypto-edge-ai.
+- Release tag: camp2026-vps-rc15.
+- Asset: crypto-edge-ai-CAMP2026-VPS-RC15-app.zip.
+- Asset SHA256: CF9A7FFBA93C63E66F004BDF877600036DB38F072E67E80E35B5678846E86420.
+- Future PREVIEW candidates should use the same pattern where practical: package locally, publish immutable release asset, download on VPS, verify SHA256, then deploy PREVIEW only.
+- PROD 4180 and canonical CRYPTO ENGINE remain frozen.
+
+
+## 2026-10-08 — RC15 VPS download PASS
+- RC15 PREVIEW package was downloaded directly from GitHub Releases to C:\CryptoEdge\incoming\crypto-edge-ai-CAMP2026-VPS-RC15-app.zip.
+- VPS SHA256 matched the canonical release hash CF9A7FFBA93C63E66F004BDF877600036DB38F072E67E80E35B5678846E86420.
+- Manual Pablito -> VPS copying is no longer required for this release.
+- Next step: deploy RC15 to PREVIEW 4280 only with rollback to RC14 on any failure. PROD 4180 and canonical CRYPTO ENGINE remain frozen.
+
+
+## 2026-10-08 — RC15 PREVIEW deploy attempt STOP before switch
+- RC15 package SHA256 check PASS.
+- PROD 4180 and PREVIEW 4280 pre-deploy health checks PASS.
+- RC15 extraction to C:\CryptoEdge\releases\CAMP2026-VPS-RC15 PASS.
+- Deployment STOPPED before any RC14 -> RC15 runtime switch because PowerShell execution policy blocked %APPDATA%\npm\pnpm.ps1 during dependency install.
+- Root cause is operator-shell command resolution, not RC15 application/runtime failure.
+- No PREVIEW process switch occurred; RC14 remains the active 4280 runtime.
+- PROD 4180 and canonical CRYPTO ENGINE remain untouched.
+- Fix: use pnpm.cmd explicitly (or cmd.exe /c pnpm) for VPS dependency install, then resume RC15 deployment from the extracted release without re-copying/re-downloading.
+
+
+## 2026-10-08 — RC15 PREVIEW deploy attempt STOP; rollback PASS
+- RC15 release files, dependency install via pnpm.cmd, launchers, wrappers and Scheduled Task registration all passed.
+- RC15 switch failed because the newly registered RC15 PREVIEW Scheduled Task was disabled when Start-ScheduledTask was called.
+- Windows returned HRESULT 0x80041326 / "task has been disabled".
+- Automatic rollback to RC14 succeeded.
+- PREVIEW 4280 rollback health = ok; build_sha=e51610351c53ba6eab699185c67b86a165530f4a.
+- PROD 4180 and canonical CRYPTO ENGINE remained untouched.
+- RC15 package/release remains valid. Next fix is deployment orchestration only: explicitly enable the RC15 PREVIEW and Bridge tasks after registration and before starting them.
+
+
+## 2026-10-08 — RC15 PREVIEW deploy PASS
+- RC15 PREVIEW deployment on canonical port 127.0.0.1:4280 PASS.
+- Runtime build_sha = c7702f215e5f569ede643ffd5fb6b43bbbb30a83.
+- RC15 Bridge task = Running; LastTaskResult 267009.
+- RC15 PREVIEW and Bridge tasks were explicitly enabled before start.
+- RC14 tasks were disabled after successful switch.
+- Safety state preserved: CRYPTO_EDGE_EXECUTION=0 and CRYPTO_EDGE_KRAKEN_LIVE_PILOT=0.
+- PROD 4180 integrity PASS and remained untouched.
+- Canonical VPS MT4 CRYPTO ENGINE remained untouched.
+- Next acceptance: refresh PREVIEW 4280 Live Signals and verify the historical ETHUSD source-only record now shows STATUS NIEPOTWIERDZONY instead of OCZEKUJE, while authoritative lifecycle states remain unchanged.
+
+
+## 2026-10-08 — RC15 stale lifecycle UI acceptance PASS
+- Visual acceptance on canonical PREVIEW 4280 PASS.
+- Historical ETHUSD SELL LIMIT record that previously appeared as OCZEKUJE now shows STATUS NIEPOTWIERDZONY.
+- UI explanation is visible: no Engine lifecycle event has been received; the record confirms only source-signal emission and does not prove that an MT4 order still exists.
+- This resolves the real stale-state mismatch observed against the canonical MT4 screen with zero open positions/orders.
+- PROD 4180 remains frozen and untouched.
+- Canonical VPS MT4 CRYPTO ENGINE remains frozen and untouched.
+- RC15 PREVIEW remains the active test surface.
+- Next gate: identify or create a strictly non-production MT4/runtime path for real Engine lifecycle acceptance before any lifecycle-capable Engine deployment to the canonical CRYPTO ENGINE.
+
+
+## 2026-10-08 — Historical ETHUSD cancellation reconciliation PASS
+- PREVIEW RC15 historical ETHUSD SELL LIMIT signal identified exactly as ACC1246441380-C-1791399600-SELL-LIMIT.
+- Historical cancellation event injected on PREVIEW only through the canonical RC15 Bridge outbox.
+- Canonical lifecycle event type: SIGNAL_CANCELLED.
+- Bridge root used: C:\Users\nazwa\AppData\Roaming\MetaQuotes\Terminal\Common\Files\CryptoEdge.
+- PREVIEW accepted the lifecycle event and resolved the signal status to CANCELLED.
+- Acceptance result: ETHUSD_STATUS=ANULOWANY; SIGNAL_CANCELLED=PASS.
+- PROD 4180 was not touched.
+- Canonical CRYPTO ENGINE was not touched.
+- Next check: refresh Live Signals on PREVIEW 4280 and visually confirm the ETHUSD record now shows ANULOWANY.
+
+
+## 2026-10-08 — Legacy log reconciliation PARTIAL, not final
+- PREVIEW log-based reconciliation processed 17 lifecycle events and skipped 10 unmatched records.
+- Current PREVIEW reference equity after the partial reconciliation is 9,467.46 USD, total R -5.44, closed trades 7, win rate 14.29%, max DD 5.3254%.
+- These equity figures are PROVISIONAL because reconciliation is incomplete.
+- A concrete unresolved case remains: setup B BTCUSD SELL MARKET at 83,814.50, SL 84,385.05, TP 82,673.39 was logged as opened with ticket 301285982, but PREVIEW still resolves it ACTIVE even though the owner-provided chart shows price subsequently below the TP level. This needs authoritative broker/terminal history verification before adding POSITION_CLOSED.
+- Do not treat 9,467.46 USD as final strategy equity until all recoverable historical events are reconciled or explicitly excluded.
+- UI requirement clarified by owner: remove STATUS NIEPOTWIERDZONY and explanatory lifecycle prose entirely. User-facing statuses should remain simple and factual: OCZEKUJE, AKTYWNY, TP, SL, ANULOWANY, WYGASŁ. For source-only records with no factual lifecycle status, do not invent a technical status.
+- PROD 4180 and canonical CRYPTO ENGINE remain untouched.
+
+
+## 2026-10-08 — Broker terminal confirms B BTCUSD TP
+- Read-only VPS terminal-log audit found ticket 301285982.
+- Order opened: SELL 0.16 BTCUSD at 83814.50, SL 84385.05, TP 82673.39.
+- Broker terminal log confirms: order #301285982 closed due take-profit at price 82637.05 on 2026-10-08 05:21:30.389 server/log time.
+- Therefore the matching B BTCUSD SELL MARKET source signal must resolve to CLOSED / TP, not ACTIVE.
+- Root cause of the partial reconciler miss: it parsed ALLinCrypto MQL log lines but did not consume the broker terminal log English closure line "closed due take-profit".
+- Next FIX: reconcile this ticket on PREVIEW using actual broker close price, then extend the reconciler to include terminal-log close events so future historical reconciliation is complete.
+- PROD 4180 and canonical CRYPTO ENGINE remain untouched.
+
+
+## 2026-10-08 — B BTCUSD TP reconciliation PASS
+- PREVIEW signal ACC1246441380-B-1791376200-SELL-MARKET was reconciled using broker terminal evidence.
+- Broker ticket: 301285982.
+- Entry: 83814.50; SL: 84385.05; configured TP: 82673.39.
+- Broker terminal close: take-profit at 82637.05.
+- PREVIEW lifecycle now resolves CLOSED / TP.
+- Result R = +2.06371.
+- Reference equity updated from 9,467.46 USD to 9,662.84 USD.
+- Total R updated to -3.37629; closed trades = 8.
+- This confirms the equity pipeline reacts correctly once authoritative lifecycle close data is present.
+- Remaining ACTIVE/source-only records still require reconciliation against broker terminal history. Current equity remains provisional until that audit is completed.
+- User-facing requirement remains: remove STATUS NIEPOTWIERDZONY and technical explanatory prose. Source-only records without factual execution evidence should be shown simply as SYGNAŁ; executed lifecycle statuses remain AKTYWNY / TP / SL / ANULOWANY / WYGASŁ.
+- PROD 4180 and canonical CRYPTO ENGINE remain untouched.
+
+
+## 2026-10-08 — Unresolved broker audit STOP before execution
+- Read-only unresolved-signal broker audit did not execute because PowerShell parser rejected the regex string containing $symbol: as an invalid variable reference.
+- This was a script syntax issue only. No PREVIEW data, PROD data or CRYPTO ENGINE state was changed.
+- Fix: delimit the interpolated variable as ${symbol} before the literal colon in the regex.
+
+
+## 2026-10-08 — Unresolved broker audit result
+- Read-only audit found 12 currently ACTIVE/PENDING records on PREVIEW.
+- 3 are synthetic PREVIEW_SMOKE_4280 records and are not real trades.
+- 8 real records are SOURCE_SIGNAL_ONLY: no matching MT4 order ticket was found. These are source signals emitted before/without broker execution and must not be treated as open trades or included in reference equity.
+- 1 real executed trade remains to reconcile: setup E ETHUSD BUY MARKET, source entry 2745.885, broker ticket 300745776, broker close classified SL at 2669.43.
+- This explains why the previous UI presentation was misleading: source-signal emission and broker execution are distinct.
+- Product presentation requirement: source-only records should display simply SYGNAŁ / SIGNAL, with no technical warning prose. Executed records use factual lifecycle labels only: OCZEKUJE, AKTYWNY, TP, SL, ANULOWANY, WYGASŁ.
+- Reference equity must include only broker-executed CLOSED trades.
+- PROD 4180 and canonical CRYPTO ENGINE remain untouched.

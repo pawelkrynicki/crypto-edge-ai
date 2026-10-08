@@ -10086,7 +10086,6 @@ summary {
 .live-signal-setup-id { color: var(--color-accent-strong); font-size: 10px; font-weight: 740; letter-spacing: 0.04em; overflow-wrap: anywhere; }
 .live-signal-card h4 { margin-top: 3px; font-size: 17px; font-weight: 740; letter-spacing: -0.02em; }
 .live-signal-card-header p { margin-top: 3px; color: var(--color-text-secondary); font-size: 12px; }
-.live-signal-lifecycle-note { margin: var(--space-3) 0 0; padding: 8px 10px; border: 1px solid var(--color-border-default); border-radius: var(--radius-sm); color: var(--color-text-secondary); font-size: 11px; line-height: 1.45; }
 .live-signal-badges { display: flex; flex: 0 0 auto; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
 
 .live-signal-facts,
