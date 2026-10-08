@@ -1158,3 +1158,21 @@ Important: autostart configuration is functionally validated through the Schedul
 - Validation: Live Signals UI 7/7 PASS, Product refresh flow 8/8 PASS, AXI gateway 10/10 PASS, lifecycle/equity 11/11 PASS, INTERNAL_BETA build PASS.
 - PROD 4180 and canonical CRYPTO ENGINE were not modified.
 - Next: package immutable PREVIEW candidate, publish via GitHub Releases, deploy to 4280 only and visually verify auto-refresh behavior.
+
+
+## 2026-10-08 — RC17 PREVIEW package ready PASS
+- Release id: CAMP2026-VPS-RC17.
+- Source commit: 6e627c1b019c30fd0ac3abc48a3fe92ebf5541d4.
+- Purpose: automatic data refresh and immediate Live Signals visibility, plus simplified source-only status.
+- Product-wide snapshot refresh cadence: 15 minutes.
+- Live Signals + reference equity background poll: 2 seconds.
+- Window focus triggers immediate Live Signals refresh.
+- Selected signal lifecycle detail refreshes with the live poll.
+- Source-only records with no factual execution lifecycle render as SYGNAŁ / SIGNAL, with no STATUS NIEPOTWIERDZONY and no technical explanatory paragraph.
+- Validation: Live Signals 7/7 PASS; Product refresh flow 8/8 PASS; AXI gateway 10/10 PASS; lifecycle/equity 11/11 PASS; INTERNAL_BETA build PASS.
+- Archive: crypto-edge-ai-CAMP2026-VPS-RC17-app.zip.
+- Archive size: 2,372,875 bytes.
+- SHA256: 818A933636D0ECEF9598F77265BB6C66B4FDB074F737DF96C8CEFB21872A8919.
+- Packaging safety gate PASS.
+- GitHub Release published under tag camp2026-vps-rc17.
+- Deployment rule: PREVIEW 4280 only. PROD 4180 and canonical CRYPTO ENGINE remain frozen.
