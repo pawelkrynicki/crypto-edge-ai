@@ -1122,3 +1122,22 @@ Important: autostart configuration is functionally validated through the Schedul
 - Product presentation requirement: source-only records should display simply SYGNAŁ / SIGNAL, with no technical warning prose. Executed records use factual lifecycle labels only: OCZEKUJE, AKTYWNY, TP, SL, ANULOWANY, WYGASŁ.
 - Reference equity must include only broker-executed CLOSED trades.
 - PROD 4180 and canonical CRYPTO ENGINE remain untouched.
+
+
+## 2026-10-08 — E ETHUSD reconciliation STOP before mutation
+- Attempted reconciliation of setup E ETHUSD BUY MARKET, signal ACC1246441380-E-1790992600-BUY-MARKET, broker ticket 300745776.
+- Script stopped before writing any lifecycle event because a strict MQL open-line lookup returned 0 matches.
+- This is a reconciliation-script lookup issue only. Earlier read-only broker audit already identified ticket 300745776 and broker SL close at 2669.43.
+- No PREVIEW lifecycle mutation occurred in this attempt. PROD 4180 and canonical CRYPTO ENGINE remained untouched.
+- Next fix: resolve open/close timestamps directly from broker terminal logs by ticket, and reuse existing filled_at when already present instead of requiring a Polish MQL 'otwarto' line.
+
+
+## 2026-10-08 — E ETHUSD SL reconciliation PASS
+- PREVIEW signal ACC1246441380-E-1790992600-BUY-MARKET reconciled from broker ticket 300745776.
+- Broker evidence: BUY 1.31 ETHUSD opened at 2745.850; broker closed due stop-loss at 2669.430.
+- PREVIEW lifecycle now resolves CLOSED / SL.
+- Result R = -1.002151.
+- Reference equity updated to 9,566.01 USD.
+- Total R = -4.378441; closed trades = 9; win rate = 22.22%; max DD = 6.2741%.
+- This is the last broker-executed unresolved trade found by the current audit. Remaining unresolved real records are source-signal-only with no matching MT4 ticket and must not be treated as open trades or included in reference equity.
+- PROD 4180 and canonical CRYPTO ENGINE remained untouched.
