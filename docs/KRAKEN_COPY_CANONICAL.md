@@ -1068,7 +1068,7 @@ Important: autostart configuration is functionally validated through the Schedul
 - PREVIEW RC15 historical ETHUSD SELL LIMIT signal identified exactly as ACC1246441380-C-1791399600-SELL-LIMIT.
 - Historical cancellation event injected on PREVIEW only through the canonical RC15 Bridge outbox.
 - Canonical lifecycle event type: SIGNAL_CANCELLED.
-- Bridge root used: C:\Users\nazwa\AppData\Roaming\MetaQuotes\Terminal\Common\Files\CryptoEdge.
+- Bridge root used: MetaTrader COMMON\Files\CryptoEdge.
 - PREVIEW accepted the lifecycle event and resolved the signal status to CANCELLED.
 - Acceptance result: ETHUSD_STATUS=ANULOWANY; SIGNAL_CANCELLED=PASS.
 - PROD 4180 was not touched.
