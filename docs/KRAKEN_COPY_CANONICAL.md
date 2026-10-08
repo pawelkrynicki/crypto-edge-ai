@@ -1176,3 +1176,31 @@ Important: autostart configuration is functionally validated through the Schedul
 - Packaging safety gate PASS.
 - GitHub Release published under tag camp2026-vps-rc17.
 - Deployment rule: PREVIEW 4280 only. PROD 4180 and canonical CRYPTO ENGINE remain frozen.
+
+
+## 2026-10-08 — RC17 PREVIEW deployment PASS
+- RC17 PREVIEW deployed successfully on canonical port 127.0.0.1:4280.
+- Runtime build_sha = 6e627c1b019c30fd0ac3abc48a3fe92ebf5541d4.
+- RC17 Bridge task is Running; LastTaskResult 267009.
+- Automatic full product snapshot refresh is enabled every 15 minutes.
+- Live Signals and reference equity refresh in the background every 2 seconds.
+- Source-only records render as SYGNAŁ / SIGNAL instead of STATUS NIEPOTWIERDZONY.
+- Safety preserved: CRYPTO_EDGE_EXECUTION=0 and CRYPTO_EDGE_KRAKEN_LIVE_PILOT=0.
+- PROD 4180 integrity PASS and remained untouched.
+- Canonical VPS MT4 CRYPTO ENGINE remained untouched.
+- RC15 tasks were superseded after successful RC17 switch.
+- Next acceptance: reload the browser once to load the RC17 frontend bundle, then verify that source-only records show SYGNAŁ with no technical warning text and that Live Signals/equity update without F5.
+
+
+## 2026-10-08 — PREVIEW MT4 lifecycle log reconciler local PASS
+- Added a PREVIEW compatibility sidecar that reads the canonical MT4 Engine/broker logs read-only and emits canonical lifecycle JSON into the existing CryptoEdge COMMON outbox.
+- It does not change Engine setup/trading logic and never places or modifies broker/Kraken orders.
+- Poll cadence = 1 second.
+- MARKET source-only signal remains SYGNAŁ until a real MT4 ticket/open event exists; then reconciler emits ORDER_FILLED so UI becomes AKTYWNY.
+- Broker terminal take-profit / stop-loss closures emit POSITION_CLOSED with actual broker close price and TP/SL reason.
+- LIMIT removal from Engine logs emits SIGNAL_CANCELLED or SIGNAL_EXPIRED.
+- Existing lifecycle event_ids are discovered across outbox/sent/rejected and not re-emitted, so manual historical reconciliation remains idempotent.
+- Focused reconciler tests 5/5 PASS using real observed Engine/broker log shapes. Existing Bridge 6/6 PASS. Live Signals 7/7 PASS. INTERNAL_BETA build PASS.
+- Combined expected live latency on PREVIEW: reconciler ~1s + Bridge ~1s + UI poll <=2s, normally a few seconds from MT4 event to visible Live Signals update.
+- This sidecar is temporary PREVIEW compatibility while canonical CRYPTO ENGINE remains frozen. Final production architecture still prefers native lifecycle emission from the verified Engine 1.10 lifecycle build after separate owner approval.
+- PROD 4180 and canonical CRYPTO ENGINE were not modified.
