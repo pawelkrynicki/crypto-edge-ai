@@ -253,9 +253,11 @@ function preserveLastKnownGoodView(view: ProductViewModel): ProductViewModel {
 export function ProductAppContent({
   dataSources = DEFAULT_PRODUCT_APP_DATA_SOURCES,
   runtimeModeOverride,
+  snapshotRefreshIntervalMs = PRODUCT_SNAPSHOT_AUTO_REFRESH_MS,
 }: {
   dataSources?: ProductAppDataSources;
   runtimeModeOverride?: ReturnType<typeof getProductRuntimeMode>;
+  snapshotRefreshIntervalMs?: number;
 } = {}) {
   const { t } = useProductLocale();
   const runtimeMode = runtimeModeOverride ?? getProductRuntimeMode();
@@ -265,6 +267,7 @@ export function ProductAppContent({
   const [activeSection, setActiveSection] = useState<ProductSectionId>(() => resolveSection());
   const [productView, setProductView] = useState<ProductViewModel>(() => createEmptyProductViewModel());
   const [loading, setLoading] = useState(true);
+  const [lastSignalsReadAt, setLastSignalsReadAt] = useState<string | null>(null);
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
   const [routeTokenIdentity, setRouteTokenIdentity] = useState<RouteTokenIdentity | null>(() => resolveRouteTokenIdentity());
   const [activeDetailTab, setActiveDetailTab] = useState<CandidateDetailTabId>(() => resolveDetailTab());
@@ -608,11 +611,12 @@ export function ProductAppContent({
   }, [loadData, loadVersionPointer]);
 
   useEffect(() => {
+    if (!Number.isFinite(snapshotRefreshIntervalMs) || snapshotRefreshIntervalMs <= 0) return undefined;
     const timer = globalThis.setInterval(() => {
       void refreshView();
-    }, PRODUCT_SNAPSHOT_AUTO_REFRESH_MS);
+    }, snapshotRefreshIntervalMs);
     return () => globalThis.clearInterval(timer);
-  }, [refreshView]);
+  }, [refreshView, snapshotRefreshIntervalMs]);
 
   useEffect(() => {
     if (activeSection !== "candidate-detail" && activeSection !== "external-checks" && routeTokenIdentity === null) return;
@@ -1011,6 +1015,7 @@ export function ProductAppContent({
             loadSignals={dataSources.loadAxiSignals}
             loadSignalDetail={dataSources.loadAxiSignalDetail}
             loadEquityPlan={dataSources.loadSignalEquityPlan}
+            onLastRefreshed={setLastSignalsReadAt}
           />
         </ProductWorkspaceSection>
       );
@@ -1060,6 +1065,7 @@ export function ProductAppContent({
         resolvedSource={resolvedSource}
         runId={runId}
         generatedAt={workspaceGeneratedAt}
+        lastSignalsReadAt={lastSignalsReadAt}
         ageSeconds={ageSeconds}
         freshnessStatus={freshnessStatus}
         viewRefreshedAt={viewRefreshedAt}

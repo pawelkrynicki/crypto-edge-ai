@@ -34,6 +34,54 @@ describe("ProductApp Refresh View last-known-good flow", () => {
     assert.equal(PRODUCT_SNAPSHOT_AUTO_REFRESH_MS, 15 * 60 * 1_000);
   });
 
+  it("automatically replaces the snapshot on schedule and preserves the selected token route", async () => {
+    const first = readyResult(scannerOutput("auto_scan_1", "FIRST", "2026-10-09T12:00:00.000Z"));
+    const next = readyResult(scannerOutput("auto_scan_2", "NEXT", "2026-10-09T12:15:00.000Z"));
+    let scannerReads = 0;
+    const dataSources = createDataSources(async () => {
+      scannerReads += 1;
+      return scannerReads === 1 ? first : next;
+    });
+    const browser = installBrowser(`http://127.0.0.1:5173/?chain=base&contract=${CONTRACT}&detail=market#candidate-detail`);
+    const originalFetch = globalThis.fetch;
+    const originalActEnvironment = globalThis.IS_REACT_ACT_ENVIRONMENT;
+    globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+    globalThis.fetch = (async () => new Response("{}", { status: 404 })) as typeof fetch;
+    let renderer: ReturnType<typeof create> | undefined;
+    try {
+      await act(async () => {
+        renderer = create(
+          <ProductLocaleProvider initialLocale="pl">
+            <ProductAppContent
+              dataSources={dataSources}
+              runtimeModeOverride="INTERNAL_BETA"
+              snapshotRefreshIntervalMs={20}
+            />
+          </ProductLocaleProvider>,
+        );
+        await flushPromises();
+      });
+      const shell = () => renderer!.root.findByType(ProductWorkspaceShell);
+      const detail = () => renderer!.root.findByType(CandidateDetailView);
+      assert.equal(detail().props.activeTab, "market");
+
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 75));
+        await flushPromises();
+      });
+      assert.ok(scannerReads >= 2, "automatic interval should fetch the new snapshot without a click");
+      assert.equal(shell().props.runId, "auto_scan_2");
+      assert.equal(detail().props.candidate.symbol, "NEXT");
+      assert.equal(detail().props.activeTab, "market");
+      assert.equal(shell().props.activeSection, "candidate-detail");
+    } finally {
+      if (renderer) await act(async () => { renderer!.unmount(); });
+      browser.restore();
+      globalThis.fetch = originalFetch;
+      globalThis.IS_REACT_ACT_ENVIRONMENT = originalActEnvironment;
+    }
+  });
+
   it("keeps the complete accepted view through a failed refresh and replaces it on the next success", async () => {
     const first = readyResult(scannerOutput("scan_refresh_1", "FIRST", "2026-07-30T12:00:00.000Z"));
     const next = readyResult(scannerOutput("scan_refresh_2", "NEXT", "2026-07-30T12:05:00.000Z"));

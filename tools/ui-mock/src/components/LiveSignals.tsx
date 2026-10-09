@@ -54,6 +54,7 @@ type LiveSignalsProps = {
   loadEquityPlan?: typeof loadSignalEquityPlan;
   loadReferenceEquity?: typeof loadAxiReferenceEquityCurve;
   pollIntervalMs?: number;
+  onLastRefreshed?: (iso: string) => void;
 };
 
 /** Read-only presentation for records accepted by the AXI signal gateway. */
@@ -63,6 +64,7 @@ export function LiveSignals({
   loadEquityPlan = loadSignalEquityPlan,
   loadReferenceEquity = loadAxiReferenceEquityCurve,
   pollIntervalMs = LIVE_SIGNALS_POLL_INTERVAL_MS,
+  onLastRefreshed,
 }: LiveSignalsProps) {
   const { locale } = useProductLocale();
   const copy = LIVE_SIGNALS_COPY[locale];
@@ -107,7 +109,12 @@ export function LiveSignals({
     if (selectedSignalId && detailResult.status === "fulfilled" && detailResult.value) {
       setDetail({ kind: "ready", record: detailResult.value });
     }
-  }, [loadReferenceEquity, loadSignalDetail, loadSignals]);
+
+    // This is the time of a successful read, not the timestamp of a new Engine event.
+    if (signalsResult.status === "fulfilled" && equityResult.status === "fulfilled") {
+      onLastRefreshed?.(new Date().toISOString());
+    }
+  }, [loadReferenceEquity, loadSignalDetail, loadSignals, onLastRefreshed]);
 
   const reload = useCallback(async () => {
     await refreshLiveData(true);

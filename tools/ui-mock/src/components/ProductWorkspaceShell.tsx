@@ -44,6 +44,7 @@ type ProductWorkspaceShellProps = {
   resolvedSource: ResolvedScannerSource;
   runId: string | null;
   generatedAt: string | null;
+  lastSignalsReadAt?: string | null;
   ageSeconds: number | null;
   freshnessStatus: "FRESH" | "STALE" | null;
   viewRefreshedAt: string | null;
@@ -74,6 +75,7 @@ export function ProductWorkspaceShell({
   loading,
   resolvedSource,
   generatedAt,
+  lastSignalsReadAt = null,
   freshnessStatus,
   sourceHealth,
   dataUnavailableMessage,
@@ -85,6 +87,16 @@ export function ProductWorkspaceShell({
   const { locale, setLocale, t } = useProductLocale();
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const activeNavItem = navItems.find((item) => item.id === activeSection);
+  const showsSignalsRead = activeSection === "live-signals";
+  const displayedTimestamp = showsSignalsRead ? lastSignalsReadAt : generatedAt;
+  const timestampLabel = showsSignalsRead
+    ? (locale === "pl" ? "Ostatni odczyt sygnałów" : "Last signals check")
+    : t("app.generated");
+  const timestampHelp = showsSignalsRead
+    ? (locale === "pl"
+      ? "Czas ostatniego udanego pobrania sygnałów i wyniku strategii."
+      : "Time of the last successful signals and strategy equity read.")
+    : t("app.generatedHelp");
   const clientDataAlert = resolveClientDataAlert({
     resolvedSource,
     freshnessStatus,
@@ -114,9 +126,9 @@ export function ProductWorkspaceShell({
           </div>
         </div>
 
-        <div className="product-header-update" aria-label={`${t("app.generated")}. ${t("app.generatedHelp")}`} title={t("app.generatedHelp")}>
-          <span>{t("app.generated")}</span>
-          <strong>{generatedAt ? formatProductDateTime(generatedAt, locale) : t("app.noData")}</strong>
+        <div className="product-header-update" aria-label={`${timestampLabel}. ${timestampHelp}`} title={timestampHelp}>
+          <span>{timestampLabel}</span>
+          <strong>{displayedTimestamp ? formatProductDateTime(displayedTimestamp, locale) : t("app.noData")}</strong>
         </div>
 
         <div className="product-header-actions">

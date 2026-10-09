@@ -30,26 +30,48 @@ describe("01D Live Signals UI", () => {
     assert.equal(LIVE_SIGNALS_POLL_INTERVAL_MS, 2_000);
   });
 
-  it("background polling refreshes signals and reference equity without a manual page refresh", async () => {
+  it("background polling renders a newly received signal and changed equity without F5", async () => {
     let signalReads = 0;
     let equityReads = 0;
+    const reportedReads: string[] = [];
     const renderer = await renderLive({
       pollIntervalMs: 10,
       loadSignals: async () => {
         signalReads += 1;
-        return [marketSignal()];
+        return signalReads === 1 ? [marketSignal()] : [marketSignal(), limitSignal()];
       },
       loadReferenceEquity: async () => {
         equityReads += 1;
-        return referenceEquity();
+        return equityReads === 1
+          ? referenceEquity()
+          : { ...referenceEquity(), ending_equity_usd: 11_000, net_pnl_usd: 1_000 };
       },
+      onLastRefreshed: (timestamp) => { reportedReads.push(timestamp); },
     });
     try {
       await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 35));
+        await new Promise((resolve) => setTimeout(resolve, 50));
       });
+      const updated = markup(renderer);
       assert.ok(signalReads >= 2, "signal feed should refresh in the background");
       assert.ok(equityReads >= 2, "reference equity should refresh in the background");
+      assert.match(updated, /ETHUSD/, "new signal should appear without navigation or F5");
+      assert.match(updated, /11,000/, "equity should update without F5");
+      assert.ok(reportedReads.length >= 2, "successful reads must be timestamped");
+    } finally {
+      await act(async () => { renderer.unmount(); });
+    }
+  });
+
+  it("does not claim a successful combined read if equity fails", async () => {
+    const reportedReads: string[] = [];
+    const renderer = await renderLive({
+      loadSignals: async () => [marketSignal()],
+      loadReferenceEquity: async () => { throw new Error("equity unavailable"); },
+      onLastRefreshed: (timestamp) => { reportedReads.push(timestamp); },
+    });
+    try {
+      assert.equal(reportedReads.length, 0);
     } finally {
       await act(async () => { renderer.unmount(); });
     }
@@ -81,6 +103,7 @@ describe("01D Live Signals UI", () => {
           resolvedSource="unavailable"
           runId={null}
           generatedAt={null}
+          lastSignalsReadAt="2026-10-09T20:00:00.000Z"
           ageSeconds={null}
           freshnessStatus={null}
           viewRefreshedAt={null}
@@ -92,6 +115,9 @@ describe("01D Live Signals UI", () => {
       </ProductLocaleProvider>,
     );
     assert.match(markup, /<section class="workspace-nav-group" aria-label="Trading">[\s\S]*?Live Signals/);
+    assert.match(markup, /Last signals check/);
+    assert.match(markup, /Last signals check<\/span><strong>[^<]+<\/strong>/);
+    assert.doesNotMatch(markup, /Last data update|<strong>No data<\/strong>/);
   });
 
   it("uses authenticated same-origin list and detail endpoints and validates source responses", async () => {
@@ -278,6 +304,7 @@ async function renderLive({
   loadEquityPlan,
   loadReferenceEquity = async () => referenceEquity(),
   pollIntervalMs = 0,
+  onLastRefreshed,
 }: {
   locale?: "en" | "pl";
   loadSignals: (limit?: number) => Promise<AxiSignalRecord[]>;
@@ -285,6 +312,7 @@ async function renderLive({
   loadEquityPlan?: (signalId: string) => Promise<SignalEquityPlanResponse>;
   loadReferenceEquity?: () => Promise<AxiReferenceEquityCurve>;
   pollIntervalMs?: number;
+  onLastRefreshed?: (iso: string) => void;
 }): Promise<TestRenderer.ReactTestRenderer> {
   let renderer: TestRenderer.ReactTestRenderer | undefined;
   await act(async () => {
@@ -296,6 +324,7 @@ async function renderLive({
           loadEquityPlan={loadEquityPlan}
           loadReferenceEquity={loadReferenceEquity}
           pollIntervalMs={pollIntervalMs}
+          onLastRefreshed={onLastRefreshed}
         />
       </ProductLocaleProvider>,
     );

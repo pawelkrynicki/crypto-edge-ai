@@ -18,17 +18,16 @@ Status: canonical. Use this file as the first reference in every new KRAKEN Copy
 - **4173 = BSS / bet-smart-system preview**. Never use for Crypto Edge.
 - **4181 = temporary troubleshooting owner-review slot; retired and not canonical.**
 
-## Current verified PREVIEW state — 2026-10-08
-- **RC15 PREVIEW is live on `127.0.0.1:4280`.**
-- PREVIEW health = `ok`.
-- PREVIEW RC15 runtime build SHA = `c7702f215e5f569ede643ffd5fb6b43bbbb30a83`.
-- RC15 Bridge is running and targets PREVIEW `4280`.
-- Historical executed trades were reconciled against MT4/broker logs on PREVIEW only. Current reference equity is 9,566.01 USD from 9 CLOSED broker-executed trades; source-only records with no MT4 ticket are excluded from equity.
-- B BTCUSD ticket 301285982 is CLOSED / TP / +2.06371R. E ETHUSD ticket 300745776 is CLOSED / SL / -1.002151R.
-- Source-only records with no broker ticket must not be presented as active trades. Next candidate simplifies them to SYGNAŁ / SIGNAL.
-- Local next-candidate refresh behavior is implemented and validated: full product snapshot every 15 minutes; Live Signals feed + reference equity poll every 2 seconds and refresh immediately on window focus.
-- PROD `4180` remained untouched and running.
-- Canonical VPS MT4 `CRYPTO ENGINE` remained untouched.
+## Current verified PREVIEW state — 2026-10-09
+- **RC18 PREVIEW is live on `127.0.0.1:4280`.**
+- PREVIEW RC18 runtime build SHA = `5e99ced588706ebafb255da93c008d2c2801b4d8`.
+- RC18 Bridge and RC18 lifecycle log reconciler tasks are running; both target PREVIEW 4280 via the canonical COMMON outbox.
+- RC18 UI displays source-only entries simply as `SYGNAŁ`, with no technical warning prose. User visual acceptance on 2026-10-09 PASS.
+- UI polling: Live Signals + reference equity every 2 seconds, full product data check every 15 minutes. Actual end-to-end updates without F5 remain pending observed VPS acceptance.
+- Last owner-observed PREVIEW reference equity was 9,566.01 USD from 9 CLOSED historical broker-executed trades. This is not Kraken account equity.
+- New local candidate changes the global Live Signals header to `Ostatni odczyt sygnałów` with a timestamp of the last successful combined signals/equity read. It does not claim a new Engine event.
+- PROD `4180` remains frozen.
+- Canonical VPS MT4 `CRYPTO ENGINE` remains frozen.
 
 ## What is proven / still blocked
 - **PROVEN:** genuine runtime Crypto Engine source signals reach Crypto Edge AI PREVIEW 4280.
@@ -49,17 +48,15 @@ Status: canonical. Use this file as the first reference in every new KRAKEN Copy
 - PROD promotion remains blocked until PREVIEW acceptance is complete and Paweł explicitly approves promotion.
 
 ## NEXT SINGLE STEP
-**Package and deploy the refresh/status candidate to PREVIEW 4280 only.**
+**Package and deploy the last-read timestamp fix to PREVIEW 4280 only, then complete real runtime acceptance.**
 
-Required next acceptance sequence:
+Required acceptance sequence:
 1. Keep PROD `4180` and canonical MT4 `CRYPTO ENGINE` untouched.
-2. Package a new immutable PREVIEW candidate containing: SYGNAŁ / SIGNAL for source-only records, no technical warning prose, 15-minute product snapshot refresh, and 2-second Live Signals + equity background refresh.
-3. Publish the archive through GitHub Releases and download it directly on the VPS with SHA256 verification.
-4. Deploy only to PREVIEW `4280` with rollback to RC15 on failure.
-5. Verify a new MARKET source signal appears on Live Signals within a few seconds without F5.
-6. Verify TP/SL/equity changes appear automatically without F5.
-7. Verify the rest of Crypto Edge AI refreshes automatically on the 15-minute snapshot cadence.
-8. PROD promotion remains blocked.
+2. Package immutable new product-only candidate with the `Ostatni odczyt sygnałów` header and verified periodic refresh tests.
+3. Deploy just the PREVIEW product, leaving the healthy RC18 Bridge and lifecycle log reconciler tasks running.
+4. Check PREVIEW build SHA, timestamp visibly advances every ~2 seconds without F5, and product data refresh runs after 15 minutes without route loss.
+5. Verify genuine SIGNAL_CREATED MARKET and later broker TP/SL update via RC18 Bridge/reconciler and UI without F5 when real events occur. Do not inject invented broker execution or synthetic signals into canonical PREVIEW.
+6. Record PASS/FIX/STOP with screenshots and safety checks. No PROD promotion.
 
 ## Hard process rules
 - Never deploy new KRAKEN Copy work first to PROD. PREVIEW first, PROD only after PASS + explicit Paweł approval.
@@ -1204,3 +1201,54 @@ Important: autostart configuration is functionally validated through the Schedul
 - Combined expected live latency on PREVIEW: reconciler ~1s + Bridge ~1s + UI poll <=2s, normally a few seconds from MT4 event to visible Live Signals update.
 - This sidecar is temporary PREVIEW compatibility while canonical CRYPTO ENGINE remains frozen. Final production architecture still prefers native lifecycle emission from the verified Engine 1.10 lifecycle build after separate owner approval.
 - PROD 4180 and canonical CRYPTO ENGINE were not modified.
+
+
+## 2026-10-08 — RC18 PREVIEW package ready PASS
+- Release id: CAMP2026-VPS-RC18.
+- Source commit: 5e99ced588706ebafb255da93c008d2c2801b4d8.
+- Adds PREVIEW-only MT4 lifecycle log reconciler sidecar on top of RC17 refresh behavior.
+- Reconciler reads the canonical MT4 terminal/MQL logs read-only, maps Engine source signals to actual MT4 tickets, emits ORDER_FILLED / POSITION_CLOSED / SIGNAL_CANCELLED / SIGNAL_EXPIRED into the existing COMMON CryptoEdge outbox and relies on the existing Bridge for API delivery.
+- Reconciler poll cadence: 1 second. Bridge poll: 1 second. Live Signals/equity UI poll: 2 seconds.
+- Focused validation: reconciler 5/5 PASS; Bridge 6/6 PASS; Live Signals 7/7 PASS; INTERNAL_BETA build PASS.
+- Archive size: 2,382,559 bytes.
+- SHA256: B11CD5F351E3C57AE96BA98C662CFBD620D05335CF8C0D0D91AD3EA1990CB1C0.
+- Packaging safety gate PASS.
+- GitHub Release tag: camp2026-vps-rc18.
+- Deployment rule: PREVIEW 4280 only. PROD 4180 and canonical CRYPTO ENGINE remain frozen.
+
+
+## 2026-10-08 — RC18 PREVIEW deployment PASS
+- RC18 PREVIEW is live on canonical port 127.0.0.1:4280.
+- Runtime build_sha = 5e99ced588706ebafb255da93c008d2c2801b4d8.
+- RC18 Bridge task = Running; LastTaskResult 267009.
+- RC18 Lifecycle Reconciler task = Running; LastTaskResult 267009.
+- Reconciler poll cadence = 1 second.
+- Live Signals + reference equity UI poll cadence = 2 seconds.
+- Full Crypto Edge AI product snapshot refresh cadence = 15 minutes.
+- Safety state preserved: CRYPTO_EDGE_EXECUTION=0 and CRYPTO_EDGE_KRAKEN_LIVE_PILOT=0.
+- PROD 4180 integrity PASS and remained untouched.
+- Canonical VPS MT4 CRYPTO ENGINE remained untouched.
+- Next acceptance: browser reload once to load RC18 frontend, then verify source-only records show SYGNAŁ with no technical warning prose and confirm subsequent genuine MARKET / TP / SL changes appear automatically without F5.
+
+
+## 2026-10-09 — RC18 visual UI acceptance partial PASS
+- PREVIEW 4280 browser loaded the RC18 frontend successfully.
+- Source-only ETHUSD record now renders the simple user-facing status SYGNAŁ, with no STATUS NIEPOTWIERDZONY and no technical warning paragraph.
+- Previously reconciled BTCUSD detail renders factual TP.
+- Reference equity panel renders the reconciled values: current 9,566.01 USD, net -433.99 USD, total R -4.378441R, win rate 22.22%, max DD 6.2741%, 9 closed trades.
+- UI counts currently show 22 loaded signals: 15 BUY, 7 SELL, 18 MARKET, 4 LIMIT.
+- This visually confirms the RC18 status simplification.
+- Automatic 2-second Live Signals/equity refresh and 15-minute product snapshot refresh are not yet visually proven by this single post-reload screenshot. They require an observed change while the page remains open without F5.
+- Header still shows OSTATNIA AKTUALIZACJA DANYCH = Brak on this Live Signals screen. Consider wiring a visible Live Signals last-refresh timestamp so the user can see that the background poll is alive.
+- PROD 4180 and canonical CRYPTO ENGINE remain untouched.
+
+
+## 2026-10-10 — Live Signals last-read clock + polling acceptance local PASS
+- Owner asked to close the current refresh milestone before collecting further UX bugs.
+- On Live Signals, the global header now shows "Ostatni odczyt sygnałów" / "Last signals check" and the timestamp of the last successful combined Live Signals list + reference equity read.
+- The header no longer shows "OSTATNIA AKTUALIZACJA DANYCH: Brak" on a healthy Live Signals view.
+- This timestamp refers to a data fetch, NOT to a new Engine signal or broker order.
+- Polling remains every 2 seconds for Live Signals/equity; ProductApp continues full product data refresh every 15 minutes.
+- Added functional tests proving a newly returned signal and changed reference equity render without F5, a failed equity read does not claim successful read time, and a shortened 15-minute-equivalent product refresh updates the scanner snapshot while preserving the selected token route.
+- Validation: Live Signals 8/8 PASS, product refresh suite 29/29 PASS, gateway 10/10 PASS, reconciler 5/5 PASS, INTERNAL_BETA build PASS.
+- Status: LOCAL PASS. Next: release package and PREVIEW product-only deployment with real VPS acceptance; PROD 4180 and canonical CRYPTO ENGINE remain frozen.
